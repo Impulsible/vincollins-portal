@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Profile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  fullName        String
+  role            Role      @default(STUDENT)
+  studentClass    String?
+  studentCategory Category?
+  accessCode      String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  exams         Exam[]
+  submissions   Submission[]
+  notifications Notification[]
+  theoryGrades  TheoryAnswer[]
+  accessCodes   AccessCode[] // ← ADD THIS LINE - opposite relation for usedByUser
+
+  @@map("profiles")
+}
+
+model Exam {
+  id                 String     @id @default(cuid())
+  title              String
+  subject            String
+  category           Category
+  class              String
+  duration           Int // in minutes
+  totalQuestions     Int        @default(0)
+  passingScore       Int        @default(50)
+  instructions       String?
+  status             ExamStatus @default(DRAFT)
+  requiresAccessCode Boolean    @default(false)
+  createdBy          String
+  publishedAt        DateTime?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+
+  createdByProfile Profile      @relation(fields: [createdBy], references: [id])
+  questions        Question[]
+  submissions      Submission[]
+  accessCodes      AccessCode[]
+
+  @@map("exams")
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  examId        String
+  questionText  String
+  questionType  QuestionType @default(OBJECTIVE)
+  optionA       String?
+  optionB       String?
+  optionC       String?
+  optionD       String?
+  correctAnswer String?
+  points        Int          @default(1)
+  orderIndex    Int          @default(0)
+  createdAt     DateTime     @default(now())
+
+  exam          Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  theoryAnswers TheoryAnswer[]
+
+  @@map("questions")
+}
+
+model Submission {
+  id              String           @id @default(cuid())
+  examId          String
+  studentId       String
+  answers         Json             @default("{}")
+  score           Int              @default(0)
+  totalPoints     Int              @default(0)
+  percentage      Float            @default(0)
+  grade           String?
+  timeSpent       Int? // in seconds
+  tabSwitches     Int              @default(0)
+  submittedAt     DateTime         @default(now())
+  status          SubmissionStatus @default(IN_PROGRESS)
+  isAutoSubmitted Boolean          @default(false)
+  ipAddress       String?
+  userAgent       String?
+
+  exam          Exam           @relation(fields: [examId], references: [id])
+  student       Profile        @relation(fields: [studentId], references: [id])
+  theoryAnswers TheoryAnswer[]
+
+  @@map("submissions")
+}
+
+model TheoryAnswer {
+  id            String    @id @default(cuid())
+  submissionId  String
+  questionId    String
+  answerText    String?
+  pointsAwarded Int       @default(0)
+  gradedBy      String?
+  gradedAt      DateTime?
+  feedback      String?
+
+  submission Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id])
+  grader     Profile?   @relation(fields: [gradedBy], references: [id])
+
+  @@map("theory_answers")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  metadata  Json?            @default("{}")
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user Profile @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+model AccessCode {
+  id        String    @id @default(cuid())
+  examId    String
+  code      String    @unique
+  used      Boolean   @default(false)
+  usedBy    String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  exam       Exam     @relation(fields: [examId], references: [id])
+  usedByUser Profile? @relation(fields: [usedBy], references: [id])
+
+  @@map("access_codes")
+}
+
+enum Role {
+  STUDENT
+  TEACHER
+  ADMIN
+}
+
+enum Category {
+  JUNIOR
+  SENIOR_SCIENCE
+  SENIOR_ARTS
+}
+
+enum ExamStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum QuestionType {
+  OBJECTIVE
+  THEORY
+}
+
+enum SubmissionStatus {
+  IN_PROGRESS
+  SUBMITTED
+  GRADING
+  GRADED
+}
+
+enum NotificationType {
+  EXAM_PUBLISHED
+  SUBMISSION_RECEIVED
+  RESULT_READY
+  GRADING_COMPLETED
+}
