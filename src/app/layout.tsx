@@ -1,4 +1,3 @@
- 
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display, Geist } from 'next/font/google';
@@ -173,7 +172,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         inter.variable, 
         dancingScript.variable, 
         playfair.variable,
-        "scroll-smooth",
         "font-sans", 
         geist.variable
       )}
