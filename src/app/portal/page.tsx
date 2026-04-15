@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - ULTRA-DIRECT NAVIGATION FIX
+// app/portal/page.tsx - COMPLETE FIXED FOR VERCEL
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Mail, Eye, EyeOff, GraduationCap, Shield, Users,
   Loader2, AlertCircle, KeyRound, ArrowRight, Sparkles,
-  Phone, Mail as MailIcon, CheckCircle, LogIn
+  Phone, Mail as MailIcon, CheckCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -71,7 +71,6 @@ export default function LoginPage() {
               redirectPath = '/staff?tab=overview'
             }
             
-            // ULTRA-DIRECT: Use replace for clean navigation
             window.location.replace(redirectPath)
             return
           }
@@ -86,7 +85,7 @@ export default function LoginPage() {
     checkSession()
   }, [])
 
-  // Load school settings - NON-BLOCKING
+  // Load school settings
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
@@ -109,7 +108,7 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // Professional success modal with ULTRA-DIRECT navigation
+  // Success Modal
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -144,15 +143,15 @@ export default function LoginPage() {
     const config = roleConfig[role]
     const firstName = userName.split(' ')[0]
 
-    // ULTRA-DIRECT navigation function
     const goToDashboard = () => {
       setShowSuccessModal(false)
       let url = '/student?tab=overview'
       if (loginSuccessData.role === 'admin') url = '/admin?tab=overview'
       else if (loginSuccessData.role === 'teacher') url = '/staff?tab=overview'
       
-      // Use replace for clean navigation without history
-      window.location.replace(url)
+      setTimeout(() => {
+        window.location.replace(url)
+      }, 100)
     }
 
     return (
@@ -273,6 +272,7 @@ export default function LoginPage() {
     )
   }
 
+  // FIXED: Simplified login handler without RPC
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -282,97 +282,109 @@ export default function LoginPage() {
     const cleanPassword = password.trim()
 
     try {
-      const { data, error: rpcError } = await supabase
-        .rpc('login_user', {
-          p_email: cleanEmail,
-          p_password: cleanPassword
-        })
-
-      if (rpcError) {
-        setError('Login service error. Please try again.')
-        setLoading(false)
-        return
-      }
-
-      if (!data || !data.success) {
-        setError(data?.message || 'Invalid email or password')
-        setLoading(false)
-        return
-      }
-
-      const userRole = data.user.role === 'staff' ? 'teacher' : data.user.role
-      
-      if (userRole !== selectedRole) {
-        const roleDisplayName = userRole === 'teacher' ? 'staff' : userRole
-        setError(`This account is for ${roleDisplayName}. Please select the ${roleDisplayName} tab.`)
-        setLoading(false)
-        return
-      }
-
-      const userName = data.user.full_name || 
-                      data.user.email?.split('@')[0].replace(/[._-]/g, ' ') || 
-                      'User'
-      const formattedName = userName.split(' ')
-        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ')
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      // Direct Supabase Auth login
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       })
 
       if (signInError) {
+        console.error('Sign in error:', signInError)
+        
         if (signInError.message.includes('Invalid login credentials')) {
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: cleanEmail,
-            password: cleanPassword,
-            options: {
-              data: {
-                role: userRole,
-                full_name: formattedName,
-                vin_id: data.user.vin_id
-              }
-            }
-          })
-
-          if (signUpError) {
-            console.error('Sign up error:', signUpError)
-          } else {
-            await supabase.auth.signInWithPassword({
-              email: cleanEmail,
-              password: cleanPassword,
-            })
-          }
+          setError('Invalid email or password. Please try again.')
+        } else {
+          setError(signInError.message)
         }
+        setLoading(false)
+        return
       }
 
-      // Skip profile update to avoid 409 error
-      // if (data.user.id) {
-      //   await supabase
-      //     .from('profiles')
-      //     .update({ 
-      //       full_name: formattedName,
-      //       role: userRole,
-      //       updated_at: new Date().toISOString()
-      //     })
-      //     .eq('id', data.user.id)
-      // }
+      if (!signInData?.user) {
+        setError('Login failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Get user profile to determine role
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', signInData.user.id)
+        .single()
+
+      if (profileError || !profile) {
+        console.error('Profile error:', profileError)
+        
+        // Try users table as fallback
+        const { data: userData } = await supabase
+          .from('users')
+          .select('role, full_name')
+          .eq('id', signInData.user.id)
+          .single()
+          
+        if (userData) {
+          const userRole = userData.role?.toLowerCase()
+          const mappedRole = userRole === 'staff' ? 'teacher' : userRole
+          const userName = userData.full_name || signInData.user.email?.split('@')[0] || 'User'
+          
+          const formattedName = userName.split(' ')
+            .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ')
+          
+          if (mappedRole !== selectedRole) {
+            const roleDisplayName = mappedRole === 'teacher' ? 'staff' : mappedRole
+            setError(`This account is for ${roleDisplayName}. Please select the ${roleDisplayName} tab.`)
+            await supabase.auth.signOut()
+            setLoading(false)
+            return
+          }
+          
+          setLoginSuccessData({
+            userName: formattedName,
+            role: mappedRole as 'student' | 'teacher' | 'admin'
+          })
+          setShowSuccessModal(true)
+          setLoading(false)
+          return
+        }
+        
+        setError('Account profile not found. Please contact support.')
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+
+      const userRole = profile.role?.toLowerCase()
+      const userName = profile.full_name || signInData.user.email?.split('@')[0] || 'User'
+      
+      const formattedName = userName.split(' ')
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+
+      const mappedRole = userRole === 'staff' ? 'teacher' : userRole
+      
+      if (mappedRole !== selectedRole) {
+        const roleDisplayName = mappedRole === 'teacher' ? 'staff' : mappedRole
+        setError(`This account is for ${roleDisplayName}. Please select the ${roleDisplayName} tab.`)
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+
+      console.log('✅ Login successful:', { email: cleanEmail, role: userRole })
 
       setLoginSuccessData({
         userName: formattedName,
-        role: userRole as 'student' | 'teacher' | 'admin'
+        role: mappedRole as 'student' | 'teacher' | 'admin'
       })
       setShowSuccessModal(true)
       setLoading(false)
 
     } catch (err: any) {
+      console.error('Login error:', err)
       setError('An unexpected error occurred. Please try again.')
       setLoading(false)
-      
-      toast.error('Login failed', {
-        description: err.message || 'Please check your credentials and try again.',
-        duration: 4000,
-      })
     }
   }
 
@@ -395,6 +407,14 @@ export default function LoginPage() {
       case 'teacher': return <Users className="h-4 w-4" />
       default: return <GraduationCap className="h-4 w-4" />
     }
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
