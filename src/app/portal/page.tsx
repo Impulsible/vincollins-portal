@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - OPTIMIZED WITH HARD REDIRECTS FOR VERCEL
+// app/portal/page.tsx - ULTRA-DIRECT NAVIGATION FIX
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -48,7 +48,7 @@ export default function LoginPage() {
   } | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  // Check if already logged in - WITH HARD REDIRECT FOR VERCEL
+  // Check if already logged in - ULTRA-DIRECT REDIRECT
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -71,11 +71,9 @@ export default function LoginPage() {
               redirectPath = '/staff?tab=overview'
             }
             
-            // Use window.location for hard redirect (works on Vercel)
-            if (typeof window !== 'undefined') {
-              window.location.href = redirectPath
-              return
-            }
+            // ULTRA-DIRECT: Use replace for clean navigation
+            window.location.replace(redirectPath)
+            return
           }
         }
       } catch (err) {
@@ -111,7 +109,7 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // Professional success modal with role-specific styling
+  // Professional success modal with ULTRA-DIRECT navigation
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -145,6 +143,17 @@ export default function LoginPage() {
 
     const config = roleConfig[role]
     const firstName = userName.split(' ')[0]
+
+    // ULTRA-DIRECT navigation function
+    const goToDashboard = () => {
+      setShowSuccessModal(false)
+      let url = '/student?tab=overview'
+      if (loginSuccessData.role === 'admin') url = '/admin?tab=overview'
+      else if (loginSuccessData.role === 'teacher') url = '/staff?tab=overview'
+      
+      // Use replace for clean navigation without history
+      window.location.replace(url)
+    }
 
     return (
       <AnimatePresence>
@@ -221,54 +230,18 @@ export default function LoginPage() {
                     </p>
                     
                     <p className="text-gray-500 mb-6">
-                      Redirecting you to your personalized dashboard...
+                      Click below to go to your dashboard
                     </p>
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="w-full"
-                  >
-                    <div className="flex items-center gap-3 mb-6">
-                      <div 
-                        className="h-2 flex-1 rounded-full overflow-hidden"
-                        style={{ background: config.bgColor }}
-                      >
-                        <motion.div
-                          initial={{ width: '0%' }}
-                          animate={{ width: '100%' }}
-                          transition={{ duration: 1.5, ease: 'easeInOut' }}
-                          className="h-full rounded-full"
-                          style={{ background: config.color }}
-                        />
-                      </div>
-                      <LogIn className="h-4 w-4 animate-pulse" style={{ color: config.color }} />
-                    </div>
                   </motion.div>
                   
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.5 }}
-                    className="flex gap-3"
+                    transition={{ delay: 0.4 }}
+                    className="flex gap-3 w-full"
                   >
                     <Button
-                      onClick={() => {
-                        setShowSuccessModal(false)
-                        if (loginSuccessData) {
-                          const redirectPath = loginSuccessData.role === 'admin' 
-                            ? '/admin?tab=overview' 
-                            : loginSuccessData.role === 'teacher' 
-                              ? '/staff?tab=overview' 
-                              : '/student?tab=overview'
-                          // Hard redirect for Vercel
-                          if (typeof window !== 'undefined') {
-                            window.location.href = redirectPath
-                          }
-                        }
-                      }}
+                      onClick={goToDashboard}
                       className="flex-1"
                       style={{ background: config.color }}
                     >
@@ -373,16 +346,17 @@ export default function LoginPage() {
         }
       }
 
-      if (data.user.id) {
-        await supabase
-          .from('profiles')
-          .update({ 
-            full_name: formattedName,
-            role: userRole,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', data.user.id)
-      }
+      // Skip profile update to avoid 409 error
+      // if (data.user.id) {
+      //   await supabase
+      //     .from('profiles')
+      //     .update({ 
+      //       full_name: formattedName,
+      //       role: userRole,
+      //       updated_at: new Date().toISOString()
+      //     })
+      //     .eq('id', data.user.id)
+      // }
 
       setLoginSuccessData({
         userName: formattedName,
@@ -390,20 +364,6 @@ export default function LoginPage() {
       })
       setShowSuccessModal(true)
       setLoading(false)
-
-      const redirectPath = userRole === 'admin' 
-        ? '/admin?tab=overview' 
-        : userRole === 'teacher' 
-          ? '/staff?tab=overview' 
-          : '/student?tab=overview'
-      
-      // Hard redirect after 1.5 seconds
-      setTimeout(() => {
-        setShowSuccessModal(false)
-        if (typeof window !== 'undefined') {
-          window.location.href = redirectPath
-        }
-      }, 1500)
 
     } catch (err: any) {
       setError('An unexpected error occurred. Please try again.')

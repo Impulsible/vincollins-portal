@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH ALL FIXES
+// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH ULTRA-DIRECT NAVIGATION
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -144,7 +144,7 @@ const adminNavigation: NavigationItem[] = [
   { name: 'Overview', href: '/admin?tab=overview', icon: LayoutDashboard, tab: 'overview' },
   { name: 'Exam Approvals', href: '/admin?tab=exams', icon: MonitorPlay, tab: 'exams' },
   { name: 'User Management', href: '/admin?tab=users', icon: Users, tab: 'users' },
-  { name: 'Settings', href: '/admin?tab=settings', icon: Settings, tab: 'settings' },
+  { name: 'Settings', href: '/admin?tab=250', icon: Settings, tab: 'settings' },
   { name: 'Reports', href: '/admin?tab=reports', icon: BarChart3, tab: 'reports' },
 ]
 
@@ -487,14 +487,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     }
   }
 
-  const handleDashboardNavigation = (e: React.MouseEvent) => {
-    e.preventDefault()
-    if (!user?.role) return
-    const dashboardUrl = getDashboardLink(user.role)
-    router.push(dashboardUrl)
-    setProfileOpen(false)
-    setMobileMenuOpen(false)
-  }
+  // Navigation function removed - now handled inline with window.location.replace()
 
   if (loading) {
     return (
@@ -689,17 +682,24 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Primary CTA */}
+                      {/* DASHBOARD BUTTON - ULTRA-DIRECT NAVIGATION */}
                       {(isHomePage || isPortalPage) && (
                         <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                           <button
-                            onClick={handleDashboardNavigation}
+                            onClick={(e) => {
+                              e.preventDefault()
+                              setProfileOpen(false)
+                              let url = '/student?tab=overview'
+                              if (user?.role === 'admin') url = '/admin?tab=overview'
+                              else if (user?.role === 'teacher') url = '/staff?tab=overview'
+                              window.location.replace(url)
+                            }}
                             className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
                           >
                             <LayoutDashboard className="h-4 w-4" />
                             <span>
-                              {user.role === 'admin' ? 'Admin Dashboard' : 
-                               user.role === 'teacher' ? 'Teacher Dashboard' : 
+                              {user?.role === 'admin' ? 'Admin Dashboard' : 
+                               user?.role === 'teacher' ? 'Teacher Dashboard' : 
                                'Student Dashboard'}
                             </span>
                             <ArrowRight className="h-4 w-4 ml-1" />
@@ -1032,11 +1032,18 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users */}
+            {/* Dashboard Link for authenticated users - ULTRA-DIRECT NAVIGATION */}
             {user?.isAuthenticated && (isHomePage || isPortalPage) && (
               <div className="p-4 border-t">
                 <button
-                  onClick={handleDashboardNavigation}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setMobileMenuOpen(false)
+                    let url = '/student?tab=overview'
+                    if (user?.role === 'admin') url = '/admin?tab=overview'
+                    else if (user?.role === 'teacher') url = '/staff?tab=overview'
+                    window.location.replace(url)
+                  }}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md hover:shadow-lg transition-all"
                 >
                   <LayoutDashboard className="h-5 w-5" />
