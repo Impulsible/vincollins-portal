@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - COMPLETE PREMIUM HEADER
+// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH DEBUG
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -709,12 +709,17 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Primary CTA - FIXED LINK */}
+                      {/* DASHBOARD BUTTON - WITH DEBUG ALERT */}
                       <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                         <button
                           onClick={() => {
                             setProfileOpen(false)
-                            router.push(getDashboardLink(user.role))
+                            const dashboardLink = getDashboardLink(user.role)
+                            // DEBUG ALERT - Remove after testing
+                            alert(`🔍 DEBUG INFO:\nUser Role: ${user.role}\nNavigating to: ${dashboardLink}\n\nIf this is wrong, check the 'role' column in your Supabase 'profiles' table.`)
+                            console.log('🔍 DEBUG - User role:', user.role)
+                            console.log('🔍 DEBUG - Dashboard link:', dashboardLink)
+                            router.push(dashboardLink)
                           }}
                           className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
                         >
@@ -1028,13 +1033,16 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users - FIXED LINK */}
+            {/* Dashboard Link for authenticated users - WITH DEBUG */}
             {user?.isAuthenticated && (
               <div className="p-4 border-t">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    router.push(getDashboardLink(user.role))
+                    const dashboardLink = getDashboardLink(user.role)
+                    // DEBUG ALERT
+                    alert(`🔍 DEBUG INFO (Mobile Menu):\nUser Role: ${user.role}\nNavigating to: ${dashboardLink}`)
+                    router.push(dashboardLink)
                   }}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
                 >
