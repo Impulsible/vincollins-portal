@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - COMPLETE PREMIUM HEADER
+// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH DEBUG
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -114,14 +114,27 @@ const normalizeRole = (role: string | null | undefined): UserRole => {
   return 'student'
 }
 
-// Helper to get dashboard link based on role - WITH TAB=OVERVIEW
-const getDashboardLink = (role: UserRole): string => {
-  switch (role) {
-    case 'admin': return '/admin?tab=overview'
-    case 'teacher': return '/staff?tab=overview'
-    case 'student': return '/student?tab=overview'
-    default: return '/portal'
+// Helper to get dashboard link based on role - FIXED TO HANDLE 'staff'
+const getDashboardLink = (role: UserRole | string): string => {
+  console.log('🔍🔍🔍 getDashboardLink received:', role, typeof role)
+  const roleStr = String(role).toLowerCase()
+  console.log('🔍🔍🔍 roleStr:', roleStr)
+  
+  if (roleStr === 'admin') {
+    console.log('✅ Returning /admin?tab=overview')
+    return '/admin?tab=overview'
   }
+  if (roleStr === 'teacher' || roleStr === 'staff') {
+    console.log('✅ Returning /staff?tab=overview')
+    return '/staff?tab=overview'
+  }
+  if (roleStr === 'student') {
+    console.log('✅ Returning /student?tab=overview')
+    return '/student?tab=overview'
+  }
+  
+  console.warn('⚠️⚠️⚠️ Unknown role, returning /portal:', role)
+  return '/portal'
 }
 
 // Navigation for public pages (Home, Portal)
@@ -369,6 +382,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
           avatar: userData?.photo_url || userData?.avatar_url || session.user.user_metadata?.avatar_url,
           isAuthenticated: true
         })
+        
+        console.log('✅ Header user state set:', { role: userRole, name: formattedName })
 
       } catch (err) {
         console.error('❌ Fetch error:', err)
@@ -682,12 +697,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Primary CTA - FIXED */}
+                      {/* DASHBOARD BUTTON - Primary CTA - WITH DEBUG */}
                       <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                         <button
                           onClick={() => {
                             setProfileOpen(false)
-                            const dashboardUrl = getDashboardLink(user.role)
+                            console.log('🔍 HEADER DEBUG - Full user object:', JSON.stringify(user, null, 2))
+                            console.log('🔍 HEADER DEBUG - user.role:', user?.role)
+                            console.log('🔍 HEADER DEBUG - user.role type:', typeof user?.role)
+                            const dashboardUrl = getDashboardLink(user?.role || 'student')
                             console.log('🚀 Desktop navigating to:', dashboardUrl)
                             window.location.href = dashboardUrl
                           }}
@@ -1003,13 +1021,14 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users - FIXED */}
+            {/* Dashboard Link for authenticated users - WITH DEBUG */}
             {user?.isAuthenticated && (
               <div className="p-4 border-t">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    const dashboardUrl = getDashboardLink(user.role)
+                    console.log('🔍 MOBILE DEBUG - user.role:', user?.role)
+                    const dashboardUrl = getDashboardLink(user?.role || 'student')
                     console.log('🚀 Mobile navigating to:', dashboardUrl)
                     window.location.href = dashboardUrl
                   }}
