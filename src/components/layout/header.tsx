@@ -288,7 +288,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     }
   }, [user])
 
-  // Subscribe to notifications
+  // Subscribe to notifications - TEMPORARILY COMMENTED OUT TO FIX WEBSOCKET ERROR
+  /*
   useEffect(() => {
     if (!user?.id) return
     fetchNotificationCount()
@@ -317,6 +318,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     
     return () => { supabase.removeChannel(channel).catch(console.error) }
   }, [user, fetchNotificationCount, router])
+  */
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -598,6 +600,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       key={item.name}
                       href={item.href}
                       onClick={isCbt ? handleCbtClick : undefined}
+                      prefetch={false}
                       className={cn(
                         "relative px-5 py-2.5 text-sm font-semibold transition-all duration-300 rounded-full",
                         isActive 
@@ -822,9 +825,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   )}
                 </div>
               ) : (
-                /* PORTAL LOGIN - Only for guests on home page */
+                /* PORTAL LOGIN - Only for guests on DESKTOP home page - HIDDEN ON MOBILE */
                 !user?.isAuthenticated && isHomePage && (
-                  <Link href="/portal">
+                  <Link href="/portal" className="hidden sm:block">
                     <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-6 py-2 font-semibold">
                       <KeyRound className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
                       Portal Login
@@ -1008,6 +1011,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   <Link
                     key={item.name}
                     href={item.href}
+                    prefetch={false}
                     onClick={(e) => {
                       if (isCbt) {
                         e.preventDefault()
