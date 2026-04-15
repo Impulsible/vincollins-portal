@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function GET() {
   try {
-    const supabase = createClient()
+    const supabase = await createClient() // ✅ Add await here
     
     const { data, error } = await supabase
       .from('school_settings')
@@ -33,7 +33,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient() // ✅ Add await here
     const body = await request.json()
     
     const { data, error } = await supabase

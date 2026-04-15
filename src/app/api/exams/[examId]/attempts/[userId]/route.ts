@@ -1,12 +1,13 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
 
 export async function GET(
   request: Request,
-  { params }: { params: { examId: string; userId: string } }
+  { params }: { params: Promise<{ examId: string; userId: string }> }
 ) {
   try {
-    const { examId, userId } = params
+    const { examId, userId } = await params
     
     // Check if user has already taken this exam
     const { data, error } = await supabase

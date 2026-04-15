@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -11,7 +13,7 @@ async function generateUniqueEmail(firstName: string, lastName: string, supabase
   const sanitizedFirst = firstName.toLowerCase().replace(/[^a-z]/g, '').substring(0, 5)
   const sanitizedLast = lastName.toLowerCase().replace(/[^a-z]/g, '').substring(0, 5)
   
-  let baseEmail = `${sanitizedFirst}.${sanitizedLast}@vincollins.edu.ng`
+  const baseEmail = `${sanitizedFirst}.${sanitizedLast}@vincollins.edu.ng`
   let finalEmail = baseEmail
   let counter = 1
   
@@ -60,7 +62,8 @@ async function generateRoleId(role: string, supabase: any): Promise<string> {
   }
   
   const prefix = prefixes[role]
-  let roleId: string
+  // ✅ Initialize roleId with a default value
+  let roleId: string = `${prefix}-${secureRandomNumber(6)}`
   let exists = true
   let attempts = 0
   
@@ -78,12 +81,12 @@ async function generateRoleId(role: string, supabase: any): Promise<string> {
     attempts++
   }
   
-  return roleId || `${prefix}-${secureRandomNumber(6)}`
+  return roleId
 }
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient() // ✅ Add await here
     const body = await request.json()
     const { first_name, last_name, role, class: userClass, department, phone, address } = body
     
@@ -164,4 +167,70 @@ function getRandomDepartment(): string {
   return departments[Math.floor(Math.random() * departments.length)]
 }
 
-// Keep the GET, PUT, DELETE functions from before...
+export async function GET(request: Request) {
+  try {
+    const supabase = await createClient() // ✅ Add await here
+    
+    const { data: users, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .order('created_at', { ascending: false })
+    
+    if (error) throw error
+    
+    return NextResponse.json({ users })
+  } catch (error) {
+    console.error('Error fetching users:', error)
+    return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+  }
+}
+
+export async function PUT(request: Request) {
+  try {
+    const supabase = await createClient() // ✅ Add await here
+    const { id, ...updates } = await request.json()
+    
+    if (!id) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+    
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    
+    if (error) throw error
+    
+    return NextResponse.json({ success: true, user: data })
+  } catch (error) {
+    console.error('Error updating user:', error)
+    return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient() // ✅ Add await here
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+    
+    if (!id) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    }
+    
+    // Soft delete
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_active: false, deleted_at: new Date().toISOString() })
+      .eq('id', id)
+    
+    if (error) throw error
+    
+    return NextResponse.json({ success: true, message: 'User deactivated successfully' })
+  } catch (error) {
+    console.error('Error deleting user:', error)
+    return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 })
+  }
+}

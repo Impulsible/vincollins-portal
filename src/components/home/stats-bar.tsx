@@ -1,181 +1,213 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { Container } from '@/components/layout/container'
-import { Award, Users, GraduationCap, CheckCircle2, TrendingUp, Star, Heart, Shield } from 'lucide-react'
+import { Award, Users, GraduationCap, CheckCircle2, Star, Heart, LucideIcon } from 'lucide-react'
 
-const stats = [
-  { 
-    value: '25+', 
-    label: 'Years of Excellence', 
+// Define strict types
+type AccentType = 'gold' | 'red'
+
+interface StatItem {
+  value: string
+  label: string
+  icon: LucideIcon
+  description: string
+  accent: AccentType
+  delay: number
+}
+
+const stats: StatItem[] = [
+  {
+    value: '4+',
+    label: 'Years of Excellence',
     icon: Award,
-    description: 'Since 1995',
-    color: 'text-secondary',
-    bgGradient: 'from-secondary/20 to-secondary/10',
-    delay: 0
+    description: 'Since 2022',
+    accent: 'gold',
+    delay: 0,
   },
-  { 
-    value: '500+', 
-    label: 'Active Students', 
+  {
+    value: '300+',
+    label: 'Active Students',
     icon: Users,
     description: 'Growing Community',
-    color: 'text-accent',
-    bgGradient: 'from-accent/20 to-accent/10',
-    delay: 1
+    accent: 'red',
+    delay: 1,
   },
-  { 
-    value: '50+', 
-    label: 'Expert Faculty', 
+  {
+    value: '20+',
+    label: 'Expert Faculty',
     icon: GraduationCap,
     description: 'Dedicated Educators',
-    color: 'text-secondary',
-    bgGradient: 'from-secondary/20 to-secondary/10',
-    delay: 2
+    accent: 'gold',
+    delay: 2,
   },
-  { 
-    value: '98%', 
-    label: 'Success Rate', 
+  {
+    value: '98%',
+    label: 'Success Rate',
     icon: CheckCircle2,
     description: 'Academic Excellence',
-    color: 'text-accent',
-    bgGradient: 'from-accent/20 to-accent/10',
-    delay: 3
+    accent: 'red',
+    delay: 3,
   },
 ]
 
+const accentStyles: Record<AccentType, {
+  iconWrap: string
+  icon: string
+  line: string
+  ring: string
+  glow: string
+  badge: string
+}> = {
+  gold: {
+    iconWrap: 'bg-amber-400/15 border-amber-300/20',
+    icon: 'text-amber-300',
+    line: 'from-transparent via-amber-300 to-transparent',
+    ring: 'group-hover:ring-amber-300/30',
+    glow: 'group-hover:shadow-[0_18px_45px_rgba(251,191,36,0.12)]',
+    badge: 'text-amber-200',
+  },
+  red: {
+    iconWrap: 'bg-rose-400/15 border-rose-300/20',
+    icon: 'text-rose-300',
+    line: 'from-transparent via-rose-300 to-transparent',
+    ring: 'group-hover:ring-rose-300/30',
+    glow: 'group-hover:shadow-[0_18px_45px_rgba(244,63,94,0.12)]',
+    badge: 'text-rose-200',
+  },
+}
+
 export function StatsBar() {
   return (
-    <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0A2472] to-[#1e3a8a] text-white py-16 sm:py-20 lg:py-24 overflow-hidden">
-      {/* Decorative Background Elements */}
-      <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-5 bg-repeat" />
-      
-      {/* Animated Gradient Orbs */}
-      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-secondary/20 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-accent/20 rounded-full blur-3xl animate-pulse animation-delay-2000" />
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl" />
-      
-      {/* Floating Particles */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white/20 rounded-full animate-float-particle"
-            style={{
-              left: `${(i * 7) % 100}%`,
-              top: `${(i * 13) % 100}%`,
-              animationDelay: `${i * 0.2}s`,
-              animationDuration: `${5 + (i % 5)}s`,
-            }}
-          />
-        ))}
-      </div>
-      
-      {/* Top Accent Line */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-secondary to-transparent" />
-      
-      {/* Side Accent Lines */}
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-secondary to-transparent" />
-      <div className="absolute right-0 top-0 bottom-0 w-1 bg-gradient-to-b from-transparent via-secondary to-transparent" />
-      
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#081B5C] via-[#0A2472] to-[#153E90] py-16 text-white sm:py-20 lg:py-24">
+      {/* Background texture */}
+      <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-[0.035]" />
+
+      {/* Premium soft glows */}
+      <div className="absolute -top-24 right-0 h-80 w-80 rounded-full bg-amber-300/10 blur-3xl" />
+      <div className="absolute -bottom-24 left-0 h-80 w-80 rounded-full bg-rose-300/10 blur-3xl" />
+      <div className="absolute inset-x-1/3 top-1/3 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
+
+      {/* Elegant border accents */}
+      <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
+      <div className="absolute left-0 right-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
       <Container className="relative px-4 sm:px-6">
-        {/* Section Header */}
-        <div className="text-center mb-10 sm:mb-12 lg:mb-16">
-          <div className="inline-flex items-center gap-2 mb-4">
-            <div className="h-px w-8 bg-gradient-to-r from-transparent to-secondary" />
-            <span className="text-xs font-medium text-secondary uppercase tracking-wider">Our Achievements</span>
-            <div className="h-px w-8 bg-gradient-to-l from-transparent to-secondary" />
+        {/* Header */}
+        <div className="mb-10 text-center sm:mb-12 lg:mb-16">
+          <div className="mb-4 inline-flex items-center gap-3">
+            <div className="h-px w-10 bg-gradient-to-r from-transparent to-amber-300/80" />
+            <span className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-200/95">
+              Our Achievements
+            </span>
+            <div className="h-px w-10 bg-gradient-to-l from-transparent to-amber-300/80" />
           </div>
-          <h3 className="font-serif text-2xl sm:text-3xl font-bold text-white">
-            By the Numbers
+
+          <h3 className="font-serif text-2xl font-bold tracking-tight text-white sm:text-3xl lg:text-4xl">
+            Excellence You Can Measure
           </h3>
-          <p className="text-white/60 text-sm mt-2 max-w-2xl mx-auto">
-            Celebrating milestones and achievements that define our commitment to excellence
+
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
+            A legacy of academic strength, trusted leadership, and student success that
+            continues to shape the future.
           </p>
         </div>
-        
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 lg:gap-12">
+
+        {/* Cards */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
           {stats.map((stat, index) => {
             const Icon = stat.icon
+            const style = accentStyles[stat.accent] // Now TypeScript knows stat.accent is 'gold' | 'red'
+
             return (
-              <div 
-                key={index} 
-                className="group relative animate-fade-in-up"
-                style={{ animationDelay: `${stat.delay * 0.1}s` }}
+              <div
+                key={index}
+                className="group animate-fade-in-up"
+                style={{ animationDelay: `${stat.delay * 0.12}s` }}
               >
-                {/* Card Background */}
-                <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-white/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                
-                {/* Glow Effect on Hover */}
-                <div className={cn(
-                  "absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 blur-xl",
-                  stat.color.replace('text', 'bg')
-                )} />
-                
-                <div className="relative text-center p-4 sm:p-6">
-                  {/* Icon Container */}
-                  <div className={cn(
-                    "bg-gradient-to-br w-14 h-14 sm:w-16 sm:h-16 lg:w-20 lg:h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-5 backdrop-blur-sm transition-all duration-500 group-hover:scale-110 group-hover:rotate-3",
-                    stat.bgGradient,
-                    "shadow-lg group-hover:shadow-xl"
-                  )}>
-                    <Icon className={cn(
-                      "h-6 w-6 sm:h-7 sm:w-7 lg:h-8 lg:w-8 transition-all duration-500",
-                      stat.color,
-                      "group-hover:scale-110 group-hover:animate-pulse"
-                    )} />
+                <article
+                  className={cn(
+                    'relative h-full overflow-hidden rounded-2xl border border-white/12 bg-white/[0.08] p-6 text-center backdrop-blur-md transition-all duration-300',
+                    'shadow-[0_10px_30px_rgba(0,0,0,0.18)]',
+                    'hover:-translate-y-1.5 hover:border-white/20 hover:bg-white/[0.11]',
+                    'ring-1 ring-transparent',
+                    style.ring,
+                    style.glow
+                  )}
+                >
+                  {/* top shine */}
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70" />
+
+                  {/* icon */}
+                  <div
+                    className={cn(
+                      'mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border shadow-md transition-all duration-300',
+                      'group-hover:scale-105 group-hover:rotate-[2deg]',
+                      style.iconWrap
+                    )}
+                  >
+                    <Icon className={cn('h-7 w-7 transition-transform duration-300 group-hover:scale-110', style.icon)} />
                   </div>
-                  
-                  {/* Value */}
-                  <p className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-1 sm:mb-2 transition-all duration-300 group-hover:scale-110 group-hover:text-secondary">
+
+                  {/* value */}
+                  <p className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
                     {stat.value}
                   </p>
-                  
-                  {/* Label */}
-                  <p className="text-xs sm:text-sm font-semibold text-white/90 uppercase tracking-wide mb-1">
+
+                  {/* label */}
+                  <p className="mb-1 text-sm font-semibold uppercase tracking-[0.14em] text-white">
                     {stat.label}
                   </p>
-                  
-                  {/* Description */}
-                  <p className="text-[10px] sm:text-xs text-white/60">
+
+                  {/* description */}
+                  <p className={cn('text-xs leading-5 sm:text-sm', style.badge)}>
                     {stat.description}
                   </p>
-                  
-                  {/* Decorative Element */}
-                  <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent via-secondary to-transparent rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                </div>
+
+                  {/* accent divider */}
+                  <div
+                    className={cn(
+                      'mx-auto mt-5 h-0.5 w-10 rounded-full bg-gradient-to-r transition-all duration-300 group-hover:w-16',
+                      style.line
+                    )}
+                  />
+
+                  {/* subtle hover overlay */}
+                  <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent" />
+                  </div>
+                </article>
               </div>
             )
           })}
         </div>
-        
-        {/* Trust Indicator */}
-        <div className="mt-12 pt-8 text-center border-t border-white/10">
-          <div className="inline-flex items-center gap-4 bg-white/5 backdrop-blur-sm rounded-full px-6 py-3">
+
+        {/* Trust pill */}
+        <div className="mt-12 border-t border-white/10 pt-8 text-center">
+          <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-white/12 bg-white/[0.08] px-5 py-3 backdrop-blur-md shadow-[0_8px_24px_rgba(0,0,0,0.16)]">
             <div className="flex items-center gap-1">
-              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
-              <Star className="h-3 w-3 text-yellow-400 fill-yellow-400" />
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
             </div>
-            <div className="h-4 w-px bg-white/20" />
-            <p className="text-xs text-white/80">
-              <span className="font-bold text-secondary">98%</span> of parents recommend Vincollins
+
+            <div className="hidden h-4 w-px bg-white/20 sm:block" />
+
+            <p className="text-sm text-white/85">
+              <span className="font-bold text-amber-200">98%</span> of parents recommend Vincollins
             </p>
-            <div className="h-4 w-px bg-white/20" />
-            <Heart className="h-3 w-3 text-secondary animate-pulse" />
+
+            <div className="hidden h-4 w-px bg-white/20 sm:block" />
+
+            <Heart className="h-4 w-4 text-rose-300" />
           </div>
         </div>
       </Container>
-      
-      {/* Bottom Gradient */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
     </section>
   )
 }
 
-// Helper function for conditional classes
 function cn(...classes: (string | boolean | undefined)[]) {
   return classes.filter(Boolean).join(' ')
 }

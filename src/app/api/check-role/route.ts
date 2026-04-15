@@ -10,7 +10,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
     
-    const supabase = createClient()
+    const supabase = await createClient() // ✅ Add await here
     
     const { data: profile, error } = await supabase
       .from('profiles')

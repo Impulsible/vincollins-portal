@@ -1,7 +1,9 @@
-// components/admin/layouts/Header.tsx
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// src/components/admin/layouts/Header.tsx
 'use client'
 
-import { useState, useEffect, type ChangeEvent } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Menu,
   Sun,
@@ -10,8 +12,11 @@ import {
   Search,
   Settings,
   User,
-  Camera,
   LogOut,
+  ChevronDown,
+  HelpCircle,
+  Shield,
+  UserCog,
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -26,32 +31,26 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
-
-interface AdminProfile {
-  id?: string
-  full_name?: string
-  email?: string
-  photo_url?: string
-}
-
-interface NotificationItem {
-  id: string
-  title: string
-  message: string
-  created_at: string
-  read: boolean
-}
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from '@/components/ui/sheet'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 interface HeaderProps {
   onMenuClick: () => void
   darkMode: boolean
   toggleDarkMode: () => void
-  adminProfile: AdminProfile | null
-  onProfileUpdate: (profile: AdminProfile) => void
-  notifications: NotificationItem[]
+  adminProfile: any
+  onProfileUpdate: (profile: any) => void
+  notifications: any[]
   onMarkNotificationRead: (id: string) => void
+  onSignOut?: () => void
 }
 
 export function Header({
@@ -62,267 +61,286 @@ export function Header({
   onProfileUpdate,
   notifications,
   onMarkNotificationRead,
+  onSignOut,
 }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentTime, setCurrentTime] = useState('')
+  const [currentDate, setCurrentDate] = useState('')
   const [showNotifications, setShowNotifications] = useState(false)
-  const [uploading, setUploading] = useState(false)
 
   useEffect(() => {
-    const updateTime = () => {
+    const updateDateTime = () => {
       const now = new Date()
       setCurrentTime(
-        now.toLocaleTimeString([], {
+        now.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
           second: '2-digit',
         })
       )
+      setCurrentDate(
+        now.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+        })
+      )
     }
-
-    updateTime()
-    const interval = setInterval(updateTime, 1000)
-
+    updateDateTime()
+    const interval = setInterval(updateDateTime, 1000)
     return () => clearInterval(interval)
   }, [])
 
-  const handlePhotoUpload = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file || !adminProfile?.id) return
-
-    setUploading(true)
-
-    try {
-      const fileExt = file.name.split('.').pop() || 'jpg'
-      const fileName = `${adminProfile.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('profiles')
-        .upload(filePath, file, { upsert: true })
-
-      if (uploadError) throw uploadError
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('profiles').getPublicUrl(filePath)
-
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ photo_url: publicUrl })
-        .eq('id', adminProfile.id)
-
-      if (updateError) throw updateError
-
-      onProfileUpdate({ ...adminProfile, photo_url: publicUrl })
-      toast.success('Profile photo updated successfully!')
-    } catch {
-      toast.error('Failed to upload photo')
-    } finally {
-      setUploading(false)
-    }
-  }
-
   const unreadCount = notifications.filter((n) => !n.read).length
-
   const firstName = adminProfile?.full_name?.split(' ')[0] || 'Admin'
   const avatarLetter = adminProfile?.full_name?.charAt(0)?.toUpperCase() || 'A'
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-card/80 backdrop-blur-sm">
-      <div className="flex items-center justify-between px-6 py-3">
-        <div className="flex items-center gap-4">
+    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/95">
+      <div className="flex items-center justify-between px-4 md:px-6 py-3">
+        {/* LEFT SECTION */}
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Mobile Menu Button */}
           <Button
             variant="ghost"
             size="icon"
             onClick={onMenuClick}
-            className="lg:hidden"
+            className="rounded-xl text-slate-700 hover:bg-slate-100 lg:hidden dark:text-slate-300 dark:hover:bg-slate-800"
+            aria-label="Open menu"
           >
             <Menu className="h-5 w-5" />
           </Button>
 
+          {/* Date & Time - Visible on mobile */}
+          <div className="lg:hidden">
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
+              {currentDate}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              {currentTime}
+            </p>
+          </div>
+
+          {/* Search - Hidden on mobile */}
           <div className="relative hidden md:block">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               placeholder="Search anything..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-96 border-0 bg-muted/50 pl-10 focus:ring-1"
+              className="w-80 lg:w-96 rounded-xl border border-slate-200 bg-slate-50 pl-10 text-sm shadow-none transition-all focus-visible:border-primary focus-visible:bg-white focus-visible:ring-2 focus-visible:ring-primary/20 dark:border-slate-800 dark:bg-slate-900 dark:text-white"
             />
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* RIGHT SECTION */}
+        <div className="flex items-center gap-1 md:gap-3">
+          {/* Mobile Search Trigger */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-xl md:hidden"
+                aria-label="Search"
+              >
+                <Search className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="top" className="h-32">
+              <SheetHeader>
+                <SheetTitle>Search</SheetTitle>
+              </SheetHeader>
+              <div className="relative mt-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="Search dashboard..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border-slate-200 pl-10"
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+
+          {/* Dark Mode Toggle */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleDarkMode}
-            className="relative"
+            className="rounded-xl text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+            aria-label="Toggle theme"
           >
-            {darkMode ? (
-              <Sun className="h-5 w-5" />
-            ) : (
-              <Moon className="h-5 w-5" />
-            )}
+            {darkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
           </Button>
 
-          <DropdownMenu
-            open={showNotifications}
-            onOpenChange={setShowNotifications}
-          >
+          {/* Notifications */}
+          <DropdownMenu open={showNotifications} onOpenChange={setShowNotifications}>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative rounded-xl">
                 <Bell className="h-5 w-5" />
                 {unreadCount > 0 && (
-                  <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                  <Badge className="absolute -right-0.5 -top-0.5 h-5 w-5 rounded-full bg-red-500 p-0 text-[10px] text-white">
+                    {unreadCount}
+                  </Badge>
                 )}
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-96">
+            <DropdownMenuContent
+              align="end"
+              className="w-80 md:w-96 rounded-xl border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
               <DropdownMenuLabel className="flex items-center justify-between">
                 <span>Notifications</span>
-                <span className="text-xs text-muted-foreground">
-                  {unreadCount} unread
-                </span>
+                {unreadCount > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {unreadCount} unread
+                  </Badge>
+                )}
               </DropdownMenuLabel>
-
               <DropdownMenuSeparator />
 
-              {notifications.length === 0 ? (
-                <div className="p-4 text-center text-muted-foreground">
-                  No notifications
-                </div>
-              ) : (
-                notifications.slice(0, 5).map((notif) => (
-                  <DropdownMenuItem
-                    key={notif.id}
-                    className="cursor-pointer p-3"
-                    onClick={() => onMarkNotificationRead(notif.id)}
-                  >
-                    <div className="flex gap-3">
-                      <div
-                        className={`rounded-lg p-2 ${
-                          notif.read ? 'bg-gray-100' : 'bg-primary/10'
-                        }`}
-                      >
-                        <Bell
-                          className={`h-4 w-4 ${
-                            notif.read ? 'text-gray-500' : 'text-primary'
-                          }`}
-                        />
+              <ScrollArea className="max-h-[300px]">
+                {notifications.length === 0 ? (
+                  <div className="p-4 text-center text-sm text-slate-500">
+                    No notifications yet
+                  </div>
+                ) : (
+                  notifications.slice(0, 5).map((notif) => (
+                    <DropdownMenuItem
+                      key={notif.id}
+                      onClick={() => onMarkNotificationRead(notif.id)}
+                      className={cn(
+                        'cursor-pointer p-3 transition-colors',
+                        !notif.read && 'bg-primary/5'
+                      )}
+                    >
+                      <div className="flex gap-3">
+                        <div
+                          className={cn(
+                            'flex h-8 w-8 items-center justify-center rounded-lg',
+                            notif.read ? 'bg-slate-100' : 'bg-primary/10'
+                          )}
+                        >
+                          <Bell
+                            className={cn(
+                              'h-4 w-4',
+                              notif.read ? 'text-slate-400' : 'text-primary'
+                            )}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{notif.title}</p>
+                          <p className="text-xs text-slate-500">{notif.message}</p>
+                          <p className="mt-1 text-[10px] text-slate-400">
+                            {formatDistanceToNow(new Date(notif.created_at), {
+                              addSuffix: true,
+                            })}
+                          </p>
+                        </div>
                       </div>
-
-                      <div className="flex-1">
-                        <p className="text-sm font-medium">{notif.title}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {notif.message}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {formatDistanceToNow(new Date(notif.created_at), {
-                            addSuffix: true,
-                          })}
-                        </p>
-                      </div>
-                    </div>
-                  </DropdownMenuItem>
-                ))
-              )}
+                    </DropdownMenuItem>
+                  ))
+                )}
+              </ScrollArea>
 
               <DropdownMenuSeparator />
-
-              <DropdownMenuItem className="justify-center text-primary">
+              <DropdownMenuItem className="cursor-pointer justify-center text-primary font-medium">
                 View all notifications
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="icon">
+          {/* Settings */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden md:flex rounded-xl"
+            aria-label="Settings"
+          >
             <Settings className="h-5 w-5" />
           </Button>
 
-          <div className="mx-1 h-8 w-px bg-border" />
+          <div className="mx-1 h-8 w-px bg-slate-200 dark:bg-slate-800" />
 
+          {/* Profile & Sign Out */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="group ml-2 flex cursor-pointer items-center gap-3"
-              >
-                <div className="hidden text-right sm:block">
-                  <p className="text-sm font-semibold text-foreground">
-                    Hi, {firstName}!
+              <button className="flex items-center gap-2 md:gap-3 group">
+                <div className="hidden text-right md:block">
+                  <p className="text-sm font-semibold text-slate-800 dark:text-white">
+                    Hi, {firstName}
                   </p>
-                  <p className="text-xs text-muted-foreground">{currentTime}</p>
+                  <p className="text-xs text-slate-500">{currentTime}</p>
                 </div>
 
-                <Avatar className="h-10 w-10 cursor-pointer ring-2 ring-primary/20 transition-all group-hover:scale-105 group-hover:ring-primary/40">
-                  <AvatarImage src={adminProfile?.photo_url} alt={firstName} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-white">
+                <Avatar className="h-9 w-9 md:h-10 md:w-10 ring-2 ring-primary/15 group-hover:scale-[1.03] transition">
+                  <AvatarImage src={adminProfile?.photo_url} />
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-white font-semibold">
                     {avatarLetter}
                   </AvatarFallback>
                 </Avatar>
+                <ChevronDown className="hidden md:block h-4 w-4 text-slate-400 transition-transform group-data-[state=open]:rotate-180" />
               </button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-64">
-              <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuContent
+              align="end"
+              className="w-64 rounded-xl border-slate-200 bg-white shadow-xl dark:border-slate-800 dark:bg-slate-900"
+            >
+              <DropdownMenuLabel>
+                <div className="flex items-center gap-3 py-1">
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src={adminProfile?.photo_url} />
+                    <AvatarFallback>{avatarLetter}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{adminProfile?.full_name || 'Admin'}</p>
+                    <p className="text-xs text-slate-500">{adminProfile?.email}</p>
+                  </div>
+                </div>
+              </DropdownMenuLabel>
               <DropdownMenuSeparator />
 
-              <div className="flex flex-col items-center gap-2 p-3">
-                <Avatar className="h-20 w-20 ring-2 ring-primary">
-                  <AvatarImage src={adminProfile?.photo_url} alt={firstName} />
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-secondary text-2xl text-white">
-                    {avatarLetter}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="text-center">
-                  <p className="font-semibold">{adminProfile?.full_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {adminProfile?.email}
-                  </p>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    id="photo-upload"
-                    disabled={uploading}
-                  />
-                  <label
-                    htmlFor="photo-upload"
-                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary/10 px-3 py-1.5 text-xs text-primary transition-colors hover:bg-primary/20"
-                  >
-                    <Camera className="h-3 w-3" />
-                    {uploading ? 'Uploading...' : 'Change Photo'}
-                  </label>
-                </div>
-              </div>
-
-              <DropdownMenuSeparator />
-
-              <DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
                 <User className="mr-2 h-4 w-4" />
                 Profile Settings
               </DropdownMenuItem>
 
-              <DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
                 <Settings className="mr-2 h-4 w-4" />
                 Account Settings
               </DropdownMenuItem>
 
+              <DropdownMenuItem className="cursor-pointer md:hidden">
+                <HelpCircle className="mr-2 h-4 w-4" />
+                Help & Support
+              </DropdownMenuItem>
+
               <DropdownMenuSeparator />
 
-              <DropdownMenuItem className="text-red-600">
+              {/* Sign Out - Visible on mobile in dropdown */}
+              <DropdownMenuItem
+                className="cursor-pointer text-red-600 hover:text-red-700 focus:text-red-700"
+                onClick={onSignOut}
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Mobile Sign Out Button (Quick access) */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="rounded-xl text-red-500 hover:bg-red-50 hover:text-red-600 md:hidden dark:hover:bg-red-950/30"
+            onClick={onSignOut}
+            aria-label="Sign Out"
+          >
+            <LogOut className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </header>

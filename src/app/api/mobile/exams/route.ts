@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(req: Request) {
-  const supabase = createClient()
+  const supabase = await createClient() // ✅ Add await here
   const { searchParams } = new URL(req.url)
   const studentId = searchParams.get('studentId')
   const examId = searchParams.get('examId')
@@ -33,7 +33,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const supabase = createClient()
+  const supabase = await createClient() // ✅ Add await here
   const { examId, studentId, answers, timeSpent } = await req.json()
 
   // Submit exam results

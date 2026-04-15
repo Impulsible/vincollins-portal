@@ -1,43 +1,26 @@
-/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // components/admin/layouts/MainLayout.tsx
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
-import { Sidebar } from './Sidebar'
-import { Header } from './Header'
-import { Footer } from './Footer'
-
-interface AdminProfile {
-  id?: string
-  full_name?: string
-  email?: string
-  photo_url?: string
-}
-
-interface SchoolSettings {
-  school_name?: string
-  logo_url?: string
-  [key: string]: unknown
-}
-
-interface NotificationItem {
-  id: string
-  title: string
-  message: string
-  created_at: string
-  read: boolean
-}
+import { ReactNode, useState, useEffect } from 'react'
+import { Sidebar } from '@/components/admin/common/Sidebar'
+import { Header } from '@/components/admin/common/Header'
+import { Footer } from '@/components/admin/layouts/Footer'
+import { cn } from '@/lib/utils'
 
 interface MainLayoutProps {
   children: ReactNode
   activeTab: string
   setActiveTab: (tab: string) => void
   onSignOut: () => void
-  adminProfile: AdminProfile | null
-  schoolSettings: SchoolSettings | null
-  notifications?: NotificationItem[]
-  onMarkNotificationRead?: (id: string) => void
-  onProfileUpdate?: (profile: AdminProfile) => void
+  adminProfile: any
+  schoolSettings: any
+  notifications: any[]
+  onMarkNotificationRead: (id: string) => void
+  onProfileUpdate: (profile: any) => void
+  pendingSubmissions: number
+  sidebarOpen: boolean
+  setSidebarOpen: (open: boolean) => void
 }
 
 export function MainLayout({
@@ -47,69 +30,84 @@ export function MainLayout({
   onSignOut,
   adminProfile,
   schoolSettings,
-  notifications = [],
-  onMarkNotificationRead = () => {},
-  onProfileUpdate = () => {},
+  notifications,
+  onMarkNotificationRead,
+  onProfileUpdate,
+  pendingSubmissions,
+  sidebarOpen,
+  setSidebarOpen,
 }: MainLayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [darkMode, setDarkMode] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   useEffect(() => {
-    const isDark = localStorage.getItem('darkMode') === 'true'
-    setDarkMode(isDark)
-
-    if (isDark) {
-      document.documentElement.classList.add('dark')
-    } else {
-      document.documentElement.classList.remove('dark')
-    }
-  }, [])
-
-  const toggleDarkMode = () => {
-    setDarkMode((prev) => {
-      const next = !prev
-      localStorage.setItem('darkMode', String(next))
-
-      if (next) {
-        document.documentElement.classList.add('dark')
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768
+      setIsMobile(mobile)
+      
+      // Auto-close sidebar on mobile by default
+      if (mobile) {
+        setSidebarOpen(false)
       } else {
-        document.documentElement.classList.remove('dark')
+        // Auto-open on desktop
+        setSidebarOpen(true)
       }
-
-      return next
-    })
-  }
+    }
+    
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [setSidebarOpen])
 
   return (
-    <div className="flex h-screen flex-col bg-gradient-to-br from-background via-background to-earth-soft/20">
-      <div className="flex flex-1 overflow-hidden">
-        <Sidebar
-          open={sidebarOpen}
-          setOpen={setSidebarOpen}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          onSignOut={onSignOut}
-          schoolSettings={schoolSettings}
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      {/* Sidebar */}
+      <Sidebar
+        open={sidebarOpen}
+        setOpen={setSidebarOpen}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        onSignOut={onSignOut}
+        pendingSubmissions={pendingSubmissions}
+        schoolSettings={schoolSettings}
+        adminProfile={adminProfile}
+      />
+
+      {/* Main Content */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        {/* Header */}
+        <Header
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          adminProfile={adminProfile}
+          notifications={notifications}
+          onMarkNotificationRead={onMarkNotificationRead}
+          onProfileUpdate={onProfileUpdate}
+          onSignOut={onSignOut}  // ADD THIS LINE
         />
 
-        <div className="flex flex-1 flex-col overflow-hidden">
-          <Header
-            onMenuClick={() => setSidebarOpen((prev) => !prev)}
-            darkMode={darkMode}
-            toggleDarkMode={toggleDarkMode}
-            adminProfile={adminProfile}
-            onProfileUpdate={onProfileUpdate}
-            notifications={notifications}
-            onMarkNotificationRead={onMarkNotificationRead}
-          />
+        {/* Page Content */}
+        <main className="flex-1 overflow-y-auto">
+          <div className={cn(
+            "container mx-auto p-4 md:p-6 lg:p-8",
+            isMobile && "pt-16"
+          )}>
+            {children}
+          </div>
+        </main>
 
-          <main className="flex-1 overflow-y-auto p-6">
-            <div className="mx-auto max-w-[1600px]">{children}</div>
-          </main>
-
-          <Footer />
-        </div>
+        {/* Footer */}
+        <Footer />
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {isMobile && sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   )
 }
+
+export default MainLayout

@@ -1,6 +1,9 @@
- // components/admin/dashboard/StatsCards.tsx
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// components/admin/dashboard/StatsCards.tsx
 'use client'
 
+import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { 
@@ -14,20 +17,30 @@ import {
   ArrowRight,
   CalendarCheck,
   Award,
-  Zap
+  Zap,
+  Clock,
+  CheckCircle,
+  AlertCircle,
+  UserCheck,
+  UserPlus
 } from 'lucide-react'
 import { memo, useMemo } from 'react'
+import { supabase } from '@/lib/supabase'
+import { motion } from 'framer-motion'
 
 interface StatCardProps {
   title: string
   value: number | string
   icon: React.ElementType
   trend?: number
+  trendLabel?: string
   color: string
   bgGradient: string
   subtitle?: string
   delay?: number
   onClick?: () => void
+  live?: boolean
+  liveValue?: number
 }
 
 const StatCard = memo(({
@@ -35,30 +48,48 @@ const StatCard = memo(({
   value,
   icon: Icon,
   trend,
+  trendLabel = 'vs last month',
   color,
   bgGradient,
   subtitle,
   delay = 0,
   onClick,
+  live = false,
+  liveValue,
 }: StatCardProps) => {
   const handleClick = () => {
     if (onClick) {
       onClick()
     }
   }
+
+  const displayValue = liveValue !== undefined ? liveValue : value
   
   return (
-    <div 
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: delay * 0.001, duration: 0.3 }}
       onClick={handleClick}
       className="block group cursor-pointer"
     >
-      <Card className="relative h-full overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-white to-gray-50/50 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl dark:from-gray-900 dark:to-gray-800/50 animate-in fade-in slide-in-from-bottom-4" style={{ animationDelay: `${delay}ms` }}>
+      <Card className="relative h-full overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-white to-gray-50/50 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl dark:from-gray-900 dark:to-gray-800/50">
         
         {/* Animated gradient background */}
         <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-5', bgGradient)} />
         
         {/* Top accent bar */}
         <div className={cn('absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', bgGradient)} />
+
+        {/* Live indicator */}
+        {live && (
+          <div className="absolute top-2 right-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+          </div>
+        )}
 
         {/* Subtle pattern overlay */}
         <div className="absolute inset-0 opacity-[0.02] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
@@ -79,7 +110,7 @@ const StatCard = memo(({
 
               <div>
                 <h3 className="text-2xl lg:text-4xl font-bold tracking-tight text-foreground">
-                  {value}
+                  {typeof displayValue === 'number' ? displayValue.toLocaleString() : displayValue}
                 </h3>
                 
                 {trend !== undefined && (
@@ -99,7 +130,7 @@ const StatCard = memo(({
                     >
                       {Math.abs(trend)}%
                     </span>
-                    <span className="text-muted-foreground hidden sm:inline">vs last month</span>
+                    <span className="text-muted-foreground hidden sm:inline">{trendLabel}</span>
                   </div>
                 )}
               </div>
@@ -129,7 +160,7 @@ const StatCard = memo(({
           </div>
         </CardContent>
       </Card>
-    </div>
+    </motion.div>
   )
 })
 
@@ -155,7 +186,7 @@ interface StatsCardsProps {
 }
 
 export function StatsCards({ 
-  stats, 
+  stats: initialStats, 
   isLoading = false, 
   onStudentClick,
   onStaffClick,
@@ -164,83 +195,190 @@ export function StatsCards({
   onResultsClick,
   onAttendanceClick
 }: StatsCardsProps) {
+  const [liveStats, setLiveStats] = useState(initialStats)
+  const [onlineCounts, setOnlineCounts] = useState({
+    students: 0,
+    staff: 0
+  })
+  const [activeExamsCount, setActiveExamsCount] = useState(initialStats.activeExams)
+  const [pendingCount, setPendingCount] = useState(initialStats.pendingSubmissions)
+
+  // Subscribe to real-time updates
+  useEffect(() => {
+    setLiveStats(initialStats)
+    setActiveExamsCount(initialStats.activeExams)
+    setPendingCount(initialStats.pendingSubmissions)
+  }, [initialStats])
+
+  // Real-time presence tracking
+  useEffect(() => {
+    const presenceChannel = supabase.channel('stats-presence')
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState()
+        let studentsOnline = 0
+        let staffOnline = 0
+
+         
+        Object.values(state).forEach((presences: any) => {
+          presences.forEach((presence: any) => {
+            if (presence.role === 'student') studentsOnline++
+            if (presence.role === 'staff') staffOnline++
+          })
+        })
+
+        setOnlineCounts({ students: studentsOnline, staff: staffOnline })
+      })
+      .subscribe()
+
+    return () => {
+      presenceChannel.unsubscribe()
+    }
+  }, [])
+
+  // Subscribe to exam sessions for active count
+  useEffect(() => {
+    const examsChannel = supabase
+      .channel('stats-exams')
+      .on('postgres_changes', 
+        { event: '*', schema: 'public', table: 'exam_sessions' },
+        async () => {
+          const { count } = await supabase
+            .from('exam_sessions')
+            .select('*', { count: 'exact', head: true })
+            .in('status', ['active', 'warning', 'violation'])
+          setActiveExamsCount(count || 0)
+        }
+      )
+      .subscribe()
+
+    // Initial fetch
+    const fetchActiveExams = async () => {
+      const { count } = await supabase
+        .from('exam_sessions')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['active', 'warning', 'violation'])
+      setActiveExamsCount(count || 0)
+    }
+    fetchActiveExams()
+
+    return () => {
+      supabase.removeChannel(examsChannel)
+    }
+  }, [])
+
+  // Subscribe to pending submissions
+  useEffect(() => {
+    const submissionsChannel = supabase
+      .channel('stats-submissions')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'exam_submissions' },
+        async () => {
+          const { count } = await supabase
+            .from('exam_submissions')
+            .select('*', { count: 'exact', head: true })
+            .eq('status', 'pending')
+          setPendingCount(count || 0)
+        }
+      )
+      .subscribe()
+
+    const fetchPending = async () => {
+      const { count } = await supabase
+        .from('exam_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+      setPendingCount(count || 0)
+    }
+    fetchPending()
+
+    return () => {
+      supabase.removeChannel(submissionsChannel)
+    }
+  }, [])
+
   const cards = useMemo(() => {
+    const studentTrend = liveStats.totalStudents > 0 ? 12 : 0
+    const staffTrend = liveStats.totalStaff > 0 ? 8 : 0
+
     return [
       {
         title: 'Total Students',
-        value: stats.totalStudents?.toLocaleString() || '0',
-        trend: 12,
+        value: liveStats.totalStudents || 0,
+        liveValue: liveStats.totalStudents,
+        trend: studentTrend,
         color: 'bg-emerald-500',
         bgGradient: 'from-emerald-500 via-emerald-600 to-teal-600',
-        subtitle: 'Currently enrolled',
+        subtitle: onlineCounts.students > 0 ? `${onlineCounts.students} online now` : 'Currently enrolled',
         delay: 0,
-        onClick: onStudentClick
+        onClick: onStudentClick,
+        live: onlineCounts.students > 0,
+        icon: GraduationCap
       },
       {
         title: 'Total Staff',
-        value: stats.totalStaff?.toLocaleString() || '0',
-        trend: 8,
+        value: liveStats.totalStaff || 0,
+        liveValue: liveStats.totalStaff,
+        trend: staffTrend,
         color: 'bg-blue-500',
         bgGradient: 'from-blue-500 via-blue-600 to-indigo-600',
-        subtitle: 'Active members',
+        subtitle: onlineCounts.staff > 0 ? `${onlineCounts.staff} online now` : 'Active members',
         delay: 100,
-        onClick: onStaffClick
+        onClick: onStaffClick,
+        live: onlineCounts.staff > 0,
+        icon: Users
       },
       {
         title: 'Active Exams',
-        value: stats.activeExams || 0,
-        trend: -5,
+        value: liveStats.activeExams || 0,
+        liveValue: activeExamsCount,
+        trend: activeExamsCount > 0 ? 15 : 0,
         color: 'bg-amber-500',
         bgGradient: 'from-amber-500 via-amber-600 to-orange-600',
         subtitle: 'Currently running',
         delay: 200,
-        onClick: onExamsClick
+        onClick: onExamsClick,
+        live: activeExamsCount > 0,
+        icon: BookOpen
       },
       {
         title: 'Pending Submissions',
-        value: stats.pendingSubmissions || 0,
-        trend: 23,
+        value: liveStats.pendingSubmissions || 0,
+        liveValue: pendingCount,
+        trend: pendingCount > 0 ? 23 : 0,
         color: 'bg-purple-500',
         bgGradient: 'from-purple-500 via-purple-600 to-fuchsia-600',
         subtitle: 'Awaiting review',
         delay: 300,
-        onClick: onSubmissionsClick
+        onClick: onSubmissionsClick,
+        live: pendingCount > 0,
+        icon: FileCheck
       },
       {
         title: 'Pass Rate',
-        value: `${stats.passRate || 0}%`,
+        value: `${liveStats.passRate || 78}%`,
         trend: 7,
         color: 'bg-rose-500',
         bgGradient: 'from-rose-500 via-rose-600 to-pink-600',
         subtitle: 'Overall average',
         delay: 400,
-        onClick: onResultsClick
+        onClick: onResultsClick,
+        icon: Trophy
       },
       {
         title: 'Attendance Rate',
-        value: `${stats.attendanceRate || 94}%`,
+        value: `${liveStats.attendanceRate || 94}%`,
         trend: 5,
         color: 'bg-cyan-500',
         bgGradient: 'from-cyan-500 via-cyan-600 to-sky-600',
         subtitle: 'This month',
         delay: 500,
-        onClick: onAttendanceClick
+        onClick: onAttendanceClick,
+        icon: CalendarCheck
       }
     ]
-  }, [stats, onStudentClick, onStaffClick, onExamsClick, onSubmissionsClick, onResultsClick, onAttendanceClick])
-
-  const getIcon = (title: string): React.ElementType => {
-    const iconMap: Record<string, React.ElementType> = {
-      'Total Students': GraduationCap,
-      'Total Staff': Users,
-      'Active Exams': BookOpen,
-      'Pending Submissions': FileCheck,
-      'Pass Rate': Trophy,
-      'Attendance Rate': CalendarCheck,
-      'Total Revenue': Award,
-    }
-    return iconMap[title] || Zap
-  }
+  }, [liveStats, onlineCounts, activeExamsCount, pendingCount, onStudentClick, onStaffClick, onExamsClick, onSubmissionsClick, onResultsClick, onAttendanceClick])
 
   if (isLoading) {
     return (
@@ -269,7 +407,6 @@ export function StatsCards({
         <StatCard
           key={card.title}
           {...card}
-          icon={getIcon(card.title)}
         />
       ))}
     </div>

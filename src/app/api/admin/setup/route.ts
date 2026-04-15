@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
   try {
-    const supabase = createClient()
+    const supabase = await createClient() // ✅ Add await here
     const { email, password, full_name } = await request.json()
     
     console.log('Attempting to create admin...', { email, full_name })

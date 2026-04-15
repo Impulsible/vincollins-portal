@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+// app/admin/login/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Suspense, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
@@ -12,7 +13,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { LogIn, Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Shield } from 'lucide-react'
 import { toast } from 'sonner'
 
-export default function AdminLoginPage() {
+function AdminLoginForm() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -20,7 +21,6 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Check if already logged in
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -166,5 +166,18 @@ export default function AdminLoginPage() {
         </CardFooter>
       </Card>
     </div>
+  )
+}
+
+// ✅ Critical fix - wrap in Suspense
+export default function AdminLoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <AdminLoginForm />
+    </Suspense>
   )
 }

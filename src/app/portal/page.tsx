@@ -1,34 +1,21 @@
-/* eslint-disable react-hooks/exhaustive-deps */
- 
-/* eslint-disable @typescript-eslint/no-unused-vars */
- 
+/* eslint-disable react-hooks/static-components */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react/no-unescaped-entities */
+// app/portal/page.tsx - UPDATED WITH TAB OVERVIEW REDIRECTS
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
-import { Footer } from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
-  Mail,
-  Eye,
-  EyeOff,
-  GraduationCap,
-  Shield,
-  Users,
-  Loader2,
-  AlertCircle,
-  Phone,
-  Mail as MailIcon,
-  MapPin,
-  KeyRound,
-  CheckCircle2,
+  Mail, Eye, EyeOff, GraduationCap, Shield, Users,
+  Loader2, AlertCircle, KeyRound, ArrowRight, Sparkles,
+  Phone, Mail as MailIcon, CheckCircle, LogIn
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -43,62 +30,257 @@ interface SchoolSettings {
 
 export default function LoginPage() {
   const router = useRouter()
-  const [email, setEmail] = useState('vincollinscollege@gmail.com')
-  const [password, setPassword] = useState('VIN-ADM-4827')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'student' | 'staff' | 'admin'>('admin')
+  const [selectedRole, setSelectedRole] = useState<'student' | 'teacher' | 'admin'>('student')
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>({
     logo_path: '',
     school_name: 'Vincollins College',
-    school_motto: 'Geared Towards Success',
+    school_motto: 'Geared Towards Excellence',
   })
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [loginSuccessData, setLoginSuccessData] = useState<{
+    userName: string
+    role: 'student' | 'teacher' | 'admin'
+  } | null>(null)
+
+  // Check if already logged in
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (session) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (profile) {
+          const role = profile.role as 'student' | 'teacher' | 'admin'
+          // FIXED: Add ?tab=overview to all redirect paths
+          const redirectPath = role === 'admin' 
+            ? '/admin?tab=overview' 
+            : role === 'teacher' 
+              ? '/staff?tab=overview' 
+              : '/student?tab=overview'
+          router.replace(redirectPath)
+        }
+      }
+    }
+    checkSession()
+  }, [router])
 
   useEffect(() => {
+    async function loadSchoolSettings() {
+      try {
+        const { data } = await supabase
+          .from('school_settings')
+          .select('*')
+          .maybeSingle()
+
+        if (data) {
+          setSchoolSettings({
+            logo_path: data.logo_path || '',
+            school_name: data.school_name || 'Vincollins College',
+            school_motto: data.school_motto || 'Geared Towards Excellence',
+          })
+        }
+      } catch (err) {
+        console.error('Failed to load school settings:', err)
+      }
+    }
     loadSchoolSettings()
-    checkExistingSession()
   }, [])
 
-  async function loadSchoolSettings() {
-    try {
-      const { data, error } = await supabase
-        .from('school_settings')
-        .select('*')
-        .maybeSingle()
-
-      if (!error && data) {
-        setSchoolSettings({
-          logo_path: data.logo_path || '',
-          school_name: data.school_name || 'Vincollins College',
-          school_motto: data.school_motto || 'Geared Towards Success',
-        })
-      }
-    } catch (err) {
-      console.error('Failed to load school settings:', err)
-    }
-  }
-
-  async function checkExistingSession() {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession()
-
-    if (session) {
-      const { data: userData } = await supabase
-        .from('users')
-        .select('role')
-        .eq('auth_id', session.user.id)
-        .maybeSingle()
-
-      if (userData?.role === 'admin') {
-        router.push('/admin')
-      } else if (userData?.role === 'staff') {
-        router.push('/staff')  // Changed to /staff
-      } else if (userData?.role === 'student') {
-        router.push('/student')  // Changed to /student
+  // Professional success modal with role-specific styling
+  const SuccessModal = () => {
+    if (!loginSuccessData) return null
+    
+    const { userName, role } = loginSuccessData
+    const roleConfig = {
+      admin: {
+        icon: '🛡️',
+        color: '#9333EA',
+        bgColor: '#F3E8FF',
+        borderColor: '#D8B4FE',
+        greeting: 'Welcome back, Administrator',
+        redirectPath: '/admin?tab=overview'  // FIXED: Add ?tab=overview
+      },
+      teacher: {
+        icon: '📚',
+        color: '#2563EB',
+        bgColor: '#EFF6FF',
+        borderColor: '#BFDBFE',
+        greeting: 'Welcome back, Teacher',
+        redirectPath: '/staff?tab=overview'  // FIXED: Add ?tab=overview
+      },
+      student: {
+        icon: '🎓',
+        color: '#059669',
+        bgColor: '#ECFDF5',
+        borderColor: '#A7F3D0',
+        greeting: 'Welcome back, Student',
+        redirectPath: '/student?tab=overview'  // FIXED: Add ?tab=overview
       }
     }
+
+    const config = roleConfig[role]
+    const firstName = userName.split(' ')[0]
+
+    return (
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSuccessModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring" as const, damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div 
+                className="absolute inset-0 opacity-5"
+                style={{
+                  background: `linear-gradient(135deg, ${config.color} 0%, ${config.color} 100%)`,
+                }}
+              />
+              
+              <div 
+                className="absolute top-0 left-0 right-0 h-2"
+                style={{ background: config.color }}
+              />
+              
+              <div className="relative p-8">
+                <div className="flex flex-col items-center text-center">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring" as const, damping: 15, stiffness: 200, delay: 0.2 }}
+                    className="mb-6"
+                  >
+                    <div 
+                      className="w-24 h-24 rounded-full flex items-center justify-center text-5xl"
+                      style={{ 
+                        background: config.bgColor,
+                        border: `3px solid ${config.borderColor}`,
+                      }}
+                    >
+                      {config.icon}
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <CheckCircle 
+                        className="h-6 w-6" 
+                        style={{ color: config.color }} 
+                      />
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        Login Successful!
+                      </h3>
+                    </div>
+                    
+                    <p className="text-gray-600 mb-2">
+                      <span className="font-semibold" style={{ color: config.color }}>
+                        {config.greeting}
+                      </span>
+                    </p>
+                    
+                    <p className="text-xl font-bold text-gray-800 mb-4">
+                      {firstName}! 👋
+                    </p>
+                    
+                    <p className="text-gray-500 mb-6">
+                      Redirecting you to your personalized dashboard...
+                    </p>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="w-full"
+                  >
+                    <div className="flex items-center gap-3 mb-6">
+                      <div 
+                        className="h-2 flex-1 rounded-full overflow-hidden"
+                        style={{ background: config.bgColor }}
+                      >
+                        <motion.div
+                          initial={{ width: '0%' }}
+                          animate={{ width: '100%' }}
+                          transition={{ duration: 2, ease: 'easeInOut' }}
+                          className="h-full rounded-full"
+                          style={{ background: config.color }}
+                        />
+                      </div>
+                      <LogIn className="h-4 w-4 animate-pulse" style={{ color: config.color }} />
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="flex gap-3"
+                  >
+                    <Button
+                      onClick={() => {
+                        setShowSuccessModal(false)
+                        if (loginSuccessData) {
+                          // FIXED: Add ?tab=overview to all redirect paths
+                          const redirectPath = loginSuccessData.role === 'admin' 
+                            ? '/admin?tab=overview' 
+                            : loginSuccessData.role === 'teacher' 
+                              ? '/staff?tab=overview' 
+                              : '/student?tab=overview'
+                          router.replace(redirectPath)
+                        }
+                      }}
+                      className="flex-1"
+                      style={{ background: config.color }}
+                    >
+                      Go to Dashboard
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowSuccessModal(false)}
+                      className="flex-1"
+                    >
+                      Stay Here
+                    </Button>
+                  </motion.div>
+                </div>
+              </div>
+              
+              <div className="absolute top-4 right-4">
+                <Sparkles className="h-5 w-5 text-yellow-400 animate-pulse" />
+              </div>
+              <div className="absolute bottom-4 left-4">
+                <Sparkles className="h-4 w-4 text-yellow-400 animate-pulse" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    )
   }
 
   async function handleLogin(e: React.FormEvent) {
@@ -106,296 +288,376 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email.toLowerCase().trim(),
-        password: password.trim(),
-      })
+    const cleanEmail = email.trim().toLowerCase().replace(/\s+/g, '')
+    const cleanPassword = password.trim()
 
-      if (authError) {
-        setError(`Login failed: ${authError.message}`)
+    console.log('🔐 Login attempt:', { email: cleanEmail, role: selectedRole })
+
+    try {
+      const { data, error: rpcError } = await supabase
+        .rpc('login_user', {
+          p_email: cleanEmail,
+          p_password: cleanPassword
+        })
+
+      if (rpcError) {
+        console.error('❌ RPC error:', rpcError)
+        setError('Login service error. Please try again.')
         setLoading(false)
         return
       }
 
-      if (authData?.user) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('auth_id', authData.user.id)
-          .maybeSingle()
+      console.log('📊 Login result:', data)
 
-        if (userError) {
-          console.error('Error getting user role:', userError)
-          setError('Could not determine user role. Please contact administrator.')
-          setLoading(false)
-          return
-        }
+      if (!data || !data.success) {
+        setError(data?.message || 'Invalid email or password')
+        setLoading(false)
+        return
+      }
 
-        if (!userData) {
-          setError('User profile not found. Please contact administrator.')
-          setLoading(false)
-          return
-        }
+      const userRole = data.user.role === 'staff' ? 'teacher' : data.user.role
+      
+      if (userRole !== selectedRole) {
+        const roleDisplayName = userRole === 'teacher' ? 'staff' : userRole
+        setError(`This account is for ${roleDisplayName}. Please select the ${roleDisplayName} tab.`)
+        setLoading(false)
+        return
+      }
 
-        if (userData.role !== selectedRole) {
-          setError(`This account is for ${userData.role}. Please select the ${userData.role} tab.`)
-          setLoading(false)
-          return
-        }
+      const userName = data.user.full_name || 
+                      data.user.email?.split('@')[0].replace(/[._-]/g, ' ') || 
+                      'User'
+      const formattedName = userName.split(' ')
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
 
-        toast.success(`Welcome back! Redirecting to ${userData.role} dashboard...`)
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: cleanPassword,
+      })
 
-        if (userData.role === 'admin') {
-          router.push('/admin')
-        } else if (userData.role === 'staff') {
-          router.push('/staff')  // Changed to /staff
+      if (signInError) {
+        if (signInError.message.includes('Invalid login credentials')) {
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: cleanEmail,
+            password: cleanPassword,
+            options: {
+              data: {
+                role: userRole,
+                full_name: formattedName,
+                vin_id: data.user.vin_id
+              }
+            }
+          })
+
+          if (signUpError) {
+            console.error('❌ Sign up error:', signUpError)
+          } else {
+            await supabase.auth.signInWithPassword({
+              email: cleanEmail,
+              password: cleanPassword,
+            })
+          }
         } else {
-          router.push('/student')  // Changed to /student
+          console.error('❌ Sign in error:', signInError)
         }
       }
-    } catch (err) {
-      console.error('Login error:', err)
-      setError('An unexpected error occurred')
-    } finally {
+
+      if (data.user.id) {
+        await supabase
+          .from('profiles')
+          .update({ 
+            full_name: formattedName,
+            role: userRole,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', data.user.id)
+      }
+
+      setLoginSuccessData({
+        userName: formattedName,
+        role: userRole as 'student' | 'teacher' | 'admin'
+      })
+      setShowSuccessModal(true)
       setLoading(false)
+
+      // FIXED: Add ?tab=overview to all redirect paths
+      const redirectPath = userRole === 'admin' 
+        ? '/admin?tab=overview' 
+        : userRole === 'teacher' 
+          ? '/staff?tab=overview' 
+          : '/student?tab=overview'
+      
+      setTimeout(() => {
+        if (showSuccessModal) {
+          setShowSuccessModal(false)
+          router.replace(redirectPath)
+          router.refresh()
+        }
+      }, 3000)
+
+    } catch (err: any) {
+      console.error('❌ Unexpected error:', err)
+      setError('An unexpected error occurred. Please try again.')
+      setLoading(false)
+      
+      toast.error('Login failed', {
+        description: err.message || 'Please check your credentials and try again.',
+        duration: 4000,
+      })
     }
+  }
+
+  const handleRoleChange = (role: 'student' | 'teacher' | 'admin') => {
+    setSelectedRole(role)
+    setError('')
   }
 
   const getRoleColor = () => {
     switch (selectedRole) {
-      case 'admin':
-        return 'bg-purple-100 text-purple-700 border-purple-200'
-      case 'staff':
-        return 'bg-blue-100 text-blue-700 border-blue-200'
-      default:
-        return 'bg-green-100 text-green-700 border-green-200'
-    }
-  }
-
-  const getRoleActiveColor = () => {
-    switch (selectedRole) {
-      case 'admin':
-        return 'bg-purple-600'
-      case 'staff':
-        return 'bg-blue-600'
-      default:
-        return 'bg-green-600'
+      case 'admin': return 'bg-purple-600 hover:bg-purple-700'
+      case 'teacher': return 'bg-blue-600 hover:bg-blue-700'
+      default: return 'bg-emerald-600 hover:bg-emerald-700'
     }
   }
 
   const getRoleIcon = () => {
     switch (selectedRole) {
-      case 'admin':
-        return <Shield className="h-4 w-4" />
-      case 'staff':
-        return <Users className="h-4 w-4" />
-      default:
-        return <GraduationCap className="h-4 w-4" />
+      case 'admin': return <Shield className="h-4 w-4" />
+      case 'teacher': return <Users className="h-4 w-4" />
+      default: return <GraduationCap className="h-4 w-4" />
     }
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
-      <Header />
-
-      <div className="container mx-auto flex min-h-screen items-center justify-center px-4 pb-16 pt-20">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="mx-auto w-full max-w-md"
-        >
-          <Card className="overflow-hidden rounded-2xl border-0 shadow-2xl">
-            <div className={`h-1 w-full ${getRoleActiveColor()}`} />
-
-            <CardHeader className="px-6 pb-6 pt-10">
-              <div className="flex flex-col items-center text-center">
-                {schoolSettings?.logo_path && (
-                  <div className="relative mb-4 flex h-24 w-24 items-center justify-center rounded-2xl bg-white shadow-sm ring-1 ring-gray-100">
-                    <Image
-                      src={schoolSettings.logo_path}
-                      alt="School Logo"
-                      fill
-                      className="object-contain p-3"
-                      unoptimized
-                    />
-                  </div>
-                )}
-
-                <CardTitle className="text-center text-2xl font-bold tracking-tight text-gray-900">
-                  {schoolSettings?.school_name || 'Vincollins College'}
-                </CardTitle>
-
-                <CardDescription className="mt-1 text-center text-sm font-medium text-gray-500">
-                  {schoolSettings?.school_motto || 'Geared Towards Success'}
-                </CardDescription>
-
-                <p className="mt-4 max-w-sm text-center text-sm leading-6 text-gray-600">
-                  Sign in with your email and password
-                </p>
+    <>
+      <div className="min-h-screen flex flex-col bg-white">
+        <Header />
+        
+        <div className="flex-1 flex items-stretch pt-16">
+          <div className="flex w-full">
+            {/* LEFT SIDE - HERO IMAGE */}
+            <div className="hidden lg:block lg:w-[55%] relative">
+              <div className="absolute inset-0">
+                <Image
+                  src="/images/portal.jpg"
+                  alt="Vincollins College Campus"
+                  fill
+                  className="object-cover object-center"
+                  priority
+                  sizes="55vw"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent) {
+                      parent.classList.add('bg-gradient-to-br', 'from-[#0A2472]', 'via-[#1e3a8a]', 'to-[#0A2472]');
+                    }
+                  }}
+                />
               </div>
-            </CardHeader>
-
-            <CardContent>
-              <Tabs
-                value={selectedRole}
-                onValueChange={(v) => setSelectedRole(v as 'student' | 'staff' | 'admin')}
-                className="mb-6"
-              >
-                <TabsList className="grid w-full grid-cols-3 gap-2 bg-gray-100 p-1">
-                  <TabsTrigger
-                    value="student"
-                    className="flex items-center gap-2 transition-all duration-200 data-[state=active]:bg-green-600 data-[state=active]:text-white"
-                  >
-                    <GraduationCap className="h-4 w-4" />
-                    <span className="hidden sm:inline">Student</span>
-                  </TabsTrigger>
-
-                  <TabsTrigger
-                    value="staff"
-                    className="flex items-center gap-2 transition-all duration-200 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-                  >
-                    <Users className="h-4 w-4" />
-                    <span className="hidden sm:inline">Staff</span>
-                  </TabsTrigger>
-
-                  <TabsTrigger
-                    value="admin"
-                    className="flex items-center gap-2 transition-all duration-200 data-[state=active]:bg-purple-600 data-[state=active]:text-white"
-                  >
-                    <Shield className="h-4 w-4" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-
-              <div className={`mb-6 rounded-lg border p-2 text-center text-xs ${getRoleColor()} opacity-80`}>
-                {selectedRole === 'admin' && 'Full system access and control'}
-                {selectedRole === 'staff' && 'Manage classes, exams, and grading'}
-                {selectedRole === 'student' && 'Access your student dashboard'}
-              </div>
-
-              <AnimatePresence>
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <Alert variant="destructive" className="mb-6 border-red-200 bg-red-50 text-red-800">
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                      <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email Address</Label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-purple-600" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="your@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="border-gray-200 pl-10 focus:border-purple-400 focus:ring-purple-400"
-                      required
-                      disabled={loading}
-                    />
+              
+              <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/40 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+              
+              <div className="absolute inset-0 flex flex-col justify-center px-8 lg:px-12 py-12">
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.8 }}
+                  className="text-white max-w-xl mx-auto text-center"
+                >
+                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6">
+                    <Sparkles className="h-4 w-4 text-yellow-300" />
+                    <span className="text-sm font-medium">Secure Portal Access</span>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password / VIN ID</Label>
-                  <div className="relative group">
-                    <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-purple-600" />
-                    <Input
-                      id="password"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="Enter your password or VIN ID"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="border-gray-200 pl-10 pr-10 focus:border-purple-400 focus:ring-purple-400"
-                      required
-                      disabled={loading}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors hover:text-gray-600"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  <h1 className="text-4xl lg:text-5xl xl:text-6xl font-bold mb-4 leading-tight">
+                    Welcome to Your Digital Campus
+                  </h1>
+                  
+                  <p className="text-lg lg:text-xl text-white/90 font-light mb-6">
+                    Experience education management redefined for excellence
+                  </p>
+                  
+                  <div className="inline-block px-5 py-2.5 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20">
+                    <p className="text-white text-base lg:text-lg font-semibold">
+                      {schoolSettings.school_name}
+                    </p>
+                    <p className="text-white/70 text-xs lg:text-sm italic">
+                      "{schoolSettings.school_motto}"
+                    </p>
+                  </div>
+                </motion.div>
+              </div>
+            </div>
+
+            {/* RIGHT SIDE - LOGIN FORM */}
+            <div className="w-full lg:w-[45%] bg-white flex items-center py-8 lg:py-12">
+              <div className="w-full max-w-md mx-auto px-6 sm:px-8 lg:px-10">
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  <div className="text-center mb-6">
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: "spring" as const, stiffness: 200, damping: 20 }}
                     >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                      {schoolSettings?.logo_path ? (
+                        <div className="relative h-20 w-20 mx-auto mb-3">
+                          <Image src={schoolSettings.logo_path} alt="Logo" fill className="object-contain" />
+                        </div>
+                      ) : (
+                        <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] flex items-center justify-center mx-auto mb-3 shadow-xl">
+                          <GraduationCap className="h-10 w-10 text-white" />
+                        </div>
+                      )}
+                    </motion.div>
+                    <h2 className="text-xl lg:hidden font-bold text-gray-900">
+                      {schoolSettings?.school_name || 'Vincollins College'}
+                    </h2>
                   </div>
-                </div>
 
-                <Button
-                  type="submit"
-                  className={`w-full py-6 font-semibold text-white shadow-lg transition-all duration-200 hover:opacity-90 hover:shadow-xl ${getRoleActiveColor()}`}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      {getRoleIcon()}
-                      <span className="ml-2">
-                        Sign in as {selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}
-                      </span>
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
+                  <div className="text-center mb-6">
+                    <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">Sign In</h3>
+                    <p className="text-gray-500 text-sm mt-1">Access your personalized portal</p>
+                  </div>
 
-            <CardFooter className="flex flex-col space-y-4 pb-8">
-              <p className="text-center text-sm text-gray-600">
-                Need access?{' '}
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center gap-1 font-medium text-purple-600 hover:underline"
-                >
-                  <MailIcon className="h-3 w-3" />
-                  Contact Administrator
-                </Link>
-              </p>
+                  <Tabs value={selectedRole} onValueChange={(v) => handleRoleChange(v as any)} className="mb-5">
+                    <TabsList className="grid w-full grid-cols-3 gap-1.5 bg-gray-100 p-1 rounded-xl">
+                      <TabsTrigger value="student" className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">
+                        <GraduationCap className="h-4 w-4" />
+                        <span className="font-medium text-sm">Student</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="teacher" className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 data-[state=active]:bg-blue-600 data-[state=active]:text-white">
+                        <Users className="h-4 w-4" />
+                        <span className="font-medium text-sm">Teacher</span>
+                      </TabsTrigger>
+                      <TabsTrigger value="admin" className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 data-[state=active]:bg-purple-600 data-[state=active]:text-white">
+                        <Shield className="h-4 w-4" />
+                        <span className="font-medium text-sm">Admin</span>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
 
-              <div className="w-full border-t border-gray-100 pt-4">
-                <div className="space-y-2 text-center text-xs text-gray-400">
-                  <div className="flex flex-wrap items-center justify-center gap-4">
-                    <div className="flex items-center gap-1">
-                      <Phone className="h-3 w-3" />
-                      <span>+234 800 123 4567</span>
+                  <motion.div 
+                    key={selectedRole}
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mb-5 rounded-xl p-3 text-center border ${
+                      selectedRole === 'admin' ? 'bg-purple-50 border-purple-200 text-purple-700' :
+                      selectedRole === 'teacher' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                      'bg-emerald-50 border-emerald-200 text-emerald-700'
+                    }`}
+                  >
+                    <p className="text-sm">
+                      {selectedRole === 'admin' && 'Administrative dashboard with full system control'}
+                      {selectedRole === 'teacher' && 'Teaching portal for class and exam management'}
+                      {selectedRole === 'student' && 'Student dashboard with CBT exam access'}
+                    </p>
+                  </motion.div>
+
+                  <AnimatePresence>
+                    {error && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                        <Alert variant="destructive" className="mb-5 border-red-200 bg-red-50 text-red-800">
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                          <AlertDescription className="text-sm">{error}</AlertDescription>
+                        </Alert>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Email Address</label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          type="email"
+                          placeholder="your.email@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="pl-10 h-11 rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm"
+                          required
+                          disabled={loading}
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <MailIcon className="h-3 w-3" />
-                      <span>info@vincollins.edu.ng</span>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                      <div className="relative">
+                        <KeyRound className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                        <Input
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Enter your password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="pl-10 pr-10 h-11 rounded-lg border-gray-200 bg-gray-50 focus:bg-white text-sm"
+                          required
+                          disabled={loading}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      <span>Ikeja, Lagos</span>
+
+                    <Button
+                      type="submit"
+                      className={`w-full h-11 text-sm font-semibold text-white shadow-md hover:shadow-lg transition-all rounded-lg mt-2 ${getRoleColor()}`}
+                      disabled={loading}
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Authenticating...
+                        </>
+                      ) : (
+                        <>
+                          {getRoleIcon()}
+                          <span className="ml-2">Sign In to Portal</span>
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </>
+                      )}
+                    </Button>
+                  </form>
+
+                  <div className="mt-6 pt-5 border-t border-gray-100">
+                    <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-400">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3 w-3" />
+                        <span>08023013110</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <MailIcon className="h-3 w-3" />
+                        <span>vincollinscollege@gmail.com</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+
+                  <p className="text-center text-xs text-gray-400 mt-4">
+                    Need assistance?{' '}
+                    <Link href="/contact" className="text-primary hover:underline font-medium">
+                      Contact Support
+                    </Link>
+                  </p>
+                </motion.div>
               </div>
-
-              <p className="pt-2 text-center text-xs text-gray-400">
-                By signing in, you agree to our Terms of Service and Privacy Policy
-              </p>
-            </CardFooter>
-          </Card>
-        </motion.div>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <Footer />
-    </div>
+      
+      <SuccessModal />
+    </>
   )
 }

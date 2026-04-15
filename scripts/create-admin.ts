@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = 'https://mvittkvxtasayycmzgha.supabase.co'

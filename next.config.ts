@@ -23,6 +23,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'mvittkvxtasayycmzgha.supabase.co',
+        port: '',
+        pathname: '/storage/v1/object/public/**',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
@@ -31,19 +37,14 @@ const nextConfig: NextConfig = {
     dangerouslyAllowSVG: true,
   },
   
-  // Enable compression
   compress: true,
-  
-  // Enable source maps in development only
   productionBrowserSourceMaps: false,
   
-  // Experimental features
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'sonner'],
   },
   
-  // Add rewrites to handle icon requests
   async rewrites() {
     return [
       {
@@ -65,7 +66,6 @@ const nextConfig: NextConfig = {
     ];
   },
   
-  // Configure headers for security and caching
   async headers() {
     return [
       {
@@ -93,17 +93,6 @@ const nextConfig: NextConfig = {
           },
         ],
       },
-      // Remove custom Cache-Control for _next/static in development
-      // Only apply in production
-      ...(process.env.NODE_ENV === 'production' ? [{
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
-        ],
-      }] : []),
       {
         source: '/admin/:path*',
         headers: [
@@ -113,7 +102,30 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        source: '/images/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400, must-revalidate',
+          },
+        ],
+      },
+      {
+        source: '/fonts/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
+  },
+  
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
   },
 };
 

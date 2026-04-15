@@ -37,45 +37,44 @@ export async function middleware(req: NextRequest) {
   )
 
   const { data: { session } } = await supabase.auth.getSession()
+  const path = req.nextUrl.pathname
   
   // Protected routes
   const protectedRoutes = ['/admin', '/student', '/staff']
-  const isProtectedRoute = protectedRoutes.some(route => 
-    req.nextUrl.pathname.startsWith(route)
-  )
+  const isProtectedRoute = protectedRoutes.some(route => path.startsWith(route))
   
-  // Auth routes (redirect to dashboard if already logged in)
-  const authRoutes = ['/portal']
-  const isAuthRoute = authRoutes.some(route => 
-    req.nextUrl.pathname === route
-  )
+  // Portal route
+  const isPortalRoute = path === '/portal' || path === '/'
   
-  // If user is logged in and tries to access login page, redirect to their dashboard
-  if (session && isAuthRoute) {
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('auth_id', session.user.id)
-      .maybeSingle()
-    
-    if (userData?.role === 'admin') {
-      return NextResponse.redirect(new URL('/admin', req.url))
-    } else if (userData?.role === 'staff') {
-      return NextResponse.redirect(new URL('/staff', req.url))
-    } else if (userData?.role === 'student') {
-      return NextResponse.redirect(new URL('/student', req.url))
+  // If user has session and tries to access portal, redirect to dashboard
+  if (session && isPortalRoute) {
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('role')
+        .or(`auth_id.eq.${session.user.id},id.eq.${session.user.id}`)
+        .maybeSingle()
+      
+      if (userData?.role === 'admin') {
+        return NextResponse.redirect(new URL('/admin', req.url))
+      } else if (userData?.role === 'staff') {
+        return NextResponse.redirect(new URL('/staff', req.url))
+      } else if (userData?.role === 'student') {
+        return NextResponse.redirect(new URL('/student', req.url))
+      }
+    } catch (err) {
+      console.error('Middleware user check error:', err)
     }
   }
   
-  // If user is not logged in and tries to access protected route, redirect to login
+  // If no session and trying to access protected route, redirect to portal
   if (!session && isProtectedRoute) {
-    const redirectUrl = new URL('/portal', req.url)
-    return NextResponse.redirect(redirectUrl)
+    return NextResponse.redirect(new URL('/portal', req.url))
   }
   
   return response
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/student/:path*', '/staff/:path*', '/portal']
+  matcher: ['/admin/:path*', '/student/:path*', '/staff/:path*', '/portal', '/']
 }

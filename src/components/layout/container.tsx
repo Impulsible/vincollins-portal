@@ -37,7 +37,7 @@ interface ContainerProps
   extends React.HTMLAttributes<HTMLDivElement>,
     VariantProps<typeof containerVariants> {
   children: ReactNode
-  as?: keyof JSX.IntrinsicElements
+  as?: React.ElementType // ✅ Changed from keyof JSX.IntrinsicElements
   fluid?: boolean
   centered?: boolean
   fullHeight?: boolean

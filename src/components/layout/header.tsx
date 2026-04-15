@@ -1,99 +1,164 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// components/layout/header.tsx - COMPLETE PREMIUM HEADER
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import Image from 'next/image'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { 
-  ChevronDown, 
-  User, 
-  LogIn,
-  Home,
-  BookOpen,
-  Briefcase,
-  Laptop,
-  Phone,
-  Calendar,
-  Users,
-  FileText,
-  Bell,
-  Search,
-  Settings,
-  LogOut,
-  LayoutDashboard,
-  GraduationCap,
-  Menu,
-  X,
-  Sparkles,
-  Award,
-  Heart,
-  Shield,
-  Mail,
-  MapPin,
-  Clock,
-  Facebook,
-  Twitter,
-  Instagram,
-  Linkedin,
-  Copyright,
-  KeyRound
+  ChevronDown, User, Home, BookOpen, Laptop, Phone, Calendar, Users, FileText,
+  Bell, Search, Settings, LogOut, LayoutDashboard, GraduationCap, Menu, X,
+  Sparkles, Mail, MapPin, Clock, Facebook, Twitter, Instagram,
+  Linkedin, KeyRound, MonitorPlay, BarChart3, TrendingUp,
+  HelpCircle, Lock, Timer, Shuffle, Shield, Award, RotateCcw, ArrowRight,
+  CheckCircle, ChevronRight, LucideIcon, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Badge } from '@/components/ui/badge'
+import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
+
+// STRICT ROLE TYPES - Only 3 roles allowed
+type UserRole = 'admin' | 'teacher' | 'student'
 
 interface User {
+  id: string
   name: string
   email: string
-  role: 'admin' | 'teacher' | 'student' | 'staff'
+  role: UserRole
   avatar?: string
   isAuthenticated: boolean
 }
 
-const navigation = [
+interface SchoolSettings {
+  school_name?: string
+  logo_path?: string
+}
+
+// Navigation item type
+interface NavigationItem {
+  name: string
+  href: string
+  icon: LucideIcon
+  tab?: string
+  isCbt?: boolean
+}
+
+// Helper function to format names - NO DOTS, Proper Capitalization
+const formatFullName = (input: string): string => {
+  if (!input) return 'User'
+  
+  return input
+    .replace(/\./g, ' ')
+    .replace(/[_\-]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 0)
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
+// Helper to get initials from formatted name
+const getInitialsFromName = (name: string): string => {
+  if (!name || name === 'User') return 'U'
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+// Helper to get first name
+const getFirstNameFromName = (name: string): string => {
+  if (!name || name === 'User') return 'User'
+  return name.trim().split(/\s+/)[0]
+}
+
+// Helper to validate and normalize role
+const normalizeRole = (role: string | null | undefined): UserRole => {
+  if (!role) return 'student'
+  
+  const lowerRole = role.toLowerCase()
+  
+  if (lowerRole === 'staff') return 'teacher'
+  
+  if (lowerRole === 'admin' || lowerRole === 'teacher' || lowerRole === 'student') {
+    return lowerRole as UserRole
+  }
+  
+  console.warn(`Unknown role "${role}", defaulting to student`)
+  return 'student'
+}
+
+// Helper to get dashboard link based on role
+const getDashboardLink = (role: UserRole): string => {
+  switch (role) {
+    case 'admin': return '/admin'
+    case 'teacher': return '/staff'
+    case 'student': return '/student'
+    default: return '/portal'
+  }
+}
+
+// Navigation for public pages (Home, Portal)
+const publicNavigation: NavigationItem[] = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Admission', href: '/admission', icon: FileText },
   { name: 'Schools', href: '/schools', icon: BookOpen },
-  { name: 'CBT Platform', href: '/cbt', icon: Laptop },
+  { name: 'CBT Platform', href: '#cbt', icon: Laptop, isCbt: true },
   { name: 'Contact', href: '/contact', icon: Phone },
 ]
 
-const studentNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'My Courses', href: '/courses', icon: BookOpen },
-  { name: 'Exams', href: '/exams', icon: FileText },
-  { name: 'Results', href: '/results', icon: GraduationCap },
-  { name: 'Attendance', href: '/attendance', icon: Calendar },
-  { name: 'Fees', href: '/fees', icon: Briefcase },
+// Student navigation - CLEAN, only dashboard tabs
+const studentNavigation: NavigationItem[] = [
+  { name: 'Overview', href: '/student?tab=overview', icon: LayoutDashboard, tab: 'overview' },
+  { name: 'My Exams', href: '/student?tab=exams', icon: MonitorPlay, tab: 'exams' },
+  { name: 'Results', href: '/student?tab=results', icon: GraduationCap, tab: 'results' },
+  { name: 'Profile', href: '/student?tab=profile', icon: User, tab: 'profile' },
 ]
 
-const teacherNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'My Classes', href: '/classes', icon: Users },
-  { name: 'Exam Management', href: '/exams/manage', icon: FileText },
-  { name: 'Grade Students', href: '/grades', icon: GraduationCap },
-  { name: 'Attendance', href: '/attendance', icon: Calendar },
-  { name: 'Resources', href: '/resources', icon: BookOpen },
+// Teacher navigation - CLEAN, only dashboard tabs
+const teacherNavigation: NavigationItem[] = [
+  { name: 'Overview', href: '/staff?tab=overview', icon: LayoutDashboard, tab: 'overview' },
+  { name: 'Exams', href: '/staff?tab=exams', icon: MonitorPlay, tab: 'exams' },
+  { name: 'Assignments', href: '/staff?tab=assignments', icon: FileText, tab: 'assignments' },
+  { name: 'Students', href: '/staff?tab=students', icon: Users, tab: 'students' },
+  { name: 'Analytics', href: '/staff?tab=analytics', icon: BarChart3, tab: 'analytics' },
 ]
 
-const adminNavigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Users Management', href: '/users', icon: Users },
-  { name: 'Courses', href: '/courses/manage', icon: BookOpen },
-  { name: 'Exams', href: '/exams/manage', icon: FileText },
-  { name: 'Fees Management', href: '/fees/manage', icon: Briefcase },
-  { name: 'Reports', href: '/reports', icon: FileText },
-  { name: 'Settings', href: '/settings', icon: Settings },
+// Admin navigation - CLEAN, only dashboard tabs
+const adminNavigation: NavigationItem[] = [
+  { name: 'Overview', href: '/admin', icon: LayoutDashboard, tab: 'overview' },
+  { name: 'Exam Approvals', href: '/admin?tab=exams', icon: MonitorPlay, tab: 'exams' },
+  { name: 'User Management', href: '/admin?tab=users', icon: Users, tab: 'users' },
+  { name: 'Settings', href: '/admin?tab=settings', icon: Settings, tab: 'settings' },
+  { name: 'Reports', href: '/admin?tab=reports', icon: BarChart3, tab: 'reports' },
 ]
 
-const socialLinks = [
-  { icon: Facebook, href: 'https://facebook.com/vincollins', label: 'Facebook' },
-  { icon: Twitter, href: 'https://twitter.com/vincollins', label: 'Twitter' },
-  { icon: Instagram, href: 'https://instagram.com/vincollins', label: 'Instagram' },
-  { icon: Linkedin, href: 'https://linkedin.com/school/vincollins', label: 'LinkedIn' },
+const quickLinks = [
+  { name: 'Academic Calendar', href: '/calendar', icon: Calendar },
+  { name: 'E-Library', href: '/library', icon: BookOpen },
+  { name: 'Student Portal', href: '/portal', icon: GraduationCap },
+  { name: 'Staff Portal', href: '/portal', icon: Users },
 ]
 
 const contactInfo = [
@@ -103,28 +168,246 @@ const contactInfo = [
   { icon: Clock, text: 'Mon-Fri: 8:00 AM - 4:00 PM' },
 ]
 
+const socialLinks = [
+  { icon: Facebook, href: 'https://facebook.com/vincollins', label: 'Facebook' },
+  { icon: Twitter, href: 'https://twitter.com/vincollins', label: 'Twitter' },
+  { icon: Instagram, href: 'https://instagram.com/vincollins', label: 'Instagram' },
+  { icon: Linkedin, href: 'https://linkedin.com/school/vincollins', label: 'LinkedIn' },
+]
+
+// Premium CBT Features
+const cbtFeatures = [
+  { 
+    title: 'Secure Exam Environment', 
+    description: 'Full-screen lockdown mode prevents tab switching, copy-paste, and screenshots during exams', 
+    icon: Shield 
+  },
+  { 
+    title: 'Smart Timer System', 
+    description: 'Real-time countdown with visual warnings. Auto-submit when time expires', 
+    icon: Timer 
+  },
+  { 
+    title: 'Question Randomization', 
+    description: 'Questions and options shuffled uniquely for each student to maintain integrity', 
+    icon: Shuffle 
+  },
+  { 
+    title: 'Instant Results & Analytics', 
+    description: 'Objective questions graded immediately with detailed performance analytics', 
+    icon: TrendingUp 
+  },
+  { 
+    title: 'Multi-Format Support', 
+    description: 'Support for MCQs, True/False, Theory/Essay questions, and file uploads', 
+    icon: FileText 
+  },
+  { 
+    title: 'Auto-Save & Resume', 
+    description: 'Progress auto-saved. Resume interrupted exams from where you stopped', 
+    icon: RotateCcw 
+  },
+]
+
 interface HeaderProps {
   user?: User
   onLogout?: () => void
 }
 
-export function Header({ user, onLogout }: HeaderProps) {
+function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [user, setUser] = useState<User | null>(null)
+  const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
-  const pathname = usePathname()
+  const [showCbtInfo, setShowCbtInfo] = useState(false)
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  const [notificationCount, setNotificationCount] = useState(0)
+  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
+  const profileDropdownRef = useRef<HTMLDivElement>(null)
+  
   const currentYear = new Date().getFullYear()
-  const mobileMenuRef = useRef<HTMLDivElement>(null)
-
-  // Check if user is on portal page
   const isPortalPage = pathname === '/portal'
+  const isHomePage = pathname === '/'
+
+  // Fetch school settings
+  useEffect(() => {
+    const fetchSchoolSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('school_settings')
+          .select('school_name, logo_path')
+          .single()
+        
+        if (!error && data) {
+          setSchoolSettings(data)
+        }
+      } catch (error) {
+        console.error('Error fetching school settings:', error)
+      }
+    }
+    fetchSchoolSettings()
+  }, [])
+
+  // Check if nav item is active - syncs with sidebar tabs
+  const isNavActive = (href: string, tab?: string) => {
+    if (tab) {
+      const basePath = href.split('?')[0]
+      if (pathname === basePath) {
+        const urlTab = searchParams.get('tab') || 'overview'
+        return urlTab === tab
+      }
+      return false
+    }
+    
+    if (pathname === href) return true
+    if (href === '/' || href === '/staff' || href === '/student' || href === '/admin') {
+      return pathname === href
+    }
+    if (pathname?.startsWith(href + '/')) return true
+    return false
+  }
+
+  // Fetch notification count
+  const fetchNotificationCount = useCallback(async () => {
+    if (!user?.id) return
+    try {
+      const { count, error } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false)
+      if (!error) setNotificationCount(count || 0)
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+    }
+  }, [user])
+
+  // Subscribe to notifications
+  useEffect(() => {
+    if (!user?.id) return
+    fetchNotificationCount()
+    
+    const channel = supabase
+      .channel('notifications-' + user.id)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        fetchNotificationCount()
+        toast.info(payload.new.title || 'New notification!', {
+          description: payload.new.message,
+          action: { label: 'View', onClick: () => router.push('/notifications') }
+        })
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${user.id}`
+      }, () => fetchNotificationCount())
+      .subscribe()
+    
+    return () => { supabase.removeChannel(channel).catch(console.error) }
+  }, [user, fetchNotificationCount, router])
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  // Fetch user with avatar
+  useEffect(() => {
+    const fetchUser = async () => {
+      setLoading(true)
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !session) {
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        let userData: any = null
+        let userRole: UserRole = 'student'
+        
+        const { data: profileById } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (profileById) {
+          userData = profileById
+          userRole = normalizeRole(profileById.role)
+        } else {
+          const { data: profileByEmail } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('email', session.user.email)
+            .maybeSingle()
+
+          if (profileByEmail) {
+            userData = profileByEmail
+            userRole = normalizeRole(profileByEmail.role)
+          }
+        }
+
+        if (!userData && session.user.user_metadata?.role) {
+          userRole = normalizeRole(session.user.user_metadata.role)
+        }
+
+        let rawName = ''
+        if (userData?.full_name) {
+          rawName = userData.full_name
+        } else if (userData?.name) {
+          rawName = userData.name
+        } else if (session.user.user_metadata?.full_name) {
+          rawName = session.user.user_metadata.full_name
+        } else if (session.user.email) {
+          rawName = session.user.email.split('@')[0]
+        } else {
+          rawName = 'User'
+        }
+
+        const formattedName = formatFullName(rawName)
+
+        setUser({
+          id: userData?.id || session.user.id,
+          name: formattedName,
+          email: userData?.email || session.user.email || '',
+          role: userRole,
+          avatar: userData?.photo_url || userData?.avatar_url || session.user.user_metadata?.avatar_url,
+          isAuthenticated: true
+        })
+
+      } catch (err) {
+        console.error('❌ Fetch error:', err)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUser()
+  }, [])
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10)
-    }
+    const handleScroll = () => setScrolled(window.scrollY > 10)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
@@ -135,41 +418,23 @@ export function Header({ user, onLogout }: HeaderProps) {
     setSearchOpen(false)
   }, [pathname])
 
-  // Prevent body scroll when mobile menu is open
   useEffect(() => {
     if (mobileMenuOpen) {
       document.body.style.overflow = 'hidden'
     } else {
       document.body.style.overflow = 'unset'
     }
-    return () => {
-      document.body.style.overflow = 'unset'
-    }
+    return () => { document.body.style.overflow = 'unset' }
   }, [mobileMenuOpen])
 
-  // Close mobile menu when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (mobileMenuOpen && mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
-        setMobileMenuOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [mobileMenuOpen])
-
-  const getNavigation = () => {
-    if (!user?.isAuthenticated) return navigation
+  const getNavigation = (): NavigationItem[] => {
+    if (isPortalPage || isHomePage || !user?.isAuthenticated) return publicNavigation
     
     switch (user.role) {
-      case 'student':
-        return studentNavigation
-      case 'teacher':
-        return teacherNavigation
-      case 'admin':
-        return adminNavigation
-      default:
-        return navigation
+      case 'admin': return adminNavigation
+      case 'teacher': return teacherNavigation
+      case 'student': return studentNavigation
+      default: return publicNavigation
     }
   }
 
@@ -177,90 +442,177 @@ export function Header({ user, onLogout }: HeaderProps) {
 
   const getUserInitials = () => {
     if (!user?.name) return 'U'
-    return user.name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2)
+    return getInitialsFromName(user.name)
   }
 
   const getFirstName = () => {
     if (!user?.name) return 'User'
-    return user.name.split(' ')[0]
+    return getFirstNameFromName(user.name)
   }
 
-  const toggleMobileMenu = () => {
-    setMobileMenuOpen(!mobileMenuOpen)
+  const getHeaderGreeting = () => {
+    if (!user) return 'User'
+    return getFirstName()
+  }
+
+  const getMobileGreeting = () => {
+    if (!user) return 'Welcome!'
+    const firstName = getFirstName()
+    return `Hi, ${firstName}!`
+  }
+
+  const getRoleBadgeColor = (role: UserRole) => {
+    switch (role) {
+      case 'admin': return 'bg-purple-500 text-white'
+      case 'teacher': return 'bg-blue-500 text-white'
+      case 'student': return 'bg-emerald-500 text-white'
+      default: return 'bg-gray-500 text-white'
+    }
+  }
+
+  const getRoleDisplayName = (role: UserRole) => {
+    switch (role) {
+      case 'admin': return 'Administrator'
+      case 'teacher': return 'Teacher'
+      case 'student': return 'Student'
+      default: return role
+    }
+  }
+
+  const handleCbtClick = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setShowCbtInfo(true)
+  }
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+      setSearchOpen(false)
+      setSearchQuery('')
+    }
+  }
+
+  const handleLogoutClick = () => {
+    setProfileOpen(false)
+    setMobileMenuOpen(false)
+    setShowSignOutConfirm(true)
+  }
+
+  const confirmSignOut = async () => {
+    setShowSignOutConfirm(false)
+    await supabase.auth.signOut({ scope: 'local' })
+    onLogout?.()
+    router.push('/')
+    router.refresh()
+  }
+
+  const handleNotificationClick = () => {
+    if (user?.role === 'admin') {
+      router.push('/admin?tab=exams')
+    } else {
+      router.push('/notifications')
+    }
+  }
+
+  if (loading) {
+    return (
+      <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-3">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse" />
+              <div className="h-6 w-32 bg-white/20 rounded animate-pulse" />
+            </div>
+            <div className="h-10 w-24 bg-white/20 rounded-full animate-pulse" />
+          </div>
+        </div>
+      </header>
+    )
   }
 
   return (
     <>
       <header className={cn(
         "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500",
-        scrolled ? "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] shadow-xl py-2" : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-3"
+        scrolled ? "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] shadow-2xl py-2" : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-4"
       )}>
         <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-4">
-            {/* Logo Section */}
-            <Link 
-              href={user?.isAuthenticated ? '/dashboard' : '/'} 
-              className="flex items-center gap-3 group flex-shrink-0"
-            >
-              <div className="relative">
-                <div className="relative h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-white/20 p-[2px] shadow-lg group-hover:shadow-xl transition-all duration-300">
-                  <div className="absolute inset-0 bg-white/20 rounded-full group-hover:bg-white/30 transition-colors" />
-                  <div className="relative w-full h-full rounded-full bg-white flex items-center justify-center overflow-hidden">
-                    <Image
-                      src="/images/logo.png"
-                      alt="Vincollins College Logo"
-                      width={48}
-                      height={48}
-                      className="rounded-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                        const parent = e.currentTarget.parentElement
-                        if (parent) {
-                          const fallbackSpan = document.createElement('span')
-                          fallbackSpan.className = 'text-primary font-bold text-lg'
-                          fallbackSpan.textContent = 'VC'
-                          parent.appendChild(fallbackSpan)
-                        }
-                      }}
+            
+            {/* CLEAN LOGO - NO CIRCLE */}
+            <Link href="/" className="flex items-center gap-3 group flex-shrink-0">
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ type: "spring" as const, stiffness: 200, damping: 20 }}
+                className="relative"
+              >
+                {schoolSettings?.logo_path ? (
+                  <div className="relative h-10 w-10 sm:h-11 sm:w-11 group-hover:scale-105 transition-all duration-300">
+                    <Image 
+                      src={schoolSettings.logo_path} 
+                      alt={schoolSettings.school_name || 'Vincollins College Logo'} 
+                      width={44}
+                      height={44}
+                      className="object-contain"
+                      priority
                     />
                   </div>
-                </div>
-                <div className="absolute inset-0 rounded-full border border-white/30 opacity-0 group-hover:opacity-100 transition-opacity duration-300 scale-110" />
-              </div>
+                ) : (
+                  <div className="relative h-10 w-10 sm:h-11 sm:w-11 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
+                    <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                  </div>
+                )}
+              </motion.div>
               <div className="flex flex-col">
-                <span className="text-lg sm:text-xl font-['Dancing_Script',cursive] font-bold text-white leading-tight">
-                  Vincollins College
+                <div className="flex items-baseline gap-1">
+                  <span className="text-lg sm:text-xl font-bold text-white leading-tight tracking-wide">
+                    Vincollins
+                  </span>
+                  <span className="text-lg sm:text-xl font-bold text-[#F5A623] leading-tight tracking-wide">
+                    College
+                  </span>
+                </div>
+                <span className="text-[10px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium">
+                  GEARED TOWARDS EXCELLENCE
                 </span>
-                <span className="text-[10px] sm:text-xs text-white/80 -mt-0.5">Geared Towards Excellence</span>
               </div>
             </Link>
 
-            {/* Desktop Navigation */}
-            <nav className="hidden lg:flex items-center justify-center flex-1">
-              <div className="flex items-center gap-1 xl:gap-2 bg-white/10 backdrop-blur-sm rounded-full p-1">
+            {/* Desktop Navigation - Perfectly centered */}
+            <nav className={cn(
+              "hidden lg:flex items-center",
+              isPortalPage 
+                ? "justify-center flex-1 mr-12" 
+                : "justify-center flex-1"
+            )}>
+              <div className="flex items-center gap-1 xl:gap-2 bg-white/15 rounded-full p-1 shadow-lg">
                 {currentNavigation.map((item) => {
                   const Icon = item.icon
-                  const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+                  const isActive = isNavActive(item.href, item.tab)
+                  const isCbt = item.name === 'CBT Platform' || item.isCbt
                   
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
+                      onClick={isCbt ? handleCbtClick : undefined}
                       className={cn(
-                        "relative px-4 py-2 text-sm font-medium transition-all duration-300 rounded-full",
+                        "relative px-5 py-2.5 text-sm font-semibold transition-all duration-300 rounded-full",
                         isActive 
-                          ? "text-primary bg-white shadow-md" 
-                          : "text-white hover:text-white hover:bg-white/20"
+                          ? "text-[#0A2472] bg-white shadow-lg" 
+                          : "text-white hover:text-white hover:bg-white/25"
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        <Icon className="h-4 w-4" />
+                        <Icon className={cn("h-4 w-4", isActive ? "text-[#0A2472]" : "text-white")} />
                         <span>{item.name}</span>
+                        {isCbt && (
+                          <Badge variant="secondary" className="ml-1 text-[10px] px-1.5 py-0.5 bg-[#F5A623] text-[#0A2472] font-bold">
+                            CBT
+                          </Badge>
+                        )}
                       </div>
                     </Link>
                   )
@@ -268,44 +620,66 @@ export function Header({ user, onLogout }: HeaderProps) {
               </div>
             </nav>
 
-            {/* Right Side Actions */}
+            {/* Right Section */}
             <div className="flex items-center gap-2 flex-shrink-0">
+              {/* Search Button */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="rounded-full text-white hover:bg-white/20 transition-all duration-300"
+                className={cn(
+                  "rounded-full text-white hover:bg-white/20 transition-all duration-300",
+                  isPortalPage && "-ml-2"
+                )}
               >
                 <Search className="h-5 w-5" />
               </Button>
 
-              {user?.isAuthenticated && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="relative rounded-full text-white hover:bg-white/20 transition-all duration-300"
-                >
-                  <Bell className="h-5 w-5" />
-                  <span className="absolute top-1 right-1 h-2 w-2 bg-red-500 rounded-full ring-2 ring-primary animate-pulse" />
-                </Button>
+              {/* Notifications - Only on dashboard pages */}
+              {user?.isAuthenticated && !isPortalPage && !isHomePage && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative rounded-full text-white hover:bg-white/20 transition-all duration-300"
+                        onClick={handleNotificationClick}
+                      >
+                        <Bell className="h-5 w-5" />
+                        {notificationCount > 0 && (
+                          <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center font-bold animate-pulse">
+                            {notificationCount > 9 ? '9+' : notificationCount}
+                          </span>
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {notificationCount > 0 ? `${notificationCount} new` : 'No new notifications'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               )}
 
+              {/* FOR AUTHENTICATED USERS - Show Avatar with Dropdown on ALL pages */}
               {user?.isAuthenticated ? (
-                <div className="relative">
+                <div className="relative" ref={profileDropdownRef}>
                   <Button
                     variant="ghost"
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className="flex items-center gap-2 rounded-full text-white hover:bg-white/20 px-3 transition-all duration-300"
+                    className="flex items-center gap-2 rounded-full text-white hover:bg-white/20 px-3 py-1.5 transition-all duration-300"
                   >
                     <Avatar className="h-8 w-8 ring-2 ring-white/50">
                       <AvatarImage src={user.avatar} />
-                      <AvatarFallback className="bg-white/20 text-white text-sm">
+                      <AvatarFallback className="bg-white/30 text-white text-sm font-bold">
                         {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
-                      <p className="text-sm font-medium leading-tight text-white">Hi, {getFirstName()}</p>
-                      <p className="text-[10px] text-white/70 capitalize">{user.role}</p>
+                      <p className="text-sm font-semibold leading-tight text-white">
+                        Hi, {getHeaderGreeting()}
+                      </p>
+                      <p className="text-[10px] text-white/80">{getRoleDisplayName(user.role)}</p>
                     </div>
                     <ChevronDown className={cn(
                       "h-4 w-4 text-white transition-transform duration-300",
@@ -313,56 +687,145 @@ export function Header({ user, onLogout }: HeaderProps) {
                     )} />
                   </Button>
 
+                  {/* DROPDOWN MENU - Context-aware based on current page */}
                   {profileOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-fade-in z-50">
-                      <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-primary/5 to-transparent">
+                    <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                      {/* User Info Header */}
+                      <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
                         <div className="flex items-center gap-3">
                           <Avatar className="h-12 w-12 ring-2 ring-primary/20">
                             <AvatarImage src={user.avatar} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-lg">
+                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-lg font-bold">
                               {getUserInitials()}
                             </AvatarFallback>
                           </Avatar>
-                          <div>
-                            <p className="font-semibold text-gray-900">{user.name}</p>
-                            <p className="text-sm text-gray-500">{user.email}</p>
-                            <p className="text-xs text-primary capitalize mt-0.5">{user.role}</p>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 truncate">{user.name}</p>
+                            <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                            <Badge className={cn("mt-1.5 text-xs text-white", getRoleBadgeColor(user.role))}>
+                              {getRoleDisplayName(user.role)}
+                            </Badge>
                           </div>
                         </div>
                       </div>
                       
-                      <div className="py-2">
-                        <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3">
-                          <User className="h-4 w-4" />
-                          <span>Profile</span>
-                        </button>
-                        <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3">
-                          <GraduationCap className="h-4 w-4" />
-                          <span>My Progress</span>
-                        </button>
-                        <button className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3">
-                          <Settings className="h-4 w-4" />
-                          <span>Settings</span>
-                        </button>
+                      {/* DASHBOARD BUTTON - Primary CTA on Home & Portal pages */}
+                      {(isHomePage || isPortalPage) && (
+                        <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
+                          <Link 
+                            href={getDashboardLink(user.role)}
+                            className="w-full px-3 py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            <span>
+                              {user.role === 'admin' ? 'Admin Dashboard' : 
+                               user.role === 'teacher' ? 'Teacher Dashboard' : 
+                               'Student Dashboard'}
+                            </span>
+                            <ArrowRight className="h-4 w-4 ml-1" />
+                          </Link>
+                        </div>
+                      )}
+                      
+                      {/* Main Menu Items - Only on dashboard pages */}
+                      {!isPortalPage && !isHomePage && (
+                        <div className="py-1">
+                          <Link 
+                            href={user.role === 'student' ? '/student?tab=profile' : user.role === 'admin' ? '/admin?tab=settings' : '/staff?tab=overview'} 
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <User className="h-4 w-4 text-gray-400" />
+                            <span>My Profile</span>
+                          </Link>
+                          
+                          <Link 
+                            href="/notifications"
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <Bell className="h-4 w-4 text-gray-400" />
+                            <span>Notifications</span>
+                            {notificationCount > 0 && (
+                              <Badge className="ml-auto bg-red-500 text-white text-xs">{notificationCount}</Badge>
+                            )}
+                          </Link>
+                          
+                          <Link 
+                            href={user.role === 'student' ? '/student?tab=settings' : user.role === 'admin' ? '/admin?tab=settings' : '/staff?tab=settings'} 
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <Settings className="h-4 w-4 text-gray-400" />
+                            <span>Settings</span>
+                          </Link>
+                        </div>
+                      )}
+                      
+                      {/* Quick Links / Quick Switch Section - Context-aware */}
+                      <div className="py-1 border-t border-gray-100">
+                        <p className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                          {!isPortalPage && !isHomePage ? 'Quick Switch' : 'Quick Links'}
+                        </p>
+                        
+                        {/* Home Link - Show if not on home */}
+                        {pathname !== '/' && (
+                          <Link 
+                            href="/" 
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                              <Home className="h-4 w-4 text-blue-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium">Home Page</p>
+                              <p className="text-xs text-gray-400">Return to main website</p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                          </Link>
+                        )}
+                        
+                        {/* Portal Link - Show if not on portal */}
+                        {pathname !== '/portal' && (
+                          <Link 
+                            href="/portal" 
+                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group"
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                              <KeyRound className="h-4 w-4 text-emerald-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium">Portal Page</p>
+                              <p className="text-xs text-gray-400">Login or switch account</p>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                          </Link>
+                        )}
                       </div>
                       
-                      <div className="border-t border-gray-100 p-2">
+                      {/* Sign Out */}
+                      <div className="border-t border-gray-100"></div>
+                      
+                      <div className="p-2">
                         <button 
-                          onClick={onLogout}
-                          className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3"
+                          onClick={handleLogoutClick}
+                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3"
                         >
                           <LogOut className="h-4 w-4" />
-                          <span>Log out</span>
+                          <span>Sign Out</span>
                         </button>
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                // Portal Login button - points to /portal
-                !isPortalPage && (
+                /* PORTAL LOGIN - Only for guests on home page */
+                !user?.isAuthenticated && isHomePage && (
                   <Link href="/portal">
-                    <Button className="bg-secondary hover:bg-secondary/90 text-white rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-6 py-2">
+                    <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-6 py-2 font-semibold">
                       <KeyRound className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
                       Portal Login
                     </Button>
@@ -370,10 +833,10 @@ export function Header({ user, onLogout }: HeaderProps) {
                 )
               )}
 
-              {/* Mobile Menu Button */}
+              {/* Hamburger Menu Button */}
               <button
-                className="lg:hidden relative w-10 h-10 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 z-50"
-                onClick={toggleMobileMenu}
+                className="lg:hidden relative w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95"
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               >
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -381,157 +844,268 @@ export function Header({ user, onLogout }: HeaderProps) {
             </div>
           </div>
 
+          {/* Search Bar */}
           {searchOpen && (
-            <div className="absolute top-full left-0 right-0 mt-2 px-4 animate-fade-in">
+            <div className="absolute top-full left-0 right-0 mt-3 px-4">
               <div className="max-w-2xl mx-auto">
-                <Input
-                  type="search"
-                  placeholder="Search for courses, exams, students..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full bg-white shadow-xl border-primary/20 rounded-full"
-                  autoFocus
-                />
+                <form onSubmit={handleSearch}>
+                  <div className="relative">
+                    <Input
+                      type="search"
+                      placeholder="Search..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full bg-white shadow-2xl border-2 border-primary/30 rounded-full py-6 text-lg pr-12"
+                      autoFocus
+                    />
+                    <button
+                      type="submit"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full bg-primary text-white hover:bg-primary/90 transition-colors"
+                    >
+                      <Search className="h-5 w-5" />
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
         </div>
-
-        {profileOpen && (
-          <div 
-            className="fixed inset-0 z-40"
-            onClick={() => setProfileOpen(false)}
-          />
-        )}
       </header>
 
-      {/* Mobile Navigation Menu */}
+      {/* PREMIUM CBT PLATFORM DIALOG */}
+      <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
+        <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto p-0">
+          <div className="relative bg-gradient-to-br from-[#0A2472] via-[#1e3a8a] to-[#0A2472] p-8 text-white overflow-hidden">
+            <div className="absolute top-0 right-0 w-80 h-80 bg-[#F5A623]/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-2xl" />
+            
+            <DialogHeader className="relative z-10">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-[#F5A623] to-[#F5A623]/80 flex items-center justify-center shadow-xl">
+                  <Laptop className="h-8 w-8 text-white" />
+                </div>
+                <div>
+                  <DialogTitle className="text-3xl font-bold text-white flex items-center gap-2">
+                    Vincollins CBT Platform
+                    <Badge className="bg-[#F5A623] text-[#0A2472] ml-2 text-xs">SECURE</Badge>
+                  </DialogTitle>
+                  <DialogDescription className="text-white/80 text-base mt-1">
+                    Secure, Reliable & Intelligent Online Examination System
+                  </DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+          </div>
+
+          <div className="p-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                <p className="text-3xl font-bold text-[#0A2472]">10k+</p>
+                <p className="text-sm text-gray-600 font-medium">Exams Delivered</p>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+                <p className="text-3xl font-bold text-[#0A2472]">99.9%</p>
+                <p className="text-sm text-gray-600 font-medium">Platform Uptime</p>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+                <p className="text-3xl font-bold text-[#0A2472]">256-bit</p>
+                <p className="text-sm text-gray-600 font-medium">SSL Encryption</p>
+              </motion.div>
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+                <p className="text-3xl font-bold text-[#0A2472]">24/7</p>
+                <p className="text-sm text-gray-600 font-medium">Tech Support</p>
+              </motion.div>
+            </div>
+
+            <div className="mb-8">
+              <h3 className="text-lg font-bold text-[#0A2472] mb-4 flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-[#F5A623]" />
+                Key Features
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {cbtFeatures.map((feature, idx) => (
+                  <motion.div
+                    key={idx}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: idx * 0.1 }}
+                    className="flex items-start gap-4 p-4 bg-gray-50 rounded-xl hover:shadow-md transition-all border border-gray-100"
+                  >
+                    <div className="h-10 w-10 rounded-lg bg-[#F5A623]/10 flex items-center justify-center shrink-0">
+                      <feature.icon className="h-5 w-5 text-[#F5A623]" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-[#0A2472]">{feature.title}</p>
+                      <p className="text-sm text-gray-600">{feature.description}</p>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 justify-end border-t pt-6">
+              <Button variant="outline" onClick={() => setShowCbtInfo(false)}>
+                Close
+              </Button>
+              <Button 
+                onClick={() => {
+                  setShowCbtInfo(false)
+                  router.push('/portal')
+                }}
+                className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] font-bold shadow-md hover:shadow-lg"
+              >
+                <KeyRound className="mr-2 h-4 w-4" />
+                Login to Student Portal
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
         <>
-          {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+            className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           />
           
-          {/* Menu Panel */}
-          <div 
-            ref={mobileMenuRef}
-            className="fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-2xl z-50 lg:hidden transform transition-transform duration-300 ease-out overflow-y-auto"
-            style={{ transform: mobileMenuOpen ? 'translateX(0)' : 'translateX(100%)' }}
-          >
-            {/* Close button */}
-            <div className="sticky top-0 right-0 flex justify-end p-4 bg-white border-b z-10">
-              <button
-                onClick={() => setMobileMenuOpen(false)}
-                className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-                aria-label="Close menu"
-              >
-                <X className="h-6 w-6 text-gray-600" />
+          <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 lg:hidden overflow-y-auto">
+            <div className="bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] text-white p-5">
+              <button onClick={() => setMobileMenuOpen(false)} className="absolute top-4 right-4 p-2">
+                <X className="h-5 w-5" />
               </button>
-            </div>
-
-            {/* User Info for Mobile */}
-            {user?.isAuthenticated && (
-              <div className="p-5 border-b border-gray-100 bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-xl">
-                  <Avatar className="h-14 w-14 ring-2 ring-primary/20">
-                    <AvatarFallback className="bg-primary/10 text-primary text-lg font-bold">
-                      {getUserInitials()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="font-semibold text-gray-900">{user.name}</p>
-                    <p className="text-sm text-gray-500">{user.email}</p>
-                    <div className="flex items-center gap-2 mt-1">
-                      <div className="px-2 py-0.5 bg-primary/10 rounded-full">
-                        <p className="text-xs text-primary capitalize font-medium">{user.role}</p>
-                      </div>
+              <p className="font-semibold text-lg">Vincollins College</p>
+              
+              {user?.isAuthenticated && (
+                <div className="mt-4 p-4 bg-white/10 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12">
+                      <AvatarImage src={user.avatar} />
+                      <AvatarFallback className="bg-white/30 text-white">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-bold">{getMobileGreeting()}</p>
+                      <p className="text-sm text-white/80">{user.name}</p>
+                      <Badge className={cn("mt-1 text-white", getRoleBadgeColor(user.role))}>
+                        {getRoleDisplayName(user.role)}
+                      </Badge>
                     </div>
                   </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4">
+              {currentNavigation.map((item) => {
+                const Icon = item.icon
+                const isActive = isNavActive(item.href, item.tab)
+                const isCbt = item.name === 'CBT Platform' || item.isCbt
+                
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={(e) => {
+                      if (isCbt) {
+                        e.preventDefault()
+                        setMobileMenuOpen(false)
+                        setShowCbtInfo(true)
+                      } else {
+                        setMobileMenuOpen(false)
+                      }
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 px-4 py-3 rounded-lg transition-all",
+                      isActive ? "bg-[#0A2472]/10 text-[#0A2472] font-semibold" : "text-gray-700 hover:bg-gray-100"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{item.name}</span>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* Dashboard Link for authenticated users on public pages */}
+            {user?.isAuthenticated && (isHomePage || isPortalPage) && (
+              <div className="p-4 border-t">
+                <Link
+                  href={getDashboardLink(user.role)}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
+                >
+                  <LayoutDashboard className="h-5 w-5" />
+                  Go to Dashboard
+                </Link>
+              </div>
+            )}
+
+            {/* Quick Switch Section for Dashboard Pages */}
+            {user?.isAuthenticated && !isPortalPage && !isHomePage && (
+              <div className="p-4 border-t bg-gray-50/50">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Switch</p>
+                <div className="space-y-1">
+                  {pathname !== '/' && (
+                    <Link
+                      href="/"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+                    >
+                      <Home className="h-5 w-5 text-blue-500" />
+                      <span>Home Page</span>
+                    </Link>
+                  )}
+                  {pathname !== '/portal' && (
+                    <Link
+                      href="/portal"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+                    >
+                      <KeyRound className="h-5 w-5 text-emerald-500" />
+                      <span>Portal Page</span>
+                    </Link>
+                  )}
                 </div>
               </div>
             )}
 
-            {/* Mobile Navigation Links */}
-            <div className="p-4">
-              <div className="space-y-1">
-                {currentNavigation.map((item) => {
-                  const Icon = item.icon
-                  const isActive = pathname === item.href
-                  
+            <div className="p-4 border-t">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Links</p>
+              <div className="grid grid-cols-2 gap-2">
+                {quickLinks.map((link) => {
+                  const Icon = link.icon
                   return (
                     <Link
-                      key={item.name}
-                      href={item.href}
-                      className={cn(
-                        "flex items-center gap-3 text-base font-medium transition-all duration-200 py-3 px-4 rounded-xl",
-                        isActive 
-                          ? "text-primary bg-primary/10" 
-                          : "text-gray-700 hover:bg-gray-50"
-                      )}
+                      key={link.name}
+                      href={link.href}
                       onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-xl"
                     >
-                      <Icon className={cn(
-                        "h-5 w-5",
-                        isActive ? "text-primary" : "text-gray-500"
-                      )} />
-                      <span className="flex-1">{item.name}</span>
-                      {isActive && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                      )}
+                      <Icon className="h-4 w-4 text-[#0A2472]" />
+                      <span>{link.name}</span>
                     </Link>
                   )
                 })}
               </div>
             </div>
 
-            {/* Quick Resources */}
-            <div className="px-4 py-3 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                Quick Resources
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <Link href="/results" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                  <GraduationCap className="h-4 w-4" />
-                  <span>Check Results</span>
-                </Link>
-                <Link href="/calendar" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                  <Calendar className="h-4 w-4" />
-                  <span>Academic Calendar</span>
-                </Link>
-                <Link href="/library" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                  <BookOpen className="h-4 w-4" />
-                  <span>E-Library</span>
-                </Link>
-                <Link href="/support" className="flex items-center gap-2 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                  <Heart className="h-4 w-4" />
-                  <span>Student Support</span>
-                </Link>
-              </div>
-            </div>
-
-            {/* Contact Info */}
-            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                Contact Information
-              </p>
+            <div className="p-4 border-t">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Contact Us</p>
               <div className="space-y-2">
                 {contactInfo.map((info, idx) => (
-                  <div key={idx} className="flex items-center gap-2 px-2 py-1.5">
-                    <info.icon className="h-3.5 w-3.5 text-secondary" />
+                  <div key={idx} className="flex items-center gap-3 px-2 py-1.5">
+                    <info.icon className="h-4 w-4 text-[#0A2472]" />
                     <span className="text-xs text-gray-600">{info.text}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Social Links */}
-            <div className="px-4 py-3 border-t border-gray-100">
-              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                Connect With Us
-              </p>
-              <div className="flex justify-center gap-3">
+            <div className="p-4 border-t">
+              <div className="flex justify-center gap-5">
                 {socialLinks.map((social, idx) => {
                   const Icon = social.icon
                   return (
@@ -539,88 +1113,81 @@ export function Header({ user, onLogout }: HeaderProps) {
                       key={idx}
                       href={social.href}
                       target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 hover:bg-secondary hover:text-white transition-all duration-300"
+                      className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-[#0A2472] hover:text-white transition-all"
                     >
-                      <Icon className="h-4 w-4" />
+                      <Icon className="h-5 w-5" />
                     </Link>
                   )
                 })}
               </div>
             </div>
 
-            {/* Trust Badges */}
-            <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50">
-              <div className="flex flex-wrap justify-center gap-4">
-                <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <Award className="h-3 w-3 text-secondary" />
-                  <span>25+ Years of Excellence</span>
-                </div>
-                <div className="w-px h-3 bg-gray-300" />
-                <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <Shield className="h-3 w-3 text-secondary" />
-                  <span>Fully Accredited</span>
-                </div>
-                <div className="w-px h-3 bg-gray-300" />
-                <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                  <Heart className="h-3 w-3 text-secondary" />
-                  <span>500+ Students</span>
-                </div>
-              </div>
+            <div className="p-4 border-t text-center">
+              <p className="text-xs text-gray-500">© {currentYear} Vincollins College</p>
             </div>
 
-            {/* Copyright Section */}
-            <div className="px-4 py-4 border-t border-gray-200 bg-gray-100">
-              <div className="text-center space-y-2">
-                <div className="flex items-center justify-center gap-1 text-xs text-gray-500">
-                  <Copyright className="h-3 w-3" />
-                  <span>{currentYear} Vincollins College.</span>
-                  <span>All rights reserved.</span>
-                </div>
-                <div className="flex flex-wrap justify-center gap-3 text-[10px] text-gray-400">
-                  <Link href="/privacy" className="hover:text-secondary transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                    Privacy Policy
-                  </Link>
-                  <span>•</span>
-                  <Link href="/terms" className="hover:text-secondary transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                    Terms of Service
-                  </Link>
-                  <span>•</span>
-                  <Link href="/accessibility" className="hover:text-secondary transition-colors" onClick={() => setMobileMenuOpen(false)}>
-                    Accessibility
-                  </Link>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-2">
-                  Designed with <Heart className="h-2 w-2 inline text-red-500" /> for excellence in education
-                </p>
-              </div>
-            </div>
-
-            {/* Mobile Bottom Actions */}
-            <div className="p-4 border-t border-gray-100 bg-gray-50 sticky bottom-0">
-              {user?.isAuthenticated ? (
+            {user?.isAuthenticated && (
+              <div className="p-4 border-t sticky bottom-0 bg-white">
                 <Button 
                   variant="outline" 
-                  className="w-full justify-center rounded-full border-gray-300 hover:border-red-300 hover:bg-red-50 hover:text-red-600" 
-                  onClick={onLogout}
+                  className="w-full text-red-600"
+                  onClick={handleLogoutClick}
                 >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Log out
+                  Sign Out
                 </Button>
-              ) : (
-                !isPortalPage && (
-                  <Link href="/portal" onClick={() => setMobileMenuOpen(false)}>
-                    <Button className="w-full bg-gradient-to-r from-primary to-[#1e3a8a] hover:from-primary/90 hover:to-[#1e3a8a]/90 text-white rounded-full shadow-md">
-                      <KeyRound className="mr-2 h-4 w-4" />
-                      Portal Login
-                    </Button>
-                  </Link>
-                )
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </>
       )}
+
+      {/* Sign Out Confirmation Dialog */}
+      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+        <AlertDialogContent className="rounded-2xl max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl flex items-center gap-2">
+              <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
+              </div>
+              Sign Out?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500">
+              Are you sure you want to sign out of your account? You&apos;ll need to log in again to access your dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmSignOut}
+              className="rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md shadow-red-500/25"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
+  )
+}
+
+export function Header(props: HeaderProps) {
+  return (
+    <Suspense fallback={
+      <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-3">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse" />
+              <div className="h-6 w-32 bg-white/20 rounded animate-pulse" />
+            </div>
+            <div className="h-10 w-24 bg-white/20 rounded-full animate-pulse" />
+          </div>
+        </div>
+      </header>
+    }>
+      <HeaderContent {...props} />
+    </Suspense>
   )
 }
