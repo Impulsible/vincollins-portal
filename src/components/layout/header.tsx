@@ -526,7 +526,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse" />
               <div className="h-6 w-32 bg-white/20 rounded animate-pulse" />
             </div>
-            <div className="h-10 w-24 bg-white/20 rounded-full animate-pulse" />
+            <div className="h-10 w-10 bg-white/20 rounded-full animate-pulse" />
           </div>
         </div>
       </header>
@@ -537,13 +537,13 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     <>
       <header className={cn(
         "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500",
-        scrolled ? "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] shadow-2xl py-2" : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-4"
+        scrolled ? "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] shadow-2xl py-2" : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-3 sm:py-4"
       )}>
-        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between gap-4">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between gap-2 sm:gap-4">
             
-            {/* CLEAN LOGO - NO CIRCLE */}
-            <Link href="/" className="flex items-center gap-3 group flex-shrink-0">
+            {/* CLEAN LOGO - Smaller on mobile */}
+            <Link href="/" className="flex items-center gap-2 sm:gap-3 group flex-shrink-0">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
@@ -551,7 +551,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 className="relative"
               >
                 {schoolSettings?.logo_path ? (
-                  <div className="relative h-10 w-10 sm:h-11 sm:w-11 group-hover:scale-105 transition-all duration-300">
+                  <div className="relative h-8 w-8 sm:h-11 sm:w-11 group-hover:scale-105 transition-all duration-300">
                     <Image 
                       src={schoolSettings.logo_path} 
                       alt={schoolSettings.school_name || 'Vincollins College Logo'} 
@@ -562,21 +562,21 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     />
                   </div>
                 ) : (
-                  <div className="relative h-10 w-10 sm:h-11 sm:w-11 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
-                    <GraduationCap className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                  <div className="relative h-8 w-8 sm:h-11 sm:w-11 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
+                    <GraduationCap className="h-5 w-5 sm:h-7 sm:w-7 text-white" />
                   </div>
                 )}
               </motion.div>
               <div className="flex flex-col">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-lg sm:text-xl font-bold text-white leading-tight tracking-wide">
+                <div className="flex items-baseline gap-0.5 sm:gap-1">
+                  <span className="text-sm sm:text-xl font-bold text-white leading-tight tracking-wide">
                     Vincollins
                   </span>
-                  <span className="text-lg sm:text-xl font-bold text-[#F5A623] leading-tight tracking-wide">
+                  <span className="text-sm sm:text-xl font-bold text-[#F5A623] leading-tight tracking-wide">
                     College
                   </span>
                 </div>
-                <span className="text-[10px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium">
+                <span className="text-[8px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium hidden sm:block">
                   GEARED TOWARDS EXCELLENCE
                 </span>
               </div>
@@ -602,7 +602,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       onClick={isCbt ? handleCbtClick : undefined}
                       prefetch={false}
                       className={cn(
-                        "relative px-5 py-2.5 text-sm font-semibold transition-all duration-300 rounded-full",
+                        "relative px-4 xl:px-5 py-2 sm:py-2.5 text-sm font-semibold transition-all duration-300 rounded-full",
                         isActive 
                           ? "text-[#0A2472] bg-white shadow-lg" 
                           : "text-white hover:text-white hover:bg-white/25"
@@ -623,19 +623,16 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </nav>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            {/* Right Section - Proper spacing for mobile */}
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               {/* Search Button */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSearchOpen(!searchOpen)}
-                className={cn(
-                  "rounded-full text-white hover:bg-white/20 transition-all duration-300",
-                  isPortalPage && "-ml-2"
-                )}
+                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
               >
-                <Search className="h-5 w-5" />
+                <Search className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
 
               {/* Notifications - Only on dashboard pages */}
@@ -646,12 +643,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="relative rounded-full text-white hover:bg-white/20 transition-all duration-300"
+                        className="relative h-9 w-9 sm:h-10 sm:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
                         onClick={handleNotificationClick}
                       >
-                        <Bell className="h-5 w-5" />
+                        <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
                         {notificationCount > 0 && (
-                          <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 rounded-full text-white text-xs flex items-center justify-center font-bold animate-pulse">
+                          <span className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 bg-red-500 rounded-full text-white text-[10px] sm:text-xs flex items-center justify-center font-bold animate-pulse">
                             {notificationCount > 9 ? '9+' : notificationCount}
                           </span>
                         )}
@@ -664,79 +661,79 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </TooltipProvider>
               )}
 
-              {/* FOR AUTHENTICATED USERS - Show Avatar with Dropdown on ALL pages */}
+              {/* FOR AUTHENTICATED USERS - Show Avatar with Dropdown */}
               {user?.isAuthenticated ? (
                 <div className="relative" ref={profileDropdownRef}>
                   <Button
                     variant="ghost"
                     onClick={() => setProfileOpen(!profileOpen)}
-                    className="flex items-center gap-2 rounded-full text-white hover:bg-white/20 px-3 py-1.5 transition-all duration-300"
+                    className="flex items-center gap-1 sm:gap-2 rounded-full text-white hover:bg-white/20 px-2 sm:px-3 py-1 sm:py-1.5 transition-all duration-300 h-auto"
                   >
-                    <Avatar className="h-8 w-8 ring-2 ring-white/50">
+                    <Avatar className="h-7 w-7 sm:h-8 sm:w-8 ring-1 sm:ring-2 ring-white/50">
                       <AvatarImage src={user.avatar} />
-                      <AvatarFallback className="bg-white/30 text-white text-sm font-bold">
+                      <AvatarFallback className="bg-white/30 text-white text-xs sm:text-sm font-bold">
                         {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="hidden md:block text-left">
-                      <p className="text-sm font-semibold leading-tight text-white">
+                      <p className="text-xs sm:text-sm font-semibold leading-tight text-white">
                         Hi, {getHeaderGreeting()}
                       </p>
-                      <p className="text-[10px] text-white/80">{getRoleDisplayName(user.role)}</p>
+                      <p className="text-[9px] sm:text-[10px] text-white/80">{getRoleDisplayName(user.role)}</p>
                     </div>
                     <ChevronDown className={cn(
-                      "h-4 w-4 text-white transition-transform duration-300",
+                      "h-3 w-3 sm:h-4 sm:w-4 text-white transition-transform duration-300",
                       profileOpen && "rotate-180"
                     )} />
                   </Button>
 
-                  {/* DROPDOWN MENU - Context-aware based on current page */}
+                  {/* DROPDOWN MENU */}
                   {profileOpen && (
-                    <div className="absolute top-full right-0 mt-2 w-72 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
+                    <div className="absolute top-full right-0 mt-2 w-64 sm:w-72 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50">
                       {/* User Info Header */}
-                      <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12 ring-2 ring-primary/20">
+                      <div className="p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-primary/20">
                             <AvatarImage src={user.avatar} />
-                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-lg font-bold">
+                            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-base sm:text-lg font-bold">
                               {getUserInitials()}
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-gray-900 truncate">{user.name}</p>
-                            <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                            <Badge className={cn("mt-1.5 text-xs text-white", getRoleBadgeColor(user.role))}>
+                            <p className="font-semibold text-gray-900 truncate text-sm sm:text-base">{user.name}</p>
+                            <p className="text-xs sm:text-sm text-gray-500 truncate">{user.email}</p>
+                            <Badge className={cn("mt-1 sm:mt-1.5 text-xs text-white", getRoleBadgeColor(user.role))}>
                               {getRoleDisplayName(user.role)}
                             </Badge>
                           </div>
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Primary CTA on Home & Portal pages */}
-                      {(isHomePage || isPortalPage) && (
-                        <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
-                          <Link 
-                            href={getDashboardLink(user.role)}
-                            className="w-full px-3 py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg"
-                            onClick={() => setProfileOpen(false)}
-                          >
-                            <LayoutDashboard className="h-4 w-4" />
-                            <span>
-                              {user.role === 'admin' ? 'Admin Dashboard' : 
-                               user.role === 'teacher' ? 'Teacher Dashboard' : 
-                               'Student Dashboard'}
-                            </span>
-                            <ArrowRight className="h-4 w-4 ml-1" />
-                          </Link>
-                        </div>
-                      )}
+                      {/* DASHBOARD BUTTON - Primary CTA - FIXED LINK */}
+                      <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
+                        <button
+                          onClick={() => {
+                            setProfileOpen(false)
+                            router.push(getDashboardLink(user.role))
+                          }}
+                          className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
+                        >
+                          <LayoutDashboard className="h-4 w-4" />
+                          <span>
+                            {user.role === 'admin' ? 'Admin Dashboard' : 
+                             user.role === 'teacher' ? 'Teacher Dashboard' : 
+                             'Student Dashboard'}
+                          </span>
+                          <ArrowRight className="h-4 w-4 ml-1" />
+                        </button>
+                      </div>
                       
                       {/* Main Menu Items - Only on dashboard pages */}
                       {!isPortalPage && !isHomePage && (
                         <div className="py-1">
                           <Link 
                             href={user.role === 'student' ? '/student?tab=profile' : user.role === 'admin' ? '/admin?tab=settings' : '/staff?tab=overview'} 
-                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
                             onClick={() => setProfileOpen(false)}
                           >
                             <User className="h-4 w-4 text-gray-400" />
@@ -745,7 +742,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           
                           <Link 
                             href="/notifications"
-                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
                             onClick={() => setProfileOpen(false)}
                           >
                             <Bell className="h-4 w-4 text-gray-400" />
@@ -757,7 +754,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           
                           <Link 
                             href={user.role === 'student' ? '/student?tab=settings' : user.role === 'admin' ? '/admin?tab=settings' : '/staff?tab=settings'} 
-                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
                             onClick={() => setProfileOpen(false)}
                           >
                             <Settings className="h-4 w-4 text-gray-400" />
@@ -766,45 +763,43 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       )}
                       
-                      {/* Quick Links / Quick Switch Section - Context-aware */}
+                      {/* Quick Links Section */}
                       <div className="py-1 border-t border-gray-100">
-                        <p className="px-4 py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                          {!isPortalPage && !isHomePage ? 'Quick Switch' : 'Quick Links'}
+                        <p className="px-3 sm:px-4 py-1 sm:py-2 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                          Quick Links
                         </p>
                         
-                        {/* Home Link - Show if not on home */}
                         {pathname !== '/' && (
                           <Link 
                             href="/" 
-                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group"
                             onClick={() => setProfileOpen(false)}
                           >
-                            <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                              <Home className="h-4 w-4 text-blue-500" />
+                            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                              <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500" />
                             </div>
                             <div className="flex-1">
-                              <p className="font-medium">Home Page</p>
-                              <p className="text-xs text-gray-400">Return to main website</p>
+                              <p className="font-medium text-sm">Home Page</p>
+                              <p className="text-[10px] sm:text-xs text-gray-400">Return to main website</p>
                             </div>
-                            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
                           </Link>
                         )}
                         
-                        {/* Portal Link - Show if not on portal */}
                         {pathname !== '/portal' && (
                           <Link 
                             href="/portal" 
-                            className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group"
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group"
                             onClick={() => setProfileOpen(false)}
                           >
-                            <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                              <KeyRound className="h-4 w-4 text-emerald-500" />
+                            <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                              <KeyRound className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500" />
                             </div>
                             <div className="flex-1">
-                              <p className="font-medium">Portal Page</p>
-                              <p className="text-xs text-gray-400">Login or switch account</p>
+                              <p className="font-medium text-sm">Portal Page</p>
+                              <p className="text-[10px] sm:text-xs text-gray-400">Login or switch account</p>
                             </div>
-                            <ChevronRight className="h-4 w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-300 group-hover:text-gray-500 transition-colors" />
                           </Link>
                         )}
                       </div>
@@ -815,7 +810,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       <div className="p-2">
                         <button 
                           onClick={handleLogoutClick}
-                          className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3"
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3"
                         >
                           <LogOut className="h-4 w-4" />
                           <span>Sign Out</span>
@@ -825,20 +820,20 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   )}
                 </div>
               ) : (
-                /* PORTAL LOGIN - Only for guests on DESKTOP home page - HIDDEN ON MOBILE */
+                /* PORTAL LOGIN - Desktop only */
                 !user?.isAuthenticated && isHomePage && (
                   <Link href="/portal" className="hidden sm:block">
-                    <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-6 py-2 font-semibold">
-                      <KeyRound className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
+                    <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-4 sm:px-6 py-2 font-semibold text-sm">
+                      <KeyRound className="mr-1.5 sm:mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
                       Portal Login
                     </Button>
                   </Link>
                 )
               )}
 
-              {/* Hamburger Menu Button */}
+              {/* Hamburger Menu Button - ALWAYS VISIBLE ON MOBILE */}
               <button
-                className="lg:hidden relative w-11 h-11 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95"
+                className="lg:hidden relative h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95 ml-0.5"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
               >
@@ -878,21 +873,21 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
       {/* PREMIUM CBT PLATFORM DIALOG */}
       <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
         <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto p-0">
-          <div className="relative bg-gradient-to-br from-[#0A2472] via-[#1e3a8a] to-[#0A2472] p-8 text-white overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-[#F5A623]/10 rounded-full blur-3xl" />
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/10 rounded-full blur-2xl" />
+          <div className="relative bg-gradient-to-br from-[#0A2472] via-[#1e3a8a] to-[#0A2472] p-6 sm:p-8 text-white overflow-hidden">
+            <div className="absolute top-0 right-0 w-60 sm:w-80 h-60 sm:h-80 bg-[#F5A623]/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-0 left-0 w-48 sm:w-64 h-48 sm:h-64 bg-blue-500/10 rounded-full blur-2xl" />
             
             <DialogHeader className="relative z-10">
-              <div className="flex items-center gap-4 mb-4">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-[#F5A623] to-[#F5A623]/80 flex items-center justify-center shadow-xl">
-                  <Laptop className="h-8 w-8 text-white" />
+              <div className="flex items-center gap-3 sm:gap-4 mb-4">
+                <div className="h-12 w-12 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br from-[#F5A623] to-[#F5A623]/80 flex items-center justify-center shadow-xl">
+                  <Laptop className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
                 <div>
-                  <DialogTitle className="text-3xl font-bold text-white flex items-center gap-2">
+                  <DialogTitle className="text-xl sm:text-3xl font-bold text-white flex items-center gap-2">
                     Vincollins CBT Platform
                     <Badge className="bg-[#F5A623] text-[#0A2472] ml-2 text-xs">SECURE</Badge>
                   </DialogTitle>
-                  <DialogDescription className="text-white/80 text-base mt-1">
+                  <DialogDescription className="text-white/80 text-sm sm:text-base mt-1">
                     Secure, Reliable & Intelligent Online Examination System
                   </DialogDescription>
                 </div>
@@ -900,46 +895,46 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
             </DialogHeader>
           </div>
 
-          <div className="p-8">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
-                <p className="text-3xl font-bold text-[#0A2472]">10k+</p>
-                <p className="text-sm text-gray-600 font-medium">Exams Delivered</p>
+          <div className="p-6 sm:p-8">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-3 sm:p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border border-blue-100">
+                <p className="text-xl sm:text-3xl font-bold text-[#0A2472]">10k+</p>
+                <p className="text-xs sm:text-sm text-gray-600 font-medium">Exams Delivered</p>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
-                <p className="text-3xl font-bold text-[#0A2472]">99.9%</p>
-                <p className="text-sm text-gray-600 font-medium">Platform Uptime</p>
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-3 sm:p-4 bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-100">
+                <p className="text-xl sm:text-3xl font-bold text-[#0A2472]">99.9%</p>
+                <p className="text-xs sm:text-sm text-gray-600 font-medium">Platform Uptime</p>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
-                <p className="text-3xl font-bold text-[#0A2472]">256-bit</p>
-                <p className="text-sm text-gray-600 font-medium">SSL Encryption</p>
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-3 sm:p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+                <p className="text-xl sm:text-3xl font-bold text-[#0A2472]">256-bit</p>
+                <p className="text-xs sm:text-sm text-gray-600 font-medium">SSL Encryption</p>
               </motion.div>
-              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
-                <p className="text-3xl font-bold text-[#0A2472]">24/7</p>
-                <p className="text-sm text-gray-600 font-medium">Tech Support</p>
+              <motion.div whileHover={{ scale: 1.02 }} className="text-center p-3 sm:p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border border-purple-100">
+                <p className="text-xl sm:text-3xl font-bold text-[#0A2472]">24/7</p>
+                <p className="text-xs sm:text-sm text-gray-600 font-medium">Tech Support</p>
               </motion.div>
             </div>
 
-            <div className="mb-8">
-              <h3 className="text-lg font-bold text-[#0A2472] mb-4 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-[#F5A623]" />
+            <div className="mb-6 sm:mb-8">
+              <h3 className="text-base sm:text-lg font-bold text-[#0A2472] mb-3 sm:mb-4 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 sm:h-5 sm:w-5 text-[#F5A623]" />
                 Key Features
               </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {cbtFeatures.map((feature, idx) => (
                   <motion.div
                     key={idx}
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: idx * 0.1 }}
-                    className="flex items-start gap-4 p-4 bg-gray-50 rounded-xl hover:shadow-md transition-all border border-gray-100"
+                    className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 bg-gray-50 rounded-xl hover:shadow-md transition-all border border-gray-100"
                   >
-                    <div className="h-10 w-10 rounded-lg bg-[#F5A623]/10 flex items-center justify-center shrink-0">
-                      <feature.icon className="h-5 w-5 text-[#F5A623]" />
+                    <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg bg-[#F5A623]/10 flex items-center justify-center shrink-0">
+                      <feature.icon className="h-4 w-4 sm:h-5 sm:w-5 text-[#F5A623]" />
                     </div>
                     <div>
-                      <p className="font-semibold text-[#0A2472]">{feature.title}</p>
-                      <p className="text-sm text-gray-600">{feature.description}</p>
+                      <p className="font-semibold text-[#0A2472] text-sm sm:text-base">{feature.title}</p>
+                      <p className="text-xs sm:text-sm text-gray-600">{feature.description}</p>
                     </div>
                   </motion.div>
                 ))}
@@ -1033,46 +1028,33 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users on public pages */}
-            {user?.isAuthenticated && (isHomePage || isPortalPage) && (
+            {/* Dashboard Link for authenticated users - FIXED LINK */}
+            {user?.isAuthenticated && (
               <div className="p-4 border-t">
-                <Link
-                  href={getDashboardLink(user.role)}
-                  onClick={() => setMobileMenuOpen(false)}
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false)
+                    router.push(getDashboardLink(user.role))
+                  }}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
                 >
                   <LayoutDashboard className="h-5 w-5" />
                   Go to Dashboard
-                </Link>
+                </button>
               </div>
             )}
 
-            {/* Quick Switch Section for Dashboard Pages */}
-            {user?.isAuthenticated && !isPortalPage && !isHomePage && (
-              <div className="p-4 border-t bg-gray-50/50">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Switch</p>
-                <div className="space-y-1">
-                  {pathname !== '/' && (
-                    <Link
-                      href="/"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
-                    >
-                      <Home className="h-5 w-5 text-blue-500" />
-                      <span>Home Page</span>
-                    </Link>
-                  )}
-                  {pathname !== '/portal' && (
-                    <Link
-                      href="/portal"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
-                    >
-                      <KeyRound className="h-5 w-5 text-emerald-500" />
-                      <span>Portal Page</span>
-                    </Link>
-                  )}
-                </div>
+            {/* Portal Login for unauthenticated users on mobile */}
+            {!user?.isAuthenticated && (
+              <div className="p-4 border-t">
+                <Link
+                  href="/portal"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
+                >
+                  <KeyRound className="h-5 w-5" />
+                  Portal Login
+                </Link>
               </div>
             )}
 
@@ -1186,7 +1168,7 @@ export function Header(props: HeaderProps) {
               <div className="h-10 w-10 rounded-full bg-white/20 animate-pulse" />
               <div className="h-6 w-32 bg-white/20 rounded animate-pulse" />
             </div>
-            <div className="h-10 w-24 bg-white/20 rounded-full animate-pulse" />
+            <div className="h-10 w-10 bg-white/20 rounded-full animate-pulse" />
           </div>
         </div>
       </header>
