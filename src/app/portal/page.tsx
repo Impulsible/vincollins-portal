@@ -1,8 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
- 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - OPTIMIZED WITH SMOOTH TRANSITIONS
+// app/portal/page.tsx - OPTIMIZED WITH HARD REDIRECTS FOR VERCEL
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -49,7 +48,7 @@ export default function LoginPage() {
   } | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  // Check if already logged in - NON-BLOCKING
+  // Check if already logged in - WITH HARD REDIRECT FOR VERCEL
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -72,21 +71,22 @@ export default function LoginPage() {
               redirectPath = '/staff?tab=overview'
             }
             
-            // Smooth redirect without page flash
-            router.replace(redirectPath)
-            return // Don't set isCheckingAuth to false if redirecting
+            // Use window.location for hard redirect (works on Vercel)
+            if (typeof window !== 'undefined') {
+              window.location.href = redirectPath
+              return
+            }
           }
         }
       } catch (err) {
         console.error('Auth check error:', err)
       } finally {
-        // Only set false if not redirecting
         setIsCheckingAuth(false)
       }
     }
     
     checkSession()
-  }, [router])
+  }, [])
 
   // Load school settings - NON-BLOCKING
   useEffect(() => {
@@ -263,7 +263,10 @@ export default function LoginPage() {
                             : loginSuccessData.role === 'teacher' 
                               ? '/staff?tab=overview' 
                               : '/student?tab=overview'
-                          router.replace(redirectPath)
+                          // Hard redirect for Vercel
+                          if (typeof window !== 'undefined') {
+                            window.location.href = redirectPath
+                          }
                         }
                       }}
                       className="flex-1"
@@ -394,10 +397,12 @@ export default function LoginPage() {
           ? '/staff?tab=overview' 
           : '/student?tab=overview'
       
-      // Faster redirect - 1.5 seconds instead of 3
+      // Hard redirect after 1.5 seconds
       setTimeout(() => {
         setShowSuccessModal(false)
-        router.replace(redirectPath)
+        if (typeof window !== 'undefined') {
+          window.location.href = redirectPath
+        }
       }, 1500)
 
     } catch (err: any) {
