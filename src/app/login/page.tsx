@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { signIn } from 'next-auth/react'
+import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { Footer } from '@/components/layout/footer'
 import { Button } from '@/components/ui/button'
@@ -57,7 +57,7 @@ export default function LoginPage() {
     school_motto: 'Geared Towards Success'
   })
 
-  // Define fetchSchoolSettings BEFORE it's used in useEffect
+  // Fetch school settings
   const fetchSchoolSettings = useCallback(async () => {
     try {
       const response = await fetch('/api/school-settings')
@@ -71,7 +71,6 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error('Error fetching school settings:', error)
-      // Use defaults if fetch fails
       setSchoolSettings({
         logo_path: '/images/logo.png',
         school_name: 'Vincollins College',
@@ -80,10 +79,18 @@ export default function LoginPage() {
     }
   }, [])
 
-  // Fetch school settings on mount
   useEffect(() => {
     fetchSchoolSettings()
   }, [fetchSchoolSettings])
+
+  // Helper to normalize role
+  const normalizeRole = (role: string | null | undefined): string => {
+    if (!role) return 'student'
+    const lowerRole = role.toLowerCase()
+    if (lowerRole === 'staff') return 'teacher'
+    if (['admin', 'teacher', 'student'].includes(lowerRole)) return lowerRole
+    return 'student'
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,35 +98,48 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const result = await signIn('credentials', {
+      // Sign in with Supabase
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
-        redirect: false,
       })
 
-      if (result?.error) {
+      if (signInError) {
         setError('Invalid email or password')
         setIsLoading(false)
         return
       }
 
-      // Get user role from session
-      const response = await fetch('/api/auth/session')
-      const session = await response.json()
-      
-      // Redirect based on role
-      const role = session?.user?.role
-      if (role === 'admin') {
-        router.push('/admin/dashboard')
-      } else if (role === 'teacher') {
-        router.push('/teacher/dashboard')
-      } else if (role === 'student') {
-        router.push('/student/dashboard')
-      } else {
-        router.push('/dashboard')
+      if (!data.user) {
+        setError('Login failed. Please try again.')
+        setIsLoading(false)
+        return
       }
-      
+
+      // Get user profile to determine role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', data.user.id)
+        .single()
+
+      const role = normalizeRole(profile?.role || data.user.user_metadata?.role)
+
       toast.success('Login successful!')
+
+      // Redirect based on role
+      switch (role) {
+        case 'admin':
+          router.push('/admin')
+          break
+        case 'teacher':
+          router.push('/staff')
+          break
+        case 'student':
+        default:
+          router.push('/student')
+          break
+      }
     } catch (error) {
       setError('An error occurred. Please try again.')
       setIsLoading(false)
@@ -137,20 +157,38 @@ export default function LoginPage() {
         admin: { email: 'admin@vincollins.edu.ng', password: 'admin123' }
       }
 
-      const result = await signIn('credentials', {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email: demoCredentials[role].email,
         password: demoCredentials[role].password,
-        redirect: false,
       })
 
-      if (result?.error) {
+      if (signInError) {
         setError('Demo login failed. Please check if demo accounts exist.')
         setIsLoading(false)
         return
       }
 
-      router.push(role === 'admin' ? '/admin/dashboard' : `/${role}/dashboard`)
+      if (!data.user) {
+        setError('Demo login failed.')
+        setIsLoading(false)
+        return
+      }
+
       toast.success(`Logged in as ${role}`)
+
+      // Redirect based on role
+      switch (role) {
+        case 'admin':
+          router.push('/admin')
+          break
+        case 'teacher':
+          router.push('/staff')
+          break
+        case 'student':
+        default:
+          router.push('/student')
+          break
+      }
     } catch (error) {
       setError('An error occurred. Please try again.')
       setIsLoading(false)
