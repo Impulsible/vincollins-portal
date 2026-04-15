@@ -1,7 +1,8 @@
-/* eslint-disable react-hooks/static-components */
+/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - UPDATED WITH TAB OVERVIEW REDIRECTS
+// app/portal/page.tsx - OPTIMIZED WITH SMOOTH TRANSITIONS
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -46,34 +47,48 @@ export default function LoginPage() {
     userName: string
     role: 'student' | 'teacher' | 'admin'
   } | null>(null)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  // Check if already logged in
+  // Check if already logged in - NON-BLOCKING
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (session) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role, full_name')
-          .eq('id', session.user.id)
-          .maybeSingle()
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (session) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role, full_name')
+            .eq('id', session.user.id)
+            .maybeSingle()
 
-        if (profile) {
-          const role = profile.role as 'student' | 'teacher' | 'admin'
-          // FIXED: Add ?tab=overview to all redirect paths
-          const redirectPath = role === 'admin' 
-            ? '/admin?tab=overview' 
-            : role === 'teacher' 
-              ? '/staff?tab=overview' 
-              : '/student?tab=overview'
-          router.replace(redirectPath)
+          if (profile) {
+            const role = profile.role?.toLowerCase()
+            let redirectPath = '/student?tab=overview'
+            
+            if (role === 'admin') {
+              redirectPath = '/admin?tab=overview'
+            } else if (role === 'staff' || role === 'teacher') {
+              redirectPath = '/staff?tab=overview'
+            }
+            
+            // Smooth redirect without page flash
+            router.replace(redirectPath)
+            return // Don't set isCheckingAuth to false if redirecting
+          }
         }
+      } catch (err) {
+        console.error('Auth check error:', err)
+      } finally {
+        // Only set false if not redirecting
+        setIsCheckingAuth(false)
       }
     }
+    
     checkSession()
   }, [router])
 
+  // Load school settings - NON-BLOCKING
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
@@ -108,7 +123,7 @@ export default function LoginPage() {
         bgColor: '#F3E8FF',
         borderColor: '#D8B4FE',
         greeting: 'Welcome back, Administrator',
-        redirectPath: '/admin?tab=overview'  // FIXED: Add ?tab=overview
+        redirectPath: '/admin?tab=overview'
       },
       teacher: {
         icon: '📚',
@@ -116,7 +131,7 @@ export default function LoginPage() {
         bgColor: '#EFF6FF',
         borderColor: '#BFDBFE',
         greeting: 'Welcome back, Teacher',
-        redirectPath: '/staff?tab=overview'  // FIXED: Add ?tab=overview
+        redirectPath: '/staff?tab=overview'
       },
       student: {
         icon: '🎓',
@@ -124,7 +139,7 @@ export default function LoginPage() {
         bgColor: '#ECFDF5',
         borderColor: '#A7F3D0',
         greeting: 'Welcome back, Student',
-        redirectPath: '/student?tab=overview'  // FIXED: Add ?tab=overview
+        redirectPath: '/student?tab=overview'
       }
     }
 
@@ -224,7 +239,7 @@ export default function LoginPage() {
                         <motion.div
                           initial={{ width: '0%' }}
                           animate={{ width: '100%' }}
-                          transition={{ duration: 2, ease: 'easeInOut' }}
+                          transition={{ duration: 1.5, ease: 'easeInOut' }}
                           className="h-full rounded-full"
                           style={{ background: config.color }}
                         />
@@ -243,7 +258,6 @@ export default function LoginPage() {
                       onClick={() => {
                         setShowSuccessModal(false)
                         if (loginSuccessData) {
-                          // FIXED: Add ?tab=overview to all redirect paths
                           const redirectPath = loginSuccessData.role === 'admin' 
                             ? '/admin?tab=overview' 
                             : loginSuccessData.role === 'teacher' 
@@ -291,8 +305,6 @@ export default function LoginPage() {
     const cleanEmail = email.trim().toLowerCase().replace(/\s+/g, '')
     const cleanPassword = password.trim()
 
-    console.log('🔐 Login attempt:', { email: cleanEmail, role: selectedRole })
-
     try {
       const { data, error: rpcError } = await supabase
         .rpc('login_user', {
@@ -301,13 +313,10 @@ export default function LoginPage() {
         })
 
       if (rpcError) {
-        console.error('❌ RPC error:', rpcError)
         setError('Login service error. Please try again.')
         setLoading(false)
         return
       }
-
-      console.log('📊 Login result:', data)
 
       if (!data || !data.success) {
         setError(data?.message || 'Invalid email or password')
@@ -351,15 +360,13 @@ export default function LoginPage() {
           })
 
           if (signUpError) {
-            console.error('❌ Sign up error:', signUpError)
+            console.error('Sign up error:', signUpError)
           } else {
             await supabase.auth.signInWithPassword({
               email: cleanEmail,
               password: cleanPassword,
             })
           }
-        } else {
-          console.error('❌ Sign in error:', signInError)
         }
       }
 
@@ -381,23 +388,19 @@ export default function LoginPage() {
       setShowSuccessModal(true)
       setLoading(false)
 
-      // FIXED: Add ?tab=overview to all redirect paths
       const redirectPath = userRole === 'admin' 
         ? '/admin?tab=overview' 
         : userRole === 'teacher' 
           ? '/staff?tab=overview' 
           : '/student?tab=overview'
       
+      // Faster redirect - 1.5 seconds instead of 3
       setTimeout(() => {
-        if (showSuccessModal) {
-          setShowSuccessModal(false)
-          router.replace(redirectPath)
-          router.refresh()
-        }
-      }, 3000)
+        setShowSuccessModal(false)
+        router.replace(redirectPath)
+      }, 1500)
 
     } catch (err: any) {
-      console.error('❌ Unexpected error:', err)
       setError('An unexpected error occurred. Please try again.')
       setLoading(false)
       
@@ -464,7 +467,7 @@ export default function LoginPage() {
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.8 }}
+                  transition={{ duration: 0.5 }}
                   className="text-white max-w-xl mx-auto text-center"
                 >
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-md border border-white/20 mb-6">

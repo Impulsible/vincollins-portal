@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // app/student/page.tsx - STUDENT DASHBOARD - COMPLETE FIXED VERSION WITH URL SYNC
 'use client'
@@ -141,6 +142,7 @@ function StudentDashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
+  const [authChecking, setAuthChecking] = useState(true)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
@@ -158,6 +160,58 @@ function StudentDashboardContent() {
     upcomingExams: [],
     availableExams: []
   })
+
+  // ========== AUTH CHECK - REDIRECT IF NOT AUTHENTICATED ==========
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !session?.user) {
+          console.log('No active session, redirecting to portal')
+          toast.error('Please log in to continue')
+          router.push('/portal')
+          return
+        }
+
+        // Load basic profile to verify user exists
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name, email, class, department, vin_id, photo_url, admission_year')
+          .eq('id', session.user.id)
+          .maybeSingle()
+
+        if (profileError || !profileData) {
+          console.log('Profile not found, redirecting to portal')
+          toast.error('Account not found')
+          router.push('/portal')
+          return
+        }
+
+        // Set basic profile immediately
+        const studentProfile: StudentProfile = {
+          id: session.user.id,
+          full_name: profileData.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Student',
+          email: profileData.email || session.user.email || '',
+          class: profileData.class || 'Not Assigned',
+          department: profileData.department || 'General',
+          vin_id: profileData.vin_id,
+          photo_url: profileData.photo_url || undefined,
+          admission_year: profileData.admission_year,
+          role: profileData.role
+        }
+        
+        setProfile(studentProfile)
+        setAuthChecking(false)
+      } catch (err) {
+        console.error('Auth check error:', err)
+        toast.error('Authentication error')
+        router.push('/portal')
+      }
+    }
+
+    checkAuth()
+  }, [router])
 
   // Sync activeTab with URL parameter
   useEffect(() => {
@@ -186,7 +240,7 @@ function StudentDashboardContent() {
 
       const user = session.user
 
-      // Load student profile
+      // Load full student profile
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
@@ -195,12 +249,6 @@ function StudentDashboardContent() {
 
       if (profileError || !profileData) {
         toast.error('Failed to load profile')
-        return
-      }
-
-      if (profileData.role !== 'student') {
-        toast.error('Access denied. Student accounts only.')
-        router.push('/portal')
         return
       }
 
@@ -307,8 +355,10 @@ function StudentDashboardContent() {
   }, [router])
 
   useEffect(() => {
-    loadDashboardData()
-  }, [loadDashboardData])
+    if (!authChecking) {
+      loadDashboardData()
+    }
+  }, [loadDashboardData, authChecking])
 
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' })
@@ -420,49 +470,15 @@ function StudentDashboardContent() {
     exam.subject.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  if (loading) {
+  if (authChecking || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <Header onLogout={handleLogout} />
-        <div className="flex">
-          <div className={cn(
-            "hidden lg:block transition-all duration-300",
-            sidebarCollapsed ? "w-20" : "w-72"
-          )} />
-          <main className={cn(
-            "flex-1 pt-16 lg:pt-20 pb-8 min-h-screen transition-all duration-300",
-            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-          )}>
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
-              <motion.div 
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-6"
-              >
-                <motion.div variants={itemVariants}>
-                  <Skeleton className="h-40 w-full rounded-2xl" />
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                    {[1, 2, 3, 4].map(i => (
-                      <Skeleton key={i} className="h-32 rounded-xl" />
-                    ))}
-                  </div>
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                  <div className="grid gap-6 lg:grid-cols-3">
-                    <div className="lg:col-span-2">
-                      <Skeleton className="h-64 w-full rounded-xl" />
-                    </div>
-                    <div>
-                      <Skeleton className="h-64 w-full rounded-xl" />
-                    </div>
-                  </div>
-                </motion.div>
-              </motion.div>
-            </div>
-          </main>
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto" />
+            <p className="mt-4 text-slate-600 dark:text-slate-400">Loading student dashboard...</p>
+          </div>
         </div>
       </div>
     )

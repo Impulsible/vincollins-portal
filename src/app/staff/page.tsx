@@ -36,7 +36,8 @@ import {
   Users,
   FileText,
   Award,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -125,7 +126,7 @@ function formatFullName(name: string): string {
   return formattedWords.join(' ')
 }
 
-// Animation variants - FIXED: Use proper framer-motion transition syntax
+// Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
@@ -153,6 +154,7 @@ function StaffDashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
+  const [authChecking, setAuthChecking] = useState(true)
   const [profile, setProfile] = useState<StaffProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
@@ -178,6 +180,67 @@ function StaffDashboardContent() {
     activeStudents: 0,
     averageScore: 0
   })
+
+  // ========== AUTH CHECK - REDIRECT IF NOT AUTHENTICATED OR NOT TEACHER/ADMIN ==========
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !session?.user) {
+          console.log('No active session, redirecting to portal')
+          toast.error('Please log in to continue')
+          router.push('/portal')
+          return
+        }
+
+        // Check if user is teacher/staff or admin
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name, email, department, position, photo_url, class')
+          .eq('id', session.user.id)
+          .single()
+
+        if (profileError || !profile) {
+          console.log('Profile not found, redirecting to portal')
+          toast.error('Account not found')
+          router.push('/portal')
+          return
+        }
+
+        const role = profile.role?.toLowerCase()
+        // Allow staff, teacher, and admin roles
+        if (role !== 'staff' && role !== 'teacher' && role !== 'admin') {
+          console.log('Not authorized for staff dashboard, redirecting to portal')
+          toast.error('Access denied. Staff only.')
+          router.push('/portal')
+          return
+        }
+
+        // Format and set profile
+        const rawFullName = profile.full_name || session.user.email?.split('@')[0] || 'Staff User'
+        const formattedFullName = formatFullName(rawFullName)
+
+        setProfile({
+          id: session.user.id,
+          full_name: formattedFullName,
+          email: profile.email || session.user.email || '',
+          department: profile.department || 'General',
+          position: profile.position || 'Teacher',
+          photo_url: profile.photo_url || null,
+          class: profile.class || null
+        })
+
+        setAuthChecking(false)
+      } catch (err) {
+        console.error('Auth check error:', err)
+        toast.error('Authentication error')
+        router.push('/portal')
+      }
+    }
+
+    checkAuth()
+  }, [router])
 
   // Check for tab parameter in URL
   useEffect(() => {
@@ -248,7 +311,8 @@ function StaffDashboardContent() {
 
       const formattedFullName = formatFullName(rawFullName)
 
-      setProfile({
+      setProfile(prev => ({
+        ...prev,
         id: session.user.id,
         full_name: formattedFullName,
         email: userData?.email || session.user.email || '',
@@ -256,7 +320,7 @@ function StaffDashboardContent() {
         position: userData?.position || session.user.user_metadata?.position || 'Teacher',
         photo_url: userData?.photo_url || userData?.avatar_url || session.user.user_metadata?.avatar_url,
         class: userData?.class || session.user.user_metadata?.class
-      })
+      }))
 
       // Load data in parallel for better performance
       const [
@@ -310,8 +374,10 @@ function StaffDashboardContent() {
   }, [router])
 
   useEffect(() => {
-    loadDashboardData()
-  }, [loadDashboardData])
+    if (!authChecking) {
+      loadDashboardData()
+    }
+  }, [loadDashboardData, authChecking])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -346,7 +412,6 @@ function StaffDashboardContent() {
   // Handle View All Students - Switch to students tab
   const handleViewAllStudents = () => {
     setActiveTab('students')
-    // Update URL without full navigation
     window.history.pushState({}, '', '/staff?tab=students')
   }
 
@@ -372,39 +437,15 @@ function StaffDashboardContent() {
     window.history.pushState({}, '', `/staff?tab=${tab}`)
   }
 
-  if (loading) {
+  if (authChecking || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="flex">
-          <div className={cn(
-            "hidden lg:block transition-all duration-300",
-            sidebarCollapsed ? "w-20" : "w-72"
-          )} />
-          <main className={cn(
-            "flex-1 pt-16 lg:pt-20 pb-8 min-h-screen transition-all duration-300",
-            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-          )}>
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 max-w-7xl">
-              <motion.div 
-                variants={containerVariants}
-                initial="hidden"
-                animate="visible"
-                className="space-y-6"
-              >
-                <motion.div variants={itemVariants}>
-                  <Skeleton className="h-40 w-full rounded-2xl" />
-                </motion.div>
-                <motion.div variants={itemVariants}>
-                  <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                    {[1, 2, 3, 4].map(i => (
-                      <Skeleton key={i} className="h-32 rounded-xl" />
-                    ))}
-                  </div>
-                </motion.div>
-              </motion.div>
-            </div>
-          </main>
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
+            <p className="mt-4 text-slate-600 dark:text-slate-400">Loading staff dashboard...</p>
+          </div>
         </div>
       </div>
     )
@@ -815,7 +856,7 @@ export default function StaffDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <div className="flex items-center justify-center min-h-screen">
           <div className="text-center">
-            <div className="h-12 w-12 animate-spin rounded-full border-b-2 border-gray-900 mx-auto"></div>
+            <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
             <p className="mt-4 text-slate-600 dark:text-slate-400">Loading staff dashboard...</p>
           </div>
         </div>

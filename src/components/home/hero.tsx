@@ -132,13 +132,13 @@ export function Hero() {
               </span>
             </div>
             
-            {/* Main Heading */}
+            {/* Main Heading - FIXED: Inline on mobile, stacked on desktop */}
             <div className="space-y-3 sm:space-y-4">
               <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold leading-tight animate-fade-in-right">
                 <span className="bg-gradient-to-r from-[#0A2472] via-[#1e3a8a] to-[#0A2472] bg-clip-text text-transparent bg-200% animate-gradient">
                   Vincollins
                 </span>
-                <span className="block text-[#dc2626] mt-2 sm:mt-3 relative group">
+                <span className="inline sm:block text-[#dc2626] ml-3 sm:ml-0 sm:mt-2 lg:mt-3 relative group">
                   College
                   <span className="absolute -bottom-2 left-0 w-0 group-hover:w-20 h-1 bg-gradient-to-r from-[#dc2626] to-transparent rounded-full transition-all duration-500"></span>
                 </span>

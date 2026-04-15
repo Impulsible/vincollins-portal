@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH DEBUG
+// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH ALL FIXES
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -13,7 +13,7 @@ import {
   Sparkles, Mail, MapPin, Clock, Facebook, Twitter, Instagram,
   Linkedin, KeyRound, MonitorPlay, BarChart3, TrendingUp,
   HelpCircle, Lock, Timer, Shuffle, Shield, Award, RotateCcw, ArrowRight,
-  CheckCircle, ChevronRight, LucideIcon, Loader2
+  CheckCircle, ChevronRight, LucideIcon
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -93,47 +93,23 @@ const getFirstNameFromName = (name: string): string => {
   return name.trim().split(/\s+/)[0]
 }
 
-// Helper to validate and normalize role - WITH DEBUG LOGS
+// Helper to validate and normalize role
 const normalizeRole = (role: string | null | undefined): UserRole => {
-  console.log('🔍 normalizeRole input:', role)
-  if (!role) {
-    console.log('⚠️ No role, defaulting to student')
-    return 'student'
-  }
+  if (!role) return 'student'
   const lowerRole = role.toLowerCase()
-  console.log('🔍 lowerRole:', lowerRole)
-  if (lowerRole === 'staff') {
-    console.log('✅ staff → teacher')
-    return 'teacher'
-  }
+  if (lowerRole === 'staff') return 'teacher'
   if (lowerRole === 'admin' || lowerRole === 'teacher' || lowerRole === 'student') {
-    console.log('✅ Valid role:', lowerRole)
     return lowerRole as UserRole
   }
-  console.warn('⚠️ Unknown role, defaulting to student')
   return 'student'
 }
 
-// Helper to get dashboard link based on role - FIXED TO HANDLE 'staff'
+// Helper to get dashboard link based on role - WITH TAB OVERVIEW
 const getDashboardLink = (role: UserRole | string): string => {
-  console.log('🔍🔍🔍 getDashboardLink received:', role, typeof role)
   const roleStr = String(role).toLowerCase()
-  console.log('🔍🔍🔍 roleStr:', roleStr)
-  
-  if (roleStr === 'admin') {
-    console.log('✅ Returning /admin?tab=overview')
-    return '/admin?tab=overview'
-  }
-  if (roleStr === 'teacher' || roleStr === 'staff') {
-    console.log('✅ Returning /staff?tab=overview')
-    return '/staff?tab=overview'
-  }
-  if (roleStr === 'student') {
-    console.log('✅ Returning /student?tab=overview')
-    return '/student?tab=overview'
-  }
-  
-  console.warn('⚠️⚠️⚠️ Unknown role, returning /portal:', role)
+  if (roleStr === 'admin') return '/admin?tab=overview'
+  if (roleStr === 'teacher' || roleStr === 'staff') return '/staff?tab=overview'
+  if (roleStr === 'student') return '/student?tab=overview'
   return '/portal'
 }
 
@@ -252,6 +228,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const currentYear = new Date().getFullYear()
   const isPortalPage = pathname === '/portal'
   const isHomePage = pathname === '/'
+  const isPublicPage = pathname === '/' || pathname === '/admission' || pathname === '/schools' || pathname === '/contact'
 
   // Fetch school settings
   useEffect(() => {
@@ -382,8 +359,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
           avatar: userData?.photo_url || userData?.avatar_url || session.user.user_metadata?.avatar_url,
           isAuthenticated: true
         })
-        
-        console.log('✅ Header user state set:', { role: userRole, name: formattedName })
 
       } catch (err) {
         console.error('❌ Fetch error:', err)
@@ -395,6 +370,13 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
     fetchUser()
   }, [])
+
+  // Fetch notifications on mount if user is logged in
+  useEffect(() => {
+    if (user?.isAuthenticated) {
+      fetchNotificationCount()
+    }
+  }, [user, fetchNotificationCount])
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10)
@@ -505,6 +487,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     }
   }
 
+  const handleDashboardNavigation = (e: React.MouseEvent) => {
+    e.preventDefault()
+    if (!user?.role) return
+    const dashboardUrl = getDashboardLink(user.role)
+    router.push(dashboardUrl)
+    setProfileOpen(false)
+    setMobileMenuOpen(false)
+  }
+
   if (loading) {
     return (
       <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-3">
@@ -564,7 +555,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     College
                   </span>
                 </div>
-                <span className="text-[8px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium hidden sm:block">
+                {/* Geared Towards Excellence - VISIBLE ON ALL SCREENS */}
+                <span className="text-[8px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium">
                   GEARED TOWARDS EXCELLENCE
                 </span>
               </div>
@@ -613,12 +605,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
             {/* Right Section - Proper spacing for mobile */}
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-              {/* Search Button */}
+              {/* Search Button - HIDDEN ON MOBILE */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => setSearchOpen(!searchOpen)}
-                className="h-9 w-9 sm:h-10 sm:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
+                className="hidden sm:flex h-9 w-9 sm:h-10 sm:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
               >
                 <Search className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
@@ -697,29 +689,23 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Primary CTA - WITH DEBUG */}
-                      <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
-                        <button
-                          onClick={() => {
-                            setProfileOpen(false)
-                            console.log('🔍 HEADER DEBUG - Full user object:', JSON.stringify(user, null, 2))
-                            console.log('🔍 HEADER DEBUG - user.role:', user?.role)
-                            console.log('🔍 HEADER DEBUG - user.role type:', typeof user?.role)
-                            const dashboardUrl = getDashboardLink(user?.role || 'student')
-                            console.log('🚀 Desktop navigating to:', dashboardUrl)
-                            window.location.href = dashboardUrl
-                          }}
-                          className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
-                        >
-                          <LayoutDashboard className="h-4 w-4" />
-                          <span>
-                            {user.role === 'admin' ? 'Admin Dashboard' : 
-                             user.role === 'teacher' ? 'Teacher Dashboard' : 
-                             'Student Dashboard'}
-                          </span>
-                          <ArrowRight className="h-4 w-4 ml-1" />
-                        </button>
-                      </div>
+                      {/* DASHBOARD BUTTON - Primary CTA */}
+                      {(isHomePage || isPortalPage) && (
+                        <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
+                          <button
+                            onClick={handleDashboardNavigation}
+                            className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
+                          >
+                            <LayoutDashboard className="h-4 w-4" />
+                            <span>
+                              {user.role === 'admin' ? 'Admin Dashboard' : 
+                               user.role === 'teacher' ? 'Teacher Dashboard' : 
+                               'Student Dashboard'}
+                            </span>
+                            <ArrowRight className="h-4 w-4 ml-1" />
+                          </button>
+                        </div>
+                      )}
                       
                       {/* Main Menu Items - Only on dashboard pages */}
                       {!isPortalPage && !isHomePage && (
@@ -813,9 +799,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   )}
                 </div>
               ) : (
-                /* PORTAL LOGIN - Desktop only */
-                !user?.isAuthenticated && isHomePage && (
-                  <Link href="/portal" className="hidden sm:block">
+                /* PORTAL LOGIN - Shows on public pages (Home, Admission, Schools, Contact) */
+                !user?.isAuthenticated && isPublicPage && (
+                  <Link href="/portal" className="hidden md:block">
                     <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-4 sm:px-6 py-2 font-semibold text-sm">
                       <KeyRound className="mr-1.5 sm:mr-2 h-4 w-4 group-hover:rotate-12 transition-transform" />
                       Portal Login
@@ -953,7 +939,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - PROFESSIONAL WITH LOGO AND SUBTEXT */}
       {mobileMenuOpen && (
         <>
           <div 
@@ -962,16 +948,40 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
           />
           
           <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 lg:hidden overflow-y-auto">
+            {/* Professional Header with Logo AND Subtext */}
             <div className="bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] text-white p-5">
               <button onClick={() => setMobileMenuOpen(false)} className="absolute top-4 right-4 p-2">
                 <X className="h-5 w-5" />
               </button>
-              <p className="font-semibold text-lg">Vincollins College</p>
               
+              {/* Logo and School Name with Subtext */}
+              <div className="flex items-center gap-3">
+                <div className="relative h-12 w-12">
+                  {schoolSettings?.logo_path ? (
+                    <Image 
+                      src={schoolSettings.logo_path} 
+                      alt="Logo" 
+                      width={48}
+                      height={48}
+                      className="object-contain"
+                    />
+                  ) : (
+                    <div className="h-12 w-12 bg-white/20 rounded-xl flex items-center justify-center">
+                      <GraduationCap className="h-6 w-6 text-white" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <p className="font-bold text-lg">Vincollins College</p>
+                  <p className="text-xs text-white/70">Geared Towards Excellence</p>
+                </div>
+              </div>
+              
+              {/* User Info if authenticated */}
               {user?.isAuthenticated && (
                 <div className="mt-4 p-4 bg-white/10 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12">
+                    <Avatar className="h-12 w-12 ring-2 ring-white/30">
                       <AvatarImage src={user.avatar} />
                       <AvatarFallback className="bg-white/30 text-white">
                         {getUserInitials()}
@@ -989,6 +999,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               )}
             </div>
 
+            {/* Navigation Items */}
             <div className="p-4">
               {currentNavigation.map((item) => {
                 const Icon = item.icon
@@ -1021,18 +1032,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users - WITH DEBUG */}
-            {user?.isAuthenticated && (
+            {/* Dashboard Link for authenticated users */}
+            {user?.isAuthenticated && (isHomePage || isPortalPage) && (
               <div className="p-4 border-t">
                 <button
-                  onClick={() => {
-                    setMobileMenuOpen(false)
-                    console.log('🔍 MOBILE DEBUG - user.role:', user?.role)
-                    const dashboardUrl = getDashboardLink(user?.role || 'student')
-                    console.log('🚀 Mobile navigating to:', dashboardUrl)
-                    window.location.href = dashboardUrl
-                  }}
-                  className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
+                  onClick={handleDashboardNavigation}
+                  className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md hover:shadow-lg transition-all"
                 >
                   <LayoutDashboard className="h-5 w-5" />
                   Go to Dashboard
@@ -1040,8 +1045,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             )}
 
-            {/* Portal Login for unauthenticated users on mobile */}
-            {!user?.isAuthenticated && (
+            {/* Portal Login for unauthenticated users on mobile - Shows on all public pages */}
+            {!user?.isAuthenticated && isPublicPage && (
               <div className="p-4 border-t">
                 <Link
                   href="/portal"
@@ -1054,6 +1059,36 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             )}
 
+            {/* Quick Switch for Dashboard Pages */}
+            {user?.isAuthenticated && !isPortalPage && !isHomePage && (
+              <div className="p-4 border-t bg-gray-50/50">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Switch</p>
+                <div className="space-y-1">
+                  {pathname !== '/' && (
+                    <Link
+                      href="/"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+                    >
+                      <Home className="h-5 w-5 text-blue-500" />
+                      <span>Home Page</span>
+                    </Link>
+                  )}
+                  {pathname !== '/portal' && (
+                    <Link
+                      href="/portal"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex items-center gap-3 px-4 py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all"
+                    >
+                      <KeyRound className="h-5 w-5 text-emerald-500" />
+                      <span>Portal Page</span>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Quick Links */}
             <div className="p-4 border-t">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Quick Links</p>
               <div className="grid grid-cols-2 gap-2">
@@ -1074,6 +1109,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </div>
 
+            {/* Contact Us */}
             <div className="p-4 border-t">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Contact Us</p>
               <div className="space-y-2">
@@ -1086,6 +1122,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </div>
 
+            {/* Social Links */}
             <div className="p-4 border-t">
               <div className="flex justify-center gap-5">
                 {socialLinks.map((social, idx) => {
@@ -1104,10 +1141,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </div>
 
+            {/* Copyright */}
             <div className="p-4 border-t text-center">
               <p className="text-xs text-gray-500">© {currentYear} Vincollins College</p>
             </div>
 
+            {/* Sign Out */}
             {user?.isAuthenticated && (
               <div className="p-4 border-t sticky bottom-0 bg-white">
                 <Button 

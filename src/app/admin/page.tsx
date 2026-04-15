@@ -90,6 +90,7 @@ const CACHE_DURATION = 5 * 60 * 1000
 export default function AdminDashboard() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [authChecking, setAuthChecking] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
@@ -113,6 +114,60 @@ export default function AdminDashboard() {
     passRate: 78,
     attendanceRate: 94,
   })
+
+  // ========== AUTH CHECK - REDIRECT IF NOT AUTHENTICATED OR NOT ADMIN ==========
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        
+        if (sessionError || !session?.user) {
+          console.log('No active session, redirecting to portal')
+          toast.error('Please log in to continue')
+          router.push('/portal')
+          return
+        }
+
+        // Check if user is admin or staff (staff can also access admin features)
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name, email')
+          .eq('id', session.user.id)
+          .single()
+
+        if (profileError || !profile) {
+          console.log('Profile not found, redirecting to portal')
+          toast.error('Account not found')
+          router.push('/portal')
+          return
+        }
+
+        const role = profile.role?.toLowerCase()
+        if (role !== 'admin' && role !== 'staff') {
+          console.log('Not an admin/staff, redirecting to portal')
+          toast.error('Access denied. Admin only.')
+          router.push('/portal')
+          return
+        }
+
+        // Set admin profile
+        setAdminProfile({
+          id: session.user.id,
+          email: session.user.email,
+          full_name: profile.full_name || session.user.email?.split('@')[0] || 'Administrator',
+          role: role === 'staff' ? 'admin' : role
+        })
+
+        setAuthChecking(false)
+      } catch (err) {
+        console.error('Auth check error:', err)
+        toast.error('Authentication error')
+        router.push('/portal')
+      }
+    }
+
+    checkAuth()
+  }, [router])
 
   // ========== HELPER FUNCTIONS ==========
   const isCacheValid = useCallback(() => {
@@ -179,8 +234,8 @@ export default function AdminDashboard() {
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
       if (sessionError || !session?.user) {
-        console.log('No active session')
-        setLoading(false)
+        console.log('No active session during data load')
+        router.push('/portal')
         return
       }
 
@@ -190,17 +245,6 @@ export default function AdminDashboard() {
         setTimeout(() => loadAllData(true), 100)
         return
       }
-
-      const adminName = session.user.user_metadata?.full_name || 
-                        getNameFromEmail(session.user.email || '') || 
-                        'Administrator'
-      
-      setAdminProfile({
-        id: session.user.id,
-        email: session.user.email,
-        full_name: adminName,
-        role: 'admin'
-      })
 
       try {
         const { data: settingsData } = await supabase
@@ -232,7 +276,7 @@ export default function AdminDashboard() {
         console.log(`📚 Students in profiles: ${profileStudents.length}`)
         console.log(`👥 Staff in profiles: ${profileStaff.length}`)
         
-        // Process students - use stored vin_id only
+        // Process students
         studentsList = profileStudents.map((profile: any) => ({
           id: profile.id,
           vin_id: profile.vin_id || 'VIN-MISSING',
@@ -247,7 +291,7 @@ export default function AdminDashboard() {
           admission_year: profile.admission_year || null
         }))
         
-        // Process staff - use stored vin_id only
+        // Process staff
         staffList = profileStaff.map((profile: any) => ({
           id: profile.id,
           vin_id: profile.vin_id || 'VIN-MISSING',
@@ -383,10 +427,12 @@ export default function AdminDashboard() {
       isInitialLoad.current = false
       dataLoadedRef.current = true
     }
-  }, [loadFromCache, saveToCache])
+  }, [loadFromCache, saveToCache, router])
 
   useEffect(() => {
-    loadAllData(false)
+    if (!authChecking) {
+      loadAllData(false)
+    }
     
     const profilesChannel = supabase
       .channel('profiles-changes')
@@ -414,7 +460,7 @@ export default function AdminDashboard() {
       supabase.removeChannel(usersChannel)
       supabase.removeChannel(examsChannel)
     }
-  }, [loadAllData])
+  }, [loadAllData, authChecking])
 
   const handleRefreshUsers = useCallback(async () => {
     setRefreshing(true)
@@ -452,7 +498,6 @@ export default function AdminDashboard() {
       const email = `${studentData.first_name.toLowerCase()}.${studentData.last_name.toLowerCase()}@vincollins.edu.ng`
       const fullName = `${studentData.first_name} ${studentData.last_name}`
       
-      // Call API route
       const response = await fetch('/api/admin/users/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -476,9 +521,6 @@ export default function AdminDashboard() {
         const error = await response.json()
         throw new Error(error.error || 'Failed to create student')
       }
-      
-      const result = await response.json()
-      console.log('✅ Student created via API:', result)
       
       toast.success(`${fullName} added successfully!`)
       toast.info(`📧 Email: ${email}\n🔑 Password: ${vinId}`, { 
@@ -602,7 +644,6 @@ export default function AdminDashboard() {
         : staffData.full_name || 'Staff Member'
       const email = staffData.email || `${fullName.toLowerCase().replace(/\s/g, '.')}@vincollins.edu.ng`
       
-      // Call API route
       const response = await fetch('/api/admin/staff/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -625,9 +666,6 @@ export default function AdminDashboard() {
         const error = await response.json()
         throw new Error(error.error || 'Failed to create staff')
       }
-      
-      const result = await response.json()
-      console.log('✅ Staff created via API:', result)
       
       toast.success(`${fullName} added successfully!`)
       toast.info(`📧 Email: ${email}\n🔑 Password: ${vinId}`, { 
@@ -770,7 +808,7 @@ export default function AdminDashboard() {
   const handleResultsClick = useCallback(() => setActiveTab('results'), [])
   const handleAttendanceClick = useCallback(() => setActiveTab('attendance'), [])
 
-  if (loading && !dataLoadedRef.current) {
+  if (authChecking || (loading && !dataLoadedRef.current)) {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100">
         <motion.div className="text-center space-y-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
