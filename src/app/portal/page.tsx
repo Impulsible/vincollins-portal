@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - ULTRA-DIRECT NAVIGATION FIX
+// app/portal/page.tsx - FIXED FOR VERCEL REDIRECT
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -15,7 +15,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Mail, Eye, EyeOff, GraduationCap, Shield, Users,
   Loader2, AlertCircle, KeyRound, ArrowRight, Sparkles,
-  Phone, Mail as MailIcon, CheckCircle, LogIn
+  Phone, Mail as MailIcon, CheckCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -48,7 +48,7 @@ export default function LoginPage() {
   } | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
 
-  // Check if already logged in - ULTRA-DIRECT REDIRECT
+  // Check if already logged in
   useEffect(() => {
     const checkSession = async () => {
       try {
@@ -71,8 +71,10 @@ export default function LoginPage() {
               redirectPath = '/staff?tab=overview'
             }
             
-            // ULTRA-DIRECT: Use replace for clean navigation
-            window.location.replace(redirectPath)
+            // Add delay for Vercel cookie persistence
+            setTimeout(() => {
+              window.location.href = redirectPath
+            }, 300)
             return
           }
         }
@@ -86,7 +88,7 @@ export default function LoginPage() {
     checkSession()
   }, [])
 
-  // Load school settings - NON-BLOCKING
+  // Load school settings
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
@@ -109,7 +111,7 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // Professional success modal with ULTRA-DIRECT navigation
+  // Success Modal
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -121,7 +123,6 @@ export default function LoginPage() {
         bgColor: '#F3E8FF',
         borderColor: '#D8B4FE',
         greeting: 'Welcome back, Administrator',
-        redirectPath: '/admin?tab=overview'
       },
       teacher: {
         icon: '📚',
@@ -129,7 +130,6 @@ export default function LoginPage() {
         bgColor: '#EFF6FF',
         borderColor: '#BFDBFE',
         greeting: 'Welcome back, Teacher',
-        redirectPath: '/staff?tab=overview'
       },
       student: {
         icon: '🎓',
@@ -137,22 +137,26 @@ export default function LoginPage() {
         bgColor: '#ECFDF5',
         borderColor: '#A7F3D0',
         greeting: 'Welcome back, Student',
-        redirectPath: '/student?tab=overview'
       }
     }
 
     const config = roleConfig[role]
     const firstName = userName.split(' ')[0]
 
-    // ULTRA-DIRECT navigation function
     const goToDashboard = () => {
       setShowSuccessModal(false)
-      let url = '/student?tab=overview'
-      if (loginSuccessData.role === 'admin') url = '/admin?tab=overview'
-      else if (loginSuccessData.role === 'teacher') url = '/staff?tab=overview'
       
-      // Use replace for clean navigation without history
-      window.location.replace(url)
+      let url = '/student?tab=overview'
+      if (loginSuccessData.role === 'admin') {
+        url = '/admin?tab=overview'
+      } else if (loginSuccessData.role === 'teacher') {
+        url = '/staff?tab=overview'
+      }
+      
+      // Add delay for Vercel session persistence
+      setTimeout(() => {
+        window.location.href = url
+      }, 300)
     }
 
     return (
@@ -230,7 +234,7 @@ export default function LoginPage() {
                     </p>
                     
                     <p className="text-gray-500 mb-6">
-                      Click below to go to your dashboard
+                      Redirecting to your dashboard...
                     </p>
                   </motion.div>
                   
@@ -273,6 +277,7 @@ export default function LoginPage() {
     )
   }
 
+  // Simple working login handler
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -282,97 +287,62 @@ export default function LoginPage() {
     const cleanPassword = password.trim()
 
     try {
-      const { data, error: rpcError } = await supabase
-        .rpc('login_user', {
-          p_email: cleanEmail,
-          p_password: cleanPassword
-        })
-
-      if (rpcError) {
-        setError('Login service error. Please try again.')
-        setLoading(false)
-        return
-      }
-
-      if (!data || !data.success) {
-        setError(data?.message || 'Invalid email or password')
-        setLoading(false)
-        return
-      }
-
-      const userRole = data.user.role === 'staff' ? 'teacher' : data.user.role
-      
-      if (userRole !== selectedRole) {
-        const roleDisplayName = userRole === 'teacher' ? 'staff' : userRole
-        setError(`This account is for ${roleDisplayName}. Please select the ${roleDisplayName} tab.`)
-        setLoading(false)
-        return
-      }
-
-      const userName = data.user.full_name || 
-                      data.user.email?.split('@')[0].replace(/[._-]/g, ' ') || 
-                      'User'
-      const formattedName = userName.split(' ')
-        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ')
-
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       })
 
       if (signInError) {
-        if (signInError.message.includes('Invalid login credentials')) {
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: cleanEmail,
-            password: cleanPassword,
-            options: {
-              data: {
-                role: userRole,
-                full_name: formattedName,
-                vin_id: data.user.vin_id
-              }
-            }
-          })
-
-          if (signUpError) {
-            console.error('Sign up error:', signUpError)
-          } else {
-            await supabase.auth.signInWithPassword({
-              email: cleanEmail,
-              password: cleanPassword,
-            })
-          }
-        }
+        console.error('Sign in error:', signInError)
+        setError('Invalid email or password. Please try again.')
+        setLoading(false)
+        return
       }
 
-      // Skip profile update to avoid 409 error
-      // if (data.user.id) {
-      //   await supabase
-      //     .from('profiles')
-      //     .update({ 
-      //       full_name: formattedName,
-      //       role: userRole,
-      //       updated_at: new Date().toISOString()
-      //     })
-      //     .eq('id', data.user.id)
-      // }
+      if (!signInData?.user) {
+        setError('Login failed. Please try again.')
+        setLoading(false)
+        return
+      }
+
+      // Get user profile
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, full_name')
+        .eq('id', signInData.user.id)
+        .maybeSingle()
+
+      const userRole = profile?.role?.toLowerCase() || 'student'
+      const userName = profile?.full_name || signInData.user.email?.split('@')[0] || 'User'
+      
+      const formattedName = userName.split(' ')
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ')
+
+      const mappedRole = userRole === 'staff' ? 'teacher' : userRole
+      
+      // Check role matches selected tab
+      if (mappedRole !== selectedRole) {
+        const roleDisplayName = mappedRole === 'teacher' ? 'staff' : mappedRole
+        setError(`This account is for ${roleDisplayName}. Please select the ${roleDisplayName} tab.`)
+        await supabase.auth.signOut()
+        setLoading(false)
+        return
+      }
+
+      console.log('✅ Login successful')
 
       setLoginSuccessData({
         userName: formattedName,
-        role: userRole as 'student' | 'teacher' | 'admin'
+        role: mappedRole as 'student' | 'teacher' | 'admin'
       })
       setShowSuccessModal(true)
       setLoading(false)
 
     } catch (err: any) {
+      console.error('Login error:', err)
       setError('An unexpected error occurred. Please try again.')
       setLoading(false)
-      
-      toast.error('Login failed', {
-        description: err.message || 'Please check your credentials and try again.',
-        duration: 4000,
-      })
     }
   }
 
@@ -395,6 +365,14 @@ export default function LoginPage() {
       case 'teacher': return <Users className="h-4 w-4" />
       default: return <GraduationCap className="h-4 w-4" />
     }
+  }
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    )
   }
 
   return (
