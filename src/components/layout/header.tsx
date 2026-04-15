@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH DEBUG
+// components/layout/header.tsx - COMPLETE PREMIUM HEADER
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -287,38 +287,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
       console.error('Error fetching notifications:', error)
     }
   }, [user])
-
-  // Subscribe to notifications - TEMPORARILY COMMENTED OUT TO FIX WEBSOCKET ERROR
-  /*
-  useEffect(() => {
-    if (!user?.id) return
-    fetchNotificationCount()
-    
-    const channel = supabase
-      .channel('notifications-' + user.id)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`
-      }, (payload) => {
-        fetchNotificationCount()
-        toast.info(payload.new.title || 'New notification!', {
-          description: payload.new.message,
-          action: { label: 'View', onClick: () => router.push('/notifications') }
-        })
-      })
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'notifications',
-        filter: `user_id=eq.${user.id}`
-      }, () => fetchNotificationCount())
-      .subscribe()
-    
-    return () => { supabase.removeChannel(channel).catch(console.error) }
-  }, [user, fetchNotificationCount, router])
-  */
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -709,17 +677,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - WITH DEBUG ALERT */}
+                      {/* DASHBOARD BUTTON - Primary CTA */}
                       <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                         <button
                           onClick={() => {
                             setProfileOpen(false)
-                            const dashboardLink = getDashboardLink(user.role)
-                            // DEBUG ALERT - Remove after testing
-                            alert(`🔍 DEBUG INFO:\nUser Role: ${user.role}\nNavigating to: ${dashboardLink}\n\nIf this is wrong, check the 'role' column in your Supabase 'profiles' table.`)
-                            console.log('🔍 DEBUG - User role:', user.role)
-                            console.log('🔍 DEBUG - Dashboard link:', dashboardLink)
-                            router.push(dashboardLink)
+                            router.push(getDashboardLink(user.role))
                           }}
                           className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
                         >
@@ -1033,16 +996,13 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users - WITH DEBUG */}
+            {/* Dashboard Link for authenticated users */}
             {user?.isAuthenticated && (
               <div className="p-4 border-t">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    const dashboardLink = getDashboardLink(user.role)
-                    // DEBUG ALERT
-                    alert(`🔍 DEBUG INFO (Mobile Menu):\nUser Role: ${user.role}\nNavigating to: ${dashboardLink}`)
-                    router.push(dashboardLink)
+                    router.push(getDashboardLink(user.role))
                   }}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
                 >
