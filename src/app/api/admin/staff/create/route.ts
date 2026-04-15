@@ -2,13 +2,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+// Helper to get Supabase client at runtime
+function getSupabaseAdmin() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase environment variables')
+  }
+
+  return createClient(supabaseUrl, serviceRoleKey)
+}
 
 export async function POST(req: NextRequest) {
   try {
+    // Create client at runtime, not at module level
+    const supabaseAdmin = getSupabaseAdmin()
+    
     const body = await req.json()
     const { 
       email, password, full_name, first_name, last_name, 
@@ -17,16 +27,16 @@ export async function POST(req: NextRequest) {
     
     console.log('📧 Creating staff:', { email, role, full_name, vin_id })
     
-    // ✅ STEP 1: Create user with Admin API - INCLUDE EMAIL IN METADATA
+    // ✅ STEP 1: Create user with Admin API
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: password,
       email_confirm: true,
       user_metadata: {
-        email: email,              // ✅ Include email
-        full_name: full_name,      // ✅ Full name
-        first_name: first_name,    // ✅ First name
-        last_name: last_name,      // ✅ Last name
+        email: email,
+        full_name: full_name,
+        first_name: first_name,
+        last_name: last_name,
         role: role,
         department: department,
         join_year: join_year,
