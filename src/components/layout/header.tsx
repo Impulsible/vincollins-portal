@@ -93,28 +93,33 @@ const getFirstNameFromName = (name: string): string => {
   return name.trim().split(/\s+/)[0]
 }
 
-// Helper to validate and normalize role
+// Helper to validate and normalize role - WITH DEBUG LOGS
 const normalizeRole = (role: string | null | undefined): UserRole => {
-  if (!role) return 'student'
-  
+  console.log('🔍 normalizeRole input:', role)
+  if (!role) {
+    console.log('⚠️ No role, defaulting to student')
+    return 'student'
+  }
   const lowerRole = role.toLowerCase()
-  
-  if (lowerRole === 'staff') return 'teacher'
-  
+  console.log('🔍 lowerRole:', lowerRole)
+  if (lowerRole === 'staff') {
+    console.log('✅ staff → teacher')
+    return 'teacher'
+  }
   if (lowerRole === 'admin' || lowerRole === 'teacher' || lowerRole === 'student') {
+    console.log('✅ Valid role:', lowerRole)
     return lowerRole as UserRole
   }
-  
-  console.warn(`Unknown role "${role}", defaulting to student`)
+  console.warn('⚠️ Unknown role, defaulting to student')
   return 'student'
 }
 
-// Helper to get dashboard link based on role
+// Helper to get dashboard link based on role - WITH TAB=OVERVIEW
 const getDashboardLink = (role: UserRole): string => {
   switch (role) {
-    case 'admin': return '/admin'
-    case 'teacher': return '/staff'
-    case 'student': return '/student'
+    case 'admin': return '/admin?tab=overview'
+    case 'teacher': return '/staff?tab=overview'
+    case 'student': return '/student?tab=overview'
     default: return '/portal'
   }
 }
@@ -147,7 +152,7 @@ const teacherNavigation: NavigationItem[] = [
 
 // Admin navigation - CLEAN, only dashboard tabs
 const adminNavigation: NavigationItem[] = [
-  { name: 'Overview', href: '/admin', icon: LayoutDashboard, tab: 'overview' },
+  { name: 'Overview', href: '/admin?tab=overview', icon: LayoutDashboard, tab: 'overview' },
   { name: 'Exam Approvals', href: '/admin?tab=exams', icon: MonitorPlay, tab: 'exams' },
   { name: 'User Management', href: '/admin?tab=users', icon: Users, tab: 'users' },
   { name: 'Settings', href: '/admin?tab=settings', icon: Settings, tab: 'settings' },
@@ -677,12 +682,14 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Primary CTA */}
+                      {/* DASHBOARD BUTTON - Primary CTA - FIXED */}
                       <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                         <button
                           onClick={() => {
                             setProfileOpen(false)
-                            router.push(getDashboardLink(user.role))
+                            const dashboardUrl = getDashboardLink(user.role)
+                            console.log('🚀 Desktop navigating to:', dashboardUrl)
+                            window.location.href = dashboardUrl
                           }}
                           className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
                         >
@@ -996,13 +1003,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users */}
+            {/* Dashboard Link for authenticated users - FIXED */}
             {user?.isAuthenticated && (
               <div className="p-4 border-t">
                 <button
                   onClick={() => {
                     setMobileMenuOpen(false)
-                    router.push(getDashboardLink(user.role))
+                    const dashboardUrl = getDashboardLink(user.role)
+                    console.log('🚀 Mobile navigating to:', dashboardUrl)
+                    window.location.href = dashboardUrl
                   }}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md"
                 >
