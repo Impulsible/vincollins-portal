@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/staff/page.tsx - FIXED WITH CLEAN URLS
+// app/staff/page.tsx - FIXED AUTH CHECK - NO REDIRECT LOOP
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
@@ -167,43 +167,27 @@ function StaffDashboardContent() {
     averageScore: 0
   })
 
-  // Read stored tab from sessionStorage
-  useEffect(() => {
-    const storedTab = sessionStorage.getItem('staffActiveTab')
-    if (storedTab && ['overview', 'exams', 'assignments', 'notes', 'students'].includes(storedTab)) {
-      setActiveTab(storedTab)
-      sessionStorage.removeItem('staffActiveTab')
-    }
-  }, [])
-
-  // ========== AUTH CHECK - FIXED - NO REDIRECT ON PROFILE NULL ==========
+  // ========== AUTH CHECK - FIXED - NO REDIRECT LOOP ==========
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        const { data: { session } } = await supabase.auth.getSession()
         
-        if (sessionError || !session?.user) {
-          console.log('No active session, redirecting to portal')
+        // ONLY redirect if DEFINITELY no session
+        if (!session) {
+          console.log('No session, redirecting to portal')
           router.push('/portal')
           return
         }
 
+        // Try to load profile - but DON'T redirect if it fails
         const { data: profile } = await supabase
           .from('profiles')
           .select('role, full_name, email, department, position, photo_url, class')
           .eq('id', session.user.id)
           .maybeSingle()
 
-        // Don't redirect if profile is null - user is authenticated
-        const role = profile?.role?.toLowerCase() || 'staff'
-        
-        // Only redirect if role is DEFINITELY not allowed
-        if (profile && role !== 'staff' && role !== 'teacher' && role !== 'admin') {
-          console.log('Not authorized for staff dashboard')
-          router.push('/portal')
-          return
-        }
-
+        // Set profile with defaults if not found
         const rawFullName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Staff User'
         const formattedFullName = formatFullName(rawFullName)
 
@@ -217,9 +201,12 @@ function StaffDashboardContent() {
           class: profile?.class || null
         })
 
+        // User is authenticated - stay on page
         setAuthChecking(false)
+        
       } catch (err) {
         console.error('Auth check error:', err)
+        // Don't redirect on error - user might still be valid
         setAuthChecking(false)
       }
     }
@@ -227,10 +214,33 @@ function StaffDashboardContent() {
     checkAuth()
   }, [router])
 
-  // FIXED: Clean URL - no tab parameter in URL
+  // Handle tab change
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
-    // No URL update - keep URL clean as /staff
+  }
+
+  // Handle sidebar navigation
+  const handleSidebarTabChange = (tab: string) => {
+    setActiveTab(tab)
+    switch (tab) {
+      case 'overview':
+        router.push('/staff')
+        break
+      case 'exams':
+        router.push('/staff/exams')
+        break
+      case 'assignments':
+        router.push('/staff/assignments')
+        break
+      case 'notes':
+        router.push('/staff/notes')
+        break
+      case 'students':
+        router.push('/staff/students')
+        break
+      default:
+        router.push('/staff')
+    }
   }
 
   const loadDashboardData = useCallback(async () => {
@@ -394,7 +404,7 @@ function StaffDashboardContent() {
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           activeTab={activeTab}
-          setActiveTab={handleTabChange}
+          setActiveTab={handleSidebarTabChange}
         />
 
         <main className={cn(
