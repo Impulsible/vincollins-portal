@@ -169,6 +169,9 @@ function StaffDashboardContent() {
 
   // ========== AUTH CHECK - FIXED - NO REDIRECT LOOP ==========
   useEffect(() => {
+    let isMounted = true
+    const redirectAttempts = 0
+    
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
@@ -176,7 +179,27 @@ function StaffDashboardContent() {
         // ONLY redirect if DEFINITELY no session
         if (!session) {
           console.log('No session, redirecting to portal')
-          router.push('/portal')
+          
+          // Add loop prevention
+          const lastRedirect = sessionStorage.getItem('last_auth_redirect')
+          const redirectTime = sessionStorage.getItem('last_auth_redirect_time')
+          const now = Date.now()
+          
+          if (lastRedirect === '/portal' && redirectTime && (now - parseInt(redirectTime)) < 3000) {
+            console.log('Possible redirect loop detected - stopping')
+            if (isMounted) {
+              setAuthChecking(false)
+              setLoading(false)
+            }
+            return
+          }
+          
+          sessionStorage.setItem('last_auth_redirect', '/portal')
+          sessionStorage.setItem('last_auth_redirect_time', String(now))
+          
+          if (isMounted) {
+            window.location.replace('/portal')
+          }
           return
         }
 
@@ -187,32 +210,39 @@ function StaffDashboardContent() {
           .eq('id', session.user.id)
           .maybeSingle()
 
-        // Set profile with defaults if not found
-        const rawFullName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Staff User'
-        const formattedFullName = formatFullName(rawFullName)
+        if (isMounted) {
+          // Set profile with defaults even if not found
+          const rawFullName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Staff User'
+          const formattedFullName = formatFullName(rawFullName)
 
-        setProfile({
-          id: session.user.id,
-          full_name: formattedFullName,
-          email: profile?.email || session.user.email || '',
-          department: profile?.department || 'General',
-          position: profile?.position || 'Teacher',
-          photo_url: profile?.photo_url || null,
-          class: profile?.class || null
-        })
+          setProfile({
+            id: session.user.id,
+            full_name: formattedFullName,
+            email: profile?.email || session.user.email || '',
+            department: profile?.department || 'General',
+            position: profile?.position || 'Teacher',
+            photo_url: profile?.photo_url || null,
+            class: profile?.class || null
+          })
 
-        // User is authenticated - stay on page
-        setAuthChecking(false)
+          // User is authenticated - stay on page
+          setAuthChecking(false)
+        }
         
       } catch (err) {
         console.error('Auth check error:', err)
-        // Don't redirect on error - user might still be valid
-        setAuthChecking(false)
+        if (isMounted) {
+          setAuthChecking(false)
+        }
       }
     }
 
     checkAuth()
-  }, [router])
+    
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   // Handle tab change
   const handleTabChange = (tab: string) => {
@@ -243,11 +273,15 @@ function StaffDashboardContent() {
     }
   }
 
+  // FIXED: loadDashboardData - NO REDIRECTS
   const loadDashboardData = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
+      
+      // Don't redirect here - just return if no session
       if (!session) {
-        router.push('/portal')
+        console.log('No session in loadDashboardData, but auth check passed?')
+        setLoading(false)
         return
       }
 
@@ -329,7 +363,7 @@ function StaffDashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, []) // Removed router dependency
 
   useEffect(() => {
     if (!authChecking) {
@@ -339,7 +373,7 @@ function StaffDashboardContent() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
-    router.push('/portal')
+    window.location.replace('/portal')
   }
 
   const handleExamCreated = () => {

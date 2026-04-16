@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - FIXED WITH CLEAN URLS
+// app/portal/page.tsx - FIXED WITH NO REDIRECT LOOPS
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -48,38 +48,32 @@ export default function LoginPage() {
   } | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const hasRedirected = useRef(false)
+  const redirectAttempts = useRef(0)
 
-  // FIXED: Check if already logged in - with clean URLs
+  // FIXED: Check if already logged in - NO AUTO REDIRECT
   useEffect(() => {
     const checkSession = async () => {
-      if (hasRedirected.current) return
+      if (hasRedirected.current) {
+        setIsCheckingAuth(false)
+        return
+      }
       
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
+        // If user is logged in, DON'T auto-redirect - let them use the button
+        // This prevents the redirect loop entirely
         if (session) {
+          console.log('User is already logged in, staying on portal page')
+          // Just load profile info but don't redirect
           const { data: profile } = await supabase
             .from('profiles')
             .select('role, full_name')
             .eq('id', session.user.id)
             .maybeSingle()
-
+          
           if (profile) {
-            hasRedirected.current = true
-            const role = profile.role?.toLowerCase()
-            let redirectPath = '/student'
-            
-            if (role === 'admin') {
-              redirectPath = '/admin'
-            } else if (role === 'staff' || role === 'teacher') {
-              redirectPath = '/staff'
-            }
-            
-            // Clean URL redirect
-            setTimeout(() => {
-              window.location.href = redirectPath
-            }, 300)
-            return
+            console.log(`Logged in as: ${profile.role} - staying on portal page`)
           }
         }
       } catch (err) {
@@ -115,7 +109,7 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // FIXED: Success Modal with clean URLs
+  // FIXED: Success Modal with clean URLs and loop prevention
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -147,7 +141,7 @@ export default function LoginPage() {
     const config = roleConfig[role]
     const firstName = userName.split(' ')[0]
 
-    // FIXED: Clean URL - no ?tab=
+    // FIXED: Clean URL with replace to prevent back button issues
     const goToDashboard = () => {
       setShowSuccessModal(false)
       
@@ -158,8 +152,9 @@ export default function LoginPage() {
         url = '/staff'
       }
       
+      // Use replace instead of href to prevent history stack issues
       setTimeout(() => {
-        window.location.href = url
+        window.location.replace(url)
       }, 300)
     }
 

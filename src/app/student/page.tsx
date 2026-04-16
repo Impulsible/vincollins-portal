@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - STUDENT DASHBOARD - CLEAN URLS FIXED
+// app/student/page.tsx - STUDENT DASHBOARD - FIXED NO REDIRECT LOOP
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
@@ -165,15 +165,38 @@ function StudentDashboardContent() {
     }
   }, [])
 
-  // ========== AUTH CHECK - FIXED - NO REDIRECT ON PROFILE NULL ==========
+  // ========== AUTH CHECK - FIXED - NO REDIRECT LOOP ==========
   useEffect(() => {
+    let isMounted = true
+    const redirectAttempts = 0
+    
     const checkAuth = async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError || !session?.user) {
           console.log('No active session, redirecting to portal')
-          router.push('/portal')
+          
+          // Add loop prevention
+          const lastRedirect = sessionStorage.getItem('last_student_auth_redirect')
+          const redirectTime = sessionStorage.getItem('last_student_auth_redirect_time')
+          const now = Date.now()
+          
+          if (lastRedirect === '/portal' && redirectTime && (now - parseInt(redirectTime)) < 3000) {
+            console.log('Possible redirect loop detected - stopping')
+            if (isMounted) {
+              setAuthChecking(false)
+              setLoading(false)
+            }
+            return
+          }
+          
+          sessionStorage.setItem('last_student_auth_redirect', '/portal')
+          sessionStorage.setItem('last_student_auth_redirect_time', String(now))
+          
+          if (isMounted) {
+            window.location.replace('/portal')
+          }
           return
         }
 
@@ -183,42 +206,53 @@ function StudentDashboardContent() {
           .eq('id', session.user.id)
           .maybeSingle()
 
-        const studentProfile: StudentProfile = {
-          id: session.user.id,
-          full_name: profileData?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Student',
-          email: profileData?.email || session.user.email || '',
-          class: profileData?.class || 'Not Assigned',
-          department: profileData?.department || 'General',
-          vin_id: profileData?.vin_id || session.user.user_metadata?.vin_id,
-          photo_url: profileData?.photo_url || undefined,
-          admission_year: profileData?.admission_year || new Date().getFullYear(),
-          role: profileData?.role || 'student'
+        if (isMounted) {
+          const studentProfile: StudentProfile = {
+            id: session.user.id,
+            full_name: profileData?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Student',
+            email: profileData?.email || session.user.email || '',
+            class: profileData?.class || 'Not Assigned',
+            department: profileData?.department || 'General',
+            vin_id: profileData?.vin_id || session.user.user_metadata?.vin_id,
+            photo_url: profileData?.photo_url || undefined,
+            admission_year: profileData?.admission_year || new Date().getFullYear(),
+            role: profileData?.role || 'student'
+          }
+          
+          setProfile(studentProfile)
+          setAuthChecking(false)
         }
-        
-        setProfile(studentProfile)
-        setAuthChecking(false)
         
       } catch (err) {
         console.error('Auth check error:', err)
-        setAuthChecking(false)
+        if (isMounted) {
+          setAuthChecking(false)
+        }
       }
     }
 
     checkAuth()
-  }, [router])
+    
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
-  // FIXED: Handle tab change - NO URL PARAMS
+  // Handle tab change - NO URL PARAMS
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
   }
 
+  // FIXED: loadDashboardData - NO REDIRECTS
   const loadDashboardData = useCallback(async () => {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
+      // Don't redirect here - just return if no session
       if (!session) {
-        router.push('/portal')
+        console.log('No session in loadDashboardData')
+        setLoading(false)
         return
       }
 
@@ -328,7 +362,7 @@ function StudentDashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, []) // Removed router dependency
 
   useEffect(() => {
     if (!authChecking) {
@@ -336,10 +370,11 @@ function StudentDashboardContent() {
     }
   }, [loadDashboardData, authChecking])
 
+  // FIXED: Logout with replace
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' })
     toast.success('Logged out successfully')
-    router.push('/portal')
+    window.location.replace('/portal')
   }
 
   const handleTakeExam = (examId: string) => {
@@ -771,29 +806,37 @@ function StudentDashboardContent() {
                 <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
                   <h1 className="text-3xl font-bold mb-4">Available Exams</h1>
                   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {filteredAvailableExams.map((exam) => (
-                      <Card key={exam.id}>
-                        <CardHeader>
-                          <CardTitle>{exam.title}</CardTitle>
-                          <CardDescription>{exam.subject}</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span>Duration:</span>
-                              <span>{exam.duration} mins</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span>Questions:</span>
-                              <span>{exam.total_questions}</span>
-                            </div>
-                            <Button onClick={() => handleTakeExam(exam.id)} className="w-full mt-3 bg-emerald-600">
-                              Take Exam <ChevronRight className="ml-2 h-4 w-4" />
-                            </Button>
-                          </div>
+                    {filteredAvailableExams.length === 0 ? (
+                      <Card className="col-span-full">
+                        <CardContent className="p-8 text-center">
+                          <p className="text-slate-500">No exams available at this time.</p>
                         </CardContent>
                       </Card>
-                    ))}
+                    ) : (
+                      filteredAvailableExams.map((exam) => (
+                        <Card key={exam.id} className="hover:shadow-lg transition-shadow">
+                          <CardHeader>
+                            <CardTitle className="text-lg">{exam.title}</CardTitle>
+                            <CardDescription>{exam.subject}</CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Duration:</span>
+                                <span className="font-medium">{exam.duration} mins</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-slate-500">Questions:</span>
+                                <span className="font-medium">{exam.total_questions}</span>
+                              </div>
+                              <Button onClick={() => handleTakeExam(exam.id)} className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700">
+                                Take Exam <ChevronRight className="ml-2 h-4 w-4" />
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
                   </div>
                 </motion.div>
               )}
@@ -809,17 +852,18 @@ function StudentDashboardContent() {
                       ) : (
                         <div className="divide-y">
                           {filteredRecentAttempts.map((attempt) => (
-                            <div key={attempt.id} className="py-4">
-                              <div className="flex items-center justify-between">
+                            <div key={attempt.id} className="py-4 first:pt-0 last:pb-0">
+                              <div className="flex items-center justify-between flex-wrap gap-3">
                                 <div>
                                   <h4 className="font-medium">{attempt.exam_title}</h4>
                                   <p className="text-sm text-slate-500">
-                                    Score: {attempt.total_score} ({attempt.percentage}%)
+                                    Score: {attempt.total_score} / {attempt.objective_total + attempt.theory_total} ({attempt.percentage}%)
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-3">
                                   {getStatusBadge(attempt.status, attempt.is_passed)}
                                   <Button variant="outline" size="sm" onClick={() => handleViewResult(attempt.id)}>
+                                    <Eye className="h-3 w-3 mr-1" />
                                     View
                                   </Button>
                                 </div>
@@ -841,7 +885,7 @@ function StudentDashboardContent() {
                     <CardContent className="p-6">
                       {profile && (
                         <div className="space-y-6">
-                          <div className="flex items-center gap-6">
+                          <div className="flex items-center gap-6 flex-wrap">
                             <Avatar className="h-24 w-24">
                               <AvatarImage src={profile.photo_url || undefined} />
                               <AvatarFallback className="bg-emerald-600 text-white text-2xl">
@@ -851,14 +895,26 @@ function StudentDashboardContent() {
                             <div>
                               <h2 className="text-2xl font-bold">{profile.full_name}</h2>
                               <p className="text-slate-500">{profile.email}</p>
-                              <Badge className="mt-2">{profile.class}</Badge>
+                              <Badge className="mt-2 bg-emerald-100 text-emerald-700">{profile.class}</Badge>
                             </div>
                           </div>
                           <div className="grid gap-4 md:grid-cols-2">
-                            <div><p className="text-sm text-slate-500">VIN ID</p><p className="font-medium">{profile.vin_id || 'N/A'}</p></div>
-                            <div><p className="text-sm text-slate-500">Department</p><p className="font-medium">{profile.department}</p></div>
-                            <div><p className="text-sm text-slate-500">Admission Year</p><p className="font-medium">{profile.admission_year || 'N/A'}</p></div>
-                            <div><p className="text-sm text-slate-500">Role</p><p className="font-medium capitalize">{profile.role}</p></div>
+                            <div>
+                              <p className="text-sm text-slate-500">VIN ID</p>
+                              <p className="font-medium">{profile.vin_id || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-slate-500">Department</p>
+                              <p className="font-medium">{profile.department}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-slate-500">Admission Year</p>
+                              <p className="font-medium">{profile.admission_year || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-slate-500">Role</p>
+                              <p className="font-medium capitalize">{profile.role}</p>
+                            </div>
                           </div>
                         </div>
                       )}
