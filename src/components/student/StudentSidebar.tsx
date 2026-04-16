@@ -1,10 +1,10 @@
 /* eslint-disable react/no-unescaped-entities */
  
-// components/student/StudentSidebar.tsx - Professional Desktop Sidebar with Tab Navigation
+// components/student/StudentSidebar.tsx - FULLY UPDATED WITH NAVIGATION
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, BookOpen, FileText, Award, Settings,
@@ -53,6 +53,7 @@ interface NavigationItem {
   name: string
   icon: React.ElementType
   description: string
+  route: string
   badge?: string
 }
 
@@ -61,38 +62,44 @@ const primaryNavigation: NavigationItem[] = [
     id: 'overview', 
     name: 'Overview', 
     icon: LayoutDashboard,
-    description: 'Dashboard & Stats'
+    description: 'Dashboard & Stats',
+    route: '/student'
   },
   { 
     id: 'exams', 
     name: 'My Exams', 
     icon: MonitorPlay,
     description: 'Take CBT & Theory',
+    route: '/student/exams',
     badge: 'Available'
   },
   { 
     id: 'results', 
     name: 'Results', 
     icon: Award,
-    description: 'View Performance'
+    description: 'View Performance',
+    route: '/student/results'
   },
   { 
     id: 'assignments', 
     name: 'Assignments', 
     icon: FileText,
-    description: 'Course Work'
+    description: 'Course Work',
+    route: '/student/assignments'
   },
   { 
     id: 'attendance', 
     name: 'Attendance', 
     icon: Calendar,
-    description: 'Track Presence'
+    description: 'Track Presence',
+    route: '/student/attendance'
   },
   { 
     id: 'courses', 
     name: 'My Courses', 
     icon: BookOpen,
-    description: 'Learning Materials'
+    description: 'Learning Materials',
+    route: '/student/courses'
   },
 ]
 
@@ -101,31 +108,36 @@ const secondaryNavigation: NavigationItem[] = [
     id: 'performance', 
     name: 'Performance', 
     icon: TrendingUp,
-    description: 'Academic Progress'
+    description: 'Academic Progress',
+    route: '/student/performance'
   },
   { 
     id: 'notifications', 
     name: 'Notifications', 
     icon: Bell,
-    description: 'Updates & Alerts'
+    description: 'Updates & Alerts',
+    route: '/student/notifications'
   },
   { 
     id: 'profile', 
     name: 'Profile', 
     icon: User,
-    description: 'Account Details'
+    description: 'Account Details',
+    route: '/student/profile'
   },
   { 
     id: 'settings', 
     name: 'Settings', 
     icon: Settings,
-    description: 'Preferences'
+    description: 'Preferences',
+    route: '/student/settings'
   },
   { 
     id: 'help', 
     name: 'Help & Support', 
     icon: HelpCircle,
-    description: 'Get assistance'
+    description: 'Get assistance',
+    route: '/student/help'
   },
 ]
 
@@ -169,12 +181,39 @@ export function StudentSidebar({
   setActiveTab,
 }: StudentSidebarProps) {
   const router = useRouter()
+  const pathname = usePathname()
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
-  // FIXED: Handle undefined profile.full_name by passing undefined to the helper functions
+  // Sync active tab with pathname
+  useEffect(() => {
+    if (pathname === '/student') {
+      setActiveTab('overview')
+    } else if (pathname?.startsWith('/student/exams')) {
+      setActiveTab('exams')
+    } else if (pathname?.startsWith('/student/results')) {
+      setActiveTab('results')
+    } else if (pathname?.startsWith('/student/assignments')) {
+      setActiveTab('assignments')
+    } else if (pathname?.startsWith('/student/attendance')) {
+      setActiveTab('attendance')
+    } else if (pathname?.startsWith('/student/courses')) {
+      setActiveTab('courses')
+    } else if (pathname?.startsWith('/student/performance')) {
+      setActiveTab('performance')
+    } else if (pathname?.startsWith('/student/notifications')) {
+      setActiveTab('notifications')
+    } else if (pathname?.startsWith('/student/profile')) {
+      setActiveTab('profile')
+    } else if (pathname?.startsWith('/student/settings')) {
+      setActiveTab('settings')
+    } else if (pathname?.startsWith('/student/help')) {
+      setActiveTab('help')
+    }
+  }, [pathname, setActiveTab])
+
   const displayName = formatDisplayName(profile?.full_name)
-  const firstName = getFirstName(profile?.full_name) // Now accepts string | undefined
-  const initials = getInitials(profile?.full_name) // Now accepts string | undefined
+  const firstName = getFirstName(profile?.full_name)
+  const initials = getInitials(profile?.full_name)
   const avatarUrl = profile?.photo_url || undefined
 
   const handleLogoutClick = () => {
@@ -186,10 +225,11 @@ export function StudentSidebar({
     onLogout()
   }
 
-  const handleNavClick = (tabId: string) => {
+  // UPDATED: Navigate to the correct route
+  const handleNavClick = (tabId: string, route: string) => {
+    console.log('🔄 Student Sidebar clicked:', tabId, '→', route)
     setActiveTab(tabId)
-    // Update URL with tab parameter
-    router.push(`/student?tab=${tabId}`)
+    router.push(route)
   }
 
   const renderNavItem = (item: NavigationItem) => {
@@ -199,7 +239,7 @@ export function StudentSidebar({
     const buttonContent = (
       <button
         key={item.id}
-        onClick={() => handleNavClick(item.id)}
+        onClick={() => handleNavClick(item.id, item.route)}
         className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full group relative overflow-hidden",
           isActive 
@@ -257,10 +297,9 @@ export function StudentSidebar({
     return <div key={item.id}>{buttonContent}</div>
   }
 
-  // Sidebar Content - Everything scrolls together naturally
+  // Sidebar Content
   const sidebarContent = (
     <>
-      {/* Top spacing for header alignment */}
       <div className="pt-6" />
       
       {/* Logo Section */}
@@ -343,7 +382,6 @@ export function StudentSidebar({
                 </p>
               </div>
 
-              {/* Badges */}
               <div className="flex flex-wrap gap-1.5">
                 <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] shadow-sm">
                   {profile?.vin_id || 'VIN-XXXXXX'}
@@ -355,7 +393,6 @@ export function StudentSidebar({
                 )}
               </div>
 
-              {/* Quick Stats - Class and Year */}
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Class</p>
@@ -385,7 +422,6 @@ export function StudentSidebar({
         {primaryNavigation.map(renderNavItem)}
       </div>
 
-      {/* Separator */}
       {!collapsed && <Separator className="mx-3 my-2 bg-slate-200 dark:bg-slate-800" />}
 
       {/* Secondary Navigation */}
@@ -398,7 +434,7 @@ export function StudentSidebar({
         {secondaryNavigation.map(renderNavItem)}
       </div>
 
-      {/* Sign Out Button - At the bottom of the scroll */}
+      {/* Sign Out Button */}
       <div className="p-3 mt-2 border-t border-slate-200 dark:border-slate-800">
         {collapsed ? (
           <Tooltip delayDuration={0}>
@@ -437,14 +473,12 @@ export function StudentSidebar({
         )}
       </div>
 
-      {/* Extra bottom padding for better scrolling */}
       <div className="h-4" />
     </>
   )
 
   return (
     <>
-      {/* Desktop Sidebar - Hidden on mobile, visible on lg screens and above */}
       <aside 
         className={cn(
           "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800",
@@ -452,12 +486,10 @@ export function StudentSidebar({
         )}
       >
         <TooltipProvider>
-          {/* Entire sidebar scrolls naturally */}
           <ScrollArea className="h-full">
             {sidebarContent}
           </ScrollArea>
 
-          {/* Collapse Toggle Button */}
           <button 
             onClick={onToggle} 
             className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 shadow-md hover:shadow-lg transition-all flex items-center justify-center hover:scale-110 group z-50"
@@ -472,7 +504,6 @@ export function StudentSidebar({
         </TooltipProvider>
       </aside>
 
-      {/* Sign Out Confirmation Dialog */}
       <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
         <AlertDialogContent className="rounded-2xl max-w-md">
           <AlertDialogHeader>

@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/profile/page.tsx
+// app/student/profile/page.tsx - FULLY FIXED WITH SIDEBAR SYNC
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -28,7 +28,8 @@ import {
   Loader2,
   Save,
   ChevronRight,
-  Home
+  Home,
+  ArrowLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -57,7 +58,60 @@ export default function StudentProfilePage() {
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeTab, setActiveTab] = useState('profile') // ✅ Added activeTab state
+  const [activeTab, setActiveTab] = useState('profile')
+  
+  // ✅ Read stored tab from sessionStorage when coming from sub-route
+  useEffect(() => {
+    const storedTab = sessionStorage.getItem('studentActiveTab')
+    if (storedTab) {
+      setActiveTab(storedTab)
+      sessionStorage.removeItem('studentActiveTab')
+    }
+  }, [])
+  
+  // ✅ Handle sidebar navigation - sync with main dashboard
+  const handleSidebarTabChange = (tab: string) => {
+    setActiveTab(tab)
+    
+    // Navigate to the corresponding route
+    switch (tab) {
+      case 'overview':
+        router.push('/student')
+        break
+      case 'exams':
+        router.push('/student/exams')
+        break
+      case 'results':
+        router.push('/student/results')
+        break
+      case 'assignments':
+        router.push('/student/assignments')
+        break
+      case 'attendance':
+        router.push('/student/attendance')
+        break
+      case 'courses':
+        router.push('/student/courses')
+        break
+      case 'performance':
+        router.push('/student/performance')
+        break
+      case 'profile':
+        // Already on profile page
+        break
+      case 'settings':
+        router.push('/student/settings')
+        break
+      case 'notifications':
+        router.push('/student/notifications')
+        break
+      case 'help':
+        router.push('/student/help')
+        break
+      default:
+        router.push('/student')
+    }
+  }
   
   // Image upload states
   const [selectedImage, setSelectedImage] = useState<File | null>(null)
@@ -149,14 +203,16 @@ export default function StudentProfilePage() {
         })
         
         // Create profile record in database
-        await supabase.from('profiles').insert({
+        await supabase.from('profiles').upsert({
           id: userData.id,
           full_name: formattedName,
           email: userData.email,
           role: 'student',
           class: 'Not Assigned',
-          is_active: true
-        })
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' })
       }
     } catch (error) {
       console.error('Error loading profile:', error)
@@ -287,6 +343,10 @@ export default function StudentProfilePage() {
     router.push('/portal')
   }
 
+  const handleBackToDashboard = () => {
+    router.push('/student')
+  }
+
   const getInitials = () => {
     if (!profile?.full_name) return 'S'
     return profile.full_name
@@ -323,8 +383,8 @@ export default function StudentProfilePage() {
           onLogout={handleLogout}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab={activeTab}           // ✅ Added
-          setActiveTab={setActiveTab}     // ✅ Added
+          activeTab={activeTab}
+          setActiveTab={handleSidebarTabChange}  // ✅ Use the navigation handler
         />
 
         <div className={cn(
@@ -333,14 +393,20 @@ export default function StudentProfilePage() {
         )}>
           <main className="pt-20 pb-8 px-4">
             <div className="container mx-auto max-w-3xl">
-              {/* Breadcrumb */}
-              <div className="mb-6 flex items-center gap-2 text-sm text-muted-foreground">
-                <Link href="/student" className="hover:text-primary flex items-center gap-1">
-                  <Home className="h-3 w-3" />
-                  Dashboard
-                </Link>
-                <ChevronRight className="h-3 w-3" />
-                <span className="text-foreground">My Profile</span>
+              {/* Breadcrumb with Back Button */}
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Link href="/student" className="hover:text-primary flex items-center gap-1">
+                    <Home className="h-3 w-3" />
+                    Dashboard
+                  </Link>
+                  <ChevronRight className="h-3 w-3" />
+                  <span className="text-foreground">My Profile</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={handleBackToDashboard}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Dashboard
+                </Button>
               </div>
 
               <motion.div

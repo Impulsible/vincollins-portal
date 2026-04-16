@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/staff/page.tsx - Professional Staff Dashboard
+// app/staff/page.tsx - FIXED WITH CLEAN URLS
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { StaffSidebar } from '@/components/staff/StaffSidebar'
@@ -18,7 +18,6 @@ import { StudentRoster } from '@/components/staff/StudentRoster'
 import { CreateExamDialog } from '@/components/staff/CreateExamDialog'
 import { CreateAssignmentDialog } from '@/components/staff/CreateAssignmentDialog'
 import { UploadNoteDialog } from '@/components/staff/UploadNoteDialog'
-import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -99,7 +98,6 @@ interface Student {
   photo_url?: string
 }
 
-// Helper function to format profile for Header component
 const formatProfileForHeader = (profile: StaffProfile | null) => {
   if (!profile) return undefined
   return {
@@ -112,28 +110,21 @@ const formatProfileForHeader = (profile: StaffProfile | null) => {
   }
 }
 
-// Helper function to format and capitalize name properly
 function formatFullName(name: string): string {
   if (!name) return ''
-  
   const words = name.split(/[\s._-]+/)
-  
   const formattedWords = words.map(word => {
     if (word.length === 0) return ''
     return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
   })
-  
   return formattedWords.join(' ')
 }
 
-// Animation variants
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.1
-    }
+    transition: { staggerChildren: 0.1 }
   }
 }
 
@@ -142,17 +133,12 @@ const itemVariants = {
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      type: "spring" as const,
-      stiffness: 300,
-      damping: 24
-    }
+    transition: { type: "spring" as const, stiffness: 300, damping: 24 }
   }
 }
 
 function StaffDashboardContent() {
   const router = useRouter()
-  const searchParams = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [authChecking, setAuthChecking] = useState(true)
   const [profile, setProfile] = useState<StaffProfile | null>(null)
@@ -181,7 +167,16 @@ function StaffDashboardContent() {
     averageScore: 0
   })
 
-  // ========== AUTH CHECK - REDIRECT IF NOT AUTHENTICATED OR NOT TEACHER/ADMIN ==========
+  // Read stored tab from sessionStorage
+  useEffect(() => {
+    const storedTab = sessionStorage.getItem('staffActiveTab')
+    if (storedTab && ['overview', 'exams', 'assignments', 'notes', 'students'].includes(storedTab)) {
+      setActiveTab(storedTab)
+      sessionStorage.removeItem('staffActiveTab')
+    }
+  }, [])
+
+  // ========== AUTH CHECK - FIXED - NO REDIRECT ON PROFILE NULL ==========
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -189,66 +184,54 @@ function StaffDashboardContent() {
         
         if (sessionError || !session?.user) {
           console.log('No active session, redirecting to portal')
-          toast.error('Please log in to continue')
           router.push('/portal')
           return
         }
 
-        // Check if user is teacher/staff or admin
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('profiles')
           .select('role, full_name, email, department, position, photo_url, class')
           .eq('id', session.user.id)
-          .single()
+          .maybeSingle()
 
-        if (profileError || !profile) {
-          console.log('Profile not found, redirecting to portal')
-          toast.error('Account not found')
+        // Don't redirect if profile is null - user is authenticated
+        const role = profile?.role?.toLowerCase() || 'staff'
+        
+        // Only redirect if role is DEFINITELY not allowed
+        if (profile && role !== 'staff' && role !== 'teacher' && role !== 'admin') {
+          console.log('Not authorized for staff dashboard')
           router.push('/portal')
           return
         }
 
-        const role = profile.role?.toLowerCase()
-        // Allow staff, teacher, and admin roles
-        if (role !== 'staff' && role !== 'teacher' && role !== 'admin') {
-          console.log('Not authorized for staff dashboard, redirecting to portal')
-          toast.error('Access denied. Staff only.')
-          router.push('/portal')
-          return
-        }
-
-        // Format and set profile
-        const rawFullName = profile.full_name || session.user.email?.split('@')[0] || 'Staff User'
+        const rawFullName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Staff User'
         const formattedFullName = formatFullName(rawFullName)
 
         setProfile({
           id: session.user.id,
           full_name: formattedFullName,
-          email: profile.email || session.user.email || '',
-          department: profile.department || 'General',
-          position: profile.position || 'Teacher',
-          photo_url: profile.photo_url || null,
-          class: profile.class || null
+          email: profile?.email || session.user.email || '',
+          department: profile?.department || 'General',
+          position: profile?.position || 'Teacher',
+          photo_url: profile?.photo_url || null,
+          class: profile?.class || null
         })
 
         setAuthChecking(false)
       } catch (err) {
         console.error('Auth check error:', err)
-        toast.error('Authentication error')
-        router.push('/portal')
+        setAuthChecking(false)
       }
     }
 
     checkAuth()
   }, [router])
 
-  // Check for tab parameter in URL
-  useEffect(() => {
-    const tabParam = searchParams.get('tab')
-    if (tabParam && ['overview', 'exams', 'assignments', 'notes', 'students'].includes(tabParam)) {
-      setActiveTab(tabParam)
-    }
-  }, [searchParams])
+  // FIXED: Clean URL - no tab parameter in URL
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    // No URL update - keep URL clean as /staff
+  }
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -258,7 +241,6 @@ function StaffDashboardContent() {
         return
       }
 
-      // Get staff profile - try multiple sources
       let userData = null
       let rawFullName = ''
       
@@ -266,47 +248,15 @@ function StaffDashboardContent() {
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
 
       if (profileData) {
         userData = profileData
-        rawFullName = profileData.full_name || profileData.name || ''
-      }
-
-      if (!userData) {
-        const { data: staffData } = await supabase
-          .from('staff')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-
-        if (staffData) {
-          userData = staffData
-          rawFullName = staffData.full_name || staffData.name || ''
-        }
-      }
-
-      if (!userData) {
-        const { data: usersData } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-
-        if (usersData) {
-          userData = usersData
-          rawFullName = usersData.full_name || usersData.name || ''
-        }
+        rawFullName = profileData.full_name || ''
       }
 
       if (!rawFullName) {
-        rawFullName = session.user.user_metadata?.full_name || 
-                     session.user.user_metadata?.name ||
-                     session.user.user_metadata?.display_name || ''
-        
-        if (!rawFullName && session.user.email) {
-          rawFullName = session.user.email.split('@')[0].replace(/[._-]/g, ' ')
-        }
+        rawFullName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Staff User'
       }
 
       const formattedFullName = formatFullName(rawFullName)
@@ -316,13 +266,12 @@ function StaffDashboardContent() {
         id: session.user.id,
         full_name: formattedFullName,
         email: userData?.email || session.user.email || '',
-        department: userData?.department || session.user.user_metadata?.department || 'General',
-        position: userData?.position || session.user.user_metadata?.position || 'Teacher',
-        photo_url: userData?.photo_url || userData?.avatar_url || session.user.user_metadata?.avatar_url,
-        class: userData?.class || session.user.user_metadata?.class
+        department: userData?.department || 'General',
+        position: userData?.position || 'Teacher',
+        photo_url: userData?.photo_url || null,
+        class: userData?.class || null
       }))
 
-      // Load data in parallel for better performance
       const [
         { data: examsData },
         { data: assignmentsData },
@@ -350,7 +299,6 @@ function StaffDashboardContent() {
         if (usersData) setStudents(usersData as Student[])
       }
 
-      // Calculate enhanced stats
       const activeStudentsCount = studentsData?.filter((s: any) => s.is_active).length || 0
       const publishedExamsCount = examsData?.filter((e: any) => e.status === 'published').length || 0
       
@@ -387,35 +335,25 @@ function StaffDashboardContent() {
   const handleExamCreated = () => {
     loadDashboardData()
     setShowCreateExam(false)
-    toast.success('Exam created successfully!', {
-      description: 'Submit for admin approval to publish.',
-      icon: <Sparkles className="h-4 w-4" />
-    })
+    toast.success('Exam created successfully!')
   }
 
   const handleAssignmentCreated = () => {
     loadDashboardData()
     setShowCreateAssignment(false)
-    toast.success('Assignment created!', {
-      description: 'Students can now view and submit their work.'
-    })
+    toast.success('Assignment created!')
   }
 
   const handleNoteUploaded = () => {
     loadDashboardData()
     setShowUploadNote(false)
-    toast.success('Study note uploaded!', {
-      description: 'Your students can now access this material.'
-    })
+    toast.success('Study note uploaded!')
   }
 
-  // Handle View All Students - Switch to students tab
   const handleViewAllStudents = () => {
     setActiveTab('students')
-    window.history.pushState({}, '', '/staff?tab=students')
   }
 
-  // Filter data based on search query
   const filteredExams = exams.filter(exam => 
     exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     exam.subject.toLowerCase().includes(searchQuery.toLowerCase())
@@ -430,12 +368,6 @@ function StaffDashboardContent() {
     note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     note.subject.toLowerCase().includes(searchQuery.toLowerCase())
   )
-
-  // Handle tab change with URL update
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab)
-    window.history.pushState({}, '', `/staff?tab=${tab}`)
-  }
 
   if (authChecking || loading) {
     return (
@@ -456,7 +388,6 @@ function StaffDashboardContent() {
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
       <div className="flex">
-        {/* Sidebar - Desktop only, proper spacing */}
         <StaffSidebar 
           profile={profile}
           onLogout={handleLogout}
@@ -466,14 +397,12 @@ function StaffDashboardContent() {
           setActiveTab={handleTabChange}
         />
 
-        {/* Main Content - Proper margin for sidebar */}
         <main className={cn(
           "flex-1 pt-16 lg:pt-20 pb-8 min-h-screen transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
             
-            {/* Search and Filter Bar */}
             {(activeTab === 'exams' || activeTab === 'assignments' || activeTab === 'notes') && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
@@ -521,17 +450,14 @@ function StaffDashboardContent() {
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-6"
                 >
-                  {/* Welcome Banner */}
                   <motion.div variants={itemVariants}>
                     <StaffWelcomeBanner profile={profile} stats={stats} />
                   </motion.div>
                   
-                  {/* Stats Cards */}
                   <motion.div variants={itemVariants}>
                     <StaffStatsCards stats={stats} />
                   </motion.div>
                   
-                  {/* Quick Actions */}
                   <motion.div variants={itemVariants}>
                     <QuickActions 
                       onCreateExam={() => setShowCreateExam(true)}
@@ -540,12 +466,9 @@ function StaffDashboardContent() {
                     />
                   </motion.div>
                   
-                  {/* Main Content Grid */}
                   <motion.div variants={itemVariants}>
                     <div className="grid gap-6 lg:grid-cols-3">
-                      {/* Left Column */}
                       <div className="lg:col-span-2 space-y-6">
-                        {/* Recent Exams */}
                         <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
                           <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
@@ -567,15 +490,10 @@ function StaffDashboardContent() {
                             </div>
                           </CardHeader>
                           <CardContent className="pt-4">
-                            <ExamsList 
-                              exams={exams.slice(0, 5)} 
-                              onRefresh={loadDashboardData} 
-                              compact 
-                            />
+                            <ExamsList exams={exams.slice(0, 5)} onRefresh={loadDashboardData} compact />
                           </CardContent>
                         </Card>
                         
-                        {/* Recent Assignments */}
                         <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
                           <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
@@ -597,18 +515,12 @@ function StaffDashboardContent() {
                             </div>
                           </CardHeader>
                           <CardContent className="pt-4">
-                            <AssignmentsList 
-                              assignments={assignments.slice(0, 3)} 
-                              onRefresh={loadDashboardData} 
-                              compact 
-                            />
+                            <AssignmentsList assignments={assignments.slice(0, 3)} onRefresh={loadDashboardData} compact />
                           </CardContent>
                         </Card>
                       </div>
                       
-                      {/* Right Column */}
                       <div className="space-y-6">
-                        {/* Quick Insights */}
                         <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-500 to-indigo-600 text-white overflow-hidden relative">
                           <div className="absolute top-0 right-0 opacity-10">
                             <TrendingUp className="h-32 w-32 -mr-8 -mt-8" />
@@ -647,13 +559,8 @@ function StaffDashboardContent() {
                           </CardContent>
                         </Card>
                         
-                        {/* Student Roster Preview */}
-                        <StudentRoster 
-                          students={students.slice(0, 6)} 
-                          onViewAll={handleViewAllStudents}
-                        />
+                        <StudentRoster students={students.slice(0, 6)} onViewAll={handleViewAllStudents} />
                         
-                        {/* Recent Notes */}
                         <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
                           <CardHeader className="pb-3">
                             <div className="flex items-center justify-between">
@@ -661,21 +568,13 @@ function StaffDashboardContent() {
                                 <CardTitle className="text-lg font-semibold">Recent Notes</CardTitle>
                                 <CardDescription>Study materials</CardDescription>
                               </div>
-                              <Button 
-                                variant="ghost" 
-                                size="sm"
-                                onClick={() => handleTabChange('notes')}
-                              >
+                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('notes')}>
                                 View All
                               </Button>
                             </div>
                           </CardHeader>
                           <CardContent>
-                            <NotesList 
-                              notes={notes.slice(0, 3)} 
-                              onRefresh={loadDashboardData} 
-                              compact 
-                            />
+                            <NotesList notes={notes.slice(0, 3)} onRefresh={loadDashboardData} compact />
                           </CardContent>
                         </Card>
                       </div>
@@ -686,27 +585,15 @@ function StaffDashboardContent() {
 
               {/* Exams Tab */}
               {activeTab === 'exams' && (
-                <motion.div 
-                  key="exams"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="space-y-6"
-                >
+                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                       <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         My Exams
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        Create and manage CBT and theory exams
-                      </p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1">Create and manage CBT and theory exams</p>
                     </div>
-                    <Button 
-                      onClick={() => setShowCreateExam(true)} 
-                      size="lg"
-                      className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
-                    >
+                    <Button onClick={() => setShowCreateExam(true)} size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all">
                       <Plus className="mr-2 h-5 w-5" /> Create New Exam
                     </Button>
                   </div>
@@ -720,27 +607,15 @@ function StaffDashboardContent() {
 
               {/* Assignments Tab */}
               {activeTab === 'assignments' && (
-                <motion.div 
-                  key="assignments"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="space-y-6"
-                >
+                <motion.div key="assignments" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                       <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         Assignments
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        Create and manage student assignments
-                      </p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1">Create and manage student assignments</p>
                     </div>
-                    <Button 
-                      onClick={() => setShowCreateAssignment(true)} 
-                      size="lg"
-                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all"
-                    >
+                    <Button onClick={() => setShowCreateAssignment(true)} size="lg" className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all">
                       <Plus className="mr-2 h-5 w-5" /> Create Assignment
                     </Button>
                   </div>
@@ -754,27 +629,15 @@ function StaffDashboardContent() {
 
               {/* Notes Tab */}
               {activeTab === 'notes' && (
-                <motion.div 
-                  key="notes"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="space-y-6"
-                >
+                <motion.div key="notes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                       <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         Study Notes
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        Upload and manage study materials
-                      </p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1">Upload and manage study materials</p>
                     </div>
-                    <Button 
-                      onClick={() => setShowUploadNote(true)} 
-                      size="lg"
-                      className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all"
-                    >
+                    <Button onClick={() => setShowUploadNote(true)} size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all">
                       <Plus className="mr-2 h-5 w-5" /> Upload Note
                     </Button>
                   </div>
@@ -788,27 +651,15 @@ function StaffDashboardContent() {
 
               {/* Students Tab */}
               {activeTab === 'students' && (
-                <motion.div 
-                  key="students"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -20 }}
-                  className="space-y-6"
-                >
+                <motion.div key="students" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
                       <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         Student Roster
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        View and manage all students in your classes
-                      </p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1">View and manage all students in your classes</p>
                     </div>
-                    <Button 
-                      variant="outline"
-                      size="lg"
-                      className="gap-2"
-                    >
+                    <Button variant="outline" size="lg" className="gap-2">
                       <Download className="h-5 w-5" />
                       Export Roster
                     </Button>
@@ -825,27 +676,9 @@ function StaffDashboardContent() {
         </main>
       </div>
 
-      {/* Dialogs */}
-      <CreateExamDialog 
-        open={showCreateExam} 
-        onOpenChange={setShowCreateExam}
-        onSuccess={handleExamCreated}
-        teacherProfile={profile}
-      />
-      
-      <CreateAssignmentDialog 
-        open={showCreateAssignment} 
-        onOpenChange={setShowCreateAssignment}
-        onSuccess={handleAssignmentCreated}
-        teacherProfile={profile}
-      />
-      
-      <UploadNoteDialog 
-        open={showUploadNote} 
-        onOpenChange={setShowUploadNote}
-        onSuccess={handleNoteUploaded}
-        teacherProfile={profile}
-      />
+      <CreateExamDialog open={showCreateExam} onOpenChange={setShowCreateExam} onSuccess={handleExamCreated} teacherProfile={profile} />
+      <CreateAssignmentDialog open={showCreateAssignment} onOpenChange={setShowCreateAssignment} onSuccess={handleAssignmentCreated} teacherProfile={profile} />
+      <UploadNoteDialog open={showUploadNote} onOpenChange={setShowUploadNote} onSuccess={handleNoteUploaded} teacherProfile={profile} />
     </div>
   )
 }

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/staff/exams/page.tsx - FINAL CLEAN VERSION
+// app/staff/exams/page.tsx - FULLY FIXED
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -156,6 +156,29 @@ export default function StaffExamsPage() {
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   const authChecked = useRef(false)
+
+  // FIXED: Handle sidebar navigation
+  const handleSidebarTabChange = (tab: string) => {
+    switch (tab) {
+      case 'overview':
+        router.push('/staff')
+        break
+      case 'exams':
+        router.push('/staff/exams')
+        break
+      case 'assignments':
+        router.push('/staff/assignments')
+        break
+      case 'notes':
+        router.push('/staff/notes')
+        break
+      case 'students':
+        router.push('/staff/students')
+        break
+      default:
+        router.push('/staff')
+    }
+  }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -726,7 +749,7 @@ export default function StaffExamsPage() {
               collapsed={sidebarCollapsed}
               onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
               activeTab="exams"
-              setActiveTab={() => {}}
+              setActiveTab={handleSidebarTabChange}
             />
           </div>
 
@@ -941,7 +964,7 @@ export default function StaffExamsPage() {
             collapsed={sidebarCollapsed}
             onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
             activeTab="exams"
-            setActiveTab={() => {}}
+            setActiveTab={handleSidebarTabChange}
           />
         </div>
 

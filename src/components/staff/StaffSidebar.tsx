@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
  
-// components/staff/StaffSidebar.tsx - Fixed for your exact schema
+// components/staff/StaffSidebar.tsx - FULLY FIXED WITH NAVIGATION
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -55,24 +55,25 @@ interface NavigationItem {
   name: string
   icon: React.ElementType
   description: string
+  route: string
   badge?: string
 }
 
 const primaryNavigation: NavigationItem[] = [
-  { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics' },
-  { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory' },
-  { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks' },
-  { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials' },
-  { id: 'students', name: 'Students', icon: Users, description: 'Class Roster' },
+  { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
+  { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory', route: '/staff/exams' },
+  { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks', route: '/staff/assignments' },
+  { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
+  { id: 'students', name: 'Students', icon: Users, description: 'Class Roster', route: '/staff/students' },
 ]
 
 const secondaryNavigation: NavigationItem[] = [
-  { id: 'calendar', name: 'Calendar', icon: Calendar, description: 'Schedule & Events' },
-  { id: 'analytics', name: 'Analytics', icon: TrendingUp, description: 'Performance Insights' },
-  { id: 'achievements', name: 'Achievements', icon: Award, description: 'Your Milestones' },
-  { id: 'notifications', name: 'Notifications', icon: Bell, description: 'Updates & Alerts' },
-  { id: 'settings', name: 'Settings', icon: Settings, description: 'Preferences' },
-  { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance' },
+  { id: 'calendar', name: 'Calendar', icon: Calendar, description: 'Schedule & Events', route: '/staff/calendar' },
+  { id: 'analytics', name: 'Analytics', icon: TrendingUp, description: 'Performance Insights', route: '/staff/analytics' },
+  { id: 'achievements', name: 'Achievements', icon: Award, description: 'Your Milestones', route: '/staff/achievements' },
+  { id: 'notifications', name: 'Notifications', icon: Bell, description: 'Updates & Alerts', route: '/staff/notifications' },
+  { id: 'settings', name: 'Settings', icon: Settings, description: 'Preferences', route: '/staff/settings' },
+  { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance', route: '/staff/help' },
 ]
 
 const formatDisplayName = (profile: StaffProfile | null): string => {
@@ -122,16 +123,18 @@ export function StaffSidebar({
   const statsFetchedRef = useRef(false)
   const profileFetchedRef = useRef(false)
 
-  // Auto-detect active tab from pathname
+  // Sync active tab with pathname
   useEffect(() => {
-    if (pathname?.startsWith('/staff/students/')) {
-      setActiveTab('students')
-    } else if (pathname?.startsWith('/staff/exams/')) {
+    if (pathname === '/staff') {
+      setActiveTab('overview')
+    } else if (pathname?.startsWith('/staff/exams')) {
       setActiveTab('exams')
-    } else if (pathname?.startsWith('/staff/assignments/')) {
+    } else if (pathname?.startsWith('/staff/assignments')) {
       setActiveTab('assignments')
-    } else if (pathname?.startsWith('/staff/notes/')) {
+    } else if (pathname?.startsWith('/staff/notes')) {
       setActiveTab('notes')
+    } else if (pathname?.startsWith('/staff/students')) {
+      setActiveTab('students')
     }
   }, [pathname, setActiveTab])
 
@@ -248,13 +251,11 @@ export function StaffSidebar({
     onLogout()
   }
 
-  const handleNavClick = (tabId: string) => {
+  // FIXED: Navigate to the correct route
+  const handleNavClick = (tabId: string, route: string) => {
+    console.log('🔄 Sidebar clicked:', tabId, '→', route)
     setActiveTab(tabId)
-    if (pathname !== '/staff') {
-      router.push(`/staff?tab=${tabId}`)
-    } else {
-      router.push(`/staff?tab=${tabId}`)
-    }
+    router.push(route)
   }
 
   const displayName = formatDisplayName(localProfile)
@@ -263,18 +264,14 @@ export function StaffSidebar({
   const avatarUrl = localProfile?.photo_url || undefined
 
   const renderNavItem = (item: NavigationItem) => {
-    const isActive = activeTab === item.id || 
-      (item.id === 'students' && pathname?.startsWith('/staff/students/')) ||
-      (item.id === 'exams' && pathname?.startsWith('/staff/exams/')) ||
-      (item.id === 'assignments' && pathname?.startsWith('/staff/assignments/')) ||
-      (item.id === 'notes' && pathname?.startsWith('/staff/notes/'))
+    const isActive = activeTab === item.id
     
     const Icon = item.icon
     
     const buttonContent = (
       <button
         key={item.id}
-        onClick={() => handleNavClick(item.id)}
+        onClick={() => handleNavClick(item.id, item.route)}
         className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full group relative overflow-hidden",
           isActive 

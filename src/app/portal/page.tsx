@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - FIXED FOR VERCEL REDIRECT
+// app/portal/page.tsx - FIXED WITH CLEAN URLS
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
@@ -47,10 +47,13 @@ export default function LoginPage() {
     role: 'student' | 'teacher' | 'admin'
   } | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const hasRedirected = useRef(false)
 
-  // Check if already logged in
+  // FIXED: Check if already logged in - with clean URLs
   useEffect(() => {
     const checkSession = async () => {
+      if (hasRedirected.current) return
+      
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
@@ -62,16 +65,17 @@ export default function LoginPage() {
             .maybeSingle()
 
           if (profile) {
+            hasRedirected.current = true
             const role = profile.role?.toLowerCase()
-            let redirectPath = '/student?tab=overview'
+            let redirectPath = '/student'
             
             if (role === 'admin') {
-              redirectPath = '/admin?tab=overview'
+              redirectPath = '/admin'
             } else if (role === 'staff' || role === 'teacher') {
-              redirectPath = '/staff?tab=overview'
+              redirectPath = '/staff'
             }
             
-            // Add delay for Vercel cookie persistence
+            // Clean URL redirect
             setTimeout(() => {
               window.location.href = redirectPath
             }, 300)
@@ -111,7 +115,7 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // Success Modal
+  // FIXED: Success Modal with clean URLs
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -143,17 +147,17 @@ export default function LoginPage() {
     const config = roleConfig[role]
     const firstName = userName.split(' ')[0]
 
+    // FIXED: Clean URL - no ?tab=
     const goToDashboard = () => {
       setShowSuccessModal(false)
       
-      let url = '/student?tab=overview'
+      let url = '/student'
       if (loginSuccessData.role === 'admin') {
-        url = '/admin?tab=overview'
+        url = '/admin'
       } else if (loginSuccessData.role === 'teacher') {
-        url = '/staff?tab=overview'
+        url = '/staff'
       }
       
-      // Add delay for Vercel session persistence
       setTimeout(() => {
         window.location.href = url
       }, 300)
@@ -277,7 +281,7 @@ export default function LoginPage() {
     )
   }
 
-  // Simple working login handler
+  // FIXED: Login handler with clean URL redirect
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)

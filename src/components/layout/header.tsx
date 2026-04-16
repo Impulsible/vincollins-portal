@@ -1,12 +1,12 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - COMPLETE PREMIUM HEADER WITH ULTRA-DIRECT NAVIGATION
+// components/layout/header.tsx - FIXED WITH CLEAN URLS
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { 
   ChevronDown, User, Home, BookOpen, Laptop, Phone, Calendar, Users, FileText,
   Bell, Search, Settings, LogOut, LayoutDashboard, GraduationCap, Menu, X,
@@ -66,7 +66,7 @@ interface NavigationItem {
   isCbt?: boolean
 }
 
-// Helper function to format names - NO DOTS, Proper Capitalization
+// Helper function to format names
 const formatFullName = (input: string): string => {
   if (!input) return 'User'
   
@@ -79,7 +79,7 @@ const formatFullName = (input: string): string => {
     .join(' ')
 }
 
-// Helper to get initials from formatted name
+// Helper to get initials
 const getInitialsFromName = (name: string): string => {
   if (!name || name === 'User') return 'U'
   const parts = name.trim().split(/\s+/)
@@ -104,16 +104,16 @@ const normalizeRole = (role: string | null | undefined): UserRole => {
   return 'student'
 }
 
-// Helper to get dashboard link based on role - WITH TAB OVERVIEW
+// FIXED: CLEAN URLS - No ?tab= parameters
 const getDashboardLink = (role: UserRole | string): string => {
   const roleStr = String(role).toLowerCase()
-  if (roleStr === 'admin') return '/admin?tab=overview'
-  if (roleStr === 'teacher' || roleStr === 'staff') return '/staff?tab=overview'
-  if (roleStr === 'student') return '/student?tab=overview'
+  if (roleStr === 'admin') return '/admin'
+  if (roleStr === 'teacher' || roleStr === 'staff') return '/staff'
+  if (roleStr === 'student') return '/student'
   return '/portal'
 }
 
-// Navigation for public pages (Home, Portal)
+// Navigation for public pages
 const publicNavigation: NavigationItem[] = [
   { name: 'Home', href: '/', icon: Home },
   { name: 'Admission', href: '/admission', icon: FileText },
@@ -122,30 +122,30 @@ const publicNavigation: NavigationItem[] = [
   { name: 'Contact', href: '/contact', icon: Phone },
 ]
 
-// Student navigation - CLEAN, only dashboard tabs
+// FIXED: CLEAN URLS - No ?tab= parameters
 const studentNavigation: NavigationItem[] = [
-  { name: 'Overview', href: '/student?tab=overview', icon: LayoutDashboard, tab: 'overview' },
-  { name: 'My Exams', href: '/student?tab=exams', icon: MonitorPlay, tab: 'exams' },
-  { name: 'Results', href: '/student?tab=results', icon: GraduationCap, tab: 'results' },
-  { name: 'Profile', href: '/student?tab=profile', icon: User, tab: 'profile' },
+  { name: 'Overview', href: '/student', icon: LayoutDashboard },
+  { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
+  { name: 'Results', href: '/student/results', icon: GraduationCap },
+  { name: 'Profile', href: '/student/profile', icon: User },
 ]
 
-// Teacher navigation - CLEAN, only dashboard tabs
+// UPDATED: Teacher navigation with your provided structure
 const teacherNavigation: NavigationItem[] = [
-  { name: 'Overview', href: '/staff?tab=overview', icon: LayoutDashboard, tab: 'overview' },
-  { name: 'Exams', href: '/staff?tab=exams', icon: MonitorPlay, tab: 'exams' },
-  { name: 'Assignments', href: '/staff?tab=assignments', icon: FileText, tab: 'assignments' },
-  { name: 'Students', href: '/staff?tab=students', icon: Users, tab: 'students' },
-  { name: 'Analytics', href: '/staff?tab=analytics', icon: BarChart3, tab: 'analytics' },
+  { name: 'Overview', href: '/staff', icon: LayoutDashboard },
+  { name: 'Exams', href: '/staff/exams', icon: MonitorPlay },
+  { name: 'Assignments', href: '/staff/assignments', icon: FileText },
+  { name: 'Students', href: '/staff/students', icon: Users },
+  { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
 ]
 
-// Admin navigation - CLEAN, only dashboard tabs
+// FIXED: CLEAN URLS - No ?tab= parameters
 const adminNavigation: NavigationItem[] = [
-  { name: 'Overview', href: '/admin?tab=overview', icon: LayoutDashboard, tab: 'overview' },
-  { name: 'Exam Approvals', href: '/admin?tab=exams', icon: MonitorPlay, tab: 'exams' },
-  { name: 'User Management', href: '/admin?tab=users', icon: Users, tab: 'users' },
-  { name: 'Settings', href: '/admin?tab=250', icon: Settings, tab: 'settings' },
-  { name: 'Reports', href: '/admin?tab=reports', icon: BarChart3, tab: 'reports' },
+  { name: 'Overview', href: '/admin', icon: LayoutDashboard },
+  { name: 'Exam Approvals', href: '/admin/exams', icon: MonitorPlay },
+  { name: 'User Management', href: '/admin/users', icon: Users },
+  { name: 'Settings', href: '/admin/settings', icon: Settings },
+  { name: 'Reports', href: '/admin/reports', icon: BarChart3 },
 ]
 
 const quickLinks = [
@@ -211,7 +211,6 @@ interface HeaderProps {
 function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -249,23 +248,18 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     fetchSchoolSettings()
   }, [])
 
-  // Check if nav item is active - syncs with sidebar tabs
-  const isNavActive = (href: string, tab?: string) => {
-    if (tab) {
-      const basePath = href.split('?')[0]
-      if (pathname === basePath) {
-        const urlTab = searchParams.get('tab') || 'overview'
-        return urlTab === tab
-      }
-      return false
-    }
+  // FIXED: More precise active check to prevent multiple active nav items
+  const isNavActive = (href: string) => {
+    if (href === '/') return pathname === '/'
     
-    if (pathname === href) return true
-    if (href === '/' || href === '/staff' || href === '/student' || href === '/admin') {
-      return pathname === href
-    }
-    if (pathname?.startsWith(href + '/')) return true
-    return false
+    // For dashboard root routes, only activate when exactly on that route
+    if (href === '/student') return pathname === '/student'
+    if (href === '/staff') return pathname === '/staff'
+    if (href === '/admin') return pathname === '/admin'
+    
+    // For sub-routes, check if the pathname starts with href + '/'
+    // But make sure we don't match the root route
+    return pathname === href || pathname?.startsWith(href + '/')
   }
 
   // Fetch notification count
@@ -294,7 +288,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch user with avatar
+  // Fetch user
   useEffect(() => {
     const fetchUser = async () => {
       setLoading(true)
@@ -371,7 +365,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     fetchUser()
   }, [])
 
-  // Fetch notifications on mount if user is logged in
   useEffect(() => {
     if (user?.isAuthenticated) {
       fetchNotificationCount()
@@ -481,13 +474,19 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
   const handleNotificationClick = () => {
     if (user?.role === 'admin') {
-      router.push('/admin?tab=exams')
+      router.push('/admin/exams')
     } else {
       router.push('/notifications')
     }
   }
 
-  // Navigation function removed - now handled inline with window.location.replace()
+  // FIXED: Ultra-direct navigation with clean URLs
+  const goToDashboard = () => {
+    setProfileOpen(false)
+    setMobileMenuOpen(false)
+    const url = getDashboardLink(user?.role || 'student')
+    window.location.replace(url)
+  }
 
   if (loading) {
     return (
@@ -514,7 +513,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             
-            {/* CLEAN LOGO - Smaller on mobile */}
+            {/* LOGO */}
             <Link href="/" className="flex items-center gap-2 sm:gap-3 group flex-shrink-0">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -548,14 +547,13 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     College
                   </span>
                 </div>
-                {/* Geared Towards Excellence - VISIBLE ON ALL SCREENS */}
                 <span className="text-[8px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium">
                   GEARED TOWARDS EXCELLENCE
                 </span>
               </div>
             </Link>
 
-            {/* Desktop Navigation - Perfectly centered */}
+            {/* Desktop Navigation */}
             <nav className={cn(
               "hidden lg:flex items-center",
               isPortalPage 
@@ -565,7 +563,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               <div className="flex items-center gap-1 xl:gap-2 bg-white/15 rounded-full p-1 shadow-lg">
                 {currentNavigation.map((item) => {
                   const Icon = item.icon
-                  const isActive = isNavActive(item.href, item.tab)
+                  const isActive = isNavActive(item.href)
                   const isCbt = item.name === 'CBT Platform' || item.isCbt
                   
                   return (
@@ -596,9 +594,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </nav>
 
-            {/* Right Section - Proper spacing for mobile */}
+            {/* Right Section */}
             <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
-              {/* Search Button - HIDDEN ON MOBILE */}
+              {/* Search Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -608,7 +606,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-4 w-4 sm:h-5 sm:w-5" />
               </Button>
 
-              {/* Notifications - Only on dashboard pages */}
+              {/* Notifications */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <TooltipProvider>
                   <Tooltip>
@@ -634,7 +632,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </TooltipProvider>
               )}
 
-              {/* FOR AUTHENTICATED USERS - Show Avatar with Dropdown */}
+              {/* AUTHENTICATED USER - Avatar with Dropdown */}
               {user?.isAuthenticated ? (
                 <div className="relative" ref={profileDropdownRef}>
                   <Button
@@ -686,14 +684,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       {(isHomePage || isPortalPage) && (
                         <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                           <button
-                            onClick={(e) => {
-                              e.preventDefault()
-                              setProfileOpen(false)
-                              let url = '/student?tab=overview'
-                              if (user?.role === 'admin') url = '/admin?tab=overview'
-                              else if (user?.role === 'teacher') url = '/staff?tab=overview'
-                              window.location.replace(url)
-                            }}
+                            onClick={goToDashboard}
                             className="w-full px-3 py-2 sm:py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
                           >
                             <LayoutDashboard className="h-4 w-4" />
@@ -711,7 +702,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       {!isPortalPage && !isHomePage && (
                         <div className="py-1">
                           <Link 
-                            href={user.role === 'student' ? '/student?tab=profile' : user.role === 'admin' ? '/admin?tab=settings' : '/staff?tab=overview'} 
+                            href={user.role === 'student' ? '/student/profile' : user.role === 'admin' ? '/admin/settings' : '/staff'} 
                             className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
                             onClick={() => setProfileOpen(false)}
                           >
@@ -732,7 +723,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           </Link>
                           
                           <Link 
-                            href={user.role === 'student' ? '/student?tab=settings' : user.role === 'admin' ? '/admin?tab=settings' : '/staff?tab=settings'} 
+                            href={user.role === 'student' ? '/student/settings' : user.role === 'admin' ? '/admin/settings' : '/staff/settings'} 
                             className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3"
                             onClick={() => setProfileOpen(false)}
                           >
@@ -799,7 +790,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   )}
                 </div>
               ) : (
-                /* PORTAL LOGIN - Shows on public pages (Home, Admission, Schools, Contact) */
+                /* PORTAL LOGIN - Shows on public pages */
                 !user?.isAuthenticated && isPublicPage && (
                   <Link href="/portal" className="hidden md:block">
                     <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-4 sm:px-6 py-2 font-semibold text-sm">
@@ -810,7 +801,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 )
               )}
 
-              {/* Hamburger Menu Button - ALWAYS VISIBLE ON MOBILE */}
+              {/* Hamburger Menu Button */}
               <button
                 className="lg:hidden relative h-9 w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95 ml-0.5"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -939,7 +930,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </DialogContent>
       </Dialog>
 
-      {/* Mobile Menu - PROFESSIONAL WITH LOGO AND SUBTEXT */}
+      {/* Mobile Menu */}
       {mobileMenuOpen && (
         <>
           <div 
@@ -948,13 +939,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
           />
           
           <div className="fixed top-0 right-0 h-full w-full max-w-sm bg-white z-50 lg:hidden overflow-y-auto">
-            {/* Professional Header with Logo AND Subtext */}
+            {/* Header */}
             <div className="bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] text-white p-5">
               <button onClick={() => setMobileMenuOpen(false)} className="absolute top-4 right-4 p-2">
                 <X className="h-5 w-5" />
               </button>
               
-              {/* Logo and School Name with Subtext */}
               <div className="flex items-center gap-3">
                 <div className="relative h-12 w-12">
                   {schoolSettings?.logo_path ? (
@@ -977,7 +967,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               </div>
               
-              {/* User Info if authenticated */}
               {user?.isAuthenticated && (
                 <div className="mt-4 p-4 bg-white/10 rounded-xl">
                   <div className="flex items-center gap-3">
@@ -1003,7 +992,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
             <div className="p-4">
               {currentNavigation.map((item) => {
                 const Icon = item.icon
-                const isActive = isNavActive(item.href, item.tab)
+                const isActive = isNavActive(item.href)
                 const isCbt = item.name === 'CBT Platform' || item.isCbt
                 
                 return (
@@ -1032,18 +1021,11 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               })}
             </div>
 
-            {/* Dashboard Link for authenticated users - ULTRA-DIRECT NAVIGATION */}
+            {/* Dashboard Link for authenticated users */}
             {user?.isAuthenticated && (isHomePage || isPortalPage) && (
               <div className="p-4 border-t">
                 <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    setMobileMenuOpen(false)
-                    let url = '/student?tab=overview'
-                    if (user?.role === 'admin') url = '/admin?tab=overview'
-                    else if (user?.role === 'teacher') url = '/staff?tab=overview'
-                    window.location.replace(url)
-                  }}
+                  onClick={goToDashboard}
                   className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md hover:shadow-lg transition-all"
                 >
                   <LayoutDashboard className="h-5 w-5" />
@@ -1052,7 +1034,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             )}
 
-            {/* Portal Login for unauthenticated users on mobile - Shows on all public pages */}
+            {/* Portal Login for unauthenticated users */}
             {!user?.isAuthenticated && isPublicPage && (
               <div className="p-4 border-t">
                 <Link
