@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/staff/page.tsx - FIXED AUTH CHECK - NO REDIRECT LOOP
+// app/staff/page.tsx - PROFESSIONAL RESPONSIVE DASHBOARD
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
@@ -36,7 +36,12 @@ import {
   FileText,
   Award,
   Download,
-  Loader2
+  Loader2,
+  LayoutDashboard,
+  MonitorPlay,
+  User,
+  Menu,
+  Settings
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -146,6 +151,7 @@ function StaffDashboardContent() {
   const [activeTab, setActiveTab] = useState('overview')
   const [searchQuery, setSearchQuery] = useState('')
   const [timeFilter, setTimeFilter] = useState('all')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
   const [exams, setExams] = useState<Exam[]>([])
   const [assignments, setAssignments] = useState<Assignment[]>([])
@@ -170,17 +176,14 @@ function StaffDashboardContent() {
   // ========== AUTH CHECK - FIXED - NO REDIRECT LOOP ==========
   useEffect(() => {
     let isMounted = true
-    const redirectAttempts = 0
     
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
-        // ONLY redirect if DEFINITELY no session
         if (!session) {
           console.log('No session, redirecting to portal')
           
-          // Add loop prevention
           const lastRedirect = sessionStorage.getItem('last_auth_redirect')
           const redirectTime = sessionStorage.getItem('last_auth_redirect_time')
           const now = Date.now()
@@ -203,7 +206,6 @@ function StaffDashboardContent() {
           return
         }
 
-        // Try to load profile - but DON'T redirect if it fails
         const { data: profile } = await supabase
           .from('profiles')
           .select('role, full_name, email, department, position, photo_url, class')
@@ -211,7 +213,6 @@ function StaffDashboardContent() {
           .maybeSingle()
 
         if (isMounted) {
-          // Set profile with defaults even if not found
           const rawFullName = profile?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Staff User'
           const formattedFullName = formatFullName(rawFullName)
 
@@ -225,7 +226,6 @@ function StaffDashboardContent() {
             class: profile?.class || null
           })
 
-          // User is authenticated - stay on page
           setAuthChecking(false)
         }
         
@@ -244,43 +244,28 @@ function StaffDashboardContent() {
     }
   }, [])
 
-  // Handle tab change
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
+    setMobileMenuOpen(false)
   }
 
-  // Handle sidebar navigation
   const handleSidebarTabChange = (tab: string) => {
     setActiveTab(tab)
     switch (tab) {
-      case 'overview':
-        router.push('/staff')
-        break
-      case 'exams':
-        router.push('/staff/exams')
-        break
-      case 'assignments':
-        router.push('/staff/assignments')
-        break
-      case 'notes':
-        router.push('/staff/notes')
-        break
-      case 'students':
-        router.push('/staff/students')
-        break
-      default:
-        router.push('/staff')
+      case 'overview': router.push('/staff'); break
+      case 'exams': router.push('/staff/exams'); break
+      case 'assignments': router.push('/staff/assignments'); break
+      case 'notes': router.push('/staff/notes'); break
+      case 'students': router.push('/staff/students'); break
+      default: router.push('/staff')
     }
   }
 
-  // FIXED: loadDashboardData - NO REDIRECTS
   const loadDashboardData = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       
-      // Don't redirect here - just return if no session
       if (!session) {
-        console.log('No session in loadDashboardData, but auth check passed?')
         setLoading(false)
         return
       }
@@ -363,7 +348,7 @@ function StaffDashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, []) // Removed router dependency
+  }, [])
 
   useEffect(() => {
     if (!authChecking) {
@@ -417,7 +402,7 @@ function StaffDashboardContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
             <p className="mt-4 text-slate-600 dark:text-slate-400">Loading staff dashboard...</p>
@@ -431,6 +416,70 @@ function StaffDashboardContent() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
+      {/* Mobile Bottom Navigation */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg pb-safe">
+        <div className="grid grid-cols-4 gap-1 p-2">
+          {[
+            { id: 'overview', icon: LayoutDashboard, label: 'Home' },
+            { id: 'exams', icon: MonitorPlay, label: 'Exams' },
+            { id: 'students', icon: Users, label: 'Students' },
+            { id: 'profile', icon: User, label: 'Profile' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={cn(
+                "flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-all",
+                activeTab === tab.id
+                  ? "text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-950/30"
+                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+              )}
+            >
+              <tab.icon className="h-5 w-5" />
+              <span className="text-[10px] mt-1 font-medium">{tab.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="flex flex-col items-center justify-center py-2 px-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+          >
+            <Menu className="h-5 w-5" />
+            <span className="text-[10px] mt-1 font-medium">More</span>
+          </button>
+        </div>
+        
+        {/* Mobile More Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute bottom-full left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg p-4 mb-2 rounded-t-xl max-h-[60vh] overflow-y-auto"
+            >
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'assignments', icon: FileText, label: 'Assignments' },
+                  { id: 'notes', icon: BookOpen, label: 'Notes' },
+                  { id: 'calendar', icon: Calendar, label: 'Calendar' },
+                  { id: 'analytics', icon: TrendingUp, label: 'Analytics' },
+                  { id: 'settings', icon: Settings, label: 'Settings' }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => handleTabChange(tab.id)}
+                    className="flex flex-col items-center p-3 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    <tab.icon className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+                    <span className="text-xs mt-1">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      
       <div className="flex">
         <StaffSidebar 
           profile={profile}
@@ -442,35 +491,35 @@ function StaffDashboardContent() {
         />
 
         <main className={cn(
-          "flex-1 pt-16 lg:pt-20 pb-8 min-h-screen transition-all duration-300",
+          "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
+          <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 max-w-7xl">
             
             {(activeTab === 'exams' || activeTab === 'assignments' || activeTab === 'notes') && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
+                className="mb-4 sm:mb-6"
               >
-                <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col sm:flex-row gap-4">
+                <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                         <Input
                           placeholder={`Search ${activeTab}...`}
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                          className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm sm:text-base"
                         />
                       </div>
                       <div className="flex gap-2">
                         <Tabs value={timeFilter} onValueChange={setTimeFilter} className="w-full sm:w-auto">
                           <TabsList className="bg-slate-100 dark:bg-slate-800">
-                            <TabsTrigger value="all">All</TabsTrigger>
-                            <TabsTrigger value="recent">Recent</TabsTrigger>
-                            <TabsTrigger value="published">Published</TabsTrigger>
+                            <TabsTrigger value="all" className="text-xs sm:text-sm px-3">All</TabsTrigger>
+                            <TabsTrigger value="recent" className="text-xs sm:text-sm px-3">Recent</TabsTrigger>
+                            <TabsTrigger value="published" className="text-xs sm:text-sm px-3">Published</TabsTrigger>
                           </TabsList>
                         </Tabs>
                         <Button variant="outline" size="icon" className="shrink-0">
@@ -492,7 +541,7 @@ function StaffDashboardContent() {
                   initial="hidden"
                   animate="visible"
                   exit={{ opacity: 0, y: -20 }}
-                  className="space-y-6"
+                  className="space-y-4 sm:space-y-6"
                 >
                   <motion.div variants={itemVariants}>
                     <StaffWelcomeBanner profile={profile} stats={stats} />
@@ -511,108 +560,108 @@ function StaffDashboardContent() {
                   </motion.div>
                   
                   <motion.div variants={itemVariants}>
-                    <div className="grid gap-6 lg:grid-cols-3">
-                      <div className="lg:col-span-2 space-y-6">
+                    <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+                      <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                         <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                          <CardHeader className="pb-2 sm:pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div>
-                                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                                <CardTitle className="text-base sm:text-lg font-semibold flex items-center gap-2">
                                   <BookOpen className="h-5 w-5 text-blue-600" />
                                   Recent Exams
                                 </CardTitle>
-                                <CardDescription>Your recently created exams</CardDescription>
+                                <CardDescription className="text-xs sm:text-sm">Your recently created exams</CardDescription>
                               </div>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={() => handleTabChange('exams')}
-                                className="text-blue-600 hover:text-blue-700"
+                                className="text-blue-600 hover:text-blue-700 text-xs sm:text-sm"
                               >
                                 View All <ArrowRight className="ml-1 h-3 w-3" />
                               </Button>
                             </div>
                           </CardHeader>
-                          <CardContent className="pt-4">
+                          <CardContent className="pt-3 sm:pt-4">
                             <ExamsList exams={exams.slice(0, 5)} onRefresh={loadDashboardData} compact />
                           </CardContent>
                         </Card>
                         
                         <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                          <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800">
+                          <CardHeader className="pb-2 sm:pb-3 border-b border-slate-100 dark:border-slate-800">
                             <div className="flex items-center justify-between">
                               <div>
-                                <CardTitle className="text-lg font-semibold flex items-center gap-2">
+                                <CardTitle className="text-base sm:text-lg font-semibold flex items-center gap-2">
                                   <FileText className="h-5 w-5 text-emerald-600" />
                                   Recent Assignments
                                 </CardTitle>
-                                <CardDescription>Your recently created assignments</CardDescription>
+                                <CardDescription className="text-xs sm:text-sm">Your recently created assignments</CardDescription>
                               </div>
                               <Button 
                                 variant="ghost" 
                                 size="sm"
                                 onClick={() => handleTabChange('assignments')}
-                                className="text-emerald-600 hover:text-emerald-700"
+                                className="text-emerald-600 hover:text-emerald-700 text-xs sm:text-sm"
                               >
                                 View All <ArrowRight className="ml-1 h-3 w-3" />
                               </Button>
                             </div>
                           </CardHeader>
-                          <CardContent className="pt-4">
+                          <CardContent className="pt-3 sm:pt-4">
                             <AssignmentsList assignments={assignments.slice(0, 3)} onRefresh={loadDashboardData} compact />
                           </CardContent>
                         </Card>
                       </div>
                       
-                      <div className="space-y-6">
+                      <div className="space-y-4 sm:space-y-6">
                         <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-500 to-indigo-600 text-white overflow-hidden relative">
                           <div className="absolute top-0 right-0 opacity-10">
                             <TrendingUp className="h-32 w-32 -mr-8 -mt-8" />
                           </div>
-                          <CardHeader>
-                            <CardTitle className="text-white flex items-center gap-2">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
                               <Sparkles className="h-5 w-5" />
                               Quick Insights
                             </CardTitle>
-                            <CardDescription className="text-blue-100">
+                            <CardDescription className="text-blue-100 text-xs sm:text-sm">
                               Your teaching impact at a glance
                             </CardDescription>
                           </CardHeader>
-                          <CardContent className="space-y-4">
+                          <CardContent className="space-y-3 sm:space-y-4">
                             <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                               <div className="flex items-center gap-3">
                                 <Users className="h-5 w-5" />
-                                <span>Active Students</span>
+                                <span className="text-sm sm:text-base">Active Students</span>
                               </div>
-                              <span className="text-2xl font-bold">{stats.activeStudents}</span>
+                              <span className="text-xl sm:text-2xl font-bold">{stats.activeStudents}</span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                               <div className="flex items-center gap-3">
                                 <BookOpen className="h-5 w-5" />
-                                <span>Published Exams</span>
+                                <span className="text-sm sm:text-base">Published Exams</span>
                               </div>
-                              <span className="text-2xl font-bold">{stats.publishedExams}</span>
+                              <span className="text-xl sm:text-2xl font-bold">{stats.publishedExams}</span>
                             </div>
                             <div className="flex items-center justify-between p-3 bg-white/10 rounded-xl backdrop-blur-sm">
                               <div className="flex items-center gap-3">
                                 <Award className="h-5 w-5" />
-                                <span>Avg. Score</span>
+                                <span className="text-sm sm:text-base">Avg. Score</span>
                               </div>
-                              <span className="text-2xl font-bold">{stats.averageScore}%</span>
+                              <span className="text-xl sm:text-2xl font-bold">{stats.averageScore}%</span>
                             </div>
                           </CardContent>
                         </Card>
                         
                         <StudentRoster students={students.slice(0, 6)} onViewAll={handleViewAllStudents} />
                         
-                        <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                          <CardHeader className="pb-3">
+                        <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                          <CardHeader className="pb-2 sm:pb-3">
                             <div className="flex items-center justify-between">
                               <div>
-                                <CardTitle className="text-lg font-semibold">Recent Notes</CardTitle>
-                                <CardDescription>Study materials</CardDescription>
+                                <CardTitle className="text-base sm:text-lg font-semibold">Recent Notes</CardTitle>
+                                <CardDescription className="text-xs sm:text-sm">Study materials</CardDescription>
                               </div>
-                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('notes')}>
+                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('notes')} className="text-xs sm:text-sm">
                                 View All
                               </Button>
                             </div>
@@ -629,20 +678,20 @@ function StaffDashboardContent() {
 
               {/* Exams Tab */}
               {activeTab === 'exams' && (
-                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         My Exams
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">Create and manage CBT and theory exams</p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">Create and manage CBT and theory exams</p>
                     </div>
-                    <Button onClick={() => setShowCreateExam(true)} size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all">
+                    <Button onClick={() => setShowCreateExam(true)} size="lg" className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto">
                       <Plus className="mr-2 h-5 w-5" /> Create New Exam
                     </Button>
                   </div>
-                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                    <CardContent className="p-6">
+                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-4 sm:p-6">
                       <ExamsList exams={filteredExams} onRefresh={loadDashboardData} />
                     </CardContent>
                   </Card>
@@ -651,20 +700,20 @@ function StaffDashboardContent() {
 
               {/* Assignments Tab */}
               {activeTab === 'assignments' && (
-                <motion.div key="assignments" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+                <motion.div key="assignments" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         Assignments
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">Create and manage student assignments</p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">Create and manage student assignments</p>
                     </div>
-                    <Button onClick={() => setShowCreateAssignment(true)} size="lg" className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all">
+                    <Button onClick={() => setShowCreateAssignment(true)} size="lg" className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto">
                       <Plus className="mr-2 h-5 w-5" /> Create Assignment
                     </Button>
                   </div>
-                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                    <CardContent className="p-6">
+                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-4 sm:p-6">
                       <AssignmentsList assignments={filteredAssignments} onRefresh={loadDashboardData} />
                     </CardContent>
                   </Card>
@@ -673,20 +722,20 @@ function StaffDashboardContent() {
 
               {/* Notes Tab */}
               {activeTab === 'notes' && (
-                <motion.div key="notes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+                <motion.div key="notes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         Study Notes
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">Upload and manage study materials</p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">Upload and manage study materials</p>
                     </div>
-                    <Button onClick={() => setShowUploadNote(true)} size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all">
+                    <Button onClick={() => setShowUploadNote(true)} size="lg" className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg hover:shadow-xl transition-all w-full sm:w-auto">
                       <Plus className="mr-2 h-5 w-5" /> Upload Note
                     </Button>
                   </div>
-                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                    <CardContent className="p-6">
+                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-4 sm:p-6">
                       <NotesList notes={filteredNotes} onRefresh={loadDashboardData} />
                     </CardContent>
                   </Card>
@@ -695,21 +744,21 @@ function StaffDashboardContent() {
 
               {/* Students Tab */}
               {activeTab === 'students' && (
-                <motion.div key="students" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-6">
+                <motion.div key="students" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
                         Student Roster
                       </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1">View and manage all students in your classes</p>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">View and manage all students in your classes</p>
                     </div>
-                    <Button variant="outline" size="lg" className="gap-2">
+                    <Button variant="outline" size="lg" className="gap-2 w-full sm:w-auto">
                       <Download className="h-5 w-5" />
                       Export Roster
                     </Button>
                   </div>
-                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
-                    <CardContent className="p-6">
+                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-4 sm:p-6">
                       <StudentRoster students={students} fullView />
                     </CardContent>
                   </Card>
@@ -731,10 +780,10 @@ export default function StaffDashboard() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-        <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center justify-center min-h-screen px-4">
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
-            <p className="mt-4 text-slate-600 dark:text-slate-400">Loading staff dashboard...</p>
+            <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm sm:text-base">Loading staff dashboard...</p>
           </div>
         </div>
       </div>
