@@ -4,6 +4,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")  // ← ADD THIS LINE
 }
 
 model Profile {
@@ -21,7 +22,7 @@ model Profile {
   submissions   Submission[]
   notifications Notification[]
   theoryGrades  TheoryAnswer[]
-  accessCodes   AccessCode[] // ← ADD THIS LINE - opposite relation for usedByUser
+  accessCodes   AccessCode[] // opposite relation for usedByUser
 
   @@map("profiles")
 }

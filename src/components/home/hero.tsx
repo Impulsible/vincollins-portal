@@ -144,7 +144,8 @@ export function Hero() {
                 </span>
               </h1>
               <div className="overflow-hidden">
-                <p className="font-['Dancing_Script',cursive] text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-[#dc2626] leading-relaxed animate-slide-in-left">
+                {/* ✅ FIXED: Using font-dancing class for cursive */}
+                <p className="font-dancing text-2xl sm:text-3xl md:text-4xl lg:text-5xl text-[#dc2626] leading-relaxed animate-slide-in-left">
                   Geared Towards Excellence
                 </p>
               </div>

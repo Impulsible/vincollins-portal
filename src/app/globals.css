@@ -914,3 +914,24 @@
   background-color: hsl(var(--primary) / 0.1) !important;
   color: hsl(var(--primary)) !important;
 }
+
+/* ==================== CUSTOM FONT CLASSES ==================== */
+.font-dancing {
+  font-family: var(--font-dancing-script), 'Dancing Script', cursive !important;
+}
+
+.font-playfair {
+  font-family: var(--font-playfair), 'Playfair Display', serif !important;
+}
+
+.font-geist {
+  font-family: var(--font-geist-sans), 'Geist Sans', sans-serif !important;
+}
+
+.font-geist-mono {
+  font-family: var(--font-geist-mono), 'Geist Mono', monospace !important;
+}
+
+.font-inter {
+  font-family: var(--font-inter), 'Inter', sans-serif !important;
+}

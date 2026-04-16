@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - FIXED WITH NO REDIRECT LOOPS
+// app/portal/page.tsx - FULLY FIXED FOR VERCEL
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -48,9 +48,8 @@ export default function LoginPage() {
   } | null>(null)
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const hasRedirected = useRef(false)
-  const redirectAttempts = useRef(0)
 
-  // FIXED: Check if already logged in - NO AUTO REDIRECT
+  // Check if already logged in - NO AUTO REDIRECT (prevents loop)
   useEffect(() => {
     const checkSession = async () => {
       if (hasRedirected.current) {
@@ -61,11 +60,9 @@ export default function LoginPage() {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         
-        // If user is logged in, DON'T auto-redirect - let them use the button
-        // This prevents the redirect loop entirely
+        // Just log the session, don't redirect automatically
         if (session) {
-          console.log('User is already logged in, staying on portal page')
-          // Just load profile info but don't redirect
+          console.log('User already logged in, staying on portal page')
           const { data: profile } = await supabase
             .from('profiles')
             .select('role, full_name')
@@ -73,7 +70,7 @@ export default function LoginPage() {
             .maybeSingle()
           
           if (profile) {
-            console.log(`Logged in as: ${profile.role} - staying on portal page`)
+            console.log(`Logged in as: ${profile.role} - user can click dashboard button`)
           }
         }
       } catch (err) {
@@ -109,174 +106,7 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // FIXED: Success Modal with clean URLs and loop prevention
-  const SuccessModal = () => {
-    if (!loginSuccessData) return null
-    
-    const { userName, role } = loginSuccessData
-    const roleConfig = {
-      admin: {
-        icon: '🛡️',
-        color: '#9333EA',
-        bgColor: '#F3E8FF',
-        borderColor: '#D8B4FE',
-        greeting: 'Welcome back, Administrator',
-      },
-      teacher: {
-        icon: '📚',
-        color: '#2563EB',
-        bgColor: '#EFF6FF',
-        borderColor: '#BFDBFE',
-        greeting: 'Welcome back, Teacher',
-      },
-      student: {
-        icon: '🎓',
-        color: '#059669',
-        bgColor: '#ECFDF5',
-        borderColor: '#A7F3D0',
-        greeting: 'Welcome back, Student',
-      }
-    }
-
-    const config = roleConfig[role]
-    const firstName = userName.split(' ')[0]
-
-    // FIXED: Clean URL with replace to prevent back button issues
-    const goToDashboard = () => {
-      setShowSuccessModal(false)
-      
-      let url = '/student'
-      if (loginSuccessData.role === 'admin') {
-        url = '/admin'
-      } else if (loginSuccessData.role === 'teacher') {
-        url = '/staff'
-      }
-      
-      // Use replace instead of href to prevent history stack issues
-      setTimeout(() => {
-        window.location.replace(url)
-      }, 300)
-    }
-
-    return (
-      <AnimatePresence>
-        {showSuccessModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => setShowSuccessModal(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              transition={{ type: "spring" as const, damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div 
-                className="absolute inset-0 opacity-5"
-                style={{
-                  background: `linear-gradient(135deg, ${config.color} 0%, ${config.color} 100%)`,
-                }}
-              />
-              
-              <div 
-                className="absolute top-0 left-0 right-0 h-2"
-                style={{ background: config.color }}
-              />
-              
-              <div className="relative p-8">
-                <div className="flex flex-col items-center text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring" as const, damping: 15, stiffness: 200, delay: 0.2 }}
-                    className="mb-6"
-                  >
-                    <div 
-                      className="w-24 h-24 rounded-full flex items-center justify-center text-5xl"
-                      style={{ 
-                        background: config.bgColor,
-                        border: `3px solid ${config.borderColor}`,
-                      }}
-                    >
-                      {config.icon}
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.3 }}
-                  >
-                    <div className="flex items-center justify-center gap-2 mb-3">
-                      <CheckCircle 
-                        className="h-6 w-6" 
-                        style={{ color: config.color }} 
-                      />
-                      <h3 className="text-2xl font-bold text-gray-900">
-                        Login Successful!
-                      </h3>
-                    </div>
-                    
-                    <p className="text-gray-600 mb-2">
-                      <span className="font-semibold" style={{ color: config.color }}>
-                        {config.greeting}
-                      </span>
-                    </p>
-                    
-                    <p className="text-xl font-bold text-gray-800 mb-4">
-                      {firstName}! 👋
-                    </p>
-                    
-                    <p className="text-gray-500 mb-6">
-                      Redirecting to your dashboard...
-                    </p>
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="flex gap-3 w-full"
-                  >
-                    <Button
-                      onClick={goToDashboard}
-                      className="flex-1"
-                      style={{ background: config.color }}
-                    >
-                      Go to Dashboard
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                    
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowSuccessModal(false)}
-                      className="flex-1"
-                    >
-                      Stay Here
-                    </Button>
-                  </motion.div>
-                </div>
-              </div>
-              
-              <div className="absolute top-4 right-4">
-                <Sparkles className="h-5 w-5 text-yellow-400 animate-pulse" />
-              </div>
-              <div className="absolute bottom-4 left-4">
-                <Sparkles className="h-4 w-4 text-yellow-400 animate-pulse" />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    )
-  }
-
-  // FIXED: Login handler with clean URL redirect
+  // Login handler
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
@@ -364,6 +194,176 @@ export default function LoginPage() {
       case 'teacher': return <Users className="h-4 w-4" />
       default: return <GraduationCap className="h-4 w-4" />
     }
+  }
+
+  // Success Modal Component with Auto-Redirect
+  const SuccessModal = () => {
+    if (!loginSuccessData) return null
+    
+    const { userName, role } = loginSuccessData
+    const roleConfig = {
+      admin: {
+        icon: '🛡️',
+        color: '#9333EA',
+        bgColor: '#F3E8FF',
+        borderColor: '#D8B4FE',
+        greeting: 'Welcome back, Administrator',
+        redirectPath: '/admin',
+      },
+      teacher: {
+        icon: '📚',
+        color: '#2563EB',
+        bgColor: '#EFF6FF',
+        borderColor: '#BFDBFE',
+        greeting: 'Welcome back, Teacher',
+        redirectPath: '/staff',
+      },
+      student: {
+        icon: '🎓',
+        color: '#059669',
+        bgColor: '#ECFDF5',
+        borderColor: '#A7F3D0',
+        greeting: 'Welcome back, Student',
+        redirectPath: '/student',
+      }
+    }
+
+    const config = roleConfig[role]
+    const firstName = userName.split(' ')[0]
+
+    // Auto-redirect after 2 seconds
+    useEffect(() => {
+      const timer = setTimeout(() => {
+        window.location.replace(config.redirectPath)
+      }, 2000)
+      
+      return () => clearTimeout(timer)
+    }, [config.redirectPath])
+
+    const goToDashboard = () => {
+      setShowSuccessModal(false)
+      window.location.replace(config.redirectPath)
+    }
+
+    return (
+      <AnimatePresence>
+        {showSuccessModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowSuccessModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              transition={{ type: "spring" as const, damping: 25, stiffness: 300 }}
+              className="relative w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div 
+                className="absolute inset-0 opacity-5"
+                style={{
+                  background: `linear-gradient(135deg, ${config.color} 0%, ${config.color} 100%)`,
+                }}
+              />
+              
+              <div 
+                className="absolute top-0 left-0 right-0 h-2"
+                style={{ background: config.color }}
+              />
+              
+              <div className="relative p-8">
+                <div className="flex flex-col items-center text-center">
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring" as const, damping: 15, stiffness: 200, delay: 0.2 }}
+                    className="mb-6"
+                  >
+                    <div 
+                      className="w-24 h-24 rounded-full flex items-center justify-center text-5xl"
+                      style={{ 
+                        background: config.bgColor,
+                        border: `3px solid ${config.borderColor}`,
+                      }}
+                    >
+                      {config.icon}
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                  >
+                    <div className="flex items-center justify-center gap-2 mb-3">
+                      <CheckCircle 
+                        className="h-6 w-6" 
+                        style={{ color: config.color }} 
+                      />
+                      <h3 className="text-2xl font-bold text-gray-900">
+                        Login Successful!
+                      </h3>
+                    </div>
+                    
+                    <p className="text-gray-600 mb-2">
+                      <span className="font-semibold" style={{ color: config.color }}>
+                        {config.greeting}
+                      </span>
+                    </p>
+                    
+                    <p className="text-xl font-bold text-gray-800 mb-4">
+                      {firstName}! 👋
+                    </p>
+                    
+                    <p className="text-gray-500 mb-6">
+                      Redirecting to your dashboard...
+                    </p>
+                    
+                    {/* Progress bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-1.5 mb-4">
+                      <motion.div
+                        className="h-1.5 rounded-full"
+                        style={{ background: config.color }}
+                        initial={{ width: "0%" }}
+                        animate={{ width: "100%" }}
+                        transition={{ duration: 2, ease: "linear" }}
+                      />
+                    </div>
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="flex gap-3 w-full"
+                  >
+                    <Button
+                      onClick={goToDashboard}
+                      className="flex-1"
+                      style={{ background: config.color }}
+                    >
+                      Go to Dashboard Now
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </motion.div>
+                </div>
+              </div>
+              
+              <div className="absolute top-4 right-4">
+                <Sparkles className="h-5 w-5 text-yellow-400 animate-pulse" />
+              </div>
+              <div className="absolute bottom-4 left-4">
+                <Sparkles className="h-4 w-4 text-yellow-400 animate-pulse" />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    )
   }
 
   if (isCheckingAuth) {

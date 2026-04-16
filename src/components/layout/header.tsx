@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - FIXED WITH CLEAN URLS
+// components/layout/header.tsx - COMPLETE UPDATED WITH PROFESSIONAL CURSIVE LOGO
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -122,7 +122,7 @@ const publicNavigation: NavigationItem[] = [
   { name: 'Contact', href: '/contact', icon: Phone },
 ]
 
-// FIXED: CLEAN URLS - No ?tab= parameters
+// Student navigation
 const studentNavigation: NavigationItem[] = [
   { name: 'Overview', href: '/student', icon: LayoutDashboard },
   { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
@@ -130,7 +130,7 @@ const studentNavigation: NavigationItem[] = [
   { name: 'Profile', href: '/student/profile', icon: User },
 ]
 
-// UPDATED: Teacher navigation with your provided structure
+// Teacher navigation
 const teacherNavigation: NavigationItem[] = [
   { name: 'Overview', href: '/staff', icon: LayoutDashboard },
   { name: 'Exams', href: '/staff/exams', icon: MonitorPlay },
@@ -139,7 +139,7 @@ const teacherNavigation: NavigationItem[] = [
   { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
 ]
 
-// FIXED: CLEAN URLS - No ?tab= parameters
+// Admin navigation
 const adminNavigation: NavigationItem[] = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
   { name: 'Exam Approvals', href: '/admin/exams', icon: MonitorPlay },
@@ -258,7 +258,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     if (href === '/admin') return pathname === '/admin'
     
     // For sub-routes, check if the pathname starts with href + '/'
-    // But make sure we don't match the root route
     return pathname === href || pathname?.startsWith(href + '/')
   }
 
@@ -513,7 +512,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         <div className="max-w-[1440px] mx-auto px-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-2 sm:gap-4">
             
-            {/* LOGO */}
+            {/* ✅ PROFESSIONAL CURSIVE LOGO WITH STYLED SUBTEXT */}
             <Link href="/" className="flex items-center gap-2 sm:gap-3 group flex-shrink-0">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -539,16 +538,18 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 )}
               </motion.div>
               <div className="flex flex-col">
-                <div className="flex items-baseline gap-0.5 sm:gap-1">
-                  <span className="text-sm sm:text-xl font-bold text-white leading-tight tracking-wide">
+                {/* Cursive "Vincollins College" */}
+                <div className="flex items-baseline gap-1">
+                  <span className="font-dancing text-xl sm:text-3xl font-bold text-white leading-tight tracking-wide group-hover:text-[#F5A623] transition-colors duration-300">
                     Vincollins
                   </span>
-                  <span className="text-sm sm:text-xl font-bold text-[#F5A623] leading-tight tracking-wide">
+                  <span className="font-dancing text-xl sm:text-3xl font-bold text-[#F5A623] leading-tight tracking-wide">
                     College
                   </span>
                 </div>
-                <span className="text-[8px] sm:text-xs text-white/70 -mt-0.5 tracking-wider font-medium">
-                  GEARED TOWARDS EXCELLENCE
+                {/* Elegant Subtext */}
+                <span className="text-[8px] sm:text-[10px] text-white/60 -mt-0.5 tracking-[0.2em] font-medium uppercase border-t border-white/20 pt-0.5">
+                  Geared Towards Excellence
                 </span>
               </div>
             </Link>

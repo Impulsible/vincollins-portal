@@ -1,6 +1,8 @@
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
-import { Inter, Dancing_Script, Playfair_Display, Geist } from 'next/font/google';
+import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
+import { GeistSans } from 'geist/font/sans';
+import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Providers } from '@/components/providers';
 import { cn } from '@/lib/utils';
@@ -10,8 +12,8 @@ import { UserProvider } from '@/contexts/UserContext';
 import { Header } from '@/components/layout/header';
 import { Loader2 } from 'lucide-react';
 
-const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
-
+// ✅ Geist is now the main sans font
+// Inter as fallback
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',
@@ -169,11 +171,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html 
       lang="en" 
       className={cn(
-        inter.variable, 
-        dancingScript.variable, 
-        playfair.variable,
-        "font-sans", 
-        geist.variable
+        GeistSans.variable,        // ✅ Geist Sans - Main font
+        GeistMono.variable,        // ✅ Geist Mono - For code
+        inter.variable,            // Fallback
+        dancingScript.variable,    // Decorative
+        playfair.variable,         // Serif
+        "font-sans"
       )}
       suppressHydrationWarning
     >
@@ -200,7 +203,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body 
         className={cn(
-          "font-sans antialiased bg-background text-foreground",
+          GeistSans.className,      // ✅ Apply Geist as the default font
+          "antialiased bg-background text-foreground",
           "min-h-screen flex flex-col"
         )}
         suppressHydrationWarning
@@ -208,7 +212,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ProgressBar />
         <UserProvider>
           <Providers>
-            {/* ✅ Header wrapped in Suspense - Fixes useSearchParams build error */}
             <Suspense fallback={
               <div className="h-16 flex items-center justify-center bg-gradient-to-r from-[#0A2472] to-[#1e3a8a]">
                 <Loader2 className="h-5 w-5 animate-spin text-white" />

@@ -175,10 +175,7 @@ export function Footer() {
   }
 
   // Smart Portal Navigation - For security, always go to /portal page
-  // The /portal page will automatically redirect logged-in users to their dashboard
   const handlePortalClick = (e: React.MouseEvent) => {
-    // Always navigate to /portal for security
-    // The portal page will handle the redirect logic for authenticated users
     e.preventDefault()
     router.push('/portal')
   }
@@ -225,10 +222,10 @@ export function Footer() {
                   </motion.div>
                   <div>
                     <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="font-['Dancing_Script',cursive] text-3xl sm:text-4xl font-bold text-white leading-tight group-hover:text-[#F5A623] transition-colors">
+                      <span className="font-dancing text-3xl sm:text-4xl font-bold text-white leading-tight group-hover:text-[#F5A623] transition-colors">
                         Vincollins
                       </span>
-                      <span className="font-['Dancing_Script',cursive] text-3xl sm:text-4xl text-[#F5A623] leading-tight">
+                      <span className="font-dancing text-3xl sm:text-4xl text-[#F5A623] leading-tight">
                         College
                       </span>
                     </div>
@@ -327,7 +324,7 @@ export function Footer() {
                   </ul>
                 </div>
 
-                {/* Portal Access - ALL GO TO /portal FOR SECURITY */}
+                {/* Portal Access */}
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
@@ -341,7 +338,6 @@ export function Footer() {
                       return (
                         <li key={item.id}>
                           {isPortalLink ? (
-                            // Portal links - Use onClick handler for security
                             <a
                               href="/portal"
                               onClick={handlePortalClick}
@@ -359,7 +355,6 @@ export function Footer() {
                               <span>{item.title}</span>
                             </a>
                           ) : (
-                            // Non-portal links - Regular Next.js Link
                             <Link 
                               href={item.href}
                               className={cn(
@@ -384,7 +379,7 @@ export function Footer() {
               </div>
 
               {/* Contact Column */}
-              <div className="lg:col-span-3 space-y-6">
+              <div className="lg:col-span-3 space-y-5">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                   <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
                   Contact Us
@@ -423,26 +418,26 @@ export function Footer() {
                 {/* Contact Button */}
                 <Link 
                   href="/contact" 
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg transition-all duration-300 text-sm shadow-md hover:shadow-lg group w-full sm:w-auto justify-center"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg transition-all duration-300 text-sm shadow-md hover:shadow-lg group w-full justify-center"
                 >
                   <Send className="h-3.5 w-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                   <span>Send us a message</span>
                   <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
                 </Link>
 
-                {/* Newsletter */}
+                {/* ✅ FIXED: Newsletter - Properly aligned on all screens */}
                 <div className="pt-2">
                   <p className="text-xs font-semibold text-white/90 mb-3 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-[#F5A623]" />
-                    Subscribe to our newsletter
+                    <Sparkles className="h-3.5 w-3.5 text-[#F5A623] shrink-0" />
+                    <span>Subscribe to our newsletter</span>
                   </p>
-                  <form onSubmit={handleSubscribe} className="flex gap-2">
+                  <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2 w-full">
                     <input 
                       type="email" 
                       placeholder="Enter your email" 
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="flex-1 px-4 py-2.5 text-sm bg-white/10 rounded-lg text-white placeholder:text-white/50 border border-white/20 focus:outline-none focus:border-[#F5A623] focus:ring-2 focus:ring-[#F5A623]/30 transition-all"
+                      className="flex-1 px-4 py-2.5 text-sm bg-white/10 rounded-lg text-white placeholder:text-white/50 border border-white/20 focus:outline-none focus:border-[#F5A623] focus:ring-2 focus:ring-[#F5A623]/30 transition-all w-full"
                       required
                     />
                     <button 
