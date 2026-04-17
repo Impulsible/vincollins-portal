@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - FIXED OVERFLOW - NO HORIZONTAL SCROLL
+// app/student/page.tsx - FIXED: Regex and type errors
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
@@ -23,26 +23,99 @@ import { cn } from '@/lib/utils'
 import { 
   Loader2, BookOpen, Award, Clock, TrendingUp, Calendar, CheckCircle,
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
-  Search, Filter, User, Settings, Sparkles, ArrowRight, Target, Trophy,
-  Eye, LayoutDashboard, Menu, Bell
+  Search, User, ArrowRight, Target, Trophy, Eye, LayoutDashboard, Menu
 } from 'lucide-react'
 
+// ============================================
+// NAME FORMATTING - Fixed regex
+// ============================================
+function formatFullName(firstName: string | null, lastName: string | null, fallback: string): string {
+  if (firstName && lastName) {
+    return `${firstName} ${lastName}`
+  }
+  if (firstName) return firstName
+  if (lastName) return lastName
+  
+  // Fixed: Proper regex escaping
+  const words = fallback.split(/[\s._\-@]+/).filter(w => w.length > 0)
+  if (words.length >= 2) {
+    return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+  }
+  return fallback || 'Student'
+}
+
+function getFirstName(firstName: string | null, lastName: string | null, fallback: string): string {
+  if (firstName && firstName.trim()) {
+    return firstName.trim()
+  }
+  
+  // Fixed: Proper regex escaping
+  const words = fallback.split(/[\s._\-]+/).filter(w => w.length > 0)
+  if (words.length > 0) {
+    return words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase()
+  }
+  
+  return 'Student'
+}
+
+function getInitials(firstName: string | null, lastName: string | null, fallback: string): string {
+  if (firstName && lastName) {
+    return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase()
+  }
+  if (firstName) return firstName.slice(0, 2).toUpperCase()
+  if (lastName) return lastName.slice(0, 2).toUpperCase()
+  
+  // Fixed: Proper regex escaping
+  const words = fallback.split(/[\s._\-]+/).filter(w => w.length > 0)
+  if (words.length >= 2) {
+    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+  }
+  if (words.length === 1) {
+    return words[0].slice(0, 2).toUpperCase()
+  }
+  return 'ST'
+}
+
+const getSubjectCountForClass = (className: string): number => {
+  if (!className) return 17
+  const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
+  if (normalizedClass.startsWith('JSS')) return 17
+  if (normalizedClass.startsWith('SS')) return 10
+  return 17
+}
+
+const calculateGrade = (percentage: number): { grade: string; color: string } => {
+  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600' }
+  return { grade: 'F', color: 'text-red-600' }
+}
+
+// ============================================
+// TYPES - Fixed department type to match StudentSidebar
+// ============================================
 interface StudentProfile {
   id: string
+  first_name: string | null
+  last_name: string | null
   full_name: string
   email: string
   class: string
-  department: string
+  department: string  // Changed from string | null to string to match sidebar
   vin_id?: string
   photo_url?: string | null
   admission_year?: number
   role?: string
+  subject_count?: number
 }
 
 interface WelcomeBannerProfile {
   full_name: string
   class: string
+  department?: string
   photo_url?: string
+  subject_count?: number
 }
 
 interface Exam {
@@ -58,7 +131,6 @@ interface Exam {
   starts_at?: string
   ends_at?: string
   has_theory?: boolean
-  teacher_name?: string
   passing_percentage?: number
 }
 
@@ -67,17 +139,10 @@ interface ExamAttempt {
   exam_id: string
   exam_title?: string
   exam_subject?: string
-  status: 'in-progress' | 'completed' | 'pending_theory' | 'graded' | 'submitted'
-  started_at: string
-  submitted_at: string | null
-  objective_score: number
-  objective_total: number
-  theory_score: number
-  theory_total: number
-  total_score: number
+  status: string
   percentage: number
   is_passed: boolean
-  attempt_number: number
+  total_score?: number
 }
 
 interface PerformanceStats {
@@ -92,24 +157,32 @@ interface PerformanceStats {
   availableExams: Exam[]
 }
 
-// Animation variants
+interface BannerStats {
+  completedExams: number
+  averageScore: number
+  availableExams: number
+  totalExams: number
+  totalSubjects: number
+  currentGrade: string
+  gradeColor: string
+}
+
+// ============================================
+// ANIMATION VARIANTS
+// ============================================
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.1 }
-  }
+  visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
 }
 
 const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: { type: "spring" as const, stiffness: 300, damping: 24 }
-  }
+  visible: { opacity: 1, y: 0, transition: { type: "spring" as const, stiffness: 300, damping: 24 } }
 }
 
+// ============================================
+// MAIN COMPONENT
+// ============================================
 function StudentDashboardContent() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -118,7 +191,6 @@ function StudentDashboardContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [searchQuery, setSearchQuery] = useState('')
-  const [timeFilter, setTimeFilter] = useState('all')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   
   const [stats, setStats] = useState<PerformanceStats>({
@@ -133,16 +205,30 @@ function StudentDashboardContent() {
     availableExams: []
   })
 
-  // Read stored tab from sessionStorage
-  useEffect(() => {
-    const storedTab = sessionStorage.getItem('studentActiveTab')
-    if (storedTab && ['overview', 'exams', 'results', 'assignments', 'attendance', 'courses', 'performance', 'profile', 'settings', 'notifications', 'help'].includes(storedTab)) {
-      setActiveTab(storedTab)
-      sessionStorage.removeItem('studentActiveTab')
-    }
-  }, [])
+  const [bannerStats, setBannerStats] = useState<BannerStats>({
+    completedExams: 0,
+    averageScore: 0,
+    availableExams: 0,
+    totalExams: 0,
+    totalSubjects: 17,
+    currentGrade: 'N/A',
+    gradeColor: 'text-gray-400'
+  })
 
-  // ========== AUTH CHECK - FIXED - NO REDIRECT LOOP ==========
+  // Format profile for header
+  const formatProfileForHeader = (profile: StudentProfile | null) => {
+    if (!profile) return undefined
+    return {
+      id: profile.id,
+      name: profile.full_name,
+      email: profile.email,
+      role: 'student' as const,
+      avatar: profile.photo_url || undefined,
+      isAuthenticated: true
+    }
+  }
+
+  // Auth check
   useEffect(() => {
     let isMounted = true
     
@@ -152,139 +238,136 @@ function StudentDashboardContent() {
         
         if (sessionError || !session?.user) {
           console.log('No active session, redirecting to portal')
-          
-          const lastRedirect = sessionStorage.getItem('last_student_auth_redirect')
-          const redirectTime = sessionStorage.getItem('last_student_auth_redirect_time')
-          const now = Date.now()
-          
-          if (lastRedirect === '/portal' && redirectTime && (now - parseInt(redirectTime)) < 3000) {
-            console.log('Possible redirect loop detected - stopping')
-            if (isMounted) {
-              setAuthChecking(false)
-              setLoading(false)
-            }
-            return
-          }
-          
-          sessionStorage.setItem('last_student_auth_redirect', '/portal')
-          sessionStorage.setItem('last_student_auth_redirect_time', String(now))
-          
-          if (isMounted) {
-            window.location.replace('/portal')
-          }
+          if (isMounted) window.location.replace('/portal')
           return
         }
 
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('role, full_name, email, class, department, vin_id, photo_url, admission_year')
+          .select('id, first_name, last_name, full_name, email, class, department, vin_id, photo_url, admission_year, role, subject_count')
           .eq('id', session.user.id)
           .maybeSingle()
 
         if (isMounted) {
-          const studentProfile: StudentProfile = {
+          const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Student'
+          
+          const fullName = formatFullName(
+            profileData?.first_name || null,
+            profileData?.last_name || null,
+            profileData?.full_name || fallbackName
+          )
+          
+          const firstName = getFirstName(
+            profileData?.first_name || null,
+            profileData?.last_name || null,
+            profileData?.full_name || fallbackName
+          )
+          
+          console.log('👤 Profile loaded:', {
+            first_name: profileData?.first_name,
+            last_name: profileData?.last_name,
+            fullName,
+            firstName,
+            class: profileData?.class
+          })
+          
+          setProfile({
             id: session.user.id,
-            full_name: profileData?.full_name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Student',
+            first_name: profileData?.first_name || null,
+            last_name: profileData?.last_name || null,
+            full_name: fullName,
             email: profileData?.email || session.user.email || '',
             class: profileData?.class || 'Not Assigned',
             department: profileData?.department || 'General',
-            vin_id: profileData?.vin_id || session.user.user_metadata?.vin_id,
-            photo_url: profileData?.photo_url || undefined,
+            vin_id: profileData?.vin_id,
+            photo_url: profileData?.photo_url || null,
             admission_year: profileData?.admission_year || new Date().getFullYear(),
-            role: profileData?.role || 'student'
-          }
-          
-          setProfile(studentProfile)
+            role: profileData?.role || 'student',
+            subject_count: profileData?.subject_count || getSubjectCountForClass(profileData?.class || '')
+          })
           setAuthChecking(false)
         }
-        
       } catch (err) {
         console.error('Auth check error:', err)
-        if (isMounted) {
-          setAuthChecking(false)
-        }
+        if (isMounted) setAuthChecking(false)
       }
     }
 
     checkAuth()
-    
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [])
 
-  // Handle tab change
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
     setMobileMenuOpen(false)
   }
 
   const loadDashboardData = useCallback(async () => {
+    if (!profile?.id) {
+      console.log('No profile ID, skipping load')
+      return
+    }
+    
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        console.log('No session in loadDashboardData')
-        setLoading(false)
-        return
-      }
+      const studentClass = profile.class
+      const totalSubjects = profile.subject_count || getSubjectCountForClass(studentClass)
 
-      const user = session.user
+      console.log('📚 Loading dashboard for:', profile.first_name, profile.last_name)
+      console.log('📚 Class:', studentClass, 'Total subjects:', totalSubjects)
 
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      const { data: userData } = await supabase
-        .from('users')
-        .select('vin_id')
-        .eq('id', user.id)
-        .maybeSingle()
-
-      const studentProfile: StudentProfile = {
-        id: user.id,
-        full_name: profileData?.full_name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Student',
-        email: profileData?.email || user.email || '',
-        class: profileData?.class || 'Not Assigned',
-        department: profileData?.department || 'General',
-        vin_id: userData?.vin_id || profileData?.vin_id || user.user_metadata?.vin_id,
-        photo_url: profileData?.photo_url || undefined,
-        admission_year: profileData?.admission_year || new Date().getFullYear(),
-        role: profileData?.role || 'student'
-      }
-
-      setProfile(studentProfile)
-
-      const { data: examsData } = await supabase
+      const { data: examsData, error: examsError } = await supabase
         .from('exams')
         .select('*')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
 
-      const allExams: Exam[] = (examsData || []).filter(exam => 
-        !exam.class || exam.class === studentProfile.class
-      )
+      if (examsError) {
+        console.error('Error loading exams:', examsError)
+        toast.error('Failed to load exams')
+        setLoading(false)
+        return
+      }
+
+      console.log('📚 Total published exams:', examsData?.length || 0)
+
+      const allExams: Exam[] = (examsData || []).filter(exam => {
+        if (!exam.class || exam.class === 'all') return true
+        
+        const normalizedExamClass = exam.class.replace(/\s+/g, '').toUpperCase()
+        const normalizedStudentClass = studentClass.replace(/\s+/g, '').toUpperCase()
+        
+        return normalizedExamClass === normalizedStudentClass
+      })
+
+      console.log('📚 Exams after class filter:', allExams.length)
 
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
-        .select(`
-          *,
-          exams:exam_id (
-            title,
-            subject
-          )
-        `)
-        .eq('student_id', user.id)
+        .select('*')
+        .eq('student_id', profile.id)
         .order('created_at', { ascending: false })
 
-      const attempts: ExamAttempt[] = (attemptsData || []).map((att: any) => ({
-        ...att,
-        exam_title: att.exams?.title || 'Unknown Exam',
-        exam_subject: att.exams?.subject || 'Unknown Subject'
-      }))
+      console.log('📝 Attempts loaded:', attemptsData?.length || 0)
+
+      const attempts: ExamAttempt[] = []
+      
+      if (attemptsData) {
+        for (const att of attemptsData) {
+          const exam = allExams.find(e => e.id === att.exam_id)
+          
+          attempts.push({
+            id: att.id,
+            exam_id: att.exam_id,
+            exam_title: exam?.title || 'Unknown Exam',
+            exam_subject: exam?.subject || 'Unknown Subject',
+            status: att.status || 'pending',
+            percentage: att.percentage || att.percentage_score || 0,
+            is_passed: att.is_passed || false,
+            total_score: att.total_score || 0
+          })
+        }
+      }
 
       const completedAttempts = attempts.filter(a => 
         a.status === 'completed' || a.status === 'graded' || 
@@ -298,7 +381,7 @@ function StudentDashboardContent() {
       const passedAttempts = completedAttempts.filter(a => a.is_passed)
 
       const avgScore = completedAttempts.length > 0
-        ? completedAttempts.reduce((sum, a) => sum + a.percentage, 0) / completedAttempts.length
+        ? Math.round(completedAttempts.reduce((sum, a) => sum + (a.percentage || 0), 0) / completedAttempts.length)
         : 0
 
       const takenExamIds = new Set(completedAttempts.map(a => a.exam_id))
@@ -318,10 +401,17 @@ function StudentDashboardContent() {
         return new Date(exam.starts_at) > now
       }).slice(0, 5)
 
+      console.log('📊 Stats calculated:', {
+        totalExams: allExams.length,
+        completed: completedAttempts.length,
+        avgScore,
+        available: availableExams.length
+      })
+
       setStats({
         totalExams: allExams.length,
         completedExams: completedAttempts.length,
-        averageScore: Math.round(avgScore),
+        averageScore: avgScore,
         passedExams: passedAttempts.length,
         failedExams: completedAttempts.length - passedAttempts.length,
         pendingResults: pendingAttempts.length,
@@ -330,19 +420,59 @@ function StudentDashboardContent() {
         availableExams: availableExams.slice(0, 6)
       })
 
+      const gradeInfo = calculateGrade(avgScore)
+      const newBannerStats: BannerStats = {
+        completedExams: completedAttempts.length,
+        averageScore: avgScore,
+        availableExams: availableExams.length,
+        totalExams: allExams.length,
+        totalSubjects: totalSubjects,
+        currentGrade: completedAttempts.length > 0 ? gradeInfo.grade : 'N/A',
+        gradeColor: gradeInfo.color
+      }
+      
+      setBannerStats(newBannerStats)
+      console.log('📊 Banner stats updated:', newBannerStats)
+
     } catch (error) {
       console.error('Error loading dashboard:', error)
       toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [profile?.id, profile?.class, profile?.subject_count])
+
+  // Real-time subscription
+  useEffect(() => {
+    if (!profile?.id) return
+
+    const channel = supabase
+      .channel('student-dashboard-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'exam_attempts',
+          filter: `student_id=eq.${profile.id}`
+        },
+        () => {
+          console.log('🔄 Exam attempt changed, refreshing...')
+          loadDashboardData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [profile?.id, loadDashboardData])
 
   useEffect(() => {
-    if (!authChecking) {
+    if (!authChecking && profile) {
       loadDashboardData()
     }
-  }, [loadDashboardData, authChecking])
+  }, [authChecking, profile, loadDashboardData])
 
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' })
@@ -358,15 +488,6 @@ function StudentDashboardContent() {
     router.push(`/student/results/${attemptId}`)
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return 'N/A'
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -378,9 +499,9 @@ function StudentDashboardContent() {
   }
 
   const getScoreColor = (percentage: number) => {
-    if (percentage >= 70) return 'text-green-600 dark:text-green-400'
-    if (percentage >= 50) return 'text-yellow-600 dark:text-yellow-400'
-    return 'text-red-600 dark:text-red-400'
+    if (percentage >= 70) return 'text-green-600'
+    if (percentage >= 50) return 'text-yellow-600'
+    return 'text-red-600'
   }
 
   const getStatusBadge = (status: string, isPassed?: boolean) => {
@@ -389,8 +510,8 @@ function StudentDashboardContent() {
       case 'graded':
         return (
           <Badge className={cn(
-            "text-xs sm:text-sm",
-            isPassed ? 'bg-green-100 text-green-700 border-green-200' : 'bg-red-100 text-red-700 border-red-200'
+            "text-xs",
+            isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
           )}>
             {isPassed ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
             {isPassed ? 'Passed' : 'Failed'}
@@ -399,20 +520,20 @@ function StudentDashboardContent() {
       case 'pending_theory':
       case 'submitted':
         return (
-          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200 text-xs sm:text-sm">
+          <Badge className="bg-yellow-100 text-yellow-700 text-xs">
             <Clock className="h-3 w-3 mr-1" />
-            Pending Grading
+            Pending
           </Badge>
         )
       case 'in-progress':
         return (
-          <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs sm:text-sm">
+          <Badge className="bg-blue-100 text-blue-700 text-xs">
             <Activity className="h-3 w-3 mr-1" />
             In Progress
           </Badge>
         )
       default:
-        return <Badge variant="outline" className="text-xs sm:text-sm">{status}</Badge>
+        return <Badge variant="outline" className="text-xs">{status}</Badge>
     }
   }
 
@@ -421,25 +542,10 @@ function StudentDashboardContent() {
     return {
       full_name: profile.full_name,
       class: profile.class,
-      photo_url: profile.photo_url || undefined
+      department: profile.department || undefined,
+      photo_url: profile.photo_url || undefined,
+      subject_count: profile.subject_count || getSubjectCountForClass(profile.class)
     }
-  }
-
-  const getWelcomeBannerStats = () => {
-    return {
-      completedExams: stats.completedExams,
-      averageScore: stats.averageScore,
-      attendance: 95
-    }
-  }
-
-  const getInitials = (name?: string): string => {
-    if (!name) return 'ST'
-    const parts = name.split(' ')
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    }
-    return name.slice(0, 2).toUpperCase()
   }
 
   const filteredAvailableExams = stats.availableExams.filter(exam => 
@@ -452,19 +558,14 @@ function StudentDashboardContent() {
     attempt.exam_subject?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const filteredUpcomingExams = stats.upcomingExams.filter(exam => 
-    exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    exam.subject.toLowerCase().includes(searchQuery.toLowerCase())
-  )
-
   if (authChecking || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden">
-        <Header onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
+        <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto" />
-            <p className="mt-4 text-slate-600 dark:text-slate-400">Loading student dashboard...</p>
+            <p className="mt-4 text-slate-600">Loading dashboard...</p>
           </div>
         </div>
       </div>
@@ -472,11 +573,11 @@ function StudentDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden">
-      <Header onLogout={handleLogout} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
+      <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
-      {/* Mobile Tab Navigation - Visible only on small screens */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg pb-safe w-full overflow-x-hidden">
+      {/* Mobile Tab Navigation */}
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-lg w-full">
         <div className="grid grid-cols-5 gap-1 p-2">
           {[
             { id: 'overview', icon: LayoutDashboard, label: 'Home' },
@@ -488,50 +589,46 @@ function StudentDashboardContent() {
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
               className={cn(
-                "flex flex-col items-center justify-center py-2 px-1 rounded-lg transition-all",
+                "flex flex-col items-center py-2 rounded-lg transition-all",
                 activeTab === tab.id
-                  ? "text-emerald-600 bg-emerald-50 dark:text-emerald-400 dark:bg-emerald-950/30"
-                  : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+                  ? "text-emerald-600 bg-emerald-50"
+                  : "text-slate-500"
               )}
             >
               <tab.icon className="h-5 w-5" />
-              <span className="text-[10px] mt-1 font-medium truncate">{tab.label}</span>
+              <span className="text-[10px] mt-1">{tab.label}</span>
             </button>
           ))}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="flex flex-col items-center justify-center py-2 px-1 rounded-lg text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-300"
+            className="flex flex-col items-center py-2 rounded-lg text-slate-500"
           >
             <Menu className="h-5 w-5" />
-            <span className="text-[10px] mt-1 font-medium truncate">More</span>
+            <span className="text-[10px] mt-1">More</span>
           </button>
         </div>
         
-        {/* Mobile More Menu */}
         <AnimatePresence>
           {mobileMenuOpen && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg p-4 mb-2 rounded-t-xl max-h-[60vh] overflow-y-auto"
+              className="absolute bottom-full left-0 right-0 bg-white border-t shadow-lg p-4 rounded-t-xl"
             >
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'assignments', icon: FileText, label: 'Assignments' },
                   { id: 'attendance', icon: Calendar, label: 'Attendance' },
-                  { id: 'courses', icon: BookOpen, label: 'Courses' },
-                  { id: 'performance', icon: TrendingUp, label: 'Performance' },
-                  { id: 'notifications', icon: Bell, label: 'Notifications' },
-                  { id: 'settings', icon: Settings, label: 'Settings' }
+                  { id: 'performance', icon: TrendingUp, label: 'Performance' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => handleTabChange(tab.id)}
-                    className="flex flex-col items-center p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+                    className="flex flex-col items-center p-2 rounded-lg hover:bg-slate-100"
                   >
-                    <tab.icon className="h-5 w-5 text-slate-600 dark:text-slate-400" />
-                    <span className="text-xs mt-1 truncate">{tab.label}</span>
+                    <tab.icon className="h-5 w-5 text-slate-600" />
+                    <span className="text-xs mt-1">{tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -540,7 +637,7 @@ function StudentDashboardContent() {
         </AnimatePresence>
       </div>
       
-      <div className="flex overflow-x-hidden">
+      <div className="flex">
         <StudentSidebar 
           profile={profile}
           onLogout={handleLogout}
@@ -551,47 +648,11 @@ function StudentDashboardContent() {
         />
 
         <main className={cn(
-          "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300 overflow-x-hidden",
+          "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
+          <div className="container mx-auto px-4 lg:px-6 py-4 sm:py-6 max-w-full">
             
-            {(activeTab === 'exams' || activeTab === 'results') && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 sm:mb-6 overflow-hidden"
-              >
-                <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <Input
-                          placeholder={`Search ${activeTab}...`}
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm sm:text-base"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Tabs value={timeFilter} onValueChange={setTimeFilter} className="w-full sm:w-auto">
-                          <TabsList className="bg-slate-100 dark:bg-slate-800">
-                            <TabsTrigger value="all" className="text-xs sm:text-sm px-3">All</TabsTrigger>
-                            <TabsTrigger value="recent" className="text-xs sm:text-sm px-3">Recent</TabsTrigger>
-                            <TabsTrigger value="upcoming" className="text-xs sm:text-sm px-3">Upcoming</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-                        <Button variant="outline" size="icon" className="shrink-0">
-                          <Filter className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-
             <AnimatePresence mode="wait">
               {/* OVERVIEW TAB */}
               {activeTab === 'overview' && (
@@ -601,17 +662,16 @@ function StudentDashboardContent() {
                   initial="hidden"
                   animate="visible"
                   exit={{ opacity: 0, y: -20 }}
-                  className="space-y-4 sm:space-y-6 overflow-hidden"
+                  className="space-y-4 sm:space-y-6"
                 >
-                  <motion.div variants={itemVariants} className="overflow-hidden">
+                  <motion.div variants={itemVariants}>
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
-                      stats={getWelcomeBannerStats()}
+                      stats={bannerStats}
                     />
                   </motion.div>
 
-                  {/* Stats Cards - 2x2 on mobile, 4x1 on desktop */}
-                  <motion.div variants={itemVariants} className="overflow-hidden">
+                  <motion.div variants={itemVariants}>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                       {[
                         { label: 'Total Exams', value: stats.totalExams, icon: BookOpen, color: 'blue' },
@@ -619,26 +679,26 @@ function StudentDashboardContent() {
                         { label: 'Average Score', value: `${stats.averageScore}%`, icon: Target, color: 'purple' },
                         { label: 'Pending', value: stats.pendingResults, icon: Clock, color: 'yellow' }
                       ].map((item, i) => (
-                        <Card key={i} className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm hover:shadow-md transition-all overflow-hidden">
+                        <Card key={i} className="border-0 shadow-sm bg-white">
                           <CardContent className="p-3 sm:p-5">
                             <div className="flex items-center justify-between">
-                              <div className="min-w-0 flex-1">
-                                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">{item.label}</p>
-                                <p className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white truncate">{item.value}</p>
+                              <div>
+                                <p className="text-xs sm:text-sm text-slate-500">{item.label}</p>
+                                <p className="text-2xl sm:text-3xl font-bold">{item.value}</p>
                               </div>
                               <div className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0 ml-2",
-                                item.color === 'blue' && "bg-blue-100 dark:bg-blue-900/30",
-                                item.color === 'green' && "bg-green-100 dark:bg-green-900/30",
-                                item.color === 'purple' && "bg-purple-100 dark:bg-purple-900/30",
-                                item.color === 'yellow' && "bg-yellow-100 dark:bg-yellow-900/30"
+                                "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center",
+                                item.color === 'blue' && "bg-blue-100",
+                                item.color === 'green' && "bg-green-100",
+                                item.color === 'purple' && "bg-purple-100",
+                                item.color === 'yellow' && "bg-yellow-100"
                               )}>
                                 <item.icon className={cn(
                                   "h-5 w-5 sm:h-6 sm:w-6",
-                                  item.color === 'blue' && "text-blue-600 dark:text-blue-400",
-                                  item.color === 'green' && "text-green-600 dark:text-green-400",
-                                  item.color === 'purple' && "text-purple-600 dark:text-purple-400",
-                                  item.color === 'yellow' && "text-yellow-600 dark:text-yellow-400"
+                                  item.color === 'blue' && "text-blue-600",
+                                  item.color === 'green' && "text-green-600",
+                                  item.color === 'purple' && "text-purple-600",
+                                  item.color === 'yellow' && "text-yellow-600"
                                 )} />
                               </div>
                             </div>
@@ -648,36 +708,36 @@ function StudentDashboardContent() {
                     </div>
                   </motion.div>
 
-                  <motion.div variants={itemVariants} className="overflow-hidden">
+                  <motion.div variants={itemVariants}>
                     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-                      <div className="lg:col-span-2 space-y-4 sm:space-y-6 overflow-hidden">
+                      <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                         {stats.completedExams > 0 && (
-                          <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                            <CardHeader className="pb-2 sm:pb-3">
-                              <CardTitle className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                          <Card className="border-0 shadow-sm bg-white">
+                            <CardHeader className="pb-2">
+                              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                                 <BarChart3 className="h-5 w-5 text-emerald-600" />
                                 Performance Overview
                               </CardTitle>
                             </CardHeader>
-                            <CardContent className="pt-2 sm:pt-4">
-                              <div className="space-y-3 sm:space-y-4">
+                            <CardContent>
+                              <div className="space-y-4">
                                 <div>
-                                  <div className="flex justify-between text-xs sm:text-sm mb-2">
+                                  <div className="flex justify-between text-sm mb-2">
                                     <span>Pass Rate</span>
                                     <span>{stats.completedExams > 0 ? Math.round((stats.passedExams / stats.completedExams) * 100) : 0}%</span>
                                   </div>
-                                  <Progress value={stats.completedExams > 0 ? (stats.passedExams / stats.completedExams) * 100 : 0} className="h-2 sm:h-2.5" />
+                                  <Progress value={stats.completedExams > 0 ? (stats.passedExams / stats.completedExams) * 100 : 0} className="h-2" />
                                 </div>
-                                <div className="grid grid-cols-2 gap-3 sm:gap-4 text-center">
-                                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-3 sm:p-4">
-                                    <Trophy className="h-5 w-5 text-green-600 mx-auto mb-1 sm:mb-2" />
-                                    <p className="text-2xl sm:text-3xl font-bold text-green-700">{stats.passedExams}</p>
-                                    <p className="text-xs sm:text-sm text-green-600">Passed</p>
+                                <div className="grid grid-cols-2 gap-4 text-center">
+                                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl p-4">
+                                    <Trophy className="h-5 w-5 text-green-600 mx-auto mb-2" />
+                                    <p className="text-3xl font-bold text-green-700">{stats.passedExams}</p>
+                                    <p className="text-sm text-green-600">Passed</p>
                                   </div>
-                                  <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-3 sm:p-4">
-                                    <XCircle className="h-5 w-5 text-red-600 mx-auto mb-1 sm:mb-2" />
-                                    <p className="text-2xl sm:text-3xl font-bold text-red-700">{stats.failedExams}</p>
-                                    <p className="text-xs sm:text-sm text-red-600">Failed</p>
+                                  <div className="bg-gradient-to-br from-red-50 to-rose-50 rounded-xl p-4">
+                                    <XCircle className="h-5 w-5 text-red-600 mx-auto mb-2" />
+                                    <p className="text-3xl font-bold text-red-700">{stats.failedExams}</p>
+                                    <p className="text-sm text-red-600">Failed</p>
                                   </div>
                                 </div>
                               </div>
@@ -685,34 +745,34 @@ function StudentDashboardContent() {
                           </Card>
                         )}
 
-                        <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                          <CardHeader className="pb-2 sm:pb-3">
+                        <Card className="border-0 shadow-sm bg-white">
+                          <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                              <CardTitle className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                                 <MonitorPlay className="h-5 w-5 text-emerald-600" />
                                 Available Exams
                               </CardTitle>
-                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('exams')} className="text-xs sm:text-sm">
+                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('exams')}>
                                 View All <ArrowRight className="ml-1 h-3 w-3" />
                               </Button>
                             </div>
                           </CardHeader>
                           <CardContent>
                             {stats.availableExams.length === 0 ? (
-                              <p className="text-center py-6 sm:py-8 text-slate-500 text-sm">No exams available</p>
+                              <p className="text-center py-6 text-slate-500">No exams available</p>
                             ) : (
-                              <div className="space-y-2 sm:space-y-3">
+                              <div className="space-y-3">
                                 {stats.availableExams.slice(0, 3).map((exam) => (
-                                  <div key={exam.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 bg-slate-50 rounded-xl">
+                                  <div key={exam.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
                                     <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-sm sm:text-base truncate">{exam.title}</p>
-                                      <div className="flex flex-wrap items-center gap-2 mt-1">
+                                      <p className="font-medium text-sm truncate">{exam.title}</p>
+                                      <div className="flex items-center gap-2 mt-1">
                                         <Badge variant="outline" className="text-xs">{exam.subject}</Badge>
                                         <span className="text-xs text-slate-500">{exam.duration} mins</span>
                                       </div>
                                     </div>
-                                    <Button size="sm" onClick={() => handleTakeExam(exam.id)} className="bg-emerald-600 w-full sm:w-auto shrink-0">
-                                      Start <ChevronRight className="ml-1 h-4 w-4" />
+                                    <Button size="sm" onClick={() => handleTakeExam(exam.id)} className="bg-emerald-600 shrink-0">
+                                      Start
                                     </Button>
                                   </div>
                                 ))}
@@ -728,33 +788,33 @@ function StudentDashboardContent() {
                         />
                       </div>
 
-                      <div className="space-y-4 sm:space-y-6 overflow-hidden">
-                        <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                          <CardHeader className="pb-2 sm:pb-3">
+                      <div className="space-y-4 sm:space-y-6">
+                        <Card className="border-0 shadow-sm bg-white">
+                          <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                              <CardTitle className="text-base sm:text-lg font-semibold flex items-center gap-2">
+                              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                                 <Activity className="h-5 w-5 text-emerald-600" />
                                 Recent Activity
                               </CardTitle>
-                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('results')} className="text-xs sm:text-sm">
-                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('results')}>
+                                View All
                               </Button>
                             </div>
                           </CardHeader>
                           <CardContent>
                             {stats.recentAttempts.length === 0 ? (
-                              <p className="text-center py-6 sm:py-8 text-slate-500 text-sm">No recent activity</p>
+                              <p className="text-center py-6 text-slate-500">No recent activity</p>
                             ) : (
-                              <div className="space-y-2 sm:space-y-3">
+                              <div className="space-y-3">
                                 {stats.recentAttempts.slice(0, 4).map((attempt) => (
-                                  <div key={attempt.id} className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                                    <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
-                                      <p className="font-medium text-sm sm:text-base truncate flex-1">{attempt.exam_title}</p>
+                                  <div key={attempt.id} className="p-3 bg-slate-50 rounded-xl">
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                      <p className="font-medium text-sm truncate flex-1">{attempt.exam_title}</p>
                                       {getStatusBadge(attempt.status, attempt.is_passed)}
                                     </div>
                                     <div className="flex items-center justify-between">
-                                      <span className="text-xs sm:text-sm text-slate-500 truncate">{attempt.exam_subject}</span>
-                                      <span className={cn("font-medium text-sm sm:text-base ml-2", getScoreColor(attempt.percentage))}>
+                                      <span className="text-xs text-slate-500">{attempt.exam_subject}</span>
+                                      <span className={cn("font-medium", getScoreColor(attempt.percentage))}>
                                         {attempt.percentage}%
                                       </span>
                                     </div>
@@ -765,25 +825,25 @@ function StudentDashboardContent() {
                           </CardContent>
                         </Card>
 
-                        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white overflow-hidden">
-                          <CardHeader className="pb-2 sm:pb-3">
-                            <CardTitle className="text-white flex items-center gap-2 text-base sm:text-lg">
+                        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+                          <CardHeader className="pb-2">
+                            <CardTitle className="text-white flex items-center gap-2">
                               <Calendar className="h-5 w-5" />
                               Upcoming Exams
                             </CardTitle>
                           </CardHeader>
                           <CardContent>
                             {stats.upcomingExams.length === 0 ? (
-                              <p className="text-emerald-100 text-center py-4 sm:py-6 text-sm">No upcoming exams</p>
+                              <p className="text-emerald-100 text-center py-4">No upcoming exams</p>
                             ) : (
-                              <div className="space-y-2 sm:space-y-3">
+                              <div className="space-y-3">
                                 {stats.upcomingExams.slice(0, 3).map((exam) => (
                                   <div key={exam.id} className="p-3 bg-white/10 rounded-xl">
-                                    <p className="font-medium text-sm sm:text-base truncate">{exam.title}</p>
-                                    <p className="text-xs sm:text-sm text-emerald-100 truncate">{exam.subject}</p>
+                                    <p className="font-medium text-sm">{exam.title}</p>
+                                    <p className="text-xs text-emerald-100">{exam.subject}</p>
                                     <p className="text-xs text-emerald-200 mt-1 flex items-center gap-1">
-                                      <Clock className="h-3 w-3 shrink-0" />
-                                      <span className="truncate">{formatDateTime(exam.starts_at)}</span>
+                                      <Clock className="h-3 w-3" />
+                                      {formatDateTime(exam.starts_at)}
                                     </p>
                                   </div>
                                 ))}
@@ -794,63 +854,57 @@ function StudentDashboardContent() {
                       </div>
                     </div>
                   </motion.div>
-
-                  {/* Quick Actions */}
-                  <motion.div variants={itemVariants} className="overflow-hidden">
-                    <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                      <CardHeader className="pb-2 sm:pb-3">
-                        <CardTitle className="text-base sm:text-lg">Quick Actions</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                          <Button onClick={() => handleTabChange('exams')} className="bg-emerald-600 w-full sm:w-auto text-sm">
-                            <MonitorPlay className="mr-2 h-4 w-4" />
-                            Browse Exams
-                          </Button>
-                          <Button variant="outline" onClick={() => handleTabChange('results')} className="w-full sm:w-auto text-sm">
-                            <Award className="mr-2 h-4 w-4" />
-                            View Results
-                          </Button>
-                          <Button variant="outline" onClick={() => handleTabChange('profile')} className="w-full sm:w-auto text-sm">
-                            <User className="mr-2 h-4 w-4" />
-                            My Profile
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
                 </motion.div>
               )}
 
               {/* EXAMS TAB */}
               {activeTab === 'exams' && (
-                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="overflow-hidden">
-                  <h1 className="text-2xl sm:text-3xl font-bold mb-4">Available Exams</h1>
+                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-2xl font-bold">Available Exams</h1>
+                    <Badge className="bg-emerald-100 text-emerald-700">
+                      {stats.availableExams.length} available
+                    </Badge>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search exams..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 bg-white"
+                      />
+                    </div>
+                  </div>
+                  
                   <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     {filteredAvailableExams.length === 0 ? (
-                      <Card className="col-span-full overflow-hidden">
-                        <CardContent className="p-6 sm:p-8 text-center">
-                          <p className="text-slate-500 text-sm sm:text-base">No exams available at this time.</p>
+                      <Card className="col-span-full">
+                        <CardContent className="p-8 text-center">
+                          <MonitorPlay className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                          <p className="text-slate-500">No exams available.</p>
                         </CardContent>
                       </Card>
                     ) : (
                       filteredAvailableExams.map((exam) => (
-                        <Card key={exam.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+                        <Card key={exam.id} className="hover:shadow-lg transition-shadow">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-base sm:text-lg truncate">{exam.title}</CardTitle>
-                            <CardDescription className="text-sm truncate">{exam.subject}</CardDescription>
+                            <CardTitle className="text-lg truncate">{exam.title}</CardTitle>
+                            <CardDescription>{exam.subject}</CardDescription>
                           </CardHeader>
                           <CardContent>
-                            <div className="space-y-2 text-xs sm:text-sm">
+                            <div className="space-y-2 text-sm">
                               <div className="flex justify-between">
                                 <span className="text-slate-500">Duration:</span>
-                                <span className="font-medium">{exam.duration} mins</span>
+                                <span>{exam.duration} mins</span>
                               </div>
                               <div className="flex justify-between">
                                 <span className="text-slate-500">Questions:</span>
-                                <span className="font-medium">{exam.total_questions}</span>
+                                <span>{exam.total_questions}</span>
                               </div>
-                              <Button onClick={() => handleTakeExam(exam.id)} className="w-full mt-3 bg-emerald-600 hover:bg-emerald-700 text-sm">
+                              <Button onClick={() => handleTakeExam(exam.id)} className="w-full mt-3 bg-emerald-600">
                                 Take Exam <ChevronRight className="ml-2 h-4 w-4" />
                               </Button>
                             </div>
@@ -864,26 +918,49 @@ function StudentDashboardContent() {
 
               {/* RESULTS TAB */}
               {activeTab === 'results' && (
-                <motion.div key="results" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="overflow-hidden">
-                  <h1 className="text-2xl sm:text-3xl font-bold mb-4">My Results</h1>
-                  <Card className="overflow-hidden">
+                <motion.div key="results" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-2xl font-bold">My Results</h1>
+                    <Badge className="bg-emerald-100 text-emerald-700">
+                      {stats.completedExams} completed
+                    </Badge>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search results..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 bg-white"
+                      />
+                    </div>
+                  </div>
+                  
+                  <Card>
                     <CardContent className="p-4 sm:p-6">
                       {filteredRecentAttempts.length === 0 ? (
-                        <p className="text-center py-6 sm:py-8 text-slate-500 text-sm">No exam results yet.</p>
+                        <div className="text-center py-8">
+                          <Award className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                          <p className="text-slate-500">No exam results yet.</p>
+                          <Button variant="link" onClick={() => handleTabChange('exams')}>
+                            Browse available exams
+                          </Button>
+                        </div>
                       ) : (
                         <div className="divide-y">
                           {filteredRecentAttempts.map((attempt) => (
-                            <div key={attempt.id} className="py-3 sm:py-4 first:pt-0 last:pb-0">
+                            <div key={attempt.id} className="py-4 first:pt-0 last:pb-0">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium text-sm sm:text-base truncate">{attempt.exam_title}</h4>
-                                  <p className="text-xs sm:text-sm text-slate-500">
-                                    Score: {attempt.total_score} / {attempt.objective_total + attempt.theory_total} ({attempt.percentage}%)
-                                  </p>
+                                <div className="flex-1">
+                                  <h4 className="font-medium">{attempt.exam_title}</h4>
+                                  <p className="text-sm text-slate-500">{attempt.exam_subject}</p>
+                                  <p className="text-sm">Score: {attempt.total_score || 0} ({attempt.percentage}%)</p>
                                 </div>
-                                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                                <div className="flex items-center gap-3">
                                   {getStatusBadge(attempt.status, attempt.is_passed)}
-                                  <Button variant="outline" size="sm" onClick={() => handleViewResult(attempt.id)} className="text-xs sm:text-sm">
+                                  <Button variant="outline" size="sm" onClick={() => handleViewResult(attempt.id)}>
                                     <Eye className="h-3 w-3 mr-1" />
                                     View
                                   </Button>
@@ -900,41 +977,53 @@ function StudentDashboardContent() {
 
               {/* PROFILE TAB */}
               {activeTab === 'profile' && (
-                <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="overflow-hidden">
-                  <h1 className="text-2xl sm:text-3xl font-bold mb-4">My Profile</h1>
-                  <Card className="overflow-hidden">
+                <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <h1 className="text-2xl font-bold mb-4">My Profile</h1>
+                  <Card>
                     <CardContent className="p-4 sm:p-6">
                       {profile && (
-                        <div className="space-y-4 sm:space-y-6">
-                          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 text-center sm:text-left">
-                            <Avatar className="h-20 w-20 sm:h-24 sm:w-24 shrink-0">
+                        <div className="space-y-6">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
+                            <Avatar className="h-24 w-24">
                               <AvatarImage src={profile.photo_url || undefined} />
-                              <AvatarFallback className="bg-emerald-600 text-white text-xl sm:text-2xl">
-                                {getInitials(profile.full_name)}
+                              <AvatarFallback className="bg-emerald-600 text-white text-2xl">
+                                {getInitials(profile.first_name, profile.last_name, profile.full_name)}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="min-w-0">
-                              <h2 className="text-xl sm:text-2xl font-bold truncate">{profile.full_name}</h2>
-                              <p className="text-slate-500 text-sm break-all">{profile.email}</p>
-                              <Badge className="mt-2 bg-emerald-100 text-emerald-700 text-xs sm:text-sm">{profile.class}</Badge>
+                            <div>
+                              <h2 className="text-2xl font-bold">{profile.full_name}</h2>
+                              <p className="text-slate-500">{profile.email}</p>
+                              <Badge className="mt-2 bg-emerald-100 text-emerald-700">{profile.class}</Badge>
                             </div>
                           </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div className="p-3 bg-slate-50 rounded-lg">
+                              <p className="text-xs text-slate-500">First Name</p>
+                              <p className="font-medium">{profile.first_name || 'N/A'}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg">
+                              <p className="text-xs text-slate-500">Last Name</p>
+                              <p className="font-medium">{profile.last_name || 'N/A'}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">VIN ID</p>
-                              <p className="font-medium text-sm sm:text-base break-all">{profile.vin_id || 'N/A'}</p>
+                              <p className="font-medium">{profile.vin_id || 'N/A'}</p>
                             </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Department</p>
-                              <p className="font-medium text-sm sm:text-base truncate">{profile.department}</p>
+                              <p className="font-medium">{profile.department}</p>
                             </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Admission Year</p>
-                              <p className="font-medium text-sm sm:text-base">{profile.admission_year || 'N/A'}</p>
+                              <p className="font-medium">{profile.admission_year || 'N/A'}</p>
                             </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                            <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Role</p>
-                              <p className="font-medium text-sm sm:text-base capitalize">{profile.role}</p>
+                              <p className="font-medium capitalize">{profile.role}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg sm:col-span-2">
+                              <p className="text-xs text-slate-500">Total Subjects</p>
+                              <p className="font-medium">{profile.subject_count || getSubjectCountForClass(profile.class)} Subjects</p>
                             </div>
                           </div>
                         </div>
@@ -954,7 +1043,7 @@ function StudentDashboardContent() {
 export default function StudentDashboardPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center overflow-x-hidden">
+      <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     }>

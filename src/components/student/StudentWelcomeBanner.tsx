@@ -1,28 +1,52 @@
-// components/student/StudentWelcomeBanner.tsx - COMPLETE FIXED VERSION
+// components/student/StudentWelcomeBanner.tsx - COMPLETELY FIXED
 'use client'
 
 import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { GraduationCap, Award } from 'lucide-react'
+import { 
+  GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen
+} from 'lucide-react'
 import { motion } from 'framer-motion'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 
 interface StudentProfile {
   full_name: string
   class: string
+  department?: string
   photo_url?: string
+  vin_id?: string
+  subject_count?: number
 }
 
 interface StudentStats {
   completedExams: number
   averageScore: number
-  attendance: number
-  rank?: number  // FIXED: Made rank optional
+  availableExams?: number
+  totalExams?: number
+  totalSubjects?: number
+  currentGrade?: string
+  gradeColor?: string
 }
 
 interface StudentWelcomeBannerProps {
   profile: StudentProfile | null
-  stats: StudentStats | null  // FIXED: Made stats nullable
+  stats: StudentStats | null
+}
+
+// Simple Grading
+const calculateGrade = (percentage: number): { grade: string; color: string; description: string } => {
+  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600', description: 'Pass' }
+  return { grade: 'F', color: 'text-red-600', description: 'Fail' }
 }
 
 export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerProps) {
@@ -42,9 +66,17 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   }
 
   const greeting = getGreeting()
+  
+  // FIXED: Properly extract first name - take the FIRST word
   const studentFullName = profile?.full_name || 'Student'
-  const firstName = studentFullName.split(' ')[0]
+  const nameParts = studentFullName.trim().split(/\s+/)
+  const firstName = nameParts[0] || 'Student'  // Always first part!
+  
   const studentClass = profile?.class || 'Not Assigned'
+  const studentDepartment = profile?.department || 'General'
+  
+  // FIXED: Get subject count - JSS=17, SSS=10
+  const totalSubjects = stats?.totalSubjects || (studentClass?.startsWith('JSS') ? 17 : 10)
 
   const formattedDate = currentTime.toLocaleDateString('en-NG', {
     weekday: 'long',
@@ -53,11 +85,21 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     day: 'numeric'
   })
 
-  // FIXED: Safe access with defaults
+  // FIXED: Use stats directly from props
   const completedExams = stats?.completedExams ?? 0
   const averageScore = stats?.averageScore ?? 0
-  const attendance = stats?.attendance ?? 0
-  const rank = stats?.rank ?? 0
+  const availableExams = stats?.availableExams ?? 0
+
+  // FIXED: Calculate grade based on average score
+  const gradeInfo = stats?.currentGrade && stats?.gradeColor 
+    ? { grade: stats.currentGrade, color: stats.gradeColor, description: '' }
+    : calculateGrade(averageScore)
+  
+  const showGrade = completedExams > 0
+  const completionPercentage = totalSubjects > 0 ? Math.round((completedExams / totalSubjects) * 100) : 0
+
+  // FIXED: Get first letter of FIRST NAME for avatar
+  const avatarLetter = firstName.charAt(0).toUpperCase()
 
   return (
     <motion.div 
@@ -66,10 +108,8 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
       transition={{ duration: 0.5 }}
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 text-white shadow-2xl mb-8"
     >
-      {/* Decorative background elements */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
-      <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-indigo-500/5 rounded-full blur-2xl" />
       
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex-1">
@@ -80,6 +120,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             </span>
           </div>
           
+          {/* FIXED: Display FIRST NAME */}
           <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white drop-shadow-sm">
             {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
           </h1>
@@ -89,17 +130,20 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           </p>
           
           <div className="flex flex-wrap gap-2">
-            <Badge className="bg-white/15 text-white border-0 hover:bg-white/20 transition-colors">
+            <Badge className="bg-white/15 text-white border-0">
               <GraduationCap className="h-3 w-3 mr-1" />
               {studentClass}
             </Badge>
-            {/* FIXED: Only show rank badge if rank > 0 */}
-            {rank > 0 && (
-              <Badge className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 text-white border-0">
-                <Award className="h-3 w-3 mr-1 text-amber-300" />
-                Rank: #{rank}
+            {studentDepartment !== 'General' && (
+              <Badge className="bg-white/15 text-white border-0">
+                <BookOpen className="h-3 w-3 mr-1" />
+                {studentDepartment}
               </Badge>
             )}
+            <Badge className="bg-white/15 text-white border-0">
+              <Award className="h-3 w-3 mr-1" />
+              {totalSubjects} Subjects
+            </Badge>
           </div>
         </div>
         
@@ -109,7 +153,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <Avatar className="h-24 w-24 md:h-28 md:w-28 ring-4 ring-white/20 shadow-xl">
               <AvatarImage src={profile?.photo_url} />
               <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-3xl font-bold">
-                {firstName.charAt(0).toUpperCase()}
+                {avatarLetter}
               </AvatarFallback>
             </Avatar>
             <div className="absolute -bottom-2 -right-2 bg-emerald-500 rounded-full p-1.5 ring-2 ring-white">
@@ -119,25 +163,85 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
         </div>
       </div>
       
+      {/* Stats Section */}
       <div className="relative z-10 mt-6 pt-4 border-t border-white/15">
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="group cursor-default">
-            <p className="text-2xl font-bold text-white group-hover:text-amber-200 transition-colors">
-              {completedExams}
-            </p>
-            <p className="text-xs text-gray-300">Exams Completed</p>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          
+          {/* Available Exams */}
+          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+                {availableExams}
+              </p>
+              <Clock className="h-5 w-5 text-blue-300 opacity-60" />
+            </div>
+            <p className="text-xs md:text-sm text-gray-300">Available Exams</p>
           </div>
-          <div className="group cursor-default">
-            <p className="text-2xl font-bold text-white group-hover:text-emerald-200 transition-colors">
-              {averageScore}%
+
+          {/* Completed Exams */}
+          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-green-200 transition-colors">
+                {completedExams}
+              </p>
+              <CheckCircle2 className="h-5 w-5 text-green-300 opacity-60" />
+            </div>
+            <p className="text-xs md:text-sm text-gray-300">Exams Completed</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">
+              {completionPercentage}% of term subjects
             </p>
-            <p className="text-xs text-gray-300">Average Score</p>
           </div>
-          <div className="group cursor-default">
-            <p className="text-2xl font-bold text-white group-hover:text-blue-200 transition-colors">
-              {attendance}%
-            </p>
-            <p className="text-xs text-gray-300">Attendance</p>
+
+          {/* Average Score */}
+          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+                {averageScore}%
+              </p>
+              <TrendingUp className="h-5 w-5 text-amber-300 opacity-60" />
+            </div>
+            <p className="text-xs md:text-sm text-gray-300">Average Score</p>
+          </div>
+
+          {/* Current Grade */}
+          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+            <div className="flex items-center justify-between mb-1">
+              {showGrade ? (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className={cn(
+                        "text-2xl md:text-3xl font-bold transition-colors",
+                        gradeInfo.color
+                      )}>
+                        {gradeInfo.grade}
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{averageScore}% average - {gradeInfo.description}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              ) : (
+                <p className="text-2xl md:text-3xl font-bold text-gray-400">-</p>
+              )}
+              <Award className="h-5 w-5 text-yellow-300 opacity-60" />
+            </div>
+            <p className="text-xs md:text-sm text-gray-300">Current Grade</p>
+          </div>
+        </div>
+        
+        {/* Subject Progress Bar */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gray-300">Term Subject Progress</span>
+            <span className="text-xs text-gray-300">{completedExams}/{totalSubjects} Subjects</span>
+          </div>
+          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div 
+              className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500"
+              style={{ width: `${completionPercentage}%` }}
+            />
           </div>
         </div>
       </div>
