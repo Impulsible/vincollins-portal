@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - FULLY RESPONSIVE AVATAR DROPDOWN
+// components/layout/header.tsx - FULLY CORRECTED
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
@@ -9,11 +9,11 @@ import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
   ChevronDown, User, Home, BookOpen, Laptop, Phone, Calendar, Users, FileText,
-  Bell, Search, Settings, LogOut, LayoutDashboard, GraduationCap, Menu, X,
+  Search, Settings, LogOut, LayoutDashboard, GraduationCap, Menu, X,
   Sparkles, Mail, MapPin, Clock, Facebook, Twitter, Instagram,
   Linkedin, KeyRound, MonitorPlay, BarChart3, TrendingUp,
   HelpCircle, Lock, Timer, Shuffle, Shield, Award, RotateCcw, ArrowRight,
-  CheckCircle, ChevronRight, LucideIcon
+  CheckCircle, ChevronRight, LucideIcon, Bell, CheckCircle2, AlertCircle, Trash2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,10 +35,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
+import { formatDistanceToNow } from 'date-fns'
 
 // STRICT ROLE TYPES - Only 3 roles allowed
 type UserRole = 'admin' | 'teacher' | 'student'
@@ -55,6 +62,17 @@ interface User {
 interface SchoolSettings {
   school_name?: string
   logo_path?: string
+}
+
+interface Notification {
+  id: string
+  title: string
+  message: string
+  type: string
+  read: boolean
+  link: string | null
+  metadata: any
+  created_at: string
 }
 
 // Navigation item type
@@ -204,6 +222,22 @@ const cbtFeatures = [
   },
 ]
 
+// Notification icon helper
+const getNotificationIcon = (type: string) => {
+  switch (type) {
+    case 'exam_graded':
+      return <Award className="h-4 w-4 text-green-500" />
+    case 'new_exam':
+      return <BookOpen className="h-4 w-4 text-blue-500" />
+    case 'needs_grading':
+      return <AlertCircle className="h-4 w-4 text-orange-500" />
+    case 'new_student':
+      return <CheckCircle2 className="h-4 w-4 text-purple-500" />
+    default:
+      return <Bell className="h-4 w-4 text-gray-500" />
+  }
+}
+
 interface HeaderProps {
   user?: User
   onLogout?: () => void
@@ -219,12 +253,16 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
+  const [notificationOpen, setNotificationOpen] = useState(false)
   const [showCbtInfo, setShowCbtInfo] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
-  const [notificationCount, setNotificationCount] = useState(0)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
   const [avatarError, setAvatarError] = useState(false)
   const profileDropdownRef = useRef<HTMLDivElement>(null)
+  
+  // Notification state
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
   
   const currentYear = new Date().getFullYear()
   const isPortalPage = pathname === '/portal'
@@ -261,20 +299,95 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return pathname === href || pathname?.startsWith(href + '/')
   }
 
-  // Fetch notification count
-  const fetchNotificationCount = useCallback(async () => {
-    if (!user?.id) return
-    try {
-      const { count, error } = await supabase
-        .from('notifications')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('read', false)
-      if (!error) setNotificationCount(count || 0)
-    } catch (error) {
-      console.error('Error fetching notifications:', error)
+  // Load notifications
+const loadNotifications = useCallback(async () => {
+  if (!user?.id) return
+  
+  try {
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+    
+    if (!error && data) {
+      setNotifications(data)
+      setUnreadCount(data.filter(n => !n.read).length)
     }
-  }, [user])
+  } catch (error) {
+    console.error('Error loading notifications:', error)
+  }
+}, [user?.id])
+
+// SIMPLE POLLING - This works 100%
+useEffect(() => {
+  if (!user?.id) return
+  
+  // Load immediately
+  loadNotifications()
+  
+  // Poll every 20 seconds for new notifications
+  const interval = setInterval(() => {
+    loadNotifications()
+  }, 20000)
+  
+  return () => clearInterval(interval)
+}, [user?.id, loadNotifications])
+
+  // Mark notification as read
+  const markAsRead = async (notificationId: string) => {
+    await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('id', notificationId)
+    
+    setNotifications(prev => 
+      prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+    )
+    setUnreadCount(prev => Math.max(0, prev - 1))
+  }
+
+  // Mark all as read
+  const markAllAsRead = async () => {
+    if (!user?.id) return
+    
+    await supabase
+      .from('notifications')
+      .update({ read: true })
+      .eq('user_id', user.id)
+      .eq('read', false)
+    
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
+    toast.success('All notifications marked as read')
+  }
+
+  // Delete notification
+  const deleteNotification = async (notificationId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    
+    await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', notificationId)
+    
+    setNotifications(prev => prev.filter(n => n.id !== notificationId))
+    const wasUnread = !notifications.find(n => n.id === notificationId)?.read
+    if (wasUnread) {
+      setUnreadCount(prev => Math.max(0, prev - 1))
+    }
+  }
+
+  // Handle notification click
+  const handleNotificationClick = async (notification: Notification) => {
+    await markAsRead(notification.id)
+    setNotificationOpen(false)
+    
+    if (notification.link) {
+      router.push(notification.link)
+    }
+  }
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -376,12 +489,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   }, [])
 
   useEffect(() => {
-    if (user?.isAuthenticated) {
-      fetchNotificationCount()
-    }
-  }, [user, fetchNotificationCount])
-
-  useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10)
     window.addEventListener('scroll', handleScroll)
     return () => window.removeEventListener('scroll', handleScroll)
@@ -390,6 +497,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   useEffect(() => {
     setMobileMenuOpen(false)
     setProfileOpen(false)
+    setNotificationOpen(false)
     setSearchOpen(false)
   }, [pathname])
 
@@ -482,14 +590,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     router.refresh()
   }
 
-  const handleNotificationClick = () => {
-    if (user?.role === 'admin') {
-      router.push('/admin/exams')
-    } else {
-      router.push('/notifications')
-    }
-  }
-
   const goToDashboard = () => {
     setProfileOpen(false)
     setMobileMenuOpen(false)
@@ -499,6 +599,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
   const handleAvatarError = () => {
     setAvatarError(true)
+  }
+
+  const handleViewAllNotifications = () => {
+    setNotificationOpen(false)
+    const role = user?.role || 'student'
+    router.push(role === 'student' ? '/student/notifications' : '/staff/notifications')
   }
 
   if (loading) {
@@ -529,7 +635,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
           <div className="flex items-center justify-between gap-1.5 sm:gap-3 lg:gap-4">
             
-            {/* LOGO */}
+            {/* LOGO - WITH DANCING SCRIPT FONT */}
             <Link href="/" className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 group flex-shrink-0">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -556,10 +662,16 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </motion.div>
               <div className="flex flex-col">
                 <div className="flex items-baseline gap-0.5 sm:gap-1">
-                  <span className="font-['Dancing_Script',cursive] text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-white leading-tight tracking-wide group-hover:text-[#F5A623] transition-colors duration-300">
+                  <span 
+                    className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-white leading-tight tracking-wide group-hover:text-[#F5A623] transition-colors duration-300"
+                    style={{ fontFamily: 'var(--font-dancing-script), cursive' }}
+                  >
                     Vincollins
                   </span>
-                  <span className="font-['Dancing_Script',cursive] text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-[#F5A623] leading-tight tracking-wide">
+                  <span 
+                    className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-[#F5A623] leading-tight tracking-wide"
+                    style={{ fontFamily: 'var(--font-dancing-script), cursive' }}
+                  >
                     College
                   </span>
                 </div>
@@ -632,33 +744,131 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* Notifications */}
+              {/* NOTIFICATION BELL - FIXED */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="relative h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
-                        onClick={handleNotificationClick}
-                      >
-                        <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
-                        {notificationCount > 0 && (
-                          <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 bg-red-500 rounded-full text-white text-[8px] sm:text-[10px] lg:text-xs flex items-center justify-center font-bold animate-pulse">
-                            {notificationCount > 9 ? '9+' : notificationCount}
-                          </span>
+                <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="relative h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
+                    >
+                      <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
+                      <AnimatePresence>
+                        {unreadCount > 0 && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 bg-red-500 rounded-full text-white text-[8px] sm:text-[10px] lg:text-xs flex items-center justify-center font-bold"
+                          >
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </motion.span>
                         )}
+                      </AnimatePresence>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    align="end" 
+                    sideOffset={8}
+                    className="w-[320px] xs:w-[360px] sm:w-[400px] p-0 rounded-xl shadow-2xl border border-gray-100"
+                  >
+                    <div className="p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-gray-50 rounded-t-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
+                          <p className="text-xs text-gray-500">
+                            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
+                          </p>
+                        </div>
+                        {unreadCount > 0 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={markAllAsRead}
+                            className="text-xs h-7"
+                          >
+                            Mark all read
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <ScrollArea className="max-h-[400px] sm:max-h-[450px]">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <Bell className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                          <p className="text-sm text-gray-500">No notifications yet</p>
+                          <p className="text-xs text-gray-400 mt-1">We'll notify you when something happens</p>
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {notifications.map((notification) => (
+                            <motion.div
+                              key={notification.id}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className={cn(
+                                "p-3 sm:p-4 hover:bg-gray-50 transition-colors cursor-pointer group relative",
+                                !notification.read && "bg-blue-50/50"
+                              )}
+                              onClick={() => handleNotificationClick(notification)}
+                            >
+                              <div className="flex gap-3">
+                                <div className="shrink-0 mt-0.5">
+                                  {getNotificationIcon(notification.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className={cn(
+                                      "text-sm font-medium truncate",
+                                      !notification.read ? "text-gray-900" : "text-gray-600"
+                                    )}>
+                                      {notification.title}
+                                    </p>
+                                    <span className="text-[10px] text-gray-400 shrink-0">
+                                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                    {notification.message}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {!notification.read && (
+                                <div className="ml-7 mt-1">
+                                  <span className="inline-block h-2 w-2 bg-blue-500 rounded-full" />
+                                </div>
+                              )}
+                              
+                              <button
+                                className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => deleteNotification(notification.id, e)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+                              </button>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                    
+                    <div className="p-2 border-t border-gray-100">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full text-xs"
+                        onClick={handleViewAllNotifications}
+                      >
+                        View All Notifications
                       </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {notificationCount > 0 ? `${notificationCount} new` : 'No new notifications'}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
 
-              {/* AUTHENTICATED USER - Avatar with FULLY RESPONSIVE Dropdown */}
+              {/* AUTHENTICATED USER - Avatar with Dropdown */}
               {user?.isAuthenticated ? (
                 <div className="relative" ref={profileDropdownRef}>
                   <Button
@@ -693,7 +903,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     )} />
                   </Button>
 
-                  {/* FULLY RESPONSIVE DROPDOWN MENU */}
+                  {/* Dropdown Menu */}
                   {profileOpen && (
                     <div className={cn(
                       "absolute bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50",
@@ -788,7 +998,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           </Link>
                           
                           <Link 
-                            href="/notifications"
+                            href={user.role === 'student' ? '/student/notifications' : '/staff/notifications'}
                             className={cn(
                               "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
                               "text-xs xs:text-sm"
@@ -797,8 +1007,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           >
                             <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
                             <span>Notifications</span>
-                            {notificationCount > 0 && (
-                              <Badge className="ml-auto bg-red-500 text-white text-[10px] xs:text-xs">{notificationCount}</Badge>
+                            {unreadCount > 0 && (
+                              <Badge className="ml-auto bg-red-500 text-white text-[10px] xs:text-xs">{unreadCount}</Badge>
                             )}
                           </Link>
                           

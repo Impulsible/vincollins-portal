@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - FIXED: Regex and type errors
+// app/student/page.tsx - UPDATED WITH SET D COMPONENT & LOADING MESSAGE
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
@@ -10,6 +10,7 @@ import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { StudentWelcomeBanner } from '@/components/student/StudentWelcomeBanner'
 import { StudentClassRoster } from '@/components/student/StudentClassRoster'
+import { SetDStatsCards } from '@/components/student/SetDStatsCards'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,21 +24,19 @@ import { cn } from '@/lib/utils'
 import { 
   Loader2, BookOpen, Award, Clock, TrendingUp, Calendar, CheckCircle,
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
-  Search, User, ArrowRight, Target, Trophy, Eye, LayoutDashboard, Menu
+  Search, User, ArrowRight, Target, Trophy, Eye, LayoutDashboard, Menu,
+  Flame, Zap, Sparkles, GraduationCap
 } from 'lucide-react'
 
 // ============================================
-// NAME FORMATTING - Fixed regex
+// NAME FORMATTING
 // ============================================
 function formatFullName(firstName: string | null, lastName: string | null, fallback: string): string {
-  if (firstName && lastName) {
-    return `${firstName} ${lastName}`
-  }
+  if (firstName && lastName) return `${firstName} ${lastName}`
   if (firstName) return firstName
   if (lastName) return lastName
   
-  // Fixed: Proper regex escaping
-  const words = fallback.split(/[\s._\-@]+/).filter(w => w.length > 0)
+  const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
   if (words.length >= 2) {
     return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
   }
@@ -45,34 +44,23 @@ function formatFullName(firstName: string | null, lastName: string | null, fallb
 }
 
 function getFirstName(firstName: string | null, lastName: string | null, fallback: string): string {
-  if (firstName && firstName.trim()) {
-    return firstName.trim()
-  }
+  if (firstName && firstName.trim()) return firstName.trim()
   
-  // Fixed: Proper regex escaping
-  const words = fallback.split(/[\s._\-]+/).filter(w => w.length > 0)
+  const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
   if (words.length > 0) {
     return words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase()
   }
-  
   return 'Student'
 }
 
 function getInitials(firstName: string | null, lastName: string | null, fallback: string): string {
-  if (firstName && lastName) {
-    return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase()
-  }
+  if (firstName && lastName) return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase()
   if (firstName) return firstName.slice(0, 2).toUpperCase()
   if (lastName) return lastName.slice(0, 2).toUpperCase()
   
-  // Fixed: Proper regex escaping
-  const words = fallback.split(/[\s._\-]+/).filter(w => w.length > 0)
-  if (words.length >= 2) {
-    return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
-  }
-  if (words.length === 1) {
-    return words[0].slice(0, 2).toUpperCase()
-  }
+  const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
+  if (words.length >= 2) return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+  if (words.length === 1) return words[0].slice(0, 2).toUpperCase()
   return 'ST'
 }
 
@@ -93,7 +81,7 @@ const calculateGrade = (percentage: number): { grade: string; color: string } =>
 }
 
 // ============================================
-// TYPES - Fixed department type to match StudentSidebar
+// TYPES
 // ============================================
 interface StudentProfile {
   id: string
@@ -102,7 +90,7 @@ interface StudentProfile {
   full_name: string
   email: string
   class: string
-  department: string  // Changed from string | null to string to match sidebar
+  department: string
   vin_id?: string
   photo_url?: string | null
   admission_year?: number
@@ -167,6 +155,21 @@ interface BannerStats {
   gradeColor: string
 }
 
+interface TermInfo {
+  termName: string
+  sessionYear: string
+  currentWeek: number
+  totalWeeks: number
+  weekProgress: number
+  startDate: string
+  endDate: string
+}
+
+interface BestSubject {
+  name: string
+  score: number
+}
+
 // ============================================
 // ANIMATION VARIANTS
 // ============================================
@@ -215,6 +218,19 @@ function StudentDashboardContent() {
     gradeColor: 'text-gray-400'
   })
 
+  const [termInfo, setTermInfo] = useState<TermInfo>({
+    termName: 'First Term',
+    sessionYear: '2024/2025',
+    currentWeek: 1,
+    totalWeeks: 13,
+    weekProgress: 8,
+    startDate: '',
+    endDate: ''
+  })
+  
+  const [studyStreak, setStudyStreak] = useState(0)
+  const [bestSubject, setBestSubject] = useState<BestSubject | null>(null)
+
   // Format profile for header
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
@@ -227,6 +243,95 @@ function StudentDashboardContent() {
       isAuthenticated: true
     }
   }
+
+  // Load term settings from database
+  const loadTermSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_current_term_settings')
+      
+      if (!error && data && data.length > 0) {
+        const term = data[0]
+        const { data: currentWeek } = await supabase.rpc('calculate_current_week')
+        
+        setTermInfo({
+          termName: term.term_name,
+          sessionYear: term.session_year,
+          currentWeek: currentWeek || 1,
+          totalWeeks: term.total_weeks || 13,
+          weekProgress: Math.round(((currentWeek || 1) / (term.total_weeks || 13)) * 100),
+          startDate: term.start_date,
+          endDate: term.end_date
+        })
+      }
+    } catch (error) {
+      console.error('Error loading term settings:', error)
+    }
+  }, [])
+
+  // Calculate study streak
+  const calculateStudyStreak = useCallback(async (studentId: string) => {
+    try {
+      const { data: attempts } = await supabase
+        .from('exam_attempts')
+        .select('created_at')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
+      
+      if (!attempts || attempts.length === 0) {
+        setStudyStreak(0)
+        return
+      }
+      
+      let streak = 0
+      let currentDate = new Date()
+      currentDate.setHours(0, 0, 0, 0)
+      
+      const attemptDates = new Set(
+        attempts.map(a => new Date(a.created_at).toISOString().split('T')[0])
+      )
+      
+      while (attemptDates.has(currentDate.toISOString().split('T')[0])) {
+        streak++
+        currentDate.setDate(currentDate.getDate() - 1)
+      }
+      
+      setStudyStreak(streak)
+    } catch (error) {
+      console.error('Error calculating streak:', error)
+      setStudyStreak(0)
+    }
+  }, [])
+
+  // Calculate best subject
+  const calculateBestSubject = useCallback((attempts: ExamAttempt[]) => {
+    const subjectScores: Record<string, number[]> = {}
+    
+    attempts.forEach(attempt => {
+      if (attempt.exam_subject && attempt.percentage) {
+        if (!subjectScores[attempt.exam_subject]) {
+          subjectScores[attempt.exam_subject] = []
+        }
+        subjectScores[attempt.exam_subject].push(attempt.percentage)
+      }
+    })
+    
+    let bestName = ''
+    let bestAvg = 0
+    
+    Object.entries(subjectScores).forEach(([subject, scores]) => {
+      const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+      if (avg > bestAvg) {
+        bestAvg = avg
+        bestName = subject
+      }
+    })
+    
+    if (bestName && bestAvg > 0) {
+      setBestSubject({ name: bestName, score: Math.round(bestAvg) })
+    } else {
+      setBestSubject(null)
+    }
+  }, [])
 
   // Auth check
   useEffect(() => {
@@ -256,20 +361,6 @@ function StudentDashboardContent() {
             profileData?.last_name || null,
             profileData?.full_name || fallbackName
           )
-          
-          const firstName = getFirstName(
-            profileData?.first_name || null,
-            profileData?.last_name || null,
-            profileData?.full_name || fallbackName
-          )
-          
-          console.log('👤 Profile loaded:', {
-            first_name: profileData?.first_name,
-            last_name: profileData?.last_name,
-            fullName,
-            firstName,
-            class: profileData?.class
-          })
           
           setProfile({
             id: session.user.id,
@@ -313,8 +404,8 @@ function StudentDashboardContent() {
       const studentClass = profile.class
       const totalSubjects = profile.subject_count || getSubjectCountForClass(studentClass)
 
-      console.log('📚 Loading dashboard for:', profile.first_name, profile.last_name)
-      console.log('📚 Class:', studentClass, 'Total subjects:', totalSubjects)
+      // Load term settings
+      await loadTermSettings()
 
       const { data: examsData, error: examsError } = await supabase
         .from('exams')
@@ -329,8 +420,6 @@ function StudentDashboardContent() {
         return
       }
 
-      console.log('📚 Total published exams:', examsData?.length || 0)
-
       const allExams: Exam[] = (examsData || []).filter(exam => {
         if (!exam.class || exam.class === 'all') return true
         
@@ -340,15 +429,11 @@ function StudentDashboardContent() {
         return normalizedExamClass === normalizedStudentClass
       })
 
-      console.log('📚 Exams after class filter:', allExams.length)
-
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
         .select('*')
         .eq('student_id', profile.id)
         .order('created_at', { ascending: false })
-
-      console.log('📝 Attempts loaded:', attemptsData?.length || 0)
 
       const attempts: ExamAttempt[] = []
       
@@ -401,13 +486,6 @@ function StudentDashboardContent() {
         return new Date(exam.starts_at) > now
       }).slice(0, 5)
 
-      console.log('📊 Stats calculated:', {
-        totalExams: allExams.length,
-        completed: completedAttempts.length,
-        avgScore,
-        available: availableExams.length
-      })
-
       setStats({
         totalExams: allExams.length,
         completedExams: completedAttempts.length,
@@ -421,7 +499,7 @@ function StudentDashboardContent() {
       })
 
       const gradeInfo = calculateGrade(avgScore)
-      const newBannerStats: BannerStats = {
+      setBannerStats({
         completedExams: completedAttempts.length,
         averageScore: avgScore,
         availableExams: availableExams.length,
@@ -429,10 +507,11 @@ function StudentDashboardContent() {
         totalSubjects: totalSubjects,
         currentGrade: completedAttempts.length > 0 ? gradeInfo.grade : 'N/A',
         gradeColor: gradeInfo.color
-      }
-      
-      setBannerStats(newBannerStats)
-      console.log('📊 Banner stats updated:', newBannerStats)
+      })
+
+      // Calculate study streak and best subject
+      await calculateStudyStreak(profile.id)
+      calculateBestSubject(completedAttempts)
 
     } catch (error) {
       console.error('Error loading dashboard:', error)
@@ -440,7 +519,7 @@ function StudentDashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, [profile?.id, profile?.class, profile?.subject_count])
+  }, [profile?.id, profile?.class, profile?.subject_count, loadTermSettings, calculateStudyStreak, calculateBestSubject])
 
   // Real-time subscription
   useEffect(() => {
@@ -564,8 +643,38 @@ function StudentDashboardContent() {
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto" />
-            <p className="mt-4 text-slate-600">Loading dashboard...</p>
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            >
+              <GraduationCap className="h-16 w-16 text-emerald-600 mx-auto" />
+            </motion.div>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="mt-4 text-slate-600 text-lg font-medium"
+            >
+              Loading Student Dashboard...
+            </motion.p>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="mt-2 text-slate-500 text-sm"
+            >
+              Preparing your learning space ✨
+            </motion.p>
+            <div className="flex justify-center gap-1 mt-4">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="h-2 w-2 rounded-full bg-emerald-400"
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -664,6 +773,7 @@ function StudentDashboardContent() {
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-4 sm:space-y-6"
                 >
+                  {/* Welcome Banner */}
                   <motion.div variants={itemVariants}>
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
@@ -671,46 +781,22 @@ function StudentDashboardContent() {
                     />
                   </motion.div>
 
+                  {/* SET D STATS CARDS - Using the reusable component */}
                   <motion.div variants={itemVariants}>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                      {[
-                        { label: 'Total Exams', value: stats.totalExams, icon: BookOpen, color: 'blue' },
-                        { label: 'Completed', value: stats.completedExams, icon: CheckCircle, color: 'green' },
-                        { label: 'Average Score', value: `${stats.averageScore}%`, icon: Target, color: 'purple' },
-                        { label: 'Pending', value: stats.pendingResults, icon: Clock, color: 'yellow' }
-                      ].map((item, i) => (
-                        <Card key={i} className="border-0 shadow-sm bg-white">
-                          <CardContent className="p-3 sm:p-5">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-xs sm:text-sm text-slate-500">{item.label}</p>
-                                <p className="text-2xl sm:text-3xl font-bold">{item.value}</p>
-                              </div>
-                              <div className={cn(
-                                "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center",
-                                item.color === 'blue' && "bg-blue-100",
-                                item.color === 'green' && "bg-green-100",
-                                item.color === 'purple' && "bg-purple-100",
-                                item.color === 'yellow' && "bg-yellow-100"
-                              )}>
-                                <item.icon className={cn(
-                                  "h-5 w-5 sm:h-6 sm:w-6",
-                                  item.color === 'blue' && "text-blue-600",
-                                  item.color === 'green' && "text-green-600",
-                                  item.color === 'purple' && "text-purple-600",
-                                  item.color === 'yellow' && "text-yellow-600"
-                                )} />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
+                    <SetDStatsCards
+                      termInfo={termInfo}
+                      totalSubjects={bannerStats.totalSubjects}
+                      completedExams={bannerStats.completedExams}
+                      studyStreak={studyStreak}
+                      bestSubject={bestSubject}
+                      studentClass={profile?.class}
+                    />
                   </motion.div>
 
                   <motion.div variants={itemVariants}>
                     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+                        {/* Performance Overview */}
                         {stats.completedExams > 0 && (
                           <Card className="border-0 shadow-sm bg-white">
                             <CardHeader className="pb-2">
@@ -745,6 +831,7 @@ function StudentDashboardContent() {
                           </Card>
                         )}
 
+                        {/* Available Exams */}
                         <Card className="border-0 shadow-sm bg-white">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
@@ -789,6 +876,7 @@ function StudentDashboardContent() {
                       </div>
 
                       <div className="space-y-4 sm:space-y-6">
+                        {/* Recent Activity */}
                         <Card className="border-0 shadow-sm bg-white">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
@@ -825,6 +913,7 @@ function StudentDashboardContent() {
                           </CardContent>
                         </Card>
 
+                        {/* Upcoming Exams */}
                         <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
                           <CardHeader className="pb-2">
                             <CardTitle className="text-white flex items-center gap-2">
@@ -1043,8 +1132,26 @@ function StudentDashboardContent() {
 export default function StudentDashboardPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          >
+            <GraduationCap className="h-12 w-12 text-emerald-600 mx-auto" />
+          </motion.div>
+          <p className="mt-4 text-slate-600 text-lg font-medium">Loading Student Dashboard...</p>
+          <div className="flex justify-center gap-1 mt-4">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="h-2 w-2 rounded-full bg-emerald-400"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }}
+              />
+            ))}
+          </div>
+        </div>
       </div>
     }>
       <StudentDashboardContent />

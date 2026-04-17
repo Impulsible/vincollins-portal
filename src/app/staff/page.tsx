@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/staff/page.tsx - FIXED OVERFLOW - NO HORIZONTAL SCROLL
+// app/staff/page.tsx - UPDATED WITH BEAUTIFUL LOADING ANIMATION
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
@@ -19,13 +19,16 @@ import { CreateExamDialog } from '@/components/staff/CreateExamDialog'
 import { CreateAssignmentDialog } from '@/components/staff/CreateAssignmentDialog'
 import { UploadNoteDialog } from '@/components/staff/UploadNoteDialog'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { 
   Plus, Sparkles, TrendingUp, Calendar, Clock, Search, Filter, ArrowRight,
   BookOpen, Users, FileText, Award, Download, Loader2, LayoutDashboard,
-  MonitorPlay, User, Menu, Settings
+  MonitorPlay, User, Menu, Settings, Flame, Zap, Trophy, Target,
+  GraduationCap, Briefcase
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -87,6 +90,16 @@ interface Student {
   photo_url?: string
 }
 
+interface TermInfo {
+  termName: string
+  sessionYear: string
+  currentWeek: number
+  totalWeeks: number
+  weekProgress: number
+  startDate: string
+  endDate: string
+}
+
 const formatProfileForHeader = (profile: StaffProfile | null) => {
   if (!profile) return undefined
   return {
@@ -143,6 +156,42 @@ function StaffDashboardContent() {
     totalExams: 0, publishedExams: 0, totalAssignments: 0, totalNotes: 0,
     totalStudents: 0, pendingSubmissions: 0, activeStudents: 0, averageScore: 0
   })
+
+  const [termInfo, setTermInfo] = useState<TermInfo>({
+    termName: 'First Term',
+    sessionYear: '2024/2025',
+    currentWeek: 1,
+    totalWeeks: 13,
+    weekProgress: 8,
+    startDate: '',
+    endDate: ''
+  })
+
+  const [pendingGrading, setPendingGrading] = useState(0)
+
+  // Load term settings
+  const loadTermSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_current_term_settings')
+      
+      if (!error && data && data.length > 0) {
+        const term = data[0]
+        const { data: currentWeek } = await supabase.rpc('calculate_current_week')
+        
+        setTermInfo({
+          termName: term.term_name,
+          sessionYear: term.session_year,
+          currentWeek: currentWeek || 1,
+          totalWeeks: term.total_weeks || 13,
+          weekProgress: Math.round(((currentWeek || 1) / (term.total_weeks || 13)) * 100),
+          startDate: term.start_date,
+          endDate: term.end_date
+        })
+      }
+    } catch (error) {
+      console.error('Error loading term settings:', error)
+    }
+  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -204,6 +253,8 @@ function StaffDashboardContent() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { setLoading(false); return }
 
+      await loadTermSettings()
+
       let userData = null, rawFullName = ''
       const { data: profileData } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
       if (profileData) { userData = profileData; rawFullName = profileData.full_name || '' }
@@ -217,11 +268,12 @@ function StaffDashboardContent() {
         photo_url: userData?.photo_url || null, class: userData?.class || null
       }))
 
-      const [{ data: examsData }, { data: assignmentsData }, { data: notesData }, { data: studentsData }] = await Promise.all([
+      const [{ data: examsData }, { data: assignmentsData }, { data: notesData }, { data: studentsData }, { data: pendingGradingData }] = await Promise.all([
         supabase.from('exams').select('*').eq('created_by', session.user.id).order('created_at', { ascending: false }),
         supabase.from('assignments').select('*').eq('created_by', session.user.id).order('created_at', { ascending: false }),
         supabase.from('notes').select('*').eq('created_by', session.user.id).order('created_at', { ascending: false }),
-        supabase.from('profiles').select('*').eq('role', 'student').order('class')
+        supabase.from('profiles').select('*').eq('role', 'student').order('class'),
+        supabase.from('exam_attempts').select('*', { count: 'exact' }).eq('status', 'submitted')
       ])
 
       if (examsData) setExams(examsData as Exam[])
@@ -233,19 +285,46 @@ function StaffDashboardContent() {
         if (usersData) setStudents(usersData as Student[])
       }
 
+      setPendingGrading(pendingGradingData?.length || 0)
+
       setStats({
         totalExams: examsData?.length || 0,
         publishedExams: examsData?.filter((e: any) => e.status === 'published').length || 0,
         totalAssignments: assignmentsData?.length || 0,
         totalNotes: notesData?.length || 0,
         totalStudents: studentsData?.length || 0,
-        pendingSubmissions: 0,
+        pendingSubmissions: pendingGradingData?.length || 0,
         activeStudents: studentsData?.filter((s: any) => s.is_active).length || 0,
         averageScore: 75
       })
     } catch (error) { toast.error('Failed to load dashboard') }
     finally { setLoading(false) }
-  }, [])
+  }, [loadTermSettings])
+
+  useEffect(() => {
+    if (!profile?.id) return
+
+    const channel = supabase
+      .channel('staff-dashboard-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'exam_attempts',
+          filter: `status=eq.submitted`
+        },
+        () => {
+          console.log('🔄 New submission, refreshing...')
+          loadDashboardData()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [profile?.id, loadDashboardData])
 
   useEffect(() => { if (!authChecking) loadDashboardData() }, [loadDashboardData, authChecking])
 
@@ -263,8 +342,41 @@ function StaffDashboardContent() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
-          <div className="text-center"><Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" /><p className="mt-4 text-slate-600">Loading staff dashboard...</p></div>
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <div className="text-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            >
+              <Briefcase className="h-16 w-16 text-blue-600 mx-auto" />
+            </motion.div>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.3 }}
+              className="mt-4 text-slate-600 text-lg font-medium"
+            >
+              Loading Staff Dashboard...
+            </motion.p>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="mt-2 text-slate-500 text-sm"
+            >
+              Preparing your teaching space ✨
+            </motion.p>
+            <div className="flex justify-center gap-1 mt-4">
+              {[0, 1, 2].map((i) => (
+                <motion.div
+                  key={i}
+                  className="h-2 w-2 rounded-full bg-blue-400"
+                  animate={{ y: [0, -8, 0] }}
+                  transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }}
+                />
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -274,6 +386,7 @@ function StaffDashboardContent() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
+      {/* Mobile Tab Navigation */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg pb-safe w-full overflow-x-hidden">
         <div className="grid grid-cols-5 gap-1 p-2">
           {[{ id: 'overview', icon: LayoutDashboard, label: 'Home' }, { id: 'exams', icon: MonitorPlay, label: 'Exams' }, { id: 'students', icon: Users, label: 'Students' }, { id: 'profile', icon: User, label: 'Profile' }].map(tab => (
@@ -323,8 +436,73 @@ function StaffDashboardContent() {
             <AnimatePresence mode="wait">
               {activeTab === 'overview' && (
                 <motion.div key="overview" variants={containerVariants} initial="hidden" animate="visible" exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6 overflow-hidden">
-                  <motion.div variants={itemVariants}><StaffWelcomeBanner profile={profile} stats={stats} /></motion.div>
-                  <motion.div variants={itemVariants}><StaffStatsCards stats={stats} /></motion.div>
+                  <motion.div variants={itemVariants}>
+                    <StaffWelcomeBanner profile={profile} stats={stats} termInfo={termInfo} />
+                  </motion.div>
+                  
+                  {/* Staff Stats Cards */}
+                  <motion.div variants={itemVariants}>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => router.push('/staff/calendar')}>
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-blue-600 font-medium truncate">{termInfo.termName}</p>
+                              <p className="text-xl sm:text-2xl font-bold text-blue-800 truncate">
+                                Week {termInfo.currentWeek}/{termInfo.totalWeeks}
+                              </p>
+                              <p className="text-[10px] sm:text-xs text-blue-600 mt-0.5 truncate">{termInfo.sessionYear}</p>
+                            </div>
+                            <Calendar className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 shrink-0 ml-2" />
+                          </div>
+                          <Progress value={termInfo.weekProgress} className="h-1.5 mt-3" />
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-teal-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('exams')}>
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-emerald-600 font-medium">Published Exams</p>
+                              <p className="text-xl sm:text-2xl font-bold text-emerald-800">{stats.publishedExams}</p>
+                              <p className="text-[10px] sm:text-xs text-emerald-600 mt-0.5">of {stats.totalExams} total</p>
+                            </div>
+                            <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 text-emerald-500 shrink-0 ml-2" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-orange-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('students')}>
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-amber-600 font-medium">Active Students</p>
+                              <p className="text-xl sm:text-2xl font-bold text-amber-800">{stats.activeStudents}</p>
+                              <p className="text-[10px] sm:text-xs text-amber-600 mt-0.5">of {stats.totalStudents} total</p>
+                            </div>
+                            <Users className="h-8 w-8 sm:h-10 sm:w-10 text-amber-500 shrink-0 ml-2" />
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('exams')}>
+                        <CardContent className="p-3 sm:p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs text-purple-600 font-medium">Pending Grading</p>
+                              <p className="text-xl sm:text-2xl font-bold text-purple-800">{pendingGrading}</p>
+                              <p className="text-[10px] sm:text-xs text-purple-600 mt-0.5 flex items-center gap-1">
+                                <Flame className="h-3 w-3" />
+                                {pendingGrading > 0 ? 'Needs attention' : 'All caught up!'}
+                              </p>
+                            </div>
+                            <Award className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 shrink-0 ml-2" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </motion.div>
+
                   <motion.div variants={itemVariants}><QuickActions onCreateExam={() => setShowCreateExam(true)} onCreateAssignment={() => setShowCreateAssignment(true)} onUploadNote={() => setShowUploadNote(true)} /></motion.div>
                   <motion.div variants={itemVariants}>
                     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
@@ -383,7 +561,29 @@ function StaffDashboardContent() {
 
 export default function StaffDashboard() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden"><div className="flex items-center justify-center min-h-screen px-4"><div className="text-center"><Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" /><p className="mt-4 text-slate-600 text-sm sm:text-base">Loading staff dashboard...</p></div></div></div>}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="text-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          >
+            <Briefcase className="h-12 w-12 text-blue-600 mx-auto" />
+          </motion.div>
+          <p className="mt-4 text-slate-600 text-lg font-medium">Loading Staff Dashboard...</p>
+          <div className="flex justify-center gap-1 mt-4">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="h-2 w-2 rounded-full bg-blue-400"
+                animate={{ y: [0, -8, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    }>
       <StaffDashboardContent />
     </Suspense>
   )
