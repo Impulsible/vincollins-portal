@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/staff/profile/page.tsx
+// app/staff/profile/page.tsx - WORKING PHOTO UPLOAD WITH SYNC
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -17,29 +17,14 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  BookOpen, 
-  Award, 
-  Calendar, 
-  Camera, 
-  Save, 
-  X, 
-  Building, 
-  Clock,
-  Shield,
-  Key,
-  Eye,
-  EyeOff,
-  CheckCircle,
-  AlertCircle,
-  ArrowLeft
+  User, Mail, Phone, MapPin, BookOpen, Award, Calendar, 
+  Camera, Save, X, Building, Clock, Shield, Key, Eye, EyeOff,
+  CheckCircle, AlertCircle, ArrowLeft, Loader2, ChevronRight, Home
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -70,15 +55,14 @@ export default function StaffProfilePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   const [isEditing, setIsEditing] = useState(false)
-  const [uploading, setUploading] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [avatarKey, setAvatarKey] = useState(Date.now())
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   // Password change state
   const [showPasswordForm, setShowPasswordForm] = useState(false)
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
@@ -105,16 +89,19 @@ export default function StaffProfilePage() {
         return
       }
 
-      // Fetch profile from profiles table
+      console.log('📸 Loading staff profile for:', session.user.id)
+
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .single()
+        .maybeSingle()
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching profile:', error)
       }
+
+      console.log('📸 Current photo_url:', profileData?.photo_url)
 
       if (profileData) {
         setProfile(profileData as StaffProfile)
@@ -132,7 +119,6 @@ export default function StaffProfilePage() {
           photo_url: profileData.photo_url || profileData.avatar_url || '',
         })
       } else {
-        // Create basic profile from session
         const emailName = session.user.email?.split('@')[0] || 'Teacher'
         const formattedName = emailName.split('.').map((part: string) => 
           part.charAt(0).toUpperCase() + part.slice(1)
@@ -190,6 +176,7 @@ export default function StaffProfilePage() {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  // FIXED: Working image upload - same as student version
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -204,42 +191,69 @@ export default function StaffProfilePage() {
       return
     }
 
-    setUploading(true)
+    setIsUploading(true)
     
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${profile?.id}-${Date.now()}.${fileExt}`
-      const filePath = `avatars/${fileName}`
-
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(filePath, file)
-
-      if (uploadError) throw uploadError
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(filePath)
-
-      setFormData(prev => ({ ...prev, photo_url: publicUrl }))
+      const fileName = `staff-${profile?.id}-${Date.now()}.${fileExt}`
       
-      // Update profile immediately with new photo
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .upsert({
-          id: profile?.id,
-          photo_url: publicUrl,
-          updated_at: new Date().toISOString(),
+      console.log('📸 Uploading staff photo:', fileName)
+
+      // Upload to Supabase Storage - using same student-photos bucket
+      const { error: uploadError } = await supabase.storage
+        .from('student-photos')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
         })
 
-      if (updateError) throw updateError
+      if (uploadError) {
+        console.error('Upload error:', uploadError)
+        throw uploadError
+      }
 
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('student-photos')
+        .getPublicUrl(fileName)
+
+      const publicUrl = urlData.publicUrl
+      console.log('📸 Staff photo URL:', publicUrl)
+
+      // Update profile with new photo URL
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ 
+          photo_url: publicUrl,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', profile?.id)
+
+      if (updateError) {
+        console.error('Profile update error:', updateError)
+        throw updateError
+      }
+
+      // Update local state
+      setFormData(prev => ({ ...prev, photo_url: publicUrl }))
+      if (profile) {
+        setProfile({ ...profile, photo_url: publicUrl, avatar_url: publicUrl })
+      }
+      setAvatarKey(Date.now())
+      
       toast.success('Profile photo updated successfully!')
-    } catch (error) {
+      
+      // Clear the input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      
+    } catch (error: any) {
       console.error('Error uploading image:', error)
-      toast.error('Failed to upload image')
+      toast.error(error.message || 'Failed to upload image')
     } finally {
-      setUploading(false)
+      setIsUploading(false)
     }
   }
 
@@ -305,7 +319,6 @@ export default function StaffProfilePage() {
 
       toast.success('Password changed successfully!')
       setShowPasswordForm(false)
-      setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
     } catch (error) {
@@ -335,14 +348,26 @@ export default function StaffProfilePage() {
     setIsEditing(false)
   }
 
+  const formatProfileForHeader = () => {
+    if (!profile) return undefined
+    return {
+      id: profile.id,
+      name: profile.full_name,
+      email: profile.email,
+      role: 'teacher' as const,
+      avatar: profile.photo_url || undefined,
+      isAuthenticated: true
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
         <div className="flex">
           <div className="hidden lg:block w-72" />
           <div className="flex-1">
-            <main className="pt-20 pb-8">
+            <main className="pt-20 lg:pt-24 pb-8">
               <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
                 <div className="space-y-6">
                   <Skeleton className="h-48 w-full rounded-2xl" />
@@ -357,10 +382,10 @@ export default function StaffProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
-      <Header onLogout={handleLogout} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col">
+      <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
-      <div className="flex">
+      <div className="flex flex-1">
         <StaffSidebar 
           profile={profile}
           onLogout={handleLogout}
@@ -370,33 +395,41 @@ export default function StaffProfilePage() {
           setActiveTab={() => {}}
         />
 
-        <div className="flex-1">
-          <main className="pt-20 pb-8">
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
-              {/* Back Button */}
+        <div className={cn(
+          "flex-1 transition-all duration-300",
+          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+        )}>
+          <main className="pt-20 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+            <div className="container mx-auto max-w-5xl">
+              
+              {/* Breadcrumb */}
               <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="mb-6"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 flex items-center justify-between"
               >
-                <Link href="/staff">
-                  <Button variant="ghost" className="gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Dashboard
-                  </Button>
-                </Link>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Link href="/staff" className="hover:text-primary flex items-center gap-1">
+                    <Home className="h-3.5 w-3.5" />
+                    Dashboard
+                  </Link>
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <span className="text-foreground font-medium">My Profile</span>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => router.push('/staff')}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Dashboard
+                </Button>
               </motion.div>
 
               {/* Profile Header */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-8"
+                className="mb-6"
               >
-                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-                  My Profile
-                </h1>
-                <p className="text-slate-500 dark:text-slate-400 mt-1">
+                <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
+                <p className="text-slate-500 mt-1">
                   Manage your personal information and account settings
                 </p>
               </motion.div>
@@ -408,12 +441,12 @@ export default function StaffProfilePage() {
                 transition={{ delay: 0.1 }}
               >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                    <TabsTrigger value="profile" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 rounded-lg">
+                  <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 p-1 rounded-xl">
+                    <TabsTrigger value="profile" className="data-[state=active]:bg-white rounded-lg">
                       <User className="h-4 w-4 mr-2" />
                       Profile
                     </TabsTrigger>
-                    <TabsTrigger value="security" className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 rounded-lg">
+                    <TabsTrigger value="security" className="data-[state=active]:bg-white rounded-lg">
                       <Shield className="h-4 w-4 mr-2" />
                       Security
                     </TabsTrigger>
@@ -422,14 +455,29 @@ export default function StaffProfilePage() {
                   {/* Profile Tab */}
                   <TabsContent value="profile" className="space-y-6">
                     {/* Profile Card with Avatar */}
-                    <Card className="border-0 shadow-lg bg-gradient-to-br from-white to-slate-50 dark:from-slate-900 dark:to-slate-950">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col md:flex-row items-center gap-6">
+                    <Card className="border-0 shadow-lg overflow-hidden">
+                      <div className="relative h-32 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600">
+                        {!isEditing && (
+                          <div className="absolute top-4 right-4">
+                            <Button 
+                              onClick={() => setIsEditing(true)} 
+                              size="sm"
+                              className="bg-white/90 text-blue-700 hover:bg-white shadow-md"
+                            >
+                              <User className="mr-2 h-4 w-4" />
+                              Edit Profile
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <CardContent className="px-6 pb-6">
+                        <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
                           {/* Avatar Section */}
-                          <div className="relative group">
+                          <div className="relative -mt-16">
                             <div className="relative">
-                              <Avatar className="h-28 w-28 md:h-32 md:w-32 ring-4 ring-primary/20 shadow-xl">
-                                <AvatarImage src={formData.photo_url} />
+                              <Avatar className="h-28 w-28 md:h-32 md:w-32 ring-4 ring-white shadow-xl" key={avatarKey}>
+                                <AvatarImage src={formData.photo_url || profile?.photo_url || undefined} />
                                 <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-3xl font-bold">
                                   {getInitials()}
                                 </AvatarFallback>
@@ -438,11 +486,11 @@ export default function StaffProfilePage() {
                               {isEditing && (
                                 <button
                                   onClick={() => fileInputRef.current?.click()}
-                                  disabled={uploading}
-                                  className="absolute -bottom-2 -right-2 p-2 bg-primary text-white rounded-full shadow-lg hover:bg-primary/90 transition-all"
+                                  disabled={isUploading}
+                                  className="absolute -bottom-2 -right-2 p-2.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
                                 >
-                                  {uploading ? (
-                                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                  {isUploading ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Camera className="h-4 w-4" />
                                   )}
@@ -453,14 +501,18 @@ export default function StaffProfilePage() {
                             <input
                               ref={fileInputRef}
                               type="file"
-                              accept="image/*"
+                              accept="image/jpeg,image/png,image/gif,image/webp"
                               onChange={handleImageUpload}
                               className="hidden"
                             />
+                            
+                            {isUploading && (
+                              <p className="text-xs text-muted-foreground mt-2 text-center">Uploading...</p>
+                            )}
                           </div>
 
                           {/* Basic Info */}
-                          <div className="flex-1 text-center md:text-left">
+                          <div className="flex-1 text-center md:text-left pb-4">
                             {isEditing ? (
                               <div className="space-y-3">
                                 <div>
@@ -470,7 +522,6 @@ export default function StaffProfilePage() {
                                     value={formData.full_name}
                                     onChange={(e) => handleInputChange('full_name', e.target.value)}
                                     placeholder="Enter your full name"
-                                    className="mt-1"
                                   />
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -504,11 +555,11 @@ export default function StaffProfilePage() {
                               </div>
                             ) : (
                               <>
-                                <h2 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+                                <h2 className="text-2xl md:text-3xl font-bold text-slate-900">
                                   {formData.full_name || 'Teacher Name'}
                                 </h2>
                                 <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
-                                  <Badge className="bg-primary/10 text-primary border-primary/20">
+                                  <Badge className="bg-blue-100 text-blue-700">
                                     {formData.position || 'Teacher'}
                                   </Badge>
                                   <Badge variant="outline">
@@ -518,7 +569,7 @@ export default function StaffProfilePage() {
                                     <Badge variant="secondary">{formData.qualification}</Badge>
                                   )}
                                 </div>
-                                <p className="text-slate-500 dark:text-slate-400 mt-2 flex items-center justify-center md:justify-start gap-2">
+                                <p className="text-slate-500 mt-2 flex items-center justify-center md:justify-start gap-2">
                                   <Mail className="h-4 w-4" />
                                   {formData.email}
                                 </p>
@@ -527,40 +578,22 @@ export default function StaffProfilePage() {
                           </div>
 
                           {/* Edit/Save Buttons */}
-                          <div className="flex gap-2">
-                            {isEditing ? (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  onClick={handleCancel}
-                                  className="gap-2"
-                                >
-                                  <X className="h-4 w-4" />
-                                  Cancel
-                                </Button>
-                                <Button
-                                  onClick={handleSave}
-                                  disabled={saving}
-                                  className="gap-2 bg-primary"
-                                >
-                                  {saving ? (
-                                    <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                  ) : (
-                                    <Save className="h-4 w-4" />
-                                  )}
-                                  Save
-                                </Button>
-                              </>
-                            ) : (
-                              <Button
-                                onClick={() => setIsEditing(true)}
-                                className="gap-2"
-                              >
-                                <User className="h-4 w-4" />
-                                Edit Profile
+                          {isEditing && (
+                            <div className="flex gap-2 md:self-end pb-4">
+                              <Button variant="outline" onClick={handleCancel}>
+                                <X className="h-4 w-4 mr-2" />
+                                Cancel
                               </Button>
-                            )}
-                          </div>
+                              <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                                {saving ? (
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                ) : (
+                                  <Save className="h-4 w-4 mr-2" />
+                                )}
+                                Save
+                              </Button>
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>
@@ -591,6 +624,7 @@ export default function StaffProfilePage() {
                                 onChange={(e) => handleInputChange('address', e.target.value)}
                                 placeholder="Your address"
                                 rows={2}
+                                className="resize-none"
                               />
                             </div>
                             <div>
@@ -601,31 +635,15 @@ export default function StaffProfilePage() {
                                 onChange={(e) => handleInputChange('bio', e.target.value)}
                                 placeholder="Tell us about yourself..."
                                 rows={4}
+                                className="resize-none"
                               />
                             </div>
                           </>
                         ) : (
                           <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <Phone className="h-5 w-5 text-primary" />
-                              <div>
-                                <p className="text-sm text-slate-500">Phone</p>
-                                <p className="font-medium">{formData.phone || 'Not provided'}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <MapPin className="h-5 w-5 text-primary" />
-                              <div>
-                                <p className="text-sm text-slate-500">Address</p>
-                                <p className="font-medium">{formData.address || 'Not provided'}</p>
-                              </div>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <p className="text-sm text-slate-500 mb-2">Bio</p>
-                              <p className="text-slate-700 dark:text-slate-300">
-                                {formData.bio || 'No bio provided yet.'}
-                              </p>
-                            </div>
+                            <InfoCard icon={Phone} label="Phone" value={formData.phone || 'Not provided'} />
+                            <InfoCard icon={MapPin} label="Address" value={formData.address || 'Not provided'} />
+                            {formData.bio && <InfoCard icon={User} label="Bio" value={formData.bio} />}
                           </div>
                         )}
                       </CardContent>
@@ -664,40 +682,16 @@ export default function StaffProfilePage() {
                                 id="subjects"
                                 value={formData.subjects}
                                 onChange={(e) => handleInputChange('subjects', e.target.value)}
-                                placeholder="e.g., Mathematics, Physics, Chemistry"
+                                placeholder="e.g., Mathematics, Physics"
                               />
                             </div>
                           </>
                         ) : (
                           <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <Award className="h-5 w-5 text-primary" />
-                              <div>
-                                <p className="text-sm text-slate-500">Qualification</p>
-                                <p className="font-medium">{formData.qualification || 'Not provided'}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <Clock className="h-5 w-5 text-primary" />
-                              <div>
-                                <p className="text-sm text-slate-500">Experience</p>
-                                <p className="font-medium">{formData.experience || 'Not provided'}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <BookOpen className="h-5 w-5 text-primary" />
-                              <div>
-                                <p className="text-sm text-slate-500">Subjects</p>
-                                <p className="font-medium">{formData.subjects || 'Not provided'}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
-                              <Building className="h-5 w-5 text-primary" />
-                              <div>
-                                <p className="text-sm text-slate-500">Department</p>
-                                <p className="font-medium">{formData.department || 'Not assigned'}</p>
-                              </div>
-                            </div>
+                            <InfoCard icon={Award} label="Qualification" value={formData.qualification || 'Not provided'} />
+                            <InfoCard icon={Clock} label="Experience" value={formData.experience || 'Not provided'} />
+                            <InfoCard icon={BookOpen} label="Subjects" value={formData.subjects || 'Not provided'} />
+                            <InfoCard icon={Building} label="Department" value={formData.department || 'Not assigned'} />
                           </div>
                         )}
                       </CardContent>
@@ -712,8 +706,7 @@ export default function StaffProfilePage() {
                         <CardDescription>Manage your password and account settings</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-6">
-                        {/* Email Info */}
-                        <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl">
+                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
                           <Mail className="h-5 w-5 text-primary" />
                           <div className="flex-1">
                             <p className="text-sm text-slate-500">Email Address</p>
@@ -725,52 +718,23 @@ export default function StaffProfilePage() {
                           </Badge>
                         </div>
 
-                        {/* Password Section */}
                         {!showPasswordForm ? (
-                          <div className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800">
+                          <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl border border-amber-200">
                             <div className="flex items-center gap-3">
                               <Key className="h-5 w-5 text-amber-600" />
                               <div>
-                                <p className="font-medium text-amber-800 dark:text-amber-200">Password</p>
-                                <p className="text-sm text-amber-600 dark:text-amber-400">Change your password regularly for security</p>
+                                <p className="font-medium text-amber-800">Password</p>
+                                <p className="text-sm text-amber-600">Change your password regularly</p>
                               </div>
                             </div>
-                            <Button 
-                              variant="outline" 
-                              onClick={() => setShowPasswordForm(true)}
-                              className="border-amber-300 dark:border-amber-700"
-                            >
+                            <Button variant="outline" onClick={() => setShowPasswordForm(true)}>
                               Change Password
                             </Button>
                           </div>
                         ) : (
-                          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-4">
+                          <div className="p-4 bg-slate-50 rounded-xl space-y-4">
                             <h4 className="font-semibold">Change Password</h4>
                             
-                            <div>
-                              <Label htmlFor="currentPassword">Current Password</Label>
-                              <div className="relative">
-                                <Input
-                                  id="currentPassword"
-                                  type={showCurrentPassword ? 'text' : 'password'}
-                                  value={currentPassword}
-                                  onChange={(e) => setCurrentPassword(e.target.value)}
-                                  placeholder="Enter current password"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2"
-                                >
-                                  {showCurrentPassword ? (
-                                    <EyeOff className="h-4 w-4 text-slate-400" />
-                                  ) : (
-                                    <Eye className="h-4 w-4 text-slate-400" />
-                                  )}
-                                </button>
-                              </div>
-                            </div>
-
                             <div>
                               <Label htmlFor="newPassword">New Password</Label>
                               <div className="relative">
@@ -786,11 +750,7 @@ export default function StaffProfilePage() {
                                   onClick={() => setShowNewPassword(!showNewPassword)}
                                   className="absolute right-3 top-1/2 -translate-y-1/2"
                                 >
-                                  {showNewPassword ? (
-                                    <EyeOff className="h-4 w-4 text-slate-400" />
-                                  ) : (
-                                    <Eye className="h-4 w-4 text-slate-400" />
-                                  )}
+                                  {showNewPassword ? <EyeOff className="h-4 w-4 text-slate-400" /> : <Eye className="h-4 w-4 text-slate-400" />}
                                 </button>
                               </div>
                             </div>
@@ -810,11 +770,7 @@ export default function StaffProfilePage() {
                                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                                   className="absolute right-3 top-1/2 -translate-y-1/2"
                                 >
-                                  {showConfirmPassword ? (
-                                    <EyeOff className="h-4 w-4 text-slate-400" />
-                                  ) : (
-                                    <Eye className="h-4 w-4 text-slate-400" />
-                                  )}
+                                  {showConfirmPassword ? <EyeOff className="h-4 w-4 text-slate-400" /> : <Eye className="h-4 w-4 text-slate-400" />}
                                 </button>
                               </div>
                             </div>
@@ -831,7 +787,6 @@ export default function StaffProfilePage() {
                                 variant="outline"
                                 onClick={() => {
                                   setShowPasswordForm(false)
-                                  setCurrentPassword('')
                                   setNewPassword('')
                                   setConfirmPassword('')
                                 }}
@@ -840,24 +795,21 @@ export default function StaffProfilePage() {
                               </Button>
                               <Button
                                 onClick={handleChangePassword}
-                                disabled={changingPassword || !currentPassword || !newPassword || newPassword !== confirmPassword}
-                                className="bg-primary"
+                                disabled={changingPassword || !newPassword || newPassword !== confirmPassword}
+                                className="bg-blue-600 hover:bg-blue-700"
                               >
-                                {changingPassword ? (
-                                  <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                ) : null}
+                                {changingPassword && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                                 Update Password
                               </Button>
                             </div>
                           </div>
                         )}
 
-                        {/* Account Status */}
-                        <div className="flex items-center gap-3 p-4 bg-green-50 dark:bg-green-950/20 rounded-xl border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-200">
                           <Shield className="h-5 w-5 text-green-600" />
                           <div>
-                            <p className="font-medium text-green-800 dark:text-green-200">Account Status</p>
-                            <p className="text-sm text-green-600 dark:text-green-400">Your account is active and secure</p>
+                            <p className="font-medium text-green-800">Account Status</p>
+                            <p className="text-sm text-green-600">Your account is active and secure</p>
                           </div>
                         </div>
                       </CardContent>
@@ -868,6 +820,21 @@ export default function StaffProfilePage() {
             </div>
           </main>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// Helper component for info cards
+function InfoCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl">
+      <div className="p-2 bg-white rounded-lg shrink-0">
+        <Icon className="h-4 w-4 text-blue-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
+        <p className="font-medium text-slate-900 break-words">{value}</p>
       </div>
     </div>
   )

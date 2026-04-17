@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - WITH REPORT CARD STATUS AND REAL-TIME PROFILE UPDATES
+// app/student/page.tsx - FULLY RESPONSIVE WITH ASSIGNMENTS & NOTES + BEAUTIFUL LOADING
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
@@ -22,15 +22,16 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { 
-  Loader2, BookOpen, Award, Clock, TrendingUp, Calendar, CheckCircle,
+  Loader2, BookOpen, Award, Clock, TrendingUp, CheckCircle,
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
   Search, User, ArrowRight, Target, Trophy, Eye, LayoutDashboard, Menu,
-  Flame, Zap, Sparkles, GraduationCap, CheckCircle2, AlertCircle,
-  FileCheck, Download
+  Flame, Zap, Sparkles, GraduationCap, CheckCircle2,
+  FileCheck, Download, Calendar, Bell, Upload, File
 } from 'lucide-react'
+import Link from 'next/link'
 
 // ============================================
-// NAME FORMATTING - FIXED TYPES
+// NAME FORMATTING
 // ============================================
 function formatFullName(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
   if (firstName && lastName) return `${firstName} ${lastName}`
@@ -137,6 +138,28 @@ interface ExamAttempt {
   total_score?: number
 }
 
+interface Assignment {
+  id: string
+  title: string
+  subject: string
+  description: string
+  due_date: string
+  total_marks: number
+  file_url?: string
+  created_at: string
+  teacher_name?: string
+}
+
+interface StudyNote {
+  id: string
+  title: string
+  subject: string
+  description: string
+  file_url?: string
+  created_at: string
+  teacher_name?: string
+}
+
 interface PerformanceStats {
   totalExams: number
   completedExams: number
@@ -145,8 +168,9 @@ interface PerformanceStats {
   failedExams: number
   pendingResults: number
   recentAttempts: ExamAttempt[]
-  upcomingExams: Exam[]
   availableExams: Exam[]
+  recentAssignments: Assignment[]
+  recentNotes: StudyNote[]
 }
 
 interface BannerStats {
@@ -217,8 +241,9 @@ function StudentDashboardContent() {
     failedExams: 0,
     pendingResults: 0,
     recentAttempts: [],
-    upcomingExams: [],
-    availableExams: []
+    availableExams: [],
+    recentAssignments: [],
+    recentNotes: []
   })
 
   const [bannerStats, setBannerStats] = useState<BannerStats>({
@@ -245,7 +270,6 @@ function StudentDashboardContent() {
   const [bestSubject, setBestSubject] = useState<BestSubject | null>(null)
   const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
 
-  // Format profile for header
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
@@ -258,7 +282,6 @@ function StudentDashboardContent() {
     }
   }
 
-  // Check report card status
   const checkReportCardStatus = useCallback(async () => {
     if (!profile?.id) return
     
@@ -297,7 +320,6 @@ function StudentDashboardContent() {
     }
   }, [profile?.id])
 
-  // Load term settings from database
   const loadTermSettings = useCallback(async () => {
     try {
       const { data, error } = await supabase.rpc('get_current_term_settings')
@@ -321,7 +343,6 @@ function StudentDashboardContent() {
     }
   }, [])
 
-  // Calculate study streak
   const calculateStudyStreak = useCallback(async (studentId: string) => {
     try {
       const { data: attempts } = await supabase
@@ -355,7 +376,6 @@ function StudentDashboardContent() {
     }
   }, [])
 
-  // Calculate best subject
   const calculateBestSubject = useCallback((attempts: ExamAttempt[]) => {
     const subjectScores: Record<string, number[]> = {}
     
@@ -386,7 +406,6 @@ function StudentDashboardContent() {
     }
   }, [])
 
-  // Auth check
   useEffect(() => {
     let isMounted = true
     
@@ -395,14 +414,13 @@ function StudentDashboardContent() {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError || !session?.user) {
-          console.log('No active session, redirecting to portal')
           if (isMounted) window.location.replace('/portal')
           return
         }
 
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, first_name, last_name, full_name, email, class, department, vin_id, photo_url, admission_year, role, subject_count')
+          .select('*')
           .eq('id', session.user.id)
           .maybeSingle()
 
@@ -447,44 +465,31 @@ function StudentDashboardContent() {
   }
 
   const loadDashboardData = useCallback(async () => {
-    if (!profile?.id) {
-      console.log('No profile ID, skipping load')
-      return
-    }
+    if (!profile?.id) return
     
     setLoading(true)
     try {
       const studentClass = profile.class
       const totalSubjects = profile.subject_count || getSubjectCountForClass(studentClass)
 
-      // Load term settings
       await loadTermSettings()
-      
-      // Check report card status
       await checkReportCardStatus()
 
-      const { data: examsData, error: examsError } = await supabase
+      // Load exams
+      const { data: examsData } = await supabase
         .from('exams')
         .select('*')
         .eq('status', 'published')
         .order('created_at', { ascending: false })
 
-      if (examsError) {
-        console.error('Error loading exams:', examsError)
-        toast.error('Failed to load exams')
-        setLoading(false)
-        return
-      }
-
       const allExams: Exam[] = (examsData || []).filter(exam => {
         if (!exam.class || exam.class === 'all') return true
-        
         const normalizedExamClass = exam.class.replace(/\s+/g, '').toUpperCase()
         const normalizedStudentClass = studentClass.replace(/\s+/g, '').toUpperCase()
-        
         return normalizedExamClass === normalizedStudentClass
       })
 
+      // Load attempts
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -492,11 +497,9 @@ function StudentDashboardContent() {
         .order('created_at', { ascending: false })
 
       const attempts: ExamAttempt[] = []
-      
       if (attemptsData) {
         for (const att of attemptsData) {
           const exam = allExams.find(e => e.id === att.exam_id)
-          
           attempts.push({
             id: att.id,
             exam_id: att.exam_id,
@@ -526,8 +529,8 @@ function StudentDashboardContent() {
         : 0
 
       const takenExamIds = new Set(completedAttempts.map(a => a.exam_id))
-      
       const now = new Date()
+      
       const availableExams = allExams.filter(exam => {
         if (takenExamIds.has(exam.id)) return false
         if (!exam.starts_at && !exam.ends_at) return true
@@ -536,11 +539,21 @@ function StudentDashboardContent() {
         return true
       })
 
-      const upcomingExams = allExams.filter(exam => {
-        if (takenExamIds.has(exam.id)) return false
-        if (!exam.starts_at) return false
-        return new Date(exam.starts_at) > now
-      }).slice(0, 5)
+      // Load assignments
+      const { data: assignmentsData } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('class', studentClass)
+        .order('created_at', { ascending: false })
+        .limit(3)
+
+      // Load study notes
+      const { data: notesData } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('class', studentClass)
+        .order('created_at', { ascending: false })
+        .limit(3)
 
       setStats({
         totalExams: allExams.length,
@@ -549,9 +562,28 @@ function StudentDashboardContent() {
         passedExams: passedAttempts.length,
         failedExams: completedAttempts.length - passedAttempts.length,
         pendingResults: pendingAttempts.length,
-        recentAttempts: attempts.slice(0, 5),
-        upcomingExams,
-        availableExams: availableExams.slice(0, 6)
+        recentAttempts: attempts.slice(0, 4),
+        availableExams: availableExams.slice(0, 6),
+        recentAssignments: (assignmentsData || []).map((a: any) => ({
+          id: a.id,
+          title: a.title,
+          subject: a.subject,
+          description: a.description,
+          due_date: a.due_date,
+          total_marks: a.total_marks,
+          file_url: a.file_url,
+          created_at: a.created_at,
+          teacher_name: a.teacher_name
+        })),
+        recentNotes: (notesData || []).map((n: any) => ({
+          id: n.id,
+          title: n.title,
+          subject: n.subject,
+          description: n.description,
+          file_url: n.file_url,
+          created_at: n.created_at,
+          teacher_name: n.teacher_name
+        }))
       })
 
       const gradeInfo = calculateGrade(avgScore)
@@ -565,7 +597,6 @@ function StudentDashboardContent() {
         gradeColor: gradeInfo.color
       })
 
-      // Calculate study streak and best subject
       await calculateStudyStreak(profile.id)
       calculateBestSubject(completedAttempts)
 
@@ -577,71 +608,24 @@ function StudentDashboardContent() {
     }
   }, [profile?.id, profile?.class, profile?.subject_count, loadTermSettings, calculateStudyStreak, checkReportCardStatus])
 
-  // Real-time subscriptions
   useEffect(() => {
     if (!profile?.id) return
 
     const channel = supabase
       .channel('student-dashboard-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'exam_attempts',
-          filter: `student_id=eq.${profile.id}`
-        },
-        () => {
-          console.log('🔄 Exam attempt changed, refreshing...')
-          loadDashboardData()
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'report_cards',
-          filter: `student_id=eq.${profile.id}`
-        },
-        () => {
-          console.log('🔄 Report card updated, refreshing...')
-          checkReportCardStatus()
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'profiles',
-          filter: `id=eq.${profile.id}`
-        },
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts', filter: `student_id=eq.${profile.id}` },
+        () => loadDashboardData())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'report_cards', filter: `student_id=eq.${profile.id}` },
+        () => checkReportCardStatus())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profile.id}` },
         (payload) => {
-          console.log('🔄 Profile updated, refreshing...')
-          // Update profile with new photo_url
           if (payload.new.photo_url) {
-            setProfile(prev => prev ? { 
-              ...prev, 
-              photo_url: payload.new.photo_url 
-            } : null)
+            setProfile(prev => prev ? { ...prev, photo_url: payload.new.photo_url } : null)
           }
-          // Also update other profile fields if they change
-          if (payload.new.full_name) {
-            setProfile(prev => prev ? { 
-              ...prev, 
-              full_name: payload.new.full_name,
-              first_name: payload.new.first_name || prev.first_name,
-              last_name: payload.new.last_name || prev.last_name
-            } : null)
-          }
-        }
-      )
+        })
       .subscribe()
 
-    return () => {
-      channel.unsubscribe()
-    }
+    return () => { channel.unsubscribe() }
   }, [profile?.id, loadDashboardData, checkReportCardStatus])
 
   useEffect(() => {
@@ -656,22 +640,17 @@ function StudentDashboardContent() {
     window.location.replace('/portal')
   }
 
-  const handleTakeExam = (examId: string) => {
-    router.push(`/student/exam/${examId}`)
-  }
+  const handleTakeExam = (examId: string) => router.push(`/student/exam/${examId}`)
+  const handleViewResult = (attemptId: string) => router.push(`/student/results/${attemptId}`)
 
-  const handleViewResult = (attemptId: string) => {
-    router.push(`/student/results/${attemptId}`)
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
   const formatDateTime = (dateString?: string) => {
     if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
   }
 
   const getScoreColor = (percentage: number) => {
@@ -685,49 +664,29 @@ function StudentDashboardContent() {
       case 'completed':
       case 'graded':
         return (
-          <Badge className={cn(
-            "text-xs",
-            isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          )}>
+          <Badge className={cn("text-xs", isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
             {isPassed ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
             {isPassed ? 'Passed' : 'Failed'}
           </Badge>
         )
       case 'pending_theory':
       case 'submitted':
-        return (
-          <Badge className="bg-yellow-100 text-yellow-700 text-xs">
-            <Clock className="h-3 w-3 mr-1" />
-            Pending
-          </Badge>
-        )
+        return <Badge className="bg-yellow-100 text-yellow-700 text-xs"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
       case 'in-progress':
-        return (
-          <Badge className="bg-blue-100 text-blue-700 text-xs">
-            <Activity className="h-3 w-3 mr-1" />
-            In Progress
-          </Badge>
-        )
+        return <Badge className="bg-blue-100 text-blue-700 text-xs"><Activity className="h-3 w-3 mr-1" />In Progress</Badge>
       default:
         return <Badge variant="outline" className="text-xs">{status}</Badge>
     }
   }
 
-  // FIXED: Updated to accept string | null to match ReportCardStatus interface
   const getReportCardStatusBadge = (status: string | null) => {
     if (!status) return null
-    
     switch (status) {
-      case 'published':
-        return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
-      case 'approved':
-        return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'rejected':
-        return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
-      default:
-        return null
+      case 'published': return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+      case 'approved': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+      case 'rejected': return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
+      default: return null
     }
   }
 
@@ -752,11 +711,12 @@ function StudentDashboardContent() {
     attempt.exam_subject?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
+  // Loading state with beautiful animation
   if (authChecking || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
           <div className="text-center">
             <motion.div
               animate={{ rotate: 360 }}
@@ -771,6 +731,14 @@ function StudentDashboardContent() {
               className="mt-4 text-slate-600 text-lg font-medium"
             >
               Loading Student Dashboard...
+            </motion.p>
+            <motion.p 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="mt-2 text-slate-500 text-sm"
+            >
+              Preparing your learning space ✨
             </motion.p>
             <div className="flex justify-center gap-1 mt-4">
               {[0, 1, 2].map((i) => (
@@ -792,7 +760,7 @@ function StudentDashboardContent() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
-      {/* Mobile Tab Navigation */}
+      {/* Mobile Bottom Navigation */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-lg w-full">
         <div className="grid grid-cols-5 gap-1 p-2">
           {[
@@ -806,9 +774,7 @@ function StudentDashboardContent() {
               onClick={() => handleTabChange(tab.id)}
               className={cn(
                 "flex flex-col items-center py-2 rounded-lg transition-all",
-                activeTab === tab.id
-                  ? "text-emerald-600 bg-emerald-50"
-                  : "text-slate-500"
+                activeTab === tab.id ? "text-emerald-600 bg-emerald-50" : "text-slate-500"
               )}
             >
               <tab.icon className="h-5 w-5" />
@@ -830,14 +796,16 @@ function StudentDashboardContent() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-full left-0 right-0 bg-white border-t shadow-lg p-4 rounded-t-xl"
+              className="absolute bottom-full left-0 right-0 bg-white border-t shadow-lg p-4 rounded-t-xl max-h-[60vh] overflow-y-auto"
             >
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'assignments', icon: FileText, label: 'Assignments' },
-                  { id: 'attendance', icon: Calendar, label: 'Attendance' },
+                  { id: 'courses', icon: BookOpen, label: 'Courses' },
                   { id: 'performance', icon: TrendingUp, label: 'Performance' },
-                  { id: 'report-card', icon: FileCheck, label: 'Report Card' }
+                  { id: 'report-card', icon: FileCheck, label: 'Report Card' },
+                  { id: 'notifications', icon: Bell, label: 'Notifications' },
+                  { id: 'settings', icon: Award, label: 'Settings' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -868,7 +836,7 @@ function StudentDashboardContent() {
           "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <div className="container mx-auto px-4 lg:px-6 py-4 sm:py-6 max-w-full">
+          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
             
             <AnimatePresence mode="wait">
               {/* OVERVIEW TAB */}
@@ -882,7 +850,7 @@ function StudentDashboardContent() {
                   className="space-y-4 sm:space-y-6"
                 >
                   {/* Welcome Banner */}
-                  <motion.div variants={itemVariants}>
+                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
                       stats={bannerStats}
@@ -890,7 +858,7 @@ function StudentDashboardContent() {
                   </motion.div>
 
                   {/* SET D STATS CARDS */}
-                  <motion.div variants={itemVariants}>
+                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <SetDStatsCards
                       termInfo={termInfo}
                       totalSubjects={bannerStats.totalSubjects}
@@ -903,7 +871,7 @@ function StudentDashboardContent() {
 
                   {/* Report Card Status Card */}
                   {reportCardStatus && (
-                    <motion.div variants={itemVariants}>
+                    <motion.div variants={itemVariants} className="w-full overflow-hidden">
                       <Card 
                         className={cn(
                           "border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden",
@@ -919,36 +887,36 @@ function StudentDashboardContent() {
                       >
                         <CardContent className="p-4">
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-3 sm:gap-4">
                               <div className={cn(
-                                "h-12 w-12 rounded-xl flex items-center justify-center",
+                                "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0",
                                 reportCardStatus.status === 'published' ? "bg-green-100" :
                                 reportCardStatus.status === 'approved' ? "bg-blue-100" :
                                 reportCardStatus.status === 'pending' ? "bg-yellow-100" : "bg-red-100"
                               )}>
                                 <FileCheck className={cn(
-                                  "h-6 w-6",
+                                  "h-5 w-5 sm:h-6 sm:w-6",
                                   reportCardStatus.status === 'published' ? "text-green-600" :
                                   reportCardStatus.status === 'approved' ? "text-blue-600" :
                                   reportCardStatus.status === 'pending' ? "text-yellow-600" : "text-red-600"
                                 )} />
                               </div>
-                              <div>
-                                <div className="flex items-center gap-2">
-                                  <h3 className="font-semibold text-gray-900">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                                     {reportCardStatus.term} {reportCardStatus.academic_year} Report Card
                                   </h3>
                                   {getReportCardStatusBadge(reportCardStatus.status)}
                                 </div>
                                 {reportCardStatus.average_score && (
-                                  <p className="text-sm text-slate-600 mt-1">
+                                  <p className="text-xs sm:text-sm text-slate-600 mt-1">
                                     Average Score: <span className="font-bold">{reportCardStatus.average_score}%</span>
                                     {reportCardStatus.grade && (
                                       <Badge className="ml-2 text-xs" variant="outline">{reportCardStatus.grade}</Badge>
                                     )}
                                   </p>
                                 )}
-                                <p className="text-xs text-slate-500 mt-1">
+                                <p className="text-xs text-slate-500 mt-1 line-clamp-2">
                                   {reportCardStatus.status === 'published' 
                                     ? '✓ Your report card is ready! Click to view and download.'
                                     : reportCardStatus.status === 'approved'
@@ -959,22 +927,23 @@ function StudentDashboardContent() {
                                 </p>
                               </div>
                             </div>
-                            <ChevronRight className="h-5 w-5 text-slate-400" />
+                            <ChevronRight className="h-5 w-5 text-slate-400 shrink-0" />
                           </div>
                         </CardContent>
                       </Card>
                     </motion.div>
                   )}
 
-                  <motion.div variants={itemVariants}>
+                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+                      {/* Left Column - Spans 2 on large screens */}
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                         {/* Performance Overview */}
                         {stats.completedExams > 0 && (
-                          <Card className="border-0 shadow-sm bg-white">
+                          <Card className="border-0 shadow-sm bg-white overflow-hidden">
                             <CardHeader className="pb-2">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                                <BarChart3 className="h-5 w-5 text-emerald-600" />
+                                <BarChart3 className="h-5 w-5 text-emerald-600 shrink-0" />
                                 Performance Overview
                               </CardTitle>
                             </CardHeader>
@@ -1005,11 +974,11 @@ function StudentDashboardContent() {
                         )}
 
                         {/* Available Exams */}
-                        <Card className="border-0 shadow-sm bg-white">
+                        <Card className="border-0 shadow-sm bg-white overflow-hidden">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                                <MonitorPlay className="h-5 w-5 text-emerald-600" />
+                                <MonitorPlay className="h-5 w-5 text-emerald-600 shrink-0" />
                                 Available Exams
                               </CardTitle>
                               <Button variant="ghost" size="sm" onClick={() => handleTabChange('exams')}>
@@ -1019,19 +988,19 @@ function StudentDashboardContent() {
                           </CardHeader>
                           <CardContent>
                             {stats.availableExams.length === 0 ? (
-                              <p className="text-center py-6 text-slate-500">No exams available</p>
+                              <p className="text-center py-6 text-slate-500 text-sm">No exams available</p>
                             ) : (
                               <div className="space-y-3">
                                 {stats.availableExams.slice(0, 3).map((exam) => (
-                                  <div key={exam.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
+                                  <div key={exam.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
                                     <div className="flex-1 min-w-0">
                                       <p className="font-medium text-sm truncate">{exam.title}</p>
-                                      <div className="flex items-center gap-2 mt-1">
+                                      <div className="flex flex-wrap items-center gap-2 mt-1">
                                         <Badge variant="outline" className="text-xs">{exam.subject}</Badge>
                                         <span className="text-xs text-slate-500">{exam.duration} mins</span>
                                       </div>
                                     </div>
-                                    <Button size="sm" onClick={() => handleTakeExam(exam.id)} className="bg-emerald-600 shrink-0">
+                                    <Button size="sm" onClick={() => handleTakeExam(exam.id)} className="bg-emerald-600 shrink-0 w-full sm:w-auto">
                                       Start
                                     </Button>
                                   </div>
@@ -1041,6 +1010,7 @@ function StudentDashboardContent() {
                           </CardContent>
                         </Card>
 
+                        {/* Class Roster */}
                         <StudentClassRoster 
                           studentClass={profile?.class as string}
                           studentId={profile?.id}
@@ -1048,13 +1018,14 @@ function StudentDashboardContent() {
                         />
                       </div>
 
+                      {/* Right Column */}
                       <div className="space-y-4 sm:space-y-6">
                         {/* Recent Activity */}
-                        <Card className="border-0 shadow-sm bg-white">
+                        <Card className="border-0 shadow-sm bg-white overflow-hidden">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                                <Activity className="h-5 w-5 text-emerald-600" />
+                                <Activity className="h-5 w-5 text-emerald-600 shrink-0" />
                                 Recent Activity
                               </CardTitle>
                               <Button variant="ghost" size="sm" onClick={() => handleTabChange('results')}>
@@ -1064,7 +1035,7 @@ function StudentDashboardContent() {
                           </CardHeader>
                           <CardContent>
                             {stats.recentAttempts.length === 0 ? (
-                              <p className="text-center py-6 text-slate-500">No recent activity</p>
+                              <p className="text-center py-6 text-slate-500 text-sm">No recent activity</p>
                             ) : (
                               <div className="space-y-3">
                                 {stats.recentAttempts.slice(0, 4).map((attempt) => (
@@ -1075,7 +1046,7 @@ function StudentDashboardContent() {
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <span className="text-xs text-slate-500">{attempt.exam_subject}</span>
-                                      <span className={cn("font-medium", getScoreColor(attempt.percentage))}>
+                                      <span className={cn("font-medium text-sm", getScoreColor(attempt.percentage))}>
                                         {attempt.percentage}%
                                       </span>
                                     </div>
@@ -1086,27 +1057,87 @@ function StudentDashboardContent() {
                           </CardContent>
                         </Card>
 
-                        {/* Upcoming Exams */}
-                        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-500 to-teal-600 text-white">
+                        {/* Assignments Section - REPLACED UPCOMING EXAMS */}
+                        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-white flex items-center gap-2">
-                              <Calendar className="h-5 w-5" />
-                              Upcoming Exams
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-blue-800">
+                                <FileText className="h-5 w-5 shrink-0" />
+                                Recent Assignments
+                              </CardTitle>
+                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('assignments')} className="text-blue-700">
+                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                              </Button>
+                            </div>
                           </CardHeader>
                           <CardContent>
-                            {stats.upcomingExams.length === 0 ? (
-                              <p className="text-emerald-100 text-center py-4">No upcoming exams</p>
+                            {stats.recentAssignments.length === 0 ? (
+                              <p className="text-center py-4 text-blue-700/70 text-sm">No assignments yet</p>
                             ) : (
                               <div className="space-y-3">
-                                {stats.upcomingExams.slice(0, 3).map((exam) => (
-                                  <div key={exam.id} className="p-3 bg-white/10 rounded-xl">
-                                    <p className="font-medium text-sm">{exam.title}</p>
-                                    <p className="text-xs text-emerald-100">{exam.subject}</p>
-                                    <p className="text-xs text-emerald-200 mt-1 flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {formatDateTime(exam.starts_at)}
-                                    </p>
+                                {stats.recentAssignments.slice(0, 2).map((assignment) => (
+                                  <div key={assignment.id} className="p-3 bg-white/60 rounded-xl">
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                      <p className="font-medium text-sm truncate">{assignment.title}</p>
+                                      <Badge variant="outline" className="text-xs shrink-0">{assignment.subject}</Badge>
+                                    </div>
+                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">{assignment.description}</p>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                                        <Calendar className="h-3 w-3" />
+                                        Due: {formatDate(assignment.due_date)}
+                                      </span>
+                                      {assignment.file_url && (
+                                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Download
+                                        </Button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+
+                        {/* Study Notes Section */}
+                        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden">
+                          <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                              <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-purple-800">
+                                <BookOpen className="h-5 w-5 shrink-0" />
+                                Study Notes
+                              </CardTitle>
+                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('courses')} className="text-purple-700">
+                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                              </Button>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            {stats.recentNotes.length === 0 ? (
+                              <p className="text-center py-4 text-purple-700/70 text-sm">No notes available</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {stats.recentNotes.slice(0, 2).map((note) => (
+                                  <div key={note.id} className="p-3 bg-white/60 rounded-xl">
+                                    <div className="flex items-start justify-between gap-2 mb-1">
+                                      <p className="font-medium text-sm truncate">{note.title}</p>
+                                      <Badge variant="outline" className="text-xs shrink-0">{note.subject}</Badge>
+                                    </div>
+                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">{note.description}</p>
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-xs text-slate-500 flex items-center gap-1">
+                                        <File className="h-3 w-3" />
+                                        {note.teacher_name || 'Teacher'}
+                                      </span>
+                                      {note.file_url && (
+                                        <Button variant="ghost" size="sm" className="h-7 text-xs">
+                                          <Download className="h-3 w-3 mr-1" />
+                                          Download
+                                        </Button>
+                                      )}
+                                    </div>
                                   </div>
                                 ))}
                               </div>
@@ -1121,10 +1152,10 @@ function StudentDashboardContent() {
 
               {/* EXAMS TAB */}
               {activeTab === 'exams' && (
-                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold">Available Exams</h1>
-                    <Badge className="bg-emerald-100 text-emerald-700">
+                <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <h1 className="text-xl sm:text-2xl font-bold">Available Exams</h1>
+                    <Badge className="bg-emerald-100 text-emerald-700 w-fit">
                       {stats.availableExams.length} available
                     </Badge>
                   </div>
@@ -1136,7 +1167,7 @@ function StudentDashboardContent() {
                         placeholder="Search exams..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 bg-white"
+                        className="pl-9 bg-white w-full"
                       />
                     </div>
                   </div>
@@ -1153,8 +1184,8 @@ function StudentDashboardContent() {
                       filteredAvailableExams.map((exam) => (
                         <Card key={exam.id} className="hover:shadow-lg transition-shadow">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-lg truncate">{exam.title}</CardTitle>
-                            <CardDescription>{exam.subject}</CardDescription>
+                            <CardTitle className="text-base sm:text-lg truncate">{exam.title}</CardTitle>
+                            <CardDescription className="text-sm">{exam.subject}</CardDescription>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-2 text-sm">
@@ -1166,7 +1197,7 @@ function StudentDashboardContent() {
                                 <span className="text-slate-500">Questions:</span>
                                 <span>{exam.total_questions}</span>
                               </div>
-                              <Button onClick={() => handleTakeExam(exam.id)} className="w-full mt-3 bg-emerald-600">
+                              <Button onClick={() => handleTakeExam(exam.id)} className="w-full mt-3 bg-emerald-600 text-sm">
                                 Take Exam <ChevronRight className="ml-2 h-4 w-4" />
                               </Button>
                             </div>
@@ -1180,10 +1211,10 @@ function StudentDashboardContent() {
 
               {/* RESULTS TAB */}
               {activeTab === 'results' && (
-                <motion.div key="results" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold">My Results</h1>
-                    <Badge className="bg-emerald-100 text-emerald-700">
+                <motion.div key="results" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <h1 className="text-xl sm:text-2xl font-bold">My Results</h1>
+                    <Badge className="bg-emerald-100 text-emerald-700 w-fit">
                       {stats.completedExams} completed
                     </Badge>
                   </div>
@@ -1195,7 +1226,7 @@ function StudentDashboardContent() {
                         placeholder="Search results..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9 bg-white"
+                        className="pl-9 bg-white w-full"
                       />
                     </div>
                   </div>
@@ -1215,12 +1246,12 @@ function StudentDashboardContent() {
                           {filteredRecentAttempts.map((attempt) => (
                             <div key={attempt.id} className="py-4 first:pt-0 last:pb-0">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                                <div className="flex-1">
-                                  <h4 className="font-medium">{attempt.exam_title}</h4>
+                                <div className="flex-1 min-w-0">
+                                  <h4 className="font-medium truncate">{attempt.exam_title}</h4>
                                   <p className="text-sm text-slate-500">{attempt.exam_subject}</p>
                                   <p className="text-sm">Score: {attempt.total_score || 0} ({attempt.percentage}%)</p>
                                 </div>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-3 shrink-0">
                                   {getStatusBadge(attempt.status, attempt.is_passed)}
                                   <Button variant="outline" size="sm" onClick={() => handleViewResult(attempt.id)}>
                                     <Eye className="h-3 w-3 mr-1" />
@@ -1239,41 +1270,41 @@ function StudentDashboardContent() {
 
               {/* PROFILE TAB */}
               {activeTab === 'profile' && (
-                <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <h1 className="text-2xl font-bold mb-4">My Profile</h1>
+                <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <h1 className="text-xl sm:text-2xl font-bold mb-4">My Profile</h1>
                   <Card>
                     <CardContent className="p-4 sm:p-6">
                       {profile && (
                         <div className="space-y-6">
                           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6 text-center sm:text-left">
-                            <Avatar className="h-24 w-24">
+                            <Avatar className="h-24 w-24 shrink-0">
                               <AvatarImage src={profile.photo_url || undefined} />
                               <AvatarFallback className="bg-emerald-600 text-white text-2xl">
-                                {getInitials(profile.first_name as string, profile.last_name as string, profile.full_name)}
+                                {getInitials(profile.first_name, profile.last_name, profile.full_name)}
                               </AvatarFallback>
                             </Avatar>
-                            <div>
-                              <h2 className="text-2xl font-bold">{profile.full_name}</h2>
-                              <p className="text-slate-500">{profile.email}</p>
+                            <div className="min-w-0">
+                              <h2 className="text-xl sm:text-2xl font-bold truncate">{profile.full_name}</h2>
+                              <p className="text-slate-500 text-sm break-all">{profile.email}</p>
                               <Badge className="mt-2 bg-emerald-100 text-emerald-700">{profile.class}</Badge>
                             </div>
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">First Name</p>
-                              <p className="font-medium">{profile.first_name || 'N/A'}</p>
+                              <p className="font-medium truncate">{profile.first_name || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Last Name</p>
-                              <p className="font-medium">{profile.last_name || 'N/A'}</p>
+                              <p className="font-medium truncate">{profile.last_name || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">VIN ID</p>
-                              <p className="font-medium">{profile.vin_id || 'N/A'}</p>
+                              <p className="font-medium truncate">{profile.vin_id || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Department</p>
-                              <p className="font-medium">{profile.department}</p>
+                              <p className="font-medium truncate">{profile.department}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Admission Year</p>
@@ -1297,9 +1328,9 @@ function StudentDashboardContent() {
 
               {/* REPORT CARD TAB */}
               {activeTab === 'report-card' && (
-                <motion.div key="report-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                <motion.div key="report-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
                   <div className="flex items-center justify-between mb-4">
-                    <h1 className="text-2xl font-bold">Report Card</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold">Report Card</h1>
                   </div>
                   
                   {reportCardStatus ? (
@@ -1349,7 +1380,7 @@ function StudentDashboardContent() {
                             </div>
                           )}
                           
-                          <p className="text-slate-600 mb-6">
+                          <p className="text-slate-600 mb-6 text-sm sm:text-base">
                             {reportCardStatus.status === 'published' 
                               ? 'Your report card is ready! Click below to view and download.'
                               : reportCardStatus.status === 'approved'
@@ -1379,7 +1410,7 @@ function StudentDashboardContent() {
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">
                           No Report Card Available
                         </h3>
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                           Your report card for the current term has not been submitted yet.
                         </p>
                       </CardContent>
@@ -1407,6 +1438,7 @@ export default function StudentDashboardPage() {
             <GraduationCap className="h-12 w-12 text-emerald-600 mx-auto" />
           </motion.div>
           <p className="mt-4 text-slate-600 text-lg font-medium">Loading Student Dashboard...</p>
+          <p className="mt-2 text-slate-500 text-sm">Preparing your learning space ✨</p>
           <div className="flex justify-center gap-1 mt-4">
             {[0, 1, 2].map((i) => (
               <motion.div

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/exam/[id]/page.tsx - COMPLETE PROFESSIONAL CBT INTERFACE
+// app/student/exam/[id]/page.tsx - COMPLETE RESTORED WITH ALL FIXES
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -32,24 +32,17 @@ import {
   BookOpen, FileText, HelpCircle, ArrowLeft,
   RotateCcw, Wifi, WifiOff, Grid3x3,
   AlertCircle, Volume2, VolumeX, Brain,
-  CheckCheck, List, Target, GraduationCap, Hash
+  CheckCheck, List, Target
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { motion, AnimatePresence } from 'framer-motion'
-import Link from 'next/link'
 
-// =============================================
-// CONSTANTS
-// =============================================
 const TAB_SWITCH_LIMIT = 3
 const FULLSCREEN_EXIT_LIMIT = 3
 const AUTO_SAVE_INTERVAL = 30000
 
-// =============================================
-// TYPES
-// =============================================
 interface Question {
   id: string
   question_text?: string
@@ -420,8 +413,8 @@ export default function StudentExamPage() {
         exam_score: objResult.score,
         total_score: objResult.score,
         percentage: objResult.percentage,
-        grade: objResult.percentage >= 80 ? 'A' : objResult.percentage >= 70 ? 'B' : objResult.percentage >= 60 ? 'C' : objResult.percentage >= 50 ? 'P' : 'F',
-        remark: objResult.percentage >= 80 ? 'Excellent' : objResult.percentage >= 70 ? 'Very Good' : objResult.percentage >= 60 ? 'Good' : objResult.percentage >= 50 ? 'Pass' : 'Fail',
+        grade: isPassed ? 'Pass' : 'Fail',
+        remark: isPassed ? 'Passed' : 'Failed',
         status: hasTheory ? 'pending_theory' : 'completed',
         updated_at: new Date().toISOString()
       }
@@ -481,11 +474,41 @@ export default function StudentExamPage() {
             title: '📝 Exam Submission',
             message: `${profile?.full_name || 'A student'} has submitted ${exam.title}. ${hasTheory ? 'Theory questions pending grading.' : 'Ready for review.'}`,
             type: 'exam_submission',
-            metadata: { exam_id: examId, student_id: profile?.id },
+            exam_id: examId,
+            student_id: profile?.id,
+            class: profile?.class,
+            subject: exam.subject,
+            read: false,
+            action_url: `/staff/exams/${examId}/submissions`,
             created_at: new Date().toISOString()
           })
         } catch (notifError) {}
       }
+
+      // Send notification to admin
+      try {
+        const { data: admins } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+
+        if (admins && admins.length > 0) {
+          const notifications = admins.map((admin: any) => ({
+            user_id: admin.id,
+            title: '📊 New Exam Submission',
+            message: `${profile?.full_name || 'A student'} submitted ${exam?.title} (${exam?.subject})`,
+            type: 'exam_submission',
+            exam_id: examId,
+            student_id: profile?.id,
+            class: profile?.class,
+            subject: exam?.subject,
+            read: false,
+            action_url: `/admin?tab=exams`,
+            created_at: new Date().toISOString()
+          }))
+          await supabase.from('notifications').insert(notifications)
+        }
+      } catch (adminNotifError) {}
 
       // Set completed state
       setHasCompletedAttempt(true)
@@ -601,7 +624,7 @@ export default function StudentExamPage() {
           type: qType,
           options: q.options || [],
           correct_answer: q.correct_answer || q.answer || '',
-          points: Number(q.points || q.marks || (qType === 'objective' ? 1 : 5)),
+          points: Number(q.points || q.marks || (qType === 'objective' ? 0.5 : 5)),
           order_number: idx + 1
         }))
       }
@@ -908,15 +931,14 @@ export default function StudentExamPage() {
   // =============================================
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center">
         <div className="text-center">
           <div className="relative">
-            <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur-2xl opacity-30" />
-            <div className="relative h-24 w-24 rounded-full border-4 border-slate-700 border-t-blue-500 animate-spin mx-auto" />
-            <BookOpen className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-10 w-10 text-blue-400" />
+            <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
+            <BookOpen className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-primary" />
           </div>
-          <p className="mt-8 text-xl font-medium text-white">Loading your exam...</p>
-          <p className="text-slate-400 mt-2">Please wait while we prepare everything</p>
+          <p className="mt-6 text-lg font-medium text-gray-700">Loading your exam...</p>
+          <p className="text-sm text-gray-500 mt-1">Please wait while we prepare everything</p>
         </div>
       </div>
     )
@@ -927,15 +949,15 @@ export default function StudentExamPage() {
   // =============================================
   if (loadError) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full shadow-2xl border-0 rounded-2xl overflow-hidden bg-slate-800 border-slate-700">
-          <div className="bg-gradient-to-r from-red-600 to-rose-600 p-6 text-center">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full shadow-xl border-0 rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-red-500 to-rose-600 p-6 text-center">
             <XCircle className="h-16 w-16 text-white/90 mx-auto mb-2" />
             <h2 className="text-xl font-bold text-white">Error Loading Exam</h2>
           </div>
           <CardContent className="p-6 text-center">
-            <p className="text-slate-300 mb-6">{loadError}</p>
-            <Button onClick={() => router.push('/student/exams')} className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white">
+            <p className="text-gray-600 mb-6">{loadError}</p>
+            <Button onClick={() => router.push('/student/exams')} className="w-full bg-primary hover:bg-primary/90">
               <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
             </Button>
           </CardContent>
@@ -949,11 +971,11 @@ export default function StudentExamPage() {
   // =============================================
   if (hasCompletedAttempt && !examStarted && !showResultDialog) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-0 shadow-2xl rounded-2xl overflow-hidden bg-slate-800 border-slate-700">
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 px-8 py-6">
+            <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-white">
+              <div className="bg-gradient-to-r from-primary to-primary/80 px-8 py-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h1 className="text-2xl font-bold text-white">{exam?.title}</h1>
@@ -972,65 +994,62 @@ export default function StudentExamPage() {
               </div>
               
               <CardContent className="p-8">
-                <div className="flex items-center gap-5 p-5 bg-slate-900/50 rounded-2xl mb-8 border border-slate-700">
-                  <div className="relative">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur opacity-40" />
-                    <Avatar className="h-20 w-20 ring-2 ring-blue-500/50 shadow-xl">
-                      <AvatarImage src={profile?.photo_url || ''} />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-cyan-600 text-white text-2xl font-bold">{getInitials()}</AvatarFallback>
-                    </Avatar>
-                  </div>
+                <div className="flex items-center gap-5 p-5 bg-gray-50 rounded-2xl mb-8">
+                  <Avatar className="h-20 w-20 ring-4 ring-primary/10">
+                    <AvatarImage src={profile?.photo_url || ''} />
+                    <AvatarFallback className="bg-primary text-white text-2xl font-bold">{getInitials()}</AvatarFallback>
+                  </Avatar>
                   <div>
-                    <p className="font-bold text-white text-xl">{profile?.full_name}</p>
-                    <p className="text-slate-400">{profile?.class} • {profile?.vin_id}</p>
-                    <p className="text-slate-500 text-sm">{profile?.email}</p>
+                    <p className="font-bold text-gray-800 text-xl">{profile?.full_name}</p>
+                    <p className="text-gray-600">{profile?.class} • {profile?.vin_id}</p>
+                    <p className="text-gray-500 text-sm">{profile?.email}</p>
                   </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  <div className="bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-2xl p-6 text-center border border-blue-500/30">
-                    <p className="text-sm text-slate-400 uppercase tracking-wider font-semibold mb-2">Overall Score</p>
-                    <p className="text-5xl font-bold text-white">{examResult?.score}/{examResult?.total}</p>
-                    <p className="text-xl text-slate-300 mt-2">{examResult?.percentage}%</p>
+                  <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 text-center border border-primary/20">
+                    <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold mb-2">Overall Score</p>
+                    <p className="text-5xl font-bold text-primary">{examResult?.score}/{examResult?.total}</p>
+                    <p className="text-xl text-gray-600 mt-2">{examResult?.percentage}%</p>
                   </div>
-                  <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-2xl p-6 text-center border border-green-500/30">
-                    <p className="text-sm text-slate-400 uppercase tracking-wider font-semibold mb-2">Objective</p>
-                    <p className="text-4xl font-bold text-green-400">{examResult?.objective_score || examResult?.score}/{examResult?.objective_total || examResult?.total}</p>
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 text-center border border-blue-100">
+                    <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold mb-2">Objective</p>
+                    <p className="text-4xl font-bold text-blue-600">{examResult?.objective_score || examResult?.score}/{examResult?.objective_total || examResult?.total}</p>
                     <div className="flex justify-center gap-5 mt-3">
                       <div className="text-center">
-                        <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-1 border border-green-500/30">
-                          <CheckCircle className="h-4 w-4 text-green-400" />
+                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-1">
+                          <CheckCircle className="h-4 w-4 text-green-600" />
                         </div>
-                        <p className="text-lg font-bold text-green-400">{examResult?.correct || 0}</p>
-                        <p className="text-xs text-slate-400">Correct</p>
+                        <p className="text-lg font-bold text-green-600">{examResult?.correct || 0}</p>
+                        <p className="text-xs text-gray-500">Correct</p>
                       </div>
                       <div className="text-center">
-                        <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-1 border border-red-500/30">
-                          <XCircle className="h-4 w-4 text-red-400" />
+                        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-1">
+                          <XCircle className="h-4 w-4 text-red-500" />
                         </div>
-                        <p className="text-lg font-bold text-red-400">{examResult?.incorrect || 0}</p>
-                        <p className="text-xs text-slate-400">Wrong</p>
+                        <p className="text-lg font-bold text-red-500">{examResult?.incorrect || 0}</p>
+                        <p className="text-xs text-gray-500">Wrong</p>
                       </div>
                       <div className="text-center">
-                        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center mx-auto mb-1 border border-slate-600">
-                          <HelpCircle className="h-4 w-4 text-slate-400" />
+                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-1">
+                          <HelpCircle className="h-4 w-4 text-gray-500" />
                         </div>
-                        <p className="text-lg font-bold text-slate-300">{examResult?.unanswered || 0}</p>
-                        <p className="text-xs text-slate-400">Skipped</p>
+                        <p className="text-lg font-bold text-gray-600">{examResult?.unanswered || 0}</p>
+                        <p className="text-xs text-gray-500">Skipped</p>
                       </div>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 rounded-2xl p-6 text-center border border-purple-500/30">
-                    <p className="text-sm text-slate-400 uppercase tracking-wider font-semibold mb-2">Theory</p>
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 text-center border border-purple-100">
+                    <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold mb-2">Theory</p>
                     {examResult?.status === 'graded' ? (
                       <>
-                        <p className="text-4xl font-bold text-purple-400">{examResult?.theory_score || 0}/{examResult?.theory_total || 0}</p>
-                        <p className="text-sm text-slate-400 mt-2">Graded</p>
+                        <p className="text-4xl font-bold text-purple-600">{examResult?.theory_score || 0}/{examResult?.theory_total || 0}</p>
+                        <p className="text-sm text-gray-600 mt-2">Graded</p>
                       </>
                     ) : (
                       <>
-                        <p className="text-4xl font-bold text-slate-500">—/{examResult?.theory_total || 0}</p>
-                        <p className="text-sm text-yellow-400 mt-2">Pending Grading</p>
+                        <p className="text-4xl font-bold text-gray-400">—/{examResult?.theory_total || 0}</p>
+                        <p className="text-sm text-yellow-600 mt-2">Pending Grading</p>
                       </>
                     )}
                   </div>
@@ -1038,23 +1057,23 @@ export default function StudentExamPage() {
                 
                 <div className={cn(
                   "rounded-2xl p-6 mb-8 text-center border-2",
-                  examResult?.is_passed ? "bg-green-500/10 border-green-500/50" : "bg-red-500/10 border-red-500/50"
+                  examResult?.is_passed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
                 )}>
                   <div className="flex items-center justify-center gap-3">
                     {examResult?.is_passed ? (
-                      <><CheckCircle className="h-8 w-8 text-green-400" /><span className="text-2xl font-bold text-green-400">Congratulations! You Passed!</span></>
+                      <><CheckCircle className="h-8 w-8 text-green-600" /><span className="text-2xl font-bold text-green-700">Congratulations! You Passed!</span></>
                     ) : (
-                      <><XCircle className="h-8 w-8 text-red-400" /><span className="text-2xl font-bold text-red-400">Not Passed - Keep Practicing!</span></>
+                      <><XCircle className="h-8 w-8 text-red-600" /><span className="text-2xl font-bold text-red-700">Not Passed - Keep Practicing!</span></>
                     )}
                   </div>
-                  <p className="text-slate-400 mt-2">Passing score: {examResult?.passing_percentage}%</p>
+                  <p className="text-gray-600 mt-2">Passing score: {examResult?.passing_percentage}%</p>
                 </div>
                 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => router.push('/student/exams')} className="flex-1 h-12 border-slate-600 text-slate-300 hover:bg-slate-700">
+                  <Button variant="outline" onClick={() => router.push('/student/exams')} className="flex-1 h-12">
                     <ArrowLeft className="mr-2 h-5 w-5" /> Back to Exams
                   </Button>
-                  <Button onClick={() => router.push('/student')} className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white">
+                  <Button onClick={() => router.push('/student')} className="flex-1 h-12 bg-primary hover:bg-primary/90">
                     <Home className="mr-2 h-5 w-5" /> Dashboard
                   </Button>
                   {canRetake && (
@@ -1062,7 +1081,7 @@ export default function StudentExamPage() {
                       setHasCompletedAttempt(false)
                       setShowInstructions(true)
                       setExistingAttempt(null)
-                    }} className="flex-1 h-12 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white">
+                    }} className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white">
                       <RotateCcw className="mr-2 h-5 w-5" /> Retake Exam
                     </Button>
                   )}
@@ -1080,11 +1099,11 @@ export default function StudentExamPage() {
   // =============================================
   if (!examStarted && showInstructions && !hasCompletedAttempt) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 py-12 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-12 px-4">
         <div className="max-w-4xl mx-auto">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-0 shadow-2xl rounded-2xl overflow-hidden bg-slate-800 border-slate-700">
-              <div className="bg-gradient-to-r from-blue-600 to-cyan-600 px-8 py-6">
+            <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-white">
+              <div className="bg-gradient-to-r from-primary to-primary/80 px-8 py-6">
                 <h1 className="text-2xl font-bold text-white">{exam?.title}</h1>
                 <div className="flex items-center gap-6 mt-2 text-white/90 text-sm">
                   <span className="flex items-center gap-1"><BookOpen className="h-4 w-4" />{exam?.subject}</span>
@@ -1095,73 +1114,70 @@ export default function StudentExamPage() {
               </div>
               
               <CardContent className="p-8">
-                <div className="flex items-center gap-4 p-4 bg-slate-900/50 rounded-2xl mb-6 border border-slate-700">
-                  <div className="relative">
-                    <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur opacity-40" />
-                    <Avatar className="h-16 w-16 ring-2 ring-blue-500/50 shadow-xl">
-                      <AvatarImage src={profile?.photo_url || ''} />
-                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-cyan-600 text-white text-xl font-bold">{getInitials()}</AvatarFallback>
-                    </Avatar>
-                  </div>
+                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl mb-6">
+                  <Avatar className="h-16 w-16 ring-2 ring-primary/20">
+                    <AvatarImage src={profile?.photo_url || ''} />
+                    <AvatarFallback className="bg-primary text-white text-xl font-bold">{getInitials()}</AvatarFallback>
+                  </Avatar>
                   <div>
-                    <p className="font-bold text-white text-lg">{profile?.full_name}</p>
-                    <p className="text-slate-400">{profile?.class} • {profile?.vin_id}</p>
+                    <p className="font-bold text-gray-800 text-lg">{profile?.full_name}</p>
+                    <p className="text-gray-600">{profile?.class} • {profile?.vin_id}</p>
                   </div>
                 </div>
                 
                 <Tabs defaultValue="instructions" className="mb-6">
-                  <TabsList className="grid w-full grid-cols-3 bg-slate-700 p-1 rounded-xl">
-                    <TabsTrigger value="instructions" className="data-[state=active]:bg-blue-500 data-[state=active]:text-white rounded-lg">Instructions</TabsTrigger>
-                    <TabsTrigger value="security" className="data-[state=active]:bg-yellow-500 data-[state=active]:text-white rounded-lg">Security Rules</TabsTrigger>
-                    <TabsTrigger value="overview" className="data-[state=active]:bg-green-500 data-[state=active]:text-white rounded-lg">Exam Overview</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="instructions">Instructions</TabsTrigger>
+                    <TabsTrigger value="security">Security Rules</TabsTrigger>
+                    <TabsTrigger value="overview">Exam Overview</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="instructions" className="mt-4">
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-2xl p-6">
-                      <h3 className="font-bold text-blue-400 mb-3 flex items-center gap-2 text-lg">
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+                      <h3 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-lg">
                         <FileText className="h-5 w-5" /> Exam Instructions
                       </h3>
-                      <p className="text-slate-300 leading-relaxed">{exam?.instructions || 'Read all questions carefully. You can flag questions for review. Your progress is auto-saved.'}</p>
+                      <p className="text-blue-700 leading-relaxed">{exam?.instructions || 'Read all questions carefully. You can flag questions for review. Your progress is auto-saved.'}</p>
                     </div>
                   </TabsContent>
                   
                   <TabsContent value="security" className="mt-4">
-                    <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-6">
-                      <h3 className="font-bold text-yellow-400 mb-4 flex items-center gap-2 text-lg">
+                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+                      <h3 className="font-bold text-amber-800 mb-4 flex items-center gap-2 text-lg">
                         <Shield className="h-5 w-5" /> Exam Security Rules
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="flex items-start gap-3">
-                          <Monitor className="h-5 w-5 text-yellow-400 mt-0.5" />
-                          <div><p className="font-medium text-yellow-300">Tab Switching</p><p className="text-sm text-slate-400">Limit: {TAB_SWITCH_LIMIT} switches</p></div>
+                          <Monitor className="h-5 w-5 text-amber-600 mt-0.5" />
+                          <div><p className="font-medium text-amber-800">Tab Switching</p><p className="text-sm text-amber-700">Limit: {TAB_SWITCH_LIMIT} switches</p></div>
                         </div>
                         <div className="flex items-start gap-3">
-                          <Maximize2 className="h-5 w-5 text-yellow-400 mt-0.5" />
-                          <div><p className="font-medium text-yellow-300">Fullscreen Required</p><p className="text-sm text-slate-400">Limit: {FULLSCREEN_EXIT_LIMIT} exits</p></div>
+                          <Maximize2 className="h-5 w-5 text-amber-600 mt-0.5" />
+                          <div><p className="font-medium text-amber-800">Fullscreen Required</p><p className="text-sm text-amber-700">Limit: {FULLSCREEN_EXIT_LIMIT} exits</p></div>
                         </div>
                         <div className="flex items-start gap-3">
-                          <Clock className="h-5 w-5 text-yellow-400 mt-0.5" />
-                          <div><p className="font-medium text-yellow-300">Time Limit</p><p className="text-sm text-slate-400">Auto-submit on timeout</p></div>
+                          <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                          <div><p className="font-medium text-amber-800">Time Limit</p><p className="text-sm text-amber-700">Auto-submit on timeout</p></div>
                         </div>
                       </div>
                     </div>
                   </TabsContent>
                   
                   <TabsContent value="overview" className="mt-4">
-                    <div className="bg-green-500/10 border border-green-500/30 rounded-2xl p-6">
-                      <h3 className="font-bold text-green-400 mb-3 flex items-center gap-2 text-lg">
+                    <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
+                      <h3 className="font-bold text-green-800 mb-3 flex items-center gap-2 text-lg">
                         <Target className="h-5 w-5" /> Exam Overview
                       </h3>
                       <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
-                          <p className="text-sm text-slate-400">Objective Questions</p>
-                          <p className="text-3xl font-bold text-blue-400">{objectiveQuestions.length}</p>
-                          <p className="text-xs text-slate-400 mt-1">{objectiveQuestions.reduce((s, q) => s + (q.points || q.marks || 1), 0)} marks</p>
+                        <div className="bg-white rounded-xl p-4">
+                          <p className="text-sm text-gray-500">Objective Questions</p>
+                          <p className="text-3xl font-bold text-green-600">{objectiveQuestions.length}</p>
+                          <p className="text-xs text-gray-500 mt-1">{objectiveQuestions.reduce((s, q) => s + (q.points || q.marks || 0.5), 0)} marks</p>
                         </div>
-                        <div className="bg-slate-900/50 rounded-xl p-4 border border-slate-700">
-                          <p className="text-sm text-slate-400">Theory Questions</p>
-                          <p className="text-3xl font-bold text-purple-400">{theoryQuestions.length}</p>
-                          <p className="text-xs text-slate-400 mt-1">{theoryQuestions.reduce((s, q) => s + (q.points || q.marks || 5), 0)} marks</p>
+                        <div className="bg-white rounded-xl p-4">
+                          <p className="text-sm text-gray-500">Theory Questions</p>
+                          <p className="text-3xl font-bold text-purple-600">{theoryQuestions.length}</p>
+                          <p className="text-xs text-gray-500 mt-1">{theoryQuestions.reduce((s, q) => s + (q.points || q.marks || 5), 0)} marks</p>
                         </div>
                       </div>
                     </div>
@@ -1169,8 +1185,8 @@ export default function StudentExamPage() {
                 </Tabs>
                 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => router.push('/student/exams')} className="flex-1 h-12 border-slate-600 text-slate-300 hover:bg-slate-700">Cancel</Button>
-                  <Button onClick={startExam} disabled={startingExam} className="flex-1 h-12 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold">
+                  <Button variant="outline" onClick={() => router.push('/student/exams')} className="flex-1 h-12">Cancel</Button>
+                  <Button onClick={startExam} disabled={startingExam} className="flex-1 h-12 bg-primary hover:bg-primary/90 text-white font-bold">
                     {startingExam ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lock className="mr-2 h-5 w-5" />}Start Exam
                   </Button>
                 </div>
@@ -1188,20 +1204,20 @@ export default function StudentExamPage() {
   if (showFullscreenPrompt && examStarted && !examEnded) {
     return (
       <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-0 shadow-2xl rounded-2xl overflow-hidden bg-slate-800 border-slate-700">
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-8 text-center">
+        <Card className="max-w-md w-full border-0 shadow-2xl rounded-2xl overflow-hidden">
+          <div className="bg-gradient-to-r from-primary to-primary/80 p-8 text-center">
             <Maximize2 className="h-16 w-16 text-white mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-white">Return to Fullscreen</h2>
           </div>
-          <CardContent className="p-6 text-center">
+          <CardContent className="p-6 text-center bg-white">
             <div className="mb-6">
-              <span className="text-6xl font-bold text-white">{fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}</span>
-              <p className="text-slate-400 mt-2">Fullscreen Exits</p>
+              <span className="text-6xl font-bold text-primary">{fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}</span>
+              <p className="text-gray-500 mt-2">Fullscreen Exits</p>
             </div>
-            <p className="text-slate-300 mb-6 font-medium">
+            <p className="text-gray-700 mb-6 font-medium">
               {fullscreenExits >= FULLSCREEN_EXIT_LIMIT - 1 ? '⚠️ ONE MORE EXIT WILL AUTO-SUBMIT!' : 'This exam must be taken in fullscreen mode.'}
             </p>
-            <Button onClick={enterFullscreen} className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-bold py-6 text-lg">
+            <Button onClick={enterFullscreen} className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-6 text-lg">
               <Maximize2 className="mr-2 h-5 w-5" />Return to Fullscreen
             </Button>
           </CardContent>
@@ -1211,68 +1227,31 @@ export default function StudentExamPage() {
   }
 
   // =============================================
-  // MAIN EXAM INTERFACE - PROFESSIONAL CBT STYLING
+  // MAIN EXAM INTERFACE
   // =============================================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-      {/* Professional CBT Header */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-slate-800/95 backdrop-blur-sm border-b border-slate-700 shadow-lg">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      {/* Header */}
+      <header className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
         <div className="px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
-            {/* Student Profile Section - LARGER AVATAR */}
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-full blur opacity-40" />
-                <Avatar className="h-12 w-12 lg:h-14 lg:w-14 ring-2 ring-blue-500/50 shadow-xl">
-                  <AvatarImage src={profile?.photo_url || ''} />
-                  <AvatarFallback className="bg-gradient-to-br from-blue-600 to-cyan-600 text-white text-lg font-bold">
-                    {getInitials()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="absolute -bottom-1 -right-1">
-                  <div className="relative h-3 w-3 bg-green-500 rounded-full ring-2 ring-slate-800 animate-pulse" />
-                </div>
-              </div>
-              <div className="hidden md:block">
-                <h2 className="font-semibold text-white text-base lg:text-lg line-clamp-1">
-                  {profile?.full_name}
-                </h2>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <Badge className="bg-blue-500/20 text-blue-200 text-[10px] border-blue-500/30">
-                    <GraduationCap className="h-3 w-3 mr-1" />
-                    {profile?.class}
-                  </Badge>
-                  <Badge className="bg-slate-700 text-slate-300 text-[10px]">
-                    <Hash className="h-3 w-3 mr-1" />
-                    {profile?.vin_id}
-                  </Badge>
-                </div>
-              </div>
-            </div>
-
-            {/* Exam Title & Subject */}
-            <div className="hidden lg:block text-center">
-              <h1 className="text-white font-bold text-lg">{exam?.title}</h1>
-              <div className="flex items-center justify-center gap-3 mt-1">
-                <Badge className="bg-blue-500/20 text-blue-200">
-                  <BookOpen className="h-3 w-3 mr-1" />
-                  {exam?.subject}
-                </Badge>
-                <Badge className="bg-purple-500/20 text-purple-200">
-                  <FileText className="h-3 w-3 mr-1" />
-                  {allQuestions.length} Questions
-                </Badge>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+                <AvatarImage src={profile?.photo_url || ''} />
+                <AvatarFallback className="bg-primary text-white text-sm font-bold">{getInitials()}</AvatarFallback>
+              </Avatar>
+              <div className="hidden sm:block">
+                <h2 className="font-semibold text-gray-800 text-sm lg:text-base line-clamp-1">{exam?.title}</h2>
+                <p className="text-xs text-gray-500">{profile?.full_name}</p>
               </div>
             </div>
             
-            {/* Timer & Status */}
             <div className="flex items-center gap-3">
-              {/* Auto-save Status */}
               {autoSaveStatus !== 'idle' && (
                 <Badge variant="outline" className={cn(
-                  "gap-1 border-slate-600",
-                  autoSaveStatus === 'saving' && "text-blue-400",
-                  autoSaveStatus === 'saved' && "text-green-400"
+                  "gap-1",
+                  autoSaveStatus === 'saving' && "text-blue-600",
+                  autoSaveStatus === 'saved' && "text-green-600"
                 )}>
                   {autoSaveStatus === 'saving' ? (
                     <><Loader2 className="h-3 w-3 animate-spin" /> Saving</>
@@ -1282,102 +1261,90 @@ export default function StudentExamPage() {
                 </Badge>
               )}
               
-              {/* Online Status */}
               <Badge variant="outline" className={cn(
-                "gap-1 border-slate-600",
-                isOnline ? "text-green-400" : "text-red-400"
+                "gap-1",
+                isOnline ? "text-green-600" : "text-red-600"
               )}>
                 {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
               </Badge>
               
-              {/* Timer */}
               <div className={cn(
-                "px-4 lg:px-6 py-2 rounded-full font-mono text-xl lg:text-2xl font-bold shadow-lg transition-all duration-300",
-                timeLeft < 300 
-                  ? "bg-gradient-to-r from-red-600 to-rose-600 text-white animate-pulse shadow-red-500/50" 
-                  : "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-blue-500/30"
+                "px-4 lg:px-6 py-2 rounded-full font-mono text-xl lg:text-2xl font-bold shadow-sm transition-colors",
+                timeLeft < 300 ? "bg-red-100 text-red-700 animate-pulse" : "bg-gray-100 text-gray-800"
               )}>
-                <Clock className="inline h-5 w-5 mr-2" />
-                {formatTime(timeLeft)}
+                <Clock className="inline h-5 w-5 mr-2" />{formatTime(timeLeft)}
               </div>
               
-              {/* Tab Switch Counter */}
               <Badge className={cn(
-                "px-3 py-1.5 text-xs font-medium hidden sm:flex items-center gap-1",
-                tabSwitches === 0 ? "bg-green-500/20 text-green-200 border border-green-500/30" : 
-                tabSwitches === 1 ? "bg-yellow-500/20 text-yellow-200 border border-yellow-500/30" : 
-                "bg-red-500/20 text-red-200 border border-red-500/30"
+                "px-2 lg:px-3 py-1 text-xs font-medium hidden sm:flex",
+                tabSwitches === 0 ? "bg-green-100 text-green-700" : 
+                tabSwitches === 1 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
               )}>
-                <Monitor className="h-3 w-3" />
                 Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}
               </Badge>
               
-              {/* Submit Button */}
               <Button 
                 size="sm" 
                 onClick={() => setShowSubmitDialog(true)} 
-                className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white h-9 px-5 shadow-lg shadow-green-500/25 border-0"
+                className="bg-primary hover:bg-primary/90 text-white h-9 px-4 lg:px-5"
               >
                 <Send className="mr-1.5 h-4 w-4" />
-                <span className="hidden sm:inline">Submit Exam</span>
+                <span className="hidden sm:inline">Submit</span>
               </Button>
             </div>
           </div>
           
-          {/* Progress Bar */}
-          <div className="mt-4">
-            <div className="flex justify-between text-xs text-slate-400 mb-1.5">
-              <span>
-                <strong className="text-white">{answeredCount}</strong> of {allQuestions.length} answered
-              </span>
-              <span className="flex items-center gap-4">
-                <span className="flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3 text-green-400" />
-                  {objectiveAnswered} objective
-                </span>
-                <span className="flex items-center gap-1">
-                  <FileText className="h-3 w-3 text-purple-400" />
-                  {theoryAnswered} theory
-                </span>
-                <span className="flex items-center gap-1">
-                  <Flag className="h-3 w-3 text-yellow-400" />
-                  {flaggedQuestions.size} flagged
-                </span>
+          <div className="mt-3">
+            <div className="flex justify-between text-xs text-gray-500 mb-1">
+              <span><strong className="text-gray-800">{answeredCount}</strong> of {allQuestions.length} answered</span>
+              <span className="flex items-center gap-3">
+                <span><CheckCircle className="inline h-3 w-3 text-green-500 mr-1" />{objectiveAnswered} obj</span>
+                <span><FileText className="inline h-3 w-3 text-purple-500 mr-1" />{theoryAnswered} theory</span>
+                <span><Flag className="inline h-3 w-3 text-yellow-500 mr-1" />{flaggedQuestions.size} flagged</span>
               </span>
             </div>
-            <Progress 
-              value={progressPercentage} 
-              className="h-2.5 bg-slate-700 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-cyan-500" 
-            />
+            <Progress value={progressPercentage} className="h-2 bg-gray-200 [&>div]:bg-primary rounded-full" />
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="pt-36 lg:pt-40 pb-8 px-4 lg:px-6">
+      {/* Security warning toast */}
+      <AnimatePresence>
+        {showSecurityWarning && (
+          <motion.div
+            initial={{ opacity: 0, y: -50 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -50 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-50"
+          >
+            <Badge className="bg-red-500 text-white px-4 py-2 text-sm shadow-lg">
+              <AlertCircle className="inline h-4 w-4 mr-1" />
+              Security violation detected! This will be reported.
+            </Badge>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Main content */}
+      <div className="pt-28 lg:pt-32 pb-8 px-4 lg:px-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col lg:flex-row gap-6">
-            
-            {/* Question Area - Professional CBT Card */}
+            {/* Question area */}
             <div className="flex-1">
-              <Card className="border-0 shadow-2xl rounded-2xl overflow-hidden bg-slate-800/90 backdrop-blur-sm border-slate-700">
+              <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-white">
                 <CardContent className="p-5 lg:p-6">
-                  {/* Question Header */}
-                  <div className="flex items-start justify-between mb-5 pb-4 border-b border-slate-700">
+                  <div className="flex items-start justify-between mb-4 pb-3 border-b border-gray-200">
                     <div className="flex items-center gap-3 flex-wrap">
-                      <Badge className="bg-blue-500/20 text-blue-200 border-blue-500/30 px-3 py-1.5">
+                      <span className="text-sm font-medium text-gray-500">
                         Question {currentIndex + 1} of {allQuestions.length}
-                      </Badge>
-                      <Badge className={cn(
-                        "px-3 py-1.5 text-xs",
-                        currentQuestion?.type === 'theory' 
-                          ? "bg-purple-500/20 text-purple-200 border-purple-500/30" 
-                          : "bg-cyan-500/20 text-cyan-200 border-cyan-500/30"
+                      </span>
+                      <Badge variant="outline" className={cn(
+                        "text-xs",
+                        currentQuestion?.type === 'theory' ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200"
                       )}>
-                        {currentQuestion?.type === 'theory' ? 'Theory Question' : 'Objective Question'}
+                        {currentQuestion?.type === 'theory' ? 'Theory' : 'Objective'}
                       </Badge>
-                      <Badge className="bg-amber-500/20 text-amber-200 border-amber-500/30 px-3 py-1.5">
-                        <Award className="h-3 w-3 mr-1" />
+                      <Badge variant="secondary" className="text-xs">
                         {currentQuestion?.points || currentQuestion?.marks || 1} {currentQuestion?.points === 1 ? 'point' : 'points'}
                       </Badge>
                     </div>
@@ -1385,28 +1352,23 @@ export default function StudentExamPage() {
                       onClick={() => setFlaggedQuestions(p => { 
                         const n = new Set(p)
                         n.has(currentQuestion.id) ? n.delete(currentQuestion.id) : n.add(currentQuestion.id)
-                        toast.info(isFlagged ? 'Flag removed' : 'Question flagged for review')
                         return n 
                       })} 
                       className={cn(
-                        "p-2.5 rounded-xl transition-all duration-200",
-                        isFlagged 
-                          ? "text-yellow-400 bg-yellow-500/20 border border-yellow-500/30" 
-                          : "text-slate-400 hover:text-yellow-400 hover:bg-slate-700"
+                        "p-2 rounded-lg transition-colors",
+                        isFlagged ? "text-yellow-600 bg-yellow-50" : "text-gray-400 hover:bg-gray-100"
                       )}
                     >
                       <Flag className="h-5 w-5" fill={isFlagged ? "currentColor" : "none"} />
                     </button>
                   </div>
                   
-                  {/* Question Text */}
-                  <div className="bg-slate-900/50 rounded-xl p-5 lg:p-6 mb-6 border border-slate-700">
-                    <p className="text-white text-base lg:text-lg leading-relaxed">
+                  <div className="bg-gray-50 rounded-xl p-5 lg:p-6 mb-6">
+                    <p className="text-gray-800 text-base lg:text-lg leading-relaxed">
                       {currentQuestion?.question_text || currentQuestion?.question}
                     </p>
                   </div>
                   
-                  {/* Answer Area */}
                   <AnimatePresence mode="wait">
                     <motion.div 
                       key={currentQuestion?.id} 
@@ -1428,26 +1390,22 @@ export default function StudentExamPage() {
                               <div 
                                 key={idx} 
                                 className={cn(
-                                  "flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all duration-200",
-                                  isSelected 
-                                    ? "border-blue-500 bg-blue-500/10 shadow-lg shadow-blue-500/20" 
-                                    : "border-slate-700 hover:border-slate-600 hover:bg-slate-800/50"
+                                  "flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all",
+                                  isSelected ? "border-primary bg-primary/5 shadow-sm" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                                 )} 
                                 onClick={() => setAnswers(p => ({ ...p, [currentQuestion.id]: opt }))}
                               >
                                 <div className={cn(
-                                  "w-10 h-10 rounded-xl flex items-center justify-center text-base font-bold transition-all duration-200",
-                                  isSelected 
-                                    ? "bg-gradient-to-br from-blue-600 to-cyan-600 text-white shadow-lg" 
-                                    : "bg-slate-700 text-slate-300"
+                                  "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors",
+                                  isSelected ? "bg-primary text-white" : "bg-gray-100 text-gray-600"
                                 )}>
                                   {letters[idx]}
                                 </div>
                                 <RadioGroupItem value={opt} id={`opt-${idx}`} className="sr-only" />
-                                <Label htmlFor={`opt-${idx}`} className="flex-1 cursor-pointer text-slate-200 text-base">
+                                <Label htmlFor={`opt-${idx}`} className="flex-1 cursor-pointer text-gray-700 text-base">
                                   {opt}
                                 </Label>
-                                {isSelected && <CheckCircle className="h-5 w-5 text-blue-400" />}
+                                {isSelected && <CheckCircle className="h-5 w-5 text-primary" />}
                               </div>
                             )
                           })}
@@ -1455,8 +1413,8 @@ export default function StudentExamPage() {
                       ) : (
                         <div className="space-y-3">
                           {currentQuestion?.type === 'theory' && (
-                            <div className="bg-purple-500/10 border border-purple-500/30 rounded-xl p-4 mb-4">
-                              <p className="text-purple-200 text-sm flex items-center gap-2">
+                            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
+                              <p className="text-purple-700 text-sm flex items-center gap-2">
                                 <Brain className="h-4 w-4" />
                                 This is a theory question. Your answer will be graded by your teacher.
                               </p>
@@ -1467,7 +1425,7 @@ export default function StudentExamPage() {
                             onChange={(e) => setAnswers(p => ({ ...p, [currentQuestion.id]: e.target.value }))} 
                             placeholder="Type your answer here..." 
                             rows={8} 
-                            className="w-full bg-slate-900 border-slate-700 rounded-xl focus:border-blue-500 focus:ring-blue-500 resize-none text-slate-200 text-base placeholder:text-slate-500" 
+                            className="w-full border-gray-200 rounded-xl focus:border-primary focus:ring-primary resize-none text-base" 
                           />
                         </div>
                       )}
@@ -1476,21 +1434,20 @@ export default function StudentExamPage() {
                 </CardContent>
               </Card>
               
-              {/* Navigation Buttons */}
               <div className="flex justify-between items-center mt-6">
                 <Button 
                   variant="outline" 
                   size="lg" 
                   onClick={() => navigateToQuestion(currentIndex - 1)} 
                   disabled={currentIndex === 0} 
-                  className="border-slate-600 text-slate-300 hover:bg-slate-800 hover:text-white h-12 px-6 rounded-xl"
+                  className="border-gray-300 h-12 px-6"
                 >
                   <ChevronLeft className="mr-2 h-5 w-5" /> Previous
                 </Button>
                 
-                <div className="text-sm text-slate-400">
+                <div className="text-sm text-gray-500">
                   {unansweredCount > 0 && (
-                    <span className="text-amber-400">
+                    <span className="text-amber-600">
                       <AlertCircle className="inline h-4 w-4 mr-1" />
                       {unansweredCount} unanswered
                     </span>
@@ -1501,7 +1458,7 @@ export default function StudentExamPage() {
                   <Button 
                     size="lg" 
                     onClick={() => setShowSubmitDialog(true)} 
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white h-12 px-8 rounded-xl shadow-lg shadow-green-500/25"
+                    className="bg-primary hover:bg-primary/90 text-white h-12 px-8"
                   >
                     Submit Exam <Send className="ml-2 h-5 w-5" />
                   </Button>
@@ -1509,7 +1466,7 @@ export default function StudentExamPage() {
                   <Button 
                     size="lg" 
                     onClick={() => navigateToQuestion(currentIndex + 1)} 
-                    className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white h-12 px-8 rounded-xl shadow-lg shadow-blue-500/25"
+                    className="bg-primary hover:bg-primary/90 text-white h-12 px-8"
                   >
                     Next <ChevronRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -1517,17 +1474,17 @@ export default function StudentExamPage() {
               </div>
             </div>
 
-            {/* Right Sidebar - Question Palette */}
+            {/* Right sidebar - Question palette */}
             <div className="lg:w-80 shrink-0">
-              <Card className="border-0 shadow-2xl rounded-2xl overflow-hidden bg-slate-800/90 backdrop-blur-sm border-slate-700 sticky top-32">
-                <CardHeader className="pb-3 border-b border-slate-700">
+              <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-white sticky top-28">
+                <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-semibold text-white">Question Palette</CardTitle>
+                    <CardTitle className="text-base font-semibold">Question Palette</CardTitle>
                     <div className="flex items-center gap-1">
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                        className="h-8 w-8"
                         onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
                       >
                         {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid3x3 className="h-4 w-4" />}
@@ -1535,7 +1492,7 @@ export default function StudentExamPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8 text-slate-400 hover:text-white hover:bg-slate-700"
+                        className="h-8 w-8"
                         onClick={() => setSoundEnabled(!soundEnabled)}
                       >
                         {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
@@ -1544,13 +1501,13 @@ export default function StudentExamPage() {
                   </div>
                 </CardHeader>
                 
-                <CardContent className="p-5 pt-4">
+                <CardContent className="p-5 pt-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-                    <TabsList className="grid w-full grid-cols-2 bg-slate-700 p-1 rounded-xl">
-                      <TabsTrigger value="objective" className="text-xs data-[state=active]:bg-blue-500 data-[state=active]:text-white rounded-lg">
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger value="objective" className="text-xs">
                         Objective ({objectiveQuestions.length})
                       </TabsTrigger>
-                      <TabsTrigger value="theory" className="text-xs data-[state=active]:bg-purple-500 data-[state=active]:text-white rounded-lg" disabled={theoryQuestions.length === 0}>
+                      <TabsTrigger value="theory" className="text-xs" disabled={theoryQuestions.length === 0}>
                         Theory ({theoryQuestions.length})
                       </TabsTrigger>
                     </TabsList>
@@ -1568,16 +1525,16 @@ export default function StudentExamPage() {
                               onClick={() => navigateToQuestion(originalIndex)} 
                               className={cn(
                                 "aspect-square rounded-lg text-sm font-medium flex items-center justify-center transition-all relative",
-                                originalIndex === currentIndex && "ring-2 ring-blue-500 ring-offset-2 ring-offset-slate-800",
-                                status === 'answered' && "bg-gradient-to-br from-green-500 to-emerald-600 text-white hover:from-green-600 hover:to-emerald-700",
-                                status === 'flagged' && "bg-gradient-to-br from-yellow-500 to-amber-600 text-white hover:from-yellow-600 hover:to-amber-700",
-                                status === 'current' && "bg-gradient-to-br from-blue-500 to-cyan-600 text-white",
-                                status === 'not-answered' && "bg-slate-700 text-slate-300 border border-slate-600 hover:bg-slate-600"
+                                originalIndex === currentIndex && "ring-2 ring-primary ring-offset-2",
+                                status === 'answered' && "bg-green-500 text-white hover:bg-green-600",
+                                status === 'flagged' && "bg-yellow-500 text-white hover:bg-yellow-600",
+                                status === 'current' && "bg-primary text-white",
+                                status === 'not-answered' && "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
                               )}
                             >
                               {originalIndex + 1}
-                              {flaggedQuestions.has(q.id) && !status.includes('flagged') && (
-                                <Flag className="absolute -top-1 -right-1 h-3 w-3 text-yellow-500 fill-yellow-500" />
+                              {flaggedQuestions.has(q.id) && (
+                                <Flag className="absolute -top-1 -right-1 h-3 w-3 text-yellow-600 fill-yellow-600" />
                               )}
                             </button>
                           )
@@ -1597,32 +1554,32 @@ export default function StudentExamPage() {
                               onClick={() => navigateToQuestion(originalIndex)}
                               className={cn(
                                 "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
-                                originalIndex === currentIndex && "ring-2 ring-blue-500 bg-blue-500/10",
-                                isAnswered && "bg-green-500/10",
-                                isFlagged && "bg-yellow-500/10",
-                                !isAnswered && !isFlagged && originalIndex !== currentIndex && "hover:bg-slate-700"
+                                originalIndex === currentIndex && "ring-2 ring-primary bg-primary/5",
+                                isAnswered && "bg-green-50",
+                                isFlagged && "bg-yellow-50",
+                                !isAnswered && !isFlagged && originalIndex !== currentIndex && "hover:bg-gray-50"
                               )}
                             >
                               <div className={cn(
                                 "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                                isAnswered ? "bg-gradient-to-br from-green-500 to-emerald-600 text-white" :
-                                isFlagged ? "bg-gradient-to-br from-yellow-500 to-amber-600 text-white" :
-                                "bg-slate-700 text-slate-300"
+                                isAnswered ? "bg-green-500 text-white" :
+                                isFlagged ? "bg-yellow-500 text-white" :
+                                "bg-gray-100 text-gray-600"
                               )}>
                                 {originalIndex + 1}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-200 truncate">
+                                <p className="text-sm font-medium truncate">
                                   {q.question_text?.substring(0, 30)}...
                                 </p>
-                                <p className="text-xs text-slate-400">
+                                <p className="text-xs text-gray-500">
                                   {q.points || q.marks || 1} {q.points === 1 ? 'point' : 'points'}
                                 </p>
                               </div>
                               <div className="flex items-center gap-1">
-                                {isAnswered && <CheckCircle className="h-4 w-4 text-green-400" />}
-                                {isFlagged && <Flag className="h-4 w-4 text-yellow-400 fill-yellow-400" />}
-                                {originalIndex === currentIndex && <ChevronRight className="h-4 w-4 text-blue-400" />}
+                                {isAnswered && <CheckCircle className="h-4 w-4 text-green-500" />}
+                                {isFlagged && <Flag className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
+                                {originalIndex === currentIndex && <ChevronRight className="h-4 w-4 text-primary" />}
                               </div>
                             </button>
                           )
@@ -1631,38 +1588,33 @@ export default function StudentExamPage() {
                     )}
                   </ScrollArea>
                   
-                  <Separator className="my-4 bg-slate-700" />
+                  <Separator className="my-4" />
                   
-                  {/* Legend */}
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-gradient-to-br from-green-500 to-emerald-600" />
-                      <span className="text-slate-300">Answered ({answeredCount})</span>
+                      <div className="w-4 h-4 rounded bg-green-500" />
+                      <span>Answered ({answeredCount})</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-gradient-to-br from-yellow-500 to-amber-600" />
-                      <span className="text-slate-300">Flagged ({flaggedQuestions.size})</span>
+                      <div className="w-4 h-4 rounded bg-yellow-500" />
+                      <span>Flagged ({flaggedQuestions.size})</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-gradient-to-br from-blue-500 to-cyan-600" />
-                      <span className="text-slate-300">Current</span>
+                      <div className="w-4 h-4 rounded bg-primary" />
+                      <span>Current</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-slate-700 border border-slate-600" />
-                      <span className="text-slate-300">Unanswered ({unansweredCount})</span>
+                      <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300" />
+                      <span>Unanswered ({unansweredCount})</span>
                     </div>
                   </div>
                   
-                  {/* Progress Summary */}
-                  <div className="mt-4 p-4 bg-slate-900/50 rounded-xl border border-slate-700">
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-slate-400">Overall Progress</span>
-                      <span className="font-medium text-white">{Math.round(progressPercentage)}%</span>
+                  <div className="mt-4 p-3 bg-gray-50 rounded-xl">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-600">Progress</span>
+                      <span className="font-medium">{Math.round(progressPercentage)}%</span>
                     </div>
-                    <Progress 
-                      value={progressPercentage} 
-                      className="h-2 bg-slate-700 rounded-full [&>div]:bg-gradient-to-r [&>div]:from-blue-500 [&>div]:to-cyan-500" 
-                    />
+                    <Progress value={progressPercentage} className="h-1.5 mt-1" />
                   </div>
                 </CardContent>
               </Card>
@@ -1673,29 +1625,29 @@ export default function StudentExamPage() {
 
       {/* Submit Dialog */}
       <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <DialogContent className="max-w-md rounded-2xl bg-slate-800 border-slate-700 text-white">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-center text-white">Submit Exam?</DialogTitle>
+            <DialogTitle className="text-xl font-bold text-center">Submit Exam?</DialogTitle>
           </DialogHeader>
           <div className="py-4 text-center">
-            <p className="text-slate-300">
-              You have answered <strong className="text-white">{answeredCount}</strong> of <strong>{allQuestions.length}</strong> questions.
+            <p className="text-gray-600">
+              You have answered <strong>{answeredCount}</strong> of <strong>{allQuestions.length}</strong> questions.
             </p>
             
             <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="bg-green-500/10 rounded-xl p-3 border border-green-500/30">
-                <p className="text-green-400 text-sm">Objective</p>
-                <p className="text-2xl font-bold text-green-400">{objectiveAnswered}/{objectiveQuestions.length}</p>
+              <div className="bg-green-50 rounded-xl p-3">
+                <p className="text-green-600 text-sm">Objective</p>
+                <p className="text-2xl font-bold text-green-700">{objectiveAnswered}/{objectiveQuestions.length}</p>
               </div>
-              <div className="bg-purple-500/10 rounded-xl p-3 border border-purple-500/30">
-                <p className="text-purple-400 text-sm">Theory</p>
-                <p className="text-2xl font-bold text-purple-400">{theoryAnswered}/{theoryQuestions.length}</p>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <p className="text-purple-600 text-sm">Theory</p>
+                <p className="text-2xl font-bold text-purple-700">{theoryAnswered}/{theoryQuestions.length}</p>
               </div>
             </div>
             
             {unansweredCount > 0 && (
-              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 mt-4">
-                <span className="text-yellow-400 text-sm flex items-center justify-center gap-2">
+              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-4">
+                <span className="text-yellow-700 text-sm flex items-center justify-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
                   {unansweredCount} question{unansweredCount > 1 ? 's' : ''} unanswered!
                 </span>
@@ -1703,20 +1655,20 @@ export default function StudentExamPage() {
             )}
             
             {flaggedQuestions.size > 0 && (
-              <p className="text-sm text-slate-400 mt-3">
-                <Flag className="inline h-3 w-3 mr-1 text-yellow-400" />
+              <p className="text-sm text-gray-500 mt-3">
+                <Flag className="inline h-3 w-3 mr-1 text-yellow-500" />
                 {flaggedQuestions.size} question{flaggedQuestions.size > 1 ? 's' : ''} flagged for review
               </p>
             )}
           </div>
           <DialogFooter className="gap-3 justify-center">
-            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="px-8 border-slate-600 text-slate-300">
+            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="px-8">
               Continue
             </Button>
             <Button 
               onClick={() => handleSubmit(false)} 
               disabled={isSubmitting} 
-              className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 px-8"
+              className="bg-primary hover:bg-primary/90 px-8"
             >
               {isSubmitting ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -1731,45 +1683,45 @@ export default function StudentExamPage() {
 
       {/* Result Dialog */}
       <Dialog open={showResultDialog} onOpenChange={() => setShowResultDialog(false)}>
-        <DialogContent className="max-w-md rounded-2xl bg-slate-800 border-slate-700 text-white">
+        <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-center gap-2 text-xl text-white">
+            <DialogTitle className="flex items-center justify-center gap-2 text-xl">
               {examResult?.is_passed ? (
-                <><CheckCircle className="h-6 w-6 text-green-400" />Passed!</>
+                <><CheckCircle className="h-6 w-6 text-green-500" />Passed!</>
               ) : (
-                <><XCircle className="h-6 w-6 text-red-400" />Completed</>
+                <><XCircle className="h-6 w-6 text-red-500" />Completed</>
               )}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4 text-center">
             <div className={cn(
               "text-5xl font-bold mb-2",
-              examResult?.is_passed ? "text-green-400" : "text-white"
+              examResult?.is_passed ? "text-green-600" : "text-gray-700"
             )}>
               {examResult?.score}/{examResult?.total}
             </div>
-            <p className="text-slate-400 text-lg">{examResult?.percentage}%</p>
+            <p className="text-gray-500 text-lg">{examResult?.percentage}%</p>
             
             <div className="flex justify-center gap-6 mt-4">
               <div className="text-center">
-                <CheckCircle className="h-5 w-5 text-green-400 mx-auto" />
-                <p className="text-xl font-bold text-green-400">{examResult?.correct}</p>
-                <p className="text-xs text-slate-400">Correct</p>
+                <CheckCircle className="h-5 w-5 text-green-500 mx-auto" />
+                <p className="text-xl font-bold text-green-600">{examResult?.correct}</p>
+                <p className="text-xs text-gray-500">Correct</p>
               </div>
               <div className="text-center">
-                <XCircle className="h-5 w-5 text-red-400 mx-auto" />
-                <p className="text-xl font-bold text-red-400">{examResult?.incorrect}</p>
-                <p className="text-xs text-slate-400">Wrong</p>
+                <XCircle className="h-5 w-5 text-red-500 mx-auto" />
+                <p className="text-xl font-bold text-red-500">{examResult?.incorrect}</p>
+                <p className="text-xs text-gray-500">Wrong</p>
               </div>
               <div className="text-center">
-                <HelpCircle className="h-5 w-5 text-slate-400 mx-auto" />
-                <p className="text-xl font-bold text-slate-300">{examResult?.unanswered}</p>
-                <p className="text-xs text-slate-400">Skipped</p>
+                <HelpCircle className="h-5 w-5 text-gray-500 mx-auto" />
+                <p className="text-xl font-bold text-gray-600">{examResult?.unanswered}</p>
+                <p className="text-xs text-gray-500">Skipped</p>
               </div>
             </div>
             
             {examResult?.status === 'pending_theory' && (
-              <p className="text-yellow-400 text-sm mt-4 bg-yellow-500/10 py-2 px-4 rounded-lg border border-yellow-500/30">
+              <p className="text-yellow-600 text-sm mt-4 bg-yellow-50 py-2 px-4 rounded-lg">
                 Theory answers pending grading by your teacher
               </p>
             )}
@@ -1780,7 +1732,7 @@ export default function StudentExamPage() {
                 setShowResultDialog(false)
                 router.push('/student') 
               }} 
-              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+              className="w-full bg-primary hover:bg-primary/90"
             >
               Back to Dashboard
             </Button>
@@ -1790,18 +1742,18 @@ export default function StudentExamPage() {
 
       {/* Time Warning Dialog */}
       <AlertDialog open={showTimeWarning} onOpenChange={setShowTimeWarning}>
-        <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-white">
-              <Clock className="h-5 w-5 text-amber-400" />
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
               5 Minutes Remaining!
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-300">
+            <AlertDialogDescription>
               You have only 5 minutes left to complete this exam. Please review your answers and prepare to submit.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowTimeWarning(false)} className="bg-gradient-to-r from-blue-600 to-cyan-600">
+            <AlertDialogAction onClick={() => setShowTimeWarning(false)}>
               I understand
             </AlertDialogAction>
           </AlertDialogFooter>
