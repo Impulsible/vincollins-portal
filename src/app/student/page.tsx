@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - UPDATED WITH SET D COMPONENT & LOADING MESSAGE
+// app/student/page.tsx - WITH REPORT CARD STATUS AND REAL-TIME PROFILE UPDATES
 'use client'
 
 import { useState, useEffect, useCallback, Suspense } from 'react'
@@ -25,13 +25,14 @@ import {
   Loader2, BookOpen, Award, Clock, TrendingUp, Calendar, CheckCircle,
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
   Search, User, ArrowRight, Target, Trophy, Eye, LayoutDashboard, Menu,
-  Flame, Zap, Sparkles, GraduationCap
+  Flame, Zap, Sparkles, GraduationCap, CheckCircle2, AlertCircle,
+  FileCheck, Download
 } from 'lucide-react'
 
 // ============================================
-// NAME FORMATTING
+// NAME FORMATTING - FIXED TYPES
 // ============================================
-function formatFullName(firstName: string | null, lastName: string | null, fallback: string): string {
+function formatFullName(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
   if (firstName && lastName) return `${firstName} ${lastName}`
   if (firstName) return firstName
   if (lastName) return lastName
@@ -43,7 +44,7 @@ function formatFullName(firstName: string | null, lastName: string | null, fallb
   return fallback || 'Student'
 }
 
-function getFirstName(firstName: string | null, lastName: string | null, fallback: string): string {
+function getFirstName(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
   if (firstName && firstName.trim()) return firstName.trim()
   
   const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
@@ -53,10 +54,13 @@ function getFirstName(firstName: string | null, lastName: string | null, fallbac
   return 'Student'
 }
 
-function getInitials(firstName: string | null, lastName: string | null, fallback: string): string {
-  if (firstName && lastName) return (firstName.charAt(0) + lastName.charAt(0)).toUpperCase()
-  if (firstName) return firstName.slice(0, 2).toUpperCase()
-  if (lastName) return lastName.slice(0, 2).toUpperCase()
+function getInitials(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
+  const first = firstName || ''
+  const last = lastName || ''
+  
+  if (first && last) return (first.charAt(0) + last.charAt(0)).toUpperCase()
+  if (first) return first.slice(0, 2).toUpperCase()
+  if (last) return last.slice(0, 2).toUpperCase()
   
   const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
   if (words.length >= 2) return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
@@ -170,6 +174,15 @@ interface BestSubject {
   score: number
 }
 
+interface ReportCardStatus {
+  status: 'pending' | 'approved' | 'published' | 'rejected' | null
+  term: string
+  academic_year: string
+  average_score?: number
+  grade?: string
+  id?: string
+}
+
 // ============================================
 // ANIMATION VARIANTS
 // ============================================
@@ -230,6 +243,7 @@ function StudentDashboardContent() {
   
   const [studyStreak, setStudyStreak] = useState(0)
   const [bestSubject, setBestSubject] = useState<BestSubject | null>(null)
+  const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
 
   // Format profile for header
   const formatProfileForHeader = (profile: StudentProfile | null) => {
@@ -243,6 +257,45 @@ function StudentDashboardContent() {
       isAuthenticated: true
     }
   }
+
+  // Check report card status
+  const checkReportCardStatus = useCallback(async () => {
+    if (!profile?.id) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('report_cards')
+        .select('id, status, term, academic_year, average_score')
+        .eq('student_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        
+      if (!error && data) {
+        const grade = data.average_score >= 75 ? 'A1' : 
+                     data.average_score >= 70 ? 'B2' :
+                     data.average_score >= 65 ? 'B3' :
+                     data.average_score >= 60 ? 'C4' :
+                     data.average_score >= 55 ? 'C5' :
+                     data.average_score >= 50 ? 'C6' :
+                     data.average_score >= 45 ? 'D7' :
+                     data.average_score >= 40 ? 'E8' : 'F9'
+                     
+        setReportCardStatus({
+          id: data.id,
+          status: data.status,
+          term: data.term,
+          academic_year: data.academic_year,
+          average_score: data.average_score,
+          grade
+        })
+      } else {
+        setReportCardStatus(null)
+      }
+    } catch (error) {
+      console.error('Error checking report card status:', error)
+    }
+  }, [profile?.id])
 
   // Load term settings from database
   const loadTermSettings = useCallback(async () => {
@@ -406,6 +459,9 @@ function StudentDashboardContent() {
 
       // Load term settings
       await loadTermSettings()
+      
+      // Check report card status
+      await checkReportCardStatus()
 
       const { data: examsData, error: examsError } = await supabase
         .from('exams')
@@ -519,9 +575,9 @@ function StudentDashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, [profile?.id, profile?.class, profile?.subject_count, loadTermSettings, calculateStudyStreak, calculateBestSubject])
+  }, [profile?.id, profile?.class, profile?.subject_count, loadTermSettings, calculateStudyStreak, checkReportCardStatus])
 
-  // Real-time subscription
+  // Real-time subscriptions
   useEffect(() => {
     if (!profile?.id) return
 
@@ -540,12 +596,53 @@ function StudentDashboardContent() {
           loadDashboardData()
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'report_cards',
+          filter: `student_id=eq.${profile.id}`
+        },
+        () => {
+          console.log('🔄 Report card updated, refreshing...')
+          checkReportCardStatus()
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'profiles',
+          filter: `id=eq.${profile.id}`
+        },
+        (payload) => {
+          console.log('🔄 Profile updated, refreshing...')
+          // Update profile with new photo_url
+          if (payload.new.photo_url) {
+            setProfile(prev => prev ? { 
+              ...prev, 
+              photo_url: payload.new.photo_url 
+            } : null)
+          }
+          // Also update other profile fields if they change
+          if (payload.new.full_name) {
+            setProfile(prev => prev ? { 
+              ...prev, 
+              full_name: payload.new.full_name,
+              first_name: payload.new.first_name || prev.first_name,
+              last_name: payload.new.last_name || prev.last_name
+            } : null)
+          }
+        }
+      )
       .subscribe()
 
     return () => {
       channel.unsubscribe()
     }
-  }, [profile?.id, loadDashboardData])
+  }, [profile?.id, loadDashboardData, checkReportCardStatus])
 
   useEffect(() => {
     if (!authChecking && profile) {
@@ -616,6 +713,24 @@ function StudentDashboardContent() {
     }
   }
 
+  // FIXED: Updated to accept string | null to match ReportCardStatus interface
+  const getReportCardStatusBadge = (status: string | null) => {
+    if (!status) return null
+    
+    switch (status) {
+      case 'published':
+        return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+      case 'approved':
+        return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
+      default:
+        return null
+    }
+  }
+
   const getWelcomeBannerProfile = (): WelcomeBannerProfile | null => {
     if (!profile) return null
     return {
@@ -656,14 +771,6 @@ function StudentDashboardContent() {
               className="mt-4 text-slate-600 text-lg font-medium"
             >
               Loading Student Dashboard...
-            </motion.p>
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="mt-2 text-slate-500 text-sm"
-            >
-              Preparing your learning space ✨
             </motion.p>
             <div className="flex justify-center gap-1 mt-4">
               {[0, 1, 2].map((i) => (
@@ -729,7 +836,8 @@ function StudentDashboardContent() {
                 {[
                   { id: 'assignments', icon: FileText, label: 'Assignments' },
                   { id: 'attendance', icon: Calendar, label: 'Attendance' },
-                  { id: 'performance', icon: TrendingUp, label: 'Performance' }
+                  { id: 'performance', icon: TrendingUp, label: 'Performance' },
+                  { id: 'report-card', icon: FileCheck, label: 'Report Card' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -781,7 +889,7 @@ function StudentDashboardContent() {
                     />
                   </motion.div>
 
-                  {/* SET D STATS CARDS - Using the reusable component */}
+                  {/* SET D STATS CARDS */}
                   <motion.div variants={itemVariants}>
                     <SetDStatsCards
                       termInfo={termInfo}
@@ -789,9 +897,74 @@ function StudentDashboardContent() {
                       completedExams={bannerStats.completedExams}
                       studyStreak={studyStreak}
                       bestSubject={bestSubject}
-                      studentClass={profile?.class}
+                      studentClass={profile?.class as string}
                     />
                   </motion.div>
+
+                  {/* Report Card Status Card */}
+                  {reportCardStatus && (
+                    <motion.div variants={itemVariants}>
+                      <Card 
+                        className={cn(
+                          "border-0 shadow-sm hover:shadow-md transition-shadow cursor-pointer overflow-hidden",
+                          reportCardStatus.status === 'published' 
+                            ? "bg-gradient-to-r from-green-50 to-emerald-50 border-l-4 border-l-green-500"
+                            : reportCardStatus.status === 'approved'
+                            ? "bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-l-blue-500"
+                            : reportCardStatus.status === 'pending'
+                            ? "bg-gradient-to-r from-yellow-50 to-amber-50 border-l-4 border-l-yellow-500"
+                            : "bg-gradient-to-r from-red-50 to-rose-50 border-l-4 border-l-red-500"
+                        )}
+                        onClick={() => router.push('/student/report-card')}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                              <div className={cn(
+                                "h-12 w-12 rounded-xl flex items-center justify-center",
+                                reportCardStatus.status === 'published' ? "bg-green-100" :
+                                reportCardStatus.status === 'approved' ? "bg-blue-100" :
+                                reportCardStatus.status === 'pending' ? "bg-yellow-100" : "bg-red-100"
+                              )}>
+                                <FileCheck className={cn(
+                                  "h-6 w-6",
+                                  reportCardStatus.status === 'published' ? "text-green-600" :
+                                  reportCardStatus.status === 'approved' ? "text-blue-600" :
+                                  reportCardStatus.status === 'pending' ? "text-yellow-600" : "text-red-600"
+                                )} />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-gray-900">
+                                    {reportCardStatus.term} {reportCardStatus.academic_year} Report Card
+                                  </h3>
+                                  {getReportCardStatusBadge(reportCardStatus.status)}
+                                </div>
+                                {reportCardStatus.average_score && (
+                                  <p className="text-sm text-slate-600 mt-1">
+                                    Average Score: <span className="font-bold">{reportCardStatus.average_score}%</span>
+                                    {reportCardStatus.grade && (
+                                      <Badge className="ml-2 text-xs" variant="outline">{reportCardStatus.grade}</Badge>
+                                    )}
+                                  </p>
+                                )}
+                                <p className="text-xs text-slate-500 mt-1">
+                                  {reportCardStatus.status === 'published' 
+                                    ? '✓ Your report card is ready! Click to view and download.'
+                                    : reportCardStatus.status === 'approved'
+                                    ? '✓ Your report card has been approved and will be published soon.'
+                                    : reportCardStatus.status === 'pending'
+                                    ? '⏳ Your report card is being reviewed by the admin.'
+                                    : '❌ Your report card was rejected. Please contact your teacher.'}
+                                </p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-5 w-5 text-slate-400" />
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
 
                   <motion.div variants={itemVariants}>
                     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
@@ -869,7 +1042,7 @@ function StudentDashboardContent() {
                         </Card>
 
                         <StudentClassRoster 
-                          studentClass={profile?.class}
+                          studentClass={profile?.class as string}
                           studentId={profile?.id}
                           compact={false}
                         />
@@ -1076,7 +1249,7 @@ function StudentDashboardContent() {
                             <Avatar className="h-24 w-24">
                               <AvatarImage src={profile.photo_url || undefined} />
                               <AvatarFallback className="bg-emerald-600 text-white text-2xl">
-                                {getInitials(profile.first_name, profile.last_name, profile.full_name)}
+                                {getInitials(profile.first_name as string, profile.last_name as string, profile.full_name)}
                               </AvatarFallback>
                             </Avatar>
                             <div>
@@ -1119,6 +1292,99 @@ function StudentDashboardContent() {
                       )}
                     </CardContent>
                   </Card>
+                </motion.div>
+              )}
+
+              {/* REPORT CARD TAB */}
+              {activeTab === 'report-card' && (
+                <motion.div key="report-card" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <div className="flex items-center justify-between mb-4">
+                    <h1 className="text-2xl font-bold">Report Card</h1>
+                  </div>
+                  
+                  {reportCardStatus ? (
+                    <Card className={cn(
+                      "border-0 shadow-lg",
+                      reportCardStatus.status === 'published' 
+                        ? "bg-gradient-to-br from-green-50 to-emerald-50"
+                        : reportCardStatus.status === 'approved'
+                        ? "bg-gradient-to-br from-blue-50 to-indigo-50"
+                        : reportCardStatus.status === 'pending'
+                        ? "bg-gradient-to-br from-yellow-50 to-amber-50"
+                        : "bg-gradient-to-br from-red-50 to-rose-50"
+                    )}>
+                      <CardContent className="p-6">
+                        <div className="text-center">
+                          <div className={cn(
+                            "h-20 w-20 rounded-full mx-auto flex items-center justify-center mb-4",
+                            reportCardStatus.status === 'published' ? "bg-green-100" :
+                            reportCardStatus.status === 'approved' ? "bg-blue-100" :
+                            reportCardStatus.status === 'pending' ? "bg-yellow-100" : "bg-red-100"
+                          )}>
+                            <FileCheck className={cn(
+                              "h-10 w-10",
+                              reportCardStatus.status === 'published' ? "text-green-600" :
+                              reportCardStatus.status === 'approved' ? "text-blue-600" :
+                              reportCardStatus.status === 'pending' ? "text-yellow-600" : "text-red-600"
+                            )} />
+                          </div>
+                          
+                          <h2 className="text-xl font-bold mb-2">
+                            {reportCardStatus.term} {reportCardStatus.academic_year}
+                          </h2>
+                          
+                          <div className="mb-4">
+                            {getReportCardStatusBadge(reportCardStatus.status)}
+                          </div>
+                          
+                          {reportCardStatus.average_score && (
+                            <div className="mb-4">
+                              <p className="text-3xl font-bold">{reportCardStatus.average_score}%</p>
+                              <p className="text-sm text-slate-500">Average Score</p>
+                              {reportCardStatus.grade && (
+                                <Badge className="mt-2 text-lg px-4 py-1" variant="outline">
+                                  Grade: {reportCardStatus.grade}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                          
+                          <p className="text-slate-600 mb-6">
+                            {reportCardStatus.status === 'published' 
+                              ? 'Your report card is ready! Click below to view and download.'
+                              : reportCardStatus.status === 'approved'
+                              ? 'Your report card has been approved and will be published soon. Check back later!'
+                              : reportCardStatus.status === 'pending'
+                              ? 'Your report card is currently being reviewed by the admin. Please check back later.'
+                              : 'Your report card was rejected. Please contact your class teacher for more information.'}
+                          </p>
+                          
+                          {reportCardStatus.status === 'published' && (
+                            <Button 
+                              size="lg" 
+                              className="bg-emerald-600"
+                              onClick={() => router.push('/student/report-card')}
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              View & Download Report Card
+                            </Button>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <Card className="border-0 shadow-lg bg-white">
+                      <CardContent className="text-center py-16">
+                        <FileCheck className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                          No Report Card Available
+                        </h3>
+                        <p className="text-muted-foreground">
+                          Your report card for the current term has not been submitted yet.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
                 </motion.div>
               )}
             </AnimatePresence>

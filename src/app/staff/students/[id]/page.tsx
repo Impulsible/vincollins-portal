@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/staff/students/[id]/page.tsx - STUDENT DETAILS & PERFORMANCE PAGE - FULLY FIXED
+// app/staff/students/[id]/page.tsx - WITH SUBMIT FOR APPROVAL
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -28,6 +28,11 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -37,7 +42,7 @@ import {
   GraduationCap, CheckCircle, XCircle, FileText,
   Activity, Trophy, Star, User,
   Plus, Save, Edit, Eye, Sparkles,
-  CheckCheck
+  CheckCheck, Send, Clock, AlertCircle, CheckCircle2
 } from 'lucide-react'
 
 // Define ReportCardData interface
@@ -324,6 +329,11 @@ export default function StudentDetailsPage() {
     attendance: 94
   })
   
+  // Report Card Status
+  const [reportCardStatus, setReportCardStatus] = useState<string | null>(null)
+  const [submittingForApproval, setSubmittingForApproval] = useState(false)
+  const [showSubmitDialog, setShowSubmitDialog] = useState(false)
+  
   // Dialog states
   const [showCADialog, setShowCADialog] = useState(false)
   const [showAssessmentDialog, setShowAssessmentDialog] = useState(false)
@@ -391,16 +401,52 @@ export default function StudentDetailsPage() {
     if (grade === 'F9') return 'bg-red-100 text-red-700 border-red-200'
     return 'bg-gray-100 text-gray-700'
   }
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'published':
+        return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+      case 'approved':
+        return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending Approval</Badge>
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
+      default:
+        return <Badge variant="outline">{status}</Badge>
+    }
+  }
+  
+  // Check report card status
+  const checkReportCardStatus = useCallback(async () => {
+    if (!studentId) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('report_cards')
+        .select('status, submitted_at, approved_at, published_at')
+        .eq('student_id', studentId)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .maybeSingle()
+        
+      if (!error && data) {
+        setReportCardStatus(data.status)
+      } else {
+        setReportCardStatus(null)
+      }
+    } catch (error) {
+      console.error('Error checking report card status:', error)
+    }
+  }, [studentId, selectedTerm, selectedYear])
   
   // Load all data
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
-      // ✅ FIX 1: Get session and profile with maybeSingle()
       const { data: { session } } = await supabase.auth.getSession()
       
       if (session?.user) {
-        // Use maybeSingle() instead of single() to prevent 406 errors
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -409,7 +455,6 @@ export default function StudentDetailsPage() {
         
         if (profileError) {
           console.error('Profile fetch error:', profileError)
-          // Set fallback profile so teacher name doesn't show as "Teacher"
           setProfile({
             id: session.user.id,
             full_name: session.user.email?.split('@')[0] || 'Staff User',
@@ -419,8 +464,6 @@ export default function StudentDetailsPage() {
         } else if (profileData) {
           setProfile(profileData)
         } else {
-          // No profile exists - create fallback
-          console.log('No profile found for user, using fallback')
           setProfile({
             id: session.user.id,
             full_name: session.user.email?.split('@')[0] || 'Staff User',
@@ -436,7 +479,6 @@ export default function StudentDetailsPage() {
         return
       }
       
-      // ✅ FIX 2: Load student profile with maybeSingle()
       const { data: studentData, error: studentError } = await supabase
         .from('profiles')
         .select('*')
@@ -451,14 +493,12 @@ export default function StudentDetailsPage() {
       }
       
       if (!studentData) {
-        console.log('Student not found with ID:', studentId)
         toast.error('Student not found')
         setStudent(null)
         setLoading(false)
         return
       }
       
-      // Get VIN ID from users table if not in profiles
       const { data: userData } = await supabase
         .from('users')
         .select('vin_id')
@@ -470,8 +510,7 @@ export default function StudentDetailsPage() {
         vin_id: userData?.vin_id || studentData.vin_id || `VIN-${studentId.slice(0, 8)}`
       })
       
-      // ✅ FIX 3: Load exam results with proper error handling
-      // First load exam_scores
+      // Load exam_scores
       const { data: examScoresData, error: scoresError } = await supabase
         .from('exam_scores')
         .select('*')
@@ -482,7 +521,7 @@ export default function StudentDetailsPage() {
         console.error('Exam scores error:', scoresError)
       }
 
-      // Load exam attempts separately with simpler query
+      // Load exam attempts
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -494,7 +533,7 @@ export default function StudentDetailsPage() {
         console.error('Exam attempts error:', attemptsError)
       }
 
-      // Load exam details for the scores
+      // Load exam details
       let examDetailsMap: Record<string, any> = {}
       if (examScoresData && examScoresData.length > 0) {
         const examIds = [...new Set(examScoresData.map(s => s.exam_id).filter(Boolean))]
@@ -513,10 +552,9 @@ export default function StudentDetailsPage() {
         }
       }
 
-      // Merge the results
+      // Merge results
       const mergedResults: ExamResult[] = []
       
-      // Process exam_scores
       if (examScoresData) {
         for (const score of examScoresData) {
           const attempt = (attemptsData || []).find(a => a.exam_id === score.exam_id)
@@ -548,7 +586,6 @@ export default function StudentDetailsPage() {
         }
       }
       
-      // Add any attempts without exam_scores
       if (attemptsData) {
         for (const attempt of attemptsData) {
           const existingScore = mergedResults.find(r => r.exam_id === attempt.exam_id)
@@ -588,7 +625,7 @@ export default function StudentDetailsPage() {
       
       setExamResults(mergedResults)
       
-      // Calculate stats from merged results
+      // Calculate stats
       const completed = mergedResults.filter(r => 
         r.status === 'graded' || r.status === 'completed' || r.status === 'pending_theory'
       )
@@ -622,7 +659,7 @@ export default function StudentDetailsPage() {
         bestSubjectScore: Math.round(bestScore)
       }))
       
-      // ✅ FIX 4: Load CA Scores with maybeSingle() and proper error handling
+      // Load CA Scores
       const { data: caData, error: caError } = await supabase
         .from('exam_scores')
         .select('*')
@@ -657,7 +694,7 @@ export default function StudentDetailsPage() {
         setCAScores([])
       }
       
-      // ✅ FIX 5: Load Assessment with maybeSingle()
+      // Load Assessment
       const { data: assessmentData, error: assessmentError } = await supabase
         .from('student_assessments')
         .select('*')
@@ -684,13 +721,16 @@ export default function StudentDetailsPage() {
         setAssessment(null)
       }
       
+      // Check report card status
+      await checkReportCardStatus()
+      
     } catch (error) {
       console.error('Failed to load data:', error)
       toast.error('Failed to load student data')
     } finally {
       setLoading(false)
     }
-  }, [studentId, selectedTerm, selectedYear, router])
+  }, [studentId, selectedTerm, selectedYear, router, checkReportCardStatus])
   
   useEffect(() => {
     if (studentId) {
@@ -889,6 +929,98 @@ export default function StudentDetailsPage() {
     }
   }
   
+  // SUBMIT REPORT CARD FOR APPROVAL
+  const handleSubmitForApproval = async () => {
+    if (!student || caScores.length === 0) {
+      toast.error('Please add CA scores before submitting')
+      return
+    }
+    
+    setSubmittingForApproval(true)
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      const allSubjectScores = caScores.map(ca => ca.total_score)
+      const classHighest = allSubjectScores.length > 0 ? Math.max(...allSubjectScores) : 92
+      const classAverage = allSubjectScores.length > 0 
+        ? Math.round(allSubjectScores.reduce((a, b) => a + b, 0) / allSubjectScores.length)
+        : 72
+
+      const reportData = {
+        student_id: studentId,
+        student_name: student.full_name,
+        student_vin: student.vin_id,
+        class: student.class,
+        term: selectedTerm,
+        academic_year: selectedYear,
+        subjects_data: caScores.map(ca => ({
+          name: ca.subject,
+          ca1: ca.ca1_score,
+          ca2: ca.ca2_score,
+          examObj: ca.exam_objective_score,
+          examTheory: ca.exam_theory_score,
+          total: ca.total_score,
+          grade: ca.grade,
+          remark: ca.remark,
+        })),
+        assessment_data: {
+          handwriting: assessment?.handwriting ?? 3,
+          sports: assessment?.sports_participation ?? 3,
+          creativity: assessment?.creative_arts ?? 3,
+          technical: assessment?.technical_skills ?? 3,
+          punctuality: assessment?.punctuality ?? 3,
+          neatness: assessment?.neatness ?? 3,
+          politeness: assessment?.politeness ?? 3,
+          cooperation: assessment?.cooperation ?? 3,
+          leadership: assessment?.leadership ?? 3,
+          daysPresent: assessment?.days_present ?? 0,
+          daysAbsent: assessment?.days_absent ?? 0,
+        },
+        teacher_comments: assessment?.teacher_comments || '',
+        principal_comments: '',
+        class_teacher: profile?.full_name || 'Class Teacher',
+        principal_name: 'Mrs. Nnoli Joy',
+        total_score: caScores.reduce((sum, ca) => sum + ca.total_score, 0),
+        average_score: stats.averageScore,
+        class_highest: classHighest,
+        class_average: classAverage,
+        position: stats.classRank || 0,
+        total_students: stats.totalStudents || caScores.length || 1,
+        status: 'pending',
+        submitted_by: session?.user?.id,
+        submitted_at: new Date().toISOString(),
+        teacher_id: profile?.id
+      }
+
+      const { error } = await supabase
+        .from('report_cards')
+        .upsert(reportData, {
+          onConflict: 'student_id,term,academic_year'
+        })
+
+      if (error) throw error
+
+      setReportCardStatus('pending')
+      toast.success('Report card submitted for approval!')
+      setShowSubmitDialog(false)
+      
+      // Send notification to admin
+      await supabase.from('notifications').insert({
+        title: 'New Report Card for Approval',
+        message: `${student.full_name} (${student.class}) - ${selectedTerm} ${selectedYear}`,
+        type: 'report_card_submitted',
+        link: '/admin/report-cards',
+        metadata: { student_id: studentId, class: student.class, term: selectedTerm, academic_year: selectedYear }
+      })
+      
+    } catch (error) {
+      console.error('Failed to submit report card:', error)
+      toast.error('Failed to submit report card')
+    } finally {
+      setSubmittingForApproval(false)
+    }
+  }
+  
   // Generate Report Card
   const handleGenerateReportCard = async () => {
     setGeneratingReport(true)
@@ -967,33 +1099,6 @@ export default function StudentDetailsPage() {
       link.remove()
       window.URL.revokeObjectURL(url)
       
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user?.id) {
-        await supabase.from('report_cards').upsert({
-          student_id: studentId,
-          term: selectedTerm,
-          academic_year: selectedYear,
-          class: student?.class,
-          class_teacher: profile?.full_name,
-          principal_name: 'Mrs. Nnoli Joy',
-          total_score: reportData.totalScore,
-          average_score: reportData.averageScore,
-          class_highest: reportData.classHighest,
-          class_average: reportData.classAverage,
-          position: reportData.position,
-          total_students: reportData.totalStudents,
-          subjects_data: reportData.subjects,
-          assessment_data: reportData.assessment,
-          teacher_comments: reportData.teacherComment,
-          principal_comments: reportData.principalComment,
-          status: 'generated',
-          generated_by: session.user.id,
-          generated_at: new Date().toISOString(),
-        }, {
-          onConflict: 'student_id,term,academic_year'
-        })
-      }
-      
       toast.success('Report card generated successfully!')
     } catch (error) {
       console.error('Failed to generate report card:', error)
@@ -1053,7 +1158,7 @@ export default function StudentDetailsPage() {
   const previewTotal = caForm.ca1_score + caForm.ca2_score + caForm.exam_objective_score + caForm.exam_theory_score
   const previewGrade = calculateGradeAndRemark(previewTotal)
   
-  // Loading state - CENTERED ON SCREEN
+  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -1071,7 +1176,7 @@ export default function StudentDetailsPage() {
     )
   }
   
-  // Student not found state - CENTERED ON SCREEN
+  // Student not found state
   if (!student) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -1128,6 +1233,11 @@ export default function StudentDetailsPage() {
                   </h1>
                 </div>
                 <div className="flex items-center gap-2">
+                  {reportCardStatus && (
+                    <div className="mr-2">
+                      {getStatusBadge(reportCardStatus)}
+                    </div>
+                  )}
                   <Button variant="outline" onClick={loadData}>
                     <RefreshCw className="mr-2 h-4 w-4" /> Refresh
                   </Button>
@@ -1140,8 +1250,19 @@ export default function StudentDetailsPage() {
                     ) : (
                       <Download className="mr-2 h-4 w-4" />
                     )}
-                    Generate Report Card
+                    Generate Report
                   </Button>
+                  
+                  {/* SUBMIT FOR APPROVAL BUTTON */}
+                  {reportCardStatus !== 'published' && reportCardStatus !== 'approved' && (
+                    <Button 
+                      onClick={() => setShowSubmitDialog(true)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      <Send className="mr-2 h-4 w-4" />
+                      Submit for Approval
+                    </Button>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -1634,6 +1755,37 @@ export default function StudentDetailsPage() {
           </div>
         </main>
       </div>
+      
+      {/* Submit Confirmation Dialog */}
+      <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-green-600" />
+              Submit Report Card for Approval?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This will send {student?.full_name}'s report card ({selectedTerm} {selectedYear}) to the admin for approval. 
+              You won't be able to edit it until the admin reviews it.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleSubmitForApproval}
+              disabled={submittingForApproval}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {submittingForApproval ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Submit for Approval
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       
       {/* Add/Edit CA Score Dialog */}
       <Dialog open={showCADialog} onOpenChange={setShowCADialog}>

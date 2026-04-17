@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/staff/page.tsx - UPDATED WITH BEAUTIFUL LOADING ANIMATION
+// app/staff/page.tsx - WITH REPORT CARD STATUS TRACKING
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
@@ -28,7 +28,8 @@ import {
   Plus, Sparkles, TrendingUp, Calendar, Clock, Search, Filter, ArrowRight,
   BookOpen, Users, FileText, Award, Download, Loader2, LayoutDashboard,
   MonitorPlay, User, Menu, Settings, Flame, Zap, Trophy, Target,
-  GraduationCap, Briefcase
+  GraduationCap, Briefcase, FileCheck, CheckCircle2, AlertCircle,
+  ChevronRight
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -100,6 +101,14 @@ interface TermInfo {
   endDate: string
 }
 
+interface ReportCardStats {
+  pending: number
+  approved: number
+  published: number
+  rejected: number
+  total: number
+}
+
 const formatProfileForHeader = (profile: StaffProfile | null) => {
   if (!profile) return undefined
   return {
@@ -168,6 +177,15 @@ function StaffDashboardContent() {
   })
 
   const [pendingGrading, setPendingGrading] = useState(0)
+  
+  // Report Card Stats
+  const [reportCardStats, setReportCardStats] = useState<ReportCardStats>({
+    pending: 0,
+    approved: 0,
+    published: 0,
+    rejected: 0,
+    total: 0
+  })
 
   // Load term settings
   const loadTermSettings = useCallback(async () => {
@@ -192,6 +210,30 @@ function StaffDashboardContent() {
       console.error('Error loading term settings:', error)
     }
   }, [])
+
+  // Load report card stats
+  const loadReportCardStats = useCallback(async () => {
+    if (!profile?.id) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('report_cards')
+        .select('status')
+        .eq('teacher_id', profile.id)
+        
+      if (!error && data) {
+        setReportCardStats({
+          pending: data.filter(r => r.status === 'pending').length,
+          approved: data.filter(r => r.status === 'approved').length,
+          published: data.filter(r => r.status === 'published').length,
+          rejected: data.filter(r => r.status === 'rejected').length,
+          total: data.length
+        })
+      }
+    } catch (error) {
+      console.error('Error loading report card stats:', error)
+    }
+  }, [profile?.id])
 
   useEffect(() => {
     let isMounted = true
@@ -244,6 +286,7 @@ function StaffDashboardContent() {
       case 'assignments': router.push('/staff/assignments'); break
       case 'notes': router.push('/staff/notes'); break
       case 'students': router.push('/staff/students'); break
+      case 'report-cards': router.push('/staff/report-cards'); break
       default: router.push('/staff')
     }
   }
@@ -297,9 +340,12 @@ function StaffDashboardContent() {
         activeStudents: studentsData?.filter((s: any) => s.is_active).length || 0,
         averageScore: 75
       })
+      
+      // Load report card stats
+      await loadReportCardStats()
     } catch (error) { toast.error('Failed to load dashboard') }
     finally { setLoading(false) }
-  }, [loadTermSettings])
+  }, [loadTermSettings, loadReportCardStats])
 
   useEffect(() => {
     if (!profile?.id) return
@@ -319,12 +365,25 @@ function StaffDashboardContent() {
           loadDashboardData()
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'report_cards',
+          filter: `teacher_id=eq.${profile.id}`
+        },
+        () => {
+          console.log('🔄 Report card status updated, refreshing...')
+          loadReportCardStats()
+        }
+      )
       .subscribe()
 
     return () => {
       channel.unsubscribe()
     }
-  }, [profile?.id, loadDashboardData])
+  }, [profile?.id, loadDashboardData, loadReportCardStats])
 
   useEffect(() => { if (!authChecking) loadDashboardData() }, [loadDashboardData, authChecking])
 
@@ -337,6 +396,21 @@ function StaffDashboardContent() {
   const filteredExams = exams.filter(e => e.title.toLowerCase().includes(searchQuery.toLowerCase()) || e.subject.toLowerCase().includes(searchQuery.toLowerCase()))
   const filteredAssignments = assignments.filter(a => a.title.toLowerCase().includes(searchQuery.toLowerCase()) || a.subject.toLowerCase().includes(searchQuery.toLowerCase()))
   const filteredNotes = notes.filter(n => n.title.toLowerCase().includes(searchQuery.toLowerCase()) || n.subject.toLowerCase().includes(searchQuery.toLowerCase()))
+
+  const getReportCardStatusBadge = (status: string) => {
+    switch (status) {
+      case 'published':
+        return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+      case 'approved':
+        return <Badge className="bg-blue-100 text-blue-700"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-700"><AlertCircle className="h-3 w-3 mr-1" />Rejected</Badge>
+      default:
+        return null
+    }
+  }
 
   if (authChecking || loading) {
     return (
@@ -402,7 +476,7 @@ function StaffDashboardContent() {
           {mobileMenuOpen && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute bottom-full left-0 right-0 bg-white dark:bg-slate-900 border-t p-4 mb-2 rounded-t-xl max-h-[60vh] overflow-y-auto">
               <div className="grid grid-cols-2 gap-2">
-                {[{ id: 'assignments', icon: FileText, label: 'Assignments' }, { id: 'notes', icon: BookOpen, label: 'Notes' }, { id: 'calendar', icon: Calendar, label: 'Calendar' }, { id: 'analytics', icon: TrendingUp, label: 'Analytics' }, { id: 'settings', icon: Settings, label: 'Settings' }].map(tab => (
+                {[{ id: 'assignments', icon: FileText, label: 'Assignments' }, { id: 'notes', icon: BookOpen, label: 'Notes' }, { id: 'calendar', icon: Calendar, label: 'Calendar' }, { id: 'analytics', icon: TrendingUp, label: 'Analytics' }, { id: 'settings', icon: Settings, label: 'Settings' }, { id: 'report-cards', icon: FileCheck, label: 'Report Cards' }].map(tab => (
                   <button key={tab.id} onClick={() => handleTabChange(tab.id)} className="flex flex-col items-center p-3 rounded-lg hover:bg-slate-100">
                     <tab.icon className="h-5 w-5 text-slate-600" /><span className="text-xs mt-1 truncate">{tab.label}</span>
                   </button>
@@ -440,9 +514,10 @@ function StaffDashboardContent() {
                     <StaffWelcomeBanner profile={profile} stats={stats} termInfo={termInfo} />
                   </motion.div>
                   
-                  {/* Staff Stats Cards */}
+                  {/* Staff Stats Cards - Including Report Card Status */}
                   <motion.div variants={itemVariants}>
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                      {/* Current Term Card */}
                       <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => router.push('/staff/calendar')}>
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex items-center justify-between">
@@ -459,6 +534,7 @@ function StaffDashboardContent() {
                         </CardContent>
                       </Card>
 
+                      {/* Published Exams Card */}
                       <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-teal-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('exams')}>
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex items-center justify-between">
@@ -472,6 +548,7 @@ function StaffDashboardContent() {
                         </CardContent>
                       </Card>
 
+                      {/* Active Students Card */}
                       <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-orange-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('students')}>
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex items-center justify-between">
@@ -485,18 +562,32 @@ function StaffDashboardContent() {
                         </CardContent>
                       </Card>
 
-                      <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('exams')}>
+                      {/* Report Card Status Card */}
+                      <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 hover:shadow-md transition-shadow overflow-hidden cursor-pointer" onClick={() => handleTabChange('report-cards')}>
                         <CardContent className="p-3 sm:p-4">
                           <div className="flex items-center justify-between">
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs text-purple-600 font-medium">Pending Grading</p>
-                              <p className="text-xl sm:text-2xl font-bold text-purple-800">{pendingGrading}</p>
-                              <p className="text-[10px] sm:text-xs text-purple-600 mt-0.5 flex items-center gap-1">
-                                <Flame className="h-3 w-3" />
-                                {pendingGrading > 0 ? 'Needs attention' : 'All caught up!'}
-                              </p>
+                              <p className="text-xs text-purple-600 font-medium">Report Cards</p>
+                              <p className="text-xl sm:text-2xl font-bold text-purple-800">{reportCardStats.total}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                {reportCardStats.pending > 0 && (
+                                  <Badge className="bg-yellow-100 text-yellow-700 text-[9px]">
+                                    {reportCardStats.pending} Pending
+                                  </Badge>
+                                )}
+                                {reportCardStats.approved > 0 && (
+                                  <Badge className="bg-blue-100 text-blue-700 text-[9px]">
+                                    {reportCardStats.approved} Approved
+                                  </Badge>
+                                )}
+                                {reportCardStats.published > 0 && (
+                                  <Badge className="bg-green-100 text-green-700 text-[9px]">
+                                    {reportCardStats.published} Published
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
-                            <Award className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 shrink-0 ml-2" />
+                            <FileCheck className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 shrink-0 ml-2" />
                           </div>
                         </CardContent>
                       </Card>
@@ -504,6 +595,48 @@ function StaffDashboardContent() {
                   </motion.div>
 
                   <motion.div variants={itemVariants}><QuickActions onCreateExam={() => setShowCreateExam(true)} onCreateAssignment={() => setShowCreateAssignment(true)} onUploadNote={() => setShowUploadNote(true)} /></motion.div>
+                  
+                  {/* Report Card Status Overview (if any pending/approved) */}
+                  {(reportCardStats.pending > 0 || reportCardStats.approved > 0) && (
+                    <motion.div variants={itemVariants}>
+                      <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                        <CardHeader className="pb-2">
+                          <div className="flex items-center justify-between">
+                            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                              <FileCheck className="h-5 w-5 text-purple-600" />
+                              Report Card Status
+                            </CardTitle>
+                            <Button variant="ghost" size="sm" onClick={() => handleTabChange('report-cards')}>
+                              View All <ArrowRight className="ml-1 h-3 w-3" />
+                            </Button>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center gap-6">
+                            {reportCardStats.pending > 0 && (
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-yellow-500" />
+                                <span className="text-sm">{reportCardStats.pending} Pending Approval</span>
+                              </div>
+                            )}
+                            {reportCardStats.approved > 0 && (
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-blue-500" />
+                                <span className="text-sm">{reportCardStats.approved} Approved (Ready to Publish)</span>
+                              </div>
+                            )}
+                            {reportCardStats.published > 0 && (
+                              <div className="flex items-center gap-2">
+                                <div className="h-3 w-3 rounded-full bg-green-500" />
+                                <span className="text-sm">{reportCardStats.published} Published</span>
+                              </div>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+
                   <motion.div variants={itemVariants}>
                     <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6 overflow-hidden">
@@ -545,6 +678,74 @@ function StaffDashboardContent() {
                 <motion.div key="students" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6 overflow-hidden">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4"><div><h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">Student Roster</h1><p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">View and manage all students</p></div><Button variant="outline" size="lg" className="gap-2 w-full sm:w-auto"><Download className="h-5 w-5" />Export Roster</Button></div>
                   <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden"><CardContent className="p-4 sm:p-6"><StudentRoster students={students} fullView /></CardContent></Card>
+                </motion.div>
+              )}
+
+              {/* REPORT CARDS TAB */}
+              {activeTab === 'report-cards' && (
+                <motion.div key="report-cards" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="space-y-4 sm:space-y-6 overflow-hidden">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                        My Report Cards
+                      </h1>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">
+                        Track the status of submitted report cards
+                      </p>
+                    </div>
+                    <Button onClick={() => router.push('/staff/students')} className="gap-2">
+                      <Users className="h-5 w-5" />
+                      View All Students
+                    </Button>
+                  </div>
+
+                  {/* Status Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                    <Card className="border-0 shadow-sm bg-yellow-50">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-3xl font-bold text-yellow-700">{reportCardStats.pending}</p>
+                        <p className="text-sm text-yellow-600">Pending Approval</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-0 shadow-sm bg-blue-50">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-3xl font-bold text-blue-700">{reportCardStats.approved}</p>
+                        <p className="text-sm text-blue-600">Approved</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-0 shadow-sm bg-green-50">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-3xl font-bold text-green-700">{reportCardStats.published}</p>
+                        <p className="text-sm text-green-600">Published</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="border-0 shadow-sm bg-red-50">
+                      <CardContent className="p-4 text-center">
+                        <p className="text-3xl font-bold text-red-700">{reportCardStats.rejected}</p>
+                        <p className="text-sm text-red-600">Rejected</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  <Card className="border-0 shadow-lg bg-white">
+                    <CardContent className="text-center py-16">
+                      <FileCheck className="h-12 w-12 text-purple-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                        Report Card Management
+                      </h3>
+                      <p className="text-muted-foreground max-w-md mx-auto">
+                        Go to a student's profile to enter CA scores and submit report cards for approval.
+                      </p>
+                      <Button 
+                        className="mt-4 bg-purple-600 hover:bg-purple-700"
+                        onClick={() => router.push('/staff/students')}
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Go to Student Roster
+                        <ChevronRight className="h-4 w-4 ml-2" />
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               )}
             </AnimatePresence>

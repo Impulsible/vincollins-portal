@@ -1,16 +1,16 @@
 /* eslint-disable react/no-unescaped-entities */
- 
-// components/student/StudentSidebar.tsx - FULLY UPDATED WITH NAVIGATION
+// components/student/StudentSidebar.tsx - ATTENDANCE REMOVED, REPORT CARD ADDED
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 import {
   LayoutDashboard, BookOpen, FileText, Award, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
-  Calendar, Sparkles, TrendingUp, MonitorPlay, User,
-  Bell, HelpCircle
+  Sparkles, TrendingUp, MonitorPlay, User,
+  Bell, HelpCircle, Wifi, WifiOff, FileCheck
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Separator } from '@/components/ui/separator'
+import { toast } from 'sonner'
 
 interface StudentProfile {
   full_name?: string
@@ -37,6 +38,7 @@ interface StudentProfile {
   vin_id?: string
   department?: string
   admission_year?: number
+  id?: string
 }
 
 interface StudentSidebarProps {
@@ -70,8 +72,7 @@ const primaryNavigation: NavigationItem[] = [
     name: 'My Exams', 
     icon: MonitorPlay,
     description: 'Take CBT & Theory',
-    route: '/student/exams',
-    badge: 'Available'
+    route: '/student/exams'
   },
   { 
     id: 'results', 
@@ -88,18 +89,18 @@ const primaryNavigation: NavigationItem[] = [
     route: '/student/assignments'
   },
   { 
-    id: 'attendance', 
-    name: 'Attendance', 
-    icon: Calendar,
-    description: 'Track Presence',
-    route: '/student/attendance'
-  },
-  { 
     id: 'courses', 
     name: 'My Courses', 
     icon: BookOpen,
     description: 'Learning Materials',
     route: '/student/courses'
+  },
+  { 
+    id: 'report-card', 
+    name: 'Report Card', 
+    icon: FileCheck,
+    description: 'Termly Reports',
+    route: '/student/report-card'
   },
 ]
 
@@ -183,6 +184,55 @@ export function StudentSidebar({
   const router = useRouter()
   const pathname = usePathname()
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
+  const [isOnline, setIsOnline] = useState(true)
+  const [lastSeen, setLastSeen] = useState<Date | null>(null)
+
+  // Track online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      updatePresence('online')
+    }
+    
+    const handleOffline = () => {
+      setIsOnline(false)
+      updatePresence('offline')
+    }
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    updatePresence('online')
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+      updatePresence('offline')
+    }
+  }, [profile?.id])
+
+  const updatePresence = async (status: 'online' | 'offline' | 'away') => {
+    if (!profile?.id) return
+    
+    try {
+      await supabase
+        .from('student_presence')
+        .upsert({
+          student_id: profile.id,
+          status: status,
+          last_seen: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'student_id'
+        })
+      
+      if (status === 'online') {
+        setLastSeen(new Date())
+      }
+    } catch (error) {
+      console.error('Error updating presence:', error)
+    }
+  }
 
   // Sync active tab with pathname
   useEffect(() => {
@@ -194,10 +244,10 @@ export function StudentSidebar({
       setActiveTab('results')
     } else if (pathname?.startsWith('/student/assignments')) {
       setActiveTab('assignments')
-    } else if (pathname?.startsWith('/student/attendance')) {
-      setActiveTab('attendance')
     } else if (pathname?.startsWith('/student/courses')) {
       setActiveTab('courses')
+    } else if (pathname?.startsWith('/student/report-card')) {
+      setActiveTab('report-card')
     } else if (pathname?.startsWith('/student/performance')) {
       setActiveTab('performance')
     } else if (pathname?.startsWith('/student/notifications')) {
@@ -220,14 +270,13 @@ export function StudentSidebar({
     setShowSignOutConfirm(true)
   }
 
-  const confirmSignOut = () => {
+  const confirmSignOut = async () => {
     setShowSignOutConfirm(false)
+    await updatePresence('offline')
     onLogout()
   }
 
-  // UPDATED: Navigate to the correct route
   const handleNavClick = (tabId: string, route: string) => {
-    console.log('🔄 Student Sidebar clicked:', tabId, '→', route)
     setActiveTab(tabId)
     router.push(route)
   }
@@ -297,7 +346,27 @@ export function StudentSidebar({
     return <div key={item.id}>{buttonContent}</div>
   }
 
-  // Sidebar Content
+  const getStatusDisplay = () => {
+    if (isOnline) {
+      return {
+        icon: Wifi,
+        color: 'bg-green-500',
+        text: 'Online',
+        textColor: 'text-green-600'
+      }
+    } else {
+      return {
+        icon: WifiOff,
+        color: 'bg-gray-400',
+        text: 'Offline',
+        textColor: 'text-gray-500'
+      }
+    }
+  }
+
+  const statusDisplay = getStatusDisplay()
+  const StatusIcon = statusDisplay.icon
+
   const sidebarContent = (
     <>
       <div className="pt-6" />
@@ -336,7 +405,6 @@ export function StudentSidebar({
       )}>
         {collapsed ? (
           <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-30" />
             <Avatar className="h-12 w-12 ring-3 ring-white dark:ring-slate-900 shadow-xl">
               <AvatarImage src={avatarUrl} alt={displayName} />
               <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-lg">
@@ -344,14 +412,24 @@ export function StudentSidebar({
               </AvatarFallback>
             </Avatar>
             <div className="absolute -bottom-1 -right-1">
-              <div className="relative h-3 w-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "relative h-3 w-3 rounded-full ring-2 ring-white dark:ring-slate-900",
+                    statusDisplay.color,
+                    isOnline && "animate-pulse"
+                  )} />
+                </TooltipTrigger>
+                <TooltipContent side="right">
+                  <p>{isOnline ? 'Online' : 'Offline'}</p>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         ) : (
           <div className="space-y-4 w-full">
             <div className="flex items-center gap-4">
               <div className="relative">
-                <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-30" />
                 <Avatar className="h-16 w-16 ring-3 ring-white dark:ring-slate-900 shadow-xl">
                   <AvatarImage src={avatarUrl} alt={displayName} />
                   <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-xl">
@@ -359,13 +437,38 @@ export function StudentSidebar({
                   </AvatarFallback>
                 </Avatar>
                 <div className="absolute -bottom-1 -right-1">
-                  <div className="relative h-3.5 w-3.5 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900 animate-pulse" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className={cn(
+                        "relative h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-900",
+                        statusDisplay.color,
+                        isOnline && "animate-pulse"
+                      )} />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{isOnline ? 'Online' : 'Offline'}</p>
+                      {lastSeen && !isOnline && (
+                        <p className="text-xs text-slate-400">
+                          Last seen: {lastSeen.toLocaleTimeString()}
+                        </p>
+                      )}
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-                  Welcome back,
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                    Welcome back,
+                  </p>
+                  <Badge className={cn(
+                    "text-[9px]",
+                    isOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                  )}>
+                    <StatusIcon className="h-3 w-3 mr-0.5" />
+                    {statusDisplay.text}
+                  </Badge>
+                </div>
                 <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">
                   {firstName}!
                 </h3>

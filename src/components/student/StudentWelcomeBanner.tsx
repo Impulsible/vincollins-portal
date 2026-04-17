@@ -1,11 +1,13 @@
-// components/student/StudentWelcomeBanner.tsx - COMPLETELY FIXED
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// components/student/StudentWelcomeBanner.tsx - SYNCED WITH ONLINE STATUS & PHOTO
 'use client'
 
 import { useState, useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
-  GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen
+  GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen,
+  Wifi, WifiOff
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -15,8 +17,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface StudentProfile {
+  id?: string
   full_name: string
   class: string
   department?: string
@@ -51,6 +55,47 @@ const calculateGrade = (percentage: number): { grade: string; color: string; des
 
 export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [isOnline, setIsOnline] = useState(true)
+  const [avatarError, setAvatarError] = useState(false)
+
+  // Track online/offline status
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+    
+    setIsOnline(navigator.onLine)
+    
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  // Also check presence from database if profile exists
+  useEffect(() => {
+    if (!profile?.id) return
+    
+    const checkPresence = async () => {
+      try {
+        const { data } = await supabase
+          .from('student_presence')
+          .select('status')
+          .eq('student_id', profile.id)
+          .maybeSingle()
+        
+        if (data) {
+          setIsOnline(data.status === 'online')
+        }
+      } catch (error) {
+        console.error('Error checking presence:', error)
+      }
+    }
+    
+    checkPresence()
+  }, [profile?.id])
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60000)
@@ -70,7 +115,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   // FIXED: Properly extract first name - take the FIRST word
   const studentFullName = profile?.full_name || 'Student'
   const nameParts = studentFullName.trim().split(/\s+/)
-  const firstName = nameParts[0] || 'Student'  // Always first part!
+  const firstName = nameParts[0] || 'Student'
   
   const studentClass = profile?.class || 'Not Assigned'
   const studentDepartment = profile?.department || 'General'
@@ -101,6 +146,35 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   // FIXED: Get first letter of FIRST NAME for avatar
   const avatarLetter = firstName.charAt(0).toUpperCase()
 
+  // Get avatar URL - support multiple possible field names
+  const avatarUrl = profile?.photo_url || undefined
+
+  const handleAvatarError = () => {
+    setAvatarError(true)
+  }
+
+  // Get online status display
+  const getStatusDisplay = () => {
+    if (isOnline) {
+      return {
+        icon: Wifi,
+        color: 'bg-emerald-500',
+        ringColor: 'ring-emerald-500/30',
+        text: 'Online'
+      }
+    } else {
+      return {
+        icon: WifiOff,
+        color: 'bg-gray-400',
+        ringColor: 'ring-gray-400/30',
+        text: 'Offline'
+      }
+    }
+  }
+
+  const statusDisplay = getStatusDisplay()
+  const StatusIcon = statusDisplay.icon
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
@@ -118,9 +192,28 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <span className="text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">
               {formattedDate}
             </span>
+            {/* Online/Offline Status Badge */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Badge className={cn(
+                    "text-[10px] gap-1 cursor-help",
+                    isOnline 
+                      ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" 
+                      : "bg-gray-500/20 text-gray-300 border-gray-500/30"
+                  )}>
+                    <StatusIcon className="h-3 w-3" />
+                    {statusDisplay.text}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isOnline ? 'You are online and visible' : 'You are currently offline'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
           
-          {/* FIXED: Display FIRST NAME */}
+          {/* Display FIRST NAME */}
           <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white drop-shadow-sm">
             {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
           </h1>
@@ -147,18 +240,45 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           </div>
         </div>
         
+        {/* Avatar with Online/Offline Ring */}
         <div className="relative group">
-          <div className="absolute -inset-1 bg-gradient-to-r from-amber-400 to-orange-500 rounded-full opacity-60 group-hover:opacity-100 blur-md transition duration-300" />
+          <div className={cn(
+            "absolute -inset-1 bg-gradient-to-r rounded-full opacity-60 group-hover:opacity-100 blur-md transition duration-300",
+            isOnline 
+              ? "from-emerald-400 to-teal-400" 
+              : "from-gray-400 to-gray-500"
+          )} />
           <div className="relative">
             <Avatar className="h-24 w-24 md:h-28 md:w-28 ring-4 ring-white/20 shadow-xl">
-              <AvatarImage src={profile?.photo_url} />
+              {avatarUrl && !avatarError ? (
+                <AvatarImage 
+                  src={avatarUrl} 
+                  alt={firstName}
+                  onError={handleAvatarError}
+                  className="object-cover"
+                />
+              ) : null}
               <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-3xl font-bold">
                 {avatarLetter}
               </AvatarFallback>
             </Avatar>
-            <div className="absolute -bottom-2 -right-2 bg-emerald-500 rounded-full p-1.5 ring-2 ring-white">
-              <div className="h-2 w-2 bg-white rounded-full animate-pulse" />
-            </div>
+            {/* Online/Offline Indicator Ring */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "absolute -bottom-2 -right-2 rounded-full p-1.5 ring-2 ring-white",
+                    statusDisplay.color,
+                    isOnline && "animate-pulse"
+                  )}>
+                    <StatusIcon className="h-2.5 w-2.5 text-white" />
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isOnline ? 'Online' : 'Offline'}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
       </div>

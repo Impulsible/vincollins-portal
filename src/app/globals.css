@@ -964,3 +964,36 @@ img, video, iframe {
   word-break: break-word;
   overflow-wrap: break-word;
 }
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  header, nav, aside, footer, button {
+    display: none !important;
+  }
+  
+  body {
+    background: white !important;
+  }
+  
+  .print-view {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .print-view .shadow-sm,
+  .print-view .shadow-lg,
+  .print-view .shadow-md {
+    box-shadow: none !important;
+  }
+  
+  .print-view .border {
+    border: 1px solid #ddd !important;
+  }
+}
