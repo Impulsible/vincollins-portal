@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
+  reactStrictMode: false, // FIX: Disable Strict Mode to prevent double auth calls and lock conflicts
   
   output: 'standalone',
   
@@ -30,6 +30,18 @@ const nextConfig = {
         port: '',
         pathname: '/storage/v1/object/public/**',
       },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3000',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: '127.0.0.1',
+        port: '3000',
+        pathname: '/**',
+      },
     ],
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
@@ -49,6 +61,26 @@ const nextConfig = {
   experimental: {
     optimizeCss: true,
     optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'sonner'],
+  },
+  
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+        dns: false,
+        child_process: false,
+      };
+    }
+    
+    config.ignoreWarnings = [
+      { module: /node_modules\/@radix-ui\/react-slot/ },
+      { module: /node_modules\/@radix-ui\/react-popover/ },
+    ];
+    
+    return config;
   },
   
   async rewrites() {
@@ -126,12 +158,32 @@ const nextConfig = {
           },
         ],
       },
+      {
+        source: '/_next/static/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
     ];
   },
   
   onDemandEntries: {
     maxInactiveAge: 25 * 1000,
     pagesBufferLength: 2,
+  },
+  
+  poweredByHeader: false,
+  transpilePackages: ['lucide-react', 'sonner'],
+  
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  
+  eslint: {
+    ignoreDuringBuilds: false,
   },
 };
 

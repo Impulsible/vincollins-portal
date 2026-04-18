@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - FULLY RESPONSIVE WITH ASSIGNMENTS & NOTES + BEAUTIFUL LOADING
+// app/student/page.tsx - FULLY RESPONSIVE WITH ASSIGNMENTS & NOTES
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
@@ -55,9 +55,12 @@ function getInitials(firstName: string | null | undefined, lastName: string | nu
   return 'ST'
 }
 
+// FIXED: Helper function - JSS = 17, SSS = 10 (handles spaces in class names)
 const getSubjectCountForClass = (className: string): number => {
   if (!className) return 17
+  // Remove all spaces before checking (handles "SS 1", "SS 2", "JSS 1", etc.)
   const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
+  console.log('📊 getSubjectCountForClass - Original:', className, '→ Normalized:', normalizedClass)
   if (normalizedClass.startsWith('JSS')) return 17
   if (normalizedClass.startsWith('SS')) return 10
   return 17
@@ -229,6 +232,12 @@ function StudentDashboardContent() {
 
   const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
 
+  // FIXED: Calculate totalSubjects from profile class for immediate display
+  const displayTotalSubjects = useMemo(() => {
+    if (!profile?.class) return 17
+    return getSubjectCountForClass(profile.class)
+  }, [profile?.class])
+
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
@@ -284,9 +293,9 @@ function StudentDashboardContent() {
     
     const checkAuth = async () => {
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
         
-        if (sessionError || !session?.user) {
+        if (userError || !user) {
           if (isMounted) window.location.replace('/portal')
           return
         }
@@ -294,11 +303,11 @@ function StudentDashboardContent() {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', session.user.id)
+          .eq('id', user.id)
           .maybeSingle()
 
         if (isMounted) {
-          const fallbackName = session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Student'
+          const fallbackName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Student'
           
           const fullName = formatFullName(
             profileData?.first_name || null,
@@ -306,20 +315,32 @@ function StudentDashboardContent() {
             profileData?.full_name || fallbackName
           )
           
+          const studentClass = profileData?.class || 'Not Assigned'
+          // FIXED: Use database subject_count if available, otherwise calculate
+          const calculatedSubjects = profileData?.subject_count || getSubjectCountForClass(studentClass)
+          
+          console.log('📊 DASHBOARD AUTH - Class:', studentClass, '| DB subject_count:', profileData?.subject_count, '| Calculated:', calculatedSubjects)
+          
           setProfile({
-            id: session.user.id,
+            id: user.id,
             first_name: profileData?.first_name || null,
             last_name: profileData?.last_name || null,
             full_name: fullName,
-            email: profileData?.email || session.user.email || '',
-            class: profileData?.class || 'Not Assigned',
+            email: profileData?.email || user.email || '',
+            class: studentClass,
             department: profileData?.department || 'General',
             vin_id: profileData?.vin_id,
             photo_url: profileData?.photo_url || null,
             admission_year: profileData?.admission_year || new Date().getFullYear(),
             role: profileData?.role || 'student',
-            subject_count: profileData?.subject_count || getSubjectCountForClass(profileData?.class || '')
+            subject_count: calculatedSubjects
           })
+          
+          setBannerStats(prev => ({
+            ...prev,
+            totalSubjects: calculatedSubjects
+          }))
+          
           setAuthChecking(false)
         }
       } catch (err) {
@@ -343,7 +364,10 @@ function StudentDashboardContent() {
     setLoading(true)
     try {
       const studentClass = profile.class
+      // FIXED: Use database subject_count first, then calculate
       const totalSubjects = profile.subject_count || getSubjectCountForClass(studentClass)
+
+      console.log('📊 DASHBOARD LOAD - Class:', studentClass, '| Total Subjects:', totalSubjects)
 
       await checkReportCardStatus()
 
@@ -459,6 +483,7 @@ function StudentDashboardContent() {
       })
 
       const gradeInfo = calculateGrade(avgScore)
+      
       setBannerStats({
         completedExams: completedAttempts.length,
         averageScore: avgScore,
@@ -561,7 +586,7 @@ function StudentDashboardContent() {
       class: profile.class,
       department: profile.department || undefined,
       photo_url: profile.photo_url || undefined,
-      subject_count: profile.subject_count || getSubjectCountForClass(profile.class)
+      subject_count: displayTotalSubjects
     }
   }
 
@@ -575,7 +600,13 @@ function StudentDashboardContent() {
     attempt.exam_subject?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // Loading state with beautiful animation
+  // FIXED: Use displayTotalSubjects for banner stats
+  const finalBannerStats = {
+    ...bannerStats,
+    totalSubjects: displayTotalSubjects || bannerStats.totalSubjects
+  }
+
+  // Loading state
   if (authChecking || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
@@ -715,7 +746,7 @@ function StudentDashboardContent() {
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
-                      stats={bannerStats}
+                      stats={finalBannerStats}
                     />
                   </motion.div>
 
@@ -786,7 +817,7 @@ function StudentDashboardContent() {
 
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
-                      {/* Left Column - Spans 2 on large screens */}
+                      {/* Left Column */}
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6 w-full overflow-hidden">
                         {/* Performance Overview */}
                         {stats.completedExams > 0 && (
@@ -1166,7 +1197,7 @@ function StudentDashboardContent() {
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg sm:col-span-2">
                               <p className="text-xs text-slate-500">Total Subjects</p>
-                              <p className="font-medium">{profile.subject_count || getSubjectCountForClass(profile.class)} Subjects</p>
+                              <p className="font-medium">{displayTotalSubjects} Subjects</p>
                             </div>
                           </div>
                         </div>

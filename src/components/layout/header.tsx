@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - FULLY CORRECTED
+// components/layout/header.tsx - FULLY CORRECTED WITH REF FIX
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense, forwardRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
@@ -243,6 +243,27 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
+// FIX: Create a wrapped button component that forwards ref properly
+const NotificationTrigger = forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
+  (props, ref) => {
+    return (
+      <button
+        ref={ref}
+        {...props}
+        className={cn(
+          "relative h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300",
+          "inline-flex items-center justify-center",
+          props.className
+        )}
+      >
+        <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
+        {props.children}
+      </button>
+    )
+  }
+)
+NotificationTrigger.displayName = 'NotificationTrigger'
+
 function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -300,40 +321,40 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   }
 
   // Load notifications
-const loadNotifications = useCallback(async () => {
-  if (!user?.id) return
-  
-  try {
-    const { data, error } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(20)
+  const loadNotifications = useCallback(async () => {
+    if (!user?.id) return
     
-    if (!error && data) {
-      setNotifications(data)
-      setUnreadCount(data.filter(n => !n.read).length)
+    try {
+      const { data, error } = await supabase
+        .from('notifications')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(20)
+      
+      if (!error && data) {
+        setNotifications(data)
+        setUnreadCount(data.filter(n => !n.read).length)
+      }
+    } catch (error) {
+      console.error('Error loading notifications:', error)
     }
-  } catch (error) {
-    console.error('Error loading notifications:', error)
-  }
-}, [user?.id])
+  }, [user?.id])
 
-// SIMPLE POLLING - This works 100%
-useEffect(() => {
-  if (!user?.id) return
-  
-  // Load immediately
-  loadNotifications()
-  
-  // Poll every 20 seconds for new notifications
-  const interval = setInterval(() => {
+  // SIMPLE POLLING - This works 100%
+  useEffect(() => {
+    if (!user?.id) return
+    
+    // Load immediately
     loadNotifications()
-  }, 20000)
-  
-  return () => clearInterval(interval)
-}, [user?.id, loadNotifications])
+    
+    // Poll every 20 seconds for new notifications
+    const interval = setInterval(() => {
+      loadNotifications()
+    }, 20000)
+    
+    return () => clearInterval(interval)
+  }, [user?.id, loadNotifications])
 
   // Mark notification as read
   const markAsRead = async (notificationId: string) => {
@@ -744,16 +765,11 @@ useEffect(() => {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL - FIXED */}
+              {/* NOTIFICATION BELL - FIXED WITH PROPER REF FORWARDING */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                   <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="relative h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300"
-                    >
-                      <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
+                    <NotificationTrigger>
                       <AnimatePresence>
                         {unreadCount > 0 && (
                           <motion.span
@@ -766,7 +782,7 @@ useEffect(() => {
                           </motion.span>
                         )}
                       </AnimatePresence>
-                    </Button>
+                    </NotificationTrigger>
                   </PopoverTrigger>
                   <PopoverContent 
                     align="end" 

@@ -107,6 +107,11 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://vincollinsschools.org' },
   category: 'education',
   classification: 'Private Educational Institution',
+  // ✅ FIX: Add verification for search engines
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION,
+    yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION,
+  },
 };
 
 const organizationSchema = {
@@ -181,8 +186,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        <link rel="preload" href="/favicon.png" as="image" type="image/png" />
-        <link rel="preload" href="/images/logo.png" as="image" type="image/png" />
+        {/* ✅ FIX: Remove manual preload links - Next.js handles this automatically via metadata */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://mvittkvxtasayycmzgha.supabase.co" />
@@ -190,16 +194,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
-        <meta name="color-scheme" content="light dark" />
+        {/* ✅ FIX: Use 'mobile-web-app-capable' instead of deprecated 'apple-mobile-web-app-capable' */}
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="Vincollins Schools" />
         <meta name="msapplication-TileColor" content="#0A2472" />
-        <meta name="theme-color" content="#0A2472" />
-        <meta property="og:image" content="/images/og-image.jpg" />
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        <meta name="twitter:image" content="/images/twitter-image.jpg" />
       </head>
       <body 
         className={cn(

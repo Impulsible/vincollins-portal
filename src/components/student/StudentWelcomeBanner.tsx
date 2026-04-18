@@ -53,6 +53,15 @@ const calculateGrade = (percentage: number): { grade: string; color: string; des
   return { grade: 'F', color: 'text-red-600', description: 'Fail' }
 }
 
+// FIXED: Helper function outside component
+const getSubjectCountForClass = (className: string): number => {
+  if (!className) return 17
+  const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
+  if (normalizedClass.startsWith('JSS')) return 17
+  if (normalizedClass.startsWith('SS')) return 10
+  return 17
+}
+
 export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isOnline, setIsOnline] = useState(true)
@@ -120,8 +129,14 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const studentClass = profile?.class || 'Not Assigned'
   const studentDepartment = profile?.department || 'General'
   
-  // FIXED: Get subject count - JSS=17, SSS=10
-  const totalSubjects = stats?.totalSubjects || (studentClass?.startsWith('JSS') ? 17 : 10)
+  // FIXED: Use stats.totalSubjects FIRST, fallback to calculated value
+  // This ensures the banner respects the value passed from the parent
+  const totalSubjects = stats?.totalSubjects || getSubjectCountForClass(studentClass)
+
+  // Debug log to verify
+  console.log('📊 Banner - Class:', studentClass)
+  console.log('📊 Banner - stats.totalSubjects:', stats?.totalSubjects)
+  console.log('📊 Banner - Final totalSubjects:', totalSubjects)
 
   const formattedDate = currentTime.toLocaleDateString('en-NG', {
     weekday: 'long',
@@ -130,12 +145,10 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     day: 'numeric'
   })
 
-  // FIXED: Use stats directly from props
   const completedExams = stats?.completedExams ?? 0
   const averageScore = stats?.averageScore ?? 0
   const availableExams = stats?.availableExams ?? 0
 
-  // FIXED: Calculate grade based on average score
   const gradeInfo = stats?.currentGrade && stats?.gradeColor 
     ? { grade: stats.currentGrade, color: stats.gradeColor, description: '' }
     : calculateGrade(averageScore)
@@ -143,17 +156,13 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const showGrade = completedExams > 0
   const completionPercentage = totalSubjects > 0 ? Math.round((completedExams / totalSubjects) * 100) : 0
 
-  // FIXED: Get first letter of FIRST NAME for avatar
   const avatarLetter = firstName.charAt(0).toUpperCase()
-
-  // Get avatar URL - support multiple possible field names
   const avatarUrl = profile?.photo_url || undefined
 
   const handleAvatarError = () => {
     setAvatarError(true)
   }
 
-  // Get online status display
   const getStatusDisplay = () => {
     if (isOnline) {
       return {
@@ -192,19 +201,21 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <span className="text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">
               {formattedDate}
             </span>
-            {/* Online/Offline Status Badge */}
+            {/* FIXED: Wrapped Badge in span to avoid ref warning */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Badge className={cn(
-                    "text-[10px] gap-1 cursor-help",
-                    isOnline 
-                      ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" 
-                      : "bg-gray-500/20 text-gray-300 border-gray-500/30"
-                  )}>
-                    <StatusIcon className="h-3 w-3" />
-                    {statusDisplay.text}
-                  </Badge>
+                  <span className="inline-flex">
+                    <Badge className={cn(
+                      "text-[10px] gap-1 cursor-help",
+                      isOnline 
+                        ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" 
+                        : "bg-gray-500/20 text-gray-300 border-gray-500/30"
+                    )}>
+                      <StatusIcon className="h-3 w-3" />
+                      {statusDisplay.text}
+                    </Badge>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{isOnline ? 'You are online and visible' : 'You are currently offline'}</p>
@@ -213,7 +224,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             </TooltipProvider>
           </div>
           
-          {/* Display FIRST NAME */}
           <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white drop-shadow-sm">
             {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
           </h1>
@@ -240,7 +250,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           </div>
         </div>
         
-        {/* Avatar with Online/Offline Ring */}
         <div className="relative group">
           <div className={cn(
             "absolute -inset-1 bg-gradient-to-r rounded-full opacity-60 group-hover:opacity-100 blur-md transition duration-300",
@@ -262,17 +271,17 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
                 {avatarLetter}
               </AvatarFallback>
             </Avatar>
-            {/* Online/Offline Indicator Ring */}
+            {/* FIXED: Wrapped indicator in span */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={cn(
-                    "absolute -bottom-2 -right-2 rounded-full p-1.5 ring-2 ring-white",
+                  <span className={cn(
+                    "absolute -bottom-2 -right-2 rounded-full p-1.5 ring-2 ring-white inline-block",
                     statusDisplay.color,
                     isOnline && "animate-pulse"
                   )}>
                     <StatusIcon className="h-2.5 w-2.5 text-white" />
-                  </div>
+                  </span>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{isOnline ? 'Online' : 'Offline'}</p>
@@ -287,7 +296,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
       <div className="relative z-10 mt-6 pt-4 border-t border-white/15">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           
-          {/* Available Exams */}
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
@@ -298,7 +306,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <p className="text-xs md:text-sm text-gray-300">Available Exams</p>
           </div>
 
-          {/* Completed Exams */}
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-green-200 transition-colors">
@@ -312,7 +319,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             </p>
           </div>
 
-          {/* Average Score */}
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
@@ -323,19 +329,20 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <p className="text-xs md:text-sm text-gray-300">Average Score</p>
           </div>
 
-          {/* Current Grade */}
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               {showGrade ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <p className={cn(
-                        "text-2xl md:text-3xl font-bold transition-colors",
-                        gradeInfo.color
-                      )}>
-                        {gradeInfo.grade}
-                      </p>
+                      <span className="inline-flex">
+                        <p className={cn(
+                          "text-2xl md:text-3xl font-bold transition-colors",
+                          gradeInfo.color
+                        )}>
+                          {gradeInfo.grade}
+                        </p>
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>{averageScore}% average - {gradeInfo.description}</p>
@@ -351,7 +358,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           </div>
         </div>
         
-        {/* Subject Progress Bar */}
+        {/* Subject Progress Bar - Uses correct totalSubjects */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-300">Term Subject Progress</span>

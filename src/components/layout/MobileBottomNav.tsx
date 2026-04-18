@@ -1,4 +1,4 @@
-// components/layout/MobileBottomNav.tsx - STATS REMOVED
+// components/layout/MobileBottomNav.tsx - STATS REMOVED + SIGN OUT DIALOG
 'use client'
 
 import { useState } from 'react'
@@ -20,6 +20,16 @@ import {
   SheetClose,
   SheetTrigger,
 } from '@/components/ui/sheet'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -76,12 +86,11 @@ const allNavItems: NavItem[] = [
 ]
 
 // More menu items with role-based access
+// ✅ ATTENDANCE AND PERFORMANCE REMOVED FOR STUDENTS
 const moreMenuItems: NavItem[] = [
-  // Student More Items
-  { id: 'attendance', label: 'Attendance', icon: Calendar, route: '/student/attendance', roles: ['student'] },
+  // Student More Items (attendance and performance removed)
   { id: 'assignments', label: 'Assignments', icon: FileText, route: '/student/assignments', roles: ['student'] },
   { id: 'courses', label: 'Courses', icon: School, route: '/student/courses', roles: ['student'] },
-  { id: 'performance', label: 'Performance', icon: TrendingUp, route: '/student/performance', roles: ['student'] },
   { id: 'notifications', label: 'Notifications', icon: Bell, route: '/student/notifications', roles: ['student'] },
   { id: 'report-card', label: 'Report Card', icon: Award, route: '/student/report-card', roles: ['student'] },
   { id: 'settings', label: 'Settings', icon: Settings, route: '/student/settings', roles: ['student'] },
@@ -139,6 +148,7 @@ export function MobileBottomNav({
   const router = useRouter()
   const pathname = usePathname()
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
   // Filter nav items based on role
   const mainItems = allNavItems.filter(item => item.roles.includes(role)).slice(0, 4)
@@ -150,8 +160,13 @@ export function MobileBottomNav({
     setMoreMenuOpen(false)
   }
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
     setMoreMenuOpen(false)
+    setShowSignOutConfirm(true)
+  }
+
+  const confirmSignOut = () => {
+    setShowSignOutConfirm(false)
     onLogout?.()
   }
 
@@ -328,10 +343,10 @@ export function MobileBottomNav({
 
                 <Separator className="my-2" />
 
-                {/* Sign Out */}
+                {/* Sign Out Button - Opens Dialog */}
                 <div className="p-3">
                   <button
-                    onClick={handleLogout}
+                    onClick={handleLogoutClick}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 transition-all"
                   >
                     <LogOut className="h-5 w-5 shrink-0" />
@@ -350,6 +365,33 @@ export function MobileBottomNav({
           </Sheet>
         </div>
       </div>
+
+      {/* ✅ SIGN OUT CONFIRMATION DIALOG */}
+      <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
+        <AlertDialogContent className="rounded-2xl max-w-[90vw] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+              <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-600 dark:text-red-400" />
+              </div>
+              Sign Out?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm text-slate-500">
+              Are you sure you want to sign out of your account? You&apos;ll need to log in again to access your dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-xl text-sm">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmSignOut}
+              className="rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md shadow-red-500/25 text-sm"
+            >
+              <LogOut className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

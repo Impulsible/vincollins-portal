@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/help/page.tsx - FIXED WITH CHAT BOT
+// app/student/help/page.tsx - REMOVED HAMBURGER, FIXED CHAT POSITION
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -30,8 +30,7 @@ import {
   Loader2, HelpCircle, MessageCircle, Phone, Mail, MapPin,
   ChevronRight, Home, ArrowLeft, Send, FileText,
   BookOpen, Award, Search, User,
-  GraduationCap, CheckCircle, Bot, X, Minimize2,
-  Maximize2, Sparkles, Clock, ThumbsUp, ThumbsDown
+  Bot, X, Minimize2, Maximize2, Sparkles, Clock, ThumbsUp, ThumbsDown
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -439,29 +438,32 @@ export default function StudentHelpPage() {
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
       <div className="flex flex-1">
-        <StudentSidebar 
-          profile={profile}
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab="help"
-          setActiveTab={() => {}}
-        />
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:block">
+          <StudentSidebar 
+            profile={profile}
+            onLogout={handleLogout}
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+            activeTab="help"
+            setActiveTab={() => {}}
+          />
+        </div>
 
         <div className={cn(
-          "flex-1 transition-all duration-300",
+          "flex-1 transition-all duration-300 w-full",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-20 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8">
+          <main className="pt-16 lg:pt-20 pb-20 sm:pb-12 px-3 sm:px-4 md:px-6 lg:px-8">
             <div className="container mx-auto max-w-6xl">
               
               {/* Breadcrumb */}
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 flex items-center justify-between"
+                className="mb-4 md:mb-6 flex items-center justify-between"
               >
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Link href="/student" className="hover:text-primary flex items-center gap-1">
                     <Home className="h-3.5 w-3.5" />
                     Dashboard
@@ -471,7 +473,7 @@ export default function StudentHelpPage() {
                 </div>
                 <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
                   <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Dashboard
+                  Back
                 </Button>
               </motion.div>
 
@@ -479,41 +481,40 @@ export default function StudentHelpPage() {
               <motion.div 
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-8"
+                className="mb-6 md:mb-8"
               >
-                <h1 className="text-3xl font-bold text-gray-900">Help & Support Center</h1>
-                <p className="text-muted-foreground mt-2">Find answers to common questions or contact our support team</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Help & Support Center</h1>
+                <p className="text-muted-foreground mt-2 text-xs sm:text-sm md:text-base">Find answers to common questions or contact our support team</p>
               </motion.div>
 
               {/* Search Bar */}
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="mb-8"
+                className="mb-4 md:mb-6 lg:mb-8"
               >
-                <div className="relative max-w-2xl">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
                   <Input
                     placeholder="Search for answers..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-12 text-base bg-white shadow-sm"
+                    className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base bg-white shadow-sm"
                   />
                 </div>
               </motion.div>
 
               {/* Main Tabs */}
-              <Tabs defaultValue="faq" className="space-y-6">
-                <TabsList className="bg-white p-1 rounded-xl shadow-sm border">
-                  <TabsTrigger value="faq" className="rounded-lg">FAQ</TabsTrigger>
-                  <TabsTrigger value="guides" className="rounded-lg">Quick Guides</TabsTrigger>
-                  <TabsTrigger value="contact" className="rounded-lg">Contact Support</TabsTrigger>
+              <Tabs defaultValue="faq" className="space-y-4 sm:space-y-6">
+                <TabsList className="bg-white p-1 rounded-xl shadow-sm border w-full overflow-x-auto flex-nowrap">
+                  <TabsTrigger value="faq" className="rounded-lg text-xs sm:text-sm whitespace-nowrap">FAQ</TabsTrigger>
+                  <TabsTrigger value="guides" className="rounded-lg text-xs sm:text-sm whitespace-nowrap">Quick Guides</TabsTrigger>
+                  <TabsTrigger value="contact" className="rounded-lg text-xs sm:text-sm whitespace-nowrap">Contact Support</TabsTrigger>
                 </TabsList>
 
                 {/* FAQ Tab */}
-                <TabsContent value="faq" className="space-y-6">
-                  {/* Category Filter */}
-                  <div className="flex flex-wrap gap-2">
+                <TabsContent value="faq" className="space-y-4 sm:space-y-6">
+                  <div className="flex gap-1.5 sm:gap-2 overflow-x-auto pb-2 sm:flex-wrap">
                     {categories.map(cat => {
                       const Icon = cat.icon
                       return (
@@ -521,37 +522,36 @@ export default function StudentHelpPage() {
                           key={cat.id}
                           variant={activeCategory === cat.id ? 'default' : 'outline'}
                           className={cn(
-                            "cursor-pointer hover:bg-primary/10 transition-all px-4 py-2 text-sm",
+                            "cursor-pointer hover:bg-primary/10 transition-all px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm whitespace-nowrap shrink-0",
                             activeCategory === cat.id && "bg-primary text-white"
                           )}
                           onClick={() => setActiveCategory(cat.id)}
                         >
-                          <Icon className="h-3.5 w-3.5 mr-1.5" />
-                          {cat.label}
+                          <Icon className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
+                          <span>{cat.label}</span>
                         </Badge>
                       )
                     })}
                   </div>
 
-                  {/* FAQ Accordion - Custom implementation since accordion component is missing */}
                   <Card className="border-0 shadow-sm bg-white">
-                    <CardContent className="p-6">
+                    <CardContent className="p-4 sm:p-6">
                       {filteredFaqs.length === 0 ? (
-                        <div className="text-center py-12">
-                          <HelpCircle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                          <p className="text-slate-500">No FAQs found matching your search.</p>
+                        <div className="text-center py-8 sm:py-12">
+                          <HelpCircle className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
+                          <p className="text-slate-500 text-sm sm:text-base">No FAQs found matching your search.</p>
                         </div>
                       ) : (
-                        <div className="space-y-3">
+                        <div className="space-y-2 sm:space-y-3">
                           {filteredFaqs.map((faq, index) => (
                             <div key={index} className="border border-slate-200 rounded-lg overflow-hidden">
                               <details className="group">
-                                <summary className="flex items-center justify-between p-4 cursor-pointer hover:bg-slate-50 list-none">
-                                  <span className="font-medium text-gray-900">{faq.question}</span>
-                                  <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90" />
+                                <summary className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50 list-none">
+                                  <span className="font-medium text-gray-900 text-sm sm:text-base pr-4">{faq.question}</span>
+                                  <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90 shrink-0" />
                                 </summary>
-                                <div className="p-4 pt-0 border-t border-slate-200 bg-slate-50">
-                                  <p className="text-slate-600">{faq.answer}</p>
+                                <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t border-slate-200 bg-slate-50">
+                                  <p className="text-slate-600 text-xs sm:text-sm">{faq.answer}</p>
                                 </div>
                               </details>
                             </div>
@@ -564,16 +564,20 @@ export default function StudentHelpPage() {
 
                 {/* Guides Tab */}
                 <TabsContent value="guides">
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {guides.map((guide) => (
-                      <Card key={guide.id} className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer" onClick={() => setSelectedGuide(guide.id)}>
-                        <CardHeader className="pb-3">
-                          <CardTitle className="text-lg">{guide.title}</CardTitle>
-                          <CardDescription>{guide.description}</CardDescription>
+                      <Card 
+                        key={guide.id} 
+                        className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer" 
+                        onClick={() => setSelectedGuide(guide.id)}
+                      >
+                        <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6">
+                          <CardTitle className="text-base sm:text-lg">{guide.title}</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm">{guide.description}</CardDescription>
                         </CardHeader>
-                        <CardContent>
-                          <div className="flex items-center text-sm text-slate-500">
-                            <Clock className="h-4 w-4 mr-1.5" />
+                        <CardContent className="px-4 sm:px-6 pb-4">
+                          <div className="flex items-center text-xs sm:text-sm text-slate-500">
+                            <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                             {guide.readTime} read
                           </div>
                         </CardContent>
@@ -584,64 +588,63 @@ export default function StudentHelpPage() {
 
                 {/* Contact Support Tab */}
                 <TabsContent value="contact">
-                  <div className="grid gap-6 lg:grid-cols-3">
-                    {/* Contact Info */}
-                    <div className="lg:col-span-1 space-y-4">
+                  <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
+                    <div className="lg:col-span-1 space-y-3 sm:space-y-4">
                       <Card className="border-0 shadow-sm bg-white">
-                        <CardHeader>
-                          <CardTitle className="text-lg">Contact Information</CardTitle>
+                        <CardHeader className="pb-2 px-4 sm:px-6">
+                          <CardTitle className="text-base sm:text-lg">Contact Information</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="flex items-start gap-3">
-                            <Phone className="h-5 w-5 text-emerald-600 mt-0.5" />
+                        <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4">
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mt-0.5 shrink-0" />
                             <div>
-                              <p className="font-medium">Phone Support</p>
-                              <p className="text-sm text-slate-600">+234 800 123 4567</p>
-                              <p className="text-xs text-slate-500">Mon-Fri, 8am-4pm</p>
+                              <p className="font-medium text-sm sm:text-base">Phone Support</p>
+                              <p className="text-xs sm:text-sm text-slate-600">+234 800 123 4567</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500">Mon-Fri, 8am-4pm</p>
                             </div>
                           </div>
-                          <div className="flex items-start gap-3">
-                            <Mail className="h-5 w-5 text-emerald-600 mt-0.5" />
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mt-0.5 shrink-0" />
                             <div>
-                              <p className="font-medium">Email Support</p>
-                              <p className="text-sm text-slate-600">support@vincollins.edu.ng</p>
-                              <p className="text-xs text-slate-500">24/7 response within 24h</p>
+                              <p className="font-medium text-sm sm:text-base">Email Support</p>
+                              <p className="text-xs sm:text-sm text-slate-600 break-all">support@vincollins.edu.ng</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500">24/7 response within 24h</p>
                             </div>
                           </div>
-                          <div className="flex items-start gap-3">
-                            <MapPin className="h-5 w-5 text-emerald-600 mt-0.5" />
+                          <div className="flex items-start gap-2 sm:gap-3">
+                            <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mt-0.5 shrink-0" />
                             <div>
-                              <p className="font-medium">Visit Us</p>
-                              <p className="text-sm text-slate-600">ICT Support Center</p>
-                              <p className="text-xs text-slate-500">Main Campus Building</p>
+                              <p className="font-medium text-sm sm:text-base">Visit Us</p>
+                              <p className="text-xs sm:text-sm text-slate-600">ICT Support Center</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500">Main Campus Building</p>
                             </div>
                           </div>
                         </CardContent>
                       </Card>
                     </div>
 
-                    {/* Ticket Form */}
                     <div className="lg:col-span-2">
                       <Card className="border-0 shadow-sm bg-white">
-                        <CardHeader>
-                          <CardTitle className="text-lg">Submit a Support Ticket</CardTitle>
-                          <CardDescription>Fill out the form below and we'll get back to you soon</CardDescription>
+                        <CardHeader className="pb-3 px-4 sm:px-6">
+                          <CardTitle className="text-base sm:text-lg">Submit a Support Ticket</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm">Fill out the form below and we'll get back to you soon</CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
                           <div>
-                            <Label htmlFor="subject">Subject *</Label>
+                            <Label htmlFor="subject" className="text-xs sm:text-sm">Subject *</Label>
                             <Input
                               id="subject"
                               value={ticketForm.subject}
                               onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
                               placeholder="Brief description of your issue"
+                              className="mt-1 text-sm"
                             />
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div>
-                              <Label htmlFor="category">Category *</Label>
+                              <Label htmlFor="category" className="text-xs sm:text-sm">Category *</Label>
                               <Select value={ticketForm.category} onValueChange={(v) => setTicketForm({ ...ticketForm, category: v })}>
-                                <SelectTrigger>
+                                <SelectTrigger className="mt-1 text-sm">
                                   <SelectValue placeholder="Select category" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -654,9 +657,9 @@ export default function StudentHelpPage() {
                               </Select>
                             </div>
                             <div>
-                              <Label htmlFor="priority">Priority</Label>
+                              <Label htmlFor="priority" className="text-xs sm:text-sm">Priority</Label>
                               <Select value={ticketForm.priority} onValueChange={(v) => setTicketForm({ ...ticketForm, priority: v })}>
-                                <SelectTrigger>
+                                <SelectTrigger className="mt-1 text-sm">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -669,19 +672,20 @@ export default function StudentHelpPage() {
                             </div>
                           </div>
                           <div>
-                            <Label htmlFor="message">Message *</Label>
+                            <Label htmlFor="message" className="text-xs sm:text-sm">Message *</Label>
                             <Textarea
                               id="message"
                               value={ticketForm.message}
                               onChange={(e) => setTicketForm({ ...ticketForm, message: e.target.value })}
                               placeholder="Describe your issue in detail..."
                               rows={5}
+                              className="mt-1 text-sm resize-none"
                             />
                           </div>
                           <Button 
                             onClick={handleSubmitTicket} 
                             disabled={submitting}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm sm:text-base"
                           >
                             {submitting ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -701,32 +705,45 @@ export default function StudentHelpPage() {
         </div>
       </div>
 
-      {/* Chat Bot Widget */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Chat Bot Widget - FIXED POSITION WITH TOP SPACING */}
+      <>
+        {/* Chat Window */}
         <AnimatePresence>
           {isChatOpen && !isMinimized && (
             <motion.div
               initial={{ opacity: 0, y: 20, scale: 0.95 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              className="absolute bottom-20 right-0 w-[380px] max-w-[calc(100vw-3rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+              className={cn(
+                "fixed z-50 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden",
+                // Position with more top spacing
+                "top-20 sm:top-24",
+                // Right position
+                "right-4 sm:right-6",
+                // Width responsive
+                "w-[calc(100vw-2rem)] sm:w-[380px]",
+                // Max width
+                "max-w-[380px]",
+                // Max height to prevent overflow
+                "max-h-[calc(100vh-120px)]"
+              )}
             >
               {/* Chat Header */}
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-4 text-white">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 sm:p-4 text-white">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 sm:gap-3">
                     <div className="relative">
-                      <div className="h-10 w-10 rounded-full bg-white/20 flex items-center justify-center">
-                        <Bot className="h-6 w-6" />
+                      <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-white/20 flex items-center justify-center">
+                        <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
-                      <span className="absolute bottom-0 right-0 h-3 w-3 bg-green-400 rounded-full border-2 border-white"></span>
+                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-400 rounded-full border-2 border-white"></span>
                     </div>
                     <div>
-                      <h3 className="font-semibold flex items-center gap-2">
+                      <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1 sm:gap-2">
                         Vincollins Assistant
-                        <Sparkles className="h-4 w-4 text-yellow-300" />
+                        <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-300" />
                       </h3>
-                      <p className="text-xs text-emerald-100">Online • Usually replies instantly</p>
+                      <p className="text-[10px] sm:text-xs text-emerald-100">Online • Usually replies instantly</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
@@ -734,21 +751,21 @@ export default function StudentHelpPage() {
                       onClick={toggleMinimize}
                       className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
                     >
-                      <Minimize2 className="h-4 w-4" />
+                      <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                     <button
                       onClick={toggleChat}
                       className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
                     >
-                      <X className="h-4 w-4" />
+                      <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                   </div>
                 </div>
               </div>
 
               {/* Chat Messages */}
-              <ScrollArea className="h-[400px] p-4 bg-slate-50">
-                <div className="space-y-4">
+              <ScrollArea className="h-[350px] sm:h-[400px] max-h-[calc(100vh-320px)] p-3 sm:p-4 bg-slate-50">
+                <div className="space-y-3 sm:space-y-4">
                   {chatMessages.map((message) => (
                     <div key={message.id}>
                       <div className={cn(
@@ -756,25 +773,25 @@ export default function StudentHelpPage() {
                         message.sender === 'user' && "flex-row-reverse"
                       )}>
                         {message.sender === 'bot' && (
-                          <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                            <Bot className="h-4 w-4 text-emerald-600" />
+                          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                            <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                           </div>
                         )}
                         <div className={cn(
-                          "max-w-[80%] rounded-2xl px-4 py-2.5",
+                          "max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5",
                           message.sender === 'user'
                             ? "bg-emerald-600 text-white"
                             : "bg-white border border-slate-200 text-slate-700"
                         )}>
-                          <p className="text-sm whitespace-pre-wrap">{message.text}</p>
-                          <span className="text-[10px] opacity-60 mt-1 block">
+                          <p className="text-xs sm:text-sm whitespace-pre-wrap">{message.text}</p>
+                          <span className="text-[9px] sm:text-[10px] opacity-60 mt-1 block">
                             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
                       </div>
                       
                       {message.sender === 'bot' && message.id !== '1' && (
-                        <div className="flex items-center gap-2 ml-10 mt-1">
+                        <div className="flex items-center gap-2 ml-9 sm:ml-10 mt-1">
                           <button
                             onClick={() => handleChatFeedback(message.id, 'up')}
                             className={cn(
@@ -782,7 +799,7 @@ export default function StudentHelpPage() {
                               feedbackGiven[message.id] === 'up' && "text-green-600"
                             )}
                           >
-                            <ThumbsUp className="h-3.5 w-3.5" />
+                            <ThumbsUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </button>
                           <button
                             onClick={() => handleChatFeedback(message.id, 'down')}
@@ -791,7 +808,7 @@ export default function StudentHelpPage() {
                               feedbackGiven[message.id] === 'down' && "text-red-600"
                             )}
                           >
-                            <ThumbsDown className="h-3.5 w-3.5" />
+                            <ThumbsDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </button>
                         </div>
                       )}
@@ -800,14 +817,14 @@ export default function StudentHelpPage() {
                   
                   {isTyping && (
                     <div className="flex items-start gap-2">
-                      <div className="h-8 w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <Bot className="h-4 w-4 text-emerald-600" />
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                        <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                       </div>
-                      <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3">
+                      <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
                         <div className="flex gap-1">
-                          <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="h-2 w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
                         </div>
                       </div>
                     </div>
@@ -818,14 +835,14 @@ export default function StudentHelpPage() {
               </ScrollArea>
 
               {/* Quick Replies */}
-              <div className="p-3 border-t border-slate-200 bg-white">
-                <p className="text-xs text-slate-500 mb-2">Quick replies:</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="p-2 sm:p-3 border-t border-slate-200 bg-white">
+                <p className="text-[10px] sm:text-xs text-slate-500 mb-1.5 sm:mb-2">Quick replies:</p>
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {quickReplies.slice(0, 4).map((reply) => (
                     <Badge
                       key={reply}
                       variant="outline"
-                      className="cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-colors"
+                      className="cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-[10px] sm:text-xs py-0.5 sm:py-1"
                       onClick={() => handleQuickReply(reply)}
                     >
                       {reply}
@@ -835,25 +852,25 @@ export default function StudentHelpPage() {
               </div>
 
               {/* Chat Input */}
-              <div className="p-4 border-t border-slate-200 bg-white">
+              <div className="p-3 sm:p-4 border-t border-slate-200 bg-white">
                 <div className="flex items-center gap-2">
                   <Input
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="Type your message..."
-                    className="flex-1 bg-slate-50 border-slate-200"
+                    className="flex-1 bg-slate-50 border-slate-200 text-sm"
                   />
                   <Button
                     onClick={handleSendMessage}
                     disabled={!chatInput.trim()}
                     size="icon"
-                    className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
+                    className="bg-emerald-600 hover:bg-emerald-700 shrink-0 h-9 w-9 sm:h-10 sm:w-10"
                   >
-                    <Send className="h-4 w-4" />
+                    <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
-                <p className="text-[10px] text-slate-400 mt-2 text-center">
+                <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1.5 sm:mt-2 text-center">
                   Powered by Vincollins AI Assistant
                 </p>
               </div>
@@ -868,42 +885,33 @@ export default function StudentHelpPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="absolute bottom-20 right-0 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full shadow-lg p-3 cursor-pointer"
+              className="fixed z-50 top-20 sm:top-24 right-4 sm:right-6 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full shadow-lg py-2 px-4 cursor-pointer"
               onClick={toggleMinimize}
             >
-              <div className="flex items-center gap-3 text-white">
-                <Bot className="h-5 w-5" />
-                <span className="font-medium">Chat with us</span>
-                <Maximize2 className="h-4 w-4" />
+              <div className="flex items-center gap-2 sm:gap-3 text-white">
+                <Bot className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="font-medium text-sm">Chat with us</span>
+                <Maximize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </div>
             </motion.div>
           )}
         </AnimatePresence>
 
         {/* Chat Button */}
-        <motion.button
-          onClick={toggleChat}
-          className={cn(
-            "relative p-4 rounded-full shadow-lg text-white transition-all",
-            isChatOpen
-              ? "bg-slate-600 hover:bg-slate-700"
-              : "bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
-          )}
-          whileHover={{ scale: 1.05 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          {isChatOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <>
-              <MessageCircle className="h-6 w-6" />
-              {hasNewMessage && !isChatOpen && (
-                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full border-2 border-white" />
-              )}
-            </>
-          )}
-        </motion.button>
-      </div>
+        {!isChatOpen && (
+          <motion.button
+            onClick={toggleChat}
+            className="fixed z-50 bottom-4 right-4 sm:bottom-6 sm:right-6 p-3 sm:p-4 rounded-full shadow-lg text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 transition-all"
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <MessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+            {hasNewMessage && (
+              <span className="absolute -top-1 -right-1 h-3.5 w-3.5 sm:h-4 sm:w-4 bg-red-500 rounded-full border-2 border-white" />
+            )}
+          </motion.button>
+        )}
+      </>
     </div>
   )
 }
