@@ -1,12 +1,14 @@
-// components/staff/StudentRoster.tsx - FULLY FIXED
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// components/staff/StudentRoster.tsx - FIXED - READS CORRECT DATA
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Users, Search, GraduationCap, Mail, ArrowRight } from 'lucide-react'
+import { Users, Search, GraduationCap, Mail, ArrowRight, Loader2, RefreshCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -19,28 +21,186 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+import { toast } from 'sonner'
 
 interface Student {
   id: string
   full_name: string | null
+  first_name?: string | null
+  last_name?: string | null
   email: string
   class: string
+  department?: string | null
   vin_id?: string | null
   photo_url?: string | null
+  avatar_url?: string | null
   is_active?: boolean | null
+  role?: string
 }
 
 interface StudentRosterProps {
-  students: Student[]
+  students?: Student[] // Made optional - will fetch internally if not provided
   fullView?: boolean
   compact?: boolean
   onViewAll?: () => void
+  teacherClass?: string // Add teacher's assigned class
 }
 
-export function StudentRoster({ students, fullView = false, compact = false, onViewAll }: StudentRosterProps) {
+export function StudentRoster({ 
+  students: externalStudents, 
+  fullView = false, 
+  compact = false, 
+  onViewAll,
+  teacherClass 
+}: StudentRosterProps) {
   const router = useRouter()
+  const [loading, setLoading] = useState(!externalStudents)
+  const [students, setStudents] = useState<Student[]>(externalStudents || [])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedClass, setSelectedClass] = useState<string>('all')
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Fetch students if not provided externally
+  const fetchStudents = useCallback(async (showToast = false) => {
+    try {
+      setRefreshing(true)
+      console.log('📚 Fetching students...')
+      
+      // First try profiles table
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'student')
+        .order('full_name')
+
+      if (profilesError) {
+        console.error('Error fetching from profiles:', profilesError)
+      }
+
+      // Also check users table for any missing students
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'student')
+        .order('full_name')
+
+      if (usersError) {
+        console.error('Error fetching from users:', usersError)
+      }
+
+      // Combine and deduplicate
+      const allStudents: Student[] = []
+      const seenIds = new Set<string>()
+
+      // Process profiles
+      if (profilesData) {
+        profilesData.forEach((profile: any) => {
+          if (!seenIds.has(profile.id)) {
+            seenIds.add(profile.id)
+            allStudents.push({
+              id: profile.id,
+              full_name: profile.full_name || profile.first_name && profile.last_name 
+                ? `${profile.first_name} ${profile.last_name}`.trim()
+                : 'Student',
+              first_name: profile.first_name,
+              last_name: profile.last_name,
+              email: profile.email || '',
+              class: profile.class || 'Not Assigned',
+              department: profile.department,
+              vin_id: profile.vin_id,
+              photo_url: profile.photo_url || profile.avatar_url,
+              avatar_url: profile.avatar_url,
+              is_active: profile.is_active ?? true,
+              role: profile.role
+            })
+          }
+        })
+      }
+
+      // Process users (only those not already in profiles)
+      if (usersData) {
+        usersData.forEach((user: any) => {
+          if (!seenIds.has(user.id)) {
+            seenIds.add(user.id)
+            allStudents.push({
+              id: user.id,
+              full_name: user.full_name || user.first_name && user.last_name 
+                ? `${user.first_name} ${user.last_name}`.trim()
+                : user.email?.split('@')[0] || 'Student',
+              first_name: user.first_name,
+              last_name: user.last_name,
+              email: user.email || '',
+              class: user.class || 'Not Assigned',
+              department: user.department,
+              vin_id: user.vin_id,
+              photo_url: user.photo_url || user.avatar_url,
+              is_active: user.is_active ?? true,
+              role: user.role
+            })
+          }
+        })
+      }
+
+      // Filter by teacher's class if provided
+      let filteredStudents = allStudents
+      if (teacherClass) {
+        filteredStudents = allStudents.filter(s => s.class === teacherClass)
+        console.log(`📚 Filtered to ${teacherClass}: ${filteredStudents.length} students`)
+      }
+
+      console.log(`📚 Total students loaded: ${filteredStudents.length}`)
+      setStudents(filteredStudents)
+      
+      if (showToast) {
+        toast.success(`Loaded ${filteredStudents.length} students`)
+      }
+    } catch (error) {
+      console.error('Error fetching students:', error)
+      toast.error('Failed to load students')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [teacherClass])
+
+  // Initial fetch if no external students provided
+  useEffect(() => {
+    if (!externalStudents) {
+      fetchStudents()
+    } else {
+      setStudents(externalStudents)
+      setLoading(false)
+    }
+  }, [externalStudents, fetchStudents])
+
+  // Real-time subscription for student updates
+  useEffect(() => {
+    if (externalStudents) return // Don't subscribe if using external data
+
+    const channel = supabase
+      .channel('students-roster')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'profiles', filter: `role=eq.student` },
+        () => {
+          console.log('🔄 Student profiles changed, refreshing...')
+          fetchStudents()
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'users', filter: `role=eq.student` },
+        () => {
+          console.log('🔄 Student users changed, refreshing...')
+          fetchStudents()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
+  }, [externalStudents, fetchStudents])
 
   // Get unique classes and sort them
   const classes = useMemo(() => {
@@ -59,10 +219,13 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       const matchesClass = selectedClass === 'all' || student.class === selectedClass
-      const matchesSearch = 
-        student.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        student.vin_id?.toLowerCase().includes(searchQuery.toLowerCase())
+      const searchLower = searchQuery.toLowerCase()
+      const matchesSearch = !searchQuery || 
+        student.full_name?.toLowerCase().includes(searchLower) ||
+        student.first_name?.toLowerCase().includes(searchLower) ||
+        student.last_name?.toLowerCase().includes(searchLower) ||
+        student.email?.toLowerCase().includes(searchLower) ||
+        student.vin_id?.toLowerCase().includes(searchLower)
       return matchesClass && matchesSearch
     })
   }, [students, selectedClass, searchQuery])
@@ -70,38 +233,47 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
   // Show 4 students in preview mode, all in full view
   const displayStudents = fullView ? filteredStudents : filteredStudents.slice(0, 4)
 
-  // Get accurate student count based on filter
+  // Get accurate student count
   const totalStudentsCount = students.length
   const filteredCount = filteredStudents.length
 
-  // Get initials for avatar - with null safety
-  const getInitials = (name?: string | null): string => {
-    if (!name) return 'S'
-    const trimmedName = name.trim()
-    if (!trimmedName) return 'S'
-    
-    const parts = trimmedName.split(/\s+/).filter(Boolean)
-    if (parts.length >= 2) {
-      const firstChar = parts[0][0]
-      const lastChar = parts[parts.length - 1][0]
-      if (firstChar && lastChar) {
-        return (firstChar + lastChar).toUpperCase()
-      }
+  // Get initials for avatar
+  const getInitials = (student: Student): string => {
+    // Try first_name + last_name first
+    if (student.first_name && student.last_name) {
+      return (student.first_name[0] + student.last_name[0]).toUpperCase()
     }
     
-    // Return first character or first two characters
-    return trimmedName.slice(0, 2).toUpperCase()
+    // Try full_name
+    if (student.full_name) {
+      const parts = student.full_name.trim().split(/\s+/)
+      if (parts.length >= 2) {
+        return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      }
+      return student.full_name.slice(0, 2).toUpperCase()
+    }
+    
+    // Fallback to email
+    if (student.email) {
+      const namePart = student.email.split('@')[0]
+      return namePart.slice(0, 2).toUpperCase()
+    }
+    
+    return 'ST'
   }
 
-  // Get status color
-  const getStatusColor = (isActive?: boolean | null) => {
-    return isActive !== false 
-      ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-      : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+  // Get display name
+  const getDisplayName = (student: Student): string => {
+    if (student.full_name) return student.full_name
+    if (student.first_name && student.last_name) return `${student.first_name} ${student.last_name}`
+    if (student.first_name) return student.first_name
+    if (student.last_name) return student.last_name
+    if (student.email) return student.email.split('@')[0]
+    return 'Student'
   }
 
-  // Get avatar gradient color - with null safety
-  const getAvatarColor = (name?: string | null): string => {
+  // Get avatar color
+  const getAvatarColor = (student: Student): string => {
     const colors = [
       'from-blue-500 to-indigo-500',
       'from-emerald-500 to-teal-500',
@@ -111,17 +283,8 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
       'from-amber-500 to-orange-500',
     ]
     
-    // Handle null or undefined name
-    if (!name) {
-      return colors[0]
-    }
-    
-    const trimmedName = name.trim()
-    if (!trimmedName) {
-      return colors[0]
-    }
-    
-    const index = trimmedName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    const name = getDisplayName(student)
+    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
     return colors[index % colors.length]
   }
 
@@ -129,7 +292,7 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
     if (onViewAll) {
       onViewAll()
     } else {
-      router.push('/staff')
+      router.push('/staff/students')
     }
   }
 
@@ -137,14 +300,21 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
     router.push(`/staff/students/${studentId}`)
   }
 
-  // Helper to safely get display name
-  const getDisplayName = (student: Student): string => {
-    return student.full_name || 'Student'
+  const handleRefresh = () => {
+    fetchStudents(true)
   }
 
-  // Helper to safely get email display
-  const getDisplayEmail = (student: Student): string => {
-    return student.email || 'No email provided'
+  if (loading) {
+    return (
+      <Card className="border-0 shadow-sm bg-white/80 backdrop-blur-sm">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-3 text-slate-500">Loading students...</span>
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
 
   return (
@@ -173,6 +343,19 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
           </div>
           
           <div className="flex items-center gap-2">
+            {/* Refresh Button */}
+            {!externalStudents && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="h-8 w-8"
+              >
+                <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              </Button>
+            )}
+
             {/* Class Selector */}
             <Select value={selectedClass} onValueChange={setSelectedClass}>
               <SelectTrigger className={cn(
@@ -195,7 +378,7 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
             </Select>
 
             {/* View All Button - Only show in preview mode */}
-            {!fullView && (
+            {!fullView && totalStudentsCount > 4 && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -247,7 +430,6 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
               <div className="space-y-1 pr-2">
                 {displayStudents.map((student, index) => {
                   const displayName = getDisplayName(student)
-                  const displayEmail = getDisplayEmail(student)
                   
                   return (
                     <motion.div
@@ -268,12 +450,12 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
                           "ring-2 ring-white dark:ring-slate-900",
                           compact ? "h-8 w-8" : "h-9 w-9"
                         )}>
-                          <AvatarImage src={student.photo_url || undefined} />
+                          <AvatarImage src={student.photo_url || student.avatar_url || undefined} />
                           <AvatarFallback className={cn(
                             "bg-gradient-to-br text-white text-xs font-medium",
-                            getAvatarColor(displayName)
+                            getAvatarColor(student)
                           )}>
-                            {getInitials(displayName)}
+                            {getInitials(student)}
                           </AvatarFallback>
                         </Avatar>
                         {student.is_active !== false && (
@@ -301,7 +483,7 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
                         <div className="flex items-center gap-2 text-xs text-slate-500">
                           <span className="truncate flex items-center gap-1">
                             <Mail className="h-3 w-3 shrink-0" />
-                            {displayEmail}
+                            {student.email || 'No email'}
                           </span>
                           {student.vin_id && fullView && (
                             <>
@@ -315,13 +497,14 @@ export function StudentRoster({ students, fullView = false, compact = false, onV
                       {fullView && (
                         <Badge className={cn(
                           "text-xs shrink-0",
-                          getStatusColor(student.is_active)
+                          student.is_active !== false
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
                         )}>
                           {student.is_active !== false ? 'Active' : 'Inactive'}
                         </Badge>
                       )}
 
-                      {/* Chevron indicator for clickable row */}
                       <ArrowRight className={cn(
                         "h-4 w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity",
                         compact && "hidden"

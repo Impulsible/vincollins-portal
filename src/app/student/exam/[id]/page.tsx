@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-expressions */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/exam/[id]/page.tsx - COMPLETE RESTORED WITH ALL FIXES
+// app/student/exam/[id]/page.tsx - WITH STRICT SECURITY AND AUTO-SUBMIT
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import {
   Clock, ChevronLeft, ChevronRight, Send, Flag,
-  CheckCircle, XCircle, AlertTriangle, Maximize2, Home,
+  CheckCircle, XCircle, AlertTriangle, Maximize2,
   Lock, Loader2, Monitor, Award, User, Shield,
   BookOpen, FileText, HelpCircle, ArrowLeft,
   RotateCcw, Wifi, WifiOff, Grid3x3,
@@ -170,6 +170,11 @@ export default function StudentExamPage() {
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false)
   const [securityViolated, setSecurityViolated] = useState(false)
   const [showSecurityWarning, setShowSecurityWarning] = useState(false)
+  const [newTabAttempts, setNewTabAttempts] = useState(0)
+  
+  // Navigation warning state
+  const [showLeaveWarning, setShowLeaveWarning] = useState(false)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
   
   const loadedRef = useRef(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
@@ -177,6 +182,7 @@ export default function StudentExamPage() {
   const isSubmittingRef = useRef(false)
   const examEndedRef = useRef(false)
   const soundRef = useRef<HTMLAudioElement | null>(null)
+  const newWindowDetectorRef = useRef<number | null>(null)
 
   // Computed values
   const currentQuestion = allQuestions[currentIndex]
@@ -217,15 +223,8 @@ export default function StudentExamPage() {
     }
   }
 
-  const getGradeColor = (grade: string) => {
-    if (grade?.startsWith('A')) return 'text-green-600 bg-green-100'
-    if (grade?.startsWith('B')) return 'text-blue-600 bg-blue-100'
-    if (grade?.startsWith('C')) return 'text-yellow-600 bg-yellow-100'
-    return 'text-red-600 bg-red-100'
-  }
-
   // =============================================
-  // playSound FUNCTION
+  // playSound FUNCTION - MUST BE DECLARED BEFORE USE
   // =============================================
   const playSound = useCallback(() => {
     if (soundEnabled && soundRef.current) {
@@ -264,32 +263,7 @@ export default function StudentExamPage() {
   }, [objectiveQuestions, answers])
 
   // =============================================
-  // AUTO-SAVE FUNCTION
-  // =============================================
-  const autoSave = useCallback(async () => {
-    if (!attemptId || !examStarted || examEndedRef.current) return
-    
-    setAutoSaveStatus('saving')
-    
-    try {
-      await supabase
-        .from('exam_attempts')
-        .update({
-          answers: answers,
-          last_auto_save: new Date().toISOString()
-        })
-        .eq('id', attemptId)
-      
-      setAutoSaveStatus('saved')
-      setTimeout(() => setAutoSaveStatus('idle'), 2000)
-    } catch (error) {
-      console.error('Auto-save failed:', error)
-      setAutoSaveStatus('idle')
-    }
-  }, [attemptId, examStarted, answers])
-
-  // =============================================
-  // HANDLE SUBMIT - WITH ALL FIXES
+  // HANDLE SUBMIT - MUST BE DECLARED BEFORE USE IN EFFECTS
   // =============================================
   const handleSubmit = useCallback(async (isAuto = false, reason = 'manual') => {
     if (isSubmittingRef.current || examEndedRef.current) return
@@ -302,6 +276,7 @@ export default function StudentExamPage() {
     
     if (timerRef.current) clearInterval(timerRef.current)
     if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
+    if (newWindowDetectorRef.current) clearInterval(newWindowDetectorRef.current)
     
     if (document.fullscreenElement) {
       try { await document.exitFullscreen() } catch (e) {}
@@ -328,7 +303,6 @@ export default function StudentExamPage() {
         throw new Error('User session expired. Please log in again.')
       }
       
-      // Update or create attempt
       if (attemptId) {
         const { error: updateError } = await supabase
           .from('exam_attempts')
@@ -349,6 +323,7 @@ export default function StudentExamPage() {
             unanswered_count: objResult.unanswered,
             tab_switches: tabSwitches,
             fullscreen_exits: fullscreenExits,
+            new_tab_attempts: newTabAttempts,
             is_auto_submitted: isAuto,
             auto_submit_reason: isAuto ? reason : null,
             updated_at: new Date().toISOString()
@@ -383,6 +358,7 @@ export default function StudentExamPage() {
             unanswered_count: objResult.unanswered,
             tab_switches: tabSwitches,
             fullscreen_exits: fullscreenExits,
+            new_tab_attempts: newTabAttempts,
             is_auto_submitted: isAuto,
             auto_submit_reason: isAuto ? reason : null
           })
@@ -393,7 +369,6 @@ export default function StudentExamPage() {
         if (newAttempt) setAttemptId(newAttempt.id)
       }
 
-      // Create/update exam score
       const { data: existingScore } = await supabase
         .from('exam_scores')
         .select('id')
@@ -425,7 +400,6 @@ export default function StudentExamPage() {
         await supabase.from('exam_scores').insert({ ...scoreData, created_at: new Date().toISOString() })
       }
 
-      // Update student stats
       if (profile?.id) {
         try {
           const { data: allScores } = await supabase
@@ -466,7 +440,6 @@ export default function StudentExamPage() {
         }
       }
 
-      // Send notification to teacher
       if (exam?.created_by) {
         try {
           await supabase.from('notifications').insert({
@@ -485,7 +458,6 @@ export default function StudentExamPage() {
         } catch (notifError) {}
       }
 
-      // Send notification to admin
       try {
         const { data: admins } = await supabase
           .from('profiles')
@@ -510,7 +482,6 @@ export default function StudentExamPage() {
         }
       } catch (adminNotifError) {}
 
-      // Set completed state
       setHasCompletedAttempt(true)
       setExamResult({ 
         ...objResult, 
@@ -556,7 +527,211 @@ export default function StudentExamPage() {
     } finally {
       setIsSubmitting(false)
     }
-  }, [attemptId, exam, calculateObjectiveScore, answers, tabSwitches, fullscreenExits, attemptsUsed, objectiveQuestions, theoryQuestions, profile, examId, playSound])
+  }, [attemptId, exam, calculateObjectiveScore, answers, tabSwitches, fullscreenExits, newTabAttempts, attemptsUsed, objectiveQuestions, theoryQuestions, profile, examId, playSound])
+
+  // =============================================
+  // STRICT SECURITY: New Tab/Window Prevention
+  // =============================================
+  useEffect(() => {
+    if (!examStarted || examEndedRef.current) return
+
+    // Detect new window/tab opening attempts
+    const detectNewWindow = () => {
+      const widthThreshold = window.outerWidth - window.innerWidth > 100
+      const heightThreshold = window.outerHeight - window.innerHeight > 100
+      
+      if (widthThreshold || heightThreshold) {
+        setNewTabAttempts(p => {
+          const n = p + 1
+          playSound()
+          
+          toast.error(`🚨 SECURITY ALERT: New window/tab detected! (${n}/${TAB_SWITCH_LIMIT})`, {
+            description: 'Opening new windows or tabs is STRICTLY PROHIBITED during the exam!',
+            duration: 5000
+          })
+          
+          if (n >= TAB_SWITCH_LIMIT) {
+            setSecurityViolated(true)
+            toast.error('❌ SECURITY VIOLATION! Auto-submitting exam...', {
+              description: 'You exceeded the allowed security violations.',
+              duration: 5000
+            })
+            setTimeout(() => handleSubmit(true, 'New window/tab limit exceeded'), 100)
+          }
+          
+          return n
+        })
+        setShowSecurityWarning(true)
+        setTimeout(() => setShowSecurityWarning(false), 5000)
+      }
+    }
+
+    // Block all keyboard shortcuts that could open new windows/tabs
+    const blockShortcuts = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase()
+      const ctrl = e.ctrlKey
+      const alt = e.altKey
+      const shift = e.shiftKey
+      const meta = e.metaKey
+
+      // Block Ctrl+T (new tab)
+      if (ctrl && key === 't') {
+        e.preventDefault()
+        detectNewWindow()
+        toast.warning('⚠️ Opening new tabs is prohibited during the exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Ctrl+N (new window)
+      if (ctrl && key === 'n') {
+        e.preventDefault()
+        detectNewWindow()
+        toast.warning('⚠️ Opening new windows is prohibited during the exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Ctrl+Shift+N (incognito)
+      if (ctrl && shift && key === 'n') {
+        e.preventDefault()
+        detectNewWindow()
+        toast.warning('⚠️ Incognito mode is prohibited during the exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Ctrl+W (close tab)
+      if (ctrl && key === 'w') {
+        e.preventDefault()
+        setShowLeaveWarning(true)
+        toast.warning('⚠️ Closing this tab will auto-submit your exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Ctrl+Shift+W (close window)
+      if (ctrl && shift && key === 'w') {
+        e.preventDefault()
+        setShowLeaveWarning(true)
+        toast.warning('⚠️ Closing this window will auto-submit your exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Alt+Tab (switch windows)
+      if (alt && key === 'tab') {
+        e.preventDefault()
+        toast.warning('⚠️ Switching windows is prohibited during the exam!', { duration: 2000 })
+        return false
+      }
+      
+      // Block Alt+F4
+      if (alt && key === 'f4') {
+        e.preventDefault()
+        setShowLeaveWarning(true)
+        toast.warning('⚠️ Closing this window will auto-submit your exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Ctrl+Shift+Q (quit)
+      if (ctrl && shift && key === 'q') {
+        e.preventDefault()
+        setShowLeaveWarning(true)
+        toast.warning('⚠️ Quitting will auto-submit your exam!', { duration: 3000 })
+        return false
+      }
+      
+      // Block Print Screen
+      if (key === 'printscreen') {
+        e.preventDefault()
+        toast.warning('⚠️ Screenshots are prohibited during the exam!', { duration: 2000 })
+        return false
+      }
+      
+      // Block Windows key
+      if (key === 'meta' || key === 'os') {
+        e.preventDefault()
+        toast.warning('⚠️ Windows key is disabled during the exam!', { duration: 2000 })
+        return false
+      }
+      
+      return true
+    }
+
+    // Block right-click context menu
+    const blockContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+      toast.warning('⚠️ Right-click is disabled during the exam!', { duration: 2000 })
+      return false
+    }
+
+    // Monitor for new windows using interval
+    newWindowDetectorRef.current = window.setInterval(detectNewWindow, 1000)
+
+    // Prevent middle-click (opens new tab)
+    const blockMiddleClick = (e: MouseEvent) => {
+      if (e.button === 1) {
+        e.preventDefault()
+        toast.warning('⚠️ Middle-click (opening new tabs) is prohibited!', { duration: 2000 })
+        return false
+      }
+    }
+
+    // Block all links that try to open in new windows
+    const blockNewWindowLinks = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      const anchor = target.closest('a')
+      if (anchor && anchor.target === '_blank') {
+        e.preventDefault()
+        toast.warning('⚠️ Opening links in new tabs is prohibited!', { duration: 2000 })
+        return false
+      }
+    }
+
+    // Prevent drag and drop (could be used to open new tabs)
+    const blockDragStart = (e: DragEvent) => {
+      e.preventDefault()
+      return false
+    }
+
+    document.addEventListener('keydown', blockShortcuts)
+    document.addEventListener('contextmenu', blockContextMenu)
+    document.addEventListener('mousedown', blockMiddleClick)
+    document.addEventListener('click', blockNewWindowLinks)
+    document.addEventListener('dragstart', blockDragStart)
+
+    return () => {
+      document.removeEventListener('keydown', blockShortcuts)
+      document.removeEventListener('contextmenu', blockContextMenu)
+      document.removeEventListener('mousedown', blockMiddleClick)
+      document.removeEventListener('click', blockNewWindowLinks)
+      document.removeEventListener('dragstart', blockDragStart)
+      if (newWindowDetectorRef.current) {
+        clearInterval(newWindowDetectorRef.current)
+      }
+    }
+  }, [examStarted, handleSubmit, playSound])
+
+  // =============================================
+  // AUTO-SAVE FUNCTION
+  // =============================================
+  const autoSave = useCallback(async () => {
+    if (!attemptId || !examStarted || examEndedRef.current) return
+    
+    setAutoSaveStatus('saving')
+    
+    try {
+      await supabase
+        .from('exam_attempts')
+        .update({
+          answers: answers,
+          last_auto_save: new Date().toISOString()
+        })
+        .eq('id', attemptId)
+      
+      setAutoSaveStatus('saved')
+      setTimeout(() => setAutoSaveStatus('idle'), 2000)
+    } catch (error) {
+      console.error('Auto-save failed:', error)
+      setAutoSaveStatus('idle')
+    }
+  }, [attemptId, examStarted, answers])
 
   // =============================================
   // LOAD EXAM DATA WITH RANDOMIZATION
@@ -697,7 +872,7 @@ export default function StudentExamPage() {
   }, [examId, router])
 
   // =============================================
-  // START EXAM FUNCTION - WITH FIXES
+  // START EXAM FUNCTION
   // =============================================
   const startExam = async () => {
     setStartingExam(true)
@@ -739,6 +914,7 @@ export default function StudentExamPage() {
       setTimeLeft((exam?.duration || 30) * 60)
       setFullscreenExits(0)
       setTabSwitches(0)
+      setNewTabAttempts(0)
       examEndedRef.current = false
       setExamEnded(false)
       
@@ -763,10 +939,61 @@ export default function StudentExamPage() {
   }
 
   // =============================================
+  // Navigation blocker with auto-submit
+  // =============================================
+  useEffect(() => {
+    if (!examStarted || examEndedRef.current) return
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!examEndedRef.current) {
+        e.preventDefault()
+        e.returnValue = 'You have an exam in progress. Leaving will auto-submit your answers.'
+        return 'You have an exam in progress. Leaving will auto-submit your answers.'
+      }
+    }
+
+    const handlePopState = (e: PopStateEvent) => {
+      if (examStarted && !examEndedRef.current) {
+        e.preventDefault()
+        setShowLeaveWarning(true)
+        window.history.pushState(null, '', window.location.pathname)
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('popstate', handlePopState)
+    
+    window.history.pushState(null, '', window.location.pathname)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [examStarted])
+
+  // =============================================
+  // Auto-submit on dashboard return
+  // =============================================
+  const handleLeaveExam = async (shouldSubmit: boolean) => {
+    setShowLeaveWarning(false)
+    
+    if (shouldSubmit && examStarted && !examEndedRef.current) {
+      toast.loading('Auto-submitting your exam...')
+      await handleSubmit(true, 'Left exam page')
+    }
+    
+    if (pendingNavigation) {
+      router.push(pendingNavigation)
+    } else {
+      router.push('/student')
+    }
+    setPendingNavigation(null)
+  }
+
+  // =============================================
   // ALL useEffect HOOKS
   // =============================================
   
-  // Initialize sound
   useEffect(() => {
     soundRef.current = new Audio('/sounds/notification.mp3')
     return () => {
@@ -777,7 +1004,6 @@ export default function StudentExamPage() {
     }
   }, [])
 
-  // Online/Offline detection
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => {
@@ -794,18 +1020,16 @@ export default function StudentExamPage() {
     }
   }, [])
 
-  // Load exam on mount
   useEffect(() => { loadExam() }, [loadExam])
   
-  // Cleanup timers
   useEffect(() => { 
     return () => { 
       if (timerRef.current) clearInterval(timerRef.current)
       if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
+      if (newWindowDetectorRef.current) clearInterval(newWindowDetectorRef.current)
     } 
   }, [])
 
-  // Timer effect
   useEffect(() => {
     if (!examStarted || timeLeft <= 0 || examEndedRef.current) return
     
@@ -829,7 +1053,6 @@ export default function StudentExamPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [examStarted, timeLeft, handleSubmit, playSound])
 
-  // Auto-save effect
   useEffect(() => {
     if (!examStarted || examEndedRef.current) return
     
@@ -840,7 +1063,6 @@ export default function StudentExamPage() {
     return () => { if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current) }
   }, [examStarted, autoSave])
 
-  // Tab switch detection
   useEffect(() => {
     if (!examStarted || examEndedRef.current) return
     const h = () => {
@@ -848,24 +1070,35 @@ export default function StudentExamPage() {
         setTabSwitches(p => {
           const n = p + 1
           playSound()
-          if (n === 1) toast.warning(`Tab switch detected! (${n}/${TAB_SWITCH_LIMIT})`)
-          else if (n === 2) toast.error(`Final warning! (${n}/${TAB_SWITCH_LIMIT})`)
-          else if (n >= TAB_SWITCH_LIMIT) { 
+          
+          if (n === 1) {
+            toast.warning(`⚠️ WARNING: Tab switch detected! (${n}/${TAB_SWITCH_LIMIT})`, {
+              description: 'This is a security violation. Further switches will result in auto-submission.',
+              duration: 5000
+            })
+          } else if (n === 2) {
+            toast.error(`🚨 FINAL WARNING! (${n}/${TAB_SWITCH_LIMIT})`, {
+              description: 'ONE MORE TAB SWITCH WILL AUTO-SUBMIT YOUR EXAM!',
+              duration: 8000
+            })
+          } else if (n >= TAB_SWITCH_LIMIT) { 
             setSecurityViolated(true)
-            toast.error('Security violation! Auto-submitting...')
+            toast.error('❌ SECURITY VIOLATION! Auto-submitting exam...', {
+              description: 'You exceeded the allowed tab switches.',
+              duration: 5000
+            })
             setTimeout(() => handleSubmit(true, 'Tab switch limit exceeded'), 100)
           }
           return n
         })
         setShowSecurityWarning(true)
-        setTimeout(() => setShowSecurityWarning(false), 3000)
+        setTimeout(() => setShowSecurityWarning(false), 5000)
       }
     }
     document.addEventListener('visibilitychange', h)
     return () => document.removeEventListener('visibilitychange', h)
   }, [examStarted, securityViolated, handleSubmit, playSound])
 
-  // Fullscreen detection
   useEffect(() => {
     if (!examStarted || examEndedRef.current) return
     const h = () => {
@@ -874,17 +1107,27 @@ export default function StudentExamPage() {
         setFullscreenExits(p => {
           const n = p + 1
           playSound()
+          
           if (n === 1) { 
-            toast.warning(`Fullscreen exited! (${n}/${FULLSCREEN_EXIT_LIMIT})`)
+            toast.warning(`⚠️ Fullscreen exited! (${n}/${FULLSCREEN_EXIT_LIMIT})`, {
+              description: 'Please return to fullscreen mode immediately.',
+              duration: 5000
+            })
             setShowFullscreenPrompt(true) 
           }
           else if (n === 2) { 
-            toast.error(`Final warning! (${n}/${FULLSCREEN_EXIT_LIMIT})`)
+            toast.error(`🚨 FINAL WARNING! (${n}/${FULLSCREEN_EXIT_LIMIT})`, {
+              description: 'ONE MORE EXIT WILL AUTO-SUBMIT YOUR EXAM!',
+              duration: 8000
+            })
             setShowFullscreenPrompt(true) 
           }
           else if (n >= FULLSCREEN_EXIT_LIMIT) { 
             setSecurityViolated(true)
-            toast.error('Security violation! Auto-submitting...')
+            toast.error('❌ SECURITY VIOLATION! Auto-submitting exam...', {
+              description: 'You exceeded the allowed fullscreen exits.',
+              duration: 5000
+            })
             setTimeout(() => handleSubmit(true, 'Fullscreen exit limit exceeded'), 100)
           }
           return n
@@ -899,15 +1142,17 @@ export default function StudentExamPage() {
     }
   }, [examStarted, securityViolated, handleSubmit, playSound])
 
-  // Prevent copy/paste/screenshot
   useEffect(() => {
     if (!examStarted) return
-    const preventDefault = (e: Event) => e.preventDefault()
+    const preventDefault = (e: Event) => {
+      e.preventDefault()
+      toast.warning('⚠️ Copy/Paste is disabled during the exam', { duration: 2000 })
+    }
     const keydown = (e: KeyboardEvent) => { 
-      if ((e.ctrlKey && ['c','v','x','p','a','s'].includes(e.key.toLowerCase())) || 
+      if ((e.ctrlKey && ['c','v','x','p','a','s','u'].includes(e.key.toLowerCase())) || 
           e.key === 'F12' || (e.altKey && e.key === 'Tab')) {
         e.preventDefault()
-        toast.warning('This action is disabled during the exam')
+        toast.warning(`⚠️ ${e.key.toUpperCase()} is disabled during the exam`, { duration: 2000 })
       }
     }
     
@@ -957,8 +1202,8 @@ export default function StudentExamPage() {
           </div>
           <CardContent className="p-6 text-center">
             <p className="text-gray-600 mb-6">{loadError}</p>
-            <Button onClick={() => router.push('/student/exams')} className="w-full bg-primary hover:bg-primary/90">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
+            <Button onClick={() => router.push('/student')} className="w-full bg-primary hover:bg-primary/90">
+              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
             </Button>
           </CardContent>
         </Card>
@@ -994,15 +1239,15 @@ export default function StudentExamPage() {
               </div>
               
               <CardContent className="p-8">
-                <div className="flex items-center gap-5 p-5 bg-gray-50 rounded-2xl mb-8">
-                  <Avatar className="h-20 w-20 ring-4 ring-primary/10">
+                <div className="flex items-center gap-6 p-6 bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl mb-8 border border-gray-100">
+                  <Avatar className="h-24 w-24 ring-4 ring-primary/20 shadow-lg">
                     <AvatarImage src={profile?.photo_url || ''} />
-                    <AvatarFallback className="bg-primary text-white text-2xl font-bold">{getInitials()}</AvatarFallback>
+                    <AvatarFallback className="bg-primary text-white text-3xl font-bold">{getInitials()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-bold text-gray-800 text-xl">{profile?.full_name}</p>
-                    <p className="text-gray-600">{profile?.class} • {profile?.vin_id}</p>
-                    <p className="text-gray-500 text-sm">{profile?.email}</p>
+                    <p className="font-bold text-gray-800 text-2xl">{profile?.full_name}</p>
+                    <p className="text-gray-600 text-lg">{profile?.class} • {profile?.vin_id}</p>
+                    <p className="text-gray-500">{profile?.email}</p>
                   </div>
                 </div>
                 
@@ -1070,11 +1315,8 @@ export default function StudentExamPage() {
                 </div>
                 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => router.push('/student/exams')} className="flex-1 h-12">
-                    <ArrowLeft className="mr-2 h-5 w-5" /> Back to Exams
-                  </Button>
-                  <Button onClick={() => router.push('/student')} className="flex-1 h-12 bg-primary hover:bg-primary/90">
-                    <Home className="mr-2 h-5 w-5" /> Dashboard
+                  <Button variant="outline" onClick={() => router.push('/student')} className="flex-1 h-12">
+                    <ArrowLeft className="mr-2 h-5 w-5" /> Back to Dashboard
                   </Button>
                   {canRetake && (
                     <Button onClick={() => {
@@ -1114,13 +1356,13 @@ export default function StudentExamPage() {
               </div>
               
               <CardContent className="p-8">
-                <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl mb-6">
-                  <Avatar className="h-16 w-16 ring-2 ring-primary/20">
+                <div className="flex items-center gap-5 p-5 bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl mb-6 border border-gray-100">
+                  <Avatar className="h-20 w-20 ring-3 ring-primary/20 shadow-md">
                     <AvatarImage src={profile?.photo_url || ''} />
-                    <AvatarFallback className="bg-primary text-white text-xl font-bold">{getInitials()}</AvatarFallback>
+                    <AvatarFallback className="bg-primary text-white text-2xl font-bold">{getInitials()}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-bold text-gray-800 text-lg">{profile?.full_name}</p>
+                    <p className="font-bold text-gray-800 text-xl">{profile?.full_name}</p>
                     <p className="text-gray-600">{profile?.class} • {profile?.vin_id}</p>
                   </div>
                 </div>
@@ -1144,21 +1386,34 @@ export default function StudentExamPage() {
                   <TabsContent value="security" className="mt-4">
                     <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
                       <h3 className="font-bold text-amber-800 mb-4 flex items-center gap-2 text-lg">
-                        <Shield className="h-5 w-5" /> Exam Security Rules
+                        <Shield className="h-5 w-5" /> Strict Exam Security Rules
                       </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="flex items-start gap-3">
-                          <Monitor className="h-5 w-5 text-amber-600 mt-0.5" />
-                          <div><p className="font-medium text-amber-800">Tab Switching</p><p className="text-sm text-amber-700">Limit: {TAB_SWITCH_LIMIT} switches</p></div>
+                          <Monitor className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                          <div><p className="font-medium text-amber-800">Tab Switching</p><p className="text-sm text-amber-700">Limit: {TAB_SWITCH_LIMIT} switches. Exceeding auto-submits.</p></div>
                         </div>
                         <div className="flex items-start gap-3">
-                          <Maximize2 className="h-5 w-5 text-amber-600 mt-0.5" />
-                          <div><p className="font-medium text-amber-800">Fullscreen Required</p><p className="text-sm text-amber-700">Limit: {FULLSCREEN_EXIT_LIMIT} exits</p></div>
+                          <Maximize2 className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+                          <div><p className="font-medium text-amber-800">Fullscreen Required</p><p className="text-sm text-amber-700">Limit: {FULLSCREEN_EXIT_LIMIT} exits. Exceeding auto-submits.</p></div>
                         </div>
                         <div className="flex items-start gap-3">
-                          <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+                          <div><p className="font-medium text-red-800">New Tabs/Windows PROHIBITED</p><p className="text-sm text-red-700">Opening new tabs/windows will auto-submit immediately!</p></div>
+                        </div>
+                        <div className="flex items-start gap-3">
+                          <Clock className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
                           <div><p className="font-medium text-amber-800">Time Limit</p><p className="text-sm text-amber-700">Auto-submit on timeout</p></div>
                         </div>
+                      </div>
+                      <div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
+                        <p className="text-red-700 text-sm font-bold flex items-center gap-2">
+                          <AlertCircle className="h-5 w-5" />
+                          ⚠️ STRICT WARNING: Do NOT attempt to open new tabs, windows, or switch applications!
+                        </p>
+                        <p className="text-red-600 text-xs mt-1">
+                          Any violation will result in immediate auto-submission of your exam.
+                        </p>
                       </div>
                     </div>
                   </TabsContent>
@@ -1185,7 +1440,7 @@ export default function StudentExamPage() {
                 </Tabs>
                 
                 <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => router.push('/student/exams')} className="flex-1 h-12">Cancel</Button>
+                  <Button variant="outline" onClick={() => router.push('/student')} className="flex-1 h-12">Cancel</Button>
                   <Button onClick={startExam} disabled={startingExam} className="flex-1 h-12 bg-primary hover:bg-primary/90 text-white font-bold">
                     {startingExam ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lock className="mr-2 h-5 w-5" />}Start Exam
                   </Button>
@@ -1215,7 +1470,7 @@ export default function StudentExamPage() {
               <p className="text-gray-500 mt-2">Fullscreen Exits</p>
             </div>
             <p className="text-gray-700 mb-6 font-medium">
-              {fullscreenExits >= FULLSCREEN_EXIT_LIMIT - 1 ? '⚠️ ONE MORE EXIT WILL AUTO-SUBMIT!' : 'This exam must be taken in fullscreen mode.'}
+              {fullscreenExits >= FULLSCREEN_EXIT_LIMIT - 1 ? '⚠️ ONE MORE EXIT WILL AUTO-SUBMIT YOUR EXAM!' : 'This exam must be taken in fullscreen mode.'}
             </p>
             <Button onClick={enterFullscreen} className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-6 text-lg">
               <Maximize2 className="mr-2 h-5 w-5" />Return to Fullscreen
@@ -1231,18 +1486,18 @@ export default function StudentExamPage() {
   // =============================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      {/* Header */}
+      {/* Simplified Exam Header - No public header import */}
       <header className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
         <div className="px-4 lg:px-6 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+            <div className="flex items-center gap-4">
+              <Avatar className="h-12 w-12 ring-2 ring-primary/20 shadow-sm">
                 <AvatarImage src={profile?.photo_url || ''} />
-                <AvatarFallback className="bg-primary text-white text-sm font-bold">{getInitials()}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-white text-lg font-bold">{getInitials()}</AvatarFallback>
               </Avatar>
               <div className="hidden sm:block">
-                <h2 className="font-semibold text-gray-800 text-sm lg:text-base line-clamp-1">{exam?.title}</h2>
-                <p className="text-xs text-gray-500">{profile?.full_name}</p>
+                <h2 className="font-semibold text-gray-800 text-base lg:text-lg line-clamp-1">{exam?.title}</h2>
+                <p className="text-sm text-gray-500">{profile?.full_name} • {profile?.class}</p>
               </div>
             </div>
             
@@ -1275,13 +1530,21 @@ export default function StudentExamPage() {
                 <Clock className="inline h-5 w-5 mr-2" />{formatTime(timeLeft)}
               </div>
               
-              <Badge className={cn(
-                "px-2 lg:px-3 py-1 text-xs font-medium hidden sm:flex",
-                tabSwitches === 0 ? "bg-green-100 text-green-700" : 
-                tabSwitches === 1 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
-              )}>
-                Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}
-              </Badge>
+              <div className="hidden sm:flex items-center gap-1">
+                <Badge className={cn(
+                  "px-2 lg:px-3 py-1 text-xs font-medium",
+                  tabSwitches === 0 ? "bg-green-100 text-green-700" : 
+                  tabSwitches === 1 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
+                )}>
+                  Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}
+                </Badge>
+                <Badge className={cn(
+                  "px-2 lg:px-3 py-1 text-xs font-medium",
+                  newTabAttempts === 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                )}>
+                  New: {newTabAttempts}/{TAB_SWITCH_LIMIT}
+                </Badge>
+              </div>
               
               <Button 
                 size="sm" 
@@ -1680,6 +1943,41 @@ export default function StudentExamPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Leave Exam Warning Dialog */}
+      <AlertDialog open={showLeaveWarning} onOpenChange={setShowLeaveWarning}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Leave Exam in Progress?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>You are about to leave the exam page. This action will:</p>
+              <ul className="list-disc list-inside space-y-1 text-sm">
+                <li>Auto-submit your current answers</li>
+                <li>End your exam session</li>
+                <li>Count as an attempt</li>
+              </ul>
+              <p className="font-medium text-amber-600">Are you sure you want to leave?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel onClick={() => {
+              setShowLeaveWarning(false)
+              setPendingNavigation(null)
+            }}>
+              Continue Exam
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleLeaveExam(true)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Submit & Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Result Dialog */}
       <Dialog open={showResultDialog} onOpenChange={() => setShowResultDialog(false)}>

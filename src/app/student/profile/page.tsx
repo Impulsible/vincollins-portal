@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/profile/page.tsx - WORKING UPLOAD
+// app/student/profile/page.tsx - WORKING UPLOAD WITH FIXED RESPONSIVENESS
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -185,12 +185,10 @@ export default function StudentProfilePage() {
     }
   }
 
-  // FIXED: Simple, working upload function
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     
-    // Validate file
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Image size should be less than 5MB')
       return
@@ -203,13 +201,11 @@ export default function StudentProfilePage() {
     setIsUploading(true)
     
     try {
-      // Create a unique filename
       const fileExt = file.name.split('.').pop()
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
       
       console.log('📸 Uploading file:', fileName)
 
-      // Upload to Supabase Storage
       const { data, error: uploadError } = await supabase.storage
         .from('student-photos')
         .upload(fileName, file, {
@@ -224,7 +220,6 @@ export default function StudentProfilePage() {
 
       console.log('📸 Upload successful:', data)
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('student-photos')
         .getPublicUrl(fileName)
@@ -232,7 +227,6 @@ export default function StudentProfilePage() {
       const publicUrl = urlData.publicUrl
       console.log('📸 Public URL:', publicUrl)
 
-      // Update profile with new photo URL
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
@@ -247,13 +241,11 @@ export default function StudentProfilePage() {
         throw updateError
       }
 
-      // Update local state
       setProfile(prev => prev ? { ...prev, photo_url: publicUrl, avatar_url: publicUrl } : null)
-      setAvatarKey(Date.now()) // Force avatar refresh
+      setAvatarKey(Date.now())
       
       toast.success('Profile photo updated successfully!')
       
-      // Reload profile to ensure sync
       setTimeout(() => loadProfile(), 500)
       
     } catch (error: any) {
@@ -261,7 +253,6 @@ export default function StudentProfilePage() {
       toast.error(error.message || 'Failed to upload photo')
     } finally {
       setIsUploading(false)
-      // Clear the input so the same file can be selected again
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -336,7 +327,7 @@ export default function StudentProfilePage() {
       <>
         <Header onLogout={handleLogout} />
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 pt-20">
-          <div className="container mx-auto px-4 py-8">
+          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
             <div className="max-w-3xl mx-auto space-y-6">
               <Skeleton className="h-48 w-full rounded-2xl" />
               <Skeleton className="h-64 w-full rounded-2xl" />
@@ -348,10 +339,10 @@ export default function StudentProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden w-full">
       <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
-      <div className="flex flex-1">
+      <div className="flex flex-1 w-full overflow-x-hidden">
         <StudentSidebar 
           profile={profile}
           onLogout={handleLogout}
@@ -362,78 +353,83 @@ export default function StudentProfilePage() {
         />
 
         <div className={cn(
-          "flex-1 transition-all duration-300",
+          "flex-1 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-20 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-            <div className="container mx-auto max-w-4xl">
+          <main className="pt-16 lg:pt-20 pb-24 lg:pb-12 px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
+            <div className="container mx-auto max-w-4xl px-0 sm:px-2">
               
+              {/* Breadcrumb Navigation */}
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 flex items-center justify-between"
+                className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               >
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Link href="/student" className="hover:text-primary flex items-center gap-1">
                     <Home className="h-3.5 w-3.5" />
-                    Dashboard
+                    <span className="hidden sm:inline">Dashboard</span>
+                    <span className="sm:hidden">Home</span>
                   </Link>
                   <ChevronRight className="h-3.5 w-3.5" />
                   <span className="text-foreground font-medium">My Profile</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
+                <Button variant="outline" size="sm" onClick={() => router.push('/student')} className="w-full sm:w-auto">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Dashboard
                 </Button>
               </motion.div>
 
-              <div className="space-y-6">
+              <div className="space-y-4 sm:space-y-6">
                 
+                {/* Profile Header Card */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
+                  className="w-full overflow-hidden"
                 >
-                  <Card className="border-0 shadow-lg overflow-hidden">
-                    <div className="relative h-36 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600">
+                  <Card className="border-0 shadow-lg overflow-hidden w-full">
+                    <div className="relative h-28 sm:h-36 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600">
                       <div className="absolute inset-0 bg-black/10" />
                       
                       {!isEditing && (
-                        <div className="absolute top-4 right-4">
+                        <div className="absolute top-3 sm:top-4 right-3 sm:right-4">
                           <Button 
                             onClick={() => setIsEditing(true)} 
                             size="sm"
-                            className="bg-white/90 text-emerald-700 hover:bg-white shadow-md"
+                            className="bg-white/90 text-emerald-700 hover:bg-white shadow-md text-xs sm:text-sm"
                           >
-                            <User className="mr-2 h-4 w-4" />
-                            Edit Profile
+                            <User className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                            <span className="hidden sm:inline">Edit Profile</span>
+                            <span className="sm:hidden">Edit</span>
                           </Button>
                         </div>
                       )}
                     </div>
                     
-                    <div className="px-6 sm:px-8">
-                      <div className="relative -mt-16 mb-4">
+                    <div className="px-4 sm:px-6 lg:px-8">
+                      <div className="relative -mt-14 sm:-mt-16 mb-4">
                         <div className="relative inline-block">
-                          <Avatar className="h-28 w-28 sm:h-32 sm:w-32 ring-4 ring-white shadow-xl" key={avatarKey}>
+                          <Avatar className="h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 ring-4 ring-white shadow-xl" key={avatarKey}>
                             <AvatarImage 
                               src={profile?.photo_url || undefined} 
                               alt={profile?.full_name}
                             />
-                            <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white text-2xl sm:text-3xl font-bold">
+                            <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white text-xl sm:text-2xl lg:text-3xl font-bold">
                               {getInitials()}
                             </AvatarFallback>
                           </Avatar>
                           
                           <button
                             onClick={() => fileInputRef.current?.click()}
-                            className="absolute -bottom-1 -right-1 p-2.5 rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-colors"
+                            className="absolute -bottom-1 -right-1 p-2 sm:p-2.5 rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700 transition-colors"
                             disabled={isUploading}
                           >
                             {isUploading ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
+                              <Loader2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                             ) : (
-                              <Camera className="h-4 w-4" />
+                              <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             )}
                           </button>
                           <input
@@ -451,32 +447,33 @@ export default function StudentProfilePage() {
                       </div>
                     </div>
                     
-                    <CardContent className="px-6 sm:px-8 pb-6">
-                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                        <div className="space-y-1">
-                          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+                    <CardContent className="px-4 sm:px-6 lg:px-8 pb-6">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 break-words">
                             {profile?.full_name}
                           </h1>
-                          <p className="text-muted-foreground flex items-center gap-1">
-                            <Mail className="h-3.5 w-3.5" />
-                            {profile?.email}
+                          <p className="text-muted-foreground flex items-center gap-1 text-sm sm:text-base break-all">
+                            <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                            <span className="truncate">{profile?.email}</span>
                           </p>
                           <div className="flex flex-wrap items-center gap-2 pt-2">
-                            <Badge className="bg-emerald-100 text-emerald-700">
-                              <GraduationCap className="mr-1 h-3.5 w-3.5" />
+                            <Badge className="bg-emerald-100 text-emerald-700 text-xs sm:text-sm">
+                              <GraduationCap className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
                               {profile?.class}
                             </Badge>
-                            <Badge variant="outline" className="font-mono">
-                              <Shield className="mr-1 h-3.5 w-3.5" />
-                              VIN: {profile?.vin_id}
+                            <Badge variant="outline" className="font-mono text-xs sm:text-sm">
+                              <Shield className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                              <span className="truncate">VIN: {profile?.vin_id}</span>
                             </Badge>
                           </div>
                         </div>
                         
                         {isEditing && (
-                          <div className="flex gap-2 sm:self-center">
+                          <div className="flex gap-2 sm:self-center shrink-0">
                             <Button 
                               variant="outline" 
+                              size="sm"
                               onClick={() => {
                                 setIsEditing(false)
                                 setEditForm({
@@ -486,20 +483,22 @@ export default function StudentProfilePage() {
                                   bio: profile?.bio || ''
                                 })
                               }}
+                              className="text-xs sm:text-sm"
                             >
                               Cancel
                             </Button>
                             <Button 
                               onClick={handleSaveProfile} 
                               disabled={saving}
-                              className="bg-emerald-600 hover:bg-emerald-700"
+                              size="sm"
+                              className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm"
                             >
                               {saving ? (
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                <Loader2 className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin" />
                               ) : (
-                                <Save className="mr-2 h-4 w-4" />
+                                <Save className="mr-1 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                               )}
-                              Save Changes
+                              Save
                             </Button>
                           </div>
                         )}
@@ -508,92 +507,100 @@ export default function StudentProfilePage() {
                   </Card>
                 </motion.div>
 
+                {/* Personal Information Card */}
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
+                  className="w-full overflow-hidden"
                 >
-                  <Card className="border-0 shadow-lg">
-                    <CardHeader className="pb-4">
-                      <CardTitle className="text-xl">Personal Information</CardTitle>
-                      <CardDescription>
+                  <Card className="border-0 shadow-lg w-full overflow-hidden">
+                    <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-6 lg:px-8">
+                      <CardTitle className="text-lg sm:text-xl">Personal Information</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">
                         Your personal details and contact information
                       </CardDescription>
                     </CardHeader>
                     
-                    <CardContent className="px-6 sm:px-8 pb-8">
+                    <CardContent className="px-4 sm:px-6 lg:px-8 pb-6 sm:pb-8">
                       {isEditing ? (
-                        <div className="space-y-5">
+                        <div className="space-y-4 sm:space-y-5">
                           <div className="space-y-2">
-                            <Label htmlFor="full_name">Full Name</Label>
+                            <Label htmlFor="full_name" className="text-sm">Full Name</Label>
                             <Input
                               id="full_name"
                               value={editForm.full_name}
                               onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })}
                               placeholder="Your full name"
+                              className="text-sm"
                             />
                           </div>
                           
                           <div className="space-y-2">
-                            <Label htmlFor="phone">Phone Number</Label>
+                            <Label htmlFor="phone" className="text-sm">Phone Number</Label>
                             <Input
                               id="phone"
                               type="tel"
                               value={editForm.phone}
                               onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                               placeholder="+234 XXX XXX XXXX"
+                              className="text-sm"
                             />
                           </div>
                           
                           <div className="space-y-2">
-                            <Label htmlFor="address">Address</Label>
+                            <Label htmlFor="address" className="text-sm">Address</Label>
                             <Textarea
                               id="address"
                               value={editForm.address}
                               onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
                               placeholder="Your residential address"
                               rows={2}
-                              className="resize-none"
+                              className="resize-none text-sm"
                             />
                           </div>
                           
                           <div className="space-y-2">
-                            <Label htmlFor="bio">Bio (Optional)</Label>
+                            <Label htmlFor="bio" className="text-sm">Bio (Optional)</Label>
                             <Textarea
                               id="bio"
                               value={editForm.bio}
                               onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })}
                               placeholder="Tell us a little about yourself..."
                               rows={3}
-                              className="resize-none"
+                              className="resize-none text-sm"
                             />
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-4 sm:space-y-5">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <InfoCard icon={User} label="Full Name" value={profile?.full_name || '-'} />
                             <InfoCard icon={Mail} label="Email Address" value={profile?.email || '-'} />
                             <InfoCard icon={Phone} label="Phone Number" value={profile?.phone || 'Not provided'} />
                             <InfoCard icon={Calendar} label="Admission Year" value={profile?.admission_year?.toString() || '-'} />
                           </div>
                           
-                          <Separator className="my-4" />
+                          <Separator className="my-3 sm:my-4" />
                           
                           <InfoCard icon={MapPin} label="Address" value={profile?.address || 'No address added yet.'} fullWidth />
                           
                           {profile?.bio && (
                             <>
-                              <Separator className="my-4" />
+                              <Separator className="my-3 sm:my-4" />
                               <InfoCard icon={User} label="Bio" value={profile.bio} fullWidth />
                             </>
                           )}
                           
-                          <Separator className="my-4" />
+                          <Separator className="my-3 sm:my-4" />
                           
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <InfoCard icon={Shield} label="VIN ID (Permanent)" value={profile?.vin_id || '-'} monospace />
-                            <InfoCard icon={Calendar} label="Member Since" value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'} />
+                            <InfoCard 
+                              icon={Calendar} 
+                              label="Member Since" 
+                              value={profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '-'} 
+                            />
                           </div>
                         </div>
                       )}
@@ -624,17 +631,17 @@ function InfoCard({
 }) {
   return (
     <div className={cn(
-      "flex items-start gap-3 p-4 rounded-xl bg-slate-50",
+      "flex items-start gap-3 p-3 sm:p-4 rounded-xl bg-slate-50 w-full",
       fullWidth && "col-span-full"
     )}>
-      <div className="p-2 bg-white rounded-lg shrink-0">
-        <Icon className="h-4 w-4 text-emerald-600" />
+      <div className="p-1.5 sm:p-2 bg-white rounded-lg shrink-0">
+        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
         <p className={cn(
-          "font-medium text-slate-900 break-words",
-          monospace && "font-mono text-sm"
+          "font-medium text-slate-900 break-words text-sm sm:text-base",
+          monospace && "font-mono text-xs sm:text-sm"
         )}>
           {value}
         </p>

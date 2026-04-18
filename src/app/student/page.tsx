@@ -10,25 +10,21 @@ import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { StudentWelcomeBanner } from '@/components/student/StudentWelcomeBanner'
 import { StudentClassRoster } from '@/components/student/StudentClassRoster'
-import { SetDStatsCards } from '@/components/student/SetDStatsCards'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { motion, AnimatePresence, Variants } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { 
-  Loader2, BookOpen, Award, Clock, TrendingUp, CheckCircle,
+  BookOpen, Award, Clock, TrendingUp, CheckCircle,
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
-  Search, User, ArrowRight, Target, Trophy, Eye, LayoutDashboard, Menu,
-  Flame, Zap, Sparkles, GraduationCap, CheckCircle2,
-  FileCheck, Download, Calendar, Bell, Upload, File
+  Search, User, ArrowRight, Trophy, Eye, LayoutDashboard, Menu,
+  GraduationCap, CheckCircle2, FileCheck, Download, Calendar, File
 } from 'lucide-react'
-import Link from 'next/link'
 
 // ============================================
 // NAME FORMATTING
@@ -43,16 +39,6 @@ function formatFullName(firstName: string | null | undefined, lastName: string |
     return words.map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
   }
   return fallback || 'Student'
-}
-
-function getFirstName(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
-  if (firstName && firstName.trim()) return firstName.trim()
-  
-  const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
-  if (words.length > 0) {
-    return words[0].charAt(0).toUpperCase() + words[0].slice(1).toLowerCase()
-  }
-  return 'Student'
 }
 
 function getInitials(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
@@ -183,21 +169,6 @@ interface BannerStats {
   gradeColor: string
 }
 
-interface TermInfo {
-  termName: string
-  sessionYear: string
-  currentWeek: number
-  totalWeeks: number
-  weekProgress: number
-  startDate: string
-  endDate: string
-}
-
-interface BestSubject {
-  name: string
-  score: number
-}
-
 interface ReportCardStatus {
   status: 'pending' | 'approved' | 'published' | 'rejected' | null
   term: string
@@ -256,18 +227,6 @@ function StudentDashboardContent() {
     gradeColor: 'text-gray-400'
   })
 
-  const [termInfo, setTermInfo] = useState<TermInfo>({
-    termName: 'First Term',
-    sessionYear: '2024/2025',
-    currentWeek: 1,
-    totalWeeks: 13,
-    weekProgress: 8,
-    startDate: '',
-    endDate: ''
-  })
-  
-  const [studyStreak, setStudyStreak] = useState(0)
-  const [bestSubject, setBestSubject] = useState<BestSubject | null>(null)
   const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
 
   const formatProfileForHeader = (profile: StudentProfile | null) => {
@@ -319,92 +278,6 @@ function StudentDashboardContent() {
       console.error('Error checking report card status:', error)
     }
   }, [profile?.id])
-
-  const loadTermSettings = useCallback(async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_current_term_settings')
-      
-      if (!error && data && data.length > 0) {
-        const term = data[0]
-        const { data: currentWeek } = await supabase.rpc('calculate_current_week')
-        
-        setTermInfo({
-          termName: term.term_name,
-          sessionYear: term.session_year,
-          currentWeek: currentWeek || 1,
-          totalWeeks: term.total_weeks || 13,
-          weekProgress: Math.round(((currentWeek || 1) / (term.total_weeks || 13)) * 100),
-          startDate: term.start_date,
-          endDate: term.end_date
-        })
-      }
-    } catch (error) {
-      console.error('Error loading term settings:', error)
-    }
-  }, [])
-
-  const calculateStudyStreak = useCallback(async (studentId: string) => {
-    try {
-      const { data: attempts } = await supabase
-        .from('exam_attempts')
-        .select('created_at')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false })
-      
-      if (!attempts || attempts.length === 0) {
-        setStudyStreak(0)
-        return
-      }
-      
-      let streak = 0
-      let currentDate = new Date()
-      currentDate.setHours(0, 0, 0, 0)
-      
-      const attemptDates = new Set(
-        attempts.map(a => new Date(a.created_at).toISOString().split('T')[0])
-      )
-      
-      while (attemptDates.has(currentDate.toISOString().split('T')[0])) {
-        streak++
-        currentDate.setDate(currentDate.getDate() - 1)
-      }
-      
-      setStudyStreak(streak)
-    } catch (error) {
-      console.error('Error calculating streak:', error)
-      setStudyStreak(0)
-    }
-  }, [])
-
-  const calculateBestSubject = useCallback((attempts: ExamAttempt[]) => {
-    const subjectScores: Record<string, number[]> = {}
-    
-    attempts.forEach(attempt => {
-      if (attempt.exam_subject && attempt.percentage) {
-        if (!subjectScores[attempt.exam_subject]) {
-          subjectScores[attempt.exam_subject] = []
-        }
-        subjectScores[attempt.exam_subject].push(attempt.percentage)
-      }
-    })
-    
-    let bestName = ''
-    let bestAvg = 0
-    
-    Object.entries(subjectScores).forEach(([subject, scores]) => {
-      const avg = scores.reduce((a, b) => a + b, 0) / scores.length
-      if (avg > bestAvg) {
-        bestAvg = avg
-        bestName = subject
-      }
-    })
-    
-    if (bestName && bestAvg > 0) {
-      setBestSubject({ name: bestName, score: Math.round(bestAvg) })
-    } else {
-      setBestSubject(null)
-    }
-  }, [])
 
   useEffect(() => {
     let isMounted = true
@@ -472,7 +345,6 @@ function StudentDashboardContent() {
       const studentClass = profile.class
       const totalSubjects = profile.subject_count || getSubjectCountForClass(studentClass)
 
-      await loadTermSettings()
       await checkReportCardStatus()
 
       // Load exams
@@ -597,16 +469,13 @@ function StudentDashboardContent() {
         gradeColor: gradeInfo.color
       })
 
-      await calculateStudyStreak(profile.id)
-      calculateBestSubject(completedAttempts)
-
     } catch (error) {
       console.error('Error loading dashboard:', error)
       toast.error('Failed to load dashboard data')
     } finally {
       setLoading(false)
     }
-  }, [profile?.id, profile?.class, profile?.subject_count, loadTermSettings, calculateStudyStreak, checkReportCardStatus])
+  }, [profile?.id, profile?.class, profile?.subject_count, checkReportCardStatus])
 
   useEffect(() => {
     if (!profile?.id) return
@@ -648,11 +517,6 @@ function StudentDashboardContent() {
     return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const formatDateTime = (dateString?: string) => {
-    if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  }
-
   const getScoreColor = (percentage: number) => {
     if (percentage >= 70) return 'text-green-600'
     if (percentage >= 50) return 'text-yellow-600'
@@ -664,28 +528,28 @@ function StudentDashboardContent() {
       case 'completed':
       case 'graded':
         return (
-          <Badge className={cn("text-xs", isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
+          <Badge className={cn("text-xs shrink-0", isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700')}>
             {isPassed ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
             {isPassed ? 'Passed' : 'Failed'}
           </Badge>
         )
       case 'pending_theory':
       case 'submitted':
-        return <Badge className="bg-yellow-100 text-yellow-700 text-xs"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+        return <Badge className="bg-yellow-100 text-yellow-700 text-xs shrink-0"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
       case 'in-progress':
-        return <Badge className="bg-blue-100 text-blue-700 text-xs"><Activity className="h-3 w-3 mr-1" />In Progress</Badge>
+        return <Badge className="bg-blue-100 text-blue-700 text-xs shrink-0"><Activity className="h-3 w-3 mr-1" />In Progress</Badge>
       default:
-        return <Badge variant="outline" className="text-xs">{status}</Badge>
+        return <Badge variant="outline" className="text-xs shrink-0">{status}</Badge>
     }
   }
 
   const getReportCardStatusBadge = (status: string | null) => {
     if (!status) return null
     switch (status) {
-      case 'published': return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
-      case 'approved': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'rejected': return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
+      case 'published': return <Badge className="bg-green-100 text-green-700 shrink-0"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+      case 'approved': return <Badge className="bg-blue-100 text-blue-700 shrink-0"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700 shrink-0"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+      case 'rejected': return <Badge className="bg-red-100 text-red-700 shrink-0"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
       default: return null
     }
   }
@@ -757,12 +621,12 @@ function StudentDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
       {/* Mobile Bottom Navigation */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-lg w-full">
-        <div className="grid grid-cols-5 gap-1 p-2">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-lg w-full overflow-hidden">
+        <div className="grid grid-cols-5 gap-1 p-2 max-w-full">
           {[
             { id: 'overview', icon: LayoutDashboard, label: 'Home' },
             { id: 'exams', icon: MonitorPlay, label: 'Exams' },
@@ -778,7 +642,7 @@ function StudentDashboardContent() {
               )}
             >
               <tab.icon className="h-5 w-5" />
-              <span className="text-[10px] mt-1">{tab.label}</span>
+              <span className="text-[10px] mt-1 truncate">{tab.label}</span>
             </button>
           ))}
           <button
@@ -786,7 +650,7 @@ function StudentDashboardContent() {
             className="flex flex-col items-center py-2 rounded-lg text-slate-500"
           >
             <Menu className="h-5 w-5" />
-            <span className="text-[10px] mt-1">More</span>
+            <span className="text-[10px] mt-1 truncate">More</span>
           </button>
         </div>
         
@@ -803,9 +667,7 @@ function StudentDashboardContent() {
                   { id: 'assignments', icon: FileText, label: 'Assignments' },
                   { id: 'courses', icon: BookOpen, label: 'Courses' },
                   { id: 'performance', icon: TrendingUp, label: 'Performance' },
-                  { id: 'report-card', icon: FileCheck, label: 'Report Card' },
-                  { id: 'notifications', icon: Bell, label: 'Notifications' },
-                  { id: 'settings', icon: Award, label: 'Settings' }
+                  { id: 'report-card', icon: FileCheck, label: 'Report Card' }
                 ].map((tab) => (
                   <button
                     key={tab.id}
@@ -813,7 +675,7 @@ function StudentDashboardContent() {
                     className="flex flex-col items-center p-2 rounded-lg hover:bg-slate-100"
                   >
                     <tab.icon className="h-5 w-5 text-slate-600" />
-                    <span className="text-xs mt-1">{tab.label}</span>
+                    <span className="text-xs mt-1 truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -822,7 +684,7 @@ function StudentDashboardContent() {
         </AnimatePresence>
       </div>
       
-      <div className="flex">
+      <div className="flex w-full overflow-x-hidden">
         <StudentSidebar 
           profile={profile}
           onLogout={handleLogout}
@@ -833,7 +695,7 @@ function StudentDashboardContent() {
         />
 
         <main className={cn(
-          "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300",
+          "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
           <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
@@ -847,25 +709,13 @@ function StudentDashboardContent() {
                   initial="hidden"
                   animate="visible"
                   exit={{ opacity: 0, y: -20 }}
-                  className="space-y-4 sm:space-y-6"
+                  className="space-y-4 sm:space-y-6 w-full overflow-hidden"
                 >
                   {/* Welcome Banner */}
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
                       stats={bannerStats}
-                    />
-                  </motion.div>
-
-                  {/* SET D STATS CARDS */}
-                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
-                    <SetDStatsCards
-                      termInfo={termInfo}
-                      totalSubjects={bannerStats.totalSubjects}
-                      completedExams={bannerStats.completedExams}
-                      studyStreak={studyStreak}
-                      bestSubject={bestSubject}
-                      studentClass={profile?.class as string}
                     />
                   </motion.div>
 
@@ -886,8 +736,8 @@ function StudentDashboardContent() {
                         onClick={() => router.push('/student/report-card')}
                       >
                         <CardContent className="p-4">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 sm:gap-4">
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
                               <div className={cn(
                                 "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0",
                                 reportCardStatus.status === 'published' ? "bg-green-100" :
@@ -901,7 +751,7 @@ function StudentDashboardContent() {
                                   reportCardStatus.status === 'pending' ? "text-yellow-600" : "text-red-600"
                                 )} />
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <h3 className="font-semibold text-gray-900 text-sm sm:text-base truncate">
                                     {reportCardStatus.term} {reportCardStatus.academic_year} Report Card
@@ -935,12 +785,12 @@ function StudentDashboardContent() {
                   )}
 
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
-                    <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
+                    <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
                       {/* Left Column - Spans 2 on large screens */}
-                      <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+                      <div className="lg:col-span-2 space-y-4 sm:space-y-6 w-full overflow-hidden">
                         {/* Performance Overview */}
                         {stats.completedExams > 0 && (
-                          <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                          <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                             <CardHeader className="pb-2">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
                                 <BarChart3 className="h-5 w-5 text-emerald-600 shrink-0" />
@@ -974,7 +824,7 @@ function StudentDashboardContent() {
                         )}
 
                         {/* Available Exams */}
-                        <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                        <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -994,7 +844,7 @@ function StudentDashboardContent() {
                                 {stats.availableExams.slice(0, 3).map((exam) => (
                                   <div key={exam.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
                                     <div className="flex-1 min-w-0">
-                                      <p className="font-medium text-sm truncate">{exam.title}</p>
+                                      <p className="font-medium text-sm break-words">{exam.title}</p>
                                       <div className="flex flex-wrap items-center gap-2 mt-1">
                                         <Badge variant="outline" className="text-xs">{exam.subject}</Badge>
                                         <span className="text-xs text-slate-500">{exam.duration} mins</span>
@@ -1019,9 +869,9 @@ function StudentDashboardContent() {
                       </div>
 
                       {/* Right Column */}
-                      <div className="space-y-4 sm:space-y-6">
+                      <div className="space-y-4 sm:space-y-6 w-full overflow-hidden">
                         {/* Recent Activity */}
-                        <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                        <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -1041,7 +891,7 @@ function StudentDashboardContent() {
                                 {stats.recentAttempts.slice(0, 4).map((attempt) => (
                                   <div key={attempt.id} className="p-3 bg-slate-50 rounded-xl">
                                     <div className="flex items-start justify-between gap-2 mb-2">
-                                      <p className="font-medium text-sm truncate flex-1">{attempt.exam_title}</p>
+                                      <p className="font-medium text-sm break-words flex-1">{attempt.exam_title}</p>
                                       {getStatusBadge(attempt.status, attempt.is_passed)}
                                     </div>
                                     <div className="flex items-center justify-between">
@@ -1057,8 +907,8 @@ function StudentDashboardContent() {
                           </CardContent>
                         </Card>
 
-                        {/* Assignments Section - REPLACED UPCOMING EXAMS */}
-                        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden">
+                        {/* Assignments Section */}
+                        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden w-full">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-blue-800">
@@ -1078,13 +928,13 @@ function StudentDashboardContent() {
                                 {stats.recentAssignments.slice(0, 2).map((assignment) => (
                                   <div key={assignment.id} className="p-3 bg-white/60 rounded-xl">
                                     <div className="flex items-start justify-between gap-2 mb-1">
-                                      <p className="font-medium text-sm truncate">{assignment.title}</p>
+                                      <p className="font-medium text-sm break-words">{assignment.title}</p>
                                       <Badge variant="outline" className="text-xs shrink-0">{assignment.subject}</Badge>
                                     </div>
-                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">{assignment.description}</p>
+                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2 break-words">{assignment.description}</p>
                                     <div className="flex items-center justify-between">
                                       <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <Calendar className="h-3 w-3" />
+                                        <Calendar className="h-3 w-3 shrink-0" />
                                         Due: {formatDate(assignment.due_date)}
                                       </span>
                                       {assignment.file_url && (
@@ -1102,7 +952,7 @@ function StudentDashboardContent() {
                         </Card>
 
                         {/* Study Notes Section */}
-                        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden">
+                        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden w-full">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
                               <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-purple-800">
@@ -1122,13 +972,13 @@ function StudentDashboardContent() {
                                 {stats.recentNotes.slice(0, 2).map((note) => (
                                   <div key={note.id} className="p-3 bg-white/60 rounded-xl">
                                     <div className="flex items-start justify-between gap-2 mb-1">
-                                      <p className="font-medium text-sm truncate">{note.title}</p>
+                                      <p className="font-medium text-sm break-words">{note.title}</p>
                                       <Badge variant="outline" className="text-xs shrink-0">{note.subject}</Badge>
                                     </div>
-                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2">{note.description}</p>
+                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2 break-words">{note.description}</p>
                                     <div className="flex items-center justify-between">
                                       <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <File className="h-3 w-3" />
+                                        <File className="h-3 w-3 shrink-0" />
                                         {note.teacher_name || 'Teacher'}
                                       </span>
                                       {note.file_url && (
@@ -1172,7 +1022,7 @@ function StudentDashboardContent() {
                     </div>
                   </div>
                   
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                     {filteredAvailableExams.length === 0 ? (
                       <Card className="col-span-full">
                         <CardContent className="p-8 text-center">
@@ -1182,10 +1032,10 @@ function StudentDashboardContent() {
                       </Card>
                     ) : (
                       filteredAvailableExams.map((exam) => (
-                        <Card key={exam.id} className="hover:shadow-lg transition-shadow">
+                        <Card key={exam.id} className="hover:shadow-lg transition-shadow overflow-hidden">
                           <CardHeader className="pb-2">
-                            <CardTitle className="text-base sm:text-lg truncate">{exam.title}</CardTitle>
-                            <CardDescription className="text-sm">{exam.subject}</CardDescription>
+                            <CardTitle className="text-base sm:text-lg break-words">{exam.title}</CardTitle>
+                            <CardDescription className="text-sm break-words">{exam.subject}</CardDescription>
                           </CardHeader>
                           <CardContent>
                             <div className="space-y-2 text-sm">
@@ -1231,7 +1081,7 @@ function StudentDashboardContent() {
                     </div>
                   </div>
                   
-                  <Card>
+                  <Card className="overflow-hidden">
                     <CardContent className="p-4 sm:p-6">
                       {filteredRecentAttempts.length === 0 ? (
                         <div className="text-center py-8">
@@ -1247,7 +1097,7 @@ function StudentDashboardContent() {
                             <div key={attempt.id} className="py-4 first:pt-0 last:pb-0">
                               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div className="flex-1 min-w-0">
-                                  <h4 className="font-medium truncate">{attempt.exam_title}</h4>
+                                  <h4 className="font-medium break-words">{attempt.exam_title}</h4>
                                   <p className="text-sm text-slate-500">{attempt.exam_subject}</p>
                                   <p className="text-sm">Score: {attempt.total_score || 0} ({attempt.percentage}%)</p>
                                 </div>
@@ -1272,7 +1122,7 @@ function StudentDashboardContent() {
               {activeTab === 'profile' && (
                 <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
                   <h1 className="text-xl sm:text-2xl font-bold mb-4">My Profile</h1>
-                  <Card>
+                  <Card className="overflow-hidden">
                     <CardContent className="p-4 sm:p-6">
                       {profile && (
                         <div className="space-y-6">
@@ -1283,8 +1133,8 @@ function StudentDashboardContent() {
                                 {getInitials(profile.first_name, profile.last_name, profile.full_name)}
                               </AvatarFallback>
                             </Avatar>
-                            <div className="min-w-0">
-                              <h2 className="text-xl sm:text-2xl font-bold truncate">{profile.full_name}</h2>
+                            <div className="min-w-0 max-w-full">
+                              <h2 className="text-xl sm:text-2xl font-bold break-words">{profile.full_name}</h2>
                               <p className="text-slate-500 text-sm break-all">{profile.email}</p>
                               <Badge className="mt-2 bg-emerald-100 text-emerald-700">{profile.class}</Badge>
                             </div>
@@ -1292,19 +1142,19 @@ function StudentDashboardContent() {
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">First Name</p>
-                              <p className="font-medium truncate">{profile.first_name || 'N/A'}</p>
+                              <p className="font-medium break-words">{profile.first_name || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Last Name</p>
-                              <p className="font-medium truncate">{profile.last_name || 'N/A'}</p>
+                              <p className="font-medium break-words">{profile.last_name || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">VIN ID</p>
-                              <p className="font-medium truncate">{profile.vin_id || 'N/A'}</p>
+                              <p className="font-medium break-words">{profile.vin_id || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Department</p>
-                              <p className="font-medium truncate">{profile.department}</p>
+                              <p className="font-medium break-words">{profile.department}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Admission Year</p>
@@ -1335,7 +1185,7 @@ function StudentDashboardContent() {
                   
                   {reportCardStatus ? (
                     <Card className={cn(
-                      "border-0 shadow-lg",
+                      "border-0 shadow-lg overflow-hidden",
                       reportCardStatus.status === 'published' 
                         ? "bg-gradient-to-br from-green-50 to-emerald-50"
                         : reportCardStatus.status === 'approved'
@@ -1360,7 +1210,7 @@ function StudentDashboardContent() {
                             )} />
                           </div>
                           
-                          <h2 className="text-xl font-bold mb-2">
+                          <h2 className="text-xl font-bold mb-2 break-words">
                             {reportCardStatus.term} {reportCardStatus.academic_year}
                           </h2>
                           
@@ -1380,7 +1230,7 @@ function StudentDashboardContent() {
                             </div>
                           )}
                           
-                          <p className="text-slate-600 mb-6 text-sm sm:text-base">
+                          <p className="text-slate-600 mb-6 text-sm sm:text-base break-words">
                             {reportCardStatus.status === 'published' 
                               ? 'Your report card is ready! Click below to view and download.'
                               : reportCardStatus.status === 'approved'
@@ -1404,7 +1254,7 @@ function StudentDashboardContent() {
                       </CardContent>
                     </Card>
                   ) : (
-                    <Card className="border-0 shadow-lg bg-white">
+                    <Card className="border-0 shadow-lg bg-white overflow-hidden">
                       <CardContent className="text-center py-16">
                         <FileCheck className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">
