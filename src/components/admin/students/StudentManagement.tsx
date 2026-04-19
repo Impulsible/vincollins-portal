@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
- 
-// components/admin/students/StudentManagement.tsx - COMPLETE WITH BULK UPLOAD
+// components/admin/students/StudentManagement.tsx - COMPLETE WITH MIDDLE NAME SUPPORT
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
@@ -85,7 +84,9 @@ interface Student {
   vin_id: string
   email: string
   full_name: string
+  display_name?: string
   first_name?: string
+  middle_name?: string
   last_name?: string
   class: string
   department: string
@@ -150,66 +151,18 @@ const formatLastSeen = (timestamp?: string) => {
   return lastSeen.toLocaleDateString()
 }
 
-const generateRandomVinNumber = (): string => {
-  return String(Math.floor(Math.random() * 9000) + 1000)
-}
-
-const generateUniqueVin = async (year: number, role: 'student' | 'staff'): Promise<string> => {
-  const prefix = role === 'student' ? 'VIN-STD' : 'VIN-STF'
-  let vinId = ''
-  let isUnique = false
-  let attempts = 0
-  const maxAttempts = 20
-
-  while (!isUnique && attempts < maxAttempts) {
-    const randomDigits = generateRandomVinNumber()
-    vinId = `${prefix}-${year}-${randomDigits}`
-    
-    const { data } = await supabase
-      .from('users')
-      .select('vin_id')
-      .eq('vin_id', vinId)
-      .maybeSingle()
-    
-    if (!data) {
-      isUnique = true
-    }
-    attempts++
-  }
-
-  if (!isUnique) {
-    const timestamp = Date.now().toString().slice(-4)
-    vinId = `${prefix}-${year}-${timestamp}`
-  }
-
-  return vinId
-}
-
-const generateSafeEmail = (firstName: string, lastName: string): string => {
-  const cleanFirst = firstName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 15)
-  
-  const cleanLast = lastName
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]/g, '')
-    .slice(0, 15)
-  
-  const safeFirst = cleanFirst || 'student'
-  const safeLast = cleanLast || 'user'
-  
-  return `${safeFirst}.${safeLast}@vincollins.edu.ng`
-}
-
-const formatFullName = (firstName: string, lastName: string): string => {
+const formatFullName = (firstName: string, lastName: string, middleName?: string): string => {
   const first = firstName.trim()
   const last = lastName.trim()
+  const middle = middleName?.trim()
   
   const formattedFirst = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
   const formattedLast = last.charAt(0).toUpperCase() + last.slice(1).toLowerCase()
+  
+  if (middle) {
+    const formattedMiddle = middle.charAt(0).toUpperCase() + middle.slice(1).toLowerCase()
+    return `${formattedFirst} ${formattedMiddle} ${formattedLast}`
+  }
   
   return `${formattedFirst} ${formattedLast}`
 }
@@ -241,7 +194,6 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
   const [studentLastSeen, setStudentLastSeen] = useState<Map<string, string>>(new Map())
   const [isPresenceConnected, setIsPresenceConnected] = useState(false)
   
-  // Bulk upload states
   const [bulkUploadFile, setBulkUploadFile] = useState<File | null>(null)
   const [bulkUploadPreview, setBulkUploadPreview] = useState<any[]>([])
   const [bulkUploading, setBulkUploading] = useState(false)
@@ -254,6 +206,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
   
   const [newStudent, setNewStudent] = useState({
     first_name: '',
+    middle_name: '',
     last_name: '',
     class: '',
     department: '',
@@ -397,6 +350,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
     }
   }, [students.length])
 
+  // ✅ UPDATED: API generates email/password/vin_id internally
   const handleAddStudent = async () => {
     if (!newStudent.first_name || !newStudent.last_name || !newStudent.class) {
       toast.error('Please fill in all required fields')
@@ -407,115 +361,59 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
     
     try {
       const year = newStudent.admission_year || currentYear
-      const fullName = formatFullName(newStudent.first_name, newStudent.last_name)
-      const email = generateSafeEmail(newStudent.first_name, newStudent.last_name)
-      const userId = crypto.randomUUID()
-      const vinId = await generateUniqueVin(year, 'student')
+      const fullName = formatFullName(newStudent.first_name, newStudent.last_name, newStudent.middle_name)
       
-      console.log('Creating student:', { fullName, email, vinId, admission_year: year })
+      console.log('📤 Sending to API:', { 
+        first_name: newStudent.first_name,
+        middle_name: newStudent.middle_name,
+        last_name: newStudent.last_name,
+        class: newStudent.class,
+        admission_year: year
+      })
       
-      // Check if email exists
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('email')
-        .eq('email', email)
-        .maybeSingle()
-      
-      if (existingUser) {
-        toast.error(`Email ${email} already exists`)
-        setIsSubmitting(false)
-        return
-      }
-      
-      // 1. Insert into USERS table
-      const { error: userError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          auth_id: userId,
-          email: email,
-          vin_id: vinId,
-          role: 'student',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-      
-      if (userError) {
-        console.error('Users table insert error:', userError)
-        throw new Error(userError.message)
-      }
-      
-      console.log('✅ Inserted into users table')
-      
-      // 2. Insert into PROFILES table
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert({
-          id: userId,
-          email: email,
-          full_name: fullName,
+      // ✅ Send ONLY form fields - API generates email, password, vin_id
+      const response = await fetch('/api/admin/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
           first_name: newStudent.first_name.trim(),
+          middle_name: newStudent.middle_name?.trim() || '',
           last_name: newStudent.last_name.trim(),
           role: 'student',
-          role_id: `student_${email}`,
           class: newStudent.class,
           department: newStudent.department || 'General',
           admission_year: year,
-          phone: newStudent.phone || null,
-          address: newStudent.address || null,
-          is_active: true,
-          password_changed: false,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          phone: newStudent.phone || '',
+          address: newStudent.address || ''
         })
+      })
       
-      if (profileError) {
-        console.error('Profiles table insert error:', profileError)
-        await supabase.from('users').delete().eq('id', userId)
-        throw new Error(profileError.message)
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create student')
       }
       
-      console.log('✅ Inserted into profiles table')
+      console.log('✅ API response:', result)
       
-      // 3. Create auth user
-      try {
-        const { error: authError } = await supabase.auth.signUp({
-          email: email,
-          password: vinId,
-          options: {
-            data: {
-              full_name: fullName,
-              first_name: newStudent.first_name.trim(),
-              last_name: newStudent.last_name.trim(),
-              role: 'student',
-              class: newStudent.class,
-              department: newStudent.department,
-              admission_year: year,
-              vin_id: vinId
-            }
-          }
-        })
-        
-        if (authError) {
-          console.warn('⚠️ Auth user creation failed:', authError.message)
-          toast.warning('Student created in database but auth account needs manual setup')
-        } else {
-          console.log('✅ Auth user created successfully')
-        }
-      } catch (authError: any) {
-        console.warn('⚠️ Auth user creation error:', authError.message)
-      }
-      
+      // ✅ Get credentials from API response
       setNewCredentials({
-        email: email,
-        password: vinId,
-        vin_id: vinId,
+        email: result.credentials.email,
+        password: result.credentials.password,
+        vin_id: result.credentials.vin_id
       })
       
       setShowAddDialog(false)
-      setShowCredentialsDialog(true)
+      
+      // Show credentials dialog
+      setTimeout(() => {
+        setShowCredentialsDialog(true)
+      }, 100)
+      
+      // Reset form
       setNewStudent({
         first_name: '',
+        middle_name: '',
         last_name: '',
         class: '',
         department: '',
@@ -528,7 +426,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
       toast.success(`${fullName} created successfully!`)
       
     } catch (error: any) {
-      console.error('Error creating student:', error)
+      console.error('❌ Error creating student:', error)
       toast.error(error.message || 'Failed to create student')
     } finally {
       setIsSubmitting(false)
@@ -620,7 +518,6 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
     setClassFilter('all')
   }
 
-  // BULK UPLOAD FUNCTIONS
   const parseCSV = (text: string) => {
     const lines = text.split('\n').filter(line => line.trim())
     if (lines.length === 0) return []
@@ -669,11 +566,11 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
   }
 
   const downloadBulkTemplate = () => {
-    const headers = ['first_name', 'last_name', 'class', 'department', 'admission_year', 'phone', 'address']
+    const headers = ['first_name', 'middle_name', 'last_name', 'class', 'department', 'admission_year', 'phone', 'address']
     const sampleRows = [
-      ['John', 'Doe', 'SS 1', 'Science', '2024', '+2341234567890', 'Lagos, Nigeria'],
-      ['Jane', 'Smith', 'JSS 2', 'Arts', '2025', '+2349876543210', 'Abuja, Nigeria'],
-      ['Michael', 'Okonkwo', 'SS 3', 'Commercial', '2023', '', '']
+      ['John', 'Chukwudi', 'Doe', 'SS 1', 'Science', '2024', '+2341234567890', 'Lagos, Nigeria'],
+      ['Jane', 'Adanna', 'Smith', 'JSS 2', 'Arts', '2025', '+2349876543210', 'Abuja, Nigeria'],
+      ['Michael', '', 'Okonkwo', 'SS 3', 'Commercial', '2023', '', '']
     ]
     
     const csvContent = [
@@ -690,6 +587,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
     window.URL.revokeObjectURL(url)
   }
 
+  // ✅ UPDATED: Bulk upload uses same API format
   const handleBulkUpload = async () => {
     if (!bulkUploadFile) {
       toast.error('Please select a file')
@@ -718,83 +616,35 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
           }
           
           const year = parseInt(student.admission_year) || currentYear
-          const fullName = formatFullName(student.first_name, student.last_name)
-          const email = generateSafeEmail(student.first_name, student.last_name)
-          const userId = crypto.randomUUID()
-          const vinId = await generateUniqueVin(year, 'student')
           
-          const { data: existingUser } = await supabase
-            .from('users')
-            .select('email')
-            .eq('email', email)
-            .maybeSingle()
-          
-          if (existingUser) {
-            throw new Error(`Email ${email} already exists`)
-          }
-          
-          const { error: userError } = await supabase
-            .from('users')
-            .insert({
-              id: userId,
-              auth_id: userId,
-              email: email,
-              vin_id: vinId,
-              role: 'student',
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            })
-          
-          if (userError) throw userError
-          
-          const { error: profileError } = await supabase
-            .from('profiles')
-            .insert({
-              id: userId,
-              email: email,
-              full_name: fullName,
+          // ✅ Send only form fields - API generates credentials
+          const response = await fetch('/api/admin/users/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
               first_name: student.first_name.trim(),
+              middle_name: student.middle_name?.trim() || '',
               last_name: student.last_name.trim(),
               role: 'student',
-              role_id: `student_${email}`,
               class: student.class,
               department: student.department || 'General',
               admission_year: year,
-              phone: student.phone || null,
-              address: student.address || null,
-              is_active: true,
-              password_changed: false,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
+              phone: student.phone || '',
+              address: student.address || ''
             })
+          })
           
-          if (profileError) {
-            await supabase.from('users').delete().eq('id', userId)
-            throw profileError
-          }
+          const result = await response.json()
           
-          try {
-            await supabase.auth.signUp({
-              email: email,
-              password: vinId,
-              options: {
-                data: {
-                  full_name: fullName,
-                  role: 'student',
-                  vin_id: vinId,
-                  class: student.class
-                }
-              }
-            })
-          } catch (authError) {
-            console.warn('Auth creation warning:', authError)
+          if (!response.ok) {
+            throw new Error(result.error || 'Failed to create student')
           }
           
           results.success++
           results.students.push({
-            full_name: fullName,
-            email: email,
-            vin_id: vinId,
+            full_name: result.user.full_name,
+            email: result.credentials.email,
+            vin_id: result.credentials.vin_id,
             class: student.class
           })
           
@@ -923,7 +773,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
                 Add Student
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>Add New Student</DialogTitle>
                 <DialogDescription>
@@ -932,13 +782,22 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
               </DialogHeader>
               
               <div className="space-y-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-3">
                   <div>
                     <Label>First Name *</Label>
                     <Input
                       value={newStudent.first_name}
                       onChange={(e) => setNewStudent({ ...newStudent, first_name: e.target.value })}
                       placeholder="John"
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Middle Name</Label>
+                    <Input
+                      value={newStudent.middle_name}
+                      onChange={(e) => setNewStudent({ ...newStudent, middle_name: e.target.value })}
+                      placeholder="Chukwudi (Other names)"
                       className="mt-1"
                     />
                   </div>
@@ -1017,12 +876,13 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
                 </div>
                 
                 <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Auto-generated Email</p>
+                  <p className="text-xs text-muted-foreground mb-1">Email will be auto-generated from first and last name only</p>
                   <p className="font-mono text-sm">
                     {newStudent.first_name && newStudent.last_name 
-                      ? generateSafeEmail(newStudent.first_name, newStudent.last_name)
+                      ? `${newStudent.first_name.toLowerCase().replace(/[^a-z]/g, '')}.${newStudent.last_name.toLowerCase().replace(/[^a-z]/g, '')}@vincollins.edu.ng`
                       : 'student@vincollins.edu.ng'}
                   </p>
+                  <p className="text-xs text-muted-foreground mt-2">Middle name will appear on report cards</p>
                 </div>
               </div>
               
@@ -1072,7 +932,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
               <h4 className="font-medium mb-2">Step 2: Upload CSV File</h4>
               <p className="text-sm text-muted-foreground mb-3">
                 Required columns: <strong>first_name, last_name, class</strong><br />
-                Optional: department, admission_year, phone, address
+                Optional: middle_name, department, admission_year, phone, address
               </p>
               <Input
                 type="file"
@@ -1089,10 +949,10 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>First Name</TableHead>
-                        <TableHead>Last Name</TableHead>
+                        <TableHead>First</TableHead>
+                        <TableHead>Middle</TableHead>
+                        <TableHead>Last</TableHead>
                         <TableHead>Class</TableHead>
-                        <TableHead>Department</TableHead>
                         <TableHead>Year</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1100,9 +960,9 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
                       {bulkUploadPreview.map((row, i) => (
                         <TableRow key={i}>
                           <TableCell>{row.first_name}</TableCell>
+                          <TableCell>{row.middle_name || '-'}</TableCell>
                           <TableCell>{row.last_name}</TableCell>
                           <TableCell>{row.class}</TableCell>
-                          <TableCell>{row.department || '-'}</TableCell>
                           <TableCell>{row.admission_year || currentYear}</TableCell>
                         </TableRow>
                       ))}
@@ -1158,8 +1018,8 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
             
             <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200">
               <p className="text-xs text-amber-800">
-                <strong>Note:</strong> Email and VIN ID will be auto-generated. 
-                Password will be the VIN ID. Each student takes ~1 second to create.
+                <strong>Note:</strong> Email uses only first and last name. 
+                Middle name will appear on report cards and profile.
               </p>
             </div>
           </div>
@@ -1378,7 +1238,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
                               </div>
                             </div>
                             <div className="min-w-0 flex-1">
-                              <p className="font-medium truncate">{student.full_name}</p>
+                              <p className="font-medium truncate">{student.display_name || student.full_name}</p>
                               <p className="text-xs text-muted-foreground truncate">{student.email}</p>
                             </div>
                           </div>
@@ -1519,7 +1379,7 @@ export function StudentManagement({ students, onRefresh, loading = false }: Stud
               <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200">
                 <p className="text-xs text-amber-800 flex items-center gap-2">
                   <Shield className="h-3 w-3" />
-                  <strong>Note:</strong> Password cannot be changed by student.
+                  <strong>Note:</strong> Student will be prompted to change password on first login.
                 </p>
               </div>
             </div>

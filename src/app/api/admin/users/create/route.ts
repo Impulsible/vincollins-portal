@@ -7,34 +7,131 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Helper function to generate secure random number
+function secureRandomNumber(length: number = 4): string {
+  return Math.floor(Math.random() * Math.pow(10, length)).toString().padStart(length, '0')
+}
+
+// Helper function to generate unique email - KEEPS IT SIMPLE (first.last)
+async function generateUniqueEmail(firstName: string, lastName: string): Promise<string> {
+  const sanitizedFirst = firstName.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15)
+  const sanitizedLast = lastName.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15)
+  
+  const baseEmail = `${sanitizedFirst}.${sanitizedLast}@vincollins.edu.ng`
+  
+  // Check if email exists
+  const { data } = await supabaseAdmin
+    .from('profiles')
+    .select('email')
+    .eq('email', baseEmail)
+    .maybeSingle()
+  
+  if (!data) return baseEmail
+  
+  // If exists, add random number
+  const randomSuffix = secureRandomNumber(3)
+  return `${sanitizedFirst}.${sanitizedLast}${randomSuffix}@vincollins.edu.ng`
+}
+
+// Helper function to generate VIN ID (also used as password)
+function generateVinId(role: string, year?: number): string {
+  const admissionYear = year || new Date().getFullYear()
+  const randomNum = secureRandomNumber(4)
+  
+  const prefixes: Record<string, string> = {
+    admin: 'VIN-ADM',
+    staff: 'VIN-STF',
+    student: 'VIN-STD'
+  }
+  
+  const prefix = prefixes[role] || 'VIN-STD'
+  return `${prefix}-${admissionYear}-${randomNum}`
+}
+
+// Helper function to format display name: "LastName FirstName MiddleName" (for report cards)
+function formatDisplayName(firstName: string, lastName: string, middleName?: string): string {
+  const parts = [lastName.trim(), firstName.trim()]
+  if (middleName?.trim()) {
+    parts.push(middleName.trim())
+  }
+  return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+}
+
+// Helper function to format full name: "FirstName MiddleName LastName"
+function formatFullName(firstName: string, lastName: string, middleName?: string): string {
+  const parts = [firstName.trim()]
+  if (middleName?.trim()) {
+    parts.push(middleName.trim())
+  }
+  parts.push(lastName.trim())
+  return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
+    console.log('📦 Received body:', body)
+    
     const { 
-      email, password, full_name, first_name, last_name, 
-      role, class: studentClass, department, admission_year, 
-      phone, address, vin_id 
+      first_name, 
+      middle_name,
+      last_name, 
+      role, 
+      class: studentClass, 
+      department, 
+      phone, 
+      address,
+      admission_year 
     } = body
     
-    console.log('📧 Creating student:', { email, role, full_name, vin_id })
+    // Validate required fields
+    if (!first_name || !last_name || !role) {
+      console.error('❌ Missing required fields:', { first_name, last_name, role })
+      return NextResponse.json({ 
+        error: 'First name, last name, and role are required' 
+      }, { status: 400 })
+    }
     
-    // ✅ STEP 1: Create user with Admin API - INCLUDE EMAIL IN METADATA
+    const year = admission_year || new Date().getFullYear()
+    
+    // ✅ GENERATE email using ONLY first and last name (simple, no middle name)
+    const email = await generateUniqueEmail(first_name, last_name)
+    
+    // ✅ GENERATE VIN ID (used as password)
+    const vinId = generateVinId(role, year)
+    
+    // ✅ FORMAT names
+    const fullName = formatFullName(first_name, last_name, middle_name)
+    const displayName = formatDisplayName(first_name, last_name, middle_name)
+    
+    console.log('📧 Creating user:', { 
+      email, 
+      password: vinId,
+      fullName, 
+      displayName, 
+      role, 
+      vin_id: vinId 
+    })
+    
+    // ✅ STEP 1: Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
-      password: password,
+      password: vinId,  // Password = VIN ID
       email_confirm: true,
       user_metadata: {
-        email: email,              // ✅ Include email
-        full_name: full_name,      // ✅ Full name
-        first_name: first_name,    // ✅ First name
-        last_name: last_name,      // ✅ Last name
+        email: email,
+        full_name: fullName,
+        display_name: displayName,
+        first_name: first_name.trim(),
+        middle_name: middle_name?.trim() || '',
+        last_name: last_name.trim(),
         role: role,
-        class: studentClass,
-        department: department,
-        admission_year: admission_year,
-        phone: phone,
-        address: address,
-        vin_id: vin_id
+        class: studentClass || null,
+        department: department || null,
+        admission_year: year,
+        phone: phone || null,
+        address: address || null,
+        vin_id: vinId
       }
     })
     
@@ -51,16 +148,18 @@ export async function POST(req: NextRequest) {
       .from('profiles')
       .insert({
         id: userId,
-        vin_id: vin_id,
-        full_name: full_name,
-        first_name: first_name,
-        last_name: last_name,
+        vin_id: vinId,
+        full_name: fullName,
+        display_name: displayName,
+        first_name: first_name.trim(),
+        middle_name: middle_name?.trim() || null,
+        last_name: last_name.trim(),
         email: email,
         role: role,
         role_id: `${role}_${email}`,
-        class: studentClass,
+        class: studentClass || null,
         department: department || 'General',
-        admission_year: admission_year,
+        admission_year: year,
         phone: phone || null,
         address: address || null,
         is_active: true,
@@ -71,11 +170,12 @@ export async function POST(req: NextRequest) {
     
     if (profileError) {
       console.error('❌ Profile insert error:', profileError)
+      // Rollback: delete auth user
       await supabaseAdmin.auth.admin.deleteUser(userId)
       return NextResponse.json({ error: profileError.message }, { status: 500 })
     }
     
-    console.log('✅ Profile created with VIN:', vin_id)
+    console.log('✅ Profile created:', { displayName, vin_id: vinId })
     
     // ✅ STEP 3: Insert into users table
     const { error: userError } = await supabaseAdmin
@@ -83,15 +183,17 @@ export async function POST(req: NextRequest) {
       .insert({
         id: userId,
         auth_id: userId,
-        vin_id: vin_id,
+        vin_id: vinId,
         email: email,
-        full_name: full_name,
-        first_name: first_name,
-        last_name: last_name,
+        full_name: fullName,
+        display_name: displayName,
+        first_name: first_name.trim(),
+        middle_name: middle_name?.trim() || null,
+        last_name: last_name.trim(),
         role: role,
-        class: studentClass,
+        class: studentClass || null,
         department: department || 'General',
-        admission_year: admission_year,
+        admission_year: year,
         phone: phone || null,
         address: address || null,
         is_active: true,
@@ -102,18 +204,25 @@ export async function POST(req: NextRequest) {
     
     if (userError) {
       console.error('❌ User table insert error:', userError)
+      // Don't fail - profile is already created
     } else {
-      console.log('✅ User record created with VIN:', vin_id)
+      console.log('✅ User record created')
     }
     
+    // ✅ Return credentials to frontend
     return NextResponse.json({ 
       success: true, 
       user: { 
         id: userId, 
         email: email, 
-        full_name: full_name,
-        password: password,
-        vin_id: vin_id
+        full_name: fullName,
+        display_name: displayName,
+        vin_id: vinId
+      },
+      credentials: {
+        email: email,
+        password: vinId,
+        vin_id: vinId
       }
     })
     

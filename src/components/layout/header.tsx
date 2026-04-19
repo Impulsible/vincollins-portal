@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - FULLY CORRECTED WITH REF FIX
+// components/layout/header.tsx - WITH USER MANAGEMENT DROPDOWN
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense, forwardRef } from 'react'
@@ -13,7 +13,8 @@ import {
   Sparkles, Mail, MapPin, Clock, Facebook, Twitter, Instagram,
   Linkedin, KeyRound, MonitorPlay, BarChart3, TrendingUp,
   HelpCircle, Lock, Timer, Shuffle, Shield, Award, RotateCcw, ArrowRight,
-  CheckCircle, ChevronRight, LucideIcon, Bell, CheckCircle2, AlertCircle, Trash2
+  CheckCircle, ChevronRight, LucideIcon, Bell, CheckCircle2, AlertCircle, Trash2,
+  Briefcase, FileCheck, Activity, MessageSquare
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +41,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
@@ -82,6 +89,8 @@ interface NavigationItem {
   icon: LucideIcon
   tab?: string
   isCbt?: boolean
+  isDropdown?: boolean
+  dropdownItems?: { name: string; href: string; icon: LucideIcon }[]
 }
 
 // Helper function to format names
@@ -158,13 +167,25 @@ const teacherNavigation: NavigationItem[] = [
   { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
 ]
 
-// Admin navigation
+// ✅ UPDATED Admin navigation - WITH USER MANAGEMENT DROPDOWN
+const userManagementItems = [
+  { name: 'Students', href: '/admin/students', icon: GraduationCap },
+  { name: 'Staff', href: '/admin/staff', icon: Briefcase },
+  { name: 'Inquiries', href: '/admin/inquiries', icon: MessageSquare },
+]
+
 const adminNavigation: NavigationItem[] = [
   { name: 'Overview', href: '/admin', icon: LayoutDashboard },
+  { 
+    name: 'User Management', 
+    href: '#', 
+    icon: Users, 
+    isDropdown: true,
+    dropdownItems: userManagementItems
+  },
   { name: 'Exam Approvals', href: '/admin/exams', icon: MonitorPlay },
-  { name: 'User Management', href: '/admin/users', icon: Users },
-  { name: 'Settings', href: '/admin/settings', icon: Settings },
-  { name: 'Reports', href: '/admin/reports', icon: BarChart3 },
+  { name: 'Reports', href: '/admin/report-cards', icon: FileCheck },
+  { name: 'Monitor', href: '/admin/monitor', icon: Activity },
 ]
 
 const quickLinks = [
@@ -275,6 +296,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)  // ✅ For User Management dropdown
   const [showCbtInfo, setShowCbtInfo] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
@@ -312,12 +334,20 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   // FIXED: More precise active check to prevent multiple active nav items
   const isNavActive = (href: string) => {
     if (href === '/') return pathname === '/'
+    if (href === '#') return false  // Dropdown trigger never active
     
     if (href === '/student') return pathname === '/student'
     if (href === '/staff') return pathname === '/staff'
     if (href === '/admin') return pathname === '/admin'
     
     return pathname === href || pathname?.startsWith(href + '/')
+  }
+
+  // Check if any user management sub-item is active
+  const isUserManagementActive = () => {
+    return pathname?.startsWith('/admin/students') || 
+           pathname?.startsWith('/admin/staff') || 
+           pathname?.startsWith('/admin/inquiries')
   }
 
   // Load notifications
@@ -345,10 +375,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   useEffect(() => {
     if (!user?.id) return
     
-    // Load immediately
     loadNotifications()
     
-    // Poll every 20 seconds for new notifications
     const interval = setInterval(() => {
       loadNotifications()
     }, 20000)
@@ -519,6 +547,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     setMobileMenuOpen(false)
     setProfileOpen(false)
     setNotificationOpen(false)
+    setUserMenuOpen(false)
     setSearchOpen(false)
   }, [pathname])
 
@@ -712,9 +741,60 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               <div className="flex items-center gap-0.5 xl:gap-1.5 bg-white/15 backdrop-blur-sm rounded-full p-0.5 lg:p-1 shadow-lg">
                 {currentNavigation.map((item) => {
                   const Icon = item.icon
-                  const isActive = isNavActive(item.href)
+                  const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
                   const isCbt = item.name === 'CBT Platform' || item.isCbt
                   
+                  // ✅ User Management Dropdown
+                  if (item.isDropdown && item.dropdownItems) {
+                    return (
+                      <DropdownMenu key={item.name} open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className={cn(
+                              "relative px-3 lg:px-3.5 xl:px-4 py-1.5 lg:py-2 text-xs lg:text-sm font-semibold transition-all duration-300 rounded-full whitespace-nowrap flex items-center gap-1.5 lg:gap-2",
+                              isUserManagementActive()
+                                ? "text-[#0A2472] bg-white shadow-lg" 
+                                : "text-white hover:text-white hover:bg-white/25"
+                            )}
+                          >
+                            <Icon className={cn(
+                              "h-3.5 w-3.5 lg:h-4 lg:w-4",
+                              isUserManagementActive() ? "text-[#0A2472]" : "text-white"
+                            )} />
+                            <span className="hidden xl:inline">{item.name}</span>
+                            <span className="lg:hidden xl:hidden">Users</span>
+                            <ChevronDown className={cn(
+                              "h-3 w-3 lg:h-3.5 lg:w-3.5 transition-transform duration-300",
+                              userMenuOpen && "rotate-180"
+                            )} />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="center" className="w-48 mt-2">
+                          {item.dropdownItems.map((subItem) => {
+                            const SubIcon = subItem.icon
+                            const isSubActive = pathname?.startsWith(subItem.href)
+                            return (
+                              <DropdownMenuItem key={subItem.name} asChild>
+                                <Link
+                                  href={subItem.href}
+                                  className={cn(
+                                    "flex items-center gap-2 cursor-pointer",
+                                    isSubActive && "bg-primary/10 text-primary font-medium"
+                                  )}
+                                  onClick={() => setUserMenuOpen(false)}
+                                >
+                                  <SubIcon className="h-4 w-4" />
+                                  <span>{subItem.name}</span>
+                                </Link>
+                              </DropdownMenuItem>
+                            )
+                          })}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )
+                  }
+                  
+                  // Regular navigation items
                   return (
                     <Link
                       key={item.name}
@@ -765,7 +845,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL - FIXED WITH PROPER REF FORWARDING */}
+              {/* NOTIFICATION BELL */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                   <PopoverTrigger asChild>
@@ -1339,8 +1419,43 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               <div className="p-3 sm:p-4">
                 {currentNavigation.map((item) => {
                   const Icon = item.icon
-                  const isActive = isNavActive(item.href)
+                  const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
                   const isCbt = item.name === 'CBT Platform' || item.isCbt
+                  
+                  // Handle dropdown items in mobile
+                  if (item.isDropdown && item.dropdownItems) {
+                    return (
+                      <div key={item.name} className="mb-1">
+                        <div className={cn(
+                          "flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm",
+                          isUserManagementActive() ? "bg-[#0A2472]/10 text-[#0A2472] font-semibold" : "text-gray-700"
+                        )}>
+                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                          <span>{item.name}</span>
+                        </div>
+                        <div className="ml-6 mt-1 space-y-1">
+                          {item.dropdownItems.map((subItem) => {
+                            const SubIcon = subItem.icon
+                            const isSubActive = pathname?.startsWith(subItem.href)
+                            return (
+                              <Link
+                                key={subItem.name}
+                                href={subItem.href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className={cn(
+                                  "flex items-center gap-3 px-3 sm:px-4 py-2 rounded-lg text-sm transition-all",
+                                  isSubActive ? "bg-[#0A2472]/10 text-[#0A2472] font-medium" : "text-gray-600 hover:bg-gray-100"
+                                )}
+                              >
+                                <SubIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                <span>{subItem.name}</span>
+                              </Link>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )
+                  }
                   
                   return (
                     <Link
@@ -1363,6 +1478,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     >
                       <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                       <span>{item.name}</span>
+                      {isCbt && (
+                        <Badge className="ml-auto bg-[#F5A623] text-[#0A2472] text-[8px] px-1.5">CBT</Badge>
+                      )}
                     </Link>
                   )
                 })}

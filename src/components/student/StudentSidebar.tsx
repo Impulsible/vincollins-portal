@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/student/StudentSidebar.tsx - ATTENDANCE REMOVED, REPORT CARD ADDED
+// components/student/StudentSidebar.tsx - UPDATED WITH DISPLAY_NAME FIX
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -31,14 +31,18 @@ import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 
 interface StudentProfile {
+  id?: string
   full_name?: string
+  display_name?: string | null
+  first_name?: string | null
+  middle_name?: string | null
+  last_name?: string | null
   email?: string
   photo_url?: string | null
   class?: string
   vin_id?: string
   department?: string
   admission_year?: number
-  id?: string
 }
 
 interface StudentSidebarProps {
@@ -142,35 +146,58 @@ const secondaryNavigation: NavigationItem[] = [
   },
 ]
 
-const formatDisplayName = (name?: string): string => {
-  if (!name) return 'Student Name'
+// Get first name from profile
+const getFirstName = (profile?: StudentProfile | null): string => {
+  if (profile?.first_name) {
+    const firstName = profile.first_name.trim()
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+  }
   
-  let formatted = name.replace(/[._]/g, ' ')
-  formatted = formatted.replace(/\s+/g, ' ').trim()
-  formatted = formatted.split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ')
+  if (profile?.full_name) {
+    const formattedName = profile.full_name.replace(/[._]/g, ' ').replace(/\s+/g, ' ').trim()
+    const firstName = formattedName.split(' ')[0]
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+  }
   
-  return formatted
+  return 'Student'
 }
 
-const getInitials = (name?: string): string => {
-  if (!name) return 'ST'
+// Get display name - PREFERS display_name from database
+const getDisplayName = (profile?: StudentProfile | null): string => {
+  // Use display_name if available
+  if (profile?.display_name) {
+    return profile.display_name
+  }
   
-  const formattedName = formatDisplayName(name)
-  const names = formattedName.split(' ')
+  // Build from first_name and last_name if available
+  if (profile?.first_name && profile?.last_name) {
+    const lastName = profile.last_name.trim()
+    const firstName = profile.first_name.trim()
+    const middleName = profile.middle_name?.trim()
+    
+    const parts = [lastName, firstName]
+    if (middleName) parts.push(middleName)
+    
+    return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+  }
+  
+  // Fallback to full_name
+  if (profile?.full_name) {
+    return profile.full_name
+  }
+  
+  return 'Student Name'
+}
+
+// Get initials for avatar
+const getInitials = (profile?: StudentProfile | null): string => {
+  const displayName = profile?.display_name || profile?.full_name || 'Student'
+  const names = displayName.split(' ')
   
   if (names.length >= 2) {
     return (names[0][0] + names[names.length - 1][0]).toUpperCase()
   }
-  return names[0].slice(0, 2).toUpperCase()
-}
-
-const getFirstName = (name?: string): string => {
-  if (!name) return 'Student'
-  
-  const formattedName = formatDisplayName(name)
-  return formattedName.split(' ')[0]
+  return displayName.slice(0, 2).toUpperCase()
 }
 
 export function StudentSidebar({ 
@@ -261,9 +288,9 @@ export function StudentSidebar({
     }
   }, [pathname, setActiveTab])
 
-  const displayName = formatDisplayName(profile?.full_name)
-  const firstName = getFirstName(profile?.full_name)
-  const initials = getInitials(profile?.full_name)
+  const firstName = getFirstName(profile)
+  const displayName = getDisplayName(profile)
+  const initials = getInitials(profile)
   const avatarUrl = profile?.photo_url || undefined
 
   const handleLogoutClick = () => {
@@ -469,16 +496,18 @@ export function StudentSidebar({
                     {statusDisplay.text}
                   </Badge>
                 </div>
+                {/* ✅ FIXED: Use first_name from profile */}
                 <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">
-                  {firstName}!
+                  {profile?.first_name || firstName}!
                 </h3>
               </div>
             </div>
 
             <div className="space-y-2">
               <div>
+                {/* ✅ FIXED: Use display_name from profile (LastName FirstName MiddleName) */}
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
-                  {displayName}
+                  {profile?.display_name || displayName}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {profile?.email || 'student@vincollins.edu.ng'}

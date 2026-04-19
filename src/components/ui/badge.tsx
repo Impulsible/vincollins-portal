@@ -90,51 +90,57 @@ export interface BadgeProps
   onClose?: () => void
 }
 
-function Badge({ 
-  className, 
-  variant, 
-  size,
-  rounded,
-  icon,
-  iconPosition = "left",
-  closable,
-  onClose,
-  children, 
-  ...props 
-}: BadgeProps) {
-  return (
-    <div
-      className={cn(badgeVariants({ variant, size, rounded }), className)}
-      {...props}
-    >
-      {icon && iconPosition === "left" && (
-        <span className="mr-1 inline-flex items-center">{icon}</span>
-      )}
-      {children}
-      {icon && iconPosition === "right" && (
-        <span className="ml-1 inline-flex items-center">{icon}</span>
-      )}
-      {closable && (
-        <button
-          type="button"
-          onClick={onClose}
-          className="ml-1.5 inline-flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5 transition-colors"
-          aria-label="Remove badge"
-        >
-          <svg
-            className="h-3 w-3"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
+// FIXED: Added forwardRef here
+const Badge = React.forwardRef<HTMLDivElement, BadgeProps>(
+  ({ 
+    className, 
+    variant, 
+    size,
+    rounded,
+    icon,
+    iconPosition = "left",
+    closable,
+    onClose,
+    children, 
+    ...props 
+  }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(badgeVariants({ variant, size, rounded }), className)}
+        {...props}
+      >
+        {icon && iconPosition === "left" && (
+          <span className="mr-1 inline-flex items-center">{icon}</span>
+        )}
+        {children}
+        {icon && iconPosition === "right" && (
+          <span className="ml-1 inline-flex items-center">{icon}</span>
+        )}
+        {closable && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="ml-1.5 inline-flex items-center justify-center rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5 transition-colors"
+            aria-label="Remove badge"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-      )}
-    </div>
-  )
-}
+            <svg
+              className="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    )
+  }
+)
+
+Badge.displayName = "Badge"
 
 // Helper components for common school portal badges
 export const GradeBadge = ({ score }: { score: number }) => {

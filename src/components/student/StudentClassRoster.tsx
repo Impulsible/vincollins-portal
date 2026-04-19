@@ -18,7 +18,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 interface Classmate {
   id: string
+  first_name?: string | null
+  last_name?: string | null
   full_name: string
+  display_name?: string | null
   email: string
   class: string
   vin_id?: string
@@ -34,6 +37,15 @@ interface StudentClassRosterProps {
   compact?: boolean
   className?: string
   onClassmateClick?: (classmate: Classmate) => void
+}
+
+// Helper function to get best display name
+function getBestDisplayName(classmate: Classmate): string {
+  if (classmate.display_name) return classmate.display_name
+  if (classmate.first_name && classmate.last_name) {
+    return `${classmate.last_name} ${classmate.first_name}`
+  }
+  return classmate.full_name || 'Student'
 }
 
 export function StudentClassRoster({ 
@@ -57,10 +69,10 @@ export function StudentClassRoster({
       }
 
       try {
-        // Fetch all students in the same class
+        // Fetch all students in the same class with all name fields
         const { data, error } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, first_name, middle_name, last_name, full_name, display_name, email, class, photo_url, vin_id, department, admission_year')
           .eq('class', studentClass)
           .eq('role', 'student')
           .order('full_name')
@@ -76,24 +88,20 @@ export function StudentClassRoster({
             ? data.filter(student => student.id !== studentId)
             : data
 
-          // Get VIN IDs from users table
-          const classmatesWithVin = await Promise.all(
-            filteredData.map(async (student) => {
-              const { data: userData } = await supabase
-                .from('users')
-                .select('vin_id')
-                .eq('id', student.id)
-                .maybeSingle()
-
-              return {
-                ...student,
-                vin_id: userData?.vin_id || student.vin_id,
-                is_active: true // Default to active
-              }
-            })
-          )
-
-          setClassmates(classmatesWithVin)
+          setClassmates(filteredData.map((student: any) => ({
+            id: student.id,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            full_name: student.full_name || `${student.first_name || ''} ${student.last_name || ''}`.trim(),
+            display_name: student.display_name,
+            email: student.email,
+            class: student.class,
+            vin_id: student.vin_id,
+            photo_url: student.photo_url,
+            department: student.department,
+            admission_year: student.admission_year,
+            is_active: true
+          })))
         }
       } catch (error) {
         console.error('Error in fetchClassmates:', error)
@@ -116,7 +124,6 @@ export function StudentClassRoster({
           filter: `class=eq.${studentClass}`
         },
         () => {
-          // Refetch when changes occur
           fetchClassmates()
         }
       )
@@ -129,21 +136,23 @@ export function StudentClassRoster({
 
   // Filter classmates by search
   const filteredClassmates = useMemo(() => {
-    return classmates.filter(classmate =>
-      classmate.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      classmate.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      classmate.vin_id?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    return classmates.filter(classmate => {
+      const displayName = getBestDisplayName(classmate)
+      return displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        classmate.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        classmate.vin_id?.toLowerCase().includes(searchQuery.toLowerCase())
+    })
   }, [classmates, searchQuery])
 
   // Get initials for avatar
-  const getInitials = (name?: string): string => {
-    if (!name) return 'S'
-    const parts = name.split(' ')
+  const getInitials = (classmate: Classmate): string => {
+    const displayName = getBestDisplayName(classmate)
+    if (!displayName) return 'S'
+    const parts = displayName.split(' ')
     if (parts.length >= 2) {
       return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
     }
-    return name.slice(0, 2).toUpperCase()
+    return displayName.slice(0, 2).toUpperCase()
   }
 
   // Get avatar color based on name
@@ -174,7 +183,7 @@ export function StudentClassRoster({
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {[1, 2, 3, 4, 5].map(i => (
+            {[1, 2, 3, 4].map(i => (
               <div key={i} className="flex items-center gap-3">
                 <Skeleton className="h-10 w-10 rounded-full" />
                 <div className="flex-1">
@@ -308,66 +317,69 @@ export function StudentClassRoster({
           )}>
             <AnimatePresence>
               <div className="space-y-1 pb-4">
-                {filteredClassmates.map((classmate, index) => (
-                  <motion.div
-                    key={classmate.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    transition={{ delay: index * 0.02 }}
-                    className={cn(
-                      "flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer group",
-                      compact && "p-2"
-                    )}
-                    onClick={() => onClassmateClick?.(classmate)}
-                  >
-                    <div className="relative">
-                      <Avatar className={cn(
-                        "ring-2 ring-white dark:ring-slate-900 shadow-sm",
-                        compact ? "h-8 w-8" : "h-10 w-10"
-                      )}>
-                        <AvatarImage src={classmate.photo_url || undefined} />
-                        <AvatarFallback className={cn(
-                          "bg-gradient-to-br text-white text-xs font-medium",
-                          getAvatarColor(classmate.full_name)
+                {filteredClassmates.map((classmate, index) => {
+                  const displayName = getBestDisplayName(classmate)
+                  return (
+                    <motion.div
+                      key={classmate.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ delay: index * 0.02 }}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer group",
+                        compact && "p-2"
+                      )}
+                      onClick={() => onClassmateClick?.(classmate)}
+                    >
+                      <div className="relative">
+                        <Avatar className={cn(
+                          "ring-2 ring-white dark:ring-slate-900 shadow-sm",
+                          compact ? "h-8 w-8" : "h-10 w-10"
                         )}>
-                          {getInitials(classmate.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -bottom-0.5 -right-0.5">
-                        <div className="h-2.5 w-2.5 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                          <AvatarImage src={classmate.photo_url || undefined} />
+                          <AvatarFallback className={cn(
+                            "bg-gradient-to-br text-white text-xs font-medium",
+                            getAvatarColor(displayName)
+                          )}>
+                            {getInitials(classmate)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-0.5 -right-0.5">
+                          <div className="h-2.5 w-2.5 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className={cn(
-                          "font-medium text-slate-900 dark:text-white truncate",
-                          compact ? "text-sm" : ""
-                        )}>
-                          {classmate.full_name}
-                        </p>
-                        {!compact && (
-                          <Badge variant="outline" className="text-[10px] shrink-0">
-                            {classmate.vin_id?.slice(-6) || 'N/A'}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={cn(
+                            "font-medium text-slate-900 dark:text-white truncate",
+                            compact ? "text-sm" : ""
+                          )}>
+                            {displayName}
+                          </p>
+                          {!compact && classmate.vin_id && (
+                            <Badge variant="outline" className="text-[10px] shrink-0">
+                              {classmate.vin_id.slice(-6)}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-slate-500">
+                          <Mail className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{classmate.email}</span>
+                        </div>
+                      </div>
+
+                      {!compact && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px]">
+                            Active
                           </Badge>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
-                        <Mail className="h-3 w-3 shrink-0" />
-                        <span className="truncate">{classmate.email}</span>
-                      </div>
-                    </div>
-
-                    {!compact && (
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-[10px]">
-                          Active
-                        </Badge>
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
+                        </div>
+                      )}
+                    </motion.div>
+                  )
+                })}
               </div>
             </AnimatePresence>
           </ScrollArea>
@@ -376,41 +388,46 @@ export function StudentClassRoster({
           <ScrollArea className="max-h-[450px] px-4 pb-4">
             <AnimatePresence>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {filteredClassmates.map((classmate, index) => (
-                  <motion.div
-                    key={classmate.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ delay: index * 0.02 }}
-                    className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer text-center"
-                    onClick={() => onClassmateClick?.(classmate)}
-                  >
-                    <div className="relative inline-block">
-                      <Avatar className="h-16 w-16 ring-2 ring-white dark:ring-slate-900 shadow-md mx-auto">
-                        <AvatarImage src={classmate.photo_url || undefined} />
-                        <AvatarFallback className={cn(
-                          "bg-gradient-to-br text-white text-lg font-medium",
-                          getAvatarColor(classmate.full_name)
-                        )}>
-                          {getInitials(classmate.full_name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -bottom-0.5 -right-0.5">
-                        <div className="h-3 w-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                {filteredClassmates.map((classmate, index) => {
+                  const displayName = getBestDisplayName(classmate)
+                  return (
+                    <motion.div
+                      key={classmate.id}
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ delay: index * 0.02 }}
+                      className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer text-center"
+                      onClick={() => onClassmateClick?.(classmate)}
+                    >
+                      <div className="relative inline-block">
+                        <Avatar className="h-16 w-16 ring-2 ring-white dark:ring-slate-900 shadow-md mx-auto">
+                          <AvatarImage src={classmate.photo_url || undefined} />
+                          <AvatarFallback className={cn(
+                            "bg-gradient-to-br text-white text-lg font-medium",
+                            getAvatarColor(displayName)
+                          )}>
+                            {getInitials(classmate)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="absolute -bottom-0.5 -right-0.5">
+                          <div className="h-3 w-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                        </div>
                       </div>
-                    </div>
-                    <p className="font-medium text-slate-900 dark:text-white text-sm mt-2 truncate">
-                      {classmate.full_name}
-                    </p>
-                    <p className="text-xs text-slate-500 truncate">
-                      {classmate.email.split('@')[0]}
-                    </p>
-                    <Badge variant="outline" className="mt-2 text-[10px]">
-                      {classmate.vin_id?.slice(-6) || 'N/A'}
-                    </Badge>
-                  </motion.div>
-                ))}
+                      <p className="font-medium text-slate-900 dark:text-white text-sm mt-2 truncate">
+                        {displayName}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate">
+                        {classmate.email.split('@')[0]}
+                      </p>
+                      {classmate.vin_id && (
+                        <Badge variant="outline" className="mt-2 text-[10px]">
+                          {classmate.vin_id.slice(-6)}
+                        </Badge>
+                      )}
+                    </motion.div>
+                  )
+                })}
               </div>
             </AnimatePresence>
           </ScrollArea>

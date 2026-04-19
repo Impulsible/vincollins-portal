@@ -1,4 +1,4 @@
-// components/admin/report-cards/ReportCardApproval.tsx
+// components/admin/report-cards/ReportCardApproval.tsx - UPDATED WITH DISPLAY NAME
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -40,6 +40,7 @@ interface ReportCard {
   id: string
   student_id: string
   student_name: string
+  student_display_name?: string  // ✅ Added - for proper report format
   student_vin: string
   class: string
   term: string
@@ -105,6 +106,11 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
     return 'text-gray-600'
   }
 
+  // ✅ Helper to get display name (fallback to student_name if display_name missing)
+  const getDisplayName = (card: ReportCard): string => {
+    return card.student_display_name || card.student_name || 'Unknown Student'
+  }
+
   // Load profile
   useEffect(() => {
     const loadProfile = async () => {
@@ -117,7 +123,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
     loadProfile()
   }, [])
 
-  // Load report cards
+  // Load report cards - ✅ Updated to fetch display_name
   const loadReportCards = useCallback(async () => {
     setLoading(true)
     try {
@@ -144,6 +150,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
         id: rc.id,
         student_id: rc.student_id,
         student_name: rc.student_name || 'Unknown',
+        student_display_name: rc.student_display_name || rc.display_name || rc.student_name, // ✅ Use display_name
         student_vin: rc.student_vin || 'N/A',
         class: rc.class,
         term: rc.term,
@@ -157,12 +164,13 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
         submitted_at: rc.submitted_at || rc.created_at
       }))
 
-      // Filter by search
+      // Filter by search - ✅ Search both display_name and student_name
       let filtered = cards
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
         filtered = cards.filter(c => 
-          c.student_name.toLowerCase().includes(query) ||
+          c.student_display_name?.toLowerCase().includes(query) ||
+          c.student_name?.toLowerCase().includes(query) ||
           c.student_vin?.toLowerCase().includes(query)
         )
       }
@@ -208,7 +216,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
 
       if (error) throw error
 
-      toast.success(`Report card for ${selectedCard.student_name} approved!`)
+      toast.success(`Report card for ${getDisplayName(selectedCard)} approved!`)
       setShowReviewDialog(false)
       loadReportCards()
       onRefresh?.()
@@ -247,7 +255,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
         link: '/student/report-card'
       })
 
-      toast.success(`Report card published for ${selectedCard.student_name}!`)
+      toast.success(`Report card published for ${getDisplayName(selectedCard)}!`)
       setShowReviewDialog(false)
       loadReportCards()
       onRefresh?.()
@@ -485,6 +493,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
               <TableBody>
                 {reportCards.map((card) => {
                   const grade = getGrade(card.average_score)
+                  const displayName = getDisplayName(card) // ✅ Use display name
                   return (
                     <TableRow key={card.id}>
                       <TableCell>
@@ -492,7 +501,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
                           <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
                             <User className="h-4 w-4 text-slate-500" />
                           </div>
-                          <span className="font-medium">{card.student_name}</span>
+                          <span className="font-medium">{displayName}</span>
                         </div>
                       </TableCell>
                       <TableCell className="font-mono text-xs">{card.student_vin}</TableCell>
@@ -524,7 +533,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
         </CardContent>
       </Card>
 
-      {/* Review Dialog */}
+      {/* Review Dialog - ✅ Updated to show display name */}
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           {selectedCard && (
@@ -532,7 +541,7 @@ export function ReportCardApproval({ onRefresh }: ReportCardApprovalProps) {
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-3">
                   <User className="h-5 w-5" />
-                  {selectedCard.student_name} - {selectedCard.class}
+                  {getDisplayName(selectedCard)} - {selectedCard.class}
                 </DialogTitle>
                 <DialogDescription>
                   {selectedCard.term} {selectedCard.academic_year} | VIN: {selectedCard.student_vin} | Teacher: {selectedCard.class_teacher}

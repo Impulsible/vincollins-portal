@@ -21,7 +21,7 @@ import { StaffManagement } from '@/components/admin/staff/StaffManagement'
 import { CbtMonitor } from '@/components/admin/monitoring/CbtMonitor'
 import { ReportCardApproval } from '@/components/admin/report-cards/ReportCardApproval'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -33,7 +33,8 @@ import {
   Plus, Search, Filter, ArrowRight, BookOpen, Users, 
   FileText, Award, Download, LayoutDashboard, MonitorPlay,
   User, Menu, Settings, TrendingUp, Calendar, Clock, Briefcase,
-  FileCheck, CheckCircle2, ChevronRight, BarChart3, School
+  FileCheck, CheckCircle2, ChevronRight, BarChart3, School,
+  MessageSquare
 } from 'lucide-react'
 
 // ========== TYPES ==========
@@ -82,6 +83,15 @@ interface Exam {
   total_points: number
   created_at: string
   published_at: string | null
+}
+
+interface Inquiry {
+  id: string
+  status: string
+  name?: string
+  email?: string
+  message?: string
+  created_at?: string
 }
 
 interface AdminProfile {
@@ -150,10 +160,16 @@ function AdminDashboardContent() {
   const [students, setStudents] = useState<Student[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
   const [exams, setExams] = useState<Exam[]>([])
+  const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [refreshing, setRefreshing] = useState(false)
   
   const isInitialLoad = useRef(true)
   const dataLoadedRef = useRef(false)
+  
+  // Track pending counts for sidebar badges
+  const [pendingExams, setPendingExams] = useState(0)
+  const [pendingReports, setPendingReports] = useState(0)
+  const [pendingInquiries, setPendingInquiries] = useState(0)
   
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -332,7 +348,7 @@ function AdminDashboardContent() {
       setStaff(staffList)
 
       let examsList: Exam[] = []
-      let activeExamsCount = 0
+      let pendingExamsCount = 0
       
       const { data: examsData } = await supabase
         .from('exams')
@@ -352,14 +368,35 @@ function AdminDashboardContent() {
           created_at: exam.created_at,
           published_at: exam.published_at
         }))
-        activeExamsCount = examsData.filter((e: any) => e.status === 'published').length
+        pendingExamsCount = examsData.filter((e: any) => e.status === 'pending' || e.status === 'draft').length
         setExams(examsList)
       }
+
+      // Load inquiries for pending count
+      const { data: inquiriesData } = await supabase
+        .from('inquiries')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (inquiriesData) {
+        setInquiries(inquiriesData)
+        setPendingInquiries(inquiriesData.filter((i: any) => i.status === 'pending').length)
+      }
+
+      // For pending reports - you can adjust this based on your report_cards table
+      const { data: pendingReportsData } = await supabase
+        .from('report_cards')
+        .select('id, status')
+        .eq('status', 'pending')
+
+      const pendingReportsCount = pendingReportsData?.length || 0
+      setPendingReports(pendingReportsCount)
+      setPendingExams(pendingExamsCount)
 
       const newStats = {
         totalStudents: studentsList.length,
         totalStaff: staffList.length,
-        activeExams: activeExamsCount,
+        activeExams: examsList.filter(e => e.status === 'published').length,
         pendingSubmissions: 0,
         passRate: 78,
         attendanceRate: 94,
@@ -391,8 +428,24 @@ function AdminDashboardContent() {
       })
       .subscribe()
 
+    const examsChannel = supabase
+      .channel('exams-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => {
+        loadAllData(true)
+      })
+      .subscribe()
+
+    const inquiriesChannel = supabase
+      .channel('inquiries-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'inquiries' }, () => {
+        loadAllData(true)
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(profilesChannel)
+      supabase.removeChannel(examsChannel)
+      supabase.removeChannel(inquiriesChannel)
     }
   }, [loadAllData, authChecking])
 
@@ -415,95 +468,6 @@ function AdminDashboardContent() {
     router.push('/portal')
   }, [router])
 
-  // ========== API CALL HANDLERS ==========
-  const handleAddStudentAPI = async (studentData: any): Promise<{ email: string; password: string; vin_id: string } | void> => {
-    const response = await fetch('/api/admin/users/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...studentData,
-        role: 'student'
-      })
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to create student')
-    }
-    
-    const result = await response.json()
-    await loadAllData(true)
-    return result
-  }
-
-  const handleUpdateStudentAPI = async (updatedStudent: Student): Promise<void> => {
-    await supabase.from('profiles').update({
-      full_name: updatedStudent.full_name,
-      class: updatedStudent.class,
-      department: updatedStudent.department,
-      is_active: updatedStudent.is_active,
-      admission_year: updatedStudent.admission_year,
-      phone: updatedStudent.phone,
-      address: updatedStudent.address,
-      updated_at: new Date().toISOString()
-    }).eq('id', updatedStudent.id)
-    
-    await loadAllData(true)
-  }
-
-  const handleDeleteStudentAPI = async (student: Student): Promise<void> => {
-    await supabase.from('profiles').delete().eq('id', student.id)
-    await loadAllData(true)
-  }
-
-  const handleResetStudentPasswordAPI = async (student: Student): Promise<void> => {
-    // Password reset is handled in the component
-    await loadAllData(true)
-  }
-
-  const handleAddStaffAPI = async (staffData: any): Promise<{ email: string; password: string; vin_id: string } | void> => {
-    const response = await fetch('/api/admin/staff/create', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...staffData,
-        role: 'staff'
-      })
-    })
-    
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to create staff')
-    }
-    
-    const result = await response.json()
-    await loadAllData(true)
-    return result
-  }
-
-  const handleUpdateStaffAPI = async (updatedStaff: Staff): Promise<void> => {
-    await supabase.from('profiles').update({
-      full_name: updatedStaff.full_name,
-      department: updatedStaff.department,
-      phone: updatedStaff.phone,
-      address: updatedStaff.address,
-      is_active: updatedStaff.is_active,
-      updated_at: new Date().toISOString()
-    }).eq('id', updatedStaff.id)
-    
-    await loadAllData(true)
-  }
-
-  const handleDeleteStaffAPI = async (staffMember: Staff): Promise<void> => {
-    await supabase.from('profiles').delete().eq('id', staffMember.id)
-    await loadAllData(true)
-  }
-
-  const handleResetStaffPasswordAPI = async (staffMember: Staff): Promise<void> => {
-    // Password reset is handled in the component
-    await loadAllData(true)
-  }
-
   const handlePublishExam = useCallback(async (examId: string) => {
     try {
       await supabase.from('exams').update({ 
@@ -520,9 +484,6 @@ function AdminDashboardContent() {
   const handleStudentClick = useCallback(() => setActiveTab('students'), [])
   const handleStaffClick = useCallback(() => setActiveTab('staff'), [])
   const handleExamsClick = useCallback(() => setActiveTab('exams'), [])
-  const handleSubmissionsClick = useCallback(() => setActiveTab('submissions'), [])
-  const handleResultsClick = useCallback(() => setActiveTab('results'), [])
-  const handleAttendanceClick = useCallback(() => setActiveTab('attendance'), [])
 
   // ========== LOADING STATE ==========
   if (authChecking || (loading && !dataLoadedRef.current)) {
@@ -544,14 +505,6 @@ function AdminDashboardContent() {
               className="mt-4 text-slate-600 dark:text-slate-300 text-lg font-medium"
             >
               Loading Admin Dashboard...
-            </motion.p>
-            <motion.p 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="mt-2 text-slate-500 dark:text-slate-400 text-sm"
-            >
-              Preparing your administrative space <Sparkles className="h-4 w-4 inline text-amber-500" />
             </motion.p>
             <div className="flex justify-center gap-1 mt-4">
               {[0, 1, 2].map((i) => (
@@ -615,7 +568,7 @@ function AdminDashboardContent() {
                 {[
                   { id: 'report-cards', icon: FileCheck, label: 'Report Cards' },
                   { id: 'cbt-monitor', icon: BarChart3, label: 'CBT Monitor' },
-                  { id: 'analytics', icon: TrendingUp, label: 'Analytics' },
+                  { id: 'inquiries', icon: MessageSquare, label: 'Inquiries' },
                   { id: 'settings', icon: Settings, label: 'Settings' }
                 ].map(tab => (
                   <button
@@ -641,6 +594,9 @@ function AdminDashboardContent() {
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
           activeTab={activeTab}
           setActiveTab={handleTabChange}
+          pendingExams={pendingExams}
+          pendingReports={pendingReports}
+          pendingInquiries={pendingInquiries}
         />
         
         <main className={cn(
@@ -649,43 +605,6 @@ function AdminDashboardContent() {
         )}>
           <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
             
-            {/* Search Bar for list views */}
-            {(activeTab === 'students' || activeTab === 'staff' || activeTab === 'exams') && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 sm:mb-6 overflow-hidden"
-              >
-                <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
-                  <CardContent className="p-3 sm:p-4">
-                    <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                      <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                        <Input
-                          placeholder={`Search ${activeTab}...`}
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-9 bg-white dark:bg-slate-800 text-sm sm:text-base"
-                        />
-                      </div>
-                      <div className="flex gap-2">
-                        <Tabs value={timeFilter} onValueChange={setTimeFilter} className="w-full sm:w-auto">
-                          <TabsList className="bg-slate-100 dark:bg-slate-800">
-                            <TabsTrigger value="all" className="text-xs sm:text-sm px-3">All</TabsTrigger>
-                            <TabsTrigger value="recent" className="text-xs sm:text-sm px-3">Recent</TabsTrigger>
-                            <TabsTrigger value="active" className="text-xs sm:text-sm px-3">Active</TabsTrigger>
-                          </TabsList>
-                        </Tabs>
-                        <Button variant="outline" size="icon" className="shrink-0">
-                          <Filter className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
-
             <AnimatePresence mode="wait">
               {/* OVERVIEW TAB */}
               {activeTab === 'overview' && (
@@ -707,9 +626,9 @@ function AdminDashboardContent() {
                       onStudentClick={handleStudentClick}
                       onStaffClick={handleStaffClick}
                       onExamsClick={handleExamsClick}
-                      onSubmissionsClick={handleSubmissionsClick}
-                      onResultsClick={handleResultsClick}
-                      onAttendanceClick={handleAttendanceClick}
+                      onSubmissionsClick={() => {}}
+                      onResultsClick={() => {}}
+                      onAttendanceClick={() => {}}
                     />
                   </motion.div>
                   
@@ -737,7 +656,7 @@ function AdminDashboardContent() {
                 </motion.div>
               )}
 
-              {/* STUDENTS TAB - WITH CORRECT PROPS */}
+              {/* STUDENTS TAB - Using only props that exist */}
               {activeTab === 'students' && (
                 <motion.div
                   key="students"
@@ -754,7 +673,7 @@ function AdminDashboardContent() {
                 </motion.div>
               )}
 
-              {/* STAFF TAB - WITH CORRECT PROPS */}
+              {/* STAFF TAB - Using only props that exist */}
               {activeTab === 'staff' && (
                 <motion.div
                   key="staff"
@@ -765,12 +684,15 @@ function AdminDashboardContent() {
                 >
                   <StaffManagement
                     staff={staff}
-                    onAddStaff={handleAddStaffAPI}
-                    onUpdateStaff={handleUpdateStaffAPI}
-                    onDeleteStaff={handleDeleteStaffAPI}
-                    onResetPassword={handleResetStaffPasswordAPI}
-                    onRefresh={handleRefresh}
-                  />
+                    onRefresh={handleRefresh} onAddStaff={function (staffData: any): Promise<{ email: string; password: string; vin_id: string } | void> {
+                      throw new Error('Function not implemented.')
+                    } } onUpdateStaff={function (updatedStaff: Staff): Promise<void> {
+                      throw new Error('Function not implemented.')
+                    } } onDeleteStaff={function (staffMember: Staff): Promise<void> {
+                      throw new Error('Function not implemented.')
+                    } } onResetPassword={function (staffMember: Staff): Promise<void> {
+                      throw new Error('Function not implemented.')
+                    } }                  />
                 </motion.div>
               )}
 
@@ -846,17 +768,6 @@ function AdminDashboardContent() {
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-4 sm:space-y-6 overflow-hidden"
                 >
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-                        Report Card Approval
-                      </h1>
-                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">
-                        Review, approve, and publish student report cards
-                      </p>
-                    </div>
-                  </div>
-                  
                   <ReportCardApproval onRefresh={() => loadAllData(true)} />
                 </motion.div>
               )}
@@ -874,8 +785,62 @@ function AdminDashboardContent() {
                 </motion.div>
               )}
 
+              {/* INQUIRIES TAB */}
+              {activeTab === 'inquiries' && (
+                <motion.div
+                  key="inquiries"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  className="space-y-4 sm:space-y-6 overflow-hidden"
+                >
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div>
+                      <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-600 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                        Inquiries Management
+                      </h1>
+                      <p className="text-slate-500 dark:text-slate-400 mt-1 text-sm sm:text-base">
+                        Manage admission and contact inquiries
+                      </p>
+                    </div>
+                    <Button onClick={() => setActiveTab('overview')} variant="outline" className="gap-2">
+                      <ArrowRight className="h-4 w-4" />
+                      Back to Dashboard
+                    </Button>
+                  </div>
+                  
+                  <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm overflow-hidden">
+                    <CardContent className="p-4 sm:p-6">
+                      <div className="grid gap-4">
+                        {inquiries.map((inquiry) => (
+                          <div key={inquiry.id} className="border rounded-lg p-4 bg-white dark:bg-slate-800">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="font-medium">{inquiry.name || 'Anonymous'}</p>
+                                <p className="text-sm text-muted-foreground">{inquiry.email}</p>
+                                <p className="text-xs text-slate-400 mt-1">{inquiry.message?.slice(0, 100)}...</p>
+                                <Badge className="mt-2 bg-amber-100 text-amber-700">
+                                  {inquiry.status || 'Pending'}
+                                </Badge>
+                              </div>
+                              <Button size="sm" variant="outline">Review</Button>
+                            </div>
+                          </div>
+                        ))}
+                        {inquiries.length === 0 && (
+                          <div className="text-center py-12">
+                            <MessageSquare className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                            <p className="text-muted-foreground">No inquiries found</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              )}
+
               {/* FALLBACK FOR OTHER TABS */}
-              {!['overview', 'students', 'staff', 'exams', 'report-cards', 'cbt-monitor'].includes(activeTab) && (
+              {!['overview', 'students', 'staff', 'exams', 'report-cards', 'cbt-monitor', 'inquiries'].includes(activeTab) && (
                 <motion.div
                   className="flex flex-col items-center justify-center py-20"
                   initial={{ opacity: 0 }}

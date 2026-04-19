@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - FULLY RESPONSIVE WITH ASSIGNMENTS & NOTES
+// app/student/page.tsx - FULLY FIXED WITH CORRECT HEADER PROPS
 'use client'
 
 import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { StudentWelcomeBanner } from '@/components/student/StudentWelcomeBanner'
-import { StudentClassRoster } from '@/components/student/StudentClassRoster'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -23,16 +22,27 @@ import {
   BookOpen, Award, Clock, TrendingUp, CheckCircle,
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
   Search, User, ArrowRight, Trophy, Eye, LayoutDashboard, Menu,
-  GraduationCap, CheckCircle2, FileCheck, Download, Calendar, File
+  GraduationCap, CheckCircle2, FileCheck, Download, Calendar, File,
+  Grid3x3, List, Users, Mail, Sparkles, UserPlus, FolderOpen
 } from 'lucide-react'
 
 // ============================================
-// NAME FORMATTING
+// NAME FORMATTING UTILITIES
 // ============================================
-function formatFullName(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
-  if (firstName && lastName) return `${firstName} ${lastName}`
-  if (firstName) return firstName
-  if (lastName) return lastName
+function formatFullName(
+  firstName: string | null | undefined, 
+  lastName: string | null | undefined, 
+  middleName?: string | null | undefined,
+  fallback: string = 'Student'
+): string {
+  if (firstName && lastName) {
+    const parts = [firstName.trim()]
+    if (middleName?.trim()) parts.push(middleName.trim())
+    parts.push(lastName.trim())
+    return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+  }
+  if (firstName) return firstName.trim()
+  if (lastName) return lastName.trim()
   
   const words = fallback.split(/[\s.\-]+/).filter(w => w.length > 0)
   if (words.length >= 2) {
@@ -41,7 +51,36 @@ function formatFullName(firstName: string | null | undefined, lastName: string |
   return fallback || 'Student'
 }
 
-function getInitials(firstName: string | null | undefined, lastName: string | null | undefined, fallback: string): string {
+function formatDisplayName(
+  firstName: string | null | undefined,
+  lastName: string | null | undefined,
+  middleName?: string | null | undefined,
+  fallback: string = 'Student'
+): string {
+  if (firstName && lastName) {
+    const parts = [lastName.trim(), firstName.trim()]
+    if (middleName?.trim()) parts.push(middleName.trim())
+    return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+  }
+  return formatFullName(firstName, lastName, middleName, fallback)
+}
+
+function getBestDisplayName(
+  profile: { display_name?: string | null; first_name?: string | null; last_name?: string | null; middle_name?: string | null; full_name?: string | null },
+  fallback: string = 'Student'
+): string {
+  if (profile.display_name) return profile.display_name
+  if (profile.first_name && profile.last_name) {
+    return formatDisplayName(profile.first_name, profile.last_name, profile.middle_name)
+  }
+  return profile.full_name || formatFullName(profile.first_name, profile.last_name, profile.middle_name, fallback)
+}
+
+function getInitials(
+  firstName: string | null | undefined, 
+  lastName: string | null | undefined, 
+  fallback: string
+): string {
   const first = firstName || ''
   const last = lastName || ''
   
@@ -55,12 +94,9 @@ function getInitials(firstName: string | null | undefined, lastName: string | nu
   return 'ST'
 }
 
-// FIXED: Helper function - JSS = 17, SSS = 10 (handles spaces in class names)
 const getSubjectCountForClass = (className: string): number => {
   if (!className) return 17
-  // Remove all spaces before checking (handles "SS 1", "SS 2", "JSS 1", etc.)
   const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
-  console.log('📊 getSubjectCountForClass - Original:', className, '→ Normalized:', normalizedClass)
   if (normalizedClass.startsWith('JSS')) return 17
   if (normalizedClass.startsWith('SS')) return 10
   return 17
@@ -80,8 +116,10 @@ const calculateGrade = (percentage: number): { grade: string; color: string } =>
 interface StudentProfile {
   id: string
   first_name: string | null
+  middle_name?: string | null
   last_name: string | null
   full_name: string
+  display_name?: string | null
   email: string
   class: string
   department: string
@@ -94,6 +132,7 @@ interface StudentProfile {
 
 interface WelcomeBannerProfile {
   full_name: string
+  display_name?: string | null
   class: string
   department?: string
   photo_url?: string
@@ -149,6 +188,18 @@ interface StudyNote {
   teacher_name?: string
 }
 
+interface Classmate {
+  id: string
+  first_name: string | null
+  middle_name?: string | null
+  last_name: string | null
+  full_name: string
+  display_name?: string | null
+  email: string
+  photo_url?: string | null
+  vin_id?: string
+}
+
 interface PerformanceStats {
   totalExams: number
   completedExams: number
@@ -160,6 +211,9 @@ interface PerformanceStats {
   availableExams: Exam[]
   recentAssignments: Assignment[]
   recentNotes: StudyNote[]
+  allAssignments: Assignment[]
+  allNotes: StudyNote[]
+  classmates: Classmate[]
 }
 
 interface BannerStats {
@@ -206,6 +260,10 @@ function StudentDashboardContent() {
   const [activeTab, setActiveTab] = useState('overview')
   const [searchQuery, setSearchQuery] = useState('')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [assignmentsSearch, setAssignmentsSearch] = useState('')
+  const [notesSearch, setNotesSearch] = useState('')
+  const [classmatesSearch, setClassmatesSearch] = useState('')
+  const [classmatesView, setClassmatesView] = useState<'grid' | 'list'>('grid')
   
   const [stats, setStats] = useState<PerformanceStats>({
     totalExams: 0,
@@ -217,7 +275,10 @@ function StudentDashboardContent() {
     recentAttempts: [],
     availableExams: [],
     recentAssignments: [],
-    recentNotes: []
+    recentNotes: [],
+    allAssignments: [],
+    allNotes: [],
+    classmates: []
   })
 
   const [bannerStats, setBannerStats] = useState<BannerStats>({
@@ -232,17 +293,22 @@ function StudentDashboardContent() {
 
   const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
 
-  // FIXED: Calculate totalSubjects from profile class for immediate display
   const displayTotalSubjects = useMemo(() => {
     if (!profile?.class) return 17
     return getSubjectCountForClass(profile.class)
   }, [profile?.class])
 
+  const profileDisplayName = useMemo(() => {
+    if (!profile) return 'Student'
+    return getBestDisplayName(profile, 'Student')
+  }, [profile])
+
+  // Format profile for Header component
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: profile.full_name,
+      name: profile.display_name || profile.full_name,
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -302,7 +368,7 @@ function StudentDashboardContent() {
 
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('*')
+          .select('id, first_name, middle_name, last_name, full_name, display_name, email, class, department, vin_id, photo_url, admission_year, role, subject_count')
           .eq('id', user.id)
           .maybeSingle()
 
@@ -312,20 +378,25 @@ function StudentDashboardContent() {
           const fullName = formatFullName(
             profileData?.first_name || null,
             profileData?.last_name || null,
+            profileData?.middle_name || null,
             profileData?.full_name || fallbackName
           )
           
-          const studentClass = profileData?.class || 'Not Assigned'
-          // FIXED: Use database subject_count if available, otherwise calculate
-          const calculatedSubjects = profileData?.subject_count || getSubjectCountForClass(studentClass)
+          const displayName = profileData?.display_name || 
+            (profileData?.first_name && profileData?.last_name 
+              ? `${profileData.last_name} ${profileData.first_name}${profileData.middle_name ? ` ${profileData.middle_name}` : ''}`
+              : fullName)
           
-          console.log('📊 DASHBOARD AUTH - Class:', studentClass, '| DB subject_count:', profileData?.subject_count, '| Calculated:', calculatedSubjects)
+          const studentClass = profileData?.class || 'Not Assigned'
+          const calculatedSubjects = profileData?.subject_count || getSubjectCountForClass(studentClass)
           
           setProfile({
             id: user.id,
             first_name: profileData?.first_name || null,
+            middle_name: profileData?.middle_name || null,
             last_name: profileData?.last_name || null,
             full_name: fullName,
+            display_name: displayName,
             email: profileData?.email || user.email || '',
             class: studentClass,
             department: profileData?.department || 'General',
@@ -364,10 +435,7 @@ function StudentDashboardContent() {
     setLoading(true)
     try {
       const studentClass = profile.class
-      // FIXED: Use database subject_count first, then calculate
       const totalSubjects = profile.subject_count || getSubjectCountForClass(studentClass)
-
-      console.log('📊 DASHBOARD LOAD - Class:', studentClass, '| Total Subjects:', totalSubjects)
 
       await checkReportCardStatus()
 
@@ -435,21 +503,61 @@ function StudentDashboardContent() {
         return true
       })
 
-      // Load assignments
-      const { data: assignmentsData } = await supabase
+      // Load ALL assignments
+      const { data: allAssignmentsData } = await supabase
         .from('assignments')
         .select('*')
         .eq('class', studentClass)
         .order('created_at', { ascending: false })
-        .limit(3)
 
-      // Load study notes
-      const { data: notesData } = await supabase
+      // Load ALL notes
+      const { data: allNotesData } = await supabase
         .from('notes')
         .select('*')
         .eq('class', studentClass)
         .order('created_at', { ascending: false })
-        .limit(3)
+
+      // Load ALL classmates
+      const { data: classmatesData } = await supabase
+        .from('profiles')
+        .select('id, first_name, middle_name, last_name, full_name, display_name, email, photo_url, vin_id')
+        .eq('class', studentClass)
+        .neq('id', profile.id)
+        .order('full_name', { ascending: true })
+
+      const mappedAssignments = (allAssignmentsData || []).map((a: any) => ({
+        id: a.id,
+        title: a.title,
+        subject: a.subject,
+        description: a.description,
+        due_date: a.due_date,
+        total_marks: a.total_marks,
+        file_url: a.file_url,
+        created_at: a.created_at,
+        teacher_name: a.teacher_name
+      }))
+
+      const mappedNotes = (allNotesData || []).map((n: any) => ({
+        id: n.id,
+        title: n.title,
+        subject: n.subject,
+        description: n.description,
+        file_url: n.file_url,
+        created_at: n.created_at,
+        teacher_name: n.teacher_name
+      }))
+
+      const mappedClassmates = (classmatesData || []).map((c: any) => ({
+        id: c.id,
+        first_name: c.first_name,
+        middle_name: c.middle_name,
+        last_name: c.last_name,
+        full_name: c.full_name || formatFullName(c.first_name, c.last_name, c.middle_name, 'Student'),
+        display_name: c.display_name || formatDisplayName(c.first_name, c.last_name, c.middle_name),
+        email: c.email,
+        photo_url: c.photo_url,
+        vin_id: c.vin_id
+      }))
 
       setStats({
         totalExams: allExams.length,
@@ -460,26 +568,11 @@ function StudentDashboardContent() {
         pendingResults: pendingAttempts.length,
         recentAttempts: attempts.slice(0, 4),
         availableExams: availableExams.slice(0, 6),
-        recentAssignments: (assignmentsData || []).map((a: any) => ({
-          id: a.id,
-          title: a.title,
-          subject: a.subject,
-          description: a.description,
-          due_date: a.due_date,
-          total_marks: a.total_marks,
-          file_url: a.file_url,
-          created_at: a.created_at,
-          teacher_name: a.teacher_name
-        })),
-        recentNotes: (notesData || []).map((n: any) => ({
-          id: n.id,
-          title: n.title,
-          subject: n.subject,
-          description: n.description,
-          file_url: n.file_url,
-          created_at: n.created_at,
-          teacher_name: n.teacher_name
-        }))
+        recentAssignments: mappedAssignments.slice(0, 3),
+        recentNotes: mappedNotes.slice(0, 3),
+        allAssignments: mappedAssignments,
+        allNotes: mappedNotes,
+        classmates: mappedClassmates
       })
 
       const gradeInfo = calculateGrade(avgScore)
@@ -509,6 +602,12 @@ function StudentDashboardContent() {
       .channel('student-dashboard-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts', filter: `student_id=eq.${profile.id}` },
         () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments', filter: `class=eq.${profile.class}` },
+        () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes', filter: `class=eq.${profile.class}` },
+        () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `class=eq.${profile.class}` },
+        () => loadDashboardData())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'report_cards', filter: `student_id=eq.${profile.id}` },
         () => checkReportCardStatus())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profile.id}` },
@@ -520,7 +619,7 @@ function StudentDashboardContent() {
       .subscribe()
 
     return () => { channel.unsubscribe() }
-  }, [profile?.id, loadDashboardData, checkReportCardStatus])
+  }, [profile?.id, profile?.class, loadDashboardData, checkReportCardStatus])
 
   useEffect(() => {
     if (!authChecking && profile) {
@@ -539,7 +638,7 @@ function StudentDashboardContent() {
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return 'N/A'
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
   const getScoreColor = (percentage: number) => {
@@ -583,11 +682,42 @@ function StudentDashboardContent() {
     if (!profile) return null
     return {
       full_name: profile.full_name,
+      display_name: profile.display_name,
       class: profile.class,
       department: profile.department || undefined,
       photo_url: profile.photo_url || undefined,
       subject_count: displayTotalSubjects
     }
+  }
+
+  const handleDownloadFile = async (fileUrl: string, title: string) => {
+    if (!fileUrl) {
+      toast.error('No file attached')
+      return
+    }
+    
+    try {
+      window.open(fileUrl, '_blank')
+      toast.success(`Opening ${title}`)
+    } catch (error) {
+      console.error('Error opening file:', error)
+      toast.error('Failed to open file')
+    }
+  }
+
+  const getAvatarColor = (name: string): string => {
+    const colors = [
+      'from-blue-500 to-indigo-500',
+      'from-emerald-500 to-teal-500',
+      'from-purple-500 to-pink-500',
+      'from-orange-500 to-red-500',
+      'from-cyan-500 to-blue-500',
+      'from-amber-500 to-orange-500',
+      'from-rose-500 to-pink-500',
+      'from-green-500 to-emerald-500',
+    ]
+    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+    return colors[index % colors.length]
   }
 
   const filteredAvailableExams = stats.availableExams.filter(exam => 
@@ -600,7 +730,25 @@ function StudentDashboardContent() {
     attempt.exam_subject?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  // FIXED: Use displayTotalSubjects for banner stats
+  const filteredAllAssignments = stats.allAssignments.filter(assignment =>
+    assignment.title.toLowerCase().includes(assignmentsSearch.toLowerCase()) ||
+    assignment.subject.toLowerCase().includes(assignmentsSearch.toLowerCase()) ||
+    (assignment.description && assignment.description.toLowerCase().includes(assignmentsSearch.toLowerCase()))
+  )
+
+  const filteredAllNotes = stats.allNotes.filter(note =>
+    note.title.toLowerCase().includes(notesSearch.toLowerCase()) ||
+    note.subject.toLowerCase().includes(notesSearch.toLowerCase()) ||
+    (note.description && note.description.toLowerCase().includes(notesSearch.toLowerCase()))
+  )
+
+  const filteredClassmates = stats.classmates.filter(classmate => {
+    const displayName = classmate.display_name || classmate.full_name
+    return displayName.toLowerCase().includes(classmatesSearch.toLowerCase()) ||
+           classmate.email.toLowerCase().includes(classmatesSearch.toLowerCase()) ||
+           (classmate.vin_id && classmate.vin_id.toLowerCase().includes(classmatesSearch.toLowerCase()))
+  })
+
   const finalBannerStats = {
     ...bannerStats,
     totalSubjects: displayTotalSubjects || bannerStats.totalSubjects
@@ -653,7 +801,11 @@ function StudentDashboardContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
-      <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
+      {/* ✅ FIXED: Header with only the required props */}
+      <Header 
+        user={formatProfileForHeader(profile)} 
+        onLogout={handleLogout}
+      />
       
       {/* Mobile Bottom Navigation */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t shadow-lg w-full overflow-hidden">
@@ -696,7 +848,8 @@ function StudentDashboardContent() {
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'assignments', icon: FileText, label: 'Assignments' },
-                  { id: 'courses', icon: BookOpen, label: 'Courses' },
+                  { id: 'notes', icon: BookOpen, label: 'Notes' },
+                  { id: 'classmates', icon: Users, label: 'Classmates' },
                   { id: 'performance', icon: TrendingUp, label: 'Performance' },
                   { id: 'report-card', icon: FileCheck, label: 'Report Card' }
                 ].map((tab) => (
@@ -742,7 +895,6 @@ function StudentDashboardContent() {
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-4 sm:space-y-6 w-full overflow-hidden"
                 >
-                  {/* Welcome Banner */}
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
@@ -750,7 +902,6 @@ function StudentDashboardContent() {
                     />
                   </motion.div>
 
-                  {/* Report Card Status Card */}
                   {reportCardStatus && (
                     <motion.div variants={itemVariants} className="w-full overflow-hidden">
                       <Card 
@@ -819,7 +970,6 @@ function StudentDashboardContent() {
                     <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
                       {/* Left Column */}
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6 w-full overflow-hidden">
-                        {/* Performance Overview */}
                         {stats.completedExams > 0 && (
                           <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                             <CardHeader className="pb-2">
@@ -854,7 +1004,6 @@ function StudentDashboardContent() {
                           </Card>
                         )}
 
-                        {/* Available Exams */}
                         <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
@@ -890,18 +1039,10 @@ function StudentDashboardContent() {
                             )}
                           </CardContent>
                         </Card>
-
-                        {/* Class Roster */}
-                        <StudentClassRoster 
-                          studentClass={profile?.class as string}
-                          studentId={profile?.id}
-                          compact={false}
-                        />
                       </div>
 
                       {/* Right Column */}
                       <div className="space-y-4 sm:space-y-6 w-full overflow-hidden">
-                        {/* Recent Activity */}
                         <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                           <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
@@ -937,96 +1078,206 @@ function StudentDashboardContent() {
                             )}
                           </CardContent>
                         </Card>
-
-                        {/* Assignments Section */}
-                        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden w-full">
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-blue-800">
-                                <FileText className="h-5 w-5 shrink-0" />
-                                Recent Assignments
-                              </CardTitle>
-                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('assignments')} className="text-blue-700">
-                                View All <ArrowRight className="ml-1 h-3 w-3" />
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            {stats.recentAssignments.length === 0 ? (
-                              <p className="text-center py-4 text-blue-700/70 text-sm">No assignments yet</p>
-                            ) : (
-                              <div className="space-y-3">
-                                {stats.recentAssignments.slice(0, 2).map((assignment) => (
-                                  <div key={assignment.id} className="p-3 bg-white/60 rounded-xl">
-                                    <div className="flex items-start justify-between gap-2 mb-1">
-                                      <p className="font-medium text-sm break-words">{assignment.title}</p>
-                                      <Badge variant="outline" className="text-xs shrink-0">{assignment.subject}</Badge>
-                                    </div>
-                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2 break-words">{assignment.description}</p>
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <Calendar className="h-3 w-3 shrink-0" />
-                                        Due: {formatDate(assignment.due_date)}
-                                      </span>
-                                      {assignment.file_url && (
-                                        <Button variant="ghost" size="sm" className="h-7 text-xs">
-                                          <Download className="h-3 w-3 mr-1" />
-                                          Download
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
-
-                        {/* Study Notes Section */}
-                        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden w-full">
-                          <CardHeader className="pb-2">
-                            <div className="flex items-center justify-between">
-                              <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-purple-800">
-                                <BookOpen className="h-5 w-5 shrink-0" />
-                                Study Notes
-                              </CardTitle>
-                              <Button variant="ghost" size="sm" onClick={() => handleTabChange('courses')} className="text-purple-700">
-                                View All <ArrowRight className="ml-1 h-3 w-3" />
-                              </Button>
-                            </div>
-                          </CardHeader>
-                          <CardContent>
-                            {stats.recentNotes.length === 0 ? (
-                              <p className="text-center py-4 text-purple-700/70 text-sm">No notes available</p>
-                            ) : (
-                              <div className="space-y-3">
-                                {stats.recentNotes.slice(0, 2).map((note) => (
-                                  <div key={note.id} className="p-3 bg-white/60 rounded-xl">
-                                    <div className="flex items-start justify-between gap-2 mb-1">
-                                      <p className="font-medium text-sm break-words">{note.title}</p>
-                                      <Badge variant="outline" className="text-xs shrink-0">{note.subject}</Badge>
-                                    </div>
-                                    <p className="text-xs text-slate-600 line-clamp-2 mb-2 break-words">{note.description}</p>
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-xs text-slate-500 flex items-center gap-1">
-                                        <File className="h-3 w-3 shrink-0" />
-                                        {note.teacher_name || 'Teacher'}
-                                      </span>
-                                      {note.file_url && (
-                                        <Button variant="ghost" size="sm" className="h-7 text-xs">
-                                          <Download className="h-3 w-3 mr-1" />
-                                          Download
-                                        </Button>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </CardContent>
-                        </Card>
                       </div>
                     </div>
+                  </motion.div>
+
+                  {/* CLASSMATES PREVIEW SECTION */}
+                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
+                    <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+                            <Users className="h-5 w-5 text-emerald-600 shrink-0" />
+                            Classmates
+                          </CardTitle>
+                          <Button variant="ghost" size="sm" onClick={() => handleTabChange('classmates')}>
+                            View All <ArrowRight className="ml-1 h-3 w-3" />
+                          </Button>
+                        </div>
+                        <CardDescription>
+                          {stats.classmates.length} student{stats.classmates.length !== 1 ? 's' : ''} in {profile?.class}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {stats.classmates.length === 0 ? (
+                          <div className="text-center py-6">
+                            <UserPlus className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                            <p className="text-sm text-slate-500">No classmates yet</p>
+                            <p className="text-xs text-slate-400">Other students will appear here once enrolled</p>
+                          </div>
+                        ) : (
+                          <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+                            {stats.classmates.slice(0, 4).map((classmate) => {
+                              const displayName = classmate.display_name || classmate.full_name
+                              return (
+                                <div key={classmate.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors border border-slate-100">
+                                  <Avatar className="h-10 w-10 shrink-0">
+                                    <AvatarImage src={classmate.photo_url || undefined} />
+                                    <AvatarFallback className={cn("bg-gradient-to-br text-white text-sm", getAvatarColor(displayName))}>
+                                      {getInitials(classmate.first_name, classmate.last_name, displayName)}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="font-medium text-sm truncate">{displayName}</p>
+                                    <p className="text-xs text-slate-500 truncate">{classmate.email}</p>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        )}
+                        {stats.classmates.length > 4 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full mt-3 text-emerald-600"
+                            onClick={() => handleTabChange('classmates')}
+                          >
+                            View all {stats.classmates.length} classmates
+                            <ArrowRight className="ml-2 h-3 w-3" />
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  {/* ASSIGNMENTS PREVIEW SECTION */}
+                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
+                    <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden w-full">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-blue-800">
+                            <FileText className="h-5 w-5 shrink-0" />
+                            Recent Assignments
+                          </CardTitle>
+                          <Button variant="ghost" size="sm" onClick={() => handleTabChange('assignments')} className="text-blue-700">
+                            View All <ArrowRight className="ml-1 h-3 w-3" />
+                          </Button>
+                        </div>
+                        <CardDescription className="text-blue-700/70">
+                          {stats.allAssignments.length} total assignment{stats.allAssignments.length !== 1 ? 's' : ''}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {stats.recentAssignments.length === 0 ? (
+                          <div className="text-center py-8">
+                            <FolderOpen className="h-12 w-12 text-blue-400 mx-auto mb-3" />
+                            <p className="text-blue-700/70 text-sm">No assignments yet</p>
+                            <p className="text-xs text-blue-600/50">Assignments from teachers will appear here</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {stats.recentAssignments.map((assignment) => (
+                              <div key={assignment.id} className="p-3 bg-white/70 rounded-xl hover:bg-white transition-all">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <p className="font-medium text-sm break-words flex-1">{assignment.title}</p>
+                                  <Badge variant="outline" className="text-xs shrink-0 bg-white">{assignment.subject}</Badge>
+                                </div>
+                                <p className="text-xs text-slate-600 line-clamp-2 mb-2 break-words">{assignment.description}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                                    <Calendar className="h-3 w-3 shrink-0" />
+                                    Due: {formatDate(assignment.due_date)}
+                                  </span>
+                                  {assignment.file_url && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-xs"
+                                      onClick={() => handleDownloadFile(assignment.file_url!, assignment.title)}
+                                    >
+                                      <Download className="h-3 w-3 mr-1" />
+                                      Download
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {stats.allAssignments.length > 3 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full mt-3 text-blue-700"
+                            onClick={() => handleTabChange('assignments')}
+                          >
+                            View all {stats.allAssignments.length} assignments
+                            <ArrowRight className="ml-2 h-3 w-3" />
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+
+                  {/* NOTES PREVIEW SECTION */}
+                  <motion.div variants={itemVariants} className="w-full overflow-hidden">
+                    <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden w-full">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-purple-800">
+                            <BookOpen className="h-5 w-5 shrink-0" />
+                            Recent Notes
+                          </CardTitle>
+                          <Button variant="ghost" size="sm" onClick={() => handleTabChange('notes')} className="text-purple-700">
+                            View All <ArrowRight className="ml-1 h-3 w-3" />
+                          </Button>
+                        </div>
+                        <CardDescription className="text-purple-700/70">
+                          {stats.allNotes.length} note{stats.allNotes.length !== 1 ? 's' : ''} available
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        {stats.recentNotes.length === 0 ? (
+                          <div className="text-center py-8">
+                            <BookOpen className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                            <p className="text-purple-700/70 text-sm">No notes available</p>
+                            <p className="text-xs text-purple-600/50">Study notes from teachers will appear here</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {stats.recentNotes.map((note) => (
+                              <div key={note.id} className="p-3 bg-white/70 rounded-xl hover:bg-white transition-all">
+                                <div className="flex items-start justify-between gap-2 mb-1">
+                                  <p className="font-medium text-sm break-words flex-1">{note.title}</p>
+                                  <Badge variant="outline" className="text-xs shrink-0 bg-white">{note.subject}</Badge>
+                                </div>
+                                <p className="text-xs text-slate-600 line-clamp-2 mb-2 break-words">{note.description}</p>
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-slate-500 flex items-center gap-1">
+                                    <File className="h-3 w-3 shrink-0" />
+                                    {note.teacher_name || 'Teacher'}
+                                  </span>
+                                  {note.file_url && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      className="h-7 text-xs"
+                                      onClick={() => handleDownloadFile(note.file_url!, note.title)}
+                                    >
+                                      <Download className="h-3 w-3 mr-1" />
+                                      Download
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {stats.allNotes.length > 3 && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="w-full mt-3 text-purple-700"
+                            onClick={() => handleTabChange('notes')}
+                          >
+                            View all {stats.allNotes.length} notes
+                            <ArrowRight className="ml-2 h-3 w-3" />
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
                   </motion.div>
                 </motion.div>
               )}
@@ -1149,6 +1400,291 @@ function StudentDashboardContent() {
                 </motion.div>
               )}
 
+              {/* ASSIGNMENTS TAB - FULL PAGE */}
+              {activeTab === 'assignments' && (
+                <motion.div key="assignments" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <h1 className="text-xl sm:text-2xl font-bold">All Assignments</h1>
+                    <Badge className="bg-blue-100 text-blue-700 w-fit">
+                      {stats.allAssignments.length} total
+                    </Badge>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search assignments by title, subject, or description..."
+                        value={assignmentsSearch}
+                        onChange={(e) => setAssignmentsSearch(e.target.value)}
+                        className="pl-9 bg-white w-full"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+                    {filteredAllAssignments.length === 0 ? (
+                      <Card className="col-span-full">
+                        <CardContent className="p-12 text-center">
+                          <FileText className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Assignments Found</h3>
+                          <p className="text-muted-foreground">
+                            {assignmentsSearch ? 'No assignments match your search.' : 'No assignments available for your class yet.'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      filteredAllAssignments.map((assignment) => (
+                        <Card key={assignment.id} className="hover:shadow-lg transition-all duration-300 overflow-hidden border-l-4 border-l-blue-500">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <CardTitle className="text-lg break-words flex-1">{assignment.title}</CardTitle>
+                              <Badge variant="outline" className="shrink-0">{assignment.subject}</Badge>
+                            </div>
+                            <CardDescription className="flex items-center gap-2 text-xs flex-wrap">
+                              <Calendar className="h-3 w-3" />
+                              Due: {formatDate(assignment.due_date)}
+                              {assignment.total_marks && (
+                                <span className="ml-2">Total Marks: {assignment.total_marks}</span>
+                              )}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-slate-600 mb-4 line-clamp-3">
+                              {assignment.description || 'No description provided.'}
+                            </p>
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <span className="text-xs text-slate-500">
+                                Posted: {formatDate(assignment.created_at)}
+                                {assignment.teacher_name && ` by ${assignment.teacher_name}`}
+                              </span>
+                              {assignment.file_url && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleDownloadFile(assignment.file_url!, assignment.title)}
+                                  className="gap-2"
+                                >
+                                  <Download className="h-4 w-4" />
+                                  Download
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* NOTES TAB - FULL PAGE */}
+              {activeTab === 'notes' && (
+                <motion.div key="notes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <h1 className="text-xl sm:text-2xl font-bold">Study Notes</h1>
+                    <Badge className="bg-purple-100 text-purple-700 w-fit">
+                      {stats.allNotes.length} notes available
+                    </Badge>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search notes by title, subject, or description..."
+                        value={notesSearch}
+                        onChange={(e) => setNotesSearch(e.target.value)}
+                        className="pl-9 bg-white w-full"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+                    {filteredAllNotes.length === 0 ? (
+                      <Card className="col-span-full">
+                        <CardContent className="p-12 text-center">
+                          <BookOpen className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2">No Notes Found</h3>
+                          <p className="text-muted-foreground">
+                            {notesSearch ? 'No notes match your search.' : 'No study notes available for your class yet.'}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    ) : (
+                      filteredAllNotes.map((note) => (
+                        <Card key={note.id} className="hover:shadow-lg transition-all duration-300 overflow-hidden border-l-4 border-l-purple-500">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <CardTitle className="text-lg break-words flex-1">{note.title}</CardTitle>
+                              <Badge variant="outline" className="shrink-0">{note.subject}</Badge>
+                            </div>
+                            <CardDescription className="flex items-center gap-2 text-xs">
+                              <File className="h-3 w-3" />
+                              {note.teacher_name || 'Teacher'}
+                            </CardDescription>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-sm text-slate-600 mb-4 line-clamp-3">
+                              {note.description || 'No description provided.'}
+                            </p>
+                            <div className="flex items-center justify-between flex-wrap gap-2">
+                              <span className="text-xs text-slate-500">
+                                Added: {formatDate(note.created_at)}
+                              </span>
+                              {note.file_url && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => handleDownloadFile(note.file_url!, note.title)}
+                                  className="gap-2"
+                                >
+                                  <Download className="h-4 w-4" />
+                                  Download
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* CLASSMATES TAB - FULL PAGE */}
+              {activeTab === 'classmates' && (
+                <motion.div key="classmates" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                    <div>
+                      <h1 className="text-xl sm:text-2xl font-bold">My Classmates</h1>
+                      <p className="text-sm text-slate-500 mt-1">Students in {profile?.class}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-emerald-100 text-emerald-700">
+                        {stats.classmates.length} classmates
+                      </Badge>
+                      <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn("h-8 w-8 p-0", classmatesView === 'grid' && "bg-white shadow-sm")}
+                          onClick={() => setClassmatesView('grid')}
+                        >
+                          <Grid3x3 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn("h-8 w-8 p-0", classmatesView === 'list' && "bg-white shadow-sm")}
+                          onClick={() => setClassmatesView('list')}
+                        >
+                          <List className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <Input
+                        placeholder="Search classmates by name, email, or VIN ID..."
+                        value={classmatesSearch}
+                        onChange={(e) => setClassmatesSearch(e.target.value)}
+                        className="pl-9 bg-white w-full"
+                      />
+                    </div>
+                  </div>
+                  
+                  {filteredClassmates.length === 0 ? (
+                    <Card className="overflow-hidden">
+                      <CardContent className="p-12 text-center">
+                        <Users className="h-16 w-16 text-slate-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Classmates Found</h3>
+                        <p className="text-muted-foreground">
+                          {classmatesSearch ? 'No classmates match your search.' : 'No other students in your class yet.'}
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <>
+                      {classmatesView === 'grid' ? (
+                        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                          {filteredClassmates.map((classmate) => {
+                            const displayName = classmate.display_name || classmate.full_name
+                            return (
+                              <Card key={classmate.id} className="hover:shadow-lg transition-all duration-300 overflow-hidden group">
+                                <CardContent className="p-6 text-center">
+                                  <div className="relative">
+                                    <Avatar className="h-24 w-24 mx-auto mb-4 ring-4 ring-emerald-100 group-hover:ring-emerald-200 transition-all">
+                                      <AvatarImage src={classmate.photo_url || undefined} />
+                                      <AvatarFallback className={cn("bg-gradient-to-br text-white text-2xl", getAvatarColor(displayName))}>
+                                        {getInitials(classmate.first_name, classmate.last_name, displayName)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  </div>
+                                  <h3 className="font-semibold text-lg mb-1 break-words">{displayName}</h3>
+                                  <p className="text-sm text-slate-500 mb-2 break-all">{classmate.email}</p>
+                                  {classmate.vin_id && (
+                                    <p className="text-xs text-slate-400 mb-3">ID: {classmate.vin_id}</p>
+                                  )}
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="mt-2 w-full"
+                                    onClick={() => window.location.href = `mailto:${classmate.email}`}
+                                  >
+                                    <Mail className="h-4 w-4 mr-2" />
+                                    Contact
+                                  </Button>
+                                </CardContent>
+                              </Card>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <Card className="overflow-hidden">
+                          <CardContent className="p-0">
+                            <div className="divide-y">
+                              {filteredClassmates.map((classmate) => {
+                                const displayName = classmate.display_name || classmate.full_name
+                                return (
+                                  <div key={classmate.id} className="flex items-center justify-between p-4 hover:bg-slate-50 transition-colors">
+                                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                                      <Avatar className="h-12 w-12 shrink-0">
+                                        <AvatarImage src={classmate.photo_url || undefined} />
+                                        <AvatarFallback className={cn("bg-gradient-to-br text-white", getAvatarColor(displayName))}>
+                                          {getInitials(classmate.first_name, classmate.last_name, displayName)}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="min-w-0 flex-1">
+                                        <h3 className="font-medium break-words">{displayName}</h3>
+                                        <p className="text-sm text-slate-500 truncate">{classmate.email}</p>
+                                        {classmate.vin_id && (
+                                          <p className="text-xs text-slate-400">ID: {classmate.vin_id}</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => window.location.href = `mailto:${classmate.email}`}
+                                    >
+                                      <Mail className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </>
+                  )}
+                </motion.div>
+              )}
+
               {/* PROFILE TAB */}
               {activeTab === 'profile' && (
                 <motion.div key="profile" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
@@ -1161,11 +1697,11 @@ function StudentDashboardContent() {
                             <Avatar className="h-24 w-24 shrink-0">
                               <AvatarImage src={profile.photo_url || undefined} />
                               <AvatarFallback className="bg-emerald-600 text-white text-2xl">
-                                {getInitials(profile.first_name, profile.last_name, profile.full_name)}
+                                {getInitials(profile.first_name, profile.last_name, profileDisplayName)}
                               </AvatarFallback>
                             </Avatar>
                             <div className="min-w-0 max-w-full">
-                              <h2 className="text-xl sm:text-2xl font-bold break-words">{profile.full_name}</h2>
+                              <h2 className="text-xl sm:text-2xl font-bold break-words">{profileDisplayName}</h2>
                               <p className="text-slate-500 text-sm break-all">{profile.email}</p>
                               <Badge className="mt-2 bg-emerald-100 text-emerald-700">{profile.class}</Badge>
                             </div>
@@ -1176,8 +1712,16 @@ function StudentDashboardContent() {
                               <p className="font-medium break-words">{profile.first_name || 'N/A'}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
+                              <p className="text-xs text-slate-500">Middle Name</p>
+                              <p className="font-medium break-words">{profile.middle_name || '—'}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">Last Name</p>
                               <p className="font-medium break-words">{profile.last_name || 'N/A'}</p>
+                            </div>
+                            <div className="p-3 bg-slate-50 rounded-lg">
+                              <p className="text-xs text-slate-500">Display Name (Reports)</p>
+                              <p className="font-medium break-words">{profile.display_name || profile.full_name}</p>
                             </div>
                             <div className="p-3 bg-slate-50 rounded-lg">
                               <p className="text-xs text-slate-500">VIN ID</p>
@@ -1297,6 +1841,72 @@ function StudentDashboardContent() {
                       </CardContent>
                     </Card>
                   )}
+                </motion.div>
+              )}
+
+              {/* PERFORMANCE TAB */}
+              {activeTab === 'performance' && (
+                <motion.div key="performance" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
+                  <h1 className="text-xl sm:text-2xl font-bold mb-4">Performance Analytics</h1>
+                  <div className="grid gap-6 grid-cols-1 md:grid-cols-2">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Exam Performance</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-4">
+                          <div>
+                            <div className="flex justify-between text-sm mb-2">
+                              <span>Overall Pass Rate</span>
+                              <span>{stats.completedExams > 0 ? Math.round((stats.passedExams / stats.completedExams) * 100) : 0}%</span>
+                            </div>
+                            <Progress value={stats.completedExams > 0 ? (stats.passedExams / stats.completedExams) * 100 : 0} className="h-2" />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4 text-center">
+                            <div className="p-4 bg-green-50 rounded-lg">
+                              <p className="text-2xl font-bold text-green-600">{stats.passedExams}</p>
+                              <p className="text-sm text-green-600">Exams Passed</p>
+                            </div>
+                            <div className="p-4 bg-red-50 rounded-lg">
+                              <p className="text-2xl font-bold text-red-600">{stats.failedExams}</p>
+                              <p className="text-sm text-red-600">Exams Failed</p>
+                            </div>
+                          </div>
+                          <div className="pt-4 border-t">
+                            <div className="flex justify-between">
+                              <span className="text-slate-600">Average Score</span>
+                              <span className="font-bold">{stats.averageScore}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Subject Summary</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="space-y-3">
+                          <div className="flex justify-between">
+                            <span>Total Subjects</span>
+                            <span className="font-bold">{displayTotalSubjects}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Exams Completed</span>
+                            <span className="font-bold">{stats.completedExams}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Pending Results</span>
+                            <span className="font-bold">{stats.pendingResults}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Available Exams</span>
+                            <span className="font-bold">{stats.availableExams.length}</span>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
