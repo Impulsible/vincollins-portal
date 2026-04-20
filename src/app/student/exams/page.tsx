@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/exams/page.tsx - FIXED: Term selector working correctly
+// app/student/exams/page.tsx - FIXED: 2025/2026 as current term + multiple years
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -140,6 +140,22 @@ const calculateGrade = (percentage: number): { grade: string; color: string } =>
   return { grade: 'F', color: 'text-red-600' }
 }
 
+// ✅ FIXED: Always use 2025/2026 as current session
+const CURRENT_SESSION = '2025/2026'
+
+const getCurrentTermSession = () => {
+  const now = new Date()
+  const month = now.getMonth() + 1
+  
+  if (month >= 9 && month <= 12) {
+    return { term: 'first', session: CURRENT_SESSION }
+  } else if (month >= 1 && month <= 4) {
+    return { term: 'second', session: CURRENT_SESSION }
+  } else {
+    return { term: 'third', session: CURRENT_SESSION }
+  }
+}
+
 export default function StudentExamsPage() {
   const router = useRouter()
   const [mounted, setMounted] = useState(false)
@@ -167,25 +183,11 @@ export default function StudentExamsPage() {
     gradeColor: 'text-gray-400',
     totalSubjects: 17,
     termName: 'First Term',
-    sessionYear: ''
+    sessionYear: CURRENT_SESSION
   })
 
   useEffect(() => {
     setMounted(true)
-  }, [])
-
-  const getCurrentTermSession = useCallback(() => {
-    const now = new Date()
-    const month = now.getMonth() + 1
-    const year = now.getFullYear()
-    
-    if (month >= 9 && month <= 12) {
-      return { term: 'first', session: `${year}/${year + 1}` }
-    } else if (month >= 1 && month <= 4) {
-      return { term: 'second', session: `${year - 1}/${year}` }
-    } else {
-      return { term: 'third', session: `${year - 1}/${year}` }
-    }
   }, [])
 
   const isExamAvailable = (exam: Exam, attemptsMap: Record<string, ExamAttempt> = examAttempts) => {
@@ -206,7 +208,7 @@ export default function StudentExamsPage() {
     return 'available'
   }
 
-  // ✅ FIXED: Load available terms from multiple sources
+  // ✅ FIXED: Generate terms with 2025/2026 as current + other years
   const loadAvailableTerms = useCallback(async (studentId: string) => {
     try {
       const termsMap = new Map<string, { term: string; session_year: string; label: string }>()
@@ -255,16 +257,9 @@ export default function StudentExamsPage() {
         })
       }
 
-      // Source 3: Generate default terms (current and previous academic years)
-      const current = getCurrentTermSession()
-      const currentYear = parseInt(current.session.split('/')[0])
-      
-      // Generate terms for current and previous year
-      const sessions = [
-        `${currentYear - 1}/${currentYear}`,
-        current.session
-      ]
-      
+      // ✅ Source 3: Generate default academic years
+      // Available sessions: 2023/2024, 2024/2025, 2025/2026, 2026/2027
+      const sessions = ['2023/2024', '2024/2025', '2025/2026', '2026/2027']
       const allTerms = ['first', 'second', 'third']
       
       sessions.forEach(session => {
@@ -283,7 +278,7 @@ export default function StudentExamsPage() {
       // Convert map to array and sort
       let terms = Array.from(termsMap.values())
       
-      // Sort: latest session first, then term order
+      // Sort: latest session first, then term order (first, second, third)
       terms.sort((a, b) => {
         const sessionA = parseInt(a.session_year.split('/')[0])
         const sessionB = parseInt(b.session_year.split('/')[0])
@@ -294,33 +289,43 @@ export default function StudentExamsPage() {
 
       setAvailableTerms(terms)
       
-      // Set default selected term
+      // ✅ Set default selected term to current term (2025/2026)
       if (terms.length > 0 && !selectedTermSession) {
-        // Try to find current term first
+        const current = getCurrentTermSession()
         const currentTerm = terms.find(t => 
           t.term === current.term && t.session_year === current.session
         )
         if (currentTerm) {
           setSelectedTermSession({ term: currentTerm.term, session_year: currentTerm.session_year })
         } else {
+          // Fallback to first available term
           setSelectedTermSession({ term: terms[0].term, session_year: terms[0].session_year })
         }
       }
     } catch (error) {
       console.error('Error loading available terms:', error)
-      // Fallback: Create default terms based on current session
-      const current = getCurrentTermSession()
-      const defaultTerms = [
-        { term: 'first', session_year: current.session, label: `First Term ${current.session}` },
-        { term: 'second', session_year: current.session, label: `Second Term ${current.session}` },
-        { term: 'third', session_year: current.session, label: `Third Term ${current.session}` }
-      ]
+      // ✅ Fallback: Create default terms with 2025/2026
+      const sessions = ['2024/2025', '2025/2026']
+      const defaultTerms: Array<{ term: string; session_year: string; label: string }> = []
+      
+      sessions.forEach(session => {
+        ['first', 'second', 'third'].forEach(term => {
+          defaultTerms.push({
+            term,
+            session_year: session,
+            label: `${TERM_NAMES[term] || term} ${session}`
+          })
+        })
+      })
+      
       setAvailableTerms(defaultTerms)
+      
+      const current = getCurrentTermSession()
       if (!selectedTermSession) {
         setSelectedTermSession({ term: current.term, session_year: current.session })
       }
     }
-  }, [selectedTermSession, getCurrentTermSession])
+  }, [selectedTermSession])
 
   const loadData = useCallback(async (term?: string, session?: string) => {
     setLoading(true)
@@ -483,7 +488,7 @@ export default function StudentExamsPage() {
     } finally {
       setLoading(false)
     }
-  }, [router, loadAvailableTerms, selectedTermSession, getCurrentTermSession])
+  }, [router, loadAvailableTerms, selectedTermSession])
 
   // Initial load
   useEffect(() => {
@@ -600,7 +605,7 @@ export default function StudentExamsPage() {
             </p>
           </div>
           
-          {/* ✅ FIXED: Term Selector & Progress Card - Now working correctly */}
+          {/* Term Selector & Progress Card */}
           <div className="mb-5 sm:mb-8">
             <Card className="border-0 shadow-sm bg-card">
               <CardContent className="p-4 sm:p-5 lg:p-6">
@@ -612,7 +617,7 @@ export default function StudentExamsPage() {
                         value={selectedTermSession ? `${selectedTermSession.term}|${selectedTermSession.session_year}` : ''} 
                         onValueChange={handleTermSessionChange}
                       >
-                        <SelectTrigger className="border-0 h-auto p-0 shadow-none focus:ring-0 text-sm font-medium min-w-[180px] bg-transparent">
+                        <SelectTrigger className="border-0 h-auto p-0 shadow-none focus:ring-0 text-sm font-medium min-w-[200px] bg-transparent">
                           <SelectValue placeholder="Select term" />
                         </SelectTrigger>
                         <SelectContent>
