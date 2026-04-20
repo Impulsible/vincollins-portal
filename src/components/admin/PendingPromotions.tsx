@@ -21,7 +21,6 @@ import {
 } from '@/components/ui/dialog'
 import { toast } from 'sonner'
 import { Loader2, CheckCircle, XCircle, GraduationCap } from 'lucide-react'
-import { motion } from 'framer-motion'
 
 interface PendingPromotion {
   id: string
@@ -144,12 +143,9 @@ export function PendingPromotions() {
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {promotions.map((promo, index) => (
-              <motion.div
+            {promotions.map((promo) => (
+              <div
                 key={promo.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.05 }}
                 className="flex items-center justify-between p-4 bg-muted/50 rounded-xl"
               >
                 <div>
@@ -182,7 +178,7 @@ export function PendingPromotions() {
                     Approve
                   </Button>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </CardContent>
