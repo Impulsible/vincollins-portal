@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/contact/page.tsx - WITH PROFESSIONAL HERO SECTION
+// app/contact/page.tsx - WITH PROFESSIONAL HERO SECTION & FIXED SPACING
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -12,14 +12,12 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { 
   Mail, Phone, MapPin, Clock, Send, CheckCircle, 
   KeyRound, AlertCircle, Home, ChevronRight, Facebook, Twitter, Instagram,
-  MessageCircle, Headphones, Sparkles, ArrowRight, GraduationCap
+  MessageCircle, Headphones, Sparkles, ArrowRight
 } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 // Dynamically import Header with SSR disabled
 const Header = dynamic(() => import('@/components/layout/header').then(mod => ({ default: mod.Header })), {
@@ -169,7 +167,7 @@ export default function ContactPage() {
       <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
         <Header />
         
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] p-3 sm:p-4">
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] p-3 sm:p-4 pb-24 sm:pb-28">
           <Card className="max-w-md w-full text-center shadow-xl">
             <CardContent className="pt-10 sm:pt-12 pb-6 sm:pb-8 px-4 sm:px-6">
               <div className="h-14 w-14 sm:h-16 sm:w-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -215,70 +213,64 @@ export default function ContactPage() {
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white dark:from-slate-950 dark:to-slate-900">
       <Header />
 
-      {/* Hero Section - Replaces the old header */}
+      {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0d2e8a] to-[#1e3a8a] text-white overflow-hidden">
-        {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.4)_0%,transparent_50%)]" />
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-400 rounded-full blur-3xl opacity-20" />
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-400 rounded-full blur-3xl opacity-20" />
         </div>
         
-        {/* Content */}
         <div className="relative container max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 lg:py-24">
           <div className="max-w-3xl">
-            {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-sm rounded-full border border-white/20 mb-6">
               <MessageCircle className="h-4 w-4 text-amber-300" />
               <span className="text-sm font-medium text-white/90">We're Here to Help</span>
             </div>
             
-            {/* Main Heading */}
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4">
               <span className="text-white">Get in </span>
               <span className="bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">Touch</span>
             </h1>
             
-            {/* Description */}
             <p className="text-base sm:text-lg md:text-xl text-white/80 max-w-2xl mb-8">
               Have questions about admissions, academics, or need technical support? 
               Our dedicated team is ready to assist you with any inquiries.
             </p>
             
-            {/* Quick Info Cards */}
-            <div className="flex flex-wrap gap-4">
-              <div className="flex items-center gap-3 px-5 py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                <div className="h-10 w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                  <Headphones className="h-5 w-5 text-amber-300" />
+            <div className="flex flex-wrap gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <Headphones className="h-4 w-4 sm:h-5 sm:w-5 text-amber-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/60">Call Us</p>
-                  <p className="text-sm sm:text-base font-semibold text-white" suppressHydrationWarning>
+                  <p className="text-[10px] sm:text-xs text-white/60">Call Us</p>
+                  <p className="text-xs sm:text-sm md:text-base font-semibold text-white" suppressHydrationWarning>
                     {CONTACT_INFO.phone}
                   </p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 px-5 py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                <div className="h-10 w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <span className="relative flex h-3 w-3">
+              <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                  <span className="relative flex h-2 w-2 sm:h-3 sm:w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 sm:h-3 sm:w-3 bg-emerald-500"></span>
                   </span>
                 </div>
                 <div>
-                  <p className="text-xs text-white/60">Response Time</p>
-                  <p className="text-sm sm:text-base font-semibold text-white">24-48 Hours</p>
+                  <p className="text-[10px] sm:text-xs text-white/60">Response Time</p>
+                  <p className="text-xs sm:text-sm md:text-base font-semibold text-white">24-48 Hours</p>
                 </div>
               </div>
               
-              <div className="flex items-center gap-3 px-5 py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                  <Mail className="h-5 w-5 text-blue-300" />
+              <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
+                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
+                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/60">Email Us</p>
-                  <p className="text-sm sm:text-base font-semibold text-white truncate max-w-[200px] sm:max-w-none" suppressHydrationWarning>
+                  <p className="text-[10px] sm:text-xs text-white/60">Email Us</p>
+                  <p className="text-xs sm:text-sm md:text-base font-semibold text-white truncate max-w-[150px] sm:max-w-[200px] md:max-w-none" suppressHydrationWarning>
                     {CONTACT_INFO.email}
                   </p>
                 </div>
@@ -287,7 +279,6 @@ export default function ContactPage() {
           </div>
         </div>
         
-        {/* Wave Decoration */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
             <path d="M0 120L60 105C120 90 240 60 360 50C480 40 600 50 720 55C840 60 960 60 1080 50C1200 40 1320 20 1380 10L1440 0V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0V120Z" 
@@ -304,20 +295,21 @@ export default function ContactPage() {
       </section>
 
       {/* Breadcrumb */}
-      <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800">
+      <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800 sticky top-0 z-10">
         <div className="container max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-            <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400">Home</Link>
-            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <Link href="/" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Home</Link>
+            <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span className="text-slate-800 dark:text-slate-200 font-medium">Contact Us</span>
           </div>
         </div>
       </div>
 
+      {/* Main Content */}
       <div className="container max-w-6xl mx-auto px-3 sm:px-4 lg:px-6 py-8 sm:py-10 md:py-12">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6 lg:gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6 lg:gap-8">
           {/* Sidebar - Contact Info */}
-          <div className="lg:col-span-1 space-y-3 sm:space-y-4 md:space-y-5">
+          <div className="lg:col-span-1 space-y-4 sm:space-y-5">
             {/* Contact Card */}
             <Card className="shadow-md border-0">
               <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-5 pt-4 sm:pt-5">
@@ -329,39 +321,50 @@ export default function ContactPage() {
                 </CardTitle>
                 <CardDescription className="text-xs sm:text-sm">Reach out to us anytime</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-5 pb-4 sm:pb-5">
-                <div className="flex items-start gap-2.5 sm:gap-3">
-                  <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+              <CardContent className="space-y-4 sm:space-y-5 px-4 sm:px-5 pb-4 sm:pb-5">
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                    <MapPin className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-blue-600 dark:text-blue-400" />
+                  </div>
                   <div>
-                    <p className="font-medium text-xs sm:text-sm">Address</p>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400" suppressHydrationWarning>
+                    <p className="font-semibold text-sm sm:text-base">Address</p>
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed" suppressHydrationWarning>
                       {CONTACT_INFO.address}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-start gap-2.5 sm:gap-3">
-                  <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                    <Phone className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-blue-600 dark:text-blue-400" />
+                  </div>
                   <div>
-                    <p className="font-medium text-xs sm:text-sm">Phone</p>
-                    <a href={`tel:${CONTACT_INFO.phoneRaw}`} className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400" suppressHydrationWarning>
+                    <p className="font-semibold text-sm sm:text-base">Phone</p>
+                    <a href={`tel:${CONTACT_INFO.phoneRaw}`} className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors" suppressHydrationWarning>
                       {CONTACT_INFO.phone}
                     </a>
                   </div>
                 </div>
-                <div className="flex items-start gap-2.5 sm:gap-3">
-                  <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                    <Mail className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-blue-600 dark:text-blue-400" />
+                  </div>
                   <div>
-                    <p className="font-medium text-xs sm:text-sm">Email</p>
-                    <a href={`mailto:${CONTACT_INFO.email}`} className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 break-all" suppressHydrationWarning>
+                    <p className="font-semibold text-sm sm:text-base">Email</p>
+                    <a href={`mailto:${CONTACT_INFO.email}`} className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors break-all" suppressHydrationWarning>
                       {CONTACT_INFO.email}
                     </a>
                   </div>
                 </div>
-                <div className="flex items-start gap-2.5 sm:gap-3">
-                  <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                
+                <div className="flex items-start gap-3 sm:gap-4">
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                    <Clock className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-blue-600 dark:text-blue-400" />
+                  </div>
                   <div>
-                    <p className="font-medium text-xs sm:text-sm">Office Hours</p>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400" suppressHydrationWarning>
+                    <p className="font-semibold text-sm sm:text-base">Office Hours</p>
+                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed" suppressHydrationWarning>
                       {CONTACT_INFO.hours.weekdays}<br />
                       {CONTACT_INFO.hours.saturday}<br />
                       <span className="text-red-500 dark:text-red-400">{CONTACT_INFO.hours.sunday}</span>
@@ -378,21 +381,21 @@ export default function ContactPage() {
                 <CardDescription className="text-xs sm:text-sm">Stay connected on social media</CardDescription>
               </CardHeader>
               <CardContent className="px-4 sm:px-5 pb-4 sm:pb-5">
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="grid grid-cols-3 gap-2">
                   <a href={SOCIAL_LINKS.facebook} target="_blank" rel="noopener noreferrer" 
-                     className="flex-1 flex items-center justify-center gap-2 p-2.5 sm:p-3 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-lg transition-colors">
-                    <Facebook className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
-                    <span className="text-xs sm:text-sm font-medium">Facebook</span>
+                     className="flex flex-col items-center gap-1.5 p-3 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 rounded-xl transition-all duration-300 group">
+                    <Facebook className="h-5 w-5 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Facebook</span>
                   </a>
                   <a href={SOCIAL_LINKS.instagram} target="_blank" rel="noopener noreferrer"
-                     className="flex-1 flex items-center justify-center gap-2 p-2.5 sm:p-3 bg-pink-50 dark:bg-pink-950/30 hover:bg-pink-100 dark:hover:bg-pink-900/50 rounded-lg transition-colors">
-                    <Instagram className="h-4 w-4 sm:h-5 sm:w-5 text-pink-600 dark:text-pink-400" />
-                    <span className="text-xs sm:text-sm font-medium">Instagram</span>
+                     className="flex flex-col items-center gap-1.5 p-3 bg-pink-50 dark:bg-pink-950/30 hover:bg-pink-100 dark:hover:bg-pink-900/50 rounded-xl transition-all duration-300 group">
+                    <Instagram className="h-5 w-5 text-pink-600 dark:text-pink-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Instagram</span>
                   </a>
                   <a href={SOCIAL_LINKS.twitter} target="_blank" rel="noopener noreferrer"
-                     className="flex-1 flex items-center justify-center gap-2 p-2.5 sm:p-3 bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 rounded-lg transition-colors">
-                    <Twitter className="h-4 w-4 sm:h-5 sm:w-5 text-sky-600 dark:text-sky-400" />
-                    <span className="text-xs sm:text-sm font-medium">Twitter</span>
+                     className="flex flex-col items-center gap-1.5 p-3 bg-sky-50 dark:bg-sky-950/30 hover:bg-sky-100 dark:hover:bg-sky-900/50 rounded-xl transition-all duration-300 group">
+                    <Twitter className="h-5 w-5 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform" />
+                    <span className="text-xs font-medium text-slate-600 dark:text-slate-400">Twitter</span>
                   </a>
                 </div>
               </CardContent>
@@ -413,14 +416,23 @@ export default function ContactPage() {
                 <p className="text-xs sm:text-sm text-amber-800 dark:text-amber-300 mb-3">
                   Select one of the recovery options in the form below:
                 </p>
-                <ul className="text-xs sm:text-sm text-amber-700 dark:text-amber-400 space-y-1">
-                  <li className="flex items-center gap-2"><span className="text-sm">🔐</span> Forgot VIN ID</li>
-                  <li className="flex items-center gap-2"><span className="text-sm">📧</span> Forgot Email</li>
-                  <li className="flex items-center gap-2"><span className="text-sm">🔑</span> Forgot Login Details</li>
+                <ul className="space-y-1.5">
+                  <li className="flex items-center gap-2 text-xs sm:text-sm text-amber-700 dark:text-amber-400">
+                    <span className="text-sm">🔐</span> Forgot VIN ID
+                  </li>
+                  <li className="flex items-center gap-2 text-xs sm:text-sm text-amber-700 dark:text-amber-400">
+                    <span className="text-sm">📧</span> Forgot Email
+                  </li>
+                  <li className="flex items-center gap-2 text-xs sm:text-sm text-amber-700 dark:text-amber-400">
+                    <span className="text-sm">🔑</span> Forgot Login Details
+                  </li>
                 </ul>
-                <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-500 mt-3">
-                  Response time: 24-48 hours
-                </p>
+                <div className="mt-3 pt-2 border-t border-amber-200 dark:border-amber-800">
+                  <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Response time: 24-48 hours
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -429,33 +441,55 @@ export default function ContactPage() {
           <div className="lg:col-span-2">
             <Card className="shadow-lg border-0">
               <CardHeader className="pb-3 sm:pb-4 px-4 sm:px-5 md:px-6 pt-4 sm:pt-5 md:pt-6">
-                <CardTitle className="text-lg sm:text-xl md:text-2xl">Send us a Message</CardTitle>
-                <CardDescription className="text-xs sm:text-sm">
+                <CardTitle className="text-xl sm:text-2xl md:text-3xl">Send us a Message</CardTitle>
+                <CardDescription className="text-sm sm:text-base">
                   Fill out the form below and we&apos;ll respond as soon as possible
                 </CardDescription>
               </CardHeader>
-              <CardContent className="px-4 sm:px-5 md:px-6 pb-5 sm:pb-6 md:pb-7">
-                <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <CardContent className="px-4 sm:px-5 md:px-6 pb-6 sm:pb-7 md:pb-8">
+                <form onSubmit={handleSubmit} className="space-y-5 sm:space-y-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     <div>
-                      <Label className="text-xs sm:text-sm">Full Name *</Label>
-                      <Input required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="John Doe" className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10" />
+                      <Label className="text-sm sm:text-base font-semibold">Full Name <span className="text-red-500">*</span></Label>
+                      <Input 
+                        required 
+                        value={formData.name} 
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })} 
+                        placeholder="John Doe" 
+                        className="mt-1.5 text-sm sm:text-base h-10 sm:h-11" 
+                      />
                     </div>
                     <div>
-                      <Label className="text-xs sm:text-sm">Email *</Label>
-                      <Input type="email" required value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} placeholder="john@example.com" className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10" />
+                      <Label className="text-sm sm:text-base font-semibold">Email <span className="text-red-500">*</span></Label>
+                      <Input 
+                        type="email" 
+                        required 
+                        value={formData.email} 
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })} 
+                        placeholder="john@example.com" 
+                        className="mt-1.5 text-sm sm:text-base h-10 sm:h-11" 
+                      />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
                     <div>
-                      <Label className="text-xs sm:text-sm">Phone (Optional)</Label>
-                      <Input value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} placeholder="+234 XXX XXX XXXX" className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10" />
+                      <Label className="text-sm sm:text-base font-semibold">Phone <span className="text-slate-400 text-xs">(Optional)</span></Label>
+                      <Input 
+                        value={formData.phone} 
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })} 
+                        placeholder="+234 XXX XXX XXXX" 
+                        className="mt-1.5 text-sm sm:text-base h-10 sm:h-11" 
+                      />
                     </div>
                     <div>
-                      <Label className="text-xs sm:text-sm">Inquiry Type *</Label>
-                      <Select required value={formData.inquiry_type} onValueChange={(v) => setFormData({ ...formData, inquiry_type: v, subject: v })}>
-                        <SelectTrigger className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10">
+                      <Label className="text-sm sm:text-base font-semibold">Inquiry Type <span className="text-red-500">*</span></Label>
+                      <Select 
+                        required 
+                        value={formData.inquiry_type} 
+                        onValueChange={(v) => setFormData({ ...formData, inquiry_type: v, subject: v })}
+                      >
+                        <SelectTrigger className="mt-1.5 text-sm sm:text-base h-10 sm:h-11">
                           <SelectValue placeholder="Select type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -466,31 +500,46 @@ export default function ContactPage() {
                   </div>
 
                   {isCredentialRecovery && (
-                    <div className="border-t pt-4 sm:pt-5 space-y-3 sm:space-y-4">
-                      <div className="flex items-start gap-2.5 sm:gap-3 bg-blue-50 dark:bg-blue-950/30 p-3 sm:p-4 rounded-lg">
-                        <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
+                    <div className="border-t pt-5 space-y-4">
+                      <div className="flex items-start gap-3 bg-blue-50 dark:bg-blue-950/30 p-4 rounded-xl">
+                        <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5 shrink-0" />
                         <div>
-                          <h4 className="font-semibold text-blue-900 dark:text-blue-300 text-xs sm:text-sm">Identity Verification Required</h4>
-                          <p className="text-[11px] sm:text-xs md:text-sm text-blue-800 dark:text-blue-400">Please provide the following details to help us verify your identity.</p>
+                          <h4 className="font-semibold text-blue-900 dark:text-blue-300 text-sm sm:text-base">Identity Verification Required</h4>
+                          <p className="text-xs sm:text-sm text-blue-800 dark:text-blue-400">Please provide the following details to help us verify your identity.</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <Label className="text-xs sm:text-sm">Class *</Label>
+                          <Label className="text-sm sm:text-base font-semibold">Class <span className="text-red-500">*</span></Label>
                           <Select value={formData.student_class} onValueChange={(v) => setFormData({ ...formData, student_class: v })}>
-                            <SelectTrigger className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10"><SelectValue placeholder="Select your class" /></SelectTrigger>
-                            <SelectContent>{classes.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}</SelectContent>
+                            <SelectTrigger className="mt-1.5 text-sm sm:text-base h-10 sm:h-11">
+                              <SelectValue placeholder="Select your class" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {classes.map(c => (<SelectItem key={c} value={c}>{c}</SelectItem>))}
+                            </SelectContent>
                           </Select>
                         </div>
                         <div>
-                          <Label className="text-xs sm:text-sm">Admission Year</Label>
-                          <Input type="number" placeholder="e.g., 2023" value={formData.admission_year} onChange={(e) => setFormData({ ...formData, admission_year: e.target.value })} className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10" />
+                          <Label className="text-sm sm:text-base font-semibold">Admission Year</Label>
+                          <Input 
+                            type="number" 
+                            placeholder="e.g., 2023" 
+                            value={formData.admission_year} 
+                            onChange={(e) => setFormData({ ...formData, admission_year: e.target.value })} 
+                            className="mt-1.5 text-sm sm:text-base h-10 sm:h-11" 
+                          />
                         </div>
                       </div>
                       {formData.inquiry_type !== 'forgot_vin' && (
                         <div>
-                          <Label className="text-xs sm:text-sm">VIN ID (If you remember it)</Label>
-                          <Input placeholder="VIN-STD-2023-XXXX" value={formData.vin_id} onChange={(e) => setFormData({ ...formData, vin_id: e.target.value })} className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10" />
+                          <Label className="text-sm sm:text-base font-semibold">VIN ID <span className="text-slate-400 text-xs">(If you remember it)</span></Label>
+                          <Input 
+                            placeholder="VIN-STD-2023-XXXX" 
+                            value={formData.vin_id} 
+                            onChange={(e) => setFormData({ ...formData, vin_id: e.target.value })} 
+                            className="mt-1.5 text-sm sm:text-base h-10 sm:h-11" 
+                          />
                         </div>
                       )}
                     </div>
@@ -498,24 +547,63 @@ export default function ContactPage() {
 
                   {!isCredentialRecovery && (
                     <div>
-                      <Label className="text-xs sm:text-sm">Subject *</Label>
-                      <Input required value={formData.subject} onChange={(e) => setFormData({ ...formData, subject: e.target.value })} placeholder="What is this about?" className="mt-1 sm:mt-1.5 text-sm h-9 sm:h-10" />
+                      <Label className="text-sm sm:text-base font-semibold">Subject <span className="text-red-500">*</span></Label>
+                      <Input 
+                        required 
+                        value={formData.subject} 
+                        onChange={(e) => setFormData({ ...formData, subject: e.target.value })} 
+                        placeholder="What is this about?" 
+                        className="mt-1.5 text-sm sm:text-base h-10 sm:h-11" 
+                      />
                     </div>
                   )}
 
                   <div>
-                    <Label className="text-xs sm:text-sm">{isCredentialRecovery ? 'Additional Information (Optional)' : 'Message *'}</Label>
-                    <Textarea required={!isCredentialRecovery} rows={4} value={formData.message} onChange={(e) => setFormData({ ...formData, message: e.target.value })} placeholder={isCredentialRecovery ? "Any additional information..." : "Please provide as much detail as possible..."} className="mt-1 sm:mt-1.5 text-sm resize-none" />
+                    <Label className="text-sm sm:text-base font-semibold">
+                      {isCredentialRecovery ? 'Additional Information' : 'Message'} 
+                      {!isCredentialRecovery && <span className="text-red-500"> *</span>}
+                      {isCredentialRecovery && <span className="text-slate-400 text-xs"> (Optional)</span>}
+                    </Label>
+                    <Textarea 
+                      required={!isCredentialRecovery} 
+                      rows={5} 
+                      value={formData.message} 
+                      onChange={(e) => setFormData({ ...formData, message: e.target.value })} 
+                      placeholder={isCredentialRecovery 
+                        ? "Any additional information that might help us verify your identity..." 
+                        : "Please provide as much detail as possible..."}
+                      className="mt-1.5 text-sm sm:text-base resize-none" 
+                    />
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <Checkbox id="urgent" checked={formData.is_urgent} onCheckedChange={(checked) => setFormData({ ...formData, is_urgent: checked as boolean })} />
-                    <Label htmlFor="urgent" className="text-xs sm:text-sm font-normal cursor-pointer">This is an urgent inquiry</Label>
+                  <div className="flex items-center gap-2 py-1">
+                    <Checkbox 
+                      id="urgent" 
+                      checked={formData.is_urgent} 
+                      onCheckedChange={(checked) => setFormData({ ...formData, is_urgent: checked as boolean })} 
+                    />
+                    <Label htmlFor="urgent" className="text-sm sm:text-base font-normal cursor-pointer">
+                      This is an urgent inquiry
+                    </Label>
                   </div>
 
-                  <div className="flex justify-end pt-3 sm:pt-4">
-                    <Button type="submit" disabled={loading} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 w-full sm:w-auto min-w-[150px] sm:min-w-[180px] text-sm h-10 sm:h-11">
-                      {loading ? 'Processing...' : (<><Send className="h-4 w-4 mr-2" />{isCredentialRecovery ? 'Submit Recovery Request' : 'Send Message'}</>)}
+                  <div className="flex justify-end pt-3">
+                    <Button 
+                      type="submit" 
+                      disabled={loading} 
+                      className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 w-full sm:w-auto min-w-[180px] sm:min-w-[200px] text-sm sm:text-base h-11 sm:h-12"
+                    >
+                      {loading ? (
+                        <>
+                          <div className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          <Send className="h-4 w-4 mr-2" />
+                          {isCredentialRecovery ? 'Submit Recovery Request' : 'Send Message'}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </form>
@@ -524,11 +612,21 @@ export default function ContactPage() {
           </div>
         </div>
 
-        {/* Map Section */}
-        <div className="mt-6 sm:mt-8 md:mt-10">
-          <Card className="shadow-md border-0 overflow-hidden">
+        {/* Map Section - Fixed with proper iframe */}
+        <div className="mt-8 sm:mt-10 md:mt-12">
+          <Card className="shadow-md border-0 overflow-hidden rounded-xl">
             <CardContent className="p-0">
-              <iframe title="Vincollins College Location" src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3964.123456789!2d3.3456789!3d6.456789!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNsKwMjcnMjQuNCJOIDPCsDIwJzQ0LjQiRQ!5e0!3m2!1sen!2sng!4v1234567890" width="100%" height="250" className="w-full sm:h-[280px] md:h-[300px]" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade" />
+              <iframe 
+                title="Vincollins College Location" 
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.9529124858783!2d3.323296614770919!3d6.585841795225566!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103b9237f1e6e0e1%3A0x9c5f6b8e3d2a1b0f!2sSurulere%2C%20Lagos!5e0!3m2!1sen!2sng!4v1700000000000!5m2!1sen!2sng" 
+                width="100%" 
+                height="280" 
+                className="w-full sm:h-[300px] md:h-[350px]" 
+                style={{ border: 0 }} 
+                allowFullScreen 
+                loading="lazy" 
+                referrerPolicy="no-referrer-when-downgrade"
+              />
             </CardContent>
           </Card>
         </div>
@@ -536,13 +634,14 @@ export default function ContactPage() {
 
       {/* Footer */}
       <footer className="border-t bg-white dark:bg-slate-900 dark:border-slate-800 mt-8 md:mt-12">
-        <div className="container mx-auto px-3 sm:px-4 py-3 sm:py-4 md:py-5">
+        <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-5 md:py-6">
           <p className="text-center text-[10px] sm:text-xs md:text-sm text-slate-500 dark:text-slate-400" suppressHydrationWarning>
             © {new Date().getFullYear()} Vincollins College. {CONTACT_INFO.address} | {CONTACT_INFO.phone}
           </p>
         </div>
       </footer>
 
+      {/* WhatsApp Widget - Rendered directly (no wrapper div) - it handles its own positioning */}
       <WhatsAppWidget />
     </div>
   )

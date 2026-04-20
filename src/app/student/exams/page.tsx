@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/exams/page.tsx - FIXED: Term selector with fallback to current term
+// app/student/exams/page.tsx - FIXED: Term selector working correctly
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -206,59 +206,116 @@ export default function StudentExamsPage() {
     return 'available'
   }
 
+  // ✅ FIXED: Load available terms from multiple sources
   const loadAvailableTerms = useCallback(async (studentId: string) => {
     try {
+      const termsMap = new Map<string, { term: string; session_year: string; label: string }>()
+      
+      // Source 1: Get terms from student_term_progress
       const { data: progressData } = await supabase
         .from('student_term_progress')
         .select('term, session_year')
         .eq('student_id', studentId)
         .order('created_at', { ascending: false })
 
-      const terms: Array<{ term: string; session_year: string; label: string }> = []
-      
       if (progressData && progressData.length > 0) {
         progressData.forEach(p => {
-          const label = `${TERM_NAMES[p.term] || p.term} ${p.session_year}`
-          if (!terms.find(t => t.term === p.term && t.session_year === p.session_year)) {
-            terms.push({ term: p.term, session_year: p.session_year, label })
+          if (p.term && p.session_year) {
+            const key = `${p.term}|${p.session_year}`
+            if (!termsMap.has(key)) {
+              termsMap.set(key, {
+                term: p.term,
+                session_year: p.session_year,
+                label: `${TERM_NAMES[p.term] || p.term} ${p.session_year}`
+              })
+            }
           }
         })
       }
 
-      // If no terms found, add the current term as default
-      if (terms.length === 0) {
-        const current = getCurrentTermSession()
-        const defaultTerm = {
-          term: current.term,
-          session_year: current.session,
-          label: `${TERM_NAMES[current.term] || current.term} ${current.session}`
-        }
-        terms.push(defaultTerm)
+      // Source 2: Get terms from exams table
+      const { data: examTerms } = await supabase
+        .from('exams')
+        .select('term, session_year')
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+
+      if (examTerms && examTerms.length > 0) {
+        examTerms.forEach(term => {
+          if (term.term && term.session_year) {
+            const key = `${term.term}|${term.session_year}`
+            if (!termsMap.has(key)) {
+              termsMap.set(key, {
+                term: term.term,
+                session_year: term.session_year,
+                label: `${TERM_NAMES[term.term] || term.term} ${term.session_year}`
+              })
+            }
+          }
+        })
       }
 
+      // Source 3: Generate default terms (current and previous academic years)
+      const current = getCurrentTermSession()
+      const currentYear = parseInt(current.session.split('/')[0])
+      
+      // Generate terms for current and previous year
+      const sessions = [
+        `${currentYear - 1}/${currentYear}`,
+        current.session
+      ]
+      
+      const allTerms = ['first', 'second', 'third']
+      
+      sessions.forEach(session => {
+        allTerms.forEach(term => {
+          const key = `${term}|${session}`
+          if (!termsMap.has(key)) {
+            termsMap.set(key, {
+              term: term,
+              session_year: session,
+              label: `${TERM_NAMES[term] || term} ${session}`
+            })
+          }
+        })
+      })
+
+      // Convert map to array and sort
+      let terms = Array.from(termsMap.values())
+      
+      // Sort: latest session first, then term order
       terms.sort((a, b) => {
-        const sessionA = a.session_year.split('/')[0]
-        const sessionB = b.session_year.split('/')[0]
-        if (sessionA !== sessionB) return parseInt(sessionB) - parseInt(sessionA)
+        const sessionA = parseInt(a.session_year.split('/')[0])
+        const sessionB = parseInt(b.session_year.split('/')[0])
+        if (sessionA !== sessionB) return sessionB - sessionA
         const termOrder: Record<string, number> = { first: 1, second: 2, third: 3 }
-        return (termOrder[b.term] || 0) - (termOrder[a.term] || 0)
+        return (termOrder[a.term] || 0) - (termOrder[b.term] || 0)
       })
 
       setAvailableTerms(terms)
       
+      // Set default selected term
       if (terms.length > 0 && !selectedTermSession) {
-        setSelectedTermSession({ term: terms[0].term, session_year: terms[0].session_year })
+        // Try to find current term first
+        const currentTerm = terms.find(t => 
+          t.term === current.term && t.session_year === current.session
+        )
+        if (currentTerm) {
+          setSelectedTermSession({ term: currentTerm.term, session_year: currentTerm.session_year })
+        } else {
+          setSelectedTermSession({ term: terms[0].term, session_year: terms[0].session_year })
+        }
       }
     } catch (error) {
       console.error('Error loading available terms:', error)
-      // Fallback to current term on error
+      // Fallback: Create default terms based on current session
       const current = getCurrentTermSession()
-      const defaultTerm = {
-        term: current.term,
-        session_year: current.session,
-        label: `${TERM_NAMES[current.term] || current.term} ${current.session}`
-      }
-      setAvailableTerms([defaultTerm])
+      const defaultTerms = [
+        { term: 'first', session_year: current.session, label: `First Term ${current.session}` },
+        { term: 'second', session_year: current.session, label: `Second Term ${current.session}` },
+        { term: 'third', session_year: current.session, label: `Third Term ${current.session}` }
+      ]
+      setAvailableTerms(defaultTerms)
       if (!selectedTermSession) {
         setSelectedTermSession({ term: current.term, session_year: current.session })
       }
@@ -306,11 +363,26 @@ export default function StudentExamsPage() {
       }
 
       setProfile(studentProfile)
+      
+      // Load available terms first
       await loadAvailableTerms(studentProfile.id)
 
-      const targetTerm = term || selectedTermSession?.term || getCurrentTermSession().term
-      const targetSession = session || selectedTermSession?.session_year || getCurrentTermSession().session
+      // Determine which term/session to load
+      let targetTerm = term
+      let targetSession = session
+      
+      if (!targetTerm || !targetSession) {
+        if (selectedTermSession) {
+          targetTerm = selectedTermSession.term
+          targetSession = selectedTermSession.session_year
+        } else {
+          const current = getCurrentTermSession()
+          targetTerm = current.term
+          targetSession = current.session
+        }
+      }
 
+      // Load term progress
       const { data: progressData } = await supabase
         .from('student_term_progress')
         .select('*')
@@ -346,6 +418,7 @@ export default function StudentExamsPage() {
         }))
       }
 
+      // Load exams for the selected term
       const { data: examsData } = await supabase
         .from('exams')
         .select('*')
@@ -368,6 +441,7 @@ export default function StudentExamsPage() {
       const subjects = [...new Set(classFilteredExams.map(e => e.subject))]
       setAvailableSubjects(subjects.sort())
 
+      // Load exam attempts
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -411,18 +485,21 @@ export default function StudentExamsPage() {
     }
   }, [router, loadAvailableTerms, selectedTermSession, getCurrentTermSession])
 
+  // Initial load
   useEffect(() => {
     if (mounted) {
       loadData()
     }
   }, [mounted])
 
+  // Handle term/session change
   const handleTermSessionChange = async (value: string) => {
     const [term, session] = value.split('|')
     setSelectedTermSession({ term, session_year: session })
     await loadData(term, session)
   }
 
+  // Filter exams when subject or search changes
   useEffect(() => {
     let filtered = [...exams]
     if (selectedSubject !== 'all') {
@@ -523,14 +600,14 @@ export default function StudentExamsPage() {
             </p>
           </div>
           
-          {/* Term Selector & Progress Card - FIXED with fallback */}
+          {/* ✅ FIXED: Term Selector & Progress Card - Now working correctly */}
           <div className="mb-5 sm:mb-8">
             <Card className="border-0 shadow-sm bg-card">
               <CardContent className="p-4 sm:p-5 lg:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                   <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2 w-full sm:w-auto">
                     <History className="h-4 w-4 text-muted-foreground shrink-0" />
-                    {mounted && availableTerms.length > 0 ? (
+                    {availableTerms.length > 0 ? (
                       <Select 
                         value={selectedTermSession ? `${selectedTermSession.term}|${selectedTermSession.session_year}` : ''} 
                         onValueChange={handleTermSessionChange}
@@ -547,8 +624,8 @@ export default function StudentExamsPage() {
                         </SelectContent>
                       </Select>
                     ) : (
-                      <div className="text-sm font-medium min-w-[180px] py-1.5 text-muted-foreground">
-                        Loading...
+                      <div className="text-sm font-medium py-1.5 text-muted-foreground">
+                        Loading terms...
                       </div>
                     )}
                   </div>
@@ -569,7 +646,13 @@ export default function StudentExamsPage() {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    onClick={() => selectedTermSession ? loadData(selectedTermSession.term, selectedTermSession.session_year) : loadData()} 
+                    onClick={() => {
+                      if (selectedTermSession) {
+                        loadData(selectedTermSession.term, selectedTermSession.session_year)
+                      } else {
+                        loadData()
+                      }
+                    }} 
                     className="h-8 w-8 shrink-0"
                   >
                     <RefreshCw className="h-4 w-4" />

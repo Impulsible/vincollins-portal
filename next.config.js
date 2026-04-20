@@ -75,9 +75,14 @@ const nextConfig = {
       };
     }
     
+    // ✅ Add source map warnings to ignore list
     config.ignoreWarnings = [
       { module: /node_modules\/@radix-ui\/react-slot/ },
       { module: /node_modules\/@radix-ui\/react-popover/ },
+      // Ignore source map warnings
+      { message: /Failed to parse source map/ },
+      { message: /Source map error/ },
+      { file: /LayoutGroupContext\.mjs\.map/ },
     ];
     
     return config;
