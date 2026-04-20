@@ -301,6 +301,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   
+  // Mobile detection state for responsive popover alignment
+  const [isMobile, setIsMobile] = useState(false)
+  
   // Dynamic contact info state - fetches from database
   const [contactInfo, setContactInfo] = useState([
     { icon: MapPin, text: '7/9, Lawani Street, off Ishaga Rd, Surulere, Lagos' },
@@ -316,6 +319,16 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                        pathname === '/admission' || 
                        pathname === '/schools' || 
                        pathname === '/contact'
+
+  // Mobile detection effect
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640) // sm breakpoint
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   // Fetch school settings including phone and email
   useEffect(() => {
@@ -863,7 +876,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL */}
+              {/* NOTIFICATION BELL - Professional spacing and sizing */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                   <PopoverTrigger asChild>
@@ -883,16 +896,22 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     </NotificationTrigger>
                   </PopoverTrigger>
                   <PopoverContent 
-                    align="end" 
-                    sideOffset={8}
-                    className="w-[320px] xs:w-[360px] sm:w-[400px] p-0 rounded-xl shadow-2xl border border-gray-100"
+                    align={isMobile ? "center" : "end"}
+                    sideOffset={isMobile ? 12 : 8}
+                    className={cn(
+                      "w-[calc(100vw-32px)] max-w-[380px] sm:w-[400px] md:w-[420px] p-0 rounded-2xl shadow-2xl border border-gray-200/80",
+                      "overflow-hidden bg-white"
+                    )}
                   >
-                    <div className="p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-gray-50 rounded-t-xl">
+                    {/* Header */}
+                    <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50">
                       <div className="flex items-center justify-between">
                         <div>
-                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
-                          <p className="text-xs text-gray-500">
-                            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
+                          <h3 className="font-semibold text-gray-900 text-base">Notifications</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {unreadCount > 0 
+                              ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` 
+                              : "You're all caught up!"}
                           </p>
                         </div>
                         {unreadCount > 0 && (
@@ -900,7 +919,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                             variant="ghost" 
                             size="sm" 
                             onClick={markAllAsRead}
-                            className="text-xs h-7"
+                            className="text-xs h-8 px-3 hover:bg-gray-100"
                           >
                             Mark all read
                           </Button>
@@ -908,34 +927,44 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       </div>
                     </div>
                     
-                    <ScrollArea className="max-h-[400px] sm:max-h-[450px]">
+                    <ScrollArea className="max-h-[400px] sm:max-h-[440px] md:max-h-[480px]">
                       {notifications.length === 0 ? (
-                        <div className="p-8 text-center">
-                          <Bell className="h-10 w-10 text-gray-300 mx-auto mb-3" />
-                          <p className="text-sm text-gray-500">No notifications yet</p>
-                          <p className="text-xs text-gray-400 mt-1">We'll notify you when something happens</p>
+                        <div className="py-12 px-6 text-center">
+                          <div className="h-12 w-12 rounded-full bg-gray-100 mx-auto mb-4 flex items-center justify-center">
+                            <Bell className="h-6 w-6 text-gray-400" />
+                          </div>
+                          <p className="text-sm font-medium text-gray-700">No notifications yet</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            We'll notify you when something important happens
+                          </p>
                         </div>
                       ) : (
                         <div className="divide-y divide-gray-100">
                           {notifications.map((notification) => (
                             <motion.div
                               key={notification.id}
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
+                              initial={{ opacity: 0, y: 5 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              transition={{ duration: 0.2 }}
                               className={cn(
-                                "p-3 sm:p-4 hover:bg-gray-50 transition-colors cursor-pointer group relative",
-                                !notification.read && "bg-blue-50/50"
+                                "px-5 py-4 hover:bg-gray-50/80 transition-colors cursor-pointer group relative",
+                                !notification.read && "bg-blue-50/40 hover:bg-blue-50/60"
                               )}
                               onClick={() => handleNotificationClick(notification)}
                             >
                               <div className="flex gap-3">
                                 <div className="shrink-0 mt-0.5">
-                                  {getNotificationIcon(notification.type)}
+                                  <div className={cn(
+                                    "h-8 w-8 rounded-full flex items-center justify-center",
+                                    !notification.read ? "bg-blue-100" : "bg-gray-100"
+                                  )}>
+                                    {getNotificationIcon(notification.type)}
+                                  </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-start justify-between gap-2 mb-1">
                                     <p className={cn(
-                                      "text-sm font-medium truncate",
+                                      "text-sm font-medium leading-tight",
                                       !notification.read ? "text-gray-900" : "text-gray-600"
                                     )}>
                                       {notification.title}
@@ -944,20 +973,23 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                                       {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
                                     {notification.message}
                                   </p>
                                 </div>
                               </div>
                               
                               {!notification.read && (
-                                <div className="ml-7 mt-1">
-                                  <span className="inline-block h-2 w-2 bg-blue-500 rounded-full" />
+                                <div className="ml-11 mt-2">
+                                  <span className="inline-flex items-center gap-1">
+                                    <span className="h-2 w-2 bg-blue-500 rounded-full" />
+                                    <span className="text-[10px] font-medium text-blue-600">New</span>
+                                  </span>
                                 </div>
                               )}
                               
                               <button
-                                className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-gray-200"
                                 onClick={(e) => deleteNotification(notification.id, e)}
                               >
                                 <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
@@ -968,14 +1000,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       )}
                     </ScrollArea>
                     
-                    <div className="p-2 border-t border-gray-100">
+                    <div className="p-3 border-t border-gray-100 bg-gray-50/50">
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="w-full text-xs"
+                        className="w-full text-sm h-9 font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                         onClick={handleViewAllNotifications}
                       >
                         View All Notifications
+                        <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
                     </div>
                   </PopoverContent>

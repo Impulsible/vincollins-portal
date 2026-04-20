@@ -135,64 +135,76 @@ export default function AdmissionPage() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <Header />
 
-      {/* Hero Section */}
+      {/* Hero Section - Fixed Spacing */}
       <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0d2e8a] to-[#1e3a8a] text-white overflow-hidden">
+        {/* Background Effects */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.4)_0%,transparent_50%)]" />
-          <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-400 rounded-full blur-3xl opacity-20" />
-          <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-400 rounded-full blur-3xl opacity-20" />
+          <div className="absolute -top-24 -right-24 w-72 h-72 sm:w-96 sm:h-96 bg-blue-400 rounded-full blur-3xl opacity-20" />
+          <div className="absolute -bottom-24 -left-24 w-72 h-72 sm:w-96 sm:h-96 bg-indigo-400 rounded-full blur-3xl opacity-20" />
         </div>
         
-        <div className="relative container max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 lg:py-24">
-          <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-sm rounded-full border border-white/20 mb-6">
-              <GraduationCap className="h-4 w-4 text-amber-300" />
-              <span className="text-sm font-medium text-white/90">Start Your Journey</span>
+        <div className="relative container max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 sm:py-14 md:py-18 lg:py-24">
+          <div className="max-w-3xl mx-auto text-center sm:text-left">
+            {/* ✅ Fixed Badge - Proper spacing on all screens */}
+            <div className="flex justify-center sm:justify-start mb-4 sm:mb-5 md:mb-6">
+              <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/15 backdrop-blur-sm rounded-full border border-white/20">
+                <GraduationCap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-300" />
+                <span className="text-[11px] sm:text-sm font-medium text-white/90 whitespace-nowrap">
+                  Start Your Journey
+                </span>
+              </div>
             </div>
             
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4">
+            {/* Heading */}
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-3 sm:mb-4 text-center sm:text-left">
               <span className="text-white">Apply to </span>
               <span className="bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">Vincollins College</span>
             </h1>
             
-            <p className="text-base sm:text-lg md:text-xl text-white/80 max-w-2xl mb-8">
+            {/* Description */}
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/80 max-w-2xl mb-6 sm:mb-8 text-center sm:text-left mx-auto sm:mx-0">
               Join a community that nurtures excellence. Submit your application today and take the first step towards a bright future.
             </p>
             
-            <div className="flex flex-wrap gap-3 sm:gap-4">
-              <Link href="#apply-form">
-                <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3 bg-amber-500/90 hover:bg-amber-500 backdrop-blur-sm rounded-xl border border-amber-400/30 transition-all duration-300 cursor-pointer shadow-lg">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-white/20 flex items-center justify-center">
-                    <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+            {/* Action Cards - Responsive grid */}
+            <div className="flex flex-wrap justify-center sm:justify-start gap-2.5 sm:gap-3 md:gap-4">
+              {/* Apply Now Card */}
+              <Link href="#apply-form" className="flex-1 min-w-[140px] sm:min-w-[160px] md:min-w-[180px]">
+                <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-3 bg-amber-500/90 hover:bg-amber-500 backdrop-blur-sm rounded-xl border border-amber-400/30 transition-all duration-300 cursor-pointer shadow-lg">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                    <GraduationCap className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-white" />
                   </div>
                   <div>
-                    <p className="text-[10px] sm:text-xs text-white/80">Apply Now</p>
-                    <p className="text-xs sm:text-sm md:text-base font-semibold text-white">Start Application</p>
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-white/80">Apply Now</p>
+                    <p className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-white">Start Application</p>
                   </div>
                 </div>
               </Link>
               
-              <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20">
-                <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                  <span className="relative flex h-2 w-2 sm:h-3 sm:w-3">
+              {/* Processing Time Card */}
+              <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 flex-1 min-w-[140px] sm:min-w-[160px] md:min-w-[180px]">
+                <div className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+                  <span className="relative flex h-1.5 w-1.5 sm:h-2 sm:w-2 md:h-3 md:w-3">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 sm:h-3 sm:w-3 bg-emerald-500"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 sm:h-2 sm:w-2 md:h-3 md:w-3 bg-emerald-500"></span>
                   </span>
                 </div>
                 <div>
-                  <p className="text-[10px] sm:text-xs text-white/60">Processing Time</p>
-                  <p className="text-xs sm:text-sm md:text-base font-semibold text-white">3-5 Days</p>
+                  <p className="text-[9px] sm:text-[10px] md:text-xs text-white/60">Processing Time</p>
+                  <p className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-white">3-5 Days</p>
                 </div>
               </div>
               
-              <Link href="/contact">
-                <div className="flex items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
-                  <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-blue-500/20 flex items-center justify-center">
-                    <Headphones className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300" />
+              {/* Need Help Card */}
+              <Link href="/contact" className="flex-1 min-w-[140px] sm:min-w-[160px] md:min-w-[180px]">
+                <div className="flex items-center gap-2 sm:gap-3 px-3 py-2 sm:px-4 sm:py-2.5 md:px-5 md:py-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all duration-300 cursor-pointer">
+                  <div className="h-7 w-7 sm:h-8 sm:w-8 md:h-10 md:w-10 rounded-full bg-blue-500/20 flex items-center justify-center shrink-0">
+                    <Headphones className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 text-blue-300" />
                   </div>
                   <div>
-                    <p className="text-[10px] sm:text-xs text-white/60">Need Help?</p>
-                    <p className="text-xs sm:text-sm md:text-base font-semibold text-white">Contact Us</p>
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-white/60">Need Help?</p>
+                    <p className="text-[10px] sm:text-xs md:text-sm lg:text-base font-semibold text-white">Contact Us</p>
                   </div>
                 </div>
               </Link>
@@ -200,6 +212,7 @@ export default function AdmissionPage() {
           </div>
         </div>
         
+        {/* Wave Decoration */}
         <div className="absolute bottom-0 left-0 right-0">
           <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full">
             <path d="M0 120L60 105C120 90 240 60 360 50C480 40 600 50 720 55C840 60 960 60 1080 50C1200 40 1320 20 1380 10L1440 0V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0V120Z" 

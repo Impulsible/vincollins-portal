@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/student/page.tsx - FULLY FIXED WITH CORRECT HEADER PROPS
+// app/student/page.tsx - FULLY FIXED: TypeScript errors resolved
 'use client'
 
 import { useState, useEffect, useCallback, Suspense, useMemo } from 'react'
@@ -23,7 +23,7 @@ import {
   XCircle, ChevronRight, FileText, MonitorPlay, BarChart3, Activity,
   Search, User, ArrowRight, Trophy, Eye, LayoutDashboard, Menu,
   GraduationCap, CheckCircle2, FileCheck, Download, Calendar, File,
-  Grid3x3, List, Users, Mail, Sparkles, UserPlus, FolderOpen
+  Grid3x3, List, Users, Mail, Sparkles, UserPlus, FolderOpen, History
 } from 'lucide-react'
 
 // ============================================
@@ -110,6 +110,29 @@ const calculateGrade = (percentage: number): { grade: string; color: string } =>
   return { grade: 'F', color: 'text-red-600' }
 }
 
+// Current session constant
+const CURRENT_SESSION = '2025/2026'
+
+const TERM_NAMES: Record<string, string> = {
+  first: 'First Term',
+  second: 'Second Term',
+  third: 'Third Term'
+}
+
+// ✅ FIXED: Return type matches state
+const getCurrentTermSession = (): { term: string; session_year: string } => {
+  const now = new Date()
+  const month = now.getMonth() + 1
+  
+  if (month >= 9 && month <= 12) {
+    return { term: 'first', session_year: CURRENT_SESSION }
+  } else if (month >= 1 && month <= 4) {
+    return { term: 'second', session_year: CURRENT_SESSION }
+  } else {
+    return { term: 'third', session_year: CURRENT_SESSION }
+  }
+}
+
 // ============================================
 // TYPES
 // ============================================
@@ -153,6 +176,8 @@ interface Exam {
   ends_at?: string
   has_theory?: boolean
   passing_percentage?: number
+  term?: string
+  session_year?: string
 }
 
 interface ExamAttempt {
@@ -164,6 +189,8 @@ interface ExamAttempt {
   percentage: number
   is_passed: boolean
   total_score?: number
+  term?: string
+  session_year?: string
 }
 
 interface Assignment {
@@ -224,6 +251,8 @@ interface BannerStats {
   totalSubjects: number
   currentGrade: string
   gradeColor: string
+  currentTerm: string
+  sessionYear: string
 }
 
 interface ReportCardStatus {
@@ -265,6 +294,10 @@ function StudentDashboardContent() {
   const [classmatesSearch, setClassmatesSearch] = useState('')
   const [classmatesView, setClassmatesView] = useState<'grid' | 'list'>('grid')
   
+  // Term/Session state
+  const [currentTermSession, setCurrentTermSession] = useState<{ term: string; session_year: string } | null>(null)
+  const [availableTerms, setAvailableTerms] = useState<Array<{ term: string; session_year: string; label: string }>>([])
+  
   const [stats, setStats] = useState<PerformanceStats>({
     totalExams: 0,
     completedExams: 0,
@@ -288,7 +321,9 @@ function StudentDashboardContent() {
     totalExams: 0,
     totalSubjects: 17,
     currentGrade: 'N/A',
-    gradeColor: 'text-gray-400'
+    gradeColor: 'text-gray-400',
+    currentTerm: 'Third Term',
+    sessionYear: CURRENT_SESSION
   })
 
   const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
@@ -303,7 +338,6 @@ function StudentDashboardContent() {
     return getBestDisplayName(profile, 'Student')
   }, [profile])
 
-  // Format profile for Header component
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
@@ -329,14 +363,14 @@ function StudentDashboardContent() {
         .maybeSingle()
         
       if (!error && data) {
-        const grade = data.average_score >= 75 ? 'A1' : 
-                     data.average_score >= 70 ? 'B2' :
-                     data.average_score >= 65 ? 'B3' :
-                     data.average_score >= 60 ? 'C4' :
-                     data.average_score >= 55 ? 'C5' :
-                     data.average_score >= 50 ? 'C6' :
-                     data.average_score >= 45 ? 'D7' :
-                     data.average_score >= 40 ? 'E8' : 'F9'
+        const grade = data.average_score && data.average_score >= 75 ? 'A1' : 
+                     data.average_score && data.average_score >= 70 ? 'B2' :
+                     data.average_score && data.average_score >= 65 ? 'B3' :
+                     data.average_score && data.average_score >= 60 ? 'C4' :
+                     data.average_score && data.average_score >= 55 ? 'C5' :
+                     data.average_score && data.average_score >= 50 ? 'C6' :
+                     data.average_score && data.average_score >= 45 ? 'D7' :
+                     data.average_score && data.average_score >= 40 ? 'E8' : 'F9'
                      
         setReportCardStatus({
           id: data.id,
@@ -439,11 +473,33 @@ function StudentDashboardContent() {
 
       await checkReportCardStatus()
 
-      // Load exams
+      // Load available terms from terms table
+      const { data: termsData } = await supabase
+        .from('terms')
+        .select('*')
+        .order('session_year', { ascending: false })
+        .order('term_code')
+
+      if (termsData) {
+        const terms = termsData.map((t: any) => ({
+          term: t.term_code,
+          session_year: t.session_year,
+          label: `${t.term_name} ${t.session_year}`
+        }))
+        setAvailableTerms(terms)
+      }
+
+      // ✅ FIXED: Get current term with correct property name
+      const currentTerm = getCurrentTermSession()
+      setCurrentTermSession({ term: currentTerm.term, session_year: currentTerm.session_year })
+
+      // Load exams for current term only
       const { data: examsData } = await supabase
         .from('exams')
         .select('*')
         .eq('status', 'published')
+        .eq('term', currentTerm.term)
+        .eq('session_year', currentTerm.session_year)
         .order('created_at', { ascending: false })
 
       const allExams: Exam[] = (examsData || []).filter(exam => {
@@ -453,11 +509,13 @@ function StudentDashboardContent() {
         return normalizedExamClass === normalizedStudentClass
       })
 
-      // Load attempts
+      // Load attempts for current term only
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
         .select('*')
         .eq('student_id', profile.id)
+        .eq('term', currentTerm.term)
+        .eq('session_year', currentTerm.session_year)
         .order('created_at', { ascending: false })
 
       const attempts: ExamAttempt[] = []
@@ -472,7 +530,9 @@ function StudentDashboardContent() {
             status: att.status || 'pending',
             percentage: att.percentage || att.percentage_score || 0,
             is_passed: att.is_passed || false,
-            total_score: att.total_score || 0
+            total_score: att.total_score || 0,
+            term: att.term,
+            session_year: att.session_year
           })
         }
       }
@@ -503,21 +563,18 @@ function StudentDashboardContent() {
         return true
       })
 
-      // Load ALL assignments
       const { data: allAssignmentsData } = await supabase
         .from('assignments')
         .select('*')
         .eq('class', studentClass)
         .order('created_at', { ascending: false })
 
-      // Load ALL notes
       const { data: allNotesData } = await supabase
         .from('notes')
         .select('*')
         .eq('class', studentClass)
         .order('created_at', { ascending: false })
 
-      // Load ALL classmates
       const { data: classmatesData } = await supabase
         .from('profiles')
         .select('id, first_name, middle_name, last_name, full_name, display_name, email, photo_url, vin_id')
@@ -577,6 +634,7 @@ function StudentDashboardContent() {
 
       const gradeInfo = calculateGrade(avgScore)
       
+      // ✅ FIXED: Using session_year consistently
       setBannerStats({
         completedExams: completedAttempts.length,
         averageScore: avgScore,
@@ -584,7 +642,9 @@ function StudentDashboardContent() {
         totalExams: allExams.length,
         totalSubjects: totalSubjects,
         currentGrade: completedAttempts.length > 0 ? gradeInfo.grade : 'N/A',
-        gradeColor: gradeInfo.color
+        gradeColor: gradeInfo.color,
+        currentTerm: TERM_NAMES[currentTerm.term] || currentTerm.term,
+        sessionYear: currentTerm.session_year
       })
 
     } catch (error) {
@@ -754,7 +814,6 @@ function StudentDashboardContent() {
     totalSubjects: displayTotalSubjects || bannerStats.totalSubjects
   }
 
-  // Loading state
   if (authChecking || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
@@ -801,7 +860,6 @@ function StudentDashboardContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
-      {/* ✅ FIXED: Header with only the required props */}
       <Header 
         user={formatProfileForHeader(profile)} 
         onLogout={handleLogout}
@@ -895,6 +953,32 @@ function StudentDashboardContent() {
                   exit={{ opacity: 0, y: -20 }}
                   className="space-y-4 sm:space-y-6 w-full overflow-hidden"
                 >
+                  {/* Current Term Display */}
+                  {currentTermSession && (
+                    <motion.div variants={itemVariants} className="w-full overflow-hidden">
+                      <Card className="border-0 shadow-sm bg-gradient-to-r from-emerald-50 to-teal-50">
+                        <CardContent className="p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className="h-10 w-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                                <History className="h-5 w-5 text-emerald-600" />
+                              </div>
+                              <div>
+                                <p className="text-sm text-emerald-700 font-medium">Current Academic Term</p>
+                                <p className="text-lg font-bold text-emerald-800">
+                                  {bannerStats.currentTerm} {bannerStats.sessionYear}
+                                </p>
+                              </div>
+                            </div>
+                            <Badge className="bg-emerald-600 text-white">
+                              {stats.completedExams}/{displayTotalSubjects} Subjects Completed
+                            </Badge>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  )}
+
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <StudentWelcomeBanner 
                       profile={getWelcomeBannerProfile()} 
@@ -968,7 +1052,6 @@ function StudentDashboardContent() {
 
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
-                      {/* Left Column */}
                       <div className="lg:col-span-2 space-y-4 sm:space-y-6 w-full overflow-hidden">
                         {stats.completedExams > 0 && (
                           <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
@@ -1018,7 +1101,7 @@ function StudentDashboardContent() {
                           </CardHeader>
                           <CardContent>
                             {stats.availableExams.length === 0 ? (
-                              <p className="text-center py-6 text-slate-500 text-sm">No exams available</p>
+                              <p className="text-center py-6 text-slate-500 text-sm">No exams available for {bannerStats.currentTerm}</p>
                             ) : (
                               <div className="space-y-3">
                                 {stats.availableExams.slice(0, 3).map((exam) => (
@@ -1041,7 +1124,6 @@ function StudentDashboardContent() {
                         </Card>
                       </div>
 
-                      {/* Right Column */}
                       <div className="space-y-4 sm:space-y-6 w-full overflow-hidden">
                         <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                           <CardHeader className="pb-2">
@@ -1082,7 +1164,7 @@ function StudentDashboardContent() {
                     </div>
                   </motion.div>
 
-                  {/* CLASSMATES PREVIEW SECTION */}
+                  {/* CLASSMATES PREVIEW */}
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
                       <CardHeader className="pb-2">
@@ -1142,7 +1224,7 @@ function StudentDashboardContent() {
                     </Card>
                   </motion.div>
 
-                  {/* ASSIGNMENTS PREVIEW SECTION */}
+                  {/* ASSIGNMENTS PREVIEW */}
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 overflow-hidden w-full">
                       <CardHeader className="pb-2">
@@ -1211,7 +1293,7 @@ function StudentDashboardContent() {
                     </Card>
                   </motion.div>
 
-                  {/* NOTES PREVIEW SECTION */}
+                  {/* NOTES PREVIEW */}
                   <motion.div variants={itemVariants} className="w-full overflow-hidden">
                     <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 overflow-hidden w-full">
                       <CardHeader className="pb-2">
@@ -1309,7 +1391,7 @@ function StudentDashboardContent() {
                       <Card className="col-span-full">
                         <CardContent className="p-8 text-center">
                           <MonitorPlay className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                          <p className="text-slate-500">No exams available.</p>
+                          <p className="text-slate-500">No exams available for {bannerStats.currentTerm}.</p>
                         </CardContent>
                       </Card>
                     ) : (
@@ -1400,7 +1482,7 @@ function StudentDashboardContent() {
                 </motion.div>
               )}
 
-              {/* ASSIGNMENTS TAB - FULL PAGE */}
+              {/* ASSIGNMENTS TAB */}
               {activeTab === 'assignments' && (
                 <motion.div key="assignments" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -1478,7 +1560,7 @@ function StudentDashboardContent() {
                 </motion.div>
               )}
 
-              {/* NOTES TAB - FULL PAGE */}
+              {/* NOTES TAB */}
               {activeTab === 'notes' && (
                 <motion.div key="notes" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
@@ -1552,7 +1634,7 @@ function StudentDashboardContent() {
                 </motion.div>
               )}
 
-              {/* CLASSMATES TAB - FULL PAGE */}
+              {/* CLASSMATES TAB */}
               {activeTab === 'classmates' && (
                 <motion.div key="classmates" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="w-full overflow-hidden">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
