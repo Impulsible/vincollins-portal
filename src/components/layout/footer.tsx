@@ -3,7 +3,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, ArrowRight, ChevronRight, Award, Shield, Heart, Sparkles, Send, Clock, GraduationCap, Lock, Timer, Shuffle } from 'lucide-react'
+import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, ArrowRight, ChevronRight, Award, Shield, Heart, Sparkles, Send, Clock, GraduationCap, Lock, Timer, Shuffle, Linkedin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 
-// Footer Navigation Data - Added unique id for each portal item
+// Footer Navigation Data
 const footerNavItems = {
   academics: [
     { id: 'creche', title: 'Crèche/Playgroup', href: '/academics/creche-playgroup' },
@@ -43,19 +43,20 @@ const footerNavItems = {
   ],
 }
 
-const siteConfig = {
-  contact: {
-    address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
-    phone: '08023013110',
-    email: 'vincollinscollege@gmail.com',
-    hours: 'Mon-Fri: 8:00 AM - 4:00 PM',
-  },
-  links: {
-    facebook: 'https://facebook.com/vincollins',
-    twitter: 'https://twitter.com/vincollins',
-    instagram: 'https://instagram.com/vincollins',
-  },
+// Default contact info (will be updated from database)
+const defaultContactInfo = {
+  address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
+  phone: '+234 912 1155 554',
+  email: 'vincollinscollege@gmail.com',
+  hours: 'Mon-Fri: 8:00 AM - 4:00 PM',
 }
+
+const socialLinks = [
+  { icon: Facebook, href: 'https://facebook.com/vincollins', label: 'Facebook' },
+  { icon: Twitter, href: 'https://twitter.com/vincollins', label: 'Twitter' },
+  { icon: Instagram, href: 'https://instagram.com/vincollins', label: 'Instagram' },
+  { icon: Linkedin, href: 'https://linkedin.com/school/vincollins', label: 'LinkedIn' },
+]
 
 // CBT Features
 const cbtFeatures = [
@@ -68,6 +69,9 @@ const cbtFeatures = [
 interface SchoolSettings {
   school_name?: string
   logo_path?: string
+  school_phone?: string
+  school_email?: string
+  school_address?: string
 }
 
 export function Footer() {
@@ -80,6 +84,22 @@ export function Footer() {
   const [showCbtInfo, setShowCbtInfo] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userRole, setUserRole] = useState<string>('student')
+  
+  // ✅ Hydration fix: Track client-side mounting
+  const [mounted, setMounted] = useState(false)
+  
+  // ✅ Dynamic contact info state
+  const [contactData, setContactData] = useState({
+    address: defaultContactInfo.address,
+    phone: defaultContactInfo.phone,
+    email: defaultContactInfo.email,
+    hours: defaultContactInfo.hours,
+  })
+
+  // ✅ Mark component as mounted on client
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Check authentication status
   useEffect(() => {
@@ -90,7 +110,6 @@ export function Footer() {
         if (session?.user) {
           setIsAuthenticated(true)
           
-          // Get user role from profiles
           const { data: profileData } = await supabase
             .from('profiles')
             .select('role')
@@ -115,7 +134,6 @@ export function Footer() {
     
     checkAuth()
     
-    // Subscribe to auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session?.user) {
         setIsAuthenticated(true)
@@ -129,17 +147,25 @@ export function Footer() {
     }
   }, [])
 
-  // Fetch school settings
+  // Fetch school settings including contact info
   useEffect(() => {
     const fetchSchoolSettings = async () => {
       try {
         const { data, error } = await supabase
           .from('school_settings')
-          .select('school_name, logo_path')
+          .select('school_name, logo_path, school_phone, school_email, school_address')
           .single()
         
         if (!error && data) {
           setSchoolSettings(data)
+          
+          // ✅ Update contact data with database values
+          setContactData({
+            address: data.school_address || defaultContactInfo.address,
+            phone: data.school_phone || defaultContactInfo.phone,
+            email: data.school_email || defaultContactInfo.email,
+            hours: defaultContactInfo.hours,
+          })
         }
       } catch (error) {
         console.error('Error fetching school settings:', error)
@@ -164,17 +190,6 @@ export function Footer() {
     }
   }
 
-  // Helper to get dashboard link based on role
-  const getDashboardLink = (role: string): string => {
-    switch (role) {
-      case 'admin': return '/admin'
-      case 'teacher': return '/staff'
-      case 'student': return '/student'
-      default: return '/portal'
-    }
-  }
-
-  // Smart Portal Navigation - For security, always go to /portal page
   const handlePortalClick = (e: React.MouseEvent) => {
     e.preventDefault()
     router.push('/portal')
@@ -183,15 +198,11 @@ export function Footer() {
   return (
     <>
       <footer className="relative bg-[#0A2472] text-white overflow-hidden">
-        {/* Simple background elements */}
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#F5A623]/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#F5A623]/5 rounded-full blur-3xl" />
-        
-        {/* Top gradient line */}
         <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#F5A623] to-transparent" />
 
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative">
-          {/* Main Footer Content */}
           <div className="py-14 lg:py-20">
             <div className="grid grid-cols-1 gap-10 md:gap-12 lg:grid-cols-12">
               {/* Brand Column */}
@@ -239,7 +250,6 @@ export function Footer() {
                   Providing quality education from Crèche to College. Nurturing future leaders with excellence, integrity, and innovation since 2022.
                 </p>
                 
-                {/* Trust Badges */}
                 <div className="flex flex-wrap gap-2">
                   <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg border border-white/20">
                     <Award className="h-3.5 w-3.5 text-[#F5A623]" />
@@ -255,20 +265,12 @@ export function Footer() {
                   </div>
                 </div>
                 
-                {/* Social Links */}
                 <div className="flex space-x-3 pt-2">
-                  {[
-                    { href: siteConfig.links.facebook, icon: Facebook, label: 'Facebook', color: 'hover:bg-[#1877f2] hover:border-[#1877f2]' },
-                    { href: siteConfig.links.twitter, icon: Twitter, label: 'Twitter', color: 'hover:bg-[#1da1f2] hover:border-[#1da1f2]' },
-                    { href: siteConfig.links.instagram, icon: Instagram, label: 'Instagram', color: 'hover:bg-[#e4405f] hover:border-[#e4405f]' }
-                  ].map((social) => (
+                  {socialLinks.map((social) => (
                     <Link 
                       key={social.label}
                       href={social.href} 
-                      className={cn(
-                        "flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/80 hover:text-white transition-all duration-300 hover:scale-110 border border-white/20",
-                        social.color
-                      )}
+                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/80 hover:text-white transition-all duration-300 hover:scale-110 border border-white/20 hover:bg-[#1877f2] hover:border-[#1877f2]"
                       aria-label={social.label}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -281,7 +283,6 @@ export function Footer() {
 
               {/* Navigation Columns */}
               <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 gap-8">
-                {/* Academics */}
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
@@ -303,7 +304,6 @@ export function Footer() {
                   </ul>
                 </div>
 
-                {/* About */}
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
@@ -324,7 +324,6 @@ export function Footer() {
                   </ul>
                 </div>
 
-                {/* Portal Access */}
                 <div>
                   <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                     <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
@@ -378,44 +377,90 @@ export function Footer() {
                 </div>
               </div>
 
-              {/* Contact Column */}
+              {/* Contact Column - FIXED: Only render dynamic content after client mount */}
               <div className="lg:col-span-3 space-y-5">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                   <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
                   Contact Us
                 </h3>
                 <ul className="space-y-4">
+                  {/* Address - Fixed hydration */}
                   <li className="flex items-start gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <MapPin className="h-4 w-4 text-[#F5A623]" />
                     </div>
-                    <span className="leading-relaxed text-white/80">{siteConfig.contact.address}</span>
+                    {mounted ? (
+                      <span className="leading-relaxed text-white/80">
+                        {contactData.address}
+                      </span>
+                    ) : (
+                      <span className="leading-relaxed text-white/80">
+                        {defaultContactInfo.address}
+                      </span>
+                    )}
                   </li>
+                  
+                  {/* Phone - Fixed hydration */}
                   <li className="flex items-center gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <Phone className="h-4 w-4 text-[#F5A623]" />
                     </div>
-                    <a href={`tel:${siteConfig.contact.phone.replace(/\s/g, '')}`} className="text-white/80 hover:text-[#F5A623] transition-colors">
-                      {siteConfig.contact.phone}
-                    </a>
+                    {mounted ? (
+                      <a 
+                        href={`tel:${contactData.phone.replace(/\s/g, '')}`} 
+                        className="text-white/80 hover:text-[#F5A623] transition-colors"
+                      >
+                        {contactData.phone}
+                      </a>
+                    ) : (
+                      <a 
+                        href={`tel:${defaultContactInfo.phone.replace(/\s/g, '')}`} 
+                        className="text-white/80 hover:text-[#F5A623] transition-colors"
+                      >
+                        {defaultContactInfo.phone}
+                      </a>
+                    )}
                   </li>
+                  
+                  {/* Email - Fixed hydration */}
                   <li className="flex items-center gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <Mail className="h-4 w-4 text-[#F5A623]" />
                     </div>
-                    <a href={`mailto:${siteConfig.contact.email}`} className="text-white/80 hover:text-[#F5A623] transition-colors">
-                      {siteConfig.contact.email}
-                    </a>
+                    {mounted ? (
+                      <a 
+                        href={`mailto:${contactData.email}`} 
+                        className="text-white/80 hover:text-[#F5A623] transition-colors"
+                      >
+                        {contactData.email}
+                      </a>
+                    ) : (
+                      <a 
+                        href={`mailto:${defaultContactInfo.email}`} 
+                        className="text-white/80 hover:text-[#F5A623] transition-colors"
+                      >
+                        {defaultContactInfo.email}
+                      </a>
+                    )}
                   </li>
+                  
+                  {/* Hours - Fixed hydration */}
                   <li className="flex items-center gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <Clock className="h-4 w-4 text-[#F5A623]" />
                     </div>
-                    <span className="text-white/80">{siteConfig.contact.hours}</span>
+                    {mounted ? (
+                      <span className="text-white/80">
+                        {contactData.hours}
+                      </span>
+                    ) : (
+                      <span className="text-white/80">
+                        {defaultContactInfo.hours}
+                      </span>
+                    )}
                   </li>
                 </ul>
 
-                {/* Contact Button */}
                 <Link 
                   href="/contact" 
                   className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg transition-all duration-300 text-sm shadow-md hover:shadow-lg group w-full justify-center"
@@ -425,7 +470,6 @@ export function Footer() {
                   <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
                 </Link>
 
-                {/* ✅ FIXED: Newsletter - Properly aligned on all screens */}
                 <div className="pt-2">
                   <p className="text-xs font-semibold text-white/90 mb-3 flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-[#F5A623] shrink-0" />
@@ -461,11 +505,15 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Bottom Bar */}
+          {/* Bottom Bar - Fixed hydration for currentYear */}
           <div className="py-6 border-t border-white/15">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-xs text-white/60 text-center md:text-left">
-                © {currentYear} Vincollins College. All rights reserved. 
+                {mounted ? (
+                  <>© {currentYear} Vincollins College. All rights reserved.</>
+                ) : (
+                  <>© 2024 Vincollins College. All rights reserved.</>
+                )}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-6">
                 {[

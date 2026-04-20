@@ -12,8 +12,6 @@ import { UserProvider } from '@/contexts/UserContext';
 import { Header } from '@/components/layout/header';
 import { Loader2 } from 'lucide-react';
 
-// ✅ Geist is now the main sans font
-// Inter as fallback
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',
@@ -55,17 +53,21 @@ export const metadata: Metadata = {
     default: 'Vincollins Schools | Affordable Quality Education in Lagos',
     template: '%s | Vincollins Schools',
   },
-  description: 'Vincollins Schools in Lagos offers Nursery (1-5 yrs), Primary (5-11 yrs), and College (11-17 yrs) education. Founded by Mrs. Joy Adaobi Nnoli to provide affordable, convenient, and excellent educational background for children.',
+  description: 'Vincollins Schools in Lagos offers Nursery (1-5 yrs), Primary (5-11 yrs), and College (11-17 yrs) education.',
   keywords: [
     'Vincollins Schools', 'schools in Lagos', 'Lagos Nigeria schools', 'Nursery school Lagos',
-    'Primary school Lagos', 'College Lagos', 'Mrs. Joy Adaobi Nnoli', 'affordable education Nigeria',
-    'best schools in Lagos', 'private schools Nigeria', 'education Nigeria', 'early years education',
-    'primary education Lagos', 'college education Nigeria'
+    'Primary school Lagos', 'College Lagos', 'affordable education Nigeria',
+    'best schools in Lagos', 'private schools Nigeria'
   ],
-  authors: [{ name: 'Mrs. Joy Adaobi Nnoli', url: 'https://vincollinsschools.org' }],
+  authors: [{ name: 'Mrs. Joy Adaobi Nnoli' }],
   creator: 'Vincollins Schools',
   publisher: 'Vincollins Schools',
-  formatDetection: { email: true, address: true, telephone: true },
+  // ✅ FIXED: Disable format detection to prevent iOS hydration errors
+  formatDetection: { 
+    email: false, 
+    address: false, 
+    telephone: false 
+  },
   robots: {
     index: true,
     follow: true,
@@ -83,13 +85,13 @@ export const metadata: Metadata = {
     url: 'https://vincollinsschools.org',
     siteName: 'Vincollins Schools',
     title: 'Vincollins Schools | Affordable Quality Education in Lagos',
-    description: 'Vincollins Schools offers Nursery (1-5 yrs), Primary (5-11 yrs), and College (11-17 yrs). Founded by financial analyst Mrs. Joy Adaobi Nnoli to impact the young generation.',
-    images: [{ url: '/images/og-image.jpg', width: 1200, height: 630, alt: 'Vincollins Schools Campus - Lagos' }],
+    description: 'Vincollins Schools offers Nursery, Primary, and College education.',
+    images: [{ url: '/images/og-image.jpg', width: 1200, height: 630, alt: 'Vincollins Schools Campus' }],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Vincollins Schools | Lagos',
-    description: 'Affordable, convenient, and excellent education for children 1-17 years in Lagos.',
+    description: 'Affordable, convenient, and excellent education.',
     images: ['/images/twitter-image.jpg'],
     creator: '@vincollins',
     site: '@vincollins',
@@ -107,7 +109,6 @@ export const metadata: Metadata = {
   alternates: { canonical: 'https://vincollinsschools.org' },
   category: 'education',
   classification: 'Private Educational Institution',
-  // ✅ FIX: Add verification for search engines
   verification: {
     google: process.env.NEXT_PUBLIC_GOOGLE_VERIFICATION,
     yandex: process.env.NEXT_PUBLIC_YANDEX_VERIFICATION,
@@ -122,13 +123,11 @@ const organizationSchema = {
   url: 'https://vincollinsschools.org',
   logo: 'https://vincollinsschools.org/images/logo.png',
   image: 'https://vincollinsschools.org/images/og-image.jpg',
-  description: 'Vincollins Schools offers affordable, convenient, and excellent educational background for children in Lagos, helping them build a blueprint to succeed.',
+  description: 'Vincollins Schools offers affordable, convenient, and excellent educational background for children in Lagos.',
   founder: {
     '@type': 'Person',
     name: 'Mrs. Joy Adaobi Nnoli',
     jobTitle: 'Proprietress',
-    alumniOf: ['Enugu State University of Technology (MBA)', 'Nnamdi Azikiwe University (Economics)'],
-    description: 'Accomplished financial/business analyst with decades of experience in the financial services sector. Established Vincollins Schools in 2019 to impact the young generation.',
   },
   address: { '@type': 'PostalAddress', addressLocality: 'Lagos', addressCountry: 'NG' },
   foundingDate: '2019',
@@ -143,8 +142,7 @@ const organizationSchema = {
           '@type': 'EducationalOccupationalProgram',
           name: 'Nursery',
           educationalCredentialAwarded: 'Early Years Foundation',
-          description: 'Early Years (1–5 Yrs). A curriculum full of activities, rhymes and real-life experiences that motivate children and provide a solid base for their future learning.',
-          image: 'https://vincollinsschools.org/images/nursery.jpg',
+          description: 'Early Years (1–5 Yrs).',
         },
       },
       {
@@ -153,8 +151,7 @@ const organizationSchema = {
           '@type': 'EducationalOccupationalProgram',
           name: 'Primary',
           educationalCredentialAwarded: 'Primary School Leaving Certificate',
-          description: 'Primary Years (5–11 yrs). Programmes designed to provide pupils with fundamental skills in reading, writing, mathematics, and to establish a solid foundation for learning.',
-          image: 'https://vincollinsschools.org/images/primary.jpg',
+          description: 'Primary Years (5–11 yrs).',
         },
       },
       {
@@ -163,8 +160,7 @@ const organizationSchema = {
           '@type': 'EducationalOccupationalProgram',
           name: 'College',
           educationalCredentialAwarded: 'Secondary School Certificate',
-          description: 'College Years (11–17 yrs). A challenging and balanced education which prepares students for adult responsibility in the modern world.',
-          image: 'https://vincollinsschools.org/images/college.jpg',
+          description: 'College Years (11–17 yrs).',
         },
       },
     ],
@@ -176,25 +172,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html 
       lang="en" 
       className={cn(
-        GeistSans.variable,        // ✅ Geist Sans - Main font
-        GeistMono.variable,        // ✅ Geist Mono - For code
-        inter.variable,            // Fallback
-        dancingScript.variable,    // Decorative
-        playfair.variable,         // Serif
+        GeistSans.variable,
+        GeistMono.variable,
+        inter.variable,
+        dancingScript.variable,
+        playfair.variable,
         "font-sans"
       )}
       suppressHydrationWarning
     >
       <head>
-        {/* ✅ FIX: Remove manual preload links - Next.js handles this automatically via metadata */}
+        {/* ✅ ADDED: Prevents iOS from auto-detecting and modifying phone numbers, emails, and addresses */}
+        <meta name="format-detection" content="telephone=no, email=no, address=no" />
+        
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://mvittkvxtasayycmzgha.supabase.co" />
+        
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
-        {/* ✅ FIX: Use 'mobile-web-app-capable' instead of deprecated 'apple-mobile-web-app-capable' */}
+        
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -203,7 +202,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body 
         className={cn(
-          GeistSans.className,      // ✅ Apply Geist as the default font
+          GeistSans.className,
           "antialiased bg-background text-foreground",
           "min-h-screen flex flex-col"
         )}

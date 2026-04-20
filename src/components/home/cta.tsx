@@ -258,7 +258,7 @@ export function CTA() {
             })}
           </motion.div>
 
-          {/* Contact cards - Updated with correct info and enhanced contrast */}
+          {/* ✅ FIXED Contact cards - Corrected phone number and added suppressHydrationWarning */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -267,7 +267,7 @@ export function CTA() {
             className="grid grid-cols-1 gap-4 border-t border-white/25 px-4 pt-8 sm:grid-cols-2 md:grid-cols-3"
           >
             <Link
-              href="tel:09121155554"
+              href="tel:+2349121155554"
               className="group rounded-2xl border border-white/20 bg-white/[0.08] p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] hover:text-white hover:border-white/35"
             >
               <div className="flex items-center gap-3">
@@ -276,7 +276,9 @@ export function CTA() {
                 </div>
                 <div>
                   <p className="text-xs text-white/70">Call Us</p>
-                  <p className="text-sm font-semibold text-white">+234 912 1155 554</p>
+                  <p className="text-sm font-semibold text-white" suppressHydrationWarning>
+                    +234 912 1155 554
+                  </p>
                 </div>
               </div>
             </Link>
@@ -291,7 +293,9 @@ export function CTA() {
                 </div>
                 <div>
                   <p className="text-xs text-white/70">Email Us</p>
-                  <p className="text-sm font-semibold text-white">vincollinscollege@gmail.com</p>
+                  <p className="text-sm font-semibold text-white" suppressHydrationWarning>
+                    vincollinscollege@gmail.com
+                  </p>
                 </div>
               </div>
             </Link>
@@ -307,7 +311,9 @@ export function CTA() {
                 </div>
                 <div>
                   <p className="text-xs text-white/70">Visit Us</p>
-                  <p className="text-sm font-semibold text-white">7/9, Lawani Street, off Ishaga Rd, Surulere, Lagos</p>
+                  <p className="text-sm font-semibold text-white" suppressHydrationWarning>
+                    7/9, Lawani Street, off Ishaga Rd, Surulere, Lagos
+                  </p>
                 </div>
               </div>
             </Link>

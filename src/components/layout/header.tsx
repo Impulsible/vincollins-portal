@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - WITH USER MANAGEMENT DROPDOWN
+// components/layout/header.tsx - WITH PUBLIC PAGES FIX
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense, forwardRef } from 'react'
@@ -69,6 +69,8 @@ interface User {
 interface SchoolSettings {
   school_name?: string
   logo_path?: string
+  school_phone?: string
+  school_email?: string
 }
 
 interface Notification {
@@ -167,7 +169,7 @@ const teacherNavigation: NavigationItem[] = [
   { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
 ]
 
-// ✅ UPDATED Admin navigation - WITH USER MANAGEMENT DROPDOWN
+// Admin navigation with User Management dropdown
 const userManagementItems = [
   { name: 'Students', href: '/admin/students', icon: GraduationCap },
   { name: 'Staff', href: '/admin/staff', icon: Briefcase },
@@ -193,13 +195,6 @@ const quickLinks = [
   { name: 'E-Library', href: '/library', icon: BookOpen },
   { name: 'Student Portal', href: '/portal', icon: GraduationCap },
   { name: 'Staff Portal', href: '/portal', icon: Users },
-]
-
-const contactInfo = [
-  { icon: MapPin, text: '123 Education Road, Ikeja, Lagos, Nigeria' },
-  { icon: Phone, text: '+234 800 123 4567' },
-  { icon: Mail, text: 'info@vincollins.edu.ng' },
-  { icon: Clock, text: 'Mon-Fri: 8:00 AM - 4:00 PM' },
 ]
 
 const socialLinks = [
@@ -264,7 +259,7 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
-// FIX: Create a wrapped button component that forwards ref properly
+// Wrapped button component that forwards ref properly
 const NotificationTrigger = forwardRef<HTMLButtonElement, React.ComponentPropsWithoutRef<'button'>>(
   (props, ref) => {
     return (
@@ -296,33 +291,51 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
-  const [userMenuOpen, setUserMenuOpen] = useState(false)  // ✅ For User Management dropdown
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
   const [showCbtInfo, setShowCbtInfo] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
   const [avatarError, setAvatarError] = useState(false)
   const profileDropdownRef = useRef<HTMLDivElement>(null)
   
-  // Notification state
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  
+  // ✅ Dynamic contact info state - fetches from database
+  const [contactInfo, setContactInfo] = useState([
+    { icon: MapPin, text: '7/9, Lawani Street, off Ishaga Rd, Surulere, Lagos' },
+    { icon: Phone, text: '+234 912 1155 554' },
+    { icon: Mail, text: 'vincollinscollege@gmail.com' },
+    { icon: Clock, text: 'Mon-Fri: 8:00 AM - 4:00 PM' },
+  ])
   
   const currentYear = new Date().getFullYear()
   const isPortalPage = pathname === '/portal'
   const isHomePage = pathname === '/'
-  const isPublicPage = pathname === '/' || pathname === '/admission' || pathname === '/schools' || pathname === '/contact'
+  const isPublicPage = pathname === '/' || 
+                       pathname === '/admission' || 
+                       pathname === '/schools' || 
+                       pathname === '/contact'
 
-  // Fetch school settings
+  // Fetch school settings including phone and email
   useEffect(() => {
     const fetchSchoolSettings = async () => {
       try {
         const { data, error } = await supabase
           .from('school_settings')
-          .select('school_name, logo_path')
+          .select('school_name, logo_path, school_phone, school_email')
           .single()
         
         if (!error && data) {
           setSchoolSettings(data)
+          
+          // ✅ Update contactInfo with database values
+          setContactInfo(prev => [
+            prev[0],  // Keep address
+            { ...prev[1], text: data.school_phone || prev[1].text },
+            { ...prev[2], text: data.school_email || prev[2].text },
+            prev[3],  // Keep hours
+          ])
         }
       } catch (error) {
         console.error('Error fetching school settings:', error)
@@ -331,10 +344,10 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     fetchSchoolSettings()
   }, [])
 
-  // FIXED: More precise active check to prevent multiple active nav items
+  // More precise active check
   const isNavActive = (href: string) => {
     if (href === '/') return pathname === '/'
-    if (href === '#') return false  // Dropdown trigger never active
+    if (href === '#') return false
     
     if (href === '/student') return pathname === '/student'
     if (href === '/staff') return pathname === '/staff'
@@ -371,7 +384,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     }
   }, [user?.id])
 
-  // SIMPLE POLLING - This works 100%
   useEffect(() => {
     if (!user?.id) return
     
@@ -560,8 +572,17 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return () => { document.body.style.overflow = 'unset' }
   }, [mobileMenuOpen])
 
+  // ✅ FIXED: Navigation logic - Public pages ALWAYS show public navigation
   const getNavigation = (): NavigationItem[] => {
-    if (isPortalPage || isHomePage || !user?.isAuthenticated) return publicNavigation
+    // Public pages, portal page, and home page ALWAYS show public navigation
+    if (isPublicPage || isPortalPage || isHomePage) {
+      return publicNavigation
+    }
+    
+    // For dashboard pages, show role-based navigation if authenticated
+    if (!user?.isAuthenticated) {
+      return publicNavigation
+    }
     
     switch (user.role) {
       case 'admin': return adminNavigation
@@ -685,7 +706,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
           <div className="flex items-center justify-between gap-1.5 sm:gap-3 lg:gap-4">
             
-            {/* LOGO - WITH DANCING SCRIPT FONT */}
+            {/* LOGO */}
             <Link href="/" className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 group flex-shrink-0">
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
@@ -744,7 +765,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
                   const isCbt = item.name === 'CBT Platform' || item.isCbt
                   
-                  // ✅ User Management Dropdown
                   if (item.isDropdown && item.dropdownItems) {
                     return (
                       <DropdownMenu key={item.name} open={userMenuOpen} onOpenChange={setUserMenuOpen}>
@@ -794,7 +814,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     )
                   }
                   
-                  // Regular navigation items
                   return (
                     <Link
                       key={item.name}
@@ -835,7 +854,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
             {/* Right Section */}
             <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-2 flex-shrink-0">
-              {/* Search Button */}
               <Button
                 variant="ghost"
                 size="icon"
@@ -845,7 +863,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                   <PopoverTrigger asChild>
@@ -964,7 +981,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </Popover>
               )}
 
-              {/* AUTHENTICATED USER - Avatar with Dropdown */}
               {user?.isAuthenticated ? (
                 <div className="relative" ref={profileDropdownRef}>
                   <Button
@@ -999,7 +1015,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     )} />
                   </Button>
 
-                  {/* Dropdown Menu */}
                   {profileOpen && (
                     <div className={cn(
                       "absolute bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50",
@@ -1008,7 +1023,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       "w-[260px] xs:w-[280px] sm:w-72 md:w-80 lg:w-80",
                       "max-w-[calc(100vw-2rem)]"
                     )}>
-                      {/* User Info Header */}
                       <div className="p-2 xs:p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
                         <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3">
                           <Avatar className={cn(
@@ -1054,7 +1068,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON */}
                       {(isHomePage || isPortalPage) && (
                         <div className="p-2 xs:p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                           <button
@@ -1078,7 +1091,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       )}
                       
-                      {/* Main Menu Items */}
                       {!isPortalPage && !isHomePage && (
                         <div className="py-1">
                           <Link 
@@ -1122,7 +1134,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       )}
                       
-                      {/* Quick Links Section */}
                       <div className="py-1 border-t border-gray-100">
                         <p className={cn(
                           "px-3 sm:px-4 py-1 sm:py-2 font-semibold text-gray-400 uppercase tracking-wider",
@@ -1172,7 +1183,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         )}
                       </div>
                       
-                      {/* Sign Out */}
                       <div className="border-t border-gray-100"></div>
                       
                       <div className="p-2">
@@ -1191,7 +1201,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   )}
                 </div>
               ) : (
-                /* PORTAL LOGIN */
                 !user?.isAuthenticated && isPublicPage && (
                   <Link href="/portal" className="hidden sm:block">
                     <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-3 sm:px-4 lg:px-6 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm">
@@ -1203,7 +1212,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 )
               )}
 
-              {/* Hamburger Menu Button */}
               <button
                 className="lg:hidden relative h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95 ml-0.5"
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -1249,7 +1257,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </div>
       </header>
 
-      {/* PREMIUM CBT PLATFORM DIALOG */}
+      {/* CBT Platform Dialog */}
       <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-[85vh] overflow-y-auto p-0">
           <div className="relative bg-gradient-to-br from-[#0A2472] via-[#1e3a8a] to-[#0A2472] p-4 sm:p-6 lg:p-8 text-white overflow-hidden">
@@ -1359,7 +1367,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               transition={{ type: 'spring', damping: 30, stiffness: 300 }}
               className="fixed top-0 right-0 h-full w-full max-w-[280px] xs:max-w-sm sm:max-w-md bg-white z-50 lg:hidden overflow-y-auto"
             >
-              {/* Header */}
               <div className="bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] text-white p-4 sm:p-5">
                 <button onClick={() => setMobileMenuOpen(false)} className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full hover:bg-white/10">
                   <X className="h-4 w-4 sm:h-5 sm:w-5" />
@@ -1415,14 +1422,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 )}
               </div>
 
-              {/* Navigation Items */}
               <div className="p-3 sm:p-4">
                 {currentNavigation.map((item) => {
                   const Icon = item.icon
                   const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
                   const isCbt = item.name === 'CBT Platform' || item.isCbt
                   
-                  // Handle dropdown items in mobile
                   if (item.isDropdown && item.dropdownItems) {
                     return (
                       <div key={item.name} className="mb-1">
@@ -1486,7 +1491,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 })}
               </div>
 
-              {/* Dashboard Link for authenticated users */}
               {user?.isAuthenticated && (isHomePage || isPortalPage) && (
                 <div className="p-3 sm:p-4 border-t">
                   <button
@@ -1499,7 +1503,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               )}
 
-              {/* Portal Login for unauthenticated users */}
               {!user?.isAuthenticated && isPublicPage && (
                 <div className="p-3 sm:p-4 border-t">
                   <Link
@@ -1513,7 +1516,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               )}
 
-              {/* Quick Switch for Dashboard Pages */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <div className="p-3 sm:p-4 border-t bg-gray-50/50">
                   <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Quick Switch</p>
@@ -1542,7 +1544,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               )}
 
-              {/* Quick Links */}
               <div className="p-3 sm:p-4 border-t">
                 <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Quick Links</p>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
@@ -1563,20 +1564,21 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               </div>
 
-              {/* Contact Us */}
+              {/* Contact Us - with suppressHydrationWarning */}
               <div className="p-3 sm:p-4 border-t">
                 <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Contact Us</p>
                 <div className="space-y-1.5 sm:space-y-2">
                   {contactInfo.map((info, idx) => (
                     <div key={idx} className="flex items-center gap-2 sm:gap-3 px-1 sm:px-2 py-1 sm:py-1.5">
                       <info.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#0A2472] shrink-0" />
-                      <span className="text-[10px] sm:text-xs text-gray-600">{info.text}</span>
+                      <span className="text-[10px] sm:text-xs text-gray-600" suppressHydrationWarning>
+                        {info.text}
+                      </span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Social Links */}
               <div className="p-3 sm:p-4 border-t">
                 <div className="flex justify-center gap-4 sm:gap-5">
                   {socialLinks.map((social, idx) => {
@@ -1595,12 +1597,10 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               </div>
 
-              {/* Copyright */}
               <div className="p-3 sm:p-4 border-t text-center">
-                <p className="text-[9px] sm:text-xs text-gray-500">© {currentYear} Vincollins College</p>
+                <p className="text-[9px] sm:text-xs text-gray-500" suppressHydrationWarning>© {currentYear} Vincollins College</p>
               </div>
 
-              {/* Sign Out */}
               {user?.isAuthenticated && (
                 <div className="p-3 sm:p-4 border-t sticky bottom-0 bg-white">
                   <Button 

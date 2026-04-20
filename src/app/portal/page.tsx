@@ -580,7 +580,7 @@ export default function LoginPage() {
                     <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-gray-400">
                       <div className="flex items-center gap-1.5">
                         <Phone className="h-3 w-3" />
-                        <span>08023013110</span>
+                        <span>+234 912 1155 554</span>
                       </div>
                       <div className="flex items-center gap-1.5">
                         <MailIcon className="h-3 w-3" />
