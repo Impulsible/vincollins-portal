@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - WITH PUBLIC PAGES FIX & IMPROVED DROPDOWNS
+// components/layout/header.tsx - WITH GO TO DASHBOARD ON ALL PUBLIC PAGES
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense, forwardRef } from 'react'
@@ -297,12 +297,11 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
   const [avatarError, setAvatarError] = useState(false)
   const profileDropdownRef = useRef<HTMLDivElement>(null)
-  const notificationRef = useRef<HTMLDivElement>(null)
   
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   
-  // ✅ Dynamic contact info state - fetches from database
+  // Dynamic contact info state - fetches from database
   const [contactInfo, setContactInfo] = useState([
     { icon: MapPin, text: '7/9, Lawani Street, off Ishaga Rd, Surulere, Lagos' },
     { icon: Phone, text: '+234 912 1155 554' },
@@ -330,7 +329,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         if (!error && data) {
           setSchoolSettings(data)
           
-          // ✅ Update contactInfo with database values
+          // Update contactInfo with database values
           setContactInfo(prev => [
             prev[0],  // Keep address
             { ...prev[1], text: data.school_phone || prev[1].text },
@@ -457,9 +456,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target as Node)) {
         setProfileOpen(false)
       }
-      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
-        setNotificationOpen(false)
-      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -576,7 +572,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return () => { document.body.style.overflow = 'unset' }
   }, [mobileMenuOpen])
 
-  // ✅ FIXED: Navigation logic - Public pages ALWAYS show public navigation
+  // FIXED: Navigation logic - Public pages ALWAYS show public navigation
   const getNavigation = (): NavigationItem[] => {
     // Public pages, portal page, and home page ALWAYS show public navigation
     if (isPublicPage || isPortalPage || isHomePage) {
@@ -867,140 +863,123 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL - Professional centered dropdown */}
+              {/* NOTIFICATION BELL */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
-                <div className="relative" ref={notificationRef}>
-                  <button
-                    onClick={() => setNotificationOpen(!notificationOpen)}
-                    className="relative h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 transition-all duration-300 flex items-center justify-center"
+                <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
+                  <PopoverTrigger asChild>
+                    <NotificationTrigger>
+                      <AnimatePresence>
+                        {unreadCount > 0 && (
+                          <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 bg-red-500 rounded-full text-white text-[8px] sm:text-[10px] lg:text-xs flex items-center justify-center font-bold"
+                          >
+                            {unreadCount > 9 ? '9+' : unreadCount}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </NotificationTrigger>
+                  </PopoverTrigger>
+                  <PopoverContent 
+                    align="end" 
+                    sideOffset={8}
+                    className="w-[320px] xs:w-[360px] sm:w-[400px] p-0 rounded-xl shadow-2xl border border-gray-100"
                   >
-                    <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
-                    <AnimatePresence>
-                      {unreadCount > 0 && (
-                        <motion.span
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          exit={{ scale: 0 }}
-                          className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 bg-red-500 rounded-full text-white text-[8px] sm:text-[10px] lg:text-xs flex items-center justify-center font-bold"
-                        >
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                  </button>
-
-                  {/* Professional Centered Notification Dropdown */}
-                  <AnimatePresence>
-                    {notificationOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute right-0 sm:right-0 top-full mt-2 w-[85vw] sm:w-96 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
-                      >
-                        {/* Header */}
-                        <div className="p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-gray-50">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
-                              <p className="text-xs text-gray-500 mt-0.5">
-                                {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
-                              </p>
-                            </div>
-                            {unreadCount > 0 && (
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={markAllAsRead}
-                                className="text-xs h-7 text-blue-600 hover:text-blue-700"
-                              >
-                                Mark all read
-                              </Button>
-                            )}
-                          </div>
+                    <div className="p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-gray-50 rounded-t-xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
+                          <p className="text-xs text-gray-500">
+                            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up!'}
+                          </p>
                         </div>
-                        
-                        {/* Notification List */}
-                        <ScrollArea className="max-h-[400px] sm:max-h-[450px]">
-                          {notifications.length === 0 ? (
-                            <div className="p-8 text-center">
-                              <div className="h-12 w-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <Bell className="h-6 w-6 text-gray-400" />
-                              </div>
-                              <p className="text-sm text-gray-500">No notifications yet</p>
-                              <p className="text-xs text-gray-400 mt-1">We'll notify you when something happens</p>
-                            </div>
-                          ) : (
-                            <div className="divide-y divide-gray-100">
-                              {notifications.map((notification) => (
-                                <motion.div
-                                  key={notification.id}
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  className={cn(
-                                    "p-3 sm:p-4 hover:bg-gray-50 transition-colors cursor-pointer group relative",
-                                    !notification.read && "bg-blue-50/50"
-                                  )}
-                                  onClick={() => handleNotificationClick(notification)}
-                                >
-                                  <div className="flex gap-3">
-                                    <div className="shrink-0 mt-0.5">
-                                      <div className="h-8 w-8 rounded-full bg-gray-100 flex items-center justify-center">
-                                        {getNotificationIcon(notification.type)}
-                                      </div>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <p className={cn(
-                                          "text-sm font-medium",
-                                          !notification.read ? "text-gray-900" : "text-gray-600"
-                                        )}>
-                                          {notification.title}
-                                        </p>
-                                        <span className="text-[10px] text-gray-400 shrink-0 whitespace-nowrap">
-                                          {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
-                                        </span>
-                                      </div>
-                                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                                        {notification.message}
-                                      </p>
-                                      {!notification.read && (
-                                        <div className="mt-1">
-                                          <span className="inline-block h-1.5 w-1.5 bg-blue-500 rounded-full" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  <button
-                                    className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-gray-200"
-                                    onClick={(e) => deleteNotification(notification.id, e)}
-                                  >
-                                    <Trash2 className="h-3 w-3 text-gray-400 hover:text-red-500" />
-                                  </button>
-                                </motion.div>
-                              ))}
-                            </div>
-                          )}
-                        </ScrollArea>
-                        
-                        {/* Footer */}
-                        <div className="p-2 border-t border-gray-100 bg-gray-50">
+                        {unreadCount > 0 && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
-                            className="w-full text-xs text-gray-600 hover:text-gray-900"
-                            onClick={handleViewAllNotifications}
+                            onClick={markAllAsRead}
+                            className="text-xs h-7"
                           >
-                            View All Notifications
-                            <ChevronRight className="ml-1 h-3 w-3" />
+                            Mark all read
                           </Button>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <ScrollArea className="max-h-[400px] sm:max-h-[450px]">
+                      {notifications.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <Bell className="h-10 w-10 text-gray-300 mx-auto mb-3" />
+                          <p className="text-sm text-gray-500">No notifications yet</p>
+                          <p className="text-xs text-gray-400 mt-1">We'll notify you when something happens</p>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                      ) : (
+                        <div className="divide-y divide-gray-100">
+                          {notifications.map((notification) => (
+                            <motion.div
+                              key={notification.id}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className={cn(
+                                "p-3 sm:p-4 hover:bg-gray-50 transition-colors cursor-pointer group relative",
+                                !notification.read && "bg-blue-50/50"
+                              )}
+                              onClick={() => handleNotificationClick(notification)}
+                            >
+                              <div className="flex gap-3">
+                                <div className="shrink-0 mt-0.5">
+                                  {getNotificationIcon(notification.type)}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-start justify-between gap-2">
+                                    <p className={cn(
+                                      "text-sm font-medium truncate",
+                                      !notification.read ? "text-gray-900" : "text-gray-600"
+                                    )}>
+                                      {notification.title}
+                                    </p>
+                                    <span className="text-[10px] text-gray-400 shrink-0">
+                                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                                    {notification.message}
+                                  </p>
+                                </div>
+                              </div>
+                              
+                              {!notification.read && (
+                                <div className="ml-7 mt-1">
+                                  <span className="inline-block h-2 w-2 bg-blue-500 rounded-full" />
+                                </div>
+                              )}
+                              
+                              <button
+                                className="absolute right-3 top-3 opacity-0 group-hover:opacity-100 transition-opacity"
+                                onClick={(e) => deleteNotification(notification.id, e)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+                              </button>
+                            </motion.div>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                    
+                    <div className="p-2 border-t border-gray-100">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full text-xs"
+                        onClick={handleViewAllNotifications}
+                      >
+                        View All Notifications
+                      </Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               )}
 
               {/* AUTHENTICATED USER - Avatar with Dropdown */}
@@ -1038,157 +1017,197 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                     )} />
                   </Button>
 
-                  {/* Profile Dropdown - Professional Design */}
-                  <AnimatePresence>
-                    {profileOpen && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        className="absolute right-0 top-full mt-2 w-[280px] xs:w-80 bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50"
-                      >
-                        {/* User Info Header */}
-                        <div className="p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-                              {user.avatar && !avatarError ? (
-                                <AvatarImage 
-                                  src={user.avatar} 
-                                  alt={user.name}
-                                  onError={handleAvatarError}
-                                  className="object-cover"
-                                />
-                              ) : null}
-                              <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold text-base">
-                                {getUserInitials()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-gray-900 truncate">
-                                {user.name}
-                              </p>
-                              <p className="text-xs text-gray-500 truncate">
-                                {user.email}
-                              </p>
-                              <Badge className={cn(
-                                "mt-1 text-white text-[10px]",
-                                getRoleBadgeColor(user.role)
-                              )}>
-                                {getRoleDisplayName(user.role)}
-                              </Badge>
-                            </div>
+                  {profileOpen && (
+                    <div className={cn(
+                      "absolute bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50",
+                      "top-full mt-2",
+                      "right-0",
+                      "w-[260px] xs:w-[280px] sm:w-72 md:w-80 lg:w-80",
+                      "max-w-[calc(100vw-2rem)]"
+                    )}>
+                      {/* User Info Header */}
+                      <div className="p-2 xs:p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3">
+                          <Avatar className={cn(
+                            "ring-2 ring-primary/20",
+                            "h-10 w-10 xs:h-11 xs:w-11 sm:h-12 sm:w-12 lg:h-14 lg:w-14"
+                          )}>
+                            {user.avatar && !avatarError ? (
+                              <AvatarImage 
+                                src={user.avatar} 
+                                alt={user.name}
+                                onError={handleAvatarError}
+                                className="object-cover"
+                              />
+                            ) : null}
+                            <AvatarFallback className={cn(
+                              "bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold",
+                              "text-sm xs:text-base sm:text-lg"
+                            )}>
+                              {getUserInitials()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              "font-semibold text-gray-900 truncate",
+                              "text-xs xs:text-sm sm:text-base"
+                            )}>
+                              {user.name}
+                            </p>
+                            <p className={cn(
+                              "text-gray-500 truncate",
+                              "text-[10px] xs:text-xs sm:text-sm"
+                            )}>
+                              {user.email}
+                            </p>
+                            <Badge className={cn(
+                              "mt-1 xs:mt-1.5 text-white",
+                              "text-[10px] xs:text-xs",
+                              getRoleBadgeColor(user.role)
+                            )}>
+                              {getRoleDisplayName(user.role)}
+                            </Badge>
                           </div>
                         </div>
-                        
-                        {/* Dashboard Button - Shows on Public Pages (Home, Admission, Contact, Schools) */}
-                        {(isPublicPage || isHomePage || isPortalPage) && (
-                          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
-                            <button
-                              onClick={goToDashboard}
-                              className="w-full px-3 py-2 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623] text-[#0A2472] rounded-lg transition-all duration-300 flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg text-sm"
-                            >
-                              <LayoutDashboard className="h-4 w-4" />
-                              <span>
-                                {user?.role === 'admin' ? 'Admin Dashboard' : 
-                                 user?.role === 'teacher' ? 'Teacher Dashboard' : 
-                                 'Student Dashboard'}
-                              </span>
-                              <ArrowRight className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        )}
-                        
-                        {/* Main Menu Items */}
+                      </div>
+                      
+                      {/* ✅ DASHBOARD BUTTON - Shows on ALL Public Pages (Home, Admission, Schools, Contact) */}
+                      {(isPublicPage || isHomePage || isPortalPage) && (
+                        <div className="p-2 xs:p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
+                          <button
+                            onClick={goToDashboard}
+                            className={cn(
+                              "w-full px-2 xs:px-3 py-1.5 xs:py-2 sm:py-2.5",
+                              "bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/95 hover:to-[#F5A623]",
+                              "text-[#0A2472] rounded-lg transition-all duration-300",
+                              "flex items-center justify-center gap-2 font-semibold shadow-md hover:shadow-lg",
+                              "text-xs xs:text-sm"
+                            )}
+                          >
+                            <LayoutDashboard className="h-3.5 w-3.5 xs:h-4 xs:w-4" />
+                            <span>
+                              {user?.role === 'admin' ? 'Admin Dashboard' : 
+                               user?.role === 'teacher' ? 'Teacher Dashboard' : 
+                               'Student Dashboard'}
+                            </span>
+                            <ArrowRight className="h-3.5 w-3.5 xs:h-4 xs:w-4 ml-1" />
+                          </button>
+                        </div>
+                      )}
+                      
+                      {/* Main Menu Items */}
+                      {!isPortalPage && !isHomePage && !isPublicPage && (
                         <div className="py-1">
                           <Link 
                             href={user.role === 'student' ? '/student/profile' : user.role === 'admin' ? '/admin/settings' : '/staff'} 
-                            className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 text-sm"
+                            className={cn(
+                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
+                              "text-xs xs:text-sm"
+                            )}
                             onClick={() => setProfileOpen(false)}
                           >
-                            <User className="h-4 w-4 text-gray-400" />
+                            <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
                             <span>My Profile</span>
                           </Link>
                           
                           <Link 
                             href={user.role === 'student' ? '/student/notifications' : '/staff/notifications'}
-                            className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 text-sm"
+                            className={cn(
+                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
+                              "text-xs xs:text-sm"
+                            )}
                             onClick={() => setProfileOpen(false)}
                           >
-                            <Bell className="h-4 w-4 text-gray-400" />
+                            <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
                             <span>Notifications</span>
                             {unreadCount > 0 && (
-                              <Badge className="ml-auto bg-red-500 text-white text-[10px]">{unreadCount}</Badge>
+                              <Badge className="ml-auto bg-red-500 text-white text-[10px] xs:text-xs">{unreadCount}</Badge>
                             )}
                           </Link>
                           
                           <Link 
                             href={user.role === 'student' ? '/student/settings' : user.role === 'admin' ? '/admin/settings' : '/staff/settings'} 
-                            className="w-full px-4 py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 text-sm"
+                            className={cn(
+                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
+                              "text-xs xs:text-sm"
+                            )}
                             onClick={() => setProfileOpen(false)}
                           >
-                            <Settings className="h-4 w-4 text-gray-400" />
+                            <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
                             <span>Settings</span>
                           </Link>
                         </div>
+                      )}
+                      
+                      {/* Quick Links Section */}
+                      <div className="py-1 border-t border-gray-100">
+                        <p className={cn(
+                          "px-3 sm:px-4 py-1 sm:py-2 font-semibold text-gray-400 uppercase tracking-wider",
+                          "text-[9px] xs:text-[10px] sm:text-xs"
+                        )}>
+                          Quick Links
+                        </p>
                         
-                        {/* Quick Links Section */}
-                        <div className="py-1 border-t border-gray-100">
-                          <p className="px-4 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
-                            Quick Links
-                          </p>
-                          
-                          {!isPublicPage && !isHomePage && (
-                            <>
-                              <Link 
-                                href="/" 
-                                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group text-sm"
-                                onClick={() => setProfileOpen(false)}
-                              >
-                                <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center">
-                                  <Home className="h-3.5 w-3.5 text-blue-500" />
-                                </div>
-                                <div className="flex-1">
-                                  <p className="font-medium">Home Page</p>
-                                  <p className="text-[10px] text-gray-400">Return to main website</p>
-                                </div>
-                                <ChevronRight className="h-3 w-3 text-gray-300" />
-                              </Link>
-                              
-                              <Link 
-                                href="/portal" 
-                                className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group text-sm"
-                                onClick={() => setProfileOpen(false)}
-                              >
-                                <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-                                  <KeyRound className="h-3.5 w-3.5 text-emerald-500" />
-                                </div>
-                                <div className="flex-1">
-                                  <p className="font-medium">Portal Page</p>
-                                  <p className="text-[10px] text-gray-400">Login or switch account</p>
-                                </div>
-                                <ChevronRight className="h-3 w-3 text-gray-300" />
-                              </Link>
-                            </>
-                          )}
-                        </div>
-                        
-                        {/* Sign Out */}
-                        <div className="border-t border-gray-100 p-2">
-                          <button 
-                            onClick={handleLogoutClick}
-                            className="w-full px-3 py-2 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3 text-sm"
+                        {pathname !== '/' && (
+                          <Link 
+                            href="/" 
+                            className={cn(
+                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group",
+                              "text-xs xs:text-sm"
+                            )}
+                            onClick={() => setProfileOpen(false)}
                           >
-                            <LogOut className="h-4 w-4" />
-                            <span>Sign Out</span>
-                          </button>
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                            <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                              <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-xs xs:text-sm">Home Page</p>
+                              <p className="text-[8px] xs:text-[10px] text-gray-400">Return to main website</p>
+                            </div>
+                            <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                          </Link>
+                        )}
+                        
+                        {pathname !== '/portal' && (
+                          <Link 
+                            href="/portal" 
+                            className={cn(
+                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group",
+                              "text-xs xs:text-sm"
+                            )}
+                            onClick={() => setProfileOpen(false)}
+                          >
+                            <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                              <KeyRound className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="font-medium text-xs xs:text-sm">Portal Page</p>
+                              <p className="text-[8px] xs:text-[10px] text-gray-400">Login or switch account</p>
+                            </div>
+                            <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                          </Link>
+                        )}
+                      </div>
+                      
+                      {/* Sign Out */}
+                      <div className="border-t border-gray-100"></div>
+                      
+                      <div className="p-2">
+                        <button 
+                          onClick={handleLogoutClick}
+                          className={cn(
+                            "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3",
+                            "text-xs xs:text-sm"
+                          )}
+                        >
+                          <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          <span>Sign Out</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
-                /* PORTAL LOGIN */
                 !user?.isAuthenticated && isPublicPage && (
                   <Link href="/portal" className="hidden sm:block">
                     <Button className="bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 hover:from-[#F5A623]/90 hover:to-[#F5A623] text-[#0A2472] rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group px-3 sm:px-4 lg:px-6 py-1.5 sm:py-2 font-semibold text-xs sm:text-sm">
@@ -1337,7 +1356,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </DialogContent>
       </Dialog>
 
-      {/* MOBILE MENU - Keep existing code */}
+      {/* MOBILE MENU */}
       <AnimatePresence>
         {mobileMenuOpen && (
           <>
@@ -1480,6 +1499,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 })}
               </div>
 
+              {/* ✅ Dashboard Button in Mobile Menu - Shows on ALL Public Pages */}
               {user?.isAuthenticated && (isPublicPage || isPortalPage || isHomePage) && (
                 <div className="p-3 sm:p-4 border-t">
                   <button
@@ -1549,6 +1569,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 </div>
               </div>
 
+              {/* Contact Us */}
               <div className="p-3 sm:p-4 border-t">
                 <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Contact Us</p>
                 <div className="space-y-1.5 sm:space-y-2">
