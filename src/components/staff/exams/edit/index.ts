@@ -1,0 +1,10 @@
+// src/components/staff/exams/edit/index.ts
+export { EditExamPage } from './EditExamPage'
+export { ExamHeader } from './ExamHeader'
+export { ExamDetailsTab } from './ExamDetailsTab'
+export { ObjectiveQuestionsTab } from './ObjectiveQuestionsTab'
+export { TheoryQuestionsTab } from './TheoryQuestionsTab'
+export { PreviewTab } from './PreviewTab'
+export { QuestionFormDialog } from './QuestionFormDialog'
+export { TheoryQuestionFormDialog } from './TheoryQuestionFormDialog'
+export type * from './types'

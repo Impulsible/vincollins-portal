@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/exams/page.tsx - FIXED: 2025/2026 as current term + multiple years
+// app/student/exams/page.tsx - FIXED: Term progress shows database values
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -140,7 +140,7 @@ const calculateGrade = (percentage: number): { grade: string; color: string } =>
   return { grade: 'F', color: 'text-red-600' }
 }
 
-// ✅ FIXED: Always use 2025/2026 as current session
+// ✅ CURRENT SESSION CONSTANTS
 const CURRENT_SESSION = '2025/2026'
 
 const getCurrentTermSession = () => {
@@ -208,12 +208,10 @@ export default function StudentExamsPage() {
     return 'available'
   }
 
-  // ✅ FIXED: Generate terms with 2025/2026 as current + other years
   const loadAvailableTerms = useCallback(async (studentId: string) => {
     try {
       const termsMap = new Map<string, { term: string; session_year: string; label: string }>()
       
-      // Source 1: Get terms from student_term_progress
       const { data: progressData } = await supabase
         .from('student_term_progress')
         .select('term, session_year')
@@ -235,7 +233,6 @@ export default function StudentExamsPage() {
         })
       }
 
-      // Source 2: Get terms from exams table
       const { data: examTerms } = await supabase
         .from('exams')
         .select('term, session_year')
@@ -257,8 +254,6 @@ export default function StudentExamsPage() {
         })
       }
 
-      // ✅ Source 3: Generate default academic years
-      // Available sessions: 2023/2024, 2024/2025, 2025/2026, 2026/2027
       const sessions = ['2023/2024', '2024/2025', '2025/2026', '2026/2027']
       const allTerms = ['first', 'second', 'third']
       
@@ -275,10 +270,8 @@ export default function StudentExamsPage() {
         })
       })
 
-      // Convert map to array and sort
       let terms = Array.from(termsMap.values())
       
-      // Sort: latest session first, then term order (first, second, third)
       terms.sort((a, b) => {
         const sessionA = parseInt(a.session_year.split('/')[0])
         const sessionB = parseInt(b.session_year.split('/')[0])
@@ -289,7 +282,6 @@ export default function StudentExamsPage() {
 
       setAvailableTerms(terms)
       
-      // ✅ Set default selected term to current term (2025/2026)
       if (terms.length > 0 && !selectedTermSession) {
         const current = getCurrentTermSession()
         const currentTerm = terms.find(t => 
@@ -298,13 +290,11 @@ export default function StudentExamsPage() {
         if (currentTerm) {
           setSelectedTermSession({ term: currentTerm.term, session_year: currentTerm.session_year })
         } else {
-          // Fallback to first available term
           setSelectedTermSession({ term: terms[0].term, session_year: terms[0].session_year })
         }
       }
     } catch (error) {
       console.error('Error loading available terms:', error)
-      // ✅ Fallback: Create default terms with 2025/2026
       const sessions = ['2024/2025', '2025/2026']
       const defaultTerms: Array<{ term: string; session_year: string; label: string }> = []
       
@@ -368,11 +358,8 @@ export default function StudentExamsPage() {
       }
 
       setProfile(studentProfile)
-      
-      // Load available terms first
       await loadAvailableTerms(studentProfile.id)
 
-      // Determine which term/session to load
       let targetTerm = term
       let targetSession = session
       
@@ -387,7 +374,7 @@ export default function StudentExamsPage() {
         }
       }
 
-      // Load term progress
+      // ✅ FETCH TERM PROGRESS FROM DATABASE
       const { data: progressData } = await supabase
         .from('student_term_progress')
         .select('*')
@@ -396,15 +383,20 @@ export default function StudentExamsPage() {
         .eq('session_year', targetSession)
         .maybeSingle()
 
+      // ✅ USE DATABASE VALUES FOR ACCURATE TERM PROGRESS
+      const dbCompletedExams = progressData?.completed_exams || 0
+      const dbAverageScore = progressData?.average_score || 0
+      const dbGrade = progressData?.grade
+
       if (progressData) {
         setTermProgress(progressData)
-        const gradeInfo = calculateGrade(progressData.average_score || 0)
+        const gradeInfo = calculateGrade(dbAverageScore)
         setStats(prev => ({
           ...prev,
           totalSubjects: progressData.total_subjects || totalSubjects,
-          completed: progressData.completed_exams || 0,
-          averageScore: progressData.average_score || 0,
-          currentGrade: progressData.grade || gradeInfo.grade,
+          completed: dbCompletedExams,
+          averageScore: dbAverageScore,
+          currentGrade: dbGrade || gradeInfo.grade,
           gradeColor: gradeInfo.color,
           termName: TERM_NAMES[targetTerm] || targetTerm,
           sessionYear: targetSession
@@ -423,7 +415,7 @@ export default function StudentExamsPage() {
         }))
       }
 
-      // Load exams for the selected term
+      // ✅ LOAD EXAMS - Staff published exams appear here
       const { data: examsData } = await supabase
         .from('exams')
         .select('*')
@@ -446,7 +438,7 @@ export default function StudentExamsPage() {
       const subjects = [...new Set(classFilteredExams.map(e => e.subject))]
       setAvailableSubjects(subjects.sort())
 
-      // Load exam attempts
+      // ✅ LOAD EXAM ATTEMPTS
       const { data: attemptsData } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -469,17 +461,17 @@ export default function StudentExamsPage() {
       setExamAttempts(attemptsMap)
 
       const now = new Date()
-      const avgScore = completedCount > 0 ? Math.round(totalScore / completedCount) : 0
-      const gradeInfo = calculateGrade(avgScore)
+      const gradeInfo = calculateGrade(dbAverageScore)
 
+      // ✅ UPDATE STATS WITH DATABASE VALUES
       setStats(prev => ({
         ...prev,
         available: classFilteredExams.filter(e => isExamAvailable(e, attemptsMap)).length,
-        completed: completedCount,
+        completed: dbCompletedExams,  // ← FROM DATABASE
         upcoming: classFilteredExams.filter(e => e.starts_at && new Date(e.starts_at) > now).length,
-        averageScore: avgScore,
-        currentGrade: completedCount > 0 ? gradeInfo.grade : prev.currentGrade,
-        gradeColor: completedCount > 0 ? gradeInfo.color : prev.gradeColor
+        averageScore: dbAverageScore,  // ← FROM DATABASE
+        currentGrade: dbCompletedExams > 0 ? (dbGrade || gradeInfo.grade) : 'N/A',
+        gradeColor: dbCompletedExams > 0 ? gradeInfo.color : 'text-gray-400'
       }))
 
     } catch (error) {
@@ -490,21 +482,18 @@ export default function StudentExamsPage() {
     }
   }, [router, loadAvailableTerms, selectedTermSession])
 
-  // Initial load
   useEffect(() => {
     if (mounted) {
       loadData()
     }
   }, [mounted])
 
-  // Handle term/session change
   const handleTermSessionChange = async (value: string) => {
     const [term, session] = value.split('|')
     setSelectedTermSession({ term, session_year: session })
     await loadData(term, session)
   }
 
-  // Filter exams when subject or search changes
   useEffect(() => {
     let filtered = [...exams]
     if (selectedSubject !== 'all') {

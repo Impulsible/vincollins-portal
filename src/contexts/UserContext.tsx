@@ -1,123 +1,77 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+// contexts/UserContext.tsx
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
-interface UserProfile {
+interface User {
   id: string
-  full_name: string
-  email: string
-  role: 'admin' | 'teacher' | 'student' | 'staff'
+  email?: string
+  full_name?: string
+  role?: string
   photo_url?: string
-  class?: string
-  department?: string
 }
 
 interface UserContextType {
-  user: UserProfile | null
+  user: User | null
   loading: boolean
+  signOut: () => Promise<void>
   refreshUser: () => Promise<void>
 }
 
-const UserContext = createContext<UserContextType>({
-  user: null,
-  loading: true,
-  refreshUser: async () => {},
-})
+const UserContext = createContext<UserContextType | null>(null)
 
-export function useUser() {
-  return useContext(UserContext)
-}
-
-export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null)
+export function UserProvider({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const router = useRouter()
 
   const fetchUser = async () => {
     try {
-      setLoading(true)
       const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
+      if (!session?.user) {
         setUser(null)
         return
       }
 
-      const { data: { user: authUser } } = await supabase.auth.getUser()
-      
-      if (!authUser) {
-        setUser(null)
-        return
-      }
-
-      // First try to get profile from profiles table
-      const { data: profile, error } = await supabase
+      const { data } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', authUser.id)
-        .maybeSingle()
+        .eq('id', session.user.id)
+        .single()
 
-      if (profile) {
+      if (data) {
         setUser({
-          id: profile.id,
-          full_name: profile.full_name,
-          email: profile.email,
-          role: profile.role,
-          photo_url: profile.photo_url,
-          class: profile.class,
-          department: profile.department,
+          id: data.id,
+          email: data.email,
+          full_name: data.full_name,
+          role: data.role,
+          photo_url: data.photo_url
         })
-      } else {
-        // If no profile exists, create one
-        const fullName = authUser.user_metadata?.full_name || authUser.email?.split('@')[0] || 'User'
-        const newProfile = {
-          id: authUser.id,
-          full_name: fullName,
-          email: authUser.email,
-          role: 'student',
-          created_at: new Date().toISOString(),
-        }
-        
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert(newProfile)
-        
-        if (!insertError) {
-          setUser({
-            id: authUser.id,
-            full_name: fullName,
-            email: authUser.email || '',
-            role: 'student',
-          })
-        } else {
-          // Fallback to auth user data
-          setUser({
-            id: authUser.id,
-            full_name: fullName,
-            email: authUser.email || '',
-            role: 'student',
-          })
-        }
       }
     } catch (error) {
       console.error('Error fetching user:', error)
-      setUser(null)
     } finally {
       setLoading(false)
     }
   }
 
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setUser(null)
+    router.push('/portal')
+  }
+
+  const refreshUser = async () => {
+    await fetchUser()
+  }
+
   useEffect(() => {
     fetchUser()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        fetchUser()
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null)
-        setLoading(false)
-      }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(() => {
+      fetchUser()
     })
 
     return () => {
@@ -126,8 +80,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <UserContext.Provider value={{ user, loading, refreshUser: fetchUser }}>
+    <UserContext.Provider value={{ user, loading, signOut, refreshUser }}>
       {children}
     </UserContext.Provider>
   )
+}
+
+export function useUser() {
+  const context = useContext(UserContext)
+  if (!context) {
+    throw new Error('useUser must be used within a UserProvider')
+  }
+  return context
 }

@@ -1,0 +1,1 @@
+export { ResultsTab } from './ResultsTab'

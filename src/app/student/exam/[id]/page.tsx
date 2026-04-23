@@ -1,47 +1,52 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-expressions */
+/* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/exam/[id]/page.tsx - WITH STRICT SECURITY AND AUTO-SUBMIT
+/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
+// app/student/exam/[id]/page.tsx - PROFESSIONAL CBT INTERFACE
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { getUserSession } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Separator } from '@/components/ui/separator'
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel,
-  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
-  AlertDialogHeader, AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
   Clock, ChevronLeft, ChevronRight, Send, Flag,
-  CheckCircle, XCircle, AlertTriangle, Maximize2,
-  Lock, Loader2, Monitor, Award, User, Shield,
-  BookOpen, FileText, HelpCircle, ArrowLeft,
-  RotateCcw, Wifi, WifiOff, Grid3x3,
-  AlertCircle, Volume2, VolumeX, Brain,
-  CheckCheck, List, Target
+  CheckCircle, XCircle, AlertTriangle, Maximize2, Home,
+  Grid, Lock, Loader2, Award, User, Shield,
+  BookOpen, CheckCheck, Eye, FileText, Calendar,
+  Wifi, WifiOff, Save, RotateCcw, Camera, AlertCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { motion, AnimatePresence } from 'framer-motion'
+import Image from 'next/image'
+// FIXED: Changed to named import
+import { RichTextEditor } from '@/components/ui/rich-text-editor'
+
+// ============================================
+// CURRENT TERM CONSTANTS
+// ============================================
+const CURRENT_TERM = 'third'
+const CURRENT_SESSION = '2025/2026'
+const TERM_NAMES: Record<string, string> = {
+  first: 'First Term',
+  second: 'Second Term',
+  third: 'Third Term'
+}
 
 const TAB_SWITCH_LIMIT = 3
 const FULLSCREEN_EXIT_LIMIT = 3
-const AUTO_SAVE_INTERVAL = 30000
+const AUTO_SAVE_INTERVAL = 30000 // 30 seconds
 
 interface Question {
   id: string
@@ -54,8 +59,6 @@ interface Question {
   points?: number
   marks?: number
   order_number?: number
-  original_options?: { text: string; letter: string }[]
-  correct_letter?: string
 }
 
 interface Exam {
@@ -73,9 +76,8 @@ interface Exam {
   theory_questions?: Question[]
   teacher_name?: string
   max_attempts?: number
-  created_by?: string
-  randomize_questions?: boolean
-  randomize_options?: boolean
+  term?: string
+  session_year?: string
 }
 
 interface StudentProfile {
@@ -88,672 +90,144 @@ interface StudentProfile {
   vin_id?: string
 }
 
-// =============================================
-// QUESTION RANDOMIZATION FUNCTION
-// =============================================
-const randomizeQuestions = (questions: Question[], randomizeOptions: boolean = true): Question[] => {
-  const shuffled = [...questions]
-  
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
-  }
-  
-  if (randomizeOptions) {
-    shuffled.forEach(q => {
-      if (q.type !== 'theory' && q.options) {
-        const correctAnswer = q.correct_answer || q.answer || ''
-        const optionsWithLetters = q.options.map((opt, idx) => ({
-          text: opt,
-          letter: String.fromCharCode(65 + idx)
-        }))
-        for (let i = optionsWithLetters.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1))
-          ;[optionsWithLetters[i], optionsWithLetters[j]] = [optionsWithLetters[j], optionsWithLetters[i]]
-        }
-        q.options = optionsWithLetters.map(opt => opt.text)
-        q.original_options = optionsWithLetters
-        q.correct_answer = correctAnswer
-      }
-    })
-  }
-  
-  return shuffled
-}
-
-export default function StudentExamPage() {
+export default function TakeExamPage() {
   const router = useRouter()
   const params = useParams()
   const examId = params.id as string
   
-  // Core states
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exam, setExam] = useState<Exam | null>(null)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
-  const [objectiveQuestions, setObjectiveQuestions] = useState<Question[]>([])
-  const [theoryQuestions, setTheoryQuestions] = useState<Question[]>([])
   const [allQuestions, setAllQuestions] = useState<Question[]>([])
   
-  // Exam state
   const [currentIndex, setCurrentIndex] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
   const [flaggedQuestions, setFlaggedQuestions] = useState<Set<string>>(new Set())
   const [timeLeft, setTimeLeft] = useState(0)
   const [examStarted, setExamStarted] = useState(false)
   const [examEnded, setExamEnded] = useState(false)
-  const [activeTab, setActiveTab] = useState('objective')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
-  const [showTimeWarning, setShowTimeWarning] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
-  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
-  const [soundEnabled, setSoundEnabled] = useState(true)
   
-  // Submission states
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   const [examResult, setExamResult] = useState<any>(null)
   const [showResultDialog, setShowResultDialog] = useState(false)
   const [showInstructions, setShowInstructions] = useState(true)
   const [startingExam, setStartingExam] = useState(false)
+  const [showQuestionPalette, setShowQuestionPalette] = useState(false)
   
-  // Attempt tracking
   const [attemptId, setAttemptId] = useState<string | null>(null)
+  const [existingAttempt, setExistingAttempt] = useState<any>(null)
   const [attemptsUsed, setAttemptsUsed] = useState(0)
   const [hasCompletedAttempt, setHasCompletedAttempt] = useState(false)
-  const [canRetake, setCanRetake] = useState(false)
-  const [existingAttempt, setExistingAttempt] = useState<any>(null)
   
-  // Security states
   const [tabSwitches, setTabSwitches] = useState(0)
   const [fullscreenExits, setFullscreenExits] = useState(0)
+  const [fullscreen, setFullscreen] = useState(false)
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false)
   const [securityViolated, setSecurityViolated] = useState(false)
-  const [showSecurityWarning, setShowSecurityWarning] = useState(false)
-  const [newTabAttempts, setNewTabAttempts] = useState(0)
   
-  // Navigation warning state
-  const [showLeaveWarning, setShowLeaveWarning] = useState(false)
-  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  const [isOnline, setIsOnline] = useState(true)
+  const [autoSaving, setAutoSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [showResumeDialog, setShowResumeDialog] = useState(false)
+  const [resumeData, setResumeData] = useState<any>(null)
+  
+  const [currentTermInfo] = useState({ term: CURRENT_TERM, session: CURRENT_SESSION })
   
   const loadedRef = useRef(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const isSubmittingRef = useRef(false)
   const examEndedRef = useRef(false)
-  const soundRef = useRef<HTMLAudioElement | null>(null)
-  const newWindowDetectorRef = useRef<number | null>(null)
 
-  // Computed values
+  const answeredCount = Object.keys(answers).length
   const currentQuestion = allQuestions[currentIndex]
   const isFlagged = currentQuestion ? flaggedQuestions.has(currentQuestion.id) : false
-  const answeredCount = Object.keys(answers).length
   const progressPercentage = allQuestions.length > 0 ? (answeredCount / allQuestions.length) * 100 : 0
   const unansweredCount = allQuestions.length - answeredCount
-  const objectiveAnswered = objectiveQuestions.filter(q => answers[q.id]).length
-  const theoryAnswered = theoryQuestions.filter(q => answers[q.id]).length
 
-  // Helper functions
-  const formatTime = (s: number) => {
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const sec = s % 60
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
-    return `${m}:${sec.toString().padStart(2, '0')}`
-  }
-
-  const getInitials = () => {
-    if (!profile?.full_name) return 'ST'
-    const parts = profile.full_name.split(' ')
-    return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : profile.full_name.slice(0, 2).toUpperCase()
-  }
-
-  const getQuestionStatus = (q: Question, idx: number) => {
-    if (answers[q.id]) return 'answered'
-    if (flaggedQuestions.has(q.id)) return 'flagged'
-    if (idx === currentIndex) return 'current'
-    return 'not-answered'
-  }
-
-  const navigateToQuestion = (index: number) => {
-    if (index >= 0 && index < allQuestions.length) {
-      setCurrentIndex(index)
-      const question = allQuestions[index]
-      setActiveTab(question.type === 'theory' ? 'theory' : 'objective')
-    }
-  }
-
-  // =============================================
-  // playSound FUNCTION - MUST BE DECLARED BEFORE USE
-  // =============================================
-  const playSound = useCallback(() => {
-    if (soundEnabled && soundRef.current) {
-      soundRef.current.play().catch(() => {})
-    }
-  }, [soundEnabled])
-
-  // =============================================
-  // CALCULATE OBJECTIVE SCORE
-  // =============================================
-  const calculateObjectiveScore = useCallback(() => {
-    if (!objectiveQuestions.length) return { score: 0, total: 0, percentage: 0, correct: 0, incorrect: 0, unanswered: 0 }
-    
-    let score = 0, totalPoints = 0, correct = 0, incorrect = 0, unanswered = 0
-    
-    objectiveQuestions.forEach(q => {
-      const points = Number(q.points || q.marks || 1)
-      totalPoints += points
-      const studentAnswer = answers[q.id]
-      const correctAnswer = String(q.correct_answer || q.answer || '').trim()
-      
-      if (studentAnswer?.trim()) {
-        if (studentAnswer.trim() === correctAnswer) {
-          score += points
-          correct++
-        } else {
-          incorrect++
-        }
-      } else {
-        unanswered++
-      }
-    })
-    
-    const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0
-    return { score, total: totalPoints, percentage, correct, incorrect, unanswered }
-  }, [objectiveQuestions, answers])
-
-  // =============================================
-  // HANDLE SUBMIT - MUST BE DECLARED BEFORE USE IN EFFECTS
-  // =============================================
-  const handleSubmit = useCallback(async (isAuto = false, reason = 'manual') => {
-    if (isSubmittingRef.current || examEndedRef.current) return
-    
-    isSubmittingRef.current = true
-    examEndedRef.current = true
-    setExamEnded(true)
-    setIsSubmitting(true)
-    setShowSubmitDialog(false)
-    
-    if (timerRef.current) clearInterval(timerRef.current)
-    if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
-    if (newWindowDetectorRef.current) clearInterval(newWindowDetectorRef.current)
-    
-    if (document.fullscreenElement) {
-      try { await document.exitFullscreen() } catch (e) {}
-    }
-    
-    try {
-      const objResult = calculateObjectiveScore()
-      const passingScore = exam?.passing_percentage || 50
-      const isPassed = objResult.percentage >= passingScore
-      
-      const objectiveAnswers: Record<string, string> = {}
-      const theoryAnswers: Record<string, string> = {}
-      
-      objectiveQuestions.forEach(q => { objectiveAnswers[q.id] = answers[q.id] || '' })
-      theoryQuestions.forEach(q => { theoryAnswers[q.id] = answers[q.id] || '' })
-      
-      const hasTheory = exam?.has_theory && theoryQuestions.length > 0
-      const status = hasTheory ? 'pending_theory' : 'completed'
-      const theoryTotal = theoryQuestions.reduce((sum, q) => sum + Number(q.points || q.marks || 5), 0)
-      
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session?.user) {
-        throw new Error('User session expired. Please log in again.')
-      }
-      
-      if (attemptId) {
-        const { error: updateError } = await supabase
-          .from('exam_attempts')
-          .update({
-            answers: objectiveAnswers,
-            theory_answers: theoryAnswers,
-            objective_score: objResult.score,
-            objective_total: objResult.total,
-            theory_total: theoryTotal,
-            total_score: objResult.score,
-            total_marks: objResult.total + theoryTotal,
-            percentage: objResult.percentage,
-            is_passed: isPassed,
-            status: status,
-            submitted_at: new Date().toISOString(),
-            correct_count: objResult.correct,
-            incorrect_count: objResult.incorrect,
-            unanswered_count: objResult.unanswered,
-            tab_switches: tabSwitches,
-            fullscreen_exits: fullscreenExits,
-            new_tab_attempts: newTabAttempts,
-            is_auto_submitted: isAuto,
-            auto_submit_reason: isAuto ? reason : null,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', attemptId)
-
-        if (updateError) throw new Error(`Failed to update attempt: ${updateError.message}`)
-      } else {
-        const { data: newAttempt, error: insertError } = await supabase
-          .from('exam_attempts')
-          .insert({
-            exam_id: examId,
-            student_id: session.user.id,
-            student_name: profile?.full_name || 'Student',
-            student_email: session.user.email,
-            student_class: profile?.class || 'Not Assigned',
-            attempt_number: attemptsUsed + 1,
-            answers: objectiveAnswers,
-            theory_answers: theoryAnswers,
-            objective_score: objResult.score,
-            objective_total: objResult.total,
-            theory_total: theoryTotal,
-            total_score: objResult.score,
-            total_marks: objResult.total + theoryTotal,
-            percentage: objResult.percentage,
-            is_passed: isPassed,
-            status: status,
-            started_at: new Date().toISOString(),
-            submitted_at: new Date().toISOString(),
-            correct_count: objResult.correct,
-            incorrect_count: objResult.incorrect,
-            unanswered_count: objResult.unanswered,
-            tab_switches: tabSwitches,
-            fullscreen_exits: fullscreenExits,
-            new_tab_attempts: newTabAttempts,
-            is_auto_submitted: isAuto,
-            auto_submit_reason: isAuto ? reason : null
-          })
-          .select('id')
-          .single()
-        
-        if (insertError) throw new Error(`Failed to create attempt: ${insertError.message}`)
-        if (newAttempt) setAttemptId(newAttempt.id)
-      }
-
-      const { data: existingScore } = await supabase
-        .from('exam_scores')
-        .select('id')
-        .eq('student_id', profile?.id)
-        .eq('exam_id', examId)
-        .maybeSingle()
-
-      const scoreData = {
-        student_id: profile?.id,
-        exam_id: examId,
-        attempt_id: attemptId,
-        subject: exam?.subject || 'Unknown',
-        term: 'First Term',
-        academic_year: '2024/2025',
-        class: profile?.class || 'Not Assigned',
-        teacher_name: exam?.teacher_name || 'Unknown',
-        exam_score: objResult.score,
-        total_score: objResult.score,
-        percentage: objResult.percentage,
-        grade: isPassed ? 'Pass' : 'Fail',
-        remark: isPassed ? 'Passed' : 'Failed',
-        status: hasTheory ? 'pending_theory' : 'completed',
-        updated_at: new Date().toISOString()
-      }
-
-      if (existingScore) {
-        await supabase.from('exam_scores').update(scoreData).eq('id', existingScore.id)
-      } else {
-        await supabase.from('exam_scores').insert({ ...scoreData, created_at: new Date().toISOString() })
-      }
-
-      if (profile?.id) {
-        try {
-          const { data: allScores } = await supabase
-            .from('exam_scores')
-            .select('percentage, status')
-            .eq('student_id', profile.id)
-            .in('status', ['completed', 'graded'])
-
-          if (allScores && allScores.length > 0) {
-            const completedExams = allScores.length
-            const passedExams = allScores.filter(s => (s.percentage || 0) >= 50).length
-            const averageScore = allScores.reduce((sum, s) => sum + (s.percentage || 0), 0) / completedExams
-
-            const { data: existingStats } = await supabase
-              .from('student_stats')
-              .select('student_id')
-              .eq('student_id', profile.id)
-              .maybeSingle()
-
-            const statsData = {
-              student_id: profile.id,
-              completed_exams: completedExams,
-              passed_exams: passedExams,
-              failed_exams: completedExams - passedExams,
-              average_score: Math.round(averageScore * 100) / 100,
-              total_points: allScores.reduce((sum, s) => sum + (s.percentage || 0), 0),
-              updated_at: new Date().toISOString()
-            }
-
-            if (existingStats) {
-              await supabase.from('student_stats').update(statsData).eq('student_id', profile.id)
-            } else {
-              await supabase.from('student_stats').insert({ ...statsData, created_at: new Date().toISOString() })
-            }
-          }
-        } catch (statsError) {
-          console.error('Stats update error (non-critical):', statsError)
-        }
-      }
-
-      if (exam?.created_by) {
-        try {
-          await supabase.from('notifications').insert({
-            user_id: exam.created_by,
-            title: '📝 Exam Submission',
-            message: `${profile?.full_name || 'A student'} has submitted ${exam.title}. ${hasTheory ? 'Theory questions pending grading.' : 'Ready for review.'}`,
-            type: 'exam_submission',
-            exam_id: examId,
-            student_id: profile?.id,
-            class: profile?.class,
-            subject: exam.subject,
-            read: false,
-            action_url: `/staff/exams/${examId}/submissions`,
-            created_at: new Date().toISOString()
-          })
-        } catch (notifError) {}
-      }
-
-      try {
-        const { data: admins } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('role', 'admin')
-
-        if (admins && admins.length > 0) {
-          const notifications = admins.map((admin: any) => ({
-            user_id: admin.id,
-            title: '📊 New Exam Submission',
-            message: `${profile?.full_name || 'A student'} submitted ${exam?.title} (${exam?.subject})`,
-            type: 'exam_submission',
-            exam_id: examId,
-            student_id: profile?.id,
-            class: profile?.class,
-            subject: exam?.subject,
-            read: false,
-            action_url: `/admin?tab=exams`,
-            created_at: new Date().toISOString()
-          }))
-          await supabase.from('notifications').insert(notifications)
-        }
-      } catch (adminNotifError) {}
-
-      setHasCompletedAttempt(true)
-      setExamResult({ 
-        ...objResult, 
-        theory_score: 0,
-        theory_total: theoryTotal,
-        is_passed: isPassed, 
-        passing_percentage: passingScore, 
-        status: status,
-        attempts_used: attemptsUsed + 1, 
-        max_attempts: exam?.max_attempts || 1 
-      })
-      setExamStarted(false)
-      setShowResultDialog(true)
-      
-      playSound()
-      toast.success(hasTheory ? 'Exam submitted! Objective graded. Theory pending.' : 'Exam submitted successfully!')
-      
-    } catch (error: any) {
-      console.error('❌ Submit error:', error)
-      toast.error(error.message || 'Failed to submit exam')
-      setIsSubmitting(false)
-      isSubmittingRef.current = false
-      examEndedRef.current = false
-      
-      if (!isAuto) {
-        setExamEnded(false)
-        if (timerRef.current) clearInterval(timerRef.current)
-        timerRef.current = setInterval(() => {
-          setTimeLeft(p => { 
-            if (p <= 1) { 
-              handleSubmit(true, 'Time expired')
-              return 0 
-            }
-            if (p === 300) {
-              setShowTimeWarning(true)
-              playSound()
-              toast.warning('5 minutes remaining!')
-            }
-            return p - 1 
-          })
-        }, 1000)
-      }
-    } finally {
-      setIsSubmitting(false)
-    }
-  }, [attemptId, exam, calculateObjectiveScore, answers, tabSwitches, fullscreenExits, newTabAttempts, attemptsUsed, objectiveQuestions, theoryQuestions, profile, examId, playSound])
-
-  // =============================================
-  // STRICT SECURITY: New Tab/Window Prevention
-  // =============================================
+  // ============================================
+  // ONLINE/OFFLINE DETECTION
+  // ============================================
   useEffect(() => {
-    if (!examStarted || examEndedRef.current) return
-
-    // Detect new window/tab opening attempts
-    const detectNewWindow = () => {
-      const widthThreshold = window.outerWidth - window.innerWidth > 100
-      const heightThreshold = window.outerHeight - window.innerHeight > 100
-      
-      if (widthThreshold || heightThreshold) {
-        setNewTabAttempts(p => {
-          const n = p + 1
-          playSound()
-          
-          toast.error(`🚨 SECURITY ALERT: New window/tab detected! (${n}/${TAB_SWITCH_LIMIT})`, {
-            description: 'Opening new windows or tabs is STRICTLY PROHIBITED during the exam!',
-            duration: 5000
-          })
-          
-          if (n >= TAB_SWITCH_LIMIT) {
-            setSecurityViolated(true)
-            toast.error('❌ SECURITY VIOLATION! Auto-submitting exam...', {
-              description: 'You exceeded the allowed security violations.',
-              duration: 5000
-            })
-            setTimeout(() => handleSubmit(true, 'New window/tab limit exceeded'), 100)
-          }
-          
-          return n
-        })
-        setShowSecurityWarning(true)
-        setTimeout(() => setShowSecurityWarning(false), 5000)
-      }
+    const handleOnline = () => {
+      setIsOnline(true)
+      toast.success('Network restored! Your progress is safe.', { duration: 2000 })
     }
-
-    // Block all keyboard shortcuts that could open new windows/tabs
-    const blockShortcuts = (e: KeyboardEvent) => {
-      const key = e.key.toLowerCase()
-      const ctrl = e.ctrlKey
-      const alt = e.altKey
-      const shift = e.shiftKey
-      const meta = e.metaKey
-
-      // Block Ctrl+T (new tab)
-      if (ctrl && key === 't') {
-        e.preventDefault()
-        detectNewWindow()
-        toast.warning('⚠️ Opening new tabs is prohibited during the exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Ctrl+N (new window)
-      if (ctrl && key === 'n') {
-        e.preventDefault()
-        detectNewWindow()
-        toast.warning('⚠️ Opening new windows is prohibited during the exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Ctrl+Shift+N (incognito)
-      if (ctrl && shift && key === 'n') {
-        e.preventDefault()
-        detectNewWindow()
-        toast.warning('⚠️ Incognito mode is prohibited during the exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Ctrl+W (close tab)
-      if (ctrl && key === 'w') {
-        e.preventDefault()
-        setShowLeaveWarning(true)
-        toast.warning('⚠️ Closing this tab will auto-submit your exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Ctrl+Shift+W (close window)
-      if (ctrl && shift && key === 'w') {
-        e.preventDefault()
-        setShowLeaveWarning(true)
-        toast.warning('⚠️ Closing this window will auto-submit your exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Alt+Tab (switch windows)
-      if (alt && key === 'tab') {
-        e.preventDefault()
-        toast.warning('⚠️ Switching windows is prohibited during the exam!', { duration: 2000 })
-        return false
-      }
-      
-      // Block Alt+F4
-      if (alt && key === 'f4') {
-        e.preventDefault()
-        setShowLeaveWarning(true)
-        toast.warning('⚠️ Closing this window will auto-submit your exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Ctrl+Shift+Q (quit)
-      if (ctrl && shift && key === 'q') {
-        e.preventDefault()
-        setShowLeaveWarning(true)
-        toast.warning('⚠️ Quitting will auto-submit your exam!', { duration: 3000 })
-        return false
-      }
-      
-      // Block Print Screen
-      if (key === 'printscreen') {
-        e.preventDefault()
-        toast.warning('⚠️ Screenshots are prohibited during the exam!', { duration: 2000 })
-        return false
-      }
-      
-      // Block Windows key
-      if (key === 'meta' || key === 'os') {
-        e.preventDefault()
-        toast.warning('⚠️ Windows key is disabled during the exam!', { duration: 2000 })
-        return false
-      }
-      
-      return true
+    const handleOffline = () => {
+      setIsOnline(false)
+      toast.warning('Network disconnected! Your answers are saved locally.', { duration: 5000 })
     }
-
-    // Block right-click context menu
-    const blockContextMenu = (e: MouseEvent) => {
-      e.preventDefault()
-      toast.warning('⚠️ Right-click is disabled during the exam!', { duration: 2000 })
-      return false
-    }
-
-    // Monitor for new windows using interval
-    newWindowDetectorRef.current = window.setInterval(detectNewWindow, 1000)
-
-    // Prevent middle-click (opens new tab)
-    const blockMiddleClick = (e: MouseEvent) => {
-      if (e.button === 1) {
-        e.preventDefault()
-        toast.warning('⚠️ Middle-click (opening new tabs) is prohibited!', { duration: 2000 })
-        return false
-      }
-    }
-
-    // Block all links that try to open in new windows
-    const blockNewWindowLinks = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      const anchor = target.closest('a')
-      if (anchor && anchor.target === '_blank') {
-        e.preventDefault()
-        toast.warning('⚠️ Opening links in new tabs is prohibited!', { duration: 2000 })
-        return false
-      }
-    }
-
-    // Prevent drag and drop (could be used to open new tabs)
-    const blockDragStart = (e: DragEvent) => {
-      e.preventDefault()
-      return false
-    }
-
-    document.addEventListener('keydown', blockShortcuts)
-    document.addEventListener('contextmenu', blockContextMenu)
-    document.addEventListener('mousedown', blockMiddleClick)
-    document.addEventListener('click', blockNewWindowLinks)
-    document.addEventListener('dragstart', blockDragStart)
-
+    
+    setIsOnline(navigator.onLine)
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    
     return () => {
-      document.removeEventListener('keydown', blockShortcuts)
-      document.removeEventListener('contextmenu', blockContextMenu)
-      document.removeEventListener('mousedown', blockMiddleClick)
-      document.removeEventListener('click', blockNewWindowLinks)
-      document.removeEventListener('dragstart', blockDragStart)
-      if (newWindowDetectorRef.current) {
-        clearInterval(newWindowDetectorRef.current)
-      }
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
     }
-  }, [examStarted, handleSubmit, playSound])
+  }, [])
 
-  // =============================================
-  // AUTO-SAVE FUNCTION
-  // =============================================
+  // ============================================
+  // AUTO-SAVE FUNCTIONALITY
+  // ============================================
   const autoSave = useCallback(async () => {
     if (!attemptId || !examStarted || examEndedRef.current) return
+    if (Object.keys(answers).length === 0) return
     
-    setAutoSaveStatus('saving')
-    
+    setAutoSaving(true)
     try {
       await supabase
         .from('exam_attempts')
-        .update({
+        .update({ 
           answers: answers,
-          last_auto_save: new Date().toISOString()
+          theory_answers: allQuestions.filter(q => q.type === 'theory').reduce((acc, q) => {
+            acc[q.id] = answers[q.id] || ''
+            return acc
+          }, {} as Record<string, string>),
+          last_saved_at: new Date().toISOString()
         })
         .eq('id', attemptId)
       
-      setAutoSaveStatus('saved')
-      setTimeout(() => setAutoSaveStatus('idle'), 2000)
+      setLastSaved(new Date())
     } catch (error) {
       console.error('Auto-save failed:', error)
-      setAutoSaveStatus('idle')
+    } finally {
+      setAutoSaving(false)
     }
-  }, [attemptId, examStarted, answers])
+  }, [attemptId, examStarted, answers, allQuestions])
 
-  // =============================================
-  // LOAD EXAM DATA WITH RANDOMIZATION
-  // =============================================
+  useEffect(() => {
+    if (!examStarted || examEndedRef.current) return
+    
+    autoSaveTimerRef.current = setInterval(autoSave, AUTO_SAVE_INTERVAL)
+    return () => { if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current) }
+  }, [examStarted, autoSave])
+
+  useEffect(() => {
+    if (!examStarted || examEndedRef.current) return
+    const timer = setTimeout(() => autoSave(), 2000)
+    return () => clearTimeout(timer)
+  }, [answers, examStarted, autoSave])
+
+  // ============================================
+  // LOAD EXAM
+  // ============================================
   const loadExam = useCallback(async () => {
     if (loadedRef.current) return
     loadedRef.current = true
     setLoading(true)
     
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        toast.error('Please log in to continue')
-        router.replace('/portal')
-        return
-      }
+      const session = await getUserSession()
+      if (!session) { router.push('/portal'); return }
       
       const { data: userData } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', session.user.id)
+        .eq('id', session.id)
         .single()
         
       if (userData) setProfile(userData)
@@ -764,62 +238,46 @@ export default function StudentExamPage() {
         .eq('id', examId)
         .single()
         
-      if (examError || !examData) { 
-        setLoadError('Exam not found')
-        setLoading(false)
-        return
-      }
+      if (examError || !examData) { setLoadError('Exam not found'); setLoading(false); return }
       
       setExam(examData)
       
-      let objQ: Question[] = []
-      let thQ: Question[] = []
+      let qList: Question[] = []
+      const { data: questionsData } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('order_number', { ascending: true })
       
-      if (examData.questions) {
-        if (typeof examData.questions === 'string') {
-          try { objQ = JSON.parse(examData.questions) } catch (e) {}
-        } else if (Array.isArray(examData.questions)) {
-          objQ = examData.questions
-        }
-      }
-      
-      if (examData.has_theory && examData.theory_questions) {
-        if (typeof examData.theory_questions === 'string') {
-          try { thQ = JSON.parse(examData.theory_questions) } catch (e) {}
-        } else if (Array.isArray(examData.theory_questions)) {
-          thQ = examData.theory_questions
-        }
-      }
-      
-      const processQuestions = (qList: Question[], qType: 'objective' | 'theory') => {
-        return qList.map((q: any, idx: number) => ({
+      if (questionsData && questionsData.length > 0) {
+        qList = questionsData.map((q: any) => ({
           ...q,
-          id: q.id || `${qType}-${idx}`,
-          question_text: q.question || q.question_text || 'No question text',
-          type: qType,
-          options: q.options || [],
-          correct_answer: q.correct_answer || q.answer || '',
-          points: Number(q.points || q.marks || (qType === 'objective' ? 0.5 : 5)),
-          order_number: idx + 1
+          question_text: q.question_text || q.question,
+          type: q.type || 'objective',
+          options: q.options ? (typeof q.options === 'string' ? JSON.parse(q.options) : q.options) : [],
+          points: q.points || 1
         }))
       }
       
-      let processedObj = processQuestions(objQ, 'objective')
-      let processedTheory = processQuestions(thQ, 'theory')
-      
-      const shouldRandomizeQuestions = examData.randomize_questions ?? true
-      const shouldRandomizeOptions = examData.randomize_options ?? true
-      
-      if (shouldRandomizeQuestions) {
-        processedObj = randomizeQuestions(processedObj, shouldRandomizeOptions)
-        if (processedTheory.length > 0) {
-          processedTheory = randomizeQuestions(processedTheory, false)
-        }
+      if (qList.length === 0) {
+        qList = [
+          { id: 'q1', type: 'mcq', question_text: 'Sample Question 1?', options: ['A', 'B', 'C', 'D'], correct_answer: 'A', points: 1 },
+          { id: 'q2', type: 'mcq', question_text: 'Sample Question 2?', options: ['A', 'B', 'C', 'D'], correct_answer: 'B', points: 1 },
+        ]
       }
       
-      setObjectiveQuestions(processedObj)
-      setTheoryQuestions(processedTheory)
-      setAllQuestions([...processedObj, ...processedTheory])
+      qList = qList.map((q: any, idx: number) => ({
+        ...q,
+        id: q.id || `q${idx}`,
+        question_text: q.question || q.question_text || 'No question text',
+        type: q.type || 'mcq',
+        options: q.options || [],
+        correct_answer: q.correct_answer || q.answer || '',
+        points: Number(q.points || q.marks || 1),
+        order_number: idx + 1
+      }))
+      
+      setAllQuestions(qList)
       
       if (userData) {
         const { data: attempts } = await supabase
@@ -832,13 +290,24 @@ export default function StudentExamPage() {
         if (attempts && attempts.length > 0) {
           const latest = attempts[0]
           setAttemptsUsed(attempts.length)
+          setExistingAttempt(latest)
           
-          const maxAttempts = examData.max_attempts || 1
-          
-          if (latest.status === 'completed' || latest.status === 'pending_theory' || latest.status === 'graded') {
+          if (latest.status === 'in-progress') {
+            const startedAt = new Date(latest.started_at)
+            const now = new Date()
+            const elapsedSeconds = Math.floor((now.getTime() - startedAt.getTime()) / 1000)
+            const remainingSeconds = Math.max(0, (examData.duration * 60) - elapsedSeconds)
+            
+            setResumeData({
+              attemptId: latest.id,
+              answers: latest.answers || {},
+              timeLeft: remainingSeconds,
+              tabSwitches: latest.tab_switches || 0,
+              fullscreenExits: latest.fullscreen_exits || 0
+            })
+            setShowResumeDialog(true)
+          } else if (latest.status === 'completed' || latest.status === 'pending_theory' || latest.status === 'graded') {
             setHasCompletedAttempt(true)
-            setExistingAttempt(latest)
-            setCanRetake(latest.can_retake && attempts.length < maxAttempts)
             
             const totalScore = (latest.objective_score || 0) + (latest.theory_score || 0)
             const totalPossible = (latest.objective_total || 0) + (latest.theory_total || 0)
@@ -859,9 +328,15 @@ export default function StudentExamPage() {
               passing_percentage: examData.passing_percentage || 50,
               status: latest.status,
               attempts_used: attempts.length,
-              max_attempts: maxAttempts
+              max_attempts: 1,
+              graded_by: latest.graded_by,
+              graded_at: latest.graded_at,
+              submitted_at: latest.submitted_at
             })
           }
+        } else {
+          setAttemptsUsed(0)
+          setHasCompletedAttempt(false)
         }
       }
     } catch (error) {
@@ -871,41 +346,211 @@ export default function StudentExamPage() {
     }
   }, [examId, router])
 
-  // =============================================
-  // START EXAM FUNCTION
-  // =============================================
+  useEffect(() => { loadExam() }, [loadExam])
+
+  // ============================================
+  // RESUME EXAM
+  // ============================================
+  const handleResumeExam = async () => {
+    if (!resumeData) return
+    
+    setAttemptId(resumeData.attemptId)
+    setAnswers(resumeData.answers || {})
+    setTimeLeft(resumeData.timeLeft)
+    setTabSwitches(resumeData.tabSwitches || 0)
+    setFullscreenExits(resumeData.fullscreenExits || 0)
+    
+    setExamStarted(true)
+    setShowInstructions(false)
+    setShowResumeDialog(false)
+    examEndedRef.current = false
+    setExamEnded(false)
+    
+    toast.success('Exam resumed! Continue where you left off.')
+    
+    try {
+      const elem = document.documentElement
+      if (elem.requestFullscreen) await elem.requestFullscreen()
+      else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
+      setFullscreen(true)
+    } catch (e) {}
+  }
+
+  const handleStartNewAttempt = async () => {
+    setShowResumeDialog(false)
+    startExam()
+  }
+
+  const handleDiscardAndStart = () => {
+    setShowResumeDialog(false)
+    setShowInstructions(true)
+  }
+
+  // ============================================
+  // CALCULATIONS & HELPERS
+  // ============================================
+  const calculateScore = useCallback(() => {
+    if (!allQuestions.length) return { score: 0, total: 0, percentage: 0, correct: 0, incorrect: 0, unanswered: 0 }
+    
+    const objectiveQuestions = allQuestions.filter(q => q.type !== 'theory')
+    let score = 0, totalPoints = 0, correct = 0, incorrect = 0, unanswered = 0
+    
+    objectiveQuestions.forEach(q => {
+      const points = Number(q.points || 1)
+      totalPoints += points
+      const studentAnswer = answers[q.id]
+      const correctAnswer = String(q.correct_answer || '').trim()
+      
+      if (studentAnswer?.trim()) {
+        if (studentAnswer.trim().toLowerCase() === correctAnswer.toLowerCase()) {
+          score += points
+          correct++
+        } else {
+          incorrect++
+        }
+      } else {
+        unanswered++
+      }
+    })
+    
+    const percentage = totalPoints > 0 ? Math.round((score / totalPoints) * 100) : 0
+    return { score, total: totalPoints, percentage, correct, incorrect, unanswered }
+  }, [allQuestions, answers])
+
+  const handleSubmit = useCallback(async (isAuto = false, reason = 'manual') => {
+    if (isSubmittingRef.current || examEndedRef.current) return
+    
+    isSubmittingRef.current = true
+    examEndedRef.current = true
+    setExamEnded(true)
+    setIsSubmitting(true)
+    setShowSubmitDialog(false)
+    
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
+    if (document.fullscreenElement) {
+      try { await document.exitFullscreen() } catch (e) {}
+    }
+    
+    try {
+      const result = calculateScore()
+      const passingScore = exam?.passing_percentage || 50
+      const isPassed = result.percentage >= passingScore
+      
+      const objectiveAnswers: Record<string, string> = {}
+      const theoryAnswers: Record<string, string> = {}
+      
+      allQuestions.forEach(q => {
+        if (q.type === 'theory') {
+          theoryAnswers[q.id] = answers[q.id] || ''
+        } else {
+          objectiveAnswers[q.id] = answers[q.id] || ''
+        }
+      })
+      
+      const hasTheory = exam?.has_theory && Object.keys(theoryAnswers).length > 0
+      const status = hasTheory ? 'pending_theory' : 'completed'
+      
+      const theoryTotal = allQuestions.filter(q => q.type === 'theory').reduce((sum, q) => sum + Number(q.points || 1), 0)
+      
+      if (attemptId) {
+        await supabase.from('exam_attempts').update({
+          answers: objectiveAnswers,
+          theory_answers: theoryAnswers,
+          objective_score: result.score,
+          objective_total: result.total,
+          theory_total: theoryTotal,
+          total_score: result.score,
+          total_marks: result.total + theoryTotal,
+          percentage: result.percentage,
+          is_passed: isPassed,
+          status: status,
+          tab_switches: tabSwitches,
+          fullscreen_exits: fullscreenExits,
+          submitted_at: new Date().toISOString(),
+          is_auto_submitted: isAuto,
+          auto_submit_reason: isAuto ? reason : null,
+          correct_count: result.correct,
+          incorrect_count: result.incorrect,
+          unanswered_count: result.unanswered,
+          term: exam?.term || CURRENT_TERM,
+          session_year: exam?.session_year || CURRENT_SESSION
+        }).eq('id', attemptId)
+        
+        if (tabSwitches > 0 || fullscreenExits > 0) {
+          await supabase.from('exam_security_logs').insert({
+            attempt_id: attemptId,
+            student_id: profile?.id,
+            exam_id: examId,
+            tab_switches: tabSwitches,
+            fullscreen_exits: fullscreenExits,
+            auto_submitted: isAuto,
+            submit_reason: reason,
+            term: exam?.term || CURRENT_TERM,
+            session_year: exam?.session_year || CURRENT_SESSION,
+            created_at: new Date().toISOString()
+          })
+        }
+      }
+      
+      setHasCompletedAttempt(true)
+      setExamResult({ 
+        ...result, 
+        theory_score: 0,
+        theory_total: theoryTotal,
+        is_passed: isPassed, 
+        passing_percentage: passingScore, 
+        status: status,
+        attempts_used: attemptsUsed + 1, 
+        max_attempts: 1,
+        submitted_at: new Date().toISOString()
+      })
+      setExamStarted(false)
+      setShowResultDialog(true)
+      
+      const message = hasTheory 
+        ? 'Exam submitted! Theory answers will be graded by your instructor.' 
+        : 'Exam submitted successfully!'
+      toast.success(message)
+    } catch (error) {
+      toast.error('Failed to submit exam')
+      setIsSubmitting(false)
+      isSubmittingRef.current = false
+      examEndedRef.current = false
+    }
+  }, [attemptId, exam, calculateScore, answers, tabSwitches, fullscreenExits, attemptsUsed, allQuestions, profile, examId])
+
   const startExam = async () => {
     setStartingExam(true)
     
     try {
       const elem = document.documentElement
       if (elem.requestFullscreen) await elem.requestFullscreen()
+      else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
+      setFullscreen(true)
       
       const { data: { session } } = await supabase.auth.getSession()
       
       if (session?.user) {
-        const { data: att, error } = await supabase
+        const { data: att } = await supabase
           .from('exam_attempts')
           .insert({ 
             exam_id: examId, 
             student_id: session.user.id,
-            student_name: profile?.full_name || 'Student',
+            student_name: profile?.full_name || session.user.email?.split('@')[0] || 'Student',
             student_email: session.user.email,
-            student_class: profile?.class || 'Not Assigned',
-            status: 'in_progress', 
+            student_class: profile?.class,
+            status: 'in-progress', 
             started_at: new Date().toISOString(),
-            attempt_number: attemptsUsed + 1,
-            answers: {},
-            theory_answers: {},
-            objective_score: 0,
-            objective_total: 0,
-            total_score: 0,
-            percentage: 0
+            tab_switches: 0,
+            fullscreen_exits: 0,
+            attempt_number: 1,
+            term: exam?.term || CURRENT_TERM,
+            session_year: exam?.session_year || CURRENT_SESSION
           })
           .select('id')
           .single()
           
-        if (error) throw error
         if (att) setAttemptId(att.id)
       }
       
@@ -914,220 +559,70 @@ export default function StudentExamPage() {
       setTimeLeft((exam?.duration || 30) * 60)
       setFullscreenExits(0)
       setTabSwitches(0)
-      setNewTabAttempts(0)
+      setSecurityViolated(false)
       examEndedRef.current = false
       setExamEnded(false)
       
-      playSound()
-      toast.success('Exam started! Good luck!', {
-        description: `You have ${exam?.duration || 30} minutes to complete this exam.`
-      })
-    } catch (error: any) {
-      console.error('Start exam error:', error)
-      toast.error(error.message || 'Failed to start exam')
+      toast.success('Exam started! Good luck!')
+    } catch (error) {
+      toast.error('Failed to start exam')
     } finally {
       setStartingExam(false)
     }
   }
 
-  const enterFullscreen = async () => {
-    try {
-      const elem = document.documentElement
-      if (elem.requestFullscreen) await elem.requestFullscreen()
-      setShowFullscreenPrompt(false)
-    } catch (e) {}
-  }
-
-  // =============================================
-  // Navigation blocker with auto-submit
-  // =============================================
-  useEffect(() => {
-    if (!examStarted || examEndedRef.current) return
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!examEndedRef.current) {
-        e.preventDefault()
-        e.returnValue = 'You have an exam in progress. Leaving will auto-submit your answers.'
-        return 'You have an exam in progress. Leaving will auto-submit your answers.'
-      }
-    }
-
-    const handlePopState = (e: PopStateEvent) => {
-      if (examStarted && !examEndedRef.current) {
-        e.preventDefault()
-        setShowLeaveWarning(true)
-        window.history.pushState(null, '', window.location.pathname)
-      }
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('popstate', handlePopState)
-    
-    window.history.pushState(null, '', window.location.pathname)
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('popstate', handlePopState)
-    }
-  }, [examStarted])
-
-  // =============================================
-  // Auto-submit on dashboard return
-  // =============================================
-  const handleLeaveExam = async (shouldSubmit: boolean) => {
-    setShowLeaveWarning(false)
-    
-    if (shouldSubmit && examStarted && !examEndedRef.current) {
-      toast.loading('Auto-submitting your exam...')
-      await handleSubmit(true, 'Left exam page')
-    }
-    
-    if (pendingNavigation) {
-      router.push(pendingNavigation)
-    } else {
-      router.push('/student')
-    }
-    setPendingNavigation(null)
-  }
-
-  // =============================================
-  // ALL useEffect HOOKS
-  // =============================================
-  
-  useEffect(() => {
-    soundRef.current = new Audio('/sounds/notification.mp3')
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.pause()
-        soundRef.current = null
-      }
-    }
-  }, [])
-
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true)
-    const handleOffline = () => {
-      setIsOnline(false)
-      toast.warning('You are offline. Answers will be saved locally.')
-    }
-    
-    window.addEventListener('online', handleOnline)
-    window.addEventListener('offline', handleOffline)
-    
-    return () => {
-      window.removeEventListener('online', handleOnline)
-      window.removeEventListener('offline', handleOffline)
-    }
-  }, [])
-
-  useEffect(() => { loadExam() }, [loadExam])
-  
-  useEffect(() => { 
-    return () => { 
-      if (timerRef.current) clearInterval(timerRef.current)
-      if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current)
-      if (newWindowDetectorRef.current) clearInterval(newWindowDetectorRef.current)
-    } 
-  }, [])
-
+  // ============================================
+  // TIMER EFFECT
+  // ============================================
   useEffect(() => {
     if (!examStarted || timeLeft <= 0 || examEndedRef.current) return
-    
     timerRef.current = setInterval(() => {
       setTimeLeft(p => { 
         if (p <= 1) { 
           handleSubmit(true, 'Time expired')
           return 0 
         }
-        if (p === 300) {
-          setShowTimeWarning(true)
-          playSound()
-          toast.warning('5 minutes remaining!', {
-            description: 'Please review your answers and prepare to submit.'
-          })
-        }
         return p - 1 
       })
     }, 1000)
-    
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [examStarted, timeLeft, handleSubmit, playSound])
+  }, [examStarted, timeLeft, handleSubmit])
 
-  useEffect(() => {
-    if (!examStarted || examEndedRef.current) return
-    
-    autoSaveTimerRef.current = setInterval(() => {
-      autoSave()
-    }, AUTO_SAVE_INTERVAL)
-    
-    return () => { if (autoSaveTimerRef.current) clearInterval(autoSaveTimerRef.current) }
-  }, [examStarted, autoSave])
-
+  // ============================================
+  // SECURITY EFFECTS (Tab Switch & Fullscreen)
+  // ============================================
   useEffect(() => {
     if (!examStarted || examEndedRef.current) return
     const h = () => {
       if (document.hidden && !examEndedRef.current && !securityViolated) {
         setTabSwitches(p => {
           const n = p + 1
-          playSound()
-          
-          if (n === 1) {
-            toast.warning(`⚠️ WARNING: Tab switch detected! (${n}/${TAB_SWITCH_LIMIT})`, {
-              description: 'This is a security violation. Further switches will result in auto-submission.',
-              duration: 5000
-            })
-          } else if (n === 2) {
-            toast.error(`🚨 FINAL WARNING! (${n}/${TAB_SWITCH_LIMIT})`, {
-              description: 'ONE MORE TAB SWITCH WILL AUTO-SUBMIT YOUR EXAM!',
-              duration: 8000
-            })
-          } else if (n >= TAB_SWITCH_LIMIT) { 
+          if (n === 1) toast.warning(`Tab switch detected! (${n}/${TAB_SWITCH_LIMIT})`)
+          else if (n === 2) toast.error(`Final warning! (${n}/${TAB_SWITCH_LIMIT})`)
+          else if (n >= TAB_SWITCH_LIMIT) { 
             setSecurityViolated(true)
-            toast.error('❌ SECURITY VIOLATION! Auto-submitting exam...', {
-              description: 'You exceeded the allowed tab switches.',
-              duration: 5000
-            })
             setTimeout(() => handleSubmit(true, 'Tab switch limit exceeded'), 100)
           }
           return n
         })
-        setShowSecurityWarning(true)
-        setTimeout(() => setShowSecurityWarning(false), 5000)
       }
     }
     document.addEventListener('visibilitychange', h)
     return () => document.removeEventListener('visibilitychange', h)
-  }, [examStarted, securityViolated, handleSubmit, playSound])
+  }, [examStarted, securityViolated, handleSubmit])
 
   useEffect(() => {
     if (!examStarted || examEndedRef.current) return
     const h = () => {
       const fs = !!document.fullscreenElement
+      setFullscreen(fs)
       if (!fs && !examEndedRef.current && !securityViolated) {
         setFullscreenExits(p => {
           const n = p + 1
-          playSound()
-          
-          if (n === 1) { 
-            toast.warning(`⚠️ Fullscreen exited! (${n}/${FULLSCREEN_EXIT_LIMIT})`, {
-              description: 'Please return to fullscreen mode immediately.',
-              duration: 5000
-            })
-            setShowFullscreenPrompt(true) 
-          }
-          else if (n === 2) { 
-            toast.error(`🚨 FINAL WARNING! (${n}/${FULLSCREEN_EXIT_LIMIT})`, {
-              description: 'ONE MORE EXIT WILL AUTO-SUBMIT YOUR EXAM!',
-              duration: 8000
-            })
-            setShowFullscreenPrompt(true) 
-          }
+          if (n === 1) { toast.warning(`Fullscreen exited! (${n}/${FULLSCREEN_EXIT_LIMIT})`); setShowFullscreenPrompt(true) }
+          else if (n === 2) { toast.error(`Final warning! (${n}/${FULLSCREEN_EXIT_LIMIT})`); setShowFullscreenPrompt(true) }
           else if (n >= FULLSCREEN_EXIT_LIMIT) { 
             setSecurityViolated(true)
-            toast.error('❌ SECURITY VIOLATION! Auto-submitting exam...', {
-              description: 'You exceeded the allowed fullscreen exits.',
-              duration: 5000
-            })
             setTimeout(() => handleSubmit(true, 'Fullscreen exit limit exceeded'), 100)
           }
           return n
@@ -1136,748 +631,886 @@ export default function StudentExamPage() {
     }
     document.addEventListener('fullscreenchange', h)
     document.addEventListener('webkitfullscreenchange', h)
-    return () => { 
-      document.removeEventListener('fullscreenchange', h)
-      document.removeEventListener('webkitfullscreenchange', h) 
-    }
-  }, [examStarted, securityViolated, handleSubmit, playSound])
+    return () => { document.removeEventListener('fullscreenchange', h); document.removeEventListener('webkitfullscreenchange', h) }
+  }, [examStarted, securityViolated, handleSubmit])
 
   useEffect(() => {
     if (!examStarted) return
-    const preventDefault = (e: Event) => {
-      e.preventDefault()
-      toast.warning('⚠️ Copy/Paste is disabled during the exam', { duration: 2000 })
-    }
+    const beforeUnload = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    const preventDefault = (e: Event) => e.preventDefault()
     const keydown = (e: KeyboardEvent) => { 
-      if ((e.ctrlKey && ['c','v','x','p','a','s','u'].includes(e.key.toLowerCase())) || 
-          e.key === 'F12' || (e.altKey && e.key === 'Tab')) {
-        e.preventDefault()
-        toast.warning(`⚠️ ${e.key.toUpperCase()} is disabled during the exam`, { duration: 2000 })
-      }
+      if ((e.ctrlKey && ['c','v','x','p','a','s'].includes(e.key.toLowerCase())) || 
+          e.key === 'F12' || (e.altKey && e.key === 'Tab')) e.preventDefault() 
     }
     
-    document.addEventListener('copy', preventDefault)
-    document.addEventListener('paste', preventDefault)
-    document.addEventListener('cut', preventDefault)
-    document.addEventListener('contextmenu', preventDefault)
+    window.addEventListener('beforeunload', beforeUnload)
+    document.addEventListener('copy', preventDefault); document.addEventListener('paste', preventDefault)
+    document.addEventListener('cut', preventDefault); document.addEventListener('contextmenu', preventDefault)
     document.addEventListener('keydown', keydown)
     
     return () => {
-      document.removeEventListener('copy', preventDefault)
-      document.removeEventListener('paste', preventDefault)
-      document.removeEventListener('cut', preventDefault)
-      document.removeEventListener('contextmenu', preventDefault)
+      window.removeEventListener('beforeunload', beforeUnload)
+      document.removeEventListener('copy', preventDefault); document.removeEventListener('paste', preventDefault)
+      document.removeEventListener('cut', preventDefault); document.removeEventListener('contextmenu', preventDefault)
       document.removeEventListener('keydown', keydown)
     }
   }, [examStarted])
 
-  // =============================================
+  const enterFullscreen = async () => {
+    try {
+      const elem = document.documentElement
+      if (elem.requestFullscreen) await elem.requestFullscreen()
+      else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
+      setFullscreen(true)
+      setShowFullscreenPrompt(false)
+    } catch (e) {}
+  }
+
+  // ============================================
+  // FORMATTING HELPERS
+  // ============================================
+  const formatTime = (s: number) => {
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+    return h > 0 ? `${h}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}` : `${m}:${sec.toString().padStart(2, '0')}`
+  }
+
+  const formatPoints = (p: number) => p === 0.5 ? '½ Point' : `${p} Point${p !== 1 ? 's' : ''}`
+
+  const getQuestionStatus = (q: Question, idx: number) => {
+    if (answers[q.id]) return 'answered'
+    if (flaggedQuestions.has(q.id)) return 'flagged'
+    if (idx === currentIndex) return 'current'
+    return 'not-answered'
+  }
+
+  // ============================================
   // LOADING STATE
-  // =============================================
-  if (loading) {
+  // ============================================
+  if (loading) return (
+    <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center">
+      <div className="text-center">
+        <Loader2 className="h-12 w-12 animate-spin text-[#c41e3a] mx-auto mb-4" />
+        <p className="text-gray-400">Loading exam environment...</p>
+      </div>
+    </div>
+  )
+  
+  if (loadError) return (
+    <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center p-4">
+      <Card className="max-w-md shadow-lg border-0 bg-[#1a1f2e] text-white">
+        <div className="bg-[#c41e3a] p-4 rounded-t-lg"><h2 className="text-white font-bold">Error</h2></div>
+        <CardContent className="p-6 text-center">
+          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+          <p className="text-gray-300 mb-4">{loadError}</p>
+          <Button onClick={() => router.push('/student')} className="bg-[#c41e3a] hover:bg-[#a01830] text-white"><Home className="mr-2 h-4 w-4" />Dashboard</Button>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  // ============================================
+  // RESUME DIALOG
+  // ============================================
+  if (showResumeDialog) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="relative">
-            <div className="h-20 w-20 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto" />
-            <BookOpen className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-8 w-8 text-primary" />
+      <div className="min-h-screen bg-[#0a0f1a] flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-0 bg-[#1a1f2e] text-white shadow-xl">
+          <div className="bg-gradient-to-r from-[#c41e3a] to-[#e8354a] p-6 text-center">
+            <RotateCcw className="h-14 w-14 mx-auto mb-3 text-white" />
+            <h2 className="text-xl font-bold">Resume Exam?</h2>
           </div>
-          <p className="mt-6 text-lg font-medium text-gray-700">Loading your exam...</p>
-          <p className="text-sm text-gray-500 mt-1">Please wait while we prepare everything</p>
-        </div>
-      </div>
-    )
-  }
-
-  // =============================================
-  // ERROR STATE
-  // =============================================
-  if (loadError) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full shadow-xl border-0 rounded-2xl overflow-hidden">
-          <div className="bg-gradient-to-r from-red-500 to-rose-600 p-6 text-center">
-            <XCircle className="h-16 w-16 text-white/90 mx-auto mb-2" />
-            <h2 className="text-xl font-bold text-white">Error Loading Exam</h2>
-          </div>
-          <CardContent className="p-6 text-center">
-            <p className="text-gray-600 mb-6">{loadError}</p>
-            <Button onClick={() => router.push('/student')} className="w-full bg-primary hover:bg-primary/90">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // =============================================
-  // COMPLETED EXAM VIEW (CANNOT RETAKE)
-  // =============================================
-  if (hasCompletedAttempt && !examStarted && !showResultDialog) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-white">
-              <div className="bg-gradient-to-r from-primary to-primary/80 px-8 py-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h1 className="text-2xl font-bold text-white">{exam?.title}</h1>
-                    <p className="text-white/80 mt-1">{exam?.subject} • {exam?.class}</p>
-                  </div>
-                  <Badge className={cn(
-                    "px-4 py-2 text-sm font-medium text-white",
-                    examResult?.status === 'graded' ? "bg-green-500" :
-                    examResult?.status === 'pending_theory' ? "bg-yellow-500" :
-                    "bg-blue-500"
-                  )}>
-                    {examResult?.status === 'graded' ? 'Graded' : 
-                     examResult?.status === 'pending_theory' ? 'Theory Pending' : 'Completed'}
-                  </Badge>
-                </div>
-              </div>
-              
-              <CardContent className="p-8">
-                <div className="flex items-center gap-6 p-6 bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl mb-8 border border-gray-100">
-                  <Avatar className="h-24 w-24 ring-4 ring-primary/20 shadow-lg">
-                    <AvatarImage src={profile?.photo_url || ''} />
-                    <AvatarFallback className="bg-primary text-white text-3xl font-bold">{getInitials()}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-bold text-gray-800 text-2xl">{profile?.full_name}</p>
-                    <p className="text-gray-600 text-lg">{profile?.class} • {profile?.vin_id}</p>
-                    <p className="text-gray-500">{profile?.email}</p>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 text-center border border-primary/20">
-                    <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold mb-2">Overall Score</p>
-                    <p className="text-5xl font-bold text-primary">{examResult?.score}/{examResult?.total}</p>
-                    <p className="text-xl text-gray-600 mt-2">{examResult?.percentage}%</p>
-                  </div>
-                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 text-center border border-blue-100">
-                    <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold mb-2">Objective</p>
-                    <p className="text-4xl font-bold text-blue-600">{examResult?.objective_score || examResult?.score}/{examResult?.objective_total || examResult?.total}</p>
-                    <div className="flex justify-center gap-5 mt-3">
-                      <div className="text-center">
-                        <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-1">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                        </div>
-                        <p className="text-lg font-bold text-green-600">{examResult?.correct || 0}</p>
-                        <p className="text-xs text-gray-500">Correct</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-1">
-                          <XCircle className="h-4 w-4 text-red-500" />
-                        </div>
-                        <p className="text-lg font-bold text-red-500">{examResult?.incorrect || 0}</p>
-                        <p className="text-xs text-gray-500">Wrong</p>
-                      </div>
-                      <div className="text-center">
-                        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-1">
-                          <HelpCircle className="h-4 w-4 text-gray-500" />
-                        </div>
-                        <p className="text-lg font-bold text-gray-600">{examResult?.unanswered || 0}</p>
-                        <p className="text-xs text-gray-500">Skipped</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 text-center border border-purple-100">
-                    <p className="text-sm text-gray-500 uppercase tracking-wider font-semibold mb-2">Theory</p>
-                    {examResult?.status === 'graded' ? (
-                      <>
-                        <p className="text-4xl font-bold text-purple-600">{examResult?.theory_score || 0}/{examResult?.theory_total || 0}</p>
-                        <p className="text-sm text-gray-600 mt-2">Graded</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-4xl font-bold text-gray-400">—/{examResult?.theory_total || 0}</p>
-                        <p className="text-sm text-yellow-600 mt-2">Pending Grading</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-                
-                <div className={cn(
-                  "rounded-2xl p-6 mb-8 text-center border-2",
-                  examResult?.is_passed ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"
-                )}>
-                  <div className="flex items-center justify-center gap-3">
-                    {examResult?.is_passed ? (
-                      <><CheckCircle className="h-8 w-8 text-green-600" /><span className="text-2xl font-bold text-green-700">Congratulations! You Passed!</span></>
-                    ) : (
-                      <><XCircle className="h-8 w-8 text-red-600" /><span className="text-2xl font-bold text-red-700">Not Passed - Keep Practicing!</span></>
-                    )}
-                  </div>
-                  <p className="text-gray-600 mt-2">Passing score: {examResult?.passing_percentage}%</p>
-                </div>
-                
-                <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => router.push('/student')} className="flex-1 h-12">
-                    <ArrowLeft className="mr-2 h-5 w-5" /> Back to Dashboard
-                  </Button>
-                  {canRetake && (
-                    <Button onClick={() => {
-                      setHasCompletedAttempt(false)
-                      setShowInstructions(true)
-                      setExistingAttempt(null)
-                    }} className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white">
-                      <RotateCcw className="mr-2 h-5 w-5" /> Retake Exam
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </div>
-    )
-  }
-
-  // =============================================
-  // INSTRUCTIONS PAGE
-  // =============================================
-  if (!examStarted && showInstructions && !hasCompletedAttempt) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 py-12 px-4">
-        <div className="max-w-4xl mx-auto">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <Card className="border-0 shadow-xl rounded-2xl overflow-hidden bg-white">
-              <div className="bg-gradient-to-r from-primary to-primary/80 px-8 py-6">
-                <h1 className="text-2xl font-bold text-white">{exam?.title}</h1>
-                <div className="flex items-center gap-6 mt-2 text-white/90 text-sm">
-                  <span className="flex items-center gap-1"><BookOpen className="h-4 w-4" />{exam?.subject}</span>
-                  <span className="flex items-center gap-1"><User className="h-4 w-4" />{exam?.class}</span>
-                  <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{exam?.duration} min</span>
-                  <span className="flex items-center gap-1"><HelpCircle className="h-4 w-4" />{allQuestions.length} questions</span>
-                </div>
-              </div>
-              
-              <CardContent className="p-8">
-                <div className="flex items-center gap-5 p-5 bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl mb-6 border border-gray-100">
-                  <Avatar className="h-20 w-20 ring-3 ring-primary/20 shadow-md">
-                    <AvatarImage src={profile?.photo_url || ''} />
-                    <AvatarFallback className="bg-primary text-white text-2xl font-bold">{getInitials()}</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="font-bold text-gray-800 text-xl">{profile?.full_name}</p>
-                    <p className="text-gray-600">{profile?.class} • {profile?.vin_id}</p>
-                  </div>
-                </div>
-                
-                <Tabs defaultValue="instructions" className="mb-6">
-                  <TabsList className="grid w-full grid-cols-3">
-                    <TabsTrigger value="instructions">Instructions</TabsTrigger>
-                    <TabsTrigger value="security">Security Rules</TabsTrigger>
-                    <TabsTrigger value="overview">Exam Overview</TabsTrigger>
-                  </TabsList>
-                  
-                  <TabsContent value="instructions" className="mt-4">
-                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-                      <h3 className="font-bold text-blue-800 mb-3 flex items-center gap-2 text-lg">
-                        <FileText className="h-5 w-5" /> Exam Instructions
-                      </h3>
-                      <p className="text-blue-700 leading-relaxed">{exam?.instructions || 'Read all questions carefully. You can flag questions for review. Your progress is auto-saved.'}</p>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="security" className="mt-4">
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6">
-                      <h3 className="font-bold text-amber-800 mb-4 flex items-center gap-2 text-lg">
-                        <Shield className="h-5 w-5" /> Strict Exam Security Rules
-                      </h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="flex items-start gap-3">
-                          <Monitor className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                          <div><p className="font-medium text-amber-800">Tab Switching</p><p className="text-sm text-amber-700">Limit: {TAB_SWITCH_LIMIT} switches. Exceeding auto-submits.</p></div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Maximize2 className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                          <div><p className="font-medium text-amber-800">Fullscreen Required</p><p className="text-sm text-amber-700">Limit: {FULLSCREEN_EXIT_LIMIT} exits. Exceeding auto-submits.</p></div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
-                          <div><p className="font-medium text-red-800">New Tabs/Windows PROHIBITED</p><p className="text-sm text-red-700">Opening new tabs/windows will auto-submit immediately!</p></div>
-                        </div>
-                        <div className="flex items-start gap-3">
-                          <Clock className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
-                          <div><p className="font-medium text-amber-800">Time Limit</p><p className="text-sm text-amber-700">Auto-submit on timeout</p></div>
-                        </div>
-                      </div>
-                      <div className="mt-4 p-4 bg-red-50 border-2 border-red-300 rounded-xl">
-                        <p className="text-red-700 text-sm font-bold flex items-center gap-2">
-                          <AlertCircle className="h-5 w-5" />
-                          ⚠️ STRICT WARNING: Do NOT attempt to open new tabs, windows, or switch applications!
-                        </p>
-                        <p className="text-red-600 text-xs mt-1">
-                          Any violation will result in immediate auto-submission of your exam.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-                  
-                  <TabsContent value="overview" className="mt-4">
-                    <div className="bg-green-50 border border-green-200 rounded-2xl p-6">
-                      <h3 className="font-bold text-green-800 mb-3 flex items-center gap-2 text-lg">
-                        <Target className="h-5 w-5" /> Exam Overview
-                      </h3>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white rounded-xl p-4">
-                          <p className="text-sm text-gray-500">Objective Questions</p>
-                          <p className="text-3xl font-bold text-green-600">{objectiveQuestions.length}</p>
-                          <p className="text-xs text-gray-500 mt-1">{objectiveQuestions.reduce((s, q) => s + (q.points || q.marks || 0.5), 0)} marks</p>
-                        </div>
-                        <div className="bg-white rounded-xl p-4">
-                          <p className="text-sm text-gray-500">Theory Questions</p>
-                          <p className="text-3xl font-bold text-purple-600">{theoryQuestions.length}</p>
-                          <p className="text-xs text-gray-500 mt-1">{theoryQuestions.reduce((s, q) => s + (q.points || q.marks || 5), 0)} marks</p>
-                        </div>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-                
-                <div className="flex gap-4">
-                  <Button variant="outline" onClick={() => router.push('/student')} className="flex-1 h-12">Cancel</Button>
-                  <Button onClick={startExam} disabled={startingExam} className="flex-1 h-12 bg-primary hover:bg-primary/90 text-white font-bold">
-                    {startingExam ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Lock className="mr-2 h-5 w-5" />}Start Exam
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
-      </div>
-    )
-  }
-
-  // =============================================
-  // FULLSCREEN PROMPT
-  // =============================================
-  if (showFullscreenPrompt && examStarted && !examEnded) {
-    return (
-      <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <Card className="max-w-md w-full border-0 shadow-2xl rounded-2xl overflow-hidden">
-          <div className="bg-gradient-to-r from-primary to-primary/80 p-8 text-center">
-            <Maximize2 className="h-16 w-16 text-white mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-white">Return to Fullscreen</h2>
-          </div>
-          <CardContent className="p-6 text-center bg-white">
-            <div className="mb-6">
-              <span className="text-6xl font-bold text-primary">{fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}</span>
-              <p className="text-gray-500 mt-2">Fullscreen Exits</p>
-            </div>
-            <p className="text-gray-700 mb-6 font-medium">
-              {fullscreenExits >= FULLSCREEN_EXIT_LIMIT - 1 ? '⚠️ ONE MORE EXIT WILL AUTO-SUBMIT YOUR EXAM!' : 'This exam must be taken in fullscreen mode.'}
+          <CardContent className="p-6">
+            <p className="text-gray-300 mb-4 text-center">
+              You have an exam in progress. Would you like to resume where you left off?
             </p>
-            <Button onClick={enterFullscreen} className="w-full bg-primary hover:bg-primary/90 text-white font-bold py-6 text-lg">
-              <Maximize2 className="mr-2 h-5 w-5" />Return to Fullscreen
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
-  // =============================================
-  // MAIN EXAM INTERFACE
-  // =============================================
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      {/* Simplified Exam Header - No public header import */}
-      <header className="fixed top-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm">
-        <div className="px-4 lg:px-6 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Avatar className="h-12 w-12 ring-2 ring-primary/20 shadow-sm">
-                <AvatarImage src={profile?.photo_url || ''} />
-                <AvatarFallback className="bg-primary text-white text-lg font-bold">{getInitials()}</AvatarFallback>
-              </Avatar>
-              <div className="hidden sm:block">
-                <h2 className="font-semibold text-gray-800 text-base lg:text-lg line-clamp-1">{exam?.title}</h2>
-                <p className="text-sm text-gray-500">{profile?.full_name} • {profile?.class}</p>
+            
+            <div className="bg-[#0a0f1a] rounded-lg p-4 mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-400">Time Remaining:</span>
+                <span className="text-[#c41e3a] font-bold text-xl">{formatTime(resumeData?.timeLeft || 0)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Questions Answered:</span>
+                <span className="text-white font-medium">{Object.keys(resumeData?.answers || {}).length} / {allQuestions.length}</span>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
-              {autoSaveStatus !== 'idle' && (
-                <Badge variant="outline" className={cn(
-                  "gap-1",
-                  autoSaveStatus === 'saving' && "text-blue-600",
-                  autoSaveStatus === 'saved' && "text-green-600"
-                )}>
-                  {autoSaveStatus === 'saving' ? (
-                    <><Loader2 className="h-3 w-3 animate-spin" /> Saving</>
-                  ) : (
-                    <><CheckCheck className="h-3 w-3" /> Saved</>
+            <div className="space-y-3">
+              <Button onClick={handleResumeExam} className="w-full bg-[#c41e3a] hover:bg-[#a01830] text-white h-12">
+                <RotateCcw className="mr-2 h-4 w-4" /> Resume Exam
+              </Button>
+              <Button variant="outline" onClick={handleStartNewAttempt} className="w-full border-gray-600 text-gray-300 hover:bg-[#0a0f1a] h-12">
+                Start New Attempt
+              </Button>
+              <Button variant="ghost" onClick={handleDiscardAndStart} className="w-full text-gray-400 hover:text-white h-12">
+                Discard & Start Fresh
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ============================================
+  // COMPLETED EXAM VIEW
+  // ============================================
+  if (hasCompletedAttempt && !examStarted && !showResultDialog) {
+    const theoryQuestions = allQuestions.filter(q => q.type === 'theory')
+    
+    return (
+      <div className="min-h-screen bg-[#0a0f1a]">
+        <div className="bg-[#1a1f2e] border-b border-gray-700 px-6 py-4">
+          <div className="max-w-6xl mx-auto flex items-center gap-4">
+            <BookOpen className="h-6 w-6 text-[#c41e3a]" />
+            <h1 className="text-2xl font-bold text-white">{exam?.title}</h1>
+            <Badge className={cn(
+              "ml-auto px-4 py-1.5 text-sm font-medium",
+              examResult?.status === 'graded' ? "bg-green-500/20 text-green-400" :
+              examResult?.status === 'pending_theory' ? "bg-yellow-500/20 text-yellow-400" :
+              "bg-blue-500/20 text-blue-400"
+            )}>
+              {examResult?.status === 'graded' ? 'Graded' : 
+               examResult?.status === 'pending_theory' ? 'Pending Grading' : 'Completed'}
+            </Badge>
+          </div>
+        </div>
+        
+        <div className="max-w-6xl mx-auto py-8 px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 space-y-6">
+              <Card className="border-0 shadow-lg bg-[#1a1f2e] overflow-hidden">
+                <div className="bg-gradient-to-r from-[#c41e3a] to-[#e8354a] p-3">
+                  <h3 className="text-white font-medium text-center flex items-center justify-center gap-2">
+                    <Camera className="h-4 w-4" /> Student Identification
+                  </h3>
+                </div>
+                <CardContent className="p-6 flex justify-center">
+                  <div className="relative">
+                    {profile?.photo_url ? (
+                      <div className="w-48 h-56 border-4 border-[#c41e3a] rounded-md overflow-hidden shadow-xl">
+                        <Image 
+                          src={profile.photo_url} 
+                          alt={profile.full_name}
+                          width={192}
+                          height={224}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-48 h-56 border-4 border-gray-600 rounded-md overflow-hidden bg-[#0a0f1a] flex items-center justify-center">
+                        <User className="h-20 w-20 text-gray-500" />
+                      </div>
+                    )}
+                    <div className="absolute -bottom-3 left-0 right-0">
+                      <Badge className="w-full justify-center bg-[#c41e3a] text-white py-1">
+                        {profile?.vin_id || 'Student'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardContent className="pt-0 pb-4 text-center">
+                  <h3 className="text-white font-bold text-lg">{profile?.full_name}</h3>
+                  <p className="text-gray-400 text-sm">{profile?.class} • {profile?.email}</p>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                    <Award className="h-5 w-5 text-[#c41e3a]" />
+                    Score Summary
+                  </h3>
+                  
+                  <div className="space-y-4">
+                    <div className="text-center py-3 bg-[#0a0f1a] rounded-lg">
+                      <p className="text-sm text-gray-400">Overall Score</p>
+                      <p className="text-4xl font-bold text-[#c41e3a]">{examResult?.score}/{examResult?.total}</p>
+                      <p className="text-lg text-gray-300">{examResult?.percentage}%</p>
+                    </div>
+                    
+                    <div className={cn(
+                      "rounded-lg p-4 text-center border-2",
+                      examResult?.is_passed ? "bg-green-500/10 border-green-500" : "bg-red-500/10 border-red-500"
+                    )}>
+                      {examResult?.is_passed ? (
+                        <div className="flex items-center justify-center gap-2 text-green-400">
+                          <CheckCircle className="h-6 w-6" />
+                          <span className="text-xl font-bold">Passed</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2 text-red-400">
+                          <XCircle className="h-6 w-6" />
+                          <span className="text-xl font-bold">Not Passed</span>
+                        </div>
+                      )}
+                      <p className="text-sm mt-1 text-gray-400">Passing: {examResult?.passing_percentage}%</p>
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 text-center">
+                      <div className="bg-blue-500/10 rounded-lg p-3 border border-blue-500/30">
+                        <p className="text-sm text-blue-400">Objective</p>
+                        <p className="text-xl font-bold text-blue-300">{examResult?.objective_score || examResult?.score}/{examResult?.objective_total || examResult?.total}</p>
+                      </div>
+                      <div className="bg-purple-500/10 rounded-lg p-3 border border-purple-500/30">
+                        <p className="text-sm text-purple-400">Theory</p>
+                        {examResult?.status === 'graded' ? (
+                          <p className="text-xl font-bold text-purple-300">{examResult?.theory_score || 0}/{examResult?.theory_total || 0}</p>
+                        ) : (
+                          <p className="text-xl font-bold text-gray-500">—/{examResult?.theory_total || 0}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Calendar className="h-4 w-4" />
+                    <span>{TERM_NAMES[exam?.term || CURRENT_TERM]} {exam?.session_year || CURRENT_SESSION}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="border-0 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-white mb-4">Exam Information</h3>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div><span className="text-gray-400">Subject:</span> <span className="text-white font-medium">{exam?.subject}</span></div>
+                    <div><span className="text-gray-400">Class:</span> <span className="text-white font-medium">{exam?.class}</span></div>
+                    <div><span className="text-gray-400">Duration:</span> <span className="text-white font-medium">{exam?.duration} minutes</span></div>
+                    <div><span className="text-gray-400">Questions:</span> <span className="text-white font-medium">{allQuestions.length}</span></div>
+                    <div><span className="text-gray-400">Submitted:</span> <span className="text-white font-medium">{examResult?.submitted_at ? new Date(examResult.submitted_at).toLocaleString() : 'N/A'}</span></div>
+                    <div><span className="text-gray-400">Status:</span> <Badge className={examResult?.status === 'graded' ? "bg-green-500/20 text-green-400" : "bg-yellow-500/20 text-yellow-400"}>{examResult?.status}</Badge></div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border-0 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-white mb-4">Objective Breakdown</h3>
+                  <div className="flex justify-around text-center">
+                    <div>
+                      <p className="text-3xl font-bold text-green-400">{examResult?.correct || 0}</p>
+                      <p className="text-sm text-gray-400">Correct</p>
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-red-400">{examResult?.incorrect || 0}</p>
+                      <p className="text-sm text-gray-400">Incorrect</p>
+                    </div>
+                    <div>
+                      <p className="text-3xl font-bold text-gray-500">{examResult?.unanswered || 0}</p>
+                      <p className="text-sm text-gray-400">Unanswered</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              {theoryQuestions.length > 0 && (
+                <Card className="border-0 shadow-lg bg-[#1a1f2e]">
+                  <CardContent className="p-6">
+                    <h3 className="font-semibold text-white mb-4 flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-[#c41e3a]" />
+                      Theory Status
+                    </h3>
+                    {examResult?.status === 'pending_theory' ? (
+                      <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                        <p className="text-yellow-400 flex items-center gap-2">
+                          <Clock className="h-5 w-5" />
+                          Your theory answers are pending grading by your instructor.
+                        </p>
+                      </div>
+                    ) : examResult?.status === 'graded' ? (
+                      <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                        <p className="text-green-400 flex items-center gap-2">
+                          <CheckCheck className="h-5 w-5" />
+                          Your theory answers have been graded!
+                        </p>
+                        {examResult?.graded_by && (
+                          <p className="text-green-500 text-sm mt-2">Graded by: {examResult.graded_by}</p>
+                        )}
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+              )}
+              
+              <div className="flex gap-4">
+                <Button onClick={() => router.push('/student')} className="flex-1 bg-[#c41e3a] hover:bg-[#a01830] text-white h-12">
+                  <Home className="mr-2 h-4 w-4" /> Back to Dashboard
+                </Button>
+                <Button variant="outline" onClick={() => setShowResultDialog(true)} className="flex-1 border-gray-600 text-gray-300 hover:bg-[#0a0f1a] h-12">
+                  <Eye className="mr-2 h-4 w-4" /> View Full Results
+                </Button>
+              </div>
+              
+              <p className="text-center text-sm text-gray-500">
+                This exam has been completed. Each exam can only be taken once.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ============================================
+  // INSTRUCTIONS PAGE
+  // ============================================
+  if (!examStarted && showInstructions && !hasCompletedAttempt) {
+    const objectiveQuestions = allQuestions.filter(q => q.type !== 'theory')
+    const theoryQuestions = allQuestions.filter(q => q.type === 'theory')
+    const totalPoints = allQuestions.reduce((sum, q) => sum + Number(q.points || 1), 0)
+    
+    return (
+      <div className="min-h-screen bg-[#0a0f1a]">
+        <div className="bg-[#1a1f2e] border-b border-gray-700 px-6 py-4">
+          <div className="max-w-5xl mx-auto">
+            <h1 className="text-2xl font-bold text-white">{exam?.title}</h1>
+            <div className="flex items-center gap-4 mt-2 text-sm text-gray-400 flex-wrap">
+              <span className="flex items-center gap-1"><BookOpen className="h-4 w-4" />{exam?.subject}</span>
+              <span className="flex items-center gap-1"><User className="h-4 w-4" />{exam?.class}</span>
+              <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{exam?.duration} minutes</span>
+              <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{TERM_NAMES[exam?.term || CURRENT_TERM]} {exam?.session_year || CURRENT_SESSION}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div className="max-w-5xl mx-auto py-8 px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <Card className="border-0 shadow-lg bg-[#1a1f2e] overflow-hidden sticky top-24">
+                <div className="bg-gradient-to-r from-[#c41e3a] to-[#e8354a] p-3">
+                  <h3 className="text-white font-medium text-center flex items-center justify-center gap-2">
+                    <Camera className="h-4 w-4" /> Candidate Verification
+                  </h3>
+                </div>
+                <CardContent className="p-6 flex justify-center">
+                  <div className="relative">
+                    {profile?.photo_url ? (
+                      <div className="w-56 h-64 border-4 border-[#c41e3a] rounded-md overflow-hidden shadow-xl">
+                        <Image 
+                          src={profile.photo_url} 
+                          alt={profile.full_name}
+                          width={224}
+                          height={256}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-56 h-64 border-4 border-gray-600 rounded-md overflow-hidden bg-[#0a0f1a] flex items-center justify-center">
+                        <User className="h-24 w-24 text-gray-500" />
+                      </div>
+                    )}
+                    <div className="absolute -bottom-3 left-0 right-0">
+                      <Badge className="w-full justify-center bg-[#c41e3a] text-white py-1.5 text-base">
+                        {profile?.vin_id || 'Student ID'}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardContent className="pt-0 pb-5 text-center">
+                  <h3 className="text-white font-bold text-xl">{profile?.full_name}</h3>
+                  <p className="text-gray-400">{profile?.class}</p>
+                  <p className="text-gray-500 text-sm mt-1">{profile?.email}</p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <div className="lg:col-span-2">
+              <Card className="border-0 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-6">
+                  <div className="grid grid-cols-4 gap-4 mb-6">
+                    <div className="bg-[#0a0f1a] rounded-lg p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase font-semibold">Questions</p>
+                      <p className="text-2xl font-bold text-white">{allQuestions.length}</p>
+                    </div>
+                    <div className="bg-[#0a0f1a] rounded-lg p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase font-semibold">Total Points</p>
+                      <p className="text-2xl font-bold text-white">{totalPoints}</p>
+                    </div>
+                    <div className="bg-[#0a0f1a] rounded-lg p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase font-semibold">Pass Mark</p>
+                      <p className="text-2xl font-bold text-white">{exam?.passing_percentage || 50}%</p>
+                    </div>
+                    <div className="bg-[#0a0f1a] rounded-lg p-4 text-center">
+                      <p className="text-xs text-gray-400 uppercase font-semibold">Attempt</p>
+                      <p className="text-2xl font-bold text-white">1 of 1</p>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-[#0a0f1a] rounded-lg p-4 mb-6">
+                    <h3 className="font-medium text-white mb-2">Question Breakdown</h3>
+                    <div className="flex gap-6">
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span className="text-gray-300">{objectiveQuestions.length} Objective Questions</span>
+                      </div>
+                      {theoryQuestions.length > 0 && (
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                          <span className="text-gray-300">{theoryQuestions.length} Theory Questions</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {exam?.instructions && (
+                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-4 mb-4">
+                      <h3 className="font-medium text-blue-400 mb-2 flex items-center gap-2">
+                        <FileText className="h-4 w-4" /> Instructions
+                      </h3>
+                      <p className="text-blue-300 text-sm">{exam.instructions}</p>
+                    </div>
                   )}
+                  
+                  <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 mb-6">
+                    <h3 className="font-medium text-yellow-400 mb-2 flex items-center gap-2">
+                      <Shield className="h-4 w-4" /> Exam Security
+                    </h3>
+                    <ul className="space-y-1 text-sm text-yellow-300">
+                      <li>• Tab switching limit: {TAB_SWITCH_LIMIT} (exceed = auto-submit)</li>
+                      <li>• Fullscreen exit limit: {FULLSCREEN_EXIT_LIMIT} (exceed = auto-submit)</li>
+                      <li>• Time limit: Auto-submits when timer reaches zero</li>
+                      <li>• Auto-save: Progress saved every 30 seconds</li>
+                    </ul>
+                  </div>
+                  
+                  {theoryQuestions.length > 0 && (
+                    <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4 mb-6">
+                      <p className="text-purple-300 text-sm">
+                        This exam contains theory questions. Objective answers are graded immediately. 
+                        Theory answers will be reviewed by your instructor.
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => router.push('/student')} className="flex-1 border-gray-600 text-gray-300 hover:bg-[#0a0f1a]">Cancel</Button>
+                    <Button onClick={startExam} disabled={startingExam} className="flex-1 bg-[#c41e3a] hover:bg-[#a01830] text-white">
+                      {startingExam ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Lock className="mr-2 h-4 w-4" />}
+                      Start Exam
+                    </Button>
+                  </div>
+                  
+                  <p className="text-center text-sm text-gray-500 mt-4">
+                    Note: This exam can only be taken once. Make sure you're ready before starting.
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ============================================
+  // FULLSCREEN PROMPT
+  // ============================================
+  if (showFullscreenPrompt && examStarted && !examEnded) {
+    return (
+      <div className="fixed inset-0 bg-black/95 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full border-0 shadow-2xl bg-[#1a1f2e]">
+          <div className="bg-[#c41e3a] p-6 text-center text-white">
+            <Maximize2 className="h-14 w-14 mx-auto mb-3" />
+            <h2 className="text-xl font-bold">Return to Fullscreen</h2>
+          </div>
+          <CardContent className="p-6 text-center">
+            <p className="text-5xl font-bold text-[#c41e3a] mb-2">{fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}</p>
+            <p className="text-gray-400 mb-6">{fullscreenExits >= FULLSCREEN_EXIT_LIMIT - 1 ? '⚠️ ONE MORE EXIT WILL AUTO-SUBMIT!' : 'This exam must be taken in fullscreen mode.'}</p>
+            <Button onClick={enterFullscreen} className="w-full bg-[#c41e3a] hover:bg-[#a01830] text-white h-12"><Maximize2 className="mr-2 h-4 w-4" />Return to Fullscreen</Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
+  // ============================================
+  // MAIN EXAM INTERFACE - PROFESSIONAL CBT
+  // ============================================
+  return (
+    <div className="min-h-screen bg-[#0a0f1a]">
+      <div className="fixed top-0 left-0 right-0 z-40 bg-[#1a1f2e] border-b border-gray-700 shadow-lg">
+        <div className="px-4 sm:px-6 py-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {profile?.photo_url ? (
+                  <div className="h-10 w-10 rounded-md overflow-hidden border-2 border-[#c41e3a]">
+                    <Image 
+                      src={profile.photo_url} 
+                      alt={profile.full_name}
+                      width={40}
+                      height={40}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  </div>
+                ) : (
+                  <div className="h-10 w-10 rounded-md bg-[#c41e3a] flex items-center justify-center">
+                    <User className="h-5 w-5 text-white" />
+                  </div>
+                )}
+              </div>
+              <div className="hidden sm:block">
+                <h2 className="font-semibold text-white text-sm">{exam?.title}</h2>
+                <p className="text-xs text-gray-400">{profile?.full_name} • {TERM_NAMES[exam?.term || CURRENT_TERM]}</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <Badge className={cn(
+                "px-2 py-0.5 text-xs",
+                isOnline ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400"
+              )}>
+                {isOnline ? <Wifi className="h-3 w-3 mr-1" /> : <WifiOff className="h-3 w-3 mr-1" />}
+                {isOnline ? 'Online' : 'Offline'}
+              </Badge>
+              
+              {autoSaving && (
+                <Badge className="bg-blue-500/20 text-blue-400 px-2 py-0.5 text-xs">
+                  <Save className="h-3 w-3 mr-1 animate-pulse" /> Saving...
+                </Badge>
+              )}
+              {lastSaved && !autoSaving && (
+                <Badge className="bg-green-500/20 text-green-400 px-2 py-0.5 text-xs">
+                  <CheckCircle className="h-3 w-3 mr-1" /> Saved
                 </Badge>
               )}
               
-              <Badge variant="outline" className={cn(
-                "gap-1",
-                isOnline ? "text-green-600" : "text-red-600"
-              )}>
-                {isOnline ? <Wifi className="h-3 w-3" /> : <WifiOff className="h-3 w-3" />}
-              </Badge>
-              
               <div className={cn(
-                "px-4 lg:px-6 py-2 rounded-full font-mono text-xl lg:text-2xl font-bold shadow-sm transition-colors",
-                timeLeft < 300 ? "bg-red-100 text-red-700 animate-pulse" : "bg-gray-100 text-gray-800"
+                "px-4 py-1.5 rounded-md font-mono text-xl font-bold",
+                timeLeft < 300 ? "bg-red-500/20 text-red-400" : "bg-[#0a0f1a] text-white border border-gray-700"
               )}>
-                <Clock className="inline h-5 w-5 mr-2" />{formatTime(timeLeft)}
+                <Clock className="inline h-4 w-4 mr-1.5" />{formatTime(timeLeft)}
               </div>
-              
-              <div className="hidden sm:flex items-center gap-1">
-                <Badge className={cn(
-                  "px-2 lg:px-3 py-1 text-xs font-medium",
-                  tabSwitches === 0 ? "bg-green-100 text-green-700" : 
-                  tabSwitches === 1 ? "bg-yellow-100 text-yellow-700" : "bg-red-100 text-red-700"
-                )}>
-                  Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}
-                </Badge>
-                <Badge className={cn(
-                  "px-2 lg:px-3 py-1 text-xs font-medium",
-                  newTabAttempts === 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                )}>
-                  New: {newTabAttempts}/{TAB_SWITCH_LIMIT}
-                </Badge>
-              </div>
-              
-              <Button 
-                size="sm" 
-                onClick={() => setShowSubmitDialog(true)} 
-                className="bg-primary hover:bg-primary/90 text-white h-9 px-4 lg:px-5"
-              >
-                <Send className="mr-1.5 h-4 w-4" />
-                <span className="hidden sm:inline">Submit</span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Badge className={cn(
+                "px-2 py-0.5 text-xs",
+                tabSwitches === 0 ? "bg-green-500/20 text-green-400" : 
+                tabSwitches === 1 ? "bg-yellow-500/20 text-yellow-400" : 
+                "bg-red-500/20 text-red-400"
+              )}>
+                Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}
+              </Badge>
+              <Badge className={cn(
+                "px-2 py-0.5 text-xs",
+                fullscreenExits === 0 ? "bg-green-500/20 text-green-400" : 
+                fullscreenExits === 1 ? "bg-yellow-500/20 text-yellow-400" : 
+                "bg-red-500/20 text-red-400"
+              )}>
+                FS: {fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}
+              </Badge>
+              <Button size="sm" onClick={() => setShowSubmitDialog(true)} className="bg-[#c41e3a] hover:bg-[#a01830] text-white h-8 px-4">
+                <Send className="mr-1.5 h-3.5 w-3.5" />Submit
               </Button>
             </div>
           </div>
           
-          <div className="mt-3">
-            <div className="flex justify-between text-xs text-gray-500 mb-1">
-              <span><strong className="text-gray-800">{answeredCount}</strong> of {allQuestions.length} answered</span>
-              <span className="flex items-center gap-3">
-                <span><CheckCircle className="inline h-3 w-3 text-green-500 mr-1" />{objectiveAnswered} obj</span>
-                <span><FileText className="inline h-3 w-3 text-purple-500 mr-1" />{theoryAnswered} theory</span>
-                <span><Flag className="inline h-3 w-3 text-yellow-500 mr-1" />{flaggedQuestions.size} flagged</span>
-              </span>
+          <div className="mt-2 pb-1">
+            <div className="flex justify-between text-xs text-gray-400 mb-0.5">
+              <span><strong className="text-white">{answeredCount}</strong> of {allQuestions.length} answered</span>
+              <span>{flaggedQuestions.size} flagged</span>
             </div>
-            <Progress value={progressPercentage} className="h-2 bg-gray-200 [&>div]:bg-primary rounded-full" />
+            <Progress value={progressPercentage} className="h-1.5 bg-gray-700 [&>div]:bg-[#c41e3a]" />
           </div>
         </div>
-      </header>
+      </div>
 
-      {/* Security warning toast */}
-      <AnimatePresence>
-        {showSecurityWarning && (
-          <motion.div
-            initial={{ opacity: 0, y: -50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="fixed top-24 left-1/2 -translate-x-1/2 z-50"
-          >
-            <Badge className="bg-red-500 text-white px-4 py-2 text-sm shadow-lg">
-              <AlertCircle className="inline h-4 w-4 mr-1" />
-              Security violation detected! This will be reported.
-            </Badge>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Main content */}
-      <div className="pt-28 lg:pt-32 pb-8 px-4 lg:px-6">
+      <div className="pt-24 pb-6 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Question area */}
+          <div className="flex flex-col lg:flex-row gap-5">
             <div className="flex-1">
-              <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-white">
-                <CardContent className="p-5 lg:p-6">
-                  <div className="flex items-start justify-between mb-4 pb-3 border-b border-gray-200">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-sm font-medium text-gray-500">
-                        Question {currentIndex + 1} of {allQuestions.length}
-                      </span>
-                      <Badge variant="outline" className={cn(
-                        "text-xs",
-                        currentQuestion?.type === 'theory' ? "bg-purple-50 text-purple-700 border-purple-200" : "bg-blue-50 text-blue-700 border-blue-200"
-                      )}>
+              <Card className="border border-gray-700 shadow-lg rounded-lg overflow-hidden bg-[#1a1f2e]">
+                <CardContent className="p-5 sm:p-6">
+                  <div className="flex items-start justify-between mb-4 pb-3 border-b border-gray-700">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-medium text-gray-400">Question {currentIndex + 1}</span>
+                      <Badge variant="outline" className="text-xs border-gray-600 text-gray-300">
                         {currentQuestion?.type === 'theory' ? 'Theory' : 'Objective'}
                       </Badge>
-                      <Badge variant="secondary" className="text-xs">
-                        {currentQuestion?.points || currentQuestion?.marks || 1} {currentQuestion?.points === 1 ? 'point' : 'points'}
-                      </Badge>
                     </div>
-                    <button 
-                      onClick={() => setFlaggedQuestions(p => { 
-                        const n = new Set(p)
-                        n.has(currentQuestion.id) ? n.delete(currentQuestion.id) : n.add(currentQuestion.id)
-                        return n 
-                      })} 
-                      className={cn(
-                        "p-2 rounded-lg transition-colors",
-                        isFlagged ? "text-yellow-600 bg-yellow-50" : "text-gray-400 hover:bg-gray-100"
-                      )}
-                    >
-                      <Flag className="h-5 w-5" fill={isFlagged ? "currentColor" : "none"} />
-                    </button>
+                    
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5 text-sm text-gray-300">
+                        <Award className="h-4 w-4 text-[#c41e3a]" />
+                        <span>{formatPoints(currentQuestion?.points || 1)}</span>
+                      </div>
+                      <button 
+                        onClick={() => setFlaggedQuestions(p => { 
+                          const n = new Set(p)
+                          n.has(currentQuestion.id) ? n.delete(currentQuestion.id) : n.add(currentQuestion.id)
+                          return n 
+                        })} 
+                        className={cn(
+                          "p-1.5 rounded hover:bg-gray-700 transition-colors",
+                          isFlagged ? "text-yellow-500" : "text-gray-500"
+                        )}
+                      >
+                        <Flag className="h-4 w-4" fill={isFlagged ? "currentColor" : "none"} />
+                      </button>
+                    </div>
                   </div>
                   
-                  <div className="bg-gray-50 rounded-xl p-5 lg:p-6 mb-6">
-                    <p className="text-gray-800 text-base lg:text-lg leading-relaxed">
-                      {currentQuestion?.question_text || currentQuestion?.question}
-                    </p>
+                  <div className="bg-[#0a0f1a] rounded-md p-5 mb-5 border border-gray-700">
+                    <p className="text-gray-200 leading-relaxed text-base">{currentQuestion?.question_text || currentQuestion?.question}</p>
                   </div>
                   
-                  <AnimatePresence mode="wait">
-                    <motion.div 
-                      key={currentQuestion?.id} 
-                      initial={{ opacity: 0, x: 20 }} 
-                      animate={{ opacity: 1, x: 0 }} 
-                      exit={{ opacity: 0, x: -20 }} 
-                      transition={{ duration: 0.2 }}
-                    >
-                      {currentQuestion?.type !== 'theory' && currentQuestion?.options ? (
-                        <RadioGroup 
-                          value={answers[currentQuestion?.id] || ''} 
-                          onValueChange={(v) => setAnswers(p => ({ ...p, [currentQuestion.id]: v }))} 
-                          className="space-y-3"
-                        >
-                          {currentQuestion.options.map((opt, idx) => {
-                            const letters = ['A', 'B', 'C', 'D', 'E', 'F']
-                            const isSelected = answers[currentQuestion?.id] === opt
-                            return (
-                              <div 
-                                key={idx} 
-                                className={cn(
-                                  "flex items-center gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all",
-                                  isSelected ? "border-primary bg-primary/5 shadow-sm" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                                )} 
-                                onClick={() => setAnswers(p => ({ ...p, [currentQuestion.id]: opt }))}
-                              >
-                                <div className={cn(
-                                  "w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold transition-colors",
-                                  isSelected ? "bg-primary text-white" : "bg-gray-100 text-gray-600"
-                                )}>
-                                  {letters[idx]}
-                                </div>
-                                <RadioGroupItem value={opt} id={`opt-${idx}`} className="sr-only" />
-                                <Label htmlFor={`opt-${idx}`} className="flex-1 cursor-pointer text-gray-700 text-base">
-                                  {opt}
-                                </Label>
-                                {isSelected && <CheckCircle className="h-5 w-5 text-primary" />}
-                              </div>
-                            )
-                          })}
-                        </RadioGroup>
-                      ) : (
-                        <div className="space-y-3">
-                          {currentQuestion?.type === 'theory' && (
-                            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4 mb-4">
-                              <p className="text-purple-700 text-sm flex items-center gap-2">
-                                <Brain className="h-4 w-4" />
-                                This is a theory question. Your answer will be graded by your teacher.
-                              </p>
+                  {currentQuestion?.type === 'theory' ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-gray-300 text-sm font-medium">Your Answer</Label>
+                        <Badge variant="outline" className="text-xs text-gray-400">
+                          You can format your answer, insert images, and create tables
+                        </Badge>
+                      </div>
+                      
+                      <RichTextEditor
+                        content={answers[currentQuestion?.id] || ''}
+                        onChange={(content: string) => setAnswers(p => ({ ...p, [currentQuestion.id]: content }))}
+                        placeholder="Type your answer here... Use the toolbar for formatting, images, and tables."
+                        minHeight="250px"
+                        maxHeight="500px"
+                        bucketName="exam-answers"
+                        folderPath={`${examId}/${profile?.id}`}
+                        // FIXED: Properly typed file parameter
+                        onImageUpload={async (file: File) => {
+                          const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+                          const filePath = `${examId}/${profile?.id}/${fileName}`
+                          const { data, error } = await supabase.storage
+                            .from('exam-answers')
+                            .upload(filePath, file)
+                          if (error) throw error
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('exam-answers')
+                            .getPublicUrl(filePath)
+                          return publicUrl
+                        }}
+                      />
+                      
+                      <div className="flex items-center gap-4 text-xs text-gray-500">
+                        <span className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3 text-green-500" />
+                          Auto-saved every 30 seconds
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <AlertCircle className="h-3 w-3 text-yellow-500" />
+                          Your answer will be graded by your teacher
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    currentQuestion?.options ? (
+                      <RadioGroup value={answers[currentQuestion?.id] || ''} onValueChange={(v) => setAnswers(p => ({ ...p, [currentQuestion.id]: v }))} className="space-y-2">
+                        {currentQuestion.options.map((opt, idx) => {
+                          const letters = ['A', 'B', 'C', 'D', 'E', 'F']
+                          const isSelected = answers[currentQuestion?.id] === opt
+                          return (
+                            <div 
+                              key={idx} 
+                              className={cn(
+                                "flex items-center gap-3 p-4 rounded-md border cursor-pointer transition-all",
+                                isSelected 
+                                  ? "border-[#c41e3a] bg-[#c41e3a]/10" 
+                                  : "border-gray-700 hover:border-gray-500 bg-[#0a0f1a]"
+                              )} 
+                              onClick={() => setAnswers(p => ({ ...p, [currentQuestion.id]: opt }))}
+                            >
+                              <div className={cn(
+                                "w-7 h-7 rounded flex items-center justify-center text-sm font-medium",
+                                isSelected ? "bg-[#c41e3a] text-white" : "bg-gray-700 text-gray-300"
+                              )}>{letters[idx]}</div>
+                              <RadioGroupItem value={opt} id={`opt-${idx}`} className="sr-only" />
+                              <Label htmlFor={`opt-${idx}`} className="flex-1 cursor-pointer text-gray-200 text-base">{opt}</Label>
                             </div>
-                          )}
-                          <Textarea 
-                            value={answers[currentQuestion?.id] || ''} 
-                            onChange={(e) => setAnswers(p => ({ ...p, [currentQuestion.id]: e.target.value }))} 
-                            placeholder="Type your answer here..." 
-                            rows={8} 
-                            className="w-full border-gray-200 rounded-xl focus:border-primary focus:ring-primary resize-none text-base" 
-                          />
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
+                          )
+                        })}
+                      </RadioGroup>
+                    ) : (
+                      <Textarea 
+                        value={answers[currentQuestion?.id] || ''} 
+                        onChange={(e) => setAnswers(p => ({ ...p, [currentQuestion.id]: e.target.value }))} 
+                        placeholder="Type your answer here..." 
+                        rows={8} 
+                        className="w-full bg-[#0a0f1a] border-gray-700 text-gray-200 rounded-md focus:border-[#c41e3a] focus:ring-[#c41e3a] resize-none text-base" 
+                      />
+                    )
+                  )}
                 </CardContent>
               </Card>
               
-              <div className="flex justify-between items-center mt-6">
+              <div className="flex justify-between items-center mt-4">
                 <Button 
                   variant="outline" 
-                  size="lg" 
-                  onClick={() => navigateToQuestion(currentIndex - 1)} 
-                  disabled={currentIndex === 0} 
-                  className="border-gray-300 h-12 px-6"
+                  size="sm" 
+                  onClick={() => setCurrentIndex(p => p - 1)} 
+                  disabled={currentIndex === 0}
+                  className="border-gray-700 text-gray-300 hover:bg-[#1a1f2e] hover:text-white"
                 >
-                  <ChevronLeft className="mr-2 h-5 w-5" /> Previous
+                  <ChevronLeft className="mr-1 h-4 w-4" />Previous
                 </Button>
                 
-                <div className="text-sm text-gray-500">
-                  {unansweredCount > 0 && (
-                    <span className="text-amber-600">
-                      <AlertCircle className="inline h-4 w-4 mr-1" />
-                      {unansweredCount} unanswered
-                    </span>
-                  )}
-                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowQuestionPalette(!showQuestionPalette)}
+                  className="border-gray-700 text-gray-300 hover:bg-[#1a1f2e] hover:text-white"
+                >
+                  <Grid className="mr-1 h-4 w-4" />Palette
+                </Button>
                 
                 {currentIndex === allQuestions.length - 1 ? (
                   <Button 
-                    size="lg" 
+                    size="sm" 
                     onClick={() => setShowSubmitDialog(true)} 
-                    className="bg-primary hover:bg-primary/90 text-white h-12 px-8"
+                    className="bg-[#c41e3a] hover:bg-[#a01830] text-white"
                   >
-                    Submit Exam <Send className="ml-2 h-5 w-5" />
+                    <Send className="mr-1 h-4 w-4" />Submit
                   </Button>
                 ) : (
                   <Button 
-                    size="lg" 
-                    onClick={() => navigateToQuestion(currentIndex + 1)} 
-                    className="bg-primary hover:bg-primary/90 text-white h-12 px-8"
+                    size="sm" 
+                    onClick={() => setCurrentIndex(p => p + 1)} 
+                    className="bg-[#c41e3a] hover:bg-[#a01830] text-white"
                   >
-                    Next <ChevronRight className="ml-2 h-5 w-5" />
+                    Next<ChevronRight className="ml-1 h-4 w-4" />
                   </Button>
                 )}
               </div>
+
+              {showQuestionPalette && (
+                <div className="mt-4 p-4 bg-[#1a1f2e] rounded-lg border border-gray-700 shadow-lg">
+                  <h4 className="font-medium text-gray-300 text-sm mb-3">Question Palette</h4>
+                  <div className="grid grid-cols-10 sm:grid-cols-12 gap-1.5 max-h-48 overflow-y-auto">
+                    {allQuestions.map((q, idx) => {
+                      const status = getQuestionStatus(q, idx)
+                      return (
+                        <button 
+                          key={q.id} 
+                          onClick={() => {
+                            setCurrentIndex(idx)
+                            setShowQuestionPalette(false)
+                          }} 
+                          className={cn(
+                            "w-7 h-7 rounded text-xs font-medium flex items-center justify-center transition-all",
+                            idx === currentIndex && "ring-2 ring-[#c41e3a] ring-offset-1 ring-offset-[#1a1f2e]",
+                            status === 'answered' && "bg-green-500 text-white",
+                            status === 'flagged' && "bg-yellow-500 text-white",
+                            status === 'current' && "bg-[#c41e3a] text-white",
+                            status === 'not-answered' && "bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600"
+                          )}
+                        >
+                          {idx + 1}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Right sidebar - Question palette */}
-            <div className="lg:w-80 shrink-0">
-              <Card className="border-0 shadow-lg rounded-2xl overflow-hidden bg-white sticky top-28">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-semibold">Question Palette</CardTitle>
-                    <div className="flex items-center gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-                      >
-                        {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid3x3 className="h-4 w-4" />}
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => setSoundEnabled(!soundEnabled)}
-                      >
-                        {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-                      </Button>
+            <div className="lg:w-72 shrink-0 space-y-4">
+              <Card className="border border-gray-700 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-4">
+                  <h4 className="font-medium text-white text-sm mb-3">Exam Progress</h4>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-400">Completion</span>
+                        <span className="font-medium text-[#c41e3a]">{Math.round(progressPercentage)}%</span>
+                      </div>
+                      <Progress value={progressPercentage} className="h-1.5 bg-gray-700 [&>div]:bg-[#c41e3a]" />
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="bg-green-500/10 rounded p-2 text-center border border-green-500/30">
+                        <p className="text-green-400 text-xs">Answered</p>
+                        <p className="text-lg font-bold text-green-300">{answeredCount}</p>
+                      </div>
+                      <div className="bg-yellow-500/10 rounded p-2 text-center border border-yellow-500/30">
+                        <p className="text-yellow-400 text-xs">Flagged</p>
+                        <p className="text-lg font-bold text-yellow-300">{flaggedQuestions.size}</p>
+                      </div>
+                      <div className="bg-gray-500/10 rounded p-2 text-center border border-gray-500/30">
+                        <p className="text-gray-400 text-xs">Remaining</p>
+                        <p className="text-lg font-bold text-gray-300">{unansweredCount}</p>
+                      </div>
                     </div>
                   </div>
-                </CardHeader>
-                
-                <CardContent className="p-5 pt-0">
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4">
-                    <TabsList className="grid w-full grid-cols-2">
-                      <TabsTrigger value="objective" className="text-xs">
-                        Objective ({objectiveQuestions.length})
-                      </TabsTrigger>
-                      <TabsTrigger value="theory" className="text-xs" disabled={theoryQuestions.length === 0}>
-                        Theory ({theoryQuestions.length})
-                      </TabsTrigger>
-                    </TabsList>
-                  </Tabs>
-                  
-                  <ScrollArea className="h-[400px] pr-2">
-                    {viewMode === 'grid' ? (
-                      <div className="grid grid-cols-5 gap-2">
-                        {(activeTab === 'objective' ? objectiveQuestions : theoryQuestions).map((q) => {
-                          const originalIndex = allQuestions.findIndex(aq => aq.id === q.id)
-                          const status = getQuestionStatus(q, originalIndex)
-                          return (
-                            <button 
-                              key={q.id} 
-                              onClick={() => navigateToQuestion(originalIndex)} 
-                              className={cn(
-                                "aspect-square rounded-lg text-sm font-medium flex items-center justify-center transition-all relative",
-                                originalIndex === currentIndex && "ring-2 ring-primary ring-offset-2",
-                                status === 'answered' && "bg-green-500 text-white hover:bg-green-600",
-                                status === 'flagged' && "bg-yellow-500 text-white hover:bg-yellow-600",
-                                status === 'current' && "bg-primary text-white",
-                                status === 'not-answered' && "bg-gray-100 text-gray-600 border border-gray-300 hover:bg-gray-200"
-                              )}
-                            >
-                              {originalIndex + 1}
-                              {flaggedQuestions.has(q.id) && (
-                                <Flag className="absolute -top-1 -right-1 h-3 w-3 text-yellow-600 fill-yellow-600" />
-                              )}
-                            </button>
-                          )
-                        })}
+                </CardContent>
+              </Card>
+              
+              <Card className="border border-gray-700 shadow-lg bg-[#1a1f2e] overflow-hidden">
+                <div className="bg-gradient-to-r from-[#c41e3a] to-[#e8354a] p-2">
+                  <h4 className="text-white text-xs font-medium text-center flex items-center justify-center gap-1">
+                    <Camera className="h-3 w-3" /> Candidate
+                  </h4>
+                </div>
+                <CardContent className="p-4 flex justify-center">
+                  <div className="relative">
+                    {profile?.photo_url ? (
+                      <div className="w-36 h-44 border-3 border-[#c41e3a] rounded-md overflow-hidden shadow-lg">
+                        <Image 
+                          src={profile.photo_url} 
+                          alt={profile.full_name}
+                          width={144}
+                          height={176}
+                          className="w-full h-full object-cover"
+                          unoptimized
+                        />
                       </div>
                     ) : (
-                      <div className="space-y-1">
-                        {(activeTab === 'objective' ? objectiveQuestions : theoryQuestions).map((q) => {
-                          const originalIndex = allQuestions.findIndex(aq => aq.id === q.id)
-                          const status = getQuestionStatus(q, originalIndex)
-                          const isAnswered = !!answers[q.id]
-                          const isFlagged = flaggedQuestions.has(q.id)
-                          
-                          return (
-                            <button
-                              key={q.id}
-                              onClick={() => navigateToQuestion(originalIndex)}
-                              className={cn(
-                                "w-full flex items-center gap-3 p-3 rounded-lg text-left transition-all",
-                                originalIndex === currentIndex && "ring-2 ring-primary bg-primary/5",
-                                isAnswered && "bg-green-50",
-                                isFlagged && "bg-yellow-50",
-                                !isAnswered && !isFlagged && originalIndex !== currentIndex && "hover:bg-gray-50"
-                              )}
-                            >
-                              <div className={cn(
-                                "w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold",
-                                isAnswered ? "bg-green-500 text-white" :
-                                isFlagged ? "bg-yellow-500 text-white" :
-                                "bg-gray-100 text-gray-600"
-                              )}>
-                                {originalIndex + 1}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium truncate">
-                                  {q.question_text?.substring(0, 30)}...
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {q.points || q.marks || 1} {q.points === 1 ? 'point' : 'points'}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                {isAnswered && <CheckCircle className="h-4 w-4 text-green-500" />}
-                                {isFlagged && <Flag className="h-4 w-4 text-yellow-500 fill-yellow-500" />}
-                                {originalIndex === currentIndex && <ChevronRight className="h-4 w-4 text-primary" />}
-                              </div>
-                            </button>
-                          )
-                        })}
+                      <div className="w-36 h-44 border-3 border-gray-600 rounded-md overflow-hidden bg-[#0a0f1a] flex items-center justify-center">
+                        <User className="h-14 w-14 text-gray-500" />
                       </div>
                     )}
-                  </ScrollArea>
-                  
-                  <Separator className="my-4" />
-                  
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-green-500" />
-                      <span>Answered ({answeredCount})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-yellow-500" />
-                      <span>Flagged ({flaggedQuestions.size})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-primary" />
-                      <span>Current</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-4 h-4 rounded bg-gray-100 border border-gray-300" />
-                      <span>Unanswered ({unansweredCount})</span>
+                    <div className="absolute -bottom-2 left-0 right-0">
+                      <Badge className="w-full justify-center bg-[#c41e3a] text-white py-0.5 text-xs">
+                        {profile?.vin_id || profile?.class || 'Student'}
+                      </Badge>
                     </div>
                   </div>
-                  
-                  <div className="mt-4 p-3 bg-gray-50 rounded-xl">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Progress</span>
-                      <span className="font-medium">{Math.round(progressPercentage)}%</span>
+                </CardContent>
+                <CardContent className="pt-0 pb-3 text-center">
+                  <p className="text-white font-medium text-sm truncate px-2">{profile?.full_name}</p>
+                </CardContent>
+              </Card>
+              
+              <Card className="border border-gray-700 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Calendar className="h-4 w-4 text-[#c41e3a]" />
+                    <span>{TERM_NAMES[exam?.term || CURRENT_TERM]} {exam?.session_year || CURRENT_SESSION}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="border border-gray-700 shadow-lg bg-[#1a1f2e]">
+                <CardContent className="p-4">
+                  <h4 className="font-medium text-white text-xs mb-2 flex items-center gap-1">
+                    <Shield className="h-3 w-3 text-[#c41e3a]" /> Security Status
+                  </h4>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Tab Switches:</span>
+                      <span className={cn(tabSwitches > 0 ? "text-yellow-400" : "text-green-400")}>{tabSwitches}/{TAB_SWITCH_LIMIT}</span>
                     </div>
-                    <Progress value={progressPercentage} className="h-1.5 mt-1" />
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Fullscreen Exits:</span>
+                      <span className={cn(fullscreenExits > 0 ? "text-yellow-400" : "text-green-400")}>{fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Network:</span>
+                      <span className={cn(isOnline ? "text-green-400" : "text-red-400")}>{isOnline ? 'Connected' : 'Offline'}</span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1886,177 +1519,55 @@ export default function StudentExamPage() {
         </div>
       </div>
 
-      {/* Submit Dialog */}
       <Dialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
-        <DialogContent className="max-w-md rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-center">Submit Exam?</DialogTitle>
-          </DialogHeader>
-          <div className="py-4 text-center">
-            <p className="text-gray-600">
-              You have answered <strong>{answeredCount}</strong> of <strong>{allQuestions.length}</strong> questions.
-            </p>
-            
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              <div className="bg-green-50 rounded-xl p-3">
-                <p className="text-green-600 text-sm">Objective</p>
-                <p className="text-2xl font-bold text-green-700">{objectiveAnswered}/{objectiveQuestions.length}</p>
-              </div>
-              <div className="bg-purple-50 rounded-xl p-3">
-                <p className="text-purple-600 text-sm">Theory</p>
-                <p className="text-2xl font-bold text-purple-700">{theoryAnswered}/{theoryQuestions.length}</p>
-              </div>
-            </div>
-            
+        <DialogContent className="max-w-md bg-[#1a1f2e] border-gray-700 text-white">
+          <DialogHeader><DialogTitle className="text-white">Submit Exam?</DialogTitle></DialogHeader>
+          <div className="py-2">
+            <p className="text-gray-300">You have answered <strong className="text-white">{answeredCount}</strong> of <strong>{allQuestions.length}</strong> questions.</p>
             {unansweredCount > 0 && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-4">
-                <span className="text-yellow-700 text-sm flex items-center justify-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  {unansweredCount} question{unansweredCount > 1 ? 's' : ''} unanswered!
+              <div className="bg-yellow-500/10 border border-yellow-500/30 rounded p-3 mt-3">
+                <span className="text-yellow-400 text-sm flex items-center gap-2">
+                  <AlertTriangle className="h-4 w-4" />{unansweredCount} unanswered questions!
                 </span>
               </div>
             )}
-            
-            {flaggedQuestions.size > 0 && (
-              <p className="text-sm text-gray-500 mt-3">
-                <Flag className="inline h-3 w-3 mr-1 text-yellow-500" />
-                {flaggedQuestions.size} question{flaggedQuestions.size > 1 ? 's' : ''} flagged for review
-              </p>
-            )}
           </div>
-          <DialogFooter className="gap-3 justify-center">
-            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="px-8">
-              Continue
-            </Button>
-            <Button 
-              onClick={() => handleSubmit(false)} 
-              disabled={isSubmitting} 
-              className="bg-primary hover:bg-primary/90 px-8"
-            >
-              {isSubmitting ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="mr-2 h-4 w-4" />
-              )}
-              Submit
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="border-gray-600 text-gray-300">Continue</Button>
+            <Button onClick={() => handleSubmit(false)} disabled={isSubmitting} className="bg-[#c41e3a] hover:bg-[#a01830] text-white">
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Leave Exam Warning Dialog */}
-      <AlertDialog open={showLeaveWarning} onOpenChange={setShowLeaveWarning}>
-        <AlertDialogContent className="max-w-md">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-              <AlertTriangle className="h-5 w-5" />
-              Leave Exam in Progress?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>You are about to leave the exam page. This action will:</p>
-              <ul className="list-disc list-inside space-y-1 text-sm">
-                <li>Auto-submit your current answers</li>
-                <li>End your exam session</li>
-                <li>Count as an attempt</li>
-              </ul>
-              <p className="font-medium text-amber-600">Are you sure you want to leave?</p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel onClick={() => {
-              setShowLeaveWarning(false)
-              setPendingNavigation(null)
-            }}>
-              Continue Exam
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={() => handleLeaveExam(true)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Submit & Leave
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Result Dialog */}
       <Dialog open={showResultDialog} onOpenChange={() => setShowResultDialog(false)}>
-        <DialogContent className="max-w-md rounded-2xl">
+        <DialogContent className="max-w-md bg-[#1a1f2e] border-gray-700 text-white">
           <DialogHeader>
-            <DialogTitle className="flex items-center justify-center gap-2 text-xl">
+            <DialogTitle className="flex items-center gap-2 text-white">
               {examResult?.is_passed ? (
-                <><CheckCircle className="h-6 w-6 text-green-500" />Passed!</>
+                <><CheckCircle className="h-5 w-5 text-green-500" />Passed</>
               ) : (
-                <><XCircle className="h-6 w-6 text-red-500" />Completed</>
+                <><XCircle className="h-5 w-5 text-red-500" />Completed</>
               )}
             </DialogTitle>
           </DialogHeader>
-          <div className="py-4 text-center">
-            <div className={cn(
-              "text-5xl font-bold mb-2",
-              examResult?.is_passed ? "text-green-600" : "text-gray-700"
-            )}>
+          <div className="py-3 text-center">
+            <div className={cn("text-4xl font-bold", examResult?.is_passed ? "text-green-400" : "text-white")}>
               {examResult?.score}/{examResult?.total}
             </div>
-            <p className="text-gray-500 text-lg">{examResult?.percentage}%</p>
-            
-            <div className="flex justify-center gap-6 mt-4">
-              <div className="text-center">
-                <CheckCircle className="h-5 w-5 text-green-500 mx-auto" />
-                <p className="text-xl font-bold text-green-600">{examResult?.correct}</p>
-                <p className="text-xs text-gray-500">Correct</p>
-              </div>
-              <div className="text-center">
-                <XCircle className="h-5 w-5 text-red-500 mx-auto" />
-                <p className="text-xl font-bold text-red-500">{examResult?.incorrect}</p>
-                <p className="text-xs text-gray-500">Wrong</p>
-              </div>
-              <div className="text-center">
-                <HelpCircle className="h-5 w-5 text-gray-500 mx-auto" />
-                <p className="text-xl font-bold text-gray-600">{examResult?.unanswered}</p>
-                <p className="text-xs text-gray-500">Skipped</p>
-              </div>
+            <p className="text-gray-400 mt-1">{examResult?.percentage}%</p>
+            <div className="flex justify-center gap-4 mt-3 text-sm">
+              <span className="text-green-400">✓{examResult?.correct}</span>
+              <span className="text-red-400">✗{examResult?.incorrect}</span>
+              <span className="text-gray-500">?{examResult?.unanswered}</span>
             </div>
-            
-            {examResult?.status === 'pending_theory' && (
-              <p className="text-yellow-600 text-sm mt-4 bg-yellow-50 py-2 px-4 rounded-lg">
-                Theory answers pending grading by your teacher
-              </p>
-            )}
           </div>
           <DialogFooter>
-            <Button 
-              onClick={() => { 
-                setShowResultDialog(false)
-                router.push('/student') 
-              }} 
-              className="w-full bg-primary hover:bg-primary/90"
-            >
-              Back to Dashboard
-            </Button>
+            <Button onClick={() => setShowResultDialog(false)} className="w-full bg-[#c41e3a] hover:bg-[#a01830] text-white">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Time Warning Dialog */}
-      <AlertDialog open={showTimeWarning} onOpenChange={setShowTimeWarning}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-500" />
-              5 Minutes Remaining!
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              You have only 5 minutes left to complete this exam. Please review your answers and prepare to submit.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setShowTimeWarning(false)}>
-              I understand
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

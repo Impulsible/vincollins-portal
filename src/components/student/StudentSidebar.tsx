@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/student/StudentSidebar.tsx - UPDATED WITH DISPLAY_NAME FIX
+// components/student/StudentSidebar.tsx - FULLY UPDATED WITH PROPER PROFILE HANDLING
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -9,8 +9,8 @@ import { supabase } from '@/lib/supabase'
 import {
   LayoutDashboard, BookOpen, FileText, Award, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
-  Sparkles, TrendingUp, MonitorPlay, User,
-  Bell, HelpCircle, Wifi, WifiOff, FileCheck
+  Sparkles, MonitorPlay, User,
+  Bell, HelpCircle, Wifi, WifiOff, FileCheck, Users
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -40,9 +40,9 @@ interface StudentProfile {
   email?: string
   photo_url?: string | null
   class?: string
-  vin_id?: string
-  department?: string
-  admission_year?: number
+  vin_id?: string | null
+  department?: string | null
+  admission_year?: number | null
 }
 
 interface StudentSidebarProps {
@@ -94,10 +94,17 @@ const primaryNavigation: NavigationItem[] = [
   },
   { 
     id: 'courses', 
-    name: 'My Courses', 
+    name: 'Study Notes', 
     icon: BookOpen,
     description: 'Learning Materials',
     route: '/student/courses'
+  },
+  { 
+    id: 'classmates', 
+    name: 'Classmates', 
+    icon: Users,
+    description: 'Student Roster',
+    route: '/student/classmates'
   },
   { 
     id: 'report-card', 
@@ -109,13 +116,6 @@ const primaryNavigation: NavigationItem[] = [
 ]
 
 const secondaryNavigation: NavigationItem[] = [
-  { 
-    id: 'performance', 
-    name: 'Performance', 
-    icon: TrendingUp,
-    description: 'Academic Progress',
-    route: '/student/performance'
-  },
   { 
     id: 'notifications', 
     name: 'Notifications', 
@@ -164,12 +164,10 @@ const getFirstName = (profile?: StudentProfile | null): string => {
 
 // Get display name - PREFERS display_name from database
 const getDisplayName = (profile?: StudentProfile | null): string => {
-  // Use display_name if available
   if (profile?.display_name) {
     return profile.display_name
   }
   
-  // Build from first_name and last_name if available
   if (profile?.first_name && profile?.last_name) {
     const lastName = profile.last_name.trim()
     const firstName = profile.first_name.trim()
@@ -181,7 +179,6 @@ const getDisplayName = (profile?: StudentProfile | null): string => {
     return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
   }
   
-  // Fallback to full_name
   if (profile?.full_name) {
     return profile.full_name
   }
@@ -200,6 +197,14 @@ const getInitials = (profile?: StudentProfile | null): string => {
   return displayName.slice(0, 2).toUpperCase()
 }
 
+// Format VIN ID for display
+const formatVinId = (vinId?: string | null): string => {
+  if (!vinId) return 'VIN-XXXXXX'
+  if (vinId.startsWith('VIN-')) return vinId
+  if (vinId.length <= 6) return `VIN-${vinId.padStart(6, '0')}`
+  return vinId
+}
+
 export function StudentSidebar({ 
   profile, 
   onLogout, 
@@ -213,6 +218,53 @@ export function StudentSidebar({
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [isOnline, setIsOnline] = useState(true)
   const [lastSeen, setLastSeen] = useState<Date | null>(null)
+  
+  // Local state for profile
+  const [localProfile, setLocalProfile] = useState<StudentProfile | null>(profile)
+
+  // Fetch profile if data is missing
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('id, first_name, middle_name, last_name, full_name, display_name, email, class, vin_id, photo_url, department, admission_year')
+          .eq('id', user.id)
+          .single()
+
+        if (profileData) {
+          setLocalProfile({
+            id: profileData.id,
+            first_name: profileData.first_name,
+            middle_name: profileData.middle_name,
+            last_name: profileData.last_name,
+            full_name: profileData.full_name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim(),
+            display_name: profileData.display_name,
+            email: profileData.email,
+            class: profileData.class,
+            vin_id: profileData.vin_id,
+            photo_url: profileData.photo_url,
+            department: profileData.department,
+            admission_year: profileData.admission_year
+          })
+        }
+      } catch (error) {
+        console.error('Error fetching profile:', error)
+      }
+    }
+
+    // Check if we have complete profile data
+    const hasCompleteProfile = profile?.vin_id && profile?.admission_year
+    
+    if (!hasCompleteProfile) {
+      fetchProfile()
+    } else {
+      setLocalProfile(profile)
+    }
+  }, [profile])
 
   // Track online/offline status
   useEffect(() => {
@@ -236,16 +288,16 @@ export function StudentSidebar({
       window.removeEventListener('offline', handleOffline)
       updatePresence('offline')
     }
-  }, [profile?.id])
+  }, [localProfile?.id])
 
   const updatePresence = async (status: 'online' | 'offline' | 'away') => {
-    if (!profile?.id) return
+    if (!localProfile?.id) return
     
     try {
       await supabase
         .from('student_presence')
         .upsert({
-          student_id: profile.id,
+          student_id: localProfile.id,
           status: status,
           last_seen: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -273,10 +325,10 @@ export function StudentSidebar({
       setActiveTab('assignments')
     } else if (pathname?.startsWith('/student/courses')) {
       setActiveTab('courses')
+    } else if (pathname?.startsWith('/student/classmates')) {
+      setActiveTab('classmates')
     } else if (pathname?.startsWith('/student/report-card')) {
       setActiveTab('report-card')
-    } else if (pathname?.startsWith('/student/performance')) {
-      setActiveTab('performance')
     } else if (pathname?.startsWith('/student/notifications')) {
       setActiveTab('notifications')
     } else if (pathname?.startsWith('/student/profile')) {
@@ -288,10 +340,12 @@ export function StudentSidebar({
     }
   }, [pathname, setActiveTab])
 
-  const firstName = getFirstName(profile)
-  const displayName = getDisplayName(profile)
-  const initials = getInitials(profile)
-  const avatarUrl = profile?.photo_url || undefined
+  const firstName = getFirstName(localProfile)
+  const displayName = getDisplayName(localProfile)
+  const initials = getInitials(localProfile)
+  const avatarUrl = localProfile?.photo_url || undefined
+  const vinId = formatVinId(localProfile?.vin_id)
+  const admissionYear = localProfile?.admission_year || new Date().getFullYear()
 
   const handleLogoutClick = () => {
     setShowSignOutConfirm(true)
@@ -496,31 +550,30 @@ export function StudentSidebar({
                     {statusDisplay.text}
                   </Badge>
                 </div>
-                {/* ✅ FIXED: Use first_name from profile */}
                 <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">
-                  {profile?.first_name || firstName}!
+                  {localProfile?.first_name || firstName}!
                 </h3>
               </div>
             </div>
 
             <div className="space-y-2">
               <div>
-                {/* ✅ FIXED: Use display_name from profile (LastName FirstName MiddleName) */}
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
-                  {profile?.display_name || displayName}
+                  {localProfile?.display_name || displayName}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {profile?.email || 'student@vincollins.edu.ng'}
+                  {localProfile?.email || 'student@vincollins.edu.ng'}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-1.5">
+                {/* ✅ Proper VIN ID display */}
                 <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] shadow-sm">
-                  {profile?.vin_id || 'VIN-XXXXXX'}
+                  {vinId}
                 </Badge>
-                {profile?.department && (
+                {localProfile?.department && (
                   <Badge variant="outline" className="text-[10px]">
-                    {profile.department}
+                    {localProfile.department}
                   </Badge>
                 )}
               </div>
@@ -529,13 +582,13 @@ export function StudentSidebar({
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Class</p>
                   <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                    {profile?.class || 'N/A'}
+                    {localProfile?.class || 'N/A'}
                   </p>
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">Year</p>
                   <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                    {profile?.admission_year || new Date().getFullYear()}
+                    {admissionYear}
                   </p>
                 </div>
               </div>

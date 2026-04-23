@@ -1,7 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-/* eslint-disable react/no-unescaped-entities */
-/* eslint-disable react-hooks/exhaustive-deps */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 // components/staff/CreateExamDialog.tsx - WITH RANDOMIZATION SETTINGS
 'use client'
 
@@ -195,23 +191,24 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
   }, [examDetails.duration])
 
   return (
-    <div className="min-h-[600px] bg-gray-50 rounded-lg overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
-        <div className="flex items-center justify-between">
+    <div className="min-h-[400px] sm:min-h-[600px] bg-gray-50 rounded-lg overflow-hidden flex flex-col">
+      {/* Header - Mobile Responsive */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 sm:p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <h3 className="text-xl font-bold">{examDetails.title || 'Untitled Exam'}</h3>
-            <p className="text-sm text-blue-100">{examDetails.subject} • {examDetails.class}</p>
+            <h3 className="text-lg sm:text-xl font-bold">{examDetails.title || 'Untitled Exam'}</h3>
+            <p className="text-xs sm:text-sm text-blue-100">{examDetails.subject} • {examDetails.class}</p>
           </div>
-          <div className="flex items-center gap-4">
-            <div className={cn("flex items-center gap-2 px-3 py-1.5 rounded-full font-mono text-lg font-bold", getTimerColor())}>
-              <Clock className="h-4 w-4" />
+          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+            <div className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-mono text-sm sm:text-lg font-bold", getTimerColor())}>
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
               {formatTime(timeRemaining)}
-              {!isTimerRunning && timeRemaining === 0 && <Badge className="ml-2 bg-red-500 text-white">Time's Up!</Badge>}
+              {!isTimerRunning && timeRemaining === 0 && <Badge className="ml-1 sm:ml-2 bg-red-500 text-white text-xs">Time's Up!</Badge>}
             </div>
-            <Badge className="bg-white/20 text-white"><Award className="h-3 w-3 mr-1" /> Pass: {examDetails.pass_mark || 50}%</Badge>
+            <Badge className="bg-white/20 text-white text-xs"><Award className="h-3 w-3 mr-1" /> Pass: {examDetails.pass_mark || 50}%</Badge>
           </div>
         </div>
-        <div className="mt-3">
+        <div className="mt-2 sm:mt-3">
           <div className="flex justify-between text-xs text-blue-100 mb-1">
             <span>Question {currentIndex + 1} of {totalQuestions}</span>
             <span>{answeredCount} of {totalQuestions} answered</span>
@@ -219,8 +216,10 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
           <Progress value={progress} className="h-2 bg-blue-800" />
         </div>
       </div>
-      <div className="bg-white border-b p-3">
-        <div className="flex flex-wrap gap-1.5 max-h-[120px] overflow-y-auto">
+
+      {/* Question navigator - Scrollable on mobile */}
+      <div className="bg-white border-b p-2 sm:p-3">
+        <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
           {allQuestions.map((q, idx) => {
             const questionId = q.id
             const isAnswered = q.type === 'theory' ? !!theoryAnswers[questionId] : !!selectedAnswers[questionId]
@@ -228,7 +227,7 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
             const isCurrent = idx === currentIndex
             return (
               <button key={questionId} onClick={() => navigateToQuestion(idx)} className={cn(
-                "w-8 h-8 rounded-lg text-xs font-medium transition-all flex-shrink-0 hover:scale-105",
+                "w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-medium transition-all flex-shrink-0",
                 isCurrent ? "ring-2 ring-blue-500 ring-offset-2" : "",
                 q.type === 'theory' ? (isAnswered ? "bg-purple-500 text-white" : "bg-purple-100 text-purple-700 border border-purple-300")
                   : (isAnswered ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 border border-gray-300"),
@@ -237,44 +236,46 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
             )
           })}
         </div>
-        <div className="flex flex-wrap gap-4 mt-3 text-xs">
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500" /> Answered</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-300" /> Not Answered</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-purple-500" /> Theory</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded ring-2 ring-amber-400" /> Flagged</span>
+        <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 sm:mt-3 text-xs">
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500 flex-shrink-0" /> Answered</span>
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-300 flex-shrink-0" /> Not Answered</span>
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-purple-500 flex-shrink-0" /> Theory</span>
+          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded ring-2 ring-amber-400 flex-shrink-0" /> Flagged</span>
         </div>
       </div>
-      <div className="p-6 min-h-[350px]">
+
+      {/* Question content - Scrollable */}
+      <div className="flex-1 p-3 sm:p-6 overflow-y-auto min-h-[200px] sm:min-h-[350px]">
         {currentQuestion && (
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'}>
+            <div className="flex items-start justify-between mb-3 sm:mb-4">
+              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'} className="text-xs">
                   {currentQuestion.type === 'theory' ? <><Brain className="h-3 w-3 mr-1" /> Theory</> : <>Objective</>}
                 </Badge>
-                <Badge variant="outline">{currentQuestion.marks || defaultMark} mark(s)</Badge>
-                {currentQuestion.type === 'theory' && <Badge className="bg-amber-100 text-amber-700 border-amber-300">Teacher Graded</Badge>}
+                <Badge variant="outline" className="text-xs">{currentQuestion.marks || defaultMark} mark(s)</Badge>
+                {currentQuestion.type === 'theory' && <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">Teacher Graded</Badge>}
               </div>
-              <button onClick={() => toggleFlag(currentQuestion.id)} className={cn("p-2 rounded-lg transition", flaggedQuestions.has(currentQuestion.id) ? "bg-amber-100 text-amber-700" : "hover:bg-gray-100 text-gray-400")}>
-                <Flag className="h-4 w-4" />
+              <button onClick={() => toggleFlag(currentQuestion.id)} className={cn("p-1.5 sm:p-2 rounded-lg transition", flaggedQuestions.has(currentQuestion.id) ? "bg-amber-100 text-amber-700" : "hover:bg-gray-100 text-gray-400")}>
+                <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
               </button>
             </div>
-            <h4 className="text-lg font-medium mb-6">{currentIndex + 1}. {currentQuestion.type === 'theory' ? (currentQuestion as TheoryQuestion).question : (currentQuestion as Question).question}</h4>
+            <h4 className="text-base sm:text-lg font-medium mb-4 sm:mb-6">{currentIndex + 1}. {currentQuestion.type === 'theory' ? (currentQuestion as TheoryQuestion).question : (currentQuestion as Question).question}</h4>
             {currentQuestion.type === 'theory' ? (
               <div>
-                <Alert className="mb-4 bg-amber-50 border-amber-200">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-700">This question will be graded by your teacher. Be detailed in your answer.</AlertDescription>
+                <Alert className="mb-3 sm:mb-4 bg-amber-50 border-amber-200">
+                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-700 text-sm">This question will be graded by your teacher. Be detailed in your answer.</AlertDescription>
                 </Alert>
-                <Textarea value={theoryAnswers[currentQuestion.id] || ''} onChange={(e) => handleTheoryAnswerChange(currentQuestion.id, e.target.value)} placeholder="Type your answer here..." rows={6} className="w-full" />
+                <Textarea value={theoryAnswers[currentQuestion.id] || ''} onChange={(e) => handleTheoryAnswerChange(currentQuestion.id, e.target.value)} placeholder="Type your answer here..." rows={4} className="w-full" />
               </div>
             ) : (
-              <RadioGroup value={selectedAnswers[currentQuestion.id] || ''} onValueChange={(v) => handleAnswerSelect(currentQuestion.id, v)} className="space-y-3">
+              <RadioGroup value={selectedAnswers[currentQuestion.id] || ''} onValueChange={(v) => handleAnswerSelect(currentQuestion.id, v)} className="space-y-2 sm:space-y-3">
                 {(currentQuestion as Question).options?.map((option, idx) => (
-                  <div key={idx} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-gray-50 cursor-pointer transition-colors">
+                  <div key={idx} className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border hover:bg-gray-50 cursor-pointer transition-colors">
                     <RadioGroupItem value={option} id={`preview-${currentQuestion.id}-${idx}`} />
-                    <Label htmlFor={`preview-${currentQuestion.id}-${idx}`} className="flex-1 cursor-pointer">
-                      <span className="font-medium mr-2">{String.fromCharCode(65 + idx)}.</span> {option}
+                    <Label htmlFor={`preview-${currentQuestion.id}-${idx}`} className="flex-1 cursor-pointer text-sm sm:text-base">
+                      <span className="font-medium mr-1 sm:mr-2">{String.fromCharCode(65 + idx)}.</span> {option}
                     </Label>
                   </div>
                 ))}
@@ -283,21 +284,23 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
           </div>
         )}
       </div>
-      <div className="bg-white border-t p-4 flex justify-between items-center">
-        <Button variant="outline" onClick={() => navigateToQuestion(currentIndex - 1)} disabled={currentIndex === 0}>
-          <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+
+      {/* Footer - Mobile responsive */}
+      <div className="bg-white border-t p-3 sm:p-4 flex justify-between items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex - 1)} disabled={currentIndex === 0} className="text-xs sm:text-sm">
+          <ChevronLeft className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Previous
         </Button>
-        <div className="text-sm text-muted-foreground flex items-center gap-2"><Shield className="h-4 w-4" /> Secure Exam Mode Preview</div>
+        <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><Shield className="h-3 w-3 sm:h-4 sm:w-4 hidden sm:block" /> Secure Mode</div>
         {currentIndex === totalQuestions - 1 ? (
-          <Button className="bg-green-600 hover:bg-green-700 text-white"><CheckCheck className="mr-2 h-4 w-4" /> Submit Exam</Button>
+          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm"><CheckCheck className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Submit Exam</Button>
         ) : (
-          <Button variant="outline" onClick={() => navigateToQuestion(currentIndex + 1)}>Next <ChevronRight className="ml-2 h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex + 1)} className="text-xs sm:text-sm">Next <ChevronRight className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" /></Button>
         )}
       </div>
       {examDetails.instructions && (
-        <div className="bg-blue-50 p-4 border-t border-blue-200">
-          <p className="text-sm text-blue-800 font-medium mb-1">Instructions:</p>
-          <p className="text-sm text-blue-700 whitespace-pre-line">{examDetails.instructions}</p>
+        <div className="bg-blue-50 p-3 sm:p-4 border-t border-blue-200">
+          <p className="text-xs sm:text-sm text-blue-800 font-medium mb-1">Instructions:</p>
+          <p className="text-xs sm:text-sm text-blue-700 whitespace-pre-line">{examDetails.instructions}</p>
         </div>
       )}
     </div>
@@ -665,297 +668,310 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[1000px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Create New Exam</DialogTitle>
-          <DialogDescription>Create a CBT exam with multiple choice questions and optional theory section. Upload DOC, DOCX, PDF, or TXT files.</DialogDescription>
+      <DialogContent className="w-[95vw] sm:max-w-[1000px] h-[90vh] flex flex-col p-0 overflow-hidden">
+        {/* Fixed Header - Not Sticky */}
+        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+            <FileText className="h-5 w-5" />
+            Create New Exam
+          </DialogTitle>
+          <DialogDescription className="text-sm">
+            Create a CBT exam with multiple choice questions and optional theory section. Upload DOC, DOCX, PDF, or TXT files.
+          </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="details">1. Details</TabsTrigger>
-            <TabsTrigger value="questions" disabled={!examDetails.title}>2. Objective ({questions.length})</TabsTrigger>
-            <TabsTrigger value="theory" disabled={!examDetails.title}>3. Theory ({theoryQuestions.length})</TabsTrigger>
-            <TabsTrigger value="preview" disabled={questions.length === 0 && theoryQuestions.length === 0}>4. CBT Preview</TabsTrigger>
-            <TabsTrigger value="summary" disabled={questions.length === 0 && theoryQuestions.length === 0}>5. Summary</TabsTrigger>
-          </TabsList>
+        {/* Tabs - Scrollable on mobile */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
+          <div className="px-4 sm:px-6 flex-shrink-0 overflow-x-auto">
+            <TabsList className="grid w-full grid-cols-5 min-w-[500px] sm:min-w-0">
+              <TabsTrigger value="details" className="text-xs sm:text-sm px-2">1. Details</TabsTrigger>
+              <TabsTrigger value="questions" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">2. Objective ({questions.length})</TabsTrigger>
+              <TabsTrigger value="theory" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">3. Theory ({theoryQuestions.length})</TabsTrigger>
+              <TabsTrigger value="preview" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">4. Preview</TabsTrigger>
+              <TabsTrigger value="summary" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">5. Summary</TabsTrigger>
+            </TabsList>
+          </div>
 
-          {/* DETAILS TAB */}
-          <TabsContent value="details" className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><Label>Exam Title *</Label><Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" /></div>
-              <div><Label>Class *</Label><Select value={examDetails.class} onValueChange={(v) => setExamDetails({ ...examDetails, class: v, subject: '' })}><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label>Subject *</Label><Select value={examDetails.subject} onValueChange={(v) => setExamDetails({ ...examDetails, subject: v })} disabled={!examDetails.class}><SelectTrigger><SelectValue placeholder={examDetails.class ? "Select subject" : "Select class first"} /></SelectTrigger><SelectContent>{availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label>Duration (minutes) *</Label><Input type="number" min="1" max="240" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} /></div>
-              <div><Label>Pass Mark (%)</Label><Input type="number" min="0" max="100" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} /></div>
-            </div>
-
-            <div className="p-4 bg-muted/50 rounded-lg">
-              <Label className="mb-2 block">Default Mark per Question (Objective = 20 marks total)</Label>
-              <RadioGroup value={defaultMark.toString()} onValueChange={(v) => { setDefaultMark(parseFloat(v)); setCurrentQuestion({ ...currentQuestion, marks: parseFloat(v) }) }} className="flex gap-6">
-                <div className="flex items-center space-x-2"><RadioGroupItem value="1" id="mark1" /><Label htmlFor="mark1">1 Mark (20 questions)</Label></div>
-                <div className="flex items-center space-x-2"><RadioGroupItem value="0.5" id="mark05" /><Label htmlFor="mark05">0.5 Mark (40 questions)</Label></div>
-              </RadioGroup>
-            </div>
-
-            {/* ANTI-CHEATING SETTINGS */}
-            <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-200 space-y-3">
-              <Label className="text-base font-semibold flex items-center gap-2">
-                <Shuffle className="h-4 w-4 text-blue-600" />
-                Anti-Cheating Settings
-              </Label>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Randomize Question Order</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Each student gets questions in a different random order
-                  </p>
-                </div>
-                <Switch
-                  checked={examDetails.randomize_questions}
-                  onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_questions: v })}
-                />
+          {/* Scrollable Content Area */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
+            {/* DETAILS TAB */}
+            <TabsContent value="details" className="space-y-4 mt-0">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div><Label>Exam Title *</Label><Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" /></div>
+                <div><Label>Class *</Label><Select value={examDetails.class} onValueChange={(v) => setExamDetails({ ...examDetails, class: v, subject: '' })}><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
+                <div><Label>Subject *</Label><Select value={examDetails.subject} onValueChange={(v) => setExamDetails({ ...examDetails, subject: v })} disabled={!examDetails.class}><SelectTrigger><SelectValue placeholder={examDetails.class ? "Select subject" : "Select class first"} /></SelectTrigger><SelectContent>{availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
+                <div><Label>Duration (minutes) *</Label><Input type="number" min="1" max="240" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} /></div>
+                <div><Label>Pass Mark (%)</Label><Input type="number" min="0" max="100" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} /></div>
               </div>
-              
-              <div className="flex items-center justify-between">
-                <div>
-                  <Label>Randomize Options (A,B,C,D)</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Shuffles multiple choice options for each student
-                  </p>
-                </div>
-                <Switch
-                  checked={examDetails.randomize_options}
-                  onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_options: v })}
-                />
+
+              <div className="p-4 bg-muted/50 rounded-lg">
+                <Label className="mb-2 block">Default Mark per Question (Objective = 20 marks total)</Label>
+                <RadioGroup value={defaultMark.toString()} onValueChange={(v) => { setDefaultMark(parseFloat(v)); setCurrentQuestion({ ...currentQuestion, marks: parseFloat(v) }) }} className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="1" id="mark1" /><Label htmlFor="mark1">1 Mark (20 questions)</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="0.5" id="mark05" /><Label htmlFor="mark05">0.5 Mark (40 questions)</Label></div>
+                </RadioGroup>
               </div>
-              
-              <Alert className="mt-2 bg-blue-100 border-blue-300">
-                <Shield className="h-4 w-4 text-blue-600" />
-                <AlertDescription className="text-blue-700 text-xs">
-                  These settings prevent cheating by ensuring no two students see the exact same exam layout.
-                </AlertDescription>
-              </Alert>
-            </div>
 
-            <div><Label>Instructions (Optional)</Label><Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} placeholder="Enter exam instructions..." rows={3} /></div>
-            <div className="flex justify-end">
-              <Button onClick={() => setActiveTab('questions')} disabled={!examDetails.title || !examDetails.class || !examDetails.subject}>Next: Add Questions <ChevronRight className="ml-2 h-4 w-4" /></Button>
-            </div>
-          </TabsContent>
+              {/* ANTI-CHEATING SETTINGS */}
+              <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-200 space-y-3">
+                <Label className="text-base font-semibold flex items-center gap-2">
+                  <Shuffle className="h-4 w-4 text-blue-600" />
+                  Anti-Cheating Settings
+                </Label>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <Label>Randomize Question Order</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Each student gets questions in a different random order
+                    </p>
+                  </div>
+                  <Switch
+                    checked={examDetails.randomize_questions}
+                    onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_questions: v })}
+                  />
+                </div>
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <Label>Randomize Options (A,B,C,D)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Shuffles multiple choice options for each student
+                    </p>
+                  </div>
+                  <Switch
+                    checked={examDetails.randomize_options}
+                    onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_options: v })}
+                  />
+                </div>
+                
+                <Alert className="mt-2 bg-blue-100 border-blue-300">
+                  <Shield className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-700 text-xs">
+                    These settings prevent cheating by ensuring no two students see the exact same exam layout.
+                  </AlertDescription>
+                </Alert>
+              </div>
 
-          {/* OBJECTIVE TAB */}
-          <TabsContent value="questions" className="space-y-4 py-4">
-            <div className="flex gap-2 border-b pb-3">
-              <Button variant={uploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('bulk')}><Sparkles className="mr-2 h-4 w-4" />Bulk Paste</Button>
-              <Button variant={uploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('manual')}><Plus className="mr-2 h-4 w-4" />Manual Entry</Button>
-            </div>
+              <div><Label>Instructions (Optional)</Label><Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} placeholder="Enter exam instructions..." rows={3} /></div>
+              <div className="flex justify-end">
+                <Button onClick={() => setActiveTab('questions')} disabled={!examDetails.title || !examDetails.class || !examDetails.subject}>Next: Add Questions <ChevronRight className="ml-2 h-4 w-4" /></Button>
+              </div>
+            </TabsContent>
 
-            {uploadMode === 'bulk' ? (
-              <div className="space-y-4">
-                <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex items-center justify-between">
-                  <span>Upload DOC, DOCX, PDF, TXT or paste questions.</span>
+            {/* OBJECTIVE TAB */}
+            <TabsContent value="questions" className="space-y-4 mt-0">
+              <div className="flex flex-wrap gap-2 border-b pb-3">
+                <Button variant={uploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('bulk')} className="text-xs sm:text-sm"><Sparkles className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Bulk Paste</Button>
+                <Button variant={uploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('manual')} className="text-xs sm:text-sm"><Plus className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Manual Entry</Button>
+              </div>
+
+              {uploadMode === 'bulk' ? (
+                <div className="space-y-4">
+                  <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                    <span>Upload DOC, DOCX, PDF, TXT or paste questions.</span>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={insertObjectiveExample} className="text-xs"><Wand2 className="mr-1 h-3 w-3" /> Example</Button>
+                      <Button variant="outline" size="sm" onClick={() => downloadTemplate('objective')} className="text-xs"><Download className="mr-1 h-3 w-3" /> Template</Button>
+                    </div>
+                  </AlertDescription></Alert>
+
+                  <div>
+                    <Label>Upload File</Label>
+                    <input ref={fileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleFileUpload} className="hidden" />
+                    <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-primary/50 transition-colors">
+                      {isParsingFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload</p><p className="text-xs">.doc, .docx, .pdf, .txt</p></>}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Or Paste Questions</Label>
+                    <Textarea value={bulkQuestionsText} onChange={(e) => setBulkQuestionsText(e.target.value)} placeholder="1. Question text\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: 0.5" rows={8} className="font-mono text-xs sm:text-sm" />
+                    <Button onClick={parseBulkQuestions} className="mt-2 w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
+                  </div>
+                  {parseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{parseError}</AlertDescription></Alert>}
+                </div>
+              ) : (
+                <>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={insertObjectiveExample}><Wand2 className="mr-1 h-3 w-3" /> Example</Button>
-                    <Button variant="outline" size="sm" onClick={() => downloadTemplate('objective')}><Download className="mr-1 h-3 w-3" /> Template</Button>
+                    <Badge className={cn("cursor-pointer", currentQuestion.type === 'mcq' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'mcq', options: ['', '', '', ''], marks: defaultMark })}>MCQ</Badge>
+                    <Badge className={cn("cursor-pointer", currentQuestion.type === 'true_false' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'true_false', options: ['True', 'False'], marks: defaultMark })}>True/False</Badge>
                   </div>
-                </AlertDescription></Alert>
-
-                <div>
-                  <Label>Upload File</Label>
-                  <input ref={fileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleFileUpload} className="hidden" />
-                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center cursor-pointer hover:border-primary/50">
-                    {isParsingFile ? <Loader2 className="h-6 w-6 mx-auto animate-spin" /> : <><FileUp className="h-6 w-6 mx-auto mb-1" /><p className="text-sm">Click to upload</p><p className="text-xs">.doc, .docx, .pdf, .txt</p></>}
-                  </div>
-                </div>
-
-                <div>
-                  <Label>Or Paste Questions</Label>
-                  <Textarea value={bulkQuestionsText} onChange={(e) => setBulkQuestionsText(e.target.value)} placeholder="1. Question text\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: 0.5" rows={10} className="font-mono text-sm" />
-                  <Button onClick={parseBulkQuestions} className="mt-2 w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
-                </div>
-                {parseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{parseError}</AlertDescription></Alert>}
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-2">
-                  <Badge className={cn("cursor-pointer", currentQuestion.type === 'mcq' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'mcq', options: ['', '', '', ''], marks: defaultMark })}>MCQ</Badge>
-                  <Badge className={cn("cursor-pointer", currentQuestion.type === 'true_false' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'true_false', options: ['True', 'False'], marks: defaultMark })}>True/False</Badge>
-                </div>
-                <div><Label>Question</Label><Textarea value={currentQuestion.question} onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })} rows={3} /></div>
-                {currentQuestion.type === 'mcq' && (
-                  <div className="space-y-2">
-                    <Label>Options</Label>
-                    {currentQuestion.options?.map((option, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <span className="w-6">{String.fromCharCode(65 + index)}.</span>
-                        <Input value={option} onChange={(e) => { const newOpts = [...(currentQuestion.options || [])]; newOpts[index] = e.target.value; setCurrentQuestion({ ...currentQuestion, options: newOpts }) }} />
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div>
-                  <Label>Correct Answer</Label>
-                  {currentQuestion.type === 'mcq' ? (
-                    <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger>
-                      <SelectContent>{currentQuestion.options?.map((opt, i) => opt ? <SelectItem key={i} value={opt}>{String.fromCharCode(65 + i)}. {opt}</SelectItem> : null)}</SelectContent>
-                    </Select>
-                  ) : currentQuestion.type === 'true_false' ? (
-                    <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
-                      <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                      <SelectContent><SelectItem value="True">True</SelectItem><SelectItem value="False">False</SelectItem></SelectContent>
-                    </Select>
-                  ) : (
-                    <Input value={currentQuestion.correct_answer} onChange={(e) => setCurrentQuestion({ ...currentQuestion, correct_answer: e.target.value })} />
-                  )}
-                </div>
-                <div><Label>Marks</Label><Input type="number" step="0.5" min="0.5" value={currentQuestion.marks} onChange={(e) => setCurrentQuestion({ ...currentQuestion, marks: parseFloat(e.target.value) || defaultMark })} /></div>
-                <Button onClick={addQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Question</Button>
-              </>
-            )}
-
-            {questions.length > 0 && (
-              <div className="space-y-2 mt-4">
-                <Label>Added Questions ({questions.length})</Label>
-                <div className="max-h-[200px] overflow-y-auto space-y-2">
-                  {questions.map((q, i) => (
-                    <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
-                      <div><p className="text-sm font-medium">{i + 1}. {q.question}</p><p className="text-xs">{q.type} • {q.marks} mark(s)</p></div>
-                      <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={() => setActiveTab('details')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-              <Button onClick={() => setActiveTab('theory')}>Next: Theory <ChevronRight className="ml-2 h-4 w-4" /></Button>
-            </div>
-          </TabsContent>
-
-          {/* THEORY TAB */}
-          <TabsContent value="theory" className="space-y-4 py-4">
-            {!hasTheory ? (
-              <div className="text-center py-8 space-y-4">
-                <Brain className="h-16 w-16 mx-auto text-muted-foreground" />
-                <div><h3 className="text-lg font-semibold">Theory Questions Disabled</h3><p className="text-muted-foreground">Enable theory questions to add essay-type questions</p></div>
-                <div className="flex items-center justify-center gap-3 p-4 bg-muted rounded-lg"><span>Include Theory Questions</span><Switch checked={hasTheory} onCheckedChange={setHasTheory} /></div>
-                <div className="flex justify-between pt-4">
-                  <Button variant="outline" onClick={() => setActiveTab('questions')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                  <Button onClick={() => setActiveTab('preview')} disabled={questions.length === 0}>Skip to Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex gap-2 border-b pb-3">
-                  <Button variant={theoryUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('bulk')}><Sparkles className="mr-2 h-4 w-4" />Bulk Paste</Button>
-                  <Button variant={theoryUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('manual')}><Plus className="mr-2 h-4 w-4" />Manual Entry</Button>
-                </div>
-
-                {theoryUploadMode === 'bulk' ? (
-                  <div className="space-y-4">
-                    <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex items-center justify-between">
-                      <span>Upload DOC, DOCX, PDF, TXT or paste theory questions.</span>
-                      <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={insertTheoryExample}>Example</Button>
-                        <Button variant="outline" size="sm" onClick={() => downloadTemplate('theory')}>Template</Button>
-                      </div>
-                    </AlertDescription></Alert>
-
-                    <div>
-                      <Label>Upload File</Label>
-                      <input ref={theoryFileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleTheoryFileUpload} className="hidden" />
-                      <div onClick={() => theoryFileInputRef.current?.click()} className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-4 text-center cursor-pointer hover:border-primary/50">
-                        {isParsingTheoryFile ? <Loader2 className="h-6 w-6 mx-auto animate-spin" /> : <><FileUp className="h-6 w-6 mx-auto mb-1" /><p className="text-sm">Click to upload</p><p className="text-xs">.doc, .docx, .pdf, .txt</p></>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label>Paste Theory Questions</Label>
-                      <Textarea value={bulkTheoryText} onChange={(e) => setBulkTheoryText(e.target.value)} placeholder="1. Explain the factors of production.\nMarks: 10" rows={10} className="font-mono text-sm" />
-                      <Button onClick={parseBulkTheory} className="mt-2 w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
-                    </div>
-                    {theoryParseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{theoryParseError}</AlertDescription></Alert>}
-                  </div>
-                ) : (
-                  <>
-                    <div><Label>Theory Question</Label><Textarea value={currentTheoryQuestion.question} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, question: e.target.value })} rows={4} /></div>
-                    <div><Label>Marks</Label><Input type="number" min="1" max="100" value={currentTheoryQuestion.marks} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, marks: parseInt(e.target.value) || 5 })} /></div>
-                    <Button onClick={addTheoryQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Theory Question</Button>
-                  </>
-                )}
-
-                {theoryQuestions.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    <Label>Added Theory Questions ({theoryQuestions.length})</Label>
-                    <div className="max-h-[200px] overflow-y-auto space-y-2">
-                      {theoryQuestions.map((q, i) => (
-                        <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
-                          <div><p className="text-sm font-medium">{i + 1}. {q.question}</p><p className="text-xs">{q.marks} marks</p></div>
-                          <Button variant="ghost" size="icon" onClick={() => removeTheoryQuestion(q.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                  <div><Label>Question</Label><Textarea value={currentQuestion.question} onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })} rows={3} /></div>
+                  {currentQuestion.type === 'mcq' && (
+                    <div className="space-y-2">
+                      <Label>Options</Label>
+                      {currentQuestion.options?.map((option, index) => (
+                        <div key={index} className="flex items-center gap-2">
+                          <span className="w-6">{String.fromCharCode(65 + index)}.</span>
+                          <Input value={option} onChange={(e) => { const newOpts = [...(currentQuestion.options || [])]; newOpts[index] = e.target.value; setCurrentQuestion({ ...currentQuestion, options: newOpts }) }} />
                         </div>
                       ))}
                     </div>
+                  )}
+                  <div>
+                    <Label>Correct Answer</Label>
+                    {currentQuestion.type === 'mcq' ? (
+                      <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger>
+                        <SelectContent>{currentQuestion.options?.map((opt, i) => opt ? <SelectItem key={i} value={opt}>{String.fromCharCode(65 + i)}. {opt}</SelectItem> : null)}</SelectContent>
+                      </Select>
+                    ) : currentQuestion.type === 'true_false' ? (
+                      <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
+                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                        <SelectContent><SelectItem value="True">True</SelectItem><SelectItem value="False">False</SelectItem></SelectContent>
+                      </Select>
+                    ) : (
+                      <Input value={currentQuestion.correct_answer} onChange={(e) => setCurrentQuestion({ ...currentQuestion, correct_answer: e.target.value })} />
+                    )}
                   </div>
-                )}
+                  <div><Label>Marks</Label><Input type="number" step="0.5" min="0.5" value={currentQuestion.marks} onChange={(e) => setCurrentQuestion({ ...currentQuestion, marks: parseFloat(e.target.value) || defaultMark })} /></div>
+                  <Button onClick={addQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Question</Button>
+                </>
+              )}
 
-                <div className="flex justify-between pt-4">
-                  <Button variant="outline" onClick={() => setActiveTab('questions')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                  <Button onClick={() => setActiveTab('preview')}>Next: CBT Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
+              {questions.length > 0 && (
+                <div className="space-y-2 mt-4">
+                  <Label>Added Questions ({questions.length})</Label>
+                  <div className="max-h-[200px] overflow-y-auto space-y-2">
+                    {questions.map((q, i) => (
+                      <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
+                        <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs">{q.type} • {q.marks} mark(s)</p></div>
+                        <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="flex-shrink-0 ml-2"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </>
-            )}
-          </TabsContent>
+              )}
 
-          {/* CBT PREVIEW TAB */}
-          <TabsContent value="preview" className="py-4">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold flex items-center gap-2"><MonitorPlay className="h-5 w-5 text-primary" />Student CBT Preview</h3>
-                <p className="text-sm text-muted-foreground">This is exactly how students will see and take this exam</p>
+              <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
+                <Button variant="outline" onClick={() => setActiveTab('details')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
+                <Button onClick={() => setActiveTab('theory')} size="sm">Next: Theory <ChevronRight className="ml-2 h-4 w-4" /></Button>
               </div>
-              <Button variant="outline" onClick={() => setActiveTab('summary')}>Next: Summary <ChevronRight className="ml-2 h-4 w-4" /></Button>
-            </div>
-            <CBTPreview examDetails={examDetails} questions={questions} theoryQuestions={theoryQuestions} hasTheory={hasTheory} defaultMark={defaultMark} />
-          </TabsContent>
+            </TabsContent>
 
-          {/* SUMMARY TAB */}
-          <TabsContent value="summary" className="space-y-4 py-4">
-            <Card>
-              <CardHeader><CardTitle>Exam Summary</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div><p className="text-sm text-muted-foreground">Title</p><p className="font-medium">{examDetails.title || 'Untitled'}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Class</p><p className="font-medium">{examDetails.class}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Subject</p><p className="font-medium">{examDetails.subject}</p></div>
-                  <div><p className="text-sm text-muted-foreground">Duration</p><p className="font-medium">{examDetails.duration} minutes</p></div>
-                  <div><p className="text-sm text-muted-foreground">Pass Mark</p><p className="font-medium">{examDetails.pass_mark}%</p></div>
-                  <div><p className="text-sm text-muted-foreground">Total Marks</p><p className="font-medium">60</p></div>
-                  <div><p className="text-sm text-muted-foreground">Randomize Questions</p><Badge variant={examDetails.randomize_questions ? 'default' : 'outline'}>{examDetails.randomize_questions ? 'Yes' : 'No'}</Badge></div>
-                  <div><p className="text-sm text-muted-foreground">Randomize Options</p><Badge variant={examDetails.randomize_options ? 'default' : 'outline'}>{examDetails.randomize_options ? 'Yes' : 'No'}</Badge></div>
+            {/* THEORY TAB */}
+            <TabsContent value="theory" className="space-y-4 mt-0">
+              {!hasTheory ? (
+                <div className="text-center py-6 sm:py-8 space-y-4">
+                  <Brain className="h-12 sm:h-16 w-12 sm:w-16 mx-auto text-muted-foreground" />
+                  <div><h3 className="text-lg font-semibold">Theory Questions Disabled</h3><p className="text-sm text-muted-foreground">Enable theory questions to add essay-type questions</p></div>
+                  <div className="flex items-center justify-center gap-3 p-4 bg-muted rounded-lg"><span>Include Theory Questions</span><Switch checked={hasTheory} onCheckedChange={setHasTheory} /></div>
+                  <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setActiveTab('questions')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
+                    <Button onClick={() => setActiveTab('preview')} disabled={questions.length === 0} size="sm">Skip to Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                  </div>
                 </div>
-                <div className="border-t pt-4"><p className="text-sm text-muted-foreground">Objective Questions</p><p className="font-medium">{questions.length} questions</p></div>
-                {hasTheory && <div><p className="text-sm text-muted-foreground">Theory Questions</p><p className="font-medium">{theoryQuestions.length} questions</p></div>}
-              </CardContent>
-            </Card>
-            <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={() => setActiveTab('preview')}><ChevronLeft className="mr-2 h-4 w-4" />Back to Preview</Button>
-            </div>
-          </TabsContent>
-        </Tabs>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2 border-b pb-3">
+                    <Button variant={theoryUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('bulk')} className="text-xs sm:text-sm"><Sparkles className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Bulk Paste</Button>
+                    <Button variant={theoryUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('manual')} className="text-xs sm:text-sm"><Plus className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Manual Entry</Button>
+                  </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
-          <Button variant="outline" onClick={() => handleSubmit(false)} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft
-          </Button>
-          <Button onClick={() => handleSubmit(true)} disabled={loading}>
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit for Approval
-          </Button>
-        </DialogFooter>
+                  {theoryUploadMode === 'bulk' ? (
+                    <div className="space-y-4">
+                      <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
+                        <span>Upload DOC, DOCX, PDF, TXT or paste theory questions.</span>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={insertTheoryExample} className="text-xs">Example</Button>
+                          <Button variant="outline" size="sm" onClick={() => downloadTemplate('theory')} className="text-xs">Template</Button>
+                        </div>
+                      </AlertDescription></Alert>
+
+                      <div>
+                        <Label>Upload File</Label>
+                        <input ref={theoryFileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleTheoryFileUpload} className="hidden" />
+                        <div onClick={() => theoryFileInputRef.current?.click()} className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-primary/50 transition-colors">
+                          {isParsingTheoryFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload</p><p className="text-xs">.doc, .docx, .pdf, .txt</p></>}
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label>Paste Theory Questions</Label>
+                        <Textarea value={bulkTheoryText} onChange={(e) => setBulkTheoryText(e.target.value)} placeholder="1. Explain the factors of production.\nMarks: 10" rows={8} className="font-mono text-xs sm:text-sm" />
+                        <Button onClick={parseBulkTheory} className="mt-2 w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
+                      </div>
+                      {theoryParseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{theoryParseError}</AlertDescription></Alert>}
+                    </div>
+                  ) : (
+                    <>
+                      <div><Label>Theory Question</Label><Textarea value={currentTheoryQuestion.question} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, question: e.target.value })} rows={4} /></div>
+                      <div><Label>Marks</Label><Input type="number" min="1" max="100" value={currentTheoryQuestion.marks} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, marks: parseInt(e.target.value) || 5 })} /></div>
+                      <Button onClick={addTheoryQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Theory Question</Button>
+                    </>
+                  )}
+
+                  {theoryQuestions.length > 0 && (
+                    <div className="space-y-2 mt-4">
+                      <Label>Added Theory Questions ({theoryQuestions.length})</Label>
+                      <div className="max-h-[200px] overflow-y-auto space-y-2">
+                        {theoryQuestions.map((q, i) => (
+                          <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
+                            <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs">{q.marks} marks</p></div>
+                            <Button variant="ghost" size="icon" onClick={() => removeTheoryQuestion(q.id)} className="flex-shrink-0 ml-2"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
+                    <Button variant="outline" onClick={() => setActiveTab('questions')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
+                    <Button onClick={() => setActiveTab('preview')} size="sm">Next: CBT Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                  </div>
+                </>
+              )}
+            </TabsContent>
+
+            {/* CBT PREVIEW TAB */}
+            <TabsContent value="preview" className="mt-0">
+              <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <div>
+                  <h3 className="text-lg font-semibold flex items-center gap-2"><MonitorPlay className="h-5 w-5 text-primary" />Student CBT Preview</h3>
+                  <p className="text-sm text-muted-foreground">This is exactly how students will see and take this exam</p>
+                </div>
+                <Button variant="outline" onClick={() => setActiveTab('summary')} size="sm">Next: Summary <ChevronRight className="ml-2 h-4 w-4" /></Button>
+              </div>
+              <CBTPreview examDetails={examDetails} questions={questions} theoryQuestions={theoryQuestions} hasTheory={hasTheory} defaultMark={defaultMark} />
+            </TabsContent>
+
+            {/* SUMMARY TAB */}
+            <TabsContent value="summary" className="space-y-4 mt-0">
+              <Card>
+                <CardHeader><CardTitle>Exam Summary</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div><p className="text-sm text-muted-foreground">Title</p><p className="font-medium">{examDetails.title || 'Untitled'}</p></div>
+                    <div><p className="text-sm text-muted-foreground">Class</p><p className="font-medium">{examDetails.class}</p></div>
+                    <div><p className="text-sm text-muted-foreground">Subject</p><p className="font-medium">{examDetails.subject}</p></div>
+                    <div><p className="text-sm text-muted-foreground">Duration</p><p className="font-medium">{examDetails.duration} minutes</p></div>
+                    <div><p className="text-sm text-muted-foreground">Pass Mark</p><p className="font-medium">{examDetails.pass_mark}%</p></div>
+                    <div><p className="text-sm text-muted-foreground">Total Marks</p><p className="font-medium">60</p></div>
+                    <div><p className="text-sm text-muted-foreground">Randomize Questions</p><Badge variant={examDetails.randomize_questions ? 'default' : 'outline'}>{examDetails.randomize_questions ? 'Yes' : 'No'}</Badge></div>
+                    <div><p className="text-sm text-muted-foreground">Randomize Options</p><Badge variant={examDetails.randomize_options ? 'default' : 'outline'}>{examDetails.randomize_options ? 'Yes' : 'No'}</Badge></div>
+                  </div>
+                  <div className="border-t pt-4"><p className="text-sm text-muted-foreground">Objective Questions</p><p className="font-medium">{questions.length} questions</p></div>
+                  {hasTheory && <div><p className="text-sm text-muted-foreground">Theory Questions</p><p className="font-medium">{theoryQuestions.length} questions</p></div>}
+                </CardContent>
+              </Card>
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={() => setActiveTab('preview')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back to Preview</Button>
+              </div>
+            </TabsContent>
+          </div>
+
+          {/* Fixed Footer */}
+          <DialogFooter className="flex-shrink-0 p-4 sm:p-6 border-t flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => handleOpenChange(false)} size="sm" className="w-full sm:w-auto">Cancel</Button>
+            <Button variant="outline" onClick={() => handleSubmit(false)} disabled={loading} size="sm" className="w-full sm:w-auto">
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft
+            </Button>
+            <Button onClick={() => handleSubmit(true)} disabled={loading} size="sm" className="w-full sm:w-auto">
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit for Approval
+            </Button>
+          </DialogFooter>
+        </Tabs>
       </DialogContent>
     </Dialog>
   )

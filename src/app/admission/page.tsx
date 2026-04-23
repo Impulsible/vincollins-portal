@@ -1,4 +1,4 @@
-// app/admission/page.tsx
+// app/admission/page.tsx - FIXED HEADER SPACING
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -96,7 +96,7 @@ export default function AdmissionPage() {
       <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
         <Header />
         
-        <div className="flex items-center justify-center p-4 py-16">
+        <div className="flex items-center justify-center p-4 pt-24 sm:pt-28 pb-16">
           <Card className="max-w-md w-full text-center">
             <CardContent className="pt-12 pb-8">
               <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -135,27 +135,28 @@ export default function AdmissionPage() {
     <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
       <Header />
 
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0d2e8a] to-[#1e3a8a] text-white overflow-hidden">
+      {/* Hero Section - FIXED: Proper padding from header */}
+      <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0d2e8a] to-[#1e3a8a] text-white overflow-hidden pt-20 sm:pt-24 lg:pt-28 pb-8 sm:pb-10 md:pb-12 lg:pb-16">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.4)_0%,transparent_50%)]" />
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-400 rounded-full blur-3xl opacity-20" />
           <div className="absolute -bottom-24 -left-24 w-96 h-96 bg-indigo-400 rounded-full blur-3xl opacity-20" />
         </div>
         
-        <div className="relative container max-w-6xl mx-auto px-4 sm:px-6 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="relative container max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/15 backdrop-blur-sm rounded-full border border-white/20 mb-6">
-              <GraduationCap className="h-4 w-4 text-amber-300" />
-              <span className="text-sm font-medium text-white/90">Start Your Journey</span>
+            {/* Badge with proper spacing */}
+            <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-white/15 backdrop-blur-sm rounded-full border border-white/20 mb-5 sm:mb-6">
+              <GraduationCap className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-amber-300" />
+              <span className="text-xs sm:text-sm md:text-base font-medium text-white/90 whitespace-nowrap">Start Your Journey</span>
             </div>
             
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold leading-tight mb-4 sm:mb-5">
               <span className="text-white">Apply to </span>
               <span className="bg-gradient-to-r from-amber-300 to-amber-500 bg-clip-text text-transparent">Vincollins College</span>
             </h1>
             
-            <p className="text-base sm:text-lg md:text-xl text-white/80 max-w-2xl mb-8">
+            <p className="text-sm sm:text-base md:text-lg lg:text-xl text-white/80 max-w-2xl mb-6 sm:mb-8">
               Join a community that nurtures excellence. Submit your application today and take the first step towards a bright future.
             </p>
             
@@ -216,7 +217,7 @@ export default function AdmissionPage() {
       </section>
 
       {/* Breadcrumb */}
-      <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800 sticky top-0 z-10">
+      <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800">
         <div className="container max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             <Link href="/" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">

@@ -1,29 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// components/staff/NotesList.tsx
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Notebook, Download, MoreVertical, Eye, Edit, Trash2 } from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { formatDistanceToNow } from 'date-fns'
-
-interface Note {
-  id: string
-  title: string
-  subject: string
-  class: string
-  description: string
-  file_url?: string
-  status: string
-  created_at: string
-}
+import { Card, CardContent } from '@/components/ui/card'
+import { FileText, RefreshCw, BookOpen, Calendar, User } from 'lucide-react'
+import { Note } from '@/lib/staff/types'
+import { cn } from '@/lib/utils'
 
 interface NotesListProps {
   notes: Note[]
@@ -32,65 +14,104 @@ interface NotesListProps {
 }
 
 export function NotesList({ notes, onRefresh, compact = false }: NotesListProps) {
-  const getStatusBadge = (status: string) => {
-    return status === 'published' 
-      ? <Badge className="bg-green-100 text-green-700">Published</Badge>
-      : <Badge variant="outline">Draft</Badge>
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'lesson_note': return <BookOpen className="h-4 w-4" />
+      case 'scheme_of_work': return <Calendar className="h-4 w-4" />
+      default: return <FileText className="h-4 w-4" />
+    }
   }
 
-  const displayNotes = compact ? notes.slice(0, 3) : notes
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'draft': return 'bg-yellow-100 text-yellow-700'
+      case 'published': return 'bg-green-100 text-green-700'
+      default: return 'bg-gray-100 text-gray-700'
+    }
+  }
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A'
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
+  if (notes.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <FileText className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+        <p className="text-gray-500 text-sm">No lesson notes</p>
+        <Button variant="link" size="sm" onClick={onRefresh} className="mt-2">
+          <RefreshCw className="h-3 w-3 mr-1" /> Refresh
+        </Button>
+      </div>
+    )
+  }
 
   return (
-    <Card className="border-0 shadow-lg">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Notebook className="h-5 w-5 text-primary" />
-          Study Notes
-        </CardTitle>
-        <CardDescription>{notes.length} notes uploaded</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {displayNotes.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">No notes uploaded yet</p>
-        ) : (
-          displayNotes.map((note) => (
-            <div key={note.id} className="flex items-center justify-between p-3 rounded-xl bg-muted/30">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-medium">{note.title}</p>
-                  {getStatusBadge(note.status)}
-                </div>
-                <p className="text-sm text-muted-foreground">{note.subject} • {note.class}</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {formatDistanceToNow(new Date(note.created_at), { addSuffix: true })}
-                </p>
+    <div className="space-y-3">
+      {notes.map((note) => (
+        <Card key={note.id} className="hover:shadow-md transition-shadow">
+          <CardContent className={cn("p-4", compact && "p-3")}>
+            <div className="flex items-start gap-3">
+              <div className={cn(
+                "p-2 rounded-lg flex-shrink-0",
+                note.type === 'lesson_note' ? "bg-blue-50" : 
+                note.type === 'scheme_of_work' ? "bg-purple-50" : "bg-gray-50"
+              )}>
+                {getTypeIcon(note.type || 'general')}
               </div>
-              
-              <div className="flex items-center gap-1">
-                {note.file_url && (
-                  <Button variant="ghost" size="icon" asChild>
-                    <a href={note.file_url} target="_blank" rel="noopener noreferrer">
-                      <Download className="h-4 w-4" />
-                    </a>
-                  </Button>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h4 className="font-medium text-gray-900 truncate">{note.title}</h4>
+                  <Badge className={cn("text-xs", getStatusColor(note.status))}>
+                    {note.status}
+                  </Badge>
+                </div>
+                
+                {(note.subject || note.class) && (
+                  <p className="text-sm text-gray-500">
+                    {note.subject && <span>{note.subject}</span>}
+                    {note.subject && note.class && <span> • </span>}
+                    {note.class && <span>{note.class}</span>}
+                    {!note.subject && !note.class && <span>General</span>}
+                  </p>
                 )}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem><Eye className="mr-2 h-4 w-4" /> View</DropdownMenuItem>
-                    <DropdownMenuItem><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                    <DropdownMenuItem className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                
+                {note.description && (
+                  <p className="text-xs text-gray-500 line-clamp-2 mt-1">{note.description}</p>
+                )}
+                
+                {!note.description && note.content && (
+                  <p className="text-xs text-gray-500 line-clamp-2 mt-1">
+                    {note.content.substring(0, 100)}...
+                  </p>
+                )}
+                
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
+                  {note.author_name && (
+                    <span className="flex items-center gap-1">
+                      <User className="h-3 w-3" />
+                      {note.author_name}
+                    </span>
+                  )}
+                  {note.week && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Week {note.week}
+                    </span>
+                  )}
+                  {note.created_at && (
+                    <span>{formatDate(note.created_at)}</span>
+                  )}
+                </div>
               </div>
             </div>
-          ))
-        )}
-      </CardContent>
-    </Card>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }

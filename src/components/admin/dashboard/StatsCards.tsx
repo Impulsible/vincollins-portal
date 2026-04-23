@@ -227,7 +227,6 @@ export function StatsCards({
             if (presence.role === 'staff') staffOnline++
           })
         })
-
         setOnlineCounts({ students: studentsOnline, staff: staffOnline })
       })
       .subscribe()
