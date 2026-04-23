@@ -1,4 +1,4 @@
-// app/staff/page.tsx - COMPLETE WITH SINGLE BEAUTIFUL LOADER
+// app/staff/page.tsx - MOBILE RESPONSIVE WITH PROPER SPACING
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
@@ -254,7 +254,7 @@ function StaffDashboardContent() {
   }
 
   return (
-    <div className="px-4 sm:px-5 md:px-6 lg:px-7 pb-4 sm:pb-5 md:pb-6 lg:pb-7 space-y-4 sm:space-y-6">
+    <div className="mt-6 sm:mt-8 lg:mt-10 px-3 sm:px-5 md:px-6 lg:px-8 pb-6 sm:pb-8 lg:pb-10 space-y-4 sm:space-y-5 md:space-y-6 max-w-[1600px] mx-auto">
       <StaffWelcomeBanner 
         profile={profile} 
         stats={{
@@ -271,16 +271,17 @@ function StaffDashboardContent() {
         termInfo={termInfo}
       />
       
+      {/* Action Buttons - Mobile responsive */}
       <div className="flex flex-wrap gap-2 sm:gap-3">
-        <Button onClick={() => router.push('/staff/exams/create')} className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm h-9 sm:h-10">
+        <Button onClick={() => router.push('/staff/exams/create')} className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm h-9 sm:h-10 flex-1 sm:flex-none">
           <Plus className="h-4 w-4 mr-1.5" />
           Create Exam
         </Button>
-        <Button onClick={() => router.push('/staff/assignments/create')} variant="outline" className="text-xs sm:text-sm h-9 sm:h-10">
+        <Button onClick={() => router.push('/staff/assignments/create')} variant="outline" className="text-xs sm:text-sm h-9 sm:h-10 flex-1 sm:flex-none">
           <FileText className="h-4 w-4 mr-1.5" />
           New Assignment
         </Button>
-        <Button onClick={() => router.push('/staff/notes/create')} variant="outline" className="text-xs sm:text-sm h-9 sm:h-10">
+        <Button onClick={() => router.push('/staff/notes/create')} variant="outline" className="text-xs sm:text-sm h-9 sm:h-10 flex-1 sm:flex-none">
           <BookOpen className="h-4 w-4 mr-1.5" />
           Add Notes
         </Button>
@@ -289,95 +290,99 @@ function StaffDashboardContent() {
         </Button>
       </div>
       
+      {/* Stats Cards - 2 columns on mobile, 4 on desktop */}
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4"
+        className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4"
       >
-        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
+        <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 col-span-1">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.totalExams}</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.totalExams}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Total Exams</p>
               </div>
-              <MonitorPlay className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600 opacity-50" />
+              <MonitorPlay className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-emerald-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
+        <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 col-span-1">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-400">{stats.publishedExams}</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-700 dark:text-blue-400">{stats.publishedExams}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Published</p>
               </div>
-              <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 opacity-50" />
+              <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-blue-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30">
+        <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 col-span-1">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-400">{stats.pendingCAScores}</p>
-                <p className="text-[10px] sm:text-xs text-muted-foreground">Pending CA Scores</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-amber-700 dark:text-amber-400">{stats.pendingCAScores}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Pending CA</p>
               </div>
-              <Calculator className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600 opacity-50" />
+              <Calculator className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-amber-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
         
-        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
+        <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 col-span-1">
           <CardContent className="p-3 sm:p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xl sm:text-2xl font-bold text-purple-700 dark:text-purple-400">{stats.totalStudents}</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-700 dark:text-purple-400">{stats.totalStudents}</p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">Students</p>
               </div>
-              <Users className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 opacity-50" />
+              <Users className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-purple-600 opacity-50" />
             </div>
           </CardContent>
         </Card>
       </motion.div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+      {/* Main Content Grid - Single column on mobile, 3 columns on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+        {/* Left column - Takes 2/3 on desktop */}
+        <div className="lg:col-span-2 space-y-4 sm:space-y-5 md:space-y-6">
+          {/* Recent Exams */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 px-4 sm:px-6">
-              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                <MonitorPlay className="h-5 w-5 text-emerald-600" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                <MonitorPlay className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
                 Recent Exams
               </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
                 <Link href="/staff/exams">
-                  View All <ArrowRight className="ml-1 h-4 w-4" />
+                  View All <ArrowRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
                 </Link>
               </Button>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6">
+            <CardContent className="px-3 sm:px-4 md:px-6">
               {exams.length === 0 ? (
-                <div className="text-center py-8">
-                  <MonitorPlay className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm">No exams created yet</p>
-                  <Button size="sm" className="mt-3" onClick={() => router.push('/staff/exams/create')}>
+                <div className="text-center py-6 sm:py-8">
+                  <MonitorPlay className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-xs sm:text-sm">No exams created yet</p>
+                  <Button size="sm" className="mt-3 text-xs sm:text-sm" onClick={() => router.push('/staff/exams/create')}>
                     Create Exam
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {exams.slice(0, 5).map((exam: any) => (
-                    <div key={exam.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-muted/50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <MonitorPlay className="h-5 w-5 text-blue-600 shrink-0" />
+                    <div key={exam.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 sm:p-3 bg-muted/50 rounded-lg">
+                      <div className="flex items-center gap-2 sm:gap-3">
+                        <MonitorPlay className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{exam.title}</p>
-                          <p className="text-xs text-muted-foreground">{exam.subject} • {exam.class}</p>
+                          <p className="font-medium text-xs sm:text-sm truncate">{exam.title}</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">{exam.subject} • {exam.class}</p>
                         </div>
                       </div>
-                      <Badge variant={exam.status === 'published' ? 'default' : 'outline'} className="shrink-0">
+                      <Badge variant={exam.status === 'published' ? 'default' : 'outline'} className="shrink-0 text-[10px] sm:text-xs">
                         {exam.status || 'draft'}
                       </Badge>
                     </div>
@@ -387,32 +392,33 @@ function StaffDashboardContent() {
             </CardContent>
           </Card>
 
+          {/* Recent Assignments */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 px-4 sm:px-6">
-              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                <FileText className="h-5 w-5 text-blue-600" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                 Recent Assignments
               </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
                 <Link href="/staff/assignments">
-                  View All <ArrowRight className="ml-1 h-4 w-4" />
+                  View All <ArrowRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
                 </Link>
               </Button>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6">
+            <CardContent className="px-3 sm:px-4 md:px-6">
               {assignments.length === 0 ? (
-                <div className="text-center py-6">
-                  <FileText className="h-10 w-10 text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm">No assignments yet</p>
+                <div className="text-center py-4 sm:py-6">
+                  <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-xs sm:text-sm">No assignments yet</p>
                 </div>
               ) : (
                 <div className="space-y-2">
                   {assignments.map((assignment: any) => (
-                    <div key={assignment.id} className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-                      <FileText className="h-5 w-5 text-emerald-600 shrink-0" />
+                    <div key={assignment.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
+                      <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm truncate">{assignment.title}</p>
-                        <p className="text-xs text-muted-foreground">{assignment.subject} • {assignment.class}</p>
+                        <p className="font-medium text-xs sm:text-sm truncate">{assignment.title}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">{assignment.subject} • {assignment.class}</p>
                       </div>
                     </div>
                   ))}
@@ -422,33 +428,35 @@ function StaffDashboardContent() {
           </Card>
         </div>
 
-        <div className="space-y-4 sm:space-y-6">
+        {/* Right column - Takes 1/3 on desktop */}
+        <div className="space-y-4 sm:space-y-5 md:space-y-6">
+          {/* Recent Notes */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 px-4 sm:px-6">
-              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-purple-600" />
+            <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
                 Recent Notes
               </CardTitle>
-              <Button variant="ghost" size="sm" asChild>
+              <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
                 <Link href="/staff/notes">
-                  View All <ArrowRight className="ml-1 h-4 w-4" />
+                  View All <ArrowRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
                 </Link>
               </Button>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6">
+            <CardContent className="px-3 sm:px-4 md:px-6">
               {notes.length === 0 ? (
                 <div className="text-center py-4">
-                  <BookOpen className="h-8 w-8 text-muted-foreground/40 mx-auto mb-2" />
-                  <p className="text-muted-foreground text-sm">No notes yet</p>
+                  <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/40 mx-auto mb-2" />
+                  <p className="text-muted-foreground text-xs sm:text-sm">No notes yet</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                <div className="space-y-2 max-h-[200px] sm:max-h-[250px] overflow-y-auto">
                   {notes.map((note: any) => (
-                    <div key={note.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg">
+                    <div key={note.id} className="flex items-center gap-2 sm:gap-3 p-2 bg-muted/50 rounded-lg">
                       <BookOpen className="h-4 w-4 text-purple-600 shrink-0" />
                       <div className="min-w-0">
-                        <p className="font-medium text-sm truncate">{note.title}</p>
-                        <p className="text-xs text-muted-foreground">{note.subject || 'General'}</p>
+                        <p className="font-medium text-xs sm:text-sm truncate">{note.title}</p>
+                        <p className="text-[10px] sm:text-xs text-muted-foreground">{note.subject || 'General'}</p>
                       </div>
                     </div>
                   ))}
@@ -457,40 +465,41 @@ function StaffDashboardContent() {
             </CardContent>
           </Card>
 
+          {/* Class Overview */}
           <Card>
-            <CardHeader className="pb-2 px-4 sm:px-6">
-              <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-emerald-600" />
+            <CardHeader className="pb-2 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
                 Class Overview
               </CardTitle>
             </CardHeader>
-            <CardContent className="px-4 sm:px-6">
-              <div className="space-y-3">
+            <CardContent className="px-3 sm:px-4 md:px-6">
+              <div className="space-y-2 sm:space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Students</span>
-                  <span className="font-bold">{stats.totalStudents}</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">Total Students</span>
+                  <span className="font-bold text-sm sm:text-base">{stats.totalStudents}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Active Classes</span>
-                  <span className="font-bold">{stats.activeClasses}</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">Active Classes</span>
+                  <span className="font-bold text-sm sm:text-base">{stats.activeClasses}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Active Students</span>
-                  <span className="font-bold text-emerald-600">{stats.activeStudents}</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">Active Students</span>
+                  <span className="font-bold text-sm sm:text-base text-emerald-600">{stats.activeStudents}</span>
                 </div>
                 
                 {stats.classBreakdown.length > 0 && (
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <p className="text-xs text-muted-foreground mb-2">Students per Class</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">Students per Class</p>
                     <div className="space-y-1.5 max-h-[150px] overflow-y-auto">
                       {stats.classBreakdown.slice(0, 5).map((cls) => (
                         <div key={cls.name} className="flex items-center justify-between">
-                          <span className="text-sm">{cls.name}</span>
-                          <Badge variant="outline" className="text-xs">{cls.count}</Badge>
+                          <span className="text-xs sm:text-sm">{cls.name}</span>
+                          <Badge variant="outline" className="text-[10px] sm:text-xs">{cls.count}</Badge>
                         </div>
                       ))}
                       {stats.classBreakdown.length > 5 && (
-                        <p className="text-xs text-muted-foreground text-center">
+                        <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
                           +{stats.classBreakdown.length - 5} more classes
                         </p>
                       )}
@@ -498,35 +507,44 @@ function StaffDashboardContent() {
                   </div>
                 )}
                 
-                <Progress value={stats.averagePerformance} className="h-2 mt-2" />
-                <p className="text-xs text-muted-foreground text-center">
+                <Progress value={stats.averagePerformance} className="h-1.5 sm:h-2 mt-2" />
+                <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
                   Average performance: {stats.averagePerformance}%
                 </p>
                 <Button 
                   variant="outline" 
                   size="sm" 
-                  className="w-full mt-2" 
+                  className="w-full mt-2 text-xs sm:text-sm" 
                   onClick={() => router.push('/staff/students')}
                 >
-                  <Users className="h-4 w-4 mr-2" />
+                  <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
                   View All Students
                 </Button>
               </div>
             </CardContent>
           </Card>
 
+          {/* Quick Actions */}
           <Card>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-3">
-                <Button variant="outline" className="h-auto py-3 flex-col gap-1" onClick={() => router.push('/staff/ca-scores')}>
-                  <Calculator className="h-5 w-5 text-amber-600" />
-                  <span className="text-sm font-medium">CA Scores</span>
-                  <span className="text-[10px] text-muted-foreground">{stats.pendingCAScores} pending</span>
+            <CardContent className="p-3 sm:p-4">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-2 sm:py-3 flex-col gap-1 text-xs sm:text-sm" 
+                  onClick={() => router.push('/staff/ca-scores')}
+                >
+                  <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                  <span className="font-medium">CA Scores</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">{stats.pendingCAScores} pending</span>
                 </Button>
-                <Button variant="outline" className="h-auto py-3 flex-col gap-1" onClick={() => router.push('/staff/report-cards')}>
-                  <FileCheck className="h-5 w-5 text-blue-600" />
-                  <span className="text-sm font-medium">Report Cards</span>
-                  <span className="text-[10px] text-muted-foreground">Generate</span>
+                <Button 
+                  variant="outline" 
+                  className="h-auto py-2 sm:py-3 flex-col gap-1 text-xs sm:text-sm" 
+                  onClick={() => router.push('/staff/report-cards')}
+                >
+                  <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                  <span className="font-medium">Report Cards</span>
+                  <span className="text-[9px] sm:text-[10px] text-muted-foreground">Generate</span>
                 </Button>
               </div>
             </CardContent>

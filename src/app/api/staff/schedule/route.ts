@@ -1,3 +1,4 @@
+// src/app/api/staff/schedule/route.ts - FIXED FOR BUILD
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextRequest, NextResponse } from 'next/server'
@@ -115,11 +116,9 @@ export async function GET(request: NextRequest) {
     if (academicYear) query = query.eq('academic_year', academicYear)
     if (status) query = query.eq('status', status)
     
-    // Date range filter
     if (dateFrom) query = query.gte('start_time', dateFrom)
     if (dateTo) query = query.lte('end_time', dateTo)
     
-    // Pagination
     if (limit) {
       const pageNum = page ? parseInt(page) : 1
       const limitNum = parseInt(limit)
@@ -132,7 +131,6 @@ export async function GET(request: NextRequest) {
     
     if (error) throw error
     
-    // Group schedules by day for calendar view
     const groupedByDay = data?.reduce((acc: Record<string, Schedule[]>, schedule: Schedule) => {
       const day = schedule.day || new Date(schedule.start_time).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase()
       if (!acc[day]) acc[day] = []
@@ -158,18 +156,12 @@ export async function POST(request: NextRequest) {
     const supabase = await createRouteHandlerClient()
     const body: CreateScheduleDto = await request.json()
     
-    // Validate required fields
     if (!body.title || !body.type || !body.start_time || !body.end_time) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: title, type, start_time, end_time' 
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Missing required fields: title, type, start_time, end_time' }, { status: 400 })
     }
     
-    // Validate time range
     if (new Date(body.start_time) >= new Date(body.end_time)) {
-      return NextResponse.json({ 
-        error: 'Start time must be before end time' 
-      }, { status: 400 })
+      return NextResponse.json({ error: 'Start time must be before end time' }, { status: 400 })
     }
     
     const scheduleData = {
@@ -187,10 +179,7 @@ export async function POST(request: NextRequest) {
     
     if (error) throw error
     
-    return NextResponse.json({ 
-      data, 
-      message: 'Schedule created successfully' 
-    })
+    return NextResponse.json({ data, message: 'Schedule created successfully' })
   } catch (error) {
     console.error('Error creating schedule:', error)
     return NextResponse.json({ error: 'Failed to create schedule' }, { status: 500 })
@@ -206,19 +195,13 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
     }
     
-    // Validate time range if both times are provided
     if (updates.start_time && updates.end_time) {
       if (new Date(updates.start_time) >= new Date(updates.end_time)) {
-        return NextResponse.json({ 
-          error: 'Start time must be before end time' 
-        }, { status: 400 })
+        return NextResponse.json({ error: 'Start time must be before end time' }, { status: 400 })
       }
     }
     
-    const updateData = {
-      ...updates,
-      updated_at: new Date().toISOString()
-    }
+    const updateData = { ...updates, updated_at: new Date().toISOString() }
     
     const { data, error } = await supabase
       .from('schedules')
@@ -229,10 +212,7 @@ export async function PUT(request: NextRequest) {
     
     if (error) throw error
     
-    return NextResponse.json({ 
-      data, 
-      message: 'Schedule updated successfully' 
-    })
+    return NextResponse.json({ data, message: 'Schedule updated successfully' })
   } catch (error) {
     console.error('Error updating schedule:', error)
     return NextResponse.json({ error: 'Failed to update schedule' }, { status: 500 })
@@ -249,14 +229,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Schedule ID is required' }, { status: 400 })
     }
     
-    // Check if schedule exists
-    const { data: existing, error: checkError } = await supabase
+    const { data: existing } = await supabase
       .from('schedules')
       .select('id')
       .eq('id', id)
       .single()
     
-    if (checkError || !existing) {
+    if (!existing) {
       return NextResponse.json({ error: 'Schedule not found' }, { status: 404 })
     }
     
@@ -267,10 +246,7 @@ export async function DELETE(request: NextRequest) {
     
     if (error) throw error
     
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Schedule deleted successfully' 
-    })
+    return NextResponse.json({ success: true, message: 'Schedule deleted successfully' })
   } catch (error) {
     console.error('Error deleting schedule:', error)
     return NextResponse.json({ error: 'Failed to delete schedule' }, { status: 500 })
@@ -322,22 +298,4 @@ export async function PATCH(request: NextRequest) {
     console.error('Error updating schedule status:', error)
     return NextResponse.json({ error: 'Failed to update schedule status' }, { status: 500 })
   }
-}
-
-// Get schedule for a specific date range (useful for calendar views)
-export async function getScheduleByDateRange(dateFrom: string, dateTo: string, classParam?: string) {
-  const supabase = await createRouteHandlerClient()
-  
-  let query = supabase
-    .from('schedules')
-    .select('*')
-    .gte('start_time', dateFrom)
-    .lte('end_time', dateTo)
-    .order('start_time', { ascending: true })
-  
-  if (classParam) query = query.eq('class', classParam)
-  
-  const { data, error } = await query
-  if (error) throw error
-  return data
 }

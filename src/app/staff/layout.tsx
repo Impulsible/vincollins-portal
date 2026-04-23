@@ -1,4 +1,4 @@
-// app/staff/layout.tsx - SIMPLE FIXED LAYOUT
+// app/staff/layout.tsx - FIXED SCROLLING
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react'
@@ -273,30 +273,26 @@ export default function StaffLayout({
         </div>
       </div>
 
-      <div className="flex min-h-screen">
-        {/* Desktop Sidebar */}
-        <div className="hidden lg:block">
-          <StaffSidebar 
-            profile={profile}
-            onLogout={handleLogout}
-            collapsed={sidebarCollapsed}
-            onToggle={() => setSidebarCollapsed(prev => !prev)}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-          />
-        </div>
+      {/* Desktop Sidebar - Fixed */}
+      <div className="hidden lg:block">
+        <StaffSidebar 
+          profile={profile}
+          onLogout={handleLogout}
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(prev => !prev)}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
+      </div>
 
-        {/* Main Content Area */}
-        <div className={`
-          flex-1
-          pt-14 lg:pt-0
-          transition-all duration-300 ease-in-out
-          ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'}
-        `}>
-          <main className="min-h-screen">
-            {children}
-          </main>
-        </div>
+      {/* Main Content Area - Full width on mobile, offset on desktop */}
+      <div className={`
+        w-full
+        pt-14 lg:pt-0
+        transition-all duration-300 ease-in-out
+        ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}
+      `}>
+        {children}
       </div>
     </StaffContext.Provider>
   )

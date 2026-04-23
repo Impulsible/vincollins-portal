@@ -1,4 +1,4 @@
-// components/staff/StaffWelcomeBanner.tsx - COMPLETE WITH FIXED SPACING
+// components/staff/StaffWelcomeBanner.tsx - COMPLETE WITH PROPER SPACING
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -126,12 +126,8 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
   }
 
   const weekDisplay = useMemo(() => {
-    if (termInfo?.displayWeek) {
-      return termInfo.displayWeek
-    }
-    if (termInfo) {
-      return `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}`
-    }
+    if (termInfo?.displayWeek) return termInfo.displayWeek
+    if (termInfo) return `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}`
     return 'Week 0/13'
   }, [termInfo])
 
@@ -139,7 +135,13 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-5 sm:p-6 md:p-7 text-white shadow-2xl border border-slate-600/30 mt-2 sm:mt-3 md:mt-4"
+      className={cn(
+        "relative overflow-hidden rounded-2xl",
+        "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900",
+        "p-5 sm:p-6 md:p-7 text-white shadow-2xl border border-slate-600/30",
+        // ✅ FIXED: Proper spacing from top
+        "mt-8 sm:mt-10 md:mt-12 lg:mt-14 mx-4 sm:mx-6 lg:mx-8"
+      )}
     >
       {/* Background decorative elements */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-3xl" />
@@ -232,7 +234,6 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
         
         {/* Stats Cards - 6 Cards Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mt-5 pt-4 border-t border-white/15">
-          {/* Published Exams */}
           <div className="group cursor-default bg-white/10 rounded-xl p-3 hover:bg-white/15 transition-colors border border-white/10">
             <div className="flex items-center justify-between mb-1">
               <p className="text-lg font-bold text-white">{stats?.publishedExams || 0}</p>
@@ -241,7 +242,6 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
             <p className="text-[10px] sm:text-xs text-gray-300">Published Exams</p>
           </div>
           
-          {/* Active Students */}
           <div className="group cursor-default bg-white/10 rounded-xl p-3 hover:bg-white/15 transition-colors border border-white/10">
             <div className="flex items-center justify-between mb-1">
               <p className="text-lg font-bold text-white">{stats?.activeStudents || stats?.totalStudents || 0}</p>
@@ -250,13 +250,9 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
             <p className="text-[10px] sm:text-xs text-gray-300">Active Students</p>
           </div>
           
-          {/* Pending Grading */}
           <div className="group cursor-default bg-white/10 rounded-xl p-3 hover:bg-white/15 transition-colors border border-white/10">
             <div className="flex items-center justify-between mb-1">
-              <p className={cn(
-                "text-lg font-bold",
-                pendingGrading > 0 ? "text-amber-300" : "text-white"
-              )}>
+              <p className={cn("text-lg font-bold", pendingGrading > 0 ? "text-amber-300" : "text-white")}>
                 {pendingGrading}
               </p>
               {pendingGrading > 0 ? (
@@ -268,7 +264,6 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
             <p className="text-[10px] sm:text-xs text-gray-300">Pending Grading</p>
           </div>
 
-          {/* Report Cards */}
           <div className="group cursor-default bg-white/10 rounded-xl p-3 hover:bg-white/15 transition-colors border border-white/10">
             <div className="flex items-center justify-between mb-1">
               <p className="text-lg font-bold text-white">{stats?.reportCardsGenerated || 0}</p>
@@ -277,7 +272,6 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
             <p className="text-[10px] sm:text-xs text-gray-300">Report Cards</p>
           </div>
 
-          {/* Assignments */}
           <div className="group cursor-default bg-white/10 rounded-xl p-3 hover:bg-white/15 transition-colors border border-white/10">
             <div className="flex items-center justify-between mb-1">
               <p className="text-lg font-bold text-white">{stats?.totalAssignments || 0}</p>
@@ -286,7 +280,6 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
             <p className="text-[10px] sm:text-xs text-gray-300">Assignments</p>
           </div>
 
-          {/* Study Notes */}
           <div className="group cursor-default bg-white/10 rounded-xl p-3 hover:bg-white/15 transition-colors border border-white/10">
             <div className="flex items-center justify-between mb-1">
               <p className="text-lg font-bold text-white">{stats?.totalNotes || 0}</p>
@@ -296,7 +289,7 @@ export function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBan
           </div>
         </div>
         
-        {/* Term Progress Bar - Only show if term has started */}
+        {/* Term Progress Bar */}
         {termInfo && termInfo.currentWeek > 0 && (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-1">
