@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/staff/profile/page.tsx - WORKING PHOTO UPLOAD WITH SYNC
+// app/staff/profile/page.tsx - FULLY RESPONSIVE, NO HORIZONTAL SCROLL
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -89,8 +89,6 @@ export default function StaffProfilePage() {
         return
       }
 
-      console.log('📸 Loading staff profile for:', session.user.id)
-
       const { data: profileData, error } = await supabase
         .from('profiles')
         .select('*')
@@ -100,8 +98,6 @@ export default function StaffProfilePage() {
       if (error) {
         console.error('Error fetching profile:', error)
       }
-
-      console.log('📸 Current photo_url:', profileData?.photo_url)
 
       if (profileData) {
         setProfile(profileData as StaffProfile)
@@ -176,7 +172,6 @@ export default function StaffProfilePage() {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
-  // FIXED: Working image upload - same as student version
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -197,9 +192,6 @@ export default function StaffProfilePage() {
       const fileExt = file.name.split('.').pop()
       const fileName = `staff-${profile?.id}-${Date.now()}.${fileExt}`
       
-      console.log('📸 Uploading staff photo:', fileName)
-
-      // Upload to Supabase Storage - using same student-photos bucket
       const { error: uploadError } = await supabase.storage
         .from('student-photos')
         .upload(fileName, file, {
@@ -207,20 +199,14 @@ export default function StaffProfilePage() {
           upsert: false
         })
 
-      if (uploadError) {
-        console.error('Upload error:', uploadError)
-        throw uploadError
-      }
+      if (uploadError) throw uploadError
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('student-photos')
         .getPublicUrl(fileName)
 
       const publicUrl = urlData.publicUrl
-      console.log('📸 Staff photo URL:', publicUrl)
 
-      // Update profile with new photo URL
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
@@ -230,12 +216,8 @@ export default function StaffProfilePage() {
         })
         .eq('id', profile?.id)
 
-      if (updateError) {
-        console.error('Profile update error:', updateError)
-        throw updateError
-      }
+      if (updateError) throw updateError
 
-      // Update local state
       setFormData(prev => ({ ...prev, photo_url: publicUrl }))
       if (profile) {
         setProfile({ ...profile, photo_url: publicUrl, avatar_url: publicUrl })
@@ -244,7 +226,6 @@ export default function StaffProfilePage() {
       
       toast.success('Profile photo updated successfully!')
       
-      // Clear the input
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -368,10 +349,10 @@ export default function StaffProfilePage() {
           <div className="hidden lg:block w-72" />
           <div className="flex-1">
             <main className="pt-20 lg:pt-24 pb-8">
-              <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-5xl">
-                <div className="space-y-6">
-                  <Skeleton className="h-48 w-full rounded-2xl" />
-                  <Skeleton className="h-96 w-full rounded-2xl" />
+              <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-4 md:px-5 lg:px-6">
+                <div className="space-y-4 sm:space-y-6">
+                  <Skeleton className="h-40 sm:h-48 w-full rounded-2xl" />
+                  <Skeleton className="h-80 sm:h-96 w-full rounded-2xl" />
                 </div>
               </div>
             </main>
@@ -382,7 +363,7 @@ export default function StaffProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden">
       <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
       <div className="flex flex-1">
@@ -396,29 +377,30 @@ export default function StaffProfilePage() {
         />
 
         <div className={cn(
-          "flex-1 transition-all duration-300",
+          "flex-1 transition-all duration-300 overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-20 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8">
-            <div className="container mx-auto max-w-5xl">
+          <main className="pt-20 lg:pt-24 pb-12">
+            <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-4 md:px-5 lg:px-6">
               
               {/* Breadcrumb */}
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6 flex items-center justify-between"
+                className="mb-4 sm:mb-6 flex flex-wrap items-center justify-between gap-3"
               >
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
                   <Link href="/staff" className="hover:text-primary flex items-center gap-1">
-                    <Home className="h-3.5 w-3.5" />
-                    Dashboard
+                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="hidden xs:inline">Dashboard</span>
                   </Link>
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   <span className="text-foreground font-medium">My Profile</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => router.push('/staff')}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Dashboard
+                <Button variant="outline" size="sm" onClick={() => router.push('/staff')} className="h-8 sm:h-9 text-xs">
+                  <ArrowLeft className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden xs:inline">Back to Dashboard</span>
+                  <span className="xs:hidden">Back</span>
                 </Button>
               </motion.div>
 
@@ -426,10 +408,10 @@ export default function StaffProfilePage() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
+                className="mb-4 sm:mb-6"
               >
-                <h1 className="text-3xl font-bold text-slate-900">My Profile</h1>
-                <p className="text-slate-500 mt-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">My Profile</h1>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5 sm:mt-1">
                   Manage your personal information and account settings
                 </p>
               </motion.div>
@@ -440,45 +422,45 @@ export default function StaffProfilePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.1 }}
               >
-                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                  <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 p-1 rounded-xl">
-                    <TabsTrigger value="profile" className="data-[state=active]:bg-white rounded-lg">
-                      <User className="h-4 w-4 mr-2" />
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+                  <TabsList className="grid w-full max-w-[280px] sm:max-w-md grid-cols-2 bg-slate-100 p-1 rounded-xl">
+                    <TabsTrigger value="profile" className="data-[state=active]:bg-white rounded-lg text-xs sm:text-sm">
+                      <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                       Profile
                     </TabsTrigger>
-                    <TabsTrigger value="security" className="data-[state=active]:bg-white rounded-lg">
-                      <Shield className="h-4 w-4 mr-2" />
+                    <TabsTrigger value="security" className="data-[state=active]:bg-white rounded-lg text-xs sm:text-sm">
+                      <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
                       Security
                     </TabsTrigger>
                   </TabsList>
 
                   {/* Profile Tab */}
-                  <TabsContent value="profile" className="space-y-6">
+                  <TabsContent value="profile" className="space-y-4 sm:space-y-6">
                     {/* Profile Card with Avatar */}
                     <Card className="border-0 shadow-lg overflow-hidden">
-                      <div className="relative h-32 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600">
+                      <div className="relative h-24 sm:h-32 bg-gradient-to-r from-blue-600 via-blue-500 to-indigo-600">
                         {!isEditing && (
-                          <div className="absolute top-4 right-4">
+                          <div className="absolute top-2 right-2 sm:top-4 sm:right-4">
                             <Button 
                               onClick={() => setIsEditing(true)} 
                               size="sm"
-                              className="bg-white/90 text-blue-700 hover:bg-white shadow-md"
+                              className="bg-white/90 text-blue-700 hover:bg-white shadow-md h-7 sm:h-8 text-xs sm:text-sm"
                             >
-                              <User className="mr-2 h-4 w-4" />
-                              Edit Profile
+                              <User className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+                              <span className="hidden xs:inline">Edit Profile</span>
                             </Button>
                           </div>
                         )}
                       </div>
                       
-                      <CardContent className="px-6 pb-6">
-                        <div className="flex flex-col md:flex-row items-center md:items-end gap-6">
+                      <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+                        <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 sm:gap-6">
                           {/* Avatar Section */}
-                          <div className="relative -mt-16">
+                          <div className="relative -mt-12 sm:-mt-16">
                             <div className="relative">
-                              <Avatar className="h-28 w-28 md:h-32 md:w-32 ring-4 ring-white shadow-xl" key={avatarKey}>
+                              <Avatar className="h-20 w-20 sm:h-28 sm:w-28 md:h-32 md:w-32 ring-4 ring-white shadow-xl" key={avatarKey}>
                                 <AvatarImage src={formData.photo_url || profile?.photo_url || undefined} />
-                                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-3xl font-bold">
+                                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-xl sm:text-3xl font-bold">
                                   {getInitials()}
                                 </AvatarFallback>
                               </Avatar>
@@ -487,12 +469,12 @@ export default function StaffProfilePage() {
                                 <button
                                   onClick={() => fileInputRef.current?.click()}
                                   disabled={isUploading}
-                                  className="absolute -bottom-2 -right-2 p-2.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
+                                  className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 p-1.5 sm:p-2.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all"
                                 >
                                   {isUploading ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin" />
                                   ) : (
-                                    <Camera className="h-4 w-4" />
+                                    <Camera className="h-3 w-3 sm:h-4 sm:w-4" />
                                   )}
                                 </button>
                               )}
@@ -507,37 +489,39 @@ export default function StaffProfilePage() {
                             />
                             
                             {isUploading && (
-                              <p className="text-xs text-muted-foreground mt-2 text-center">Uploading...</p>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 sm:mt-2 text-center">Uploading...</p>
                             )}
                           </div>
 
                           {/* Basic Info */}
-                          <div className="flex-1 text-center md:text-left pb-4">
+                          <div className="flex-1 text-center sm:text-left pb-2 sm:pb-4">
                             {isEditing ? (
-                              <div className="space-y-3">
+                              <div className="space-y-2 sm:space-y-3">
                                 <div>
-                                  <Label htmlFor="full_name">Full Name</Label>
+                                  <Label htmlFor="full_name" className="text-xs sm:text-sm">Full Name</Label>
                                   <Input
                                     id="full_name"
                                     value={formData.full_name}
                                     onChange={(e) => handleInputChange('full_name', e.target.value)}
                                     placeholder="Enter your full name"
+                                    className="h-8 sm:h-10 text-sm"
                                   />
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                                   <div>
-                                    <Label htmlFor="position">Position</Label>
+                                    <Label htmlFor="position" className="text-xs sm:text-sm">Position</Label>
                                     <Input
                                       id="position"
                                       value={formData.position}
                                       onChange={(e) => handleInputChange('position', e.target.value)}
                                       placeholder="e.g., Senior Teacher"
+                                      className="h-8 sm:h-10 text-sm"
                                     />
                                   </div>
                                   <div>
-                                    <Label htmlFor="department">Department</Label>
+                                    <Label htmlFor="department" className="text-xs sm:text-sm">Department</Label>
                                     <Select value={formData.department} onValueChange={(value) => handleInputChange('department', value)}>
-                                      <SelectTrigger>
+                                      <SelectTrigger className="h-8 sm:h-10 text-sm">
                                         <SelectValue placeholder="Select department" />
                                       </SelectTrigger>
                                       <SelectContent>
@@ -555,22 +539,22 @@ export default function StaffProfilePage() {
                               </div>
                             ) : (
                               <>
-                                <h2 className="text-2xl md:text-3xl font-bold text-slate-900">
+                                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900">
                                   {formData.full_name || 'Teacher Name'}
                                 </h2>
-                                <div className="flex flex-wrap justify-center md:justify-start gap-2 mt-2">
-                                  <Badge className="bg-blue-100 text-blue-700">
+                                <div className="flex flex-wrap justify-center sm:justify-start gap-1.5 sm:gap-2 mt-1 sm:mt-2">
+                                  <Badge className="bg-blue-100 text-blue-700 text-[10px] sm:text-xs">
                                     {formData.position || 'Teacher'}
                                   </Badge>
-                                  <Badge variant="outline">
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs">
                                     {formData.department || 'Department'}
                                   </Badge>
                                   {formData.qualification && (
-                                    <Badge variant="secondary">{formData.qualification}</Badge>
+                                    <Badge variant="secondary" className="text-[10px] sm:text-xs">{formData.qualification}</Badge>
                                   )}
                                 </div>
-                                <p className="text-slate-500 mt-2 flex items-center justify-center md:justify-start gap-2">
-                                  <Mail className="h-4 w-4" />
+                                <p className="text-slate-500 mt-1 sm:mt-2 flex items-center justify-center sm:justify-start gap-1 sm:gap-2 text-xs sm:text-sm">
+                                  <Mail className="h-3 w-3 sm:h-4 sm:w-4" />
                                   {formData.email}
                                 </p>
                               </>
@@ -579,16 +563,16 @@ export default function StaffProfilePage() {
 
                           {/* Edit/Save Buttons */}
                           {isEditing && (
-                            <div className="flex gap-2 md:self-end pb-4">
-                              <Button variant="outline" onClick={handleCancel}>
-                                <X className="h-4 w-4 mr-2" />
+                            <div className="flex gap-2 sm:self-end pb-2 sm:pb-4">
+                              <Button variant="outline" onClick={handleCancel} className="h-8 sm:h-9 text-xs sm:text-sm">
+                                <X className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                                 Cancel
                               </Button>
-                              <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+                              <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-xs sm:text-sm">
                                 {saving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1 sm:mr-2" />
                                 ) : (
-                                  <Save className="h-4 w-4 mr-2" />
+                                  <Save className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
                                 )}
                                 Save
                               </Button>
@@ -598,145 +582,152 @@ export default function StaffProfilePage() {
                       </CardContent>
                     </Card>
 
-                    {/* Detailed Information */}
-                    <Card className="border-0 shadow-lg">
-                      <CardHeader>
-                        <CardTitle>Personal Information</CardTitle>
-                        <CardDescription>Your personal contact details</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {isEditing ? (
-                          <>
-                            <div>
-                              <Label htmlFor="phone">Phone Number</Label>
-                              <Input
-                                id="phone"
-                                value={formData.phone}
-                                onChange={(e) => handleInputChange('phone', e.target.value)}
-                                placeholder="+234 XXX XXX XXXX"
-                              />
+                    {/* Detailed Information - Responsive grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                      {/* Personal Information */}
+                      <Card className="border-0 shadow-lg">
+                        <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6">
+                          <CardTitle className="text-base sm:text-lg">Personal Information</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm">Your personal contact details</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+                          {isEditing ? (
+                            <>
+                              <div>
+                                <Label htmlFor="phone" className="text-xs sm:text-sm">Phone Number</Label>
+                                <Input
+                                  id="phone"
+                                  value={formData.phone}
+                                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                                  placeholder="+234 XXX XXX XXXX"
+                                  className="h-8 sm:h-10 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="address" className="text-xs sm:text-sm">Address</Label>
+                                <Textarea
+                                  id="address"
+                                  value={formData.address}
+                                  onChange={(e) => handleInputChange('address', e.target.value)}
+                                  placeholder="Your address"
+                                  rows={2}
+                                  className="resize-none text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="bio" className="text-xs sm:text-sm">Bio</Label>
+                                <Textarea
+                                  id="bio"
+                                  value={formData.bio}
+                                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                                  placeholder="Tell us about yourself..."
+                                  rows={3}
+                                  className="resize-none text-sm"
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-3 sm:space-y-4">
+                              <InfoCard icon={Phone} label="Phone" value={formData.phone || 'Not provided'} />
+                              <InfoCard icon={MapPin} label="Address" value={formData.address || 'Not provided'} />
+                              {formData.bio && <InfoCard icon={User} label="Bio" value={formData.bio} />}
                             </div>
-                            <div>
-                              <Label htmlFor="address">Address</Label>
-                              <Textarea
-                                id="address"
-                                value={formData.address}
-                                onChange={(e) => handleInputChange('address', e.target.value)}
-                                placeholder="Your address"
-                                rows={2}
-                                className="resize-none"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="bio">Bio</Label>
-                              <Textarea
-                                id="bio"
-                                value={formData.bio}
-                                onChange={(e) => handleInputChange('bio', e.target.value)}
-                                placeholder="Tell us about yourself..."
-                                rows={4}
-                                className="resize-none"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="space-y-4">
-                            <InfoCard icon={Phone} label="Phone" value={formData.phone || 'Not provided'} />
-                            <InfoCard icon={MapPin} label="Address" value={formData.address || 'Not provided'} />
-                            {formData.bio && <InfoCard icon={User} label="Bio" value={formData.bio} />}
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                          )}
+                        </CardContent>
+                      </Card>
 
-                    {/* Professional Information */}
-                    <Card className="border-0 shadow-lg">
-                      <CardHeader>
-                        <CardTitle>Professional Information</CardTitle>
-                        <CardDescription>Your teaching qualifications and experience</CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        {isEditing ? (
-                          <>
-                            <div>
-                              <Label htmlFor="qualification">Highest Qualification</Label>
-                              <Input
-                                id="qualification"
-                                value={formData.qualification}
-                                onChange={(e) => handleInputChange('qualification', e.target.value)}
-                                placeholder="e.g., M.Ed., B.Sc."
-                              />
+                      {/* Professional Information */}
+                      <Card className="border-0 shadow-lg">
+                        <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6">
+                          <CardTitle className="text-base sm:text-lg">Professional Information</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm">Your teaching qualifications and experience</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+                          {isEditing ? (
+                            <>
+                              <div>
+                                <Label htmlFor="qualification" className="text-xs sm:text-sm">Highest Qualification</Label>
+                                <Input
+                                  id="qualification"
+                                  value={formData.qualification}
+                                  onChange={(e) => handleInputChange('qualification', e.target.value)}
+                                  placeholder="e.g., M.Ed., B.Sc."
+                                  className="h-8 sm:h-10 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="experience" className="text-xs sm:text-sm">Years of Experience</Label>
+                                <Input
+                                  id="experience"
+                                  value={formData.experience}
+                                  onChange={(e) => handleInputChange('experience', e.target.value)}
+                                  placeholder="e.g., 5 years"
+                                  className="h-8 sm:h-10 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="subjects" className="text-xs sm:text-sm">Subjects Taught</Label>
+                                <Input
+                                  id="subjects"
+                                  value={formData.subjects}
+                                  onChange={(e) => handleInputChange('subjects', e.target.value)}
+                                  placeholder="e.g., Mathematics, Physics"
+                                  className="h-8 sm:h-10 text-sm"
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div className="space-y-3 sm:space-y-4">
+                              <InfoCard icon={Award} label="Qualification" value={formData.qualification || 'Not provided'} />
+                              <InfoCard icon={Clock} label="Experience" value={formData.experience || 'Not provided'} />
+                              <InfoCard icon={BookOpen} label="Subjects" value={formData.subjects || 'Not provided'} />
+                              <InfoCard icon={Building} label="Department" value={formData.department || 'Not assigned'} />
                             </div>
-                            <div>
-                              <Label htmlFor="experience">Years of Experience</Label>
-                              <Input
-                                id="experience"
-                                value={formData.experience}
-                                onChange={(e) => handleInputChange('experience', e.target.value)}
-                                placeholder="e.g., 5 years"
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="subjects">Subjects Taught</Label>
-                              <Input
-                                id="subjects"
-                                value={formData.subjects}
-                                onChange={(e) => handleInputChange('subjects', e.target.value)}
-                                placeholder="e.g., Mathematics, Physics"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="space-y-4">
-                            <InfoCard icon={Award} label="Qualification" value={formData.qualification || 'Not provided'} />
-                            <InfoCard icon={Clock} label="Experience" value={formData.experience || 'Not provided'} />
-                            <InfoCard icon={BookOpen} label="Subjects" value={formData.subjects || 'Not provided'} />
-                            <InfoCard icon={Building} label="Department" value={formData.department || 'Not assigned'} />
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
+                          )}
+                        </CardContent>
+                      </Card>
+                    </div>
                   </TabsContent>
 
                   {/* Security Tab */}
-                  <TabsContent value="security" className="space-y-6">
+                  <TabsContent value="security" className="space-y-4 sm:space-y-6">
                     <Card className="border-0 shadow-lg">
-                      <CardHeader>
-                        <CardTitle>Account Security</CardTitle>
-                        <CardDescription>Manage your password and account settings</CardDescription>
+                      <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6">
+                        <CardTitle className="text-base sm:text-lg">Account Security</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm">Manage your password and account settings</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-6">
-                        <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
-                          <Mail className="h-5 w-5 text-primary" />
-                          <div className="flex-1">
-                            <p className="text-sm text-slate-500">Email Address</p>
-                            <p className="font-medium">{formData.email}</p>
+                      <CardContent className="space-y-4 sm:space-y-6 px-4 sm:px-6 pb-4 sm:pb-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 sm:p-4 bg-slate-50 rounded-xl">
+                          <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-primary shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs sm:text-sm text-slate-500">Email Address</p>
+                            <p className="font-medium text-sm sm:text-base break-all">{formData.email}</p>
                           </div>
-                          <Badge variant="outline" className="gap-1">
+                          <Badge variant="outline" className="gap-1 shrink-0 text-[10px] sm:text-xs">
                             <CheckCircle className="h-3 w-3 text-green-500" />
                             Verified
                           </Badge>
                         </div>
 
                         {!showPasswordForm ? (
-                          <div className="flex items-center justify-between p-4 bg-amber-50 rounded-xl border border-amber-200">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 sm:p-4 bg-amber-50 rounded-xl border border-amber-200">
                             <div className="flex items-center gap-3">
-                              <Key className="h-5 w-5 text-amber-600" />
+                              <Key className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
                               <div>
-                                <p className="font-medium text-amber-800">Password</p>
-                                <p className="text-sm text-amber-600">Change your password regularly</p>
+                                <p className="font-medium text-amber-800 text-sm sm:text-base">Password</p>
+                                <p className="text-xs sm:text-sm text-amber-600">Change your password regularly</p>
                               </div>
                             </div>
-                            <Button variant="outline" onClick={() => setShowPasswordForm(true)}>
+                            <Button variant="outline" onClick={() => setShowPasswordForm(true)} className="h-8 sm:h-9 text-xs sm:text-sm">
                               Change Password
                             </Button>
                           </div>
                         ) : (
-                          <div className="p-4 bg-slate-50 rounded-xl space-y-4">
-                            <h4 className="font-semibold">Change Password</h4>
+                          <div className="p-3 sm:p-4 bg-slate-50 rounded-xl space-y-3 sm:space-y-4">
+                            <h4 className="font-semibold text-sm sm:text-base">Change Password</h4>
                             
                             <div>
-                              <Label htmlFor="newPassword">New Password</Label>
+                              <Label htmlFor="newPassword" className="text-xs sm:text-sm">New Password</Label>
                               <div className="relative">
                                 <Input
                                   id="newPassword"
@@ -744,19 +735,20 @@ export default function StaffProfilePage() {
                                   value={newPassword}
                                   onChange={(e) => setNewPassword(e.target.value)}
                                   placeholder="Enter new password"
+                                  className="h-8 sm:h-10 text-sm pr-8 sm:pr-10"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowNewPassword(!showNewPassword)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2"
                                 >
-                                  {showNewPassword ? <EyeOff className="h-4 w-4 text-slate-400" /> : <Eye className="h-4 w-4 text-slate-400" />}
+                                  {showNewPassword ? <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" /> : <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" />}
                                 </button>
                               </div>
                             </div>
 
                             <div>
-                              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                              <Label htmlFor="confirmPassword" className="text-xs sm:text-sm">Confirm New Password</Label>
                               <div className="relative">
                                 <Input
                                   id="confirmPassword"
@@ -764,25 +756,26 @@ export default function StaffProfilePage() {
                                   value={confirmPassword}
                                   onChange={(e) => setConfirmPassword(e.target.value)}
                                   placeholder="Confirm new password"
+                                  className="h-8 sm:h-10 text-sm pr-8 sm:pr-10"
                                 />
                                 <button
                                   type="button"
                                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                                  className="absolute right-3 top-1/2 -translate-y-1/2"
+                                  className="absolute right-2 sm:right-3 top-1/2 -translate-y-1/2"
                                 >
-                                  {showConfirmPassword ? <EyeOff className="h-4 w-4 text-slate-400" /> : <Eye className="h-4 w-4 text-slate-400" />}
+                                  {showConfirmPassword ? <EyeOff className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" /> : <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" />}
                                 </button>
                               </div>
                             </div>
 
                             {newPassword && confirmPassword && newPassword !== confirmPassword && (
-                              <div className="flex items-center gap-2 text-red-500 text-sm">
-                                <AlertCircle className="h-4 w-4" />
+                              <div className="flex items-center gap-2 text-red-500 text-xs sm:text-sm">
+                                <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
                                 Passwords do not match
                               </div>
                             )}
 
-                            <div className="flex gap-2 pt-2">
+                            <div className="flex flex-wrap gap-2 pt-2">
                               <Button
                                 variant="outline"
                                 onClick={() => {
@@ -790,26 +783,27 @@ export default function StaffProfilePage() {
                                   setNewPassword('')
                                   setConfirmPassword('')
                                 }}
+                                className="h-8 sm:h-9 text-xs sm:text-sm"
                               >
                                 Cancel
                               </Button>
                               <Button
                                 onClick={handleChangePassword}
                                 disabled={changingPassword || !newPassword || newPassword !== confirmPassword}
-                                className="bg-blue-600 hover:bg-blue-700"
+                                className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-xs sm:text-sm"
                               >
-                                {changingPassword && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                                {changingPassword && <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 animate-spin mr-1 sm:mr-2" />}
                                 Update Password
                               </Button>
                             </div>
                           </div>
                         )}
 
-                        <div className="flex items-center gap-3 p-4 bg-green-50 rounded-xl border border-green-200">
-                          <Shield className="h-5 w-5 text-green-600" />
+                        <div className="flex items-center gap-3 p-3 sm:p-4 bg-green-50 rounded-xl border border-green-200">
+                          <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
                           <div>
-                            <p className="font-medium text-green-800">Account Status</p>
-                            <p className="text-sm text-green-600">Your account is active and secure</p>
+                            <p className="font-medium text-green-800 text-sm sm:text-base">Account Status</p>
+                            <p className="text-xs sm:text-sm text-green-600">Your account is active and secure</p>
                           </div>
                         </div>
                       </CardContent>
@@ -828,13 +822,13 @@ export default function StaffProfilePage() {
 // Helper component for info cards
 function InfoCard({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: string }) {
   return (
-    <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-xl">
-      <div className="p-2 bg-white rounded-lg shrink-0">
-        <Icon className="h-4 w-4 text-blue-600" />
+    <div className="flex items-start gap-2 sm:gap-3 p-2 sm:p-4 bg-slate-50 rounded-xl">
+      <div className="p-1.5 sm:p-2 bg-white rounded-lg shrink-0">
+        <Icon className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-slate-500 mb-0.5">{label}</p>
-        <p className="font-medium text-slate-900 break-words">{value}</p>
+        <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">{label}</p>
+        <p className="font-medium text-slate-900 text-xs sm:text-sm break-words">{value}</p>
       </div>
     </div>
   )

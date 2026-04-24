@@ -1,10 +1,10 @@
-// app/staff/page.tsx - WITH PROPER SPACING AND MOBILE BOTTOM NAV
+// app/staff/page.tsx - FULLY RESPONSIVE ALL SCREENS, PROPER MOBILE SPACING
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { StaffWelcomeBanner } from '@/components/staff/StaffWelcomeBanner'
+import StaffWelcomeBanner from '@/components/staff/StaffWelcomeBanner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,43 +18,35 @@ import {
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
-import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 
 // ============================================
-// BEAUTIFUL LOADING COMPONENT
+// LOADING COMPONENT
 // ============================================
 function StaffDashboardLoading() {
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <div className="text-center">
+    <div className="min-h-[60vh] flex items-center justify-center px-4">
+      <div className="text-center w-full max-w-sm">
         <motion.div 
           animate={{ rotate: 360 }} 
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          className="mx-auto w-fit"
         >
-          <Briefcase className="h-16 w-16 text-emerald-600 mx-auto" />
+          <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 text-emerald-600" />
         </motion.div>
         <motion.p 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="mt-4 text-slate-600 dark:text-slate-400 text-lg font-medium"
+          className="mt-3 sm:mt-4 text-slate-600 dark:text-slate-400 text-sm sm:text-base font-medium"
         >
-          Loading Staff Dashboard...
+          Loading Dashboard...
         </motion.p>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="mt-2 text-slate-500 dark:text-slate-500 text-sm"
-        >
-          Preparing your teaching space ✨
-        </motion.p>
-        <div className="flex justify-center gap-1.5 mt-4">
+        <div className="flex justify-center gap-1.5 mt-3 sm:mt-4">
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="h-2.5 w-2.5 rounded-full bg-emerald-400"
-              animate={{ y: [0, -10, 0] }}
+              className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-400"
+              animate={{ y: [0, -8, 0] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
           ))}
@@ -76,7 +68,6 @@ function StaffDashboardContent() {
   const [notes, setNotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
   
   const [stats, setStats] = useState({
     totalStudents: 0,
@@ -134,6 +125,8 @@ function StaffDashboardContent() {
     } catch (error) {
       console.error('Auth error:', error)
       router.replace('/portal')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -142,12 +135,9 @@ function StaffDashboardContent() {
       const TERM_START_DATE = new Date('2026-05-04')
       const TERM_END_DATE = new Date('2026-08-01')
       const today = new Date()
-      
       const totalWeeks = 13
       
-      let currentWeek: number
-      let weekProgress: number
-      let displayWeek: string
+      let currentWeek: number, weekProgress: number, displayWeek: string
       
       if (today < TERM_START_DATE) {
         currentWeek = 0
@@ -237,9 +227,6 @@ function StaffDashboardContent() {
     } catch (error) {
       console.error('Error loading data:', error)
       toast.error('Failed to load dashboard data')
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
     }
   }
 
@@ -249,16 +236,11 @@ function StaffDashboardContent() {
       await loadAllData(profile.id)
     }
     toast.success('Dashboard refreshed')
+    setRefreshing(false)
   }
 
-  // Handle exam click to view
   const handleExamClick = (examId: string) => {
     router.push(`/staff/exams/${examId}`)
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/portal')
   }
 
   if (loading) {
@@ -266,150 +248,128 @@ function StaffDashboardContent() {
   }
 
   return (
-    <>
-      <div className="pb-20 lg:pb-0">
-        {/* Main Content */}
-        <div className="p-4 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 md:space-y-6 max-w-[1600px] mx-auto">
-          {/* Welcome Banner with proper spacing */}
-          <div className="mt-0 sm:mt-0">
-            <StaffWelcomeBanner 
-              profile={profile} 
-              stats={{
-                totalExams: stats.totalExams,
-                publishedExams: stats.publishedExams,
-                totalStudents: stats.totalStudents,
-                activeStudents: stats.activeStudents,
-                pendingGrading: stats.pendingCAScores,
-                totalAssignments: stats.totalAssignments,
-                totalNotes: stats.totalNotes,
-                reportCardsGenerated: stats.reportCardsGenerated,
-                averagePerformance: stats.averagePerformance
-              }} 
-              termInfo={termInfo}
-            />
-          </div>
+    <div className="w-full min-h-screen overflow-x-hidden bg-slate-50/50 dark:bg-slate-950/50">
+      
+      {/* BANNER - Full width, close to header */}
+      <div className="w-full px-0.5 sm:px-1 pt-0.5 sm:pt-1">
+        <StaffWelcomeBanner 
+          profile={profile} 
+          stats={{
+            totalExams: stats.totalExams,
+            publishedExams: stats.publishedExams,
+            totalStudents: stats.totalStudents,
+            activeStudents: stats.activeStudents,
+            pendingGrading: stats.pendingCAScores,
+            totalAssignments: stats.totalAssignments,
+            totalNotes: stats.totalNotes,
+            reportCardsGenerated: stats.reportCardsGenerated,
+            averagePerformance: stats.averagePerformance
+          }} 
+          termInfo={termInfo}
+        />
+      </div>
+
+      {/* CONTENT AREA */}
+      <div className="w-full max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pb-20 sm:pb-8">
+        <div className="space-y-3 sm:space-y-4 md:space-y-5 mt-3 sm:mt-4 md:mt-5">
           
-          {/* Action Buttons - Mobile responsive */}
-          <div className="flex flex-wrap gap-2 sm:gap-3">
+          {/* ACTION BUTTONS - 2x2 on mobile, 4 across on sm+ */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <Button 
               onClick={() => router.push('/staff/exams')} 
-              className="bg-emerald-600 hover:bg-emerald-700 text-xs sm:text-sm h-9 sm:h-10 flex-1 sm:flex-none"
+              className="bg-emerald-600 hover:bg-emerald-700 h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
             >
-              <Plus className="h-4 w-4 mr-1.5" />
+              <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
               Create Exam
             </Button>
-            <Button onClick={() => router.push('/staff/assignments/create')} variant="outline" className="text-xs sm:text-sm h-9 sm:h-10 flex-1 sm:flex-none">
-              <FileText className="h-4 w-4 mr-1.5" />
+            <Button 
+              onClick={() => router.push('/staff/assignments/create')} 
+              variant="outline" 
+              className="h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+            >
+              <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
               New Assignment
             </Button>
-            <Button onClick={() => router.push('/staff/notes/create')} variant="outline" className="text-xs sm:text-sm h-9 sm:h-10 flex-1 sm:flex-none">
-              <BookOpen className="h-4 w-4 mr-1.5" />
+            <Button 
+              onClick={() => router.push('/staff/notes/create')} 
+              variant="outline" 
+              className="h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+            >
+              <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
               Add Notes
             </Button>
-            <Button onClick={handleRefresh} variant="ghost" size="sm" className="ml-auto h-9 sm:h-10" disabled={refreshing}>
-              <Loader2 className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            <Button 
+              onClick={handleRefresh} 
+              variant="outline" 
+              className="h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+              disabled={refreshing}
+            >
+              <Loader2 className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5", refreshing && "animate-spin")} />
+              Refresh
             </Button>
           </div>
           
-          {/* Stats Cards - 2 columns on mobile, 4 on desktop */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 md:gap-4"
-          >
-            <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 col-span-1">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-emerald-700 dark:text-emerald-400">{stats.totalExams}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Total Exams</p>
-                  </div>
-                  <MonitorPlay className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-emerald-600 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
+          {/* MAIN CONTENT - Stack on mobile, side by side on lg+ */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
             
-            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 col-span-1">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue-700 dark:text-blue-400">{stats.publishedExams}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Published</p>
-                  </div>
-                  <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-blue-600 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 col-span-1">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-amber-700 dark:text-amber-400">{stats.pendingCAScores}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Pending CA</p>
-                  </div>
-                  <Calculator className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-amber-600 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30 col-span-1">
-              <CardContent className="p-3 sm:p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-lg sm:text-xl md:text-2xl font-bold text-purple-700 dark:text-purple-400">{stats.totalStudents}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground">Students</p>
-                  </div>
-                  <Users className="h-5 w-5 sm:h-6 sm:w-6 md:h-8 md:w-8 text-purple-600 opacity-50" />
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-          
-          {/* Main Content Grid - Single column on mobile, 3 columns on desktop */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
-            {/* Left column - Takes 2/3 on desktop */}
-            <div className="lg:col-span-2 space-y-4 sm:space-y-5 md:space-y-6">
+            {/* LEFT COLUMN */}
+            <div className="lg:col-span-2 space-y-3 sm:space-y-4 md:space-y-5">
+              
               {/* Recent Exams */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-6">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                    <MonitorPlay className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-                    Recent Exams
+              <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                    <MonitorPlay className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
+                    <span className="truncate">Recent Exams</span>
                   </CardTitle>
-                  <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
-                    <Link href="/staff/exams">
-                      View All <ArrowRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
+                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 flex-shrink-0">
+                    <Link href="/staff/exams" className="flex items-center">
+                      View All <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-6">
+                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
                   {exams.length === 0 ? (
                     <div className="text-center py-6 sm:py-8">
-                      <MonitorPlay className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/40 mx-auto mb-2" />
+                      <MonitorPlay className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/30 mx-auto mb-2" />
                       <p className="text-muted-foreground text-xs sm:text-sm">No exams created yet</p>
+                      <Button 
+                        variant="link" 
+                        size="sm" 
+                        className="mt-2 text-xs text-emerald-600"
+                        onClick={() => router.push('/staff/exams')}
+                      >
+                        Create your first exam
+                      </Button>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       {exams.slice(0, 5).map((exam: any) => (
                         <div 
                           key={exam.id} 
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 sm:p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/80 transition-colors"
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 p-2 sm:p-2.5 md:p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/80 transition-colors active:scale-[0.98]"
                           onClick={() => handleExamClick(exam.id)}
                         >
-                          <div className="flex items-center gap-2 sm:gap-3">
-                            <MonitorPlay className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
-                            <div className="min-w-0">
+                          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                            <div className="p-1 sm:p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md flex-shrink-0">
+                              <MonitorPlay className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
                               <p className="font-medium text-xs sm:text-sm truncate">{exam.title}</p>
-                              <p className="text-[10px] sm:text-xs text-muted-foreground">{exam.subject} • {exam.class}</p>
+                              <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                {exam.subject} • {exam.class}
+                              </p>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant={exam.status === 'published' ? 'default' : 'outline'} className="shrink-0 text-[10px] sm:text-xs">
-                              {exam.status || 'draft'}
-                            </Badge>
-                            <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground" />
-                          </div>
+                          <Badge 
+                            variant={exam.status === 'published' ? 'default' : 'outline'} 
+                            className={cn(
+                              "text-[10px] sm:text-xs self-end sm:self-center flex-shrink-0",
+                              exam.status === 'published' && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            )}
+                          >
+                            {exam.status || 'draft'}
+                          </Badge>
                         </div>
                       ))}
                     </div>
@@ -418,32 +378,39 @@ function StaffDashboardContent() {
               </Card>
 
               {/* Recent Assignments */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-6">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                    Recent Assignments
+              <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
+                    <span className="truncate">Recent Assignments</span>
                   </CardTitle>
-                  <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
-                    <Link href="/staff/assignments">
-                      View All <ArrowRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
+                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 flex-shrink-0">
+                    <Link href="/staff/assignments" className="flex items-center">
+                      View All <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-6">
+                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
                   {assignments.length === 0 ? (
                     <div className="text-center py-4 sm:py-6">
-                      <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/40 mx-auto mb-2" />
+                      <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/30 mx-auto mb-2" />
                       <p className="text-muted-foreground text-xs sm:text-sm">No assignments yet</p>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       {assignments.map((assignment: any) => (
-                        <div key={assignment.id} className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
-                          <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                        <div 
+                          key={assignment.id} 
+                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 md:p-3 bg-muted/50 rounded-lg hover:bg-muted/80 transition-colors"
+                        >
+                          <div className="p-1 sm:p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-md flex-shrink-0">
+                            <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
+                          </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-xs sm:text-sm truncate">{assignment.title}</p>
-                            <p className="text-[10px] sm:text-xs text-muted-foreground">{assignment.subject} • {assignment.class}</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                              {assignment.subject} • {assignment.class}
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -453,35 +420,43 @@ function StaffDashboardContent() {
               </Card>
             </div>
 
-            {/* Right column - Takes 1/3 on desktop */}
-            <div className="space-y-4 sm:space-y-5 md:space-y-6">
+            {/* RIGHT COLUMN */}
+            <div className="space-y-3 sm:space-y-4 md:space-y-5">
+              
               {/* Recent Notes */}
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-6">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-                    Recent Notes
+              <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
+                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                    <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
+                    <span className="truncate">Recent Notes</span>
                   </CardTitle>
-                  <Button variant="ghost" size="sm" asChild className="text-xs sm:text-sm">
-                    <Link href="/staff/notes">
-                      View All <ArrowRight className="ml-1 h-3 w-3 sm:h-4 sm:w-4" />
+                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 flex-shrink-0">
+                    <Link href="/staff/notes" className="flex items-center">
+                      View All <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-6">
+                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
                   {notes.length === 0 ? (
                     <div className="text-center py-4">
-                      <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/40 mx-auto mb-2" />
+                      <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/30 mx-auto mb-2" />
                       <p className="text-muted-foreground text-xs sm:text-sm">No notes yet</p>
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-[200px] sm:max-h-[250px] overflow-y-auto">
+                    <div className="space-y-1.5 max-h-[180px] sm:max-h-[220px] md:max-h-[250px] overflow-y-auto">
                       {notes.map((note: any) => (
-                        <div key={note.id} className="flex items-center gap-2 sm:gap-3 p-2 bg-muted/50 rounded-lg">
-                          <BookOpen className="h-4 w-4 text-purple-600 shrink-0" />
-                          <div className="min-w-0">
+                        <div 
+                          key={note.id} 
+                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-muted/50 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
+                        >
+                          <div className="p-1 sm:p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-md flex-shrink-0">
+                            <BookOpen className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
                             <p className="font-medium text-xs sm:text-sm truncate">{note.title}</p>
-                            <p className="text-[10px] sm:text-xs text-muted-foreground">{note.subject || 'General'}</p>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                              {note.subject || 'General'}
+                            </p>
                           </div>
                         </div>
                       ))}
@@ -491,58 +466,57 @@ function StaffDashboardContent() {
               </Card>
 
               {/* Class Overview */}
-              <Card>
-                <CardHeader className="pb-2 px-3 sm:px-4 md:px-6">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
-                    Class Overview
+              <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
+                <CardHeader className="pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                    <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
+                    <span className="truncate">Class Overview</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-6">
+                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
                   <div className="space-y-2 sm:space-y-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-2 bg-muted/40 rounded-lg">
                       <span className="text-xs sm:text-sm text-muted-foreground">Total Students</span>
                       <span className="font-bold text-sm sm:text-base">{stats.totalStudents}</span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-2 bg-muted/40 rounded-lg">
                       <span className="text-xs sm:text-sm text-muted-foreground">Active Classes</span>
                       <span className="font-bold text-sm sm:text-base">{stats.activeClasses}</span>
                     </div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between p-2 bg-muted/40 rounded-lg">
                       <span className="text-xs sm:text-sm text-muted-foreground">Active Students</span>
-                      <span className="font-bold text-sm sm:text-base text-emerald-600">{stats.activeStudents}</span>
+                      <span className="font-bold text-sm sm:text-base text-emerald-600 dark:text-emerald-400">{stats.activeStudents}</span>
                     </div>
                     
                     {stats.classBreakdown.length > 0 && (
-                      <div className="pt-2 border-t border-slate-200 dark:border-slate-800">
-                        <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">Students per Class</p>
-                        <div className="space-y-1.5 max-h-[150px] overflow-y-auto">
+                      <div className="pt-2 border-t">
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">Students per Class</p>
+                        <div className="space-y-1 max-h-[120px] sm:max-h-[150px] overflow-y-auto">
                           {stats.classBreakdown.slice(0, 5).map((cls) => (
-                            <div key={cls.name} className="flex items-center justify-between">
-                              <span className="text-xs sm:text-sm">{cls.name}</span>
-                              <Badge variant="outline" className="text-[10px] sm:text-xs">{cls.count}</Badge>
+                            <div key={cls.name} className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-muted/40">
+                              <span className="text-xs sm:text-sm truncate mr-2">{cls.name}</span>
+                              <Badge variant="outline" className="text-[10px] sm:text-xs flex-shrink-0">{cls.count}</Badge>
                             </div>
                           ))}
-                          {stats.classBreakdown.length > 5 && (
-                            <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-                              +{stats.classBreakdown.length - 5} more classes
-                            </p>
-                          )}
                         </div>
                       </div>
                     )}
                     
-                    <Progress value={stats.averagePerformance} className="h-1.5 sm:h-2 mt-2" />
-                    <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
-                      Average performance: {stats.averagePerformance}%
-                    </p>
+                    <div className="pt-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">Avg Performance</span>
+                        <span className="text-[10px] sm:text-xs font-medium">{stats.averagePerformance}%</span>
+                      </div>
+                      <Progress value={stats.averagePerformance} className="h-1.5 sm:h-2" />
+                    </div>
+                    
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="w-full mt-2 text-xs sm:text-sm" 
+                      className="w-full text-xs sm:text-sm h-8 sm:h-9"
                       onClick={() => router.push('/staff/students')}
                     >
-                      <Users className="h-3 w-3 sm:h-4 sm:w-4 mr-2" />
+                      <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1.5 sm:mr-2" />
                       View All Students
                     </Button>
                   </div>
@@ -550,25 +524,31 @@ function StaffDashboardContent() {
               </Card>
 
               {/* Quick Actions */}
-              <Card>
+              <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
                 <CardContent className="p-3 sm:p-4">
+                  <h3 className="text-xs sm:text-sm font-semibold mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
+                    <Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600 dark:text-slate-400 flex-shrink-0" />
+                    Quick Actions
+                  </h3>
                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
                     <Button 
                       variant="outline" 
-                      className="h-auto py-2 sm:py-3 flex-col gap-1 text-xs sm:text-sm" 
+                      className="h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-1.5 text-xs sm:text-sm hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
                       onClick={() => router.push('/staff/ca-scores')}
                     >
-                      <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
-                      <span className="font-medium">CA Scores</span>
-                      <span className="text-[9px] sm:text-[10px] text-muted-foreground">{stats.pendingCAScores} pending</span>
+                      <Calculator className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600 dark:text-amber-400" />
+                      <span className="font-medium text-[10px] sm:text-xs">CA Scores</span>
+                      <span className="text-[9px] sm:text-[10px] text-muted-foreground">
+                        {stats.pendingCAScores} pending
+                      </span>
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="h-auto py-2 sm:py-3 flex-col gap-1 text-xs sm:text-sm" 
+                      className="h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-1.5 text-xs sm:text-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
                       onClick={() => router.push('/staff/report-cards')}
                     >
-                      <FileCheck className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-                      <span className="font-medium">Report Cards</span>
+                      <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+                      <span className="font-medium text-[10px] sm:text-xs">Report Cards</span>
                       <span className="text-[9px] sm:text-[10px] text-muted-foreground">Generate</span>
                     </Button>
                   </div>
@@ -578,21 +558,12 @@ function StaffDashboardContent() {
           </div>
         </div>
       </div>
-
-      {/* Mobile Bottom Navigation */}
-      <MobileBottomNav 
-        role="staff"
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        profile={profile}
-        onLogout={handleLogout}
-      />
-    </>
+    </div>
   )
 }
 
 // ============================================
-// MAIN EXPORT WITH SUSPENSE
+// MAIN EXPORT
 // ============================================
 export default function StaffDashboardPage() {
   return (
