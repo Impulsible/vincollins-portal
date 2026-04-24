@@ -7,6 +7,7 @@ import { useStaffContext } from '../layout'
 import { useExams } from './hooks/useExams'
 import { ExamList } from '@/components/staff/exams/ExamList'
 import { ExamViewer } from '@/components/staff/exams/ExamViewer'
+// ✅ FIX: Change to named import since ExamEditor doesn't have default export
 import { ExamEditor } from '@/components/staff/exams/ExamEditor'
 import { CreateExamDialog } from '@/components/staff/CreateExamDialog'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -49,31 +50,52 @@ export default function StaffExamsPage() {
           {viewMode === 'list' && (
             <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
               <ExamList
-                exams={filteredExams} searchQuery={searchQuery} onSearchChange={setSearchQuery}
-                statusFilter={statusFilter} onStatusFilterChange={setStatusFilter}
+                exams={filteredExams} 
+                searchQuery={searchQuery} 
+                onSearchChange={setSearchQuery}
+                statusFilter={statusFilter} 
+                onStatusFilterChange={setStatusFilter}
                 onCreateExam={() => setShowCreateDialog(true)}
                 onViewExam={(id) => { setSelectedExamId(id); setViewMode('view') }}
                 onEditExam={(id) => { setSelectedExamId(id); setViewMode('edit') }}
-                onDeleteExam={handleDeleteExam} onDuplicateExam={handleDuplicateExam}
+                onDeleteExam={handleDeleteExam} 
+                onDuplicateExam={handleDuplicateExam}
                 onSubmitForApproval={handleSubmitForApproval}
-                totalExams={exams.length} draftCount={draftCount}
-                pendingCount={pendingCount} publishedCount={publishedCount}
+                totalExams={exams.length} 
+                draftCount={draftCount}
+                pendingCount={pendingCount} 
+                publishedCount={publishedCount}
               />
             </motion.div>
           )}
           {viewMode === 'view' && selectedExamId && (
             <motion.div key="view" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ExamViewer examId={selectedExamId} onBack={() => { setViewMode('list'); setSelectedExamId(null) }} onEdit={() => setViewMode('edit')} onSubmitForApproval={handleSubmitForApproval} />
+              <ExamViewer 
+                examId={selectedExamId} 
+                onBack={() => { setViewMode('list'); setSelectedExamId(null) }} 
+                onEdit={() => setViewMode('edit')} 
+                onSubmitForApproval={handleSubmitForApproval} 
+              />
             </motion.div>
           )}
           {viewMode === 'edit' && selectedExamId && (
             <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ExamEditor examId={selectedExamId} onBack={() => { setViewMode('list'); setSelectedExamId(null) }} onCancel={() => setViewMode('view')} onSave={() => { setViewMode('list'); setSelectedExamId(null) }} />
+              <ExamEditor 
+                examId={selectedExamId} 
+                onBack={() => { setViewMode('list'); setSelectedExamId(null) }} 
+                onCancel={() => setViewMode('view')} 
+                onSave={() => { setViewMode('list'); setSelectedExamId(null) }} 
+              />
             </motion.div>
           )}
         </AnimatePresence>
       </div>
-      <CreateExamDialog open={showCreateDialog} onOpenChange={setShowCreateDialog} onSuccess={() => { loadExams(); setShowCreateDialog(false) }} teacherProfile={profile} />
+      <CreateExamDialog 
+        open={showCreateDialog} 
+        onOpenChange={setShowCreateDialog} 
+        onSuccess={() => { loadExams(); setShowCreateDialog(false) }} 
+        teacherProfile={profile} 
+      />
     </>
   )
 }

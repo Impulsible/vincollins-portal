@@ -7,7 +7,11 @@ import { supabase } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { Eye } from 'lucide-react'
+import { Eye, Calculator } from 'lucide-react'
+import { Button } from '@/components/ui/button' // ✅ ADD MISSING IMPORT
+import { Card, CardContent } from '@/components/ui/card' // ✅ ADD MISSING IMPORT
+import { Label } from '@/components/ui/label' // ✅ ADD MISSING IMPORT
+import { Input } from '@/components/ui/input' // ✅ ADD MISSING IMPORT
 import { ExamHeader } from './ExamHeader'
 import { ExamDetailsTab } from './ExamDetailsTab'
 import { ObjectiveQuestionsTab } from './ObjectiveQuestionsTab'
@@ -60,6 +64,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([])
   const [hasTheory, setHasTheory] = useState(false)
   
+  // Default points values
+  const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] = useState<number>(1)
+  const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] = useState<number>(5)
+  
   const [examDetails, setExamDetails] = useState<ExamDetailsForm>({
     title: '',
     subject: '',
@@ -85,6 +93,55 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     if (!examDetails.class) return []
     return examDetails.class.startsWith('JSS') ? JSS_SUBJECTS : SS_SUBJECTS
   }, [examDetails.class])
+
+  // DYNAMIC CALCULATIONS
+  const objectiveCount = questions.length
+  const theoryCount = theoryQuestions.length
+  const totalQuestions = objectiveCount + theoryCount
+  
+  const totalObjectivePoints = objectiveCount * objectivePointsPerQuestion
+  const totalTheoryPoints = theoryCount * theoryPointsPerQuestion
+  const totalExamPoints = totalObjectivePoints + totalTheoryPoints
+  const passMarkPercentage = totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0
+
+  // Update all existing questions when points per question changes
+  const updateAllObjectivePoints = useCallback(async () => {
+    if (questions.length === 0) return
+    
+    const { error } = await supabase
+      .from('questions')
+      .update({ points: objectivePointsPerQuestion })
+      .eq('exam_id', examId)
+      .eq('question_type', 'objective')
+
+    if (error) {
+      console.error('Error updating question points:', error)
+      toast.error('Failed to update question points')
+      return
+    }
+    
+    setQuestions(prev => prev.map(q => ({ ...q, points: objectivePointsPerQuestion })))
+    toast.success(`Updated ${questions.length} objective questions to ${objectivePointsPerQuestion} point(s) each`)
+  }, [examId, questions.length, objectivePointsPerQuestion])
+
+  const updateAllTheoryPoints = useCallback(async () => {
+    if (theoryQuestions.length === 0) return
+    
+    const { error } = await supabase
+      .from('questions')
+      .update({ points: theoryPointsPerQuestion })
+      .eq('exam_id', examId)
+      .eq('question_type', 'theory')
+
+    if (error) {
+      console.error('Error updating theory points:', error)
+      toast.error('Failed to update theory points')
+      return
+    }
+    
+    setTheoryQuestions(prev => prev.map(q => ({ ...q, points: theoryPointsPerQuestion })))
+    toast.success(`Updated ${theoryQuestions.length} theory questions to ${theoryPointsPerQuestion} point(s) each`)
+  }, [examId, theoryQuestions.length, theoryPointsPerQuestion])
 
   // Load exam data
   const loadExamData = useCallback(async () => {
@@ -131,12 +188,17 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         .eq('question_type', 'objective')
         .order('order_number', { ascending: true })
 
-      if (questionsData) {
+      if (questionsData && questionsData.length > 0) {
         const parsedQuestions = questionsData.map(q => ({
           ...q,
           options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || [])
         }))
         setQuestions(parsedQuestions as Question[])
+        
+        // Set points per question based on first question's points
+        if (parsedQuestions[0]?.points) {
+          setObjectivePointsPerQuestion(parsedQuestions[0].points)
+        }
       }
 
       // Load theory questions if enabled
@@ -148,8 +210,11 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           .eq('question_type', 'theory')
           .order('order_number', { ascending: true })
 
-        if (theoryData) {
+        if (theoryData && theoryData.length > 0) {
           setTheoryQuestions(theoryData as TheoryQuestion[])
+          if (theoryData[0]?.points) {
+            setTheoryPointsPerQuestion(theoryData[0].points)
+          }
         }
       }
 
@@ -165,13 +230,37 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     loadExamData()
   }, [loadExamData])
 
+  // Update exam totals in database
+  const updateExamTotals = useCallback(async () => {
+    if (!examId) return
+    
+    try {
+      const { error } = await supabase
+        .from('exams')
+        .update({
+          total_questions: totalQuestions,
+          total_marks: totalExamPoints,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', examId)
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating exam totals:', error)
+    }
+  }, [examId, totalQuestions, totalExamPoints])
+
+  // Auto-save totals when questions or points change
+  useEffect(() => {
+    if (!loading && examId) {
+      updateExamTotals()
+    }
+  }, [totalQuestions, totalExamPoints, objectivePointsPerQuestion, theoryPointsPerQuestion, loading, examId, updateExamTotals])
+
   // Save exam
   const handleSaveExam = async () => {
     setSaving(true)
     try {
-      const totalMarks = questions.reduce((sum, q) => sum + (q.points || 1), 0) + 
-                         theoryQuestions.reduce((sum, q) => sum + (q.points || 5), 0)
-
       const { error } = await supabase
         .from('exams')
         .update({
@@ -188,8 +277,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           has_theory: hasTheory,
           term: examDetails.term,
           session_year: examDetails.session_year,
-          total_questions: questions.length + (hasTheory ? theoryQuestions.length : 0),
-          total_marks: totalMarks,
+          total_questions: totalQuestions,
+          total_marks: totalExamPoints,
           updated_at: new Date().toISOString()
         })
         .eq('id', examId)
@@ -215,7 +304,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         question_type: 'objective',
         options: data.options,
         correct_answer: data.correct_answer,
-        points: data.points || 1,
+        points: objectivePointsPerQuestion,
         order_number: questions.length + 1
       }
 
@@ -227,8 +316,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
       if (error) throw error
 
-      setQuestions([...questions, result as Question])
-      toast.success('Question added')
+      setQuestions([...questions, { ...result, points: objectivePointsPerQuestion } as Question])
+      toast.success(`Question added (${objectivePointsPerQuestion} point${objectivePointsPerQuestion !== 1 ? 's' : ''})`)
       setShowQuestionDialog(false)
       setEditingQuestion(null)
     } catch (error) {
@@ -245,13 +334,13 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           question_text: data.question_text,
           options: data.options,
           correct_answer: data.correct_answer,
-          points: data.points
+          points: data.points || objectivePointsPerQuestion
         })
         .eq('id', questionId)
 
       if (error) throw error
 
-      setQuestions(questions.map(q => q.id === questionId ? { ...q, ...data } : q))
+      setQuestions(questions.map(q => q.id === questionId ? { ...q, ...data, points: data.points || objectivePointsPerQuestion } : q))
       toast.success('Question updated')
       setShowQuestionDialog(false)
       setEditingQuestion(null)
@@ -272,7 +361,16 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
       if (error) throw error
 
-      setQuestions(questions.filter(q => q.id !== questionId))
+      const updatedQuestions = questions.filter(q => q.id !== questionId)
+      // Reorder remaining questions
+      for (let i = 0; i < updatedQuestions.length; i++) {
+        await supabase
+          .from('questions')
+          .update({ order_number: i + 1 })
+          .eq('id', updatedQuestions[i].id)
+      }
+      
+      setQuestions(updatedQuestions)
       toast.success('Question deleted')
     } catch (error) {
       console.error('Error deleting question:', error)
@@ -287,7 +385,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         exam_id: examId,
         question_text: data.question_text,
         question_type: 'theory',
-        points: data.points || 5,
+        points: theoryPointsPerQuestion,
         order_number: theoryQuestions.length + 1
       }
 
@@ -299,8 +397,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
       if (error) throw error
 
-      setTheoryQuestions([...theoryQuestions, result as TheoryQuestion])
-      toast.success('Theory question added')
+      setTheoryQuestions([...theoryQuestions, { ...result, points: theoryPointsPerQuestion } as TheoryQuestion])
+      toast.success(`Theory question added (${theoryPointsPerQuestion} point${theoryPointsPerQuestion !== 1 ? 's' : ''})`)
       setShowTheoryDialog(false)
       setEditingTheoryQuestion(null)
     } catch (error) {
@@ -315,14 +413,14 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         .from('questions')
         .update({
           question_text: data.question_text,
-          points: data.points
+          points: data.points || theoryPointsPerQuestion
         })
         .eq('id', questionId)
 
       if (error) throw error
 
-      setTheoryQuestions(theoryQuestions.map(q => q.id === questionId ? { ...q, ...data } : q))
-      toast.success('Question updated')
+      setTheoryQuestions(theoryQuestions.map(q => q.id === questionId ? { ...q, ...data, points: data.points || theoryPointsPerQuestion } : q))
+      toast.success('Theory question updated')
       setShowTheoryDialog(false)
       setEditingTheoryQuestion(null)
     } catch (error) {
@@ -342,13 +440,61 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
       if (error) throw error
 
-      setTheoryQuestions(theoryQuestions.filter(q => q.id !== questionId))
-      toast.success('Question deleted')
+      const updatedTheory = theoryQuestions.filter(q => q.id !== questionId)
+      for (let i = 0; i < updatedTheory.length; i++) {
+        await supabase
+          .from('questions')
+          .update({ order_number: i + 1 })
+          .eq('id', updatedTheory[i].id)
+      }
+      
+      setTheoryQuestions(updatedTheory)
+      toast.success('Theory question deleted')
     } catch (error) {
       console.error('Error deleting theory question:', error)
-      toast.error('Failed to delete question')
+      toast.error('Failed to delete theory question')
     }
   }
+
+  // Points Summary Component
+  const PointsSummary = () => (
+    <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center gap-2 mb-2 sm:mb-3">
+          <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+          <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-300">Exam Points Summary</h3>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">{objectiveCount}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Objective Qs</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">{totalObjectivePoints}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Obj Points</p>
+            <p className="text-[8px] sm:text-[10px] text-muted-foreground">({objectivePointsPerQuestion} pts each)</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">{theoryCount}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Theory Qs</p>
+          </div>
+          <div className="text-center">
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">{totalTheoryPoints}</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Theory Points</p>
+            <p className="text-[8px] sm:text-[10px] text-muted-foreground">({theoryPointsPerQuestion} pts each)</p>
+          </div>
+        </div>
+        <div className="mt-2 sm:mt-3 pt-2 border-t border-blue-200 dark:border-blue-800 flex justify-between items-center">
+          <span className="text-xs sm:text-sm font-medium">Total Exam Points:</span>
+          <span className="text-base sm:text-lg font-bold text-blue-700">{totalExamPoints}</span>
+        </div>
+        <div className="flex justify-between items-center text-xs sm:text-sm">
+          <span className="text-muted-foreground">Pass Mark:</span>
+          <span className="font-medium">{examDetails.pass_mark} / {totalExamPoints} ({Math.round(passMarkPercentage)}%)</span>
+        </div>
+      </CardContent>
+    </Card>
+  )
 
   if (loading) {
     return (
@@ -363,7 +509,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
   return (
     <div className="relative w-full h-full overflow-y-auto">
-      <div className="p-4 sm:p-6 lg:p-8 space-y-6 max-w-[1600px] mx-auto">
+      <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
         <ExamHeader
           examId={examId}
           examTitle={exam?.title}
@@ -374,16 +520,19 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           onSave={handleSaveExam}
         />
 
+        {/* Dynamic Points Summary */}
+        <PointsSummary />
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 mb-6 h-auto sm:h-10">
-            <TabsTrigger value="details" className="text-xs sm:text-sm py-2">Details</TabsTrigger>
-            <TabsTrigger value="questions" className="text-xs sm:text-sm py-2">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto sm:h-10">
+            <TabsTrigger value="details" className="text-xs sm:text-sm py-1.5 sm:py-2">Details</TabsTrigger>
+            <TabsTrigger value="questions" className="text-xs sm:text-sm py-1.5 sm:py-2">
               Objective ({questions.length})
             </TabsTrigger>
-            <TabsTrigger value="theory" className="text-xs sm:text-sm py-2">
+            <TabsTrigger value="theory" className="text-xs sm:text-sm py-1.5 sm:py-2">
               Theory ({theoryQuestions.length})
             </TabsTrigger>
-            <TabsTrigger value="preview" className="text-xs sm:text-sm py-2">
+            <TabsTrigger value="preview" className="text-xs sm:text-sm py-1.5 sm:py-2">
               <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Preview
             </TabsTrigger>
           </TabsList>
@@ -402,6 +551,37 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
 
           <TabsContent value="questions">
+            {/* Points per question control for objective */}
+            <div className="mb-4">
+              <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                <Label className="text-green-800 dark:text-green-300 font-medium text-sm">Objective Questions Points</Label>
+                <div className="flex flex-wrap items-center gap-3 mt-2">
+                  <Input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={objectivePointsPerQuestion}
+                    onChange={(e) => setObjectivePointsPerQuestion(parseFloat(e.target.value) || 1)}
+                    className="w-24 bg-white h-8 sm:h-9 text-sm"
+                  />
+                  <span className="text-xs sm:text-sm text-muted-foreground">point(s) per question</span>
+                  {questions.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={updateAllObjectivePoints}
+                      className="text-green-700 border-green-300 text-xs sm:text-sm"
+                    >
+                      Apply to all {questions.length} questions
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+                  Total: {objectiveCount} × {objectivePointsPerQuestion} = {totalObjectivePoints} points
+                </p>
+              </div>
+            </div>
+            
             <ObjectiveQuestionsTab
               questions={questions}
               onAddQuestion={() => {
@@ -417,6 +597,37 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
 
           <TabsContent value="theory">
+            {/* Points per question control for theory */}
+            <div className="mb-4">
+              <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
+                <Label className="text-purple-800 dark:text-purple-300 font-medium text-sm">Theory Questions Points</Label>
+                <div className="flex flex-wrap items-center gap-3 mt-2">
+                  <Input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={theoryPointsPerQuestion}
+                    onChange={(e) => setTheoryPointsPerQuestion(parseInt(e.target.value) || 5)}
+                    className="w-24 bg-white h-8 sm:h-9 text-sm"
+                  />
+                  <span className="text-xs sm:text-sm text-muted-foreground">point(s) per question</span>
+                  {theoryQuestions.length > 0 && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={updateAllTheoryPoints}
+                      className="text-purple-700 border-purple-300 text-xs sm:text-sm"
+                    >
+                      Apply to all {theoryQuestions.length} questions
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+                  Total: {theoryCount} × {theoryPointsPerQuestion} = {totalTheoryPoints} points
+                </p>
+              </div>
+            </div>
+            
             <TheoryQuestionsTab
               questions={theoryQuestions}
               hasTheory={hasTheory}

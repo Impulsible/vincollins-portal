@@ -1,8 +1,17 @@
+// hooks/useDashboardData.ts - REMOVED HARDCODED TEST DATA
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { StudentProfile, PerformanceStats, BannerStats, TermProgressData, Exam, ExamAttempt, Assignment, StudyNote, Classmate } from '../types'
 import { formatFullName, formatDisplayName } from '../utils/nameFormatter'
 import { TERM_NAMES, calculateGrade, getSubjectCountForClass } from '../utils/constants'
+
+// Helper function to get valid subject display
+const getValidSubject = (subject: string | null | undefined): string => {
+  if (!subject || subject === 'null' || subject === 'undefined' || subject === '') {
+    return 'General Studies'
+  }
+  return subject
+}
 
 export function useDashboardData(profile: StudentProfile | null) {
   const [loading, setLoading] = useState(true)
@@ -80,31 +89,34 @@ export function useDashboardData(profile: StudentProfile | null) {
         console.warn('student_term_progress table not available:', error)
       }
 
+      // ✅ Use REAL data from database, NOT hardcoded
       let completedExamsFromDB = progressData?.completed_exams || 0
       let averageScoreFromDB = progressData?.average_score || 0
       let gradeFromDB = progressData?.grade || 'N/A'
       const totalSubjectsFromDB = progressData?.total_subjects || totalSubjects
 
-      if (profile.id === '5f131c1b-db28-4e32-9bd1-b5f2122c08a1') {
-        completedExamsFromDB = 1
-        averageScoreFromDB = 70
-        gradeFromDB = 'B'
-      }
+      // ❌ REMOVED hardcoded test data for Laila Yusuf
+      // No more if (profile.id === '...') block
 
       if (progressData) {
         setTermProgress(progressData as TermProgressData)
       }
 
-      // Load exams
+      // Load exams - filter out invalid subjects
       let allExams: Exam[] = []
       try {
         const { data: examsData } = await supabase
           .from('exams')
           .select('*')
           .eq('status', 'published')
+          .not('subject', 'is', null)
+          .neq('subject', '')
           .order('created_at', { ascending: false })
 
         allExams = (examsData || []).filter((exam: any) => {
+          if (!exam || !exam.id) return false
+          if (!exam.subject || exam.subject === 'null' || exam.subject === '') return false
+          
           if (!exam.class || exam.class === 'all') return true
           const normalizedExamClass = exam.class.replace(/\s+/g, '').toUpperCase()
           const normalizedStudentClass = studentClass.replace(/\s+/g, '').toUpperCase()
@@ -114,7 +126,7 @@ export function useDashboardData(profile: StudentProfile | null) {
         console.warn('Exams table not available:', error)
       }
 
-      // Load attempts
+      // Load attempts - skip deleted exams
       const attempts: ExamAttempt[] = []
       try {
         const { data: attemptsData } = await supabase
@@ -126,11 +138,13 @@ export function useDashboardData(profile: StudentProfile | null) {
         if (attemptsData) {
           for (const att of attemptsData) {
             const exam = allExams.find(e => e.id === att.exam_id)
+            if (!exam) continue  // Skip deleted exams
+            
             attempts.push({
               id: att.id,
               exam_id: att.exam_id,
-              exam_title: exam?.title || 'Unknown Exam',
-              exam_subject: exam?.subject || 'Unknown Subject',
+              exam_title: exam?.title || 'Untitled Exam',
+              exam_subject: getValidSubject(exam?.subject),
               status: att.status || 'pending',
               percentage: att.percentage || att.percentage_score || 0,
               is_passed: att.is_passed || false,
@@ -158,6 +172,8 @@ export function useDashboardData(profile: StudentProfile | null) {
       const now = new Date()
       
       const availableExams = allExams.filter(exam => {
+        if (!exam || !exam.id) return false
+        if (!exam.subject || exam.subject === 'null' || exam.subject === '') return false
         if (takenExamIds.has(exam.id)) return false
         if (!exam.starts_at && !exam.ends_at) return true
         if (exam.starts_at && new Date(exam.starts_at) > now) return false
@@ -182,7 +198,7 @@ export function useDashboardData(profile: StudentProfile | null) {
             .map((a: any) => ({
               id: a.id,
               title: a.title || 'Untitled',
-              subject: a.subject || 'General',
+              subject: getValidSubject(a.subject),
               description: a.description || '',
               due_date: a.due_date || a.created_at,
               total_marks: a.total_marks || 0,
@@ -213,7 +229,7 @@ export function useDashboardData(profile: StudentProfile | null) {
             .map((n: any) => ({
               id: n.id,
               title: n.title || 'Untitled',
-              subject: n.subject || 'General',
+              subject: getValidSubject(n.subject),
               description: n.description || '',
               file_url: n.file_url || null,
               created_at: n.created_at,

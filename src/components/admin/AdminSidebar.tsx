@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/AdminSidebar.tsx - MATCHES STUDENT/STAFF PATTERN
+// components/admin/AdminSidebar.tsx - FIXED: Navigates using tabs, not routes
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -40,13 +40,11 @@ interface AdminSidebarProps {
   pendingInquiries?: number
 }
 
-// ✅ Navigation items with correct IDs matching the page's activeTab
 interface NavigationItem {
   id: string
   name: string
   icon: React.ElementType
   description: string
-  route: string
   badge?: number
 }
 
@@ -66,122 +64,73 @@ export function AdminSidebar({
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [mounted, setMounted] = useState(false)
 
-  // Fix hydration issues by only rendering after mount
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // ✅ FLAT NAVIGATION - IDs match the page's activeTab values
+  // Primary navigation - clicking these switches tabs, NOT routes
   const primaryNavigation: NavigationItem[] = [
     { 
       id: 'overview', 
       name: 'Overview', 
       icon: LayoutDashboard,
       description: 'Dashboard & Analytics',
-      route: '/admin'
     },
     { 
       id: 'students', 
       name: 'Students', 
       icon: GraduationCap,
       description: 'Manage Students',
-      route: '/admin/students'
     },
     { 
       id: 'staff', 
       name: 'Staff', 
       icon: Briefcase,
       description: 'Manage Teachers',
-      route: '/admin/staff'
     },
     { 
       id: 'exams', 
       name: 'Exam Approvals', 
       icon: MonitorPlay,
       description: 'Review & Publish',
-      route: '/admin/exams',
-      badge: pendingExams
+      badge: pendingExams > 0 ? pendingExams : undefined
     },
     { 
       id: 'report-cards', 
       name: 'Report Cards', 
       icon: FileCheck,
       description: 'Review & Approve',
-      route: '/admin/report-cards',
-      badge: pendingReports
+      badge: pendingReports > 0 ? pendingReports : undefined
     },
     { 
       id: 'inquiries', 
       name: 'Inquiries', 
       icon: MessageSquare,
       description: 'Admissions & Contact',
-      route: '/admin/inquiries',
-      badge: pendingInquiries
+      badge: pendingInquiries > 0 ? pendingInquiries : undefined
     },
     { 
       id: 'cbt-monitor', 
       name: 'Live Monitor', 
       icon: Activity,
       description: 'Real-time Activity',
-      route: '/admin/cbt-monitor'
     },
   ]
 
   const secondaryNavigation: NavigationItem[] = [
     { 
-      id: 'profile', 
-      name: 'My Profile', 
-      icon: User,
-      description: 'Account Details',
-      route: '/admin/profile'
-    },
-    { 
-      id: 'notifications', 
-      name: 'Notifications', 
-      icon: Bell,
-      description: 'Updates & Alerts',
-      route: '/admin/notifications'
-    },
-    { 
       id: 'settings', 
       name: 'Settings', 
       icon: Settings,
       description: 'Preferences',
-      route: '/admin/settings'
     },
     { 
       id: 'help', 
       name: 'Help & Support', 
       icon: HelpCircle,
       description: 'Get assistance',
-      route: '/admin/help'
     },
   ]
-
-  // ✅ Sync active tab with pathname - only on client
-  useEffect(() => {
-    if (!mounted) return
-    
-    if (pathname === '/admin') {
-      setActiveTab('overview')
-    } else if (pathname?.startsWith('/admin/students')) {
-      setActiveTab('students')
-    } else if (pathname?.startsWith('/admin/staff')) {
-      setActiveTab('staff')
-    } else if (pathname?.startsWith('/admin/exams')) {
-      setActiveTab('exams')
-    } else if (pathname?.startsWith('/admin/report-cards')) {
-      setActiveTab('report-cards')
-    } else if (pathname?.startsWith('/admin/inquiries')) {
-      setActiveTab('inquiries')
-    } else if (pathname?.startsWith('/admin/cbt-monitor')) {
-      setActiveTab('cbt-monitor')
-    } else if (pathname?.startsWith('/admin/profile')) {
-      setActiveTab('profile')
-    } else if (pathname?.startsWith('/admin/settings')) {
-      setActiveTab('settings')
-    }
-  }, [pathname, setActiveTab, mounted])
 
   const displayName = profile?.full_name || 'Administrator'
   const firstName = displayName.split(' ')[0]
@@ -195,9 +144,9 @@ export function AdminSidebar({
     onLogout()
   }
 
-  const handleNavClick = (tabId: string, route: string) => {
+  // FIXED: Just switch tabs, don't navigate to new routes
+  const handleNavClick = (tabId: string) => {
     setActiveTab(tabId)
-    router.push(route)
   }
 
   const renderNavItem = (item: NavigationItem) => {
@@ -207,7 +156,7 @@ export function AdminSidebar({
     const buttonContent = (
       <button
         key={item.id}
-        onClick={() => handleNavClick(item.id, item.route)}
+        onClick={() => handleNavClick(item.id)}
         className={cn(
           "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full group relative overflow-hidden",
           isActive 
@@ -226,7 +175,7 @@ export function AdminSidebar({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium block">{item.name}</span>
               {item.badge && item.badge > 0 && (
-                <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0.5">
+                <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 animate-pulse">
                   {item.badge}
                 </Badge>
               )}
@@ -240,9 +189,15 @@ export function AdminSidebar({
           </div>
         )}
         
-        {/* Active indicator dot for collapsed mode */}
         {collapsed && isActive && (
           <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
+        )}
+        
+        {/* Badge for collapsed mode */}
+        {collapsed && item.badge && item.badge > 0 && (
+          <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">
+            {item.badge}
+          </div>
         )}
       </button>
     )
@@ -269,14 +224,13 @@ export function AdminSidebar({
     return <div key={item.id}>{buttonContent}</div>
   }
 
-  // Don't render anything during SSR to prevent hydration mismatch
+  // SSR placeholder
   if (!mounted) {
     return (
       <aside className={cn(
         "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800",
         collapsed ? "w-20" : "w-72"
       )}>
-        {/* Placeholder with same dimensions to prevent layout shift */}
         <div className="flex-1" />
       </aside>
     )
@@ -290,7 +244,7 @@ export function AdminSidebar({
       )}>
         <TooltipProvider delayDuration={0}>
           <ScrollArea className="h-full">
-            <div className="pt-6" />
+            <div className="pt-16" />
             
             {/* Logo Section */}
             <div className={cn(

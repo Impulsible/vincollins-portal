@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/admin/exams/ExamApprovals.tsx - FIXED: Hide answers from admin view
+// components/admin/exams/ExamApprovals.tsx - FIXED: Load questions from exam JSON
 'use client'
 
 import { useState } from 'react'
@@ -37,10 +37,13 @@ import {
   Users,
   ChevronDown,
   ChevronRight,
-  Brain
+  Brain,
+  AlertCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { toast } from 'sonner'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 interface Exam {
   id: string
@@ -50,7 +53,8 @@ interface Exam {
   duration: number
   total_questions: number
   total_marks: number
-  pass_mark: number
+  pass_mark?: number
+  passing_percentage?: number
   status: string
   created_at: string
   submitted_at: string
@@ -60,6 +64,11 @@ interface Exam {
   department?: string
   instructions?: string
   has_theory?: boolean
+  randomize_questions?: boolean
+  randomize_options?: boolean
+  // Questions stored as JSON in the exam record
+  questions?: any[]
+  theory_questions?: any[]
 }
 
 interface ExamApprovalsProps {
@@ -90,6 +99,7 @@ export function ExamApprovals({
   
   // Question loading states
   const [examQuestions, setExamQuestions] = useState<any[]>([])
+  const [examTheoryQuestions, setExamTheoryQuestions] = useState<any[]>([])
   const [loadingQuestions, setLoadingQuestions] = useState(false)
 
   // Group exams by class
@@ -105,29 +115,45 @@ export function ExamApprovals({
     return acc
   }, {} as Record<string, Exam[]>)
 
-  // Load questions for an exam - NO ANSWERS INCLUDED
-  const loadExamQuestions = async (examId: string) => {
+  // Load questions from exam record - FIXED
+  const loadExamQuestions = async (exam: Exam) => {
     setLoadingQuestions(true)
     setExamQuestions([])
+    setExamTheoryQuestions([])
     
     try {
+      // Fetch the full exam record to get questions JSON
       const { data, error } = await supabase
-        .from('questions')
-        .select('id, question_text, question_type, options, points, order_number, exam_id')
-        .eq('exam_id', examId)
-        .order('order_number', { ascending: true })
+        .from('exams')
+        .select('questions, theory_questions, has_theory')
+        .eq('id', exam.id)
+        .single()
 
       if (error) throw error
-      
-      // Parse options if needed - EXCLUDE correct_answer
-      const parsed = data?.map(q => ({
-        ...q,
-        options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || [])
-      }))
-      
-      setExamQuestions(parsed || [])
+
+      if (data) {
+        // Parse questions if they're stored as string
+        const objectiveQuestions = typeof data.questions === 'string' 
+          ? JSON.parse(data.questions) 
+          : (data.questions || [])
+        
+        const theoryQuestions = data.has_theory 
+          ? (typeof data.theory_questions === 'string' 
+            ? JSON.parse(data.theory_questions) 
+            : (data.theory_questions || []))
+          : []
+
+        console.log('📝 Loaded questions:', {
+          objective: objectiveQuestions.length,
+          theory: theoryQuestions.length
+        })
+
+        setExamQuestions(objectiveQuestions)
+        setExamTheoryQuestions(theoryQuestions)
+      }
     } catch (error) {
-      console.error('Error loading questions:', error)
+      console.error('Error loading exam questions:', error)
+      toast.error('Failed to load exam questions')
     } finally {
       setLoadingQuestions(false)
     }
@@ -135,7 +161,7 @@ export function ExamApprovals({
 
   const handleViewDetails = (exam: Exam) => {
     setSelectedExam(exam)
-    loadExamQuestions(exam.id)
+    loadExamQuestions(exam)
     setShowDetailsDialog(true)
   }
 
@@ -175,6 +201,8 @@ export function ExamApprovals({
         return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">Published</Badge>
       case 'pending':
         return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">Pending</Badge>
+      case 'rejected':
+        return <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">Rejected</Badge>
       case 'draft':
         return <Badge className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400">Draft</Badge>
       default:
@@ -220,6 +248,7 @@ export function ExamApprovals({
                   variant="ghost" 
                   size="icon"
                   onClick={() => handleViewDetails(exam)}
+                  title="View Exam"
                 >
                   <Eye className="h-4 w-4" />
                 </Button>
@@ -233,6 +262,7 @@ export function ExamApprovals({
                         setSelectedExam(exam)
                         setShowApproveDialog(true)
                       }}
+                      title="Approve"
                     >
                       <CheckCircle className="h-4 w-4" />
                     </Button>
@@ -244,6 +274,7 @@ export function ExamApprovals({
                         setSelectedExam(exam)
                         setShowRejectDialog(true)
                       }}
+                      title="Reject"
                     >
                       <XCircle className="h-4 w-4" />
                     </Button>
@@ -307,9 +338,21 @@ export function ExamApprovals({
   )
 
   // Student Preview Component - Shows exam exactly as students will see it
-  const StudentExamPreview = ({ exam, questions }: { exam: Exam, questions: any[] }) => {
+  const StudentExamPreview = ({ exam, questions, theoryQuestions }: { 
+    exam: Exam
+    questions: any[]
+    theoryQuestions: any[]
+  }) => {
     const [currentIndex, setCurrentIndex] = useState(0)
-    const currentQuestion = questions[currentIndex]
+    
+    // Combine objective and theory questions
+    const allQuestions = [
+      ...questions.map(q => ({ ...q, type: 'objective' })),
+      ...theoryQuestions.map(q => ({ ...q, type: 'theory' }))
+    ]
+    
+    const currentQuestion = allQuestions[currentIndex]
+    const totalQuestions = allQuestions.length
 
     return (
       <div className="border rounded-lg overflow-hidden">
@@ -321,57 +364,77 @@ export function ExamApprovals({
             <span>⏱️ {exam.duration} minutes</span>
             <span>📝 {exam.total_questions} questions</span>
             <span>⭐ {exam.total_marks} marks</span>
+            <span>✅ Pass: {exam.passing_percentage || exam.pass_mark || 50}%</span>
           </div>
         </div>
 
         {/* Question Navigator */}
         <div className="bg-gray-50 p-3 border-b">
           <div className="flex flex-wrap gap-1.5">
-            {questions.map((q, idx) => (
+            {allQuestions.map((q, idx) => (
               <button
-                key={q.id}
+                key={q.id || idx}
                 onClick={() => setCurrentIndex(idx)}
                 className={`w-8 h-8 rounded-lg text-xs font-medium transition-all
-                  ${idx === currentIndex ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
+                  ${q.type === 'theory' 
+                    ? (idx === currentIndex ? 'ring-2 ring-purple-500 ring-offset-2 bg-purple-500 text-white' : 'bg-purple-100 text-purple-700 border border-purple-300')
+                    : (idx === currentIndex ? 'ring-2 ring-blue-500 ring-offset-2 bg-blue-500 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300')
+                  }`}
               >
                 {idx + 1}
               </button>
             ))}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Question {currentIndex + 1} of {questions.length}</p>
+          <div className="flex justify-between text-xs text-gray-500 mt-2">
+            <span>Question {currentIndex + 1} of {totalQuestions}</span>
+            <span className="flex items-center gap-2">
+              <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-blue-500" /> Objective</span>
+              {theoryQuestions.length > 0 && (
+                <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-purple-500" /> Theory</span>
+              )}
+            </span>
+          </div>
         </div>
 
-        {/* Question Display - NO ANSWERS */}
+        {/* Question Display - NO ANSWERS SHOWN */}
         <div className="p-6 min-h-[300px]">
-          {currentQuestion && (
+          {currentQuestion ? (
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <Badge variant={currentQuestion.question_type === 'theory' ? 'secondary' : 'outline'}>
-                  {currentQuestion.question_type === 'theory' ? (
+                <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'}>
+                  {currentQuestion.type === 'theory' ? (
                     <><Brain className="h-3 w-3 mr-1" /> Theory</>
                   ) : 'Objective'}
                 </Badge>
-                <Badge variant="outline">{currentQuestion.points || 1} mark(s)</Badge>
+                <Badge variant="outline">{currentQuestion.marks || currentQuestion.points || 1} mark(s)</Badge>
+                {currentQuestion.type === 'theory' && (
+                  <Badge className="bg-amber-100 text-amber-700">Teacher Graded</Badge>
+                )}
               </div>
               
               <h4 className="text-lg font-medium mb-6">
-                {currentIndex + 1}. {currentQuestion.question_text}
+                {currentIndex + 1}. {currentQuestion.question || currentQuestion.question_text}
               </h4>
 
-              {currentQuestion.question_type === 'theory' ? (
-                <div className="bg-amber-50 p-4 rounded-lg">
-                  <p className="text-amber-700 text-sm">Essay question - students will type their answer here.</p>
+              {currentQuestion.type === 'theory' ? (
+                <div>
+                  <Alert className="mb-4 bg-amber-50 border-amber-200">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-700 text-sm">
+                      Essay question - students will type their answer here. This will be graded by a teacher.
+                    </AlertDescription>
+                  </Alert>
                   <div className="mt-3 h-32 bg-gray-100 rounded border border-dashed border-gray-300 flex items-center justify-center">
                     <span className="text-gray-400 text-sm">Student answer area</span>
                   </div>
                 </div>
               ) : (
                 <RadioGroup className="space-y-3">
-                  {currentQuestion.options?.map((opt: string, idx: number) => (
+                  {(currentQuestion.options || []).map((opt: string, idx: number) => (
                     opt && (
-                      <div key={idx} className="flex items-center space-x-3 p-3 rounded-lg border">
+                      <div key={idx} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-gray-50">
                         <RadioGroupItem value={opt} id={`option-${idx}`} disabled />
-                        <Label htmlFor={`option-${idx}`} className="flex-1">
+                        <Label htmlFor={`option-${idx}`} className="flex-1 cursor-pointer">
                           <span className="font-medium mr-2">{String.fromCharCode(65 + idx)}.</span> {opt}
                         </Label>
                       </div>
@@ -379,6 +442,10 @@ export function ExamApprovals({
                   ))}
                 </RadioGroup>
               )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-gray-400">No questions available</p>
             </div>
           )}
         </div>
@@ -388,21 +455,21 @@ export function ExamApprovals({
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setCurrentIndex(prev => prev - 1)}
+            onClick={() => setCurrentIndex(prev => Math.max(0, prev - 1))}
             disabled={currentIndex === 0}
           >
-            Previous
+            ← Previous
           </Button>
           <span className="text-sm text-gray-500">
-            {currentIndex + 1} / {questions.length}
+            {currentIndex + 1} / {totalQuestions}
           </span>
           <Button 
             variant="outline" 
             size="sm"
-            onClick={() => setCurrentIndex(prev => prev + 1)}
-            disabled={currentIndex === questions.length - 1}
+            onClick={() => setCurrentIndex(prev => Math.min(totalQuestions - 1, prev + 1))}
+            disabled={currentIndex === totalQuestions - 1}
           >
-            Next
+            Next →
           </Button>
         </div>
       </div>
@@ -420,7 +487,7 @@ export function ExamApprovals({
           Exam Approvals
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-1">
-          Review and approve exams submitted by teachers
+          Review and approve exams submitted by teachers. Answers are hidden from admin view.
         </p>
       </div>
 
@@ -498,16 +565,36 @@ export function ExamApprovals({
 
       {/* Exam Details Dialog - STUDENT VIEW (No Answers) */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Exam Preview - Student View</DialogTitle>
             <DialogDescription>
-              This is exactly how students will see the exam. Answers are hidden.
+              This is exactly how students will see the exam. Correct answers are hidden from admin view.
             </DialogDescription>
           </DialogHeader>
           
           {selectedExam && (
             <div className="space-y-4 py-4">
+              {/* Exam Info */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Status</Label>
+                  <div className="mt-1">{getStatusBadge(selectedExam.status)}</div>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Teacher</Label>
+                  <p className="text-sm font-medium">{selectedExam.teacher_name || 'Unknown'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Department</Label>
+                  <p className="text-sm font-medium">{selectedExam.department || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Submitted</Label>
+                  <p className="text-sm font-medium">{formatDate(selectedExam.submitted_at || selectedExam.created_at)}</p>
+                </div>
+              </div>
+
               {selectedExam.instructions && (
                 <div className="p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200">
                   <Label className="text-blue-800 dark:text-blue-300 font-medium">Instructions:</Label>
@@ -519,13 +606,17 @@ export function ExamApprovals({
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin" />
                 </div>
-              ) : examQuestions.length === 0 ? (
+              ) : examQuestions.length === 0 && examTheoryQuestions.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-slate-300 mx-auto mb-2" />
                   <p className="text-slate-500">No questions found for this exam</p>
                 </div>
               ) : (
-                <StudentExamPreview exam={selectedExam} questions={examQuestions} />
+                <StudentExamPreview 
+                  exam={selectedExam} 
+                  questions={examQuestions} 
+                  theoryQuestions={examTheoryQuestions} 
+                />
               )}
             </div>
           )}
@@ -593,7 +684,7 @@ export function ExamApprovals({
           <DialogHeader>
             <DialogTitle>Send Back for Revision</DialogTitle>
             <DialogDescription>
-              Please provide a reason for sending this exam back.
+              Please provide a reason for sending this exam back to the teacher.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -601,7 +692,7 @@ export function ExamApprovals({
             <Textarea
               value={rejectionReason}
               onChange={(e) => setRejectionReason(e.target.value)}
-              placeholder="e.g., Questions need review, formatting issues, etc."
+              placeholder="e.g., Questions need review, formatting issues, unclear instructions, etc."
               rows={3}
               className="mt-2"
             />
@@ -612,7 +703,7 @@ export function ExamApprovals({
             </Button>
             <Button 
               onClick={handleReject} 
-              disabled={processing || !rejectionReason}
+              disabled={processing || !rejectionReason.trim()}
               className="bg-red-600 hover:bg-red-700"
             >
               {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

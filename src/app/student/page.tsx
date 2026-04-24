@@ -1,254 +1,223 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// src/app/student/page.tsx
+// components/student/ClassmatesTab.tsx - Add supabase import
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { Header } from '@/components/layout/header'
-import { StudentSidebar } from '@/components/student/StudentSidebar'
-import { toast } from 'sonner'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'  // ← ADD THIS IMPORT
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Input } from '@/components/ui/input'
+import { 
+  Users, Search, ArrowRight, ChevronRight, 
+  GraduationCap, Mail, User, BookOpen, MapPin
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { GraduationCap } from 'lucide-react'
+import Link from 'next/link'
 
-// Hooks
-import { useStudentProfile } from './hooks/useStudentProfile'
-import { useDashboardData } from './hooks/useDashboardData'
-
-// Components
-import { OverviewTab } from '@/components/student/OverviewTab'
-import { ExamsTab } from '@/components/student/ExamsTab'
-import { ResultsTab } from '@/components/student/ResultsTab'
-import { AssignmentsTab } from '@/components/student/AssignmentsTab'
-import { NotesTab } from '@/components/student/NotesTab'
-import { ClassmatesTab } from '@/components/student/ClassmatesTab'
-import { ProfileTab } from '@/components/student/ProfileTab'
-import { ReportCardTab } from '@/components/student/ReportCardTab'
-import { MobileBottomNav } from '@/components/student/MobileBottomNav'
-import { LoadingState } from '@/components/student/LoadingState'
-
-// Types
-import { WelcomeBannerProfile, ReportCardStatus, StudentProfile } from './types'
-
-// Utils
-import { getBestDisplayName } from './utils/nameFormatter'
-import { getSubjectCountForClass } from './utils/constants'
-
-function StudentDashboardContent() {
-  const router = useRouter()
-  const { profile, authChecking, setProfile } = useStudentProfile()
-  const { 
-    loading, 
-    stats, 
-    bannerStats, 
-    termProgress, 
-    loadDashboardData,
-    setStats,
-    setBannerStats 
-  } = useDashboardData(profile)
-  
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
-
-  const displayTotalSubjects = useMemo(() => {
-    if (termProgress?.total_subjects) return termProgress.total_subjects
-    if (!profile?.class) return 17
-    return getSubjectCountForClass(profile.class)
-  }, [profile?.class, termProgress])
-
-  const profileDisplayName = useMemo(() => {
-    if (!profile) return 'Student'
-    return getBestDisplayName(profile, 'Student')
-  }, [profile])
-
-  const formatProfileForHeader = (profile: StudentProfile | null) => {
-    if (!profile) return undefined
-    return {
-      id: profile.id,
-      name: profile.display_name || profile.full_name,
-      email: profile.email,
-      role: 'student' as const,
-      avatar: profile.photo_url || undefined,
-      isAuthenticated: true
-    }
-  }
-
-  const checkReportCardStatus = useCallback(async () => {
-    if (!profile?.id) return
-    try {
-      const { data, error } = await supabase
-        .from('report_cards')
-        .select('id, status, term, academic_year, average_score')
-        .eq('student_id', profile.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-        
-      if (error) {
-        if (error.code === '42703') {
-          const { data: basicData } = await supabase
-            .from('report_cards')
-            .select('id, status')
-            .eq('student_id', profile.id)
-            .limit(1)
-            .maybeSingle()
-          if (basicData) {
-            setReportCardStatus({
-              id: basicData.id,
-              status: basicData.status,
-              term: 'Current Term',
-              academic_year: '2025/2026'
-            })
-          }
-          return
-        }
-        throw error
-      }
-      if (data) {
-        const grade = data.average_score && data.average_score >= 75 ? 'A1' : 
-                     data.average_score && data.average_score >= 70 ? 'B2' :
-                     data.average_score && data.average_score >= 65 ? 'B3' :
-                     data.average_score && data.average_score >= 60 ? 'C4' :
-                     data.average_score && data.average_score >= 55 ? 'C5' :
-                     data.average_score && data.average_score >= 50 ? 'C6' :
-                     data.average_score && data.average_score >= 45 ? 'D7' :
-                     data.average_score && data.average_score >= 40 ? 'E8' : 'F9'
-        setReportCardStatus({
-          id: data.id,
-          status: data.status,
-          term: data.term,
-          academic_year: data.academic_year,
-          average_score: data.average_score,
-          grade
-        })
-      } else {
-        setReportCardStatus(null)
-      }
-    } catch (error: any) {
-      console.warn('Error checking report card status:', error.message)
-      setReportCardStatus(null)
-    }
-  }, [profile?.id])
-
-  useEffect(() => {
-    if (!profile?.id) return
-    const channel = supabase
-      .channel('student-dashboard-updates')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts', filter: `student_id=eq.${profile.id}` }, () => loadDashboardData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_term_progress', filter: `student_id=eq.${profile.id}` }, () => loadDashboardData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => loadDashboardData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, () => loadDashboardData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `class=eq.${profile.class}` }, () => loadDashboardData())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'report_cards', filter: `student_id=eq.${profile.id}` }, () => checkReportCardStatus())
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profile.id}` }, (payload) => {
-        if (payload.new.photo_url) {
-          setProfile(prev => prev ? { ...prev, photo_url: payload.new.photo_url } : null)
-        }
-      })
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [profile?.id, profile?.class, loadDashboardData, checkReportCardStatus, setProfile])
-
-  useEffect(() => {
-    if (!authChecking && profile) {
-      loadDashboardData()
-      checkReportCardStatus()
-    }
-  }, [authChecking, profile, loadDashboardData, checkReportCardStatus])
-
-  const handleTabChange = (tab: string) => {
-    setActiveTab(tab)
-    setMobileMenuOpen(false)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut({ scope: 'local' })
-    toast.success('Logged out successfully')
-    window.location.replace('/portal')
-  }
-
-  const getWelcomeBannerProfile = (): WelcomeBannerProfile | null => {
-    if (!profile) return null
-    return {
-      full_name: profile.full_name,
-      display_name: profile.display_name,
-      class: profile.class,
-      department: profile.department || undefined,
-      photo_url: profile.photo_url || undefined,
-      subject_count: displayTotalSubjects
-    }
-  }
-
-  const finalBannerStats = {
-    ...bannerStats,
-    totalSubjects: displayTotalSubjects || bannerStats.totalSubjects
-  }
-
-  if (authChecking || loading) {
-    return <LoadingState profile={profile} onLogout={handleLogout} />
-  }
-
-  const tabProps = {
-    profile,
-    stats,
-    bannerStats: finalBannerStats,
-    reportCardStatus,
-    displayTotalSubjects,
-    profileDisplayName,
-    handleTabChange,
-    router,
-    setStats,
-    setBannerStats,
-    checkReportCardStatus
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
-      <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-      <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
-      <div className="flex w-full overflow-x-hidden">
-        <StudentSidebar profile={profile} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab={activeTab} setActiveTab={handleTabChange} />
-        <main className={cn("flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300 w-full overflow-x-hidden", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
-            <AnimatePresence mode="wait">
-              {activeTab === 'overview' && <OverviewTab {...tabProps} welcomeBannerProfile={getWelcomeBannerProfile()} />}
-              {activeTab === 'exams' && <ExamsTab {...tabProps} />}
-              {activeTab === 'results' && <ResultsTab {...tabProps} />}
-              {activeTab === 'assignments' && <AssignmentsTab {...tabProps} />}
-              {activeTab === 'notes' && <NotesTab {...tabProps} />}
-              {activeTab === 'classmates' && <ClassmatesTab {...tabProps} />}
-              {activeTab === 'profile' && <ProfileTab {...tabProps} />}
-              {activeTab === 'report-card' && <ReportCardTab {...tabProps} />}
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
-    </div>
-  )
+interface Classmate {
+  id: string
+  full_name: string
+  email: string
+  vin_id?: string
+  photo_url?: string
+  class: string
+  department?: string
 }
 
-export default function StudentDashboardPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
-        <div className="text-center">
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
-            <GraduationCap className="h-12 w-12 text-emerald-600 mx-auto" />
-          </motion.div>
-          <p className="mt-4 text-slate-600 text-lg font-medium">Loading Student Dashboard...</p>
-          <div className="flex justify-center gap-1 mt-4">
-            {[0, 1, 2].map((i) => (
-              <motion.div key={i} className="h-2 w-2 rounded-full bg-emerald-400" animate={{ y: [0, -8, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }} />
+interface ClassmatesTabProps {
+  profile: any
+  stats?: any
+  router?: any
+  setStats?: any
+  setBannerStats?: any
+  checkReportCardStatus?: any
+  displayTotalSubjects?: number
+  profileDisplayName?: string
+  handleTabChange?: (tab: string) => void
+  reportCardStatus?: any
+  bannerStats?: any
+}
+
+export function ClassmatesTab({ profile, router }: ClassmatesTabProps) {
+  const [loading, setLoading] = useState(true)
+  const [classmates, setClassmates] = useState<Classmate[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Limit to 4 for dashboard view
+  const displayClassmates = classmates.slice(0, 4)
+  const totalClassmates = classmates.length
+
+  useEffect(() => {
+    loadClassmates()
+  }, [profile?.class])
+
+  const loadClassmates = async () => {
+    if (!profile?.class) return
+    
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, vin_id, photo_url, class, department')
+        .eq('class', profile.class)
+        .eq('role', 'student')
+        .neq('id', profile.id)
+        .order('full_name')
+
+      if (error) throw error
+      setClassmates(data || [])
+    } catch (error) {
+      console.error('Error loading classmates:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getInitials = (name: string) => {
+    if (!name) return 'ST'
+    const parts = name.split(' ')
+    return parts.length >= 2 
+      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+      : name.slice(0, 2).toUpperCase()
+  }
+
+  const filteredClassmates = classmates.filter(classmate =>
+    classmate.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    classmate.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Users className="h-5 w-5 text-emerald-600" />
+            Your Classmates
+          </CardTitle>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/student/classmates">
+              View All <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[1, 2, 3].map(i => (
+              <div key={i} className="flex items-center gap-3">
+                <Skeleton className="h-10 w-10 rounded-full" />
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-24 mt-1" />
+                </div>
+              </div>
             ))}
           </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  if (classmates.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Users className="h-5 w-5 text-emerald-600" />
+            Your Classmates
+          </CardTitle>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/student/classmates">
+              View All <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center py-8">
+            <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
+            <p className="text-muted-foreground">No classmates found</p>
+            <p className="text-xs text-muted-foreground mt-1">You're the only student in your class</p>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-lg flex items-center gap-2">
+          <Users className="h-5 w-5 text-emerald-600" />
+          Your Classmates
+          <Badge variant="secondary" className="ml-2">
+            {totalClassmates}
+          </Badge>
+        </CardTitle>
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/student/classmates">
+            View All <ArrowRight className="ml-1 h-4 w-4" />
+          </Link>
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {/* Search - only show if there are many classmates */}
+        {classmates.length > 4 && (
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search classmates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        )}
+        
+        <div className="space-y-3">
+          {displayClassmates.map((classmate) => (
+            <div 
+              key={classmate.id} 
+              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
+              onClick={() => router?.push(`/student/classmates?student=${classmate.id}`)}
+            >
+              <Avatar className="h-10 w-10 ring-1 ring-slate-200">
+                <AvatarImage src={classmate.photo_url} />
+                <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white text-sm">
+                  {getInitials(classmate.full_name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm truncate">{classmate.full_name}</p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex items-center gap-0.5">
+                    <GraduationCap className="h-3 w-3" />
+                    {classmate.class}
+                  </span>
+                  {classmate.department && (
+                    <span className="flex items-center gap-0.5">
+                      <BookOpen className="h-3 w-3" />
+                      {classmate.department}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+            </div>
+          ))}
         </div>
-      </div>
-    }>
-      <StudentDashboardContent />
-    </Suspense>
+        
+        {classmates.length > 4 && (
+          <div className="text-center pt-3 mt-2">
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/student/classmates" className="text-muted-foreground">
+                View all {totalClassmates} classmates
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }

@@ -1,4 +1,4 @@
-// components/staff/CreateExamDialog.tsx - WITH RANDOMIZATION SETTINGS
+// components/staff/CreateExamDialog.tsx - COMPLETE WITH AUTO-CALCULATION
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
@@ -23,10 +23,42 @@ import {
   Plus, Trash2, Save, Send, Clock, Loader2, FileText, Brain,
   Upload, FileUp, Download, AlertCircle, CheckCheck, Sparkles, Wand2,
   ChevronLeft, ChevronRight, Eye, MonitorPlay, Shield, Flag, Award,
-  Shuffle
+  Shuffle, Calculator, GraduationCap, BookOpen, Users
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+
+// ✅ FIX: PDF parser using PDF.js instead of pdf-parse (permanent fix)
+const parsePDFWithPDFJS = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+  try {
+    // Dynamically import pdfjs-dist to avoid SSR issues
+    const pdfjsLib = await import('pdfjs-dist')
+    
+    // Set worker path (required for pdf.js v3+)
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`
+    }
+    
+    const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) })
+    const pdf = await loadingTask.promise
+    
+    let fullText = ''
+    
+    for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+      const page = await pdf.getPage(pageNum)
+      const textContent = await page.getTextContent()
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ')
+      fullText += pageText + '\n'
+    }
+    
+    return fullText.trim()
+  } catch (error) {
+    console.error('PDF.js parse error:', error)
+    throw new Error('Failed to parse PDF document. Please ensure the file is not corrupted or password protected.')
+  }
+}
 
 // Document parser
 const parseDocument = async (file: File): Promise<string> => {
@@ -43,25 +75,22 @@ const parseDocument = async (file: File): Promise<string> => {
       const result = await mammoth.extractRawText({ arrayBuffer })
       return result.value
     } catch (error) {
-      console.error('Error parsing Word document:', error)
-      throw new Error('Failed to parse Word document')
+      throw new Error('Failed to parse Word document. Please ensure the file is not corrupted.')
     }
   }
   
   if (fileExt === 'pdf') {
     try {
-      const pdfModule = await import('pdf-parse')
-      const pdfParse = (pdfModule as any).default || pdfModule
       const arrayBuffer = await file.arrayBuffer()
-      const data = await pdfParse(Buffer.from(arrayBuffer))
-      return data.text
-    } catch (error) {
-      console.error('Error parsing PDF:', error)
-      throw new Error('Failed to parse PDF document')
+      // ✅ Use PDF.js instead of pdf-parse
+      return await parsePDFWithPDFJS(arrayBuffer)
+    } catch (error: any) {
+      console.error('PDF parse error:', error)
+      throw new Error(error.message || 'Failed to parse PDF document')
     }
   }
   
-  throw new Error('Unsupported file format')
+  throw new Error('Unsupported file format. Please upload .txt, .md, .doc, .docx, or .pdf files.')
 }
 
 interface Question {
@@ -128,9 +157,7 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
   const currentQuestion = allQuestions[currentIndex]
   const totalQuestions = allQuestions.length
   const progress = totalQuestions > 0 ? ((currentIndex + 1) / totalQuestions) * 100 : 0
-  const answeredCount = useMemo(() => {
-    return Object.keys(selectedAnswers).length + Object.keys(theoryAnswers).length
-  }, [selectedAnswers, theoryAnswers])
+  const answeredCount = Object.keys(selectedAnswers).length + Object.keys(theoryAnswers).length
 
   useEffect(() => {
     if (isTimerRunning && timeRemaining > 0) {
@@ -191,35 +218,32 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
   }, [examDetails.duration])
 
   return (
-    <div className="min-h-[400px] sm:min-h-[600px] bg-gray-50 rounded-lg overflow-hidden flex flex-col">
-      {/* Header - Mobile Responsive */}
+    <div className="min-h-[400px] sm:min-h-[500px] lg:min-h-[600px] bg-gray-50 rounded-lg overflow-hidden flex flex-col">
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 sm:p-4">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div>
-            <h3 className="text-lg sm:text-xl font-bold">{examDetails.title || 'Untitled Exam'}</h3>
-            <p className="text-xs sm:text-sm text-blue-100">{examDetails.subject} • {examDetails.class}</p>
+          <div className="min-w-0 flex-1">
+            <h3 className="text-base sm:text-lg lg:text-xl font-bold truncate">{examDetails.title || 'Untitled Exam'}</h3>
+            <p className="text-xs sm:text-sm text-blue-100 truncate">{examDetails.subject} • {examDetails.class}</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-            <div className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-mono text-sm sm:text-lg font-bold", getTimerColor())}>
+            <div className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-mono text-xs sm:text-sm lg:text-lg font-bold", getTimerColor())}>
               <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
               {formatTime(timeRemaining)}
-              {!isTimerRunning && timeRemaining === 0 && <Badge className="ml-1 sm:ml-2 bg-red-500 text-white text-xs">Time's Up!</Badge>}
             </div>
-            <Badge className="bg-white/20 text-white text-xs"><Award className="h-3 w-3 mr-1" /> Pass: {examDetails.pass_mark || 50}%</Badge>
+            <Badge className="bg-white/20 text-white text-[10px] sm:text-xs"><Award className="h-3 w-3 mr-1" /> Pass: {examDetails.pass_mark || 50}%</Badge>
           </div>
         </div>
         <div className="mt-2 sm:mt-3">
-          <div className="flex justify-between text-xs text-blue-100 mb-1">
+          <div className="flex justify-between text-[10px] sm:text-xs text-blue-100 mb-1">
             <span>Question {currentIndex + 1} of {totalQuestions}</span>
             <span>{answeredCount} of {totalQuestions} answered</span>
           </div>
-          <Progress value={progress} className="h-2 bg-blue-800" />
+          <Progress value={progress} className="h-1.5 sm:h-2 bg-blue-800" />
         </div>
       </div>
 
-      {/* Question navigator - Scrollable on mobile */}
-      <div className="bg-white border-b p-2 sm:p-3">
-        <div className="flex flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent">
+      <div className="bg-white border-b p-2 sm:p-3 overflow-x-auto">
+        <div className="flex gap-1 sm:gap-1.5 min-w-max pb-1">
           {allQuestions.map((q, idx) => {
             const questionId = q.id
             const isAnswered = q.type === 'theory' ? !!theoryAnswers[questionId] : !!selectedAnswers[questionId]
@@ -227,8 +251,8 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
             const isCurrent = idx === currentIndex
             return (
               <button key={questionId} onClick={() => navigateToQuestion(idx)} className={cn(
-                "w-7 h-7 sm:w-8 sm:h-8 rounded-lg text-xs font-medium transition-all flex-shrink-0",
-                isCurrent ? "ring-2 ring-blue-500 ring-offset-2" : "",
+                "w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-lg text-[10px] sm:text-xs font-medium transition-all flex-shrink-0",
+                isCurrent ? "ring-2 ring-blue-500 ring-offset-1" : "",
                 q.type === 'theory' ? (isAnswered ? "bg-purple-500 text-white" : "bg-purple-100 text-purple-700 border border-purple-300")
                   : (isAnswered ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 border border-gray-300"),
                 isFlagged && "ring-2 ring-amber-400"
@@ -236,71 +260,78 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
             )
           })}
         </div>
-        <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 sm:mt-3 text-xs">
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-green-500 flex-shrink-0" /> Answered</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-gray-100 border border-gray-300 flex-shrink-0" /> Not Answered</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-purple-500 flex-shrink-0" /> Theory</span>
-          <span className="flex items-center gap-1"><div className="w-3 h-3 rounded ring-2 ring-amber-400 flex-shrink-0" /> Flagged</span>
+        <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 sm:mt-3 text-[10px] sm:text-xs">
+          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-green-500" /> Answered</span>
+          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-gray-100 border border-gray-300" /> Not Answered</span>
+          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-purple-500" /> Theory</span>
+          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded ring-2 ring-amber-400" /> Flagged</span>
         </div>
       </div>
 
-      {/* Question content - Scrollable */}
-      <div className="flex-1 p-3 sm:p-6 overflow-y-auto min-h-[200px] sm:min-h-[350px]">
+      <div className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto">
         {currentQuestion && (
           <div className="max-w-3xl mx-auto">
-            <div className="flex items-start justify-between mb-3 sm:mb-4">
-              <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'} className="text-xs">
+            <div className="flex flex-wrap items-start justify-between gap-2 mb-3 sm:mb-4">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'} className="text-[10px] sm:text-xs">
                   {currentQuestion.type === 'theory' ? <><Brain className="h-3 w-3 mr-1" /> Theory</> : <>Objective</>}
                 </Badge>
-                <Badge variant="outline" className="text-xs">{currentQuestion.marks || defaultMark} mark(s)</Badge>
-                {currentQuestion.type === 'theory' && <Badge className="bg-amber-100 text-amber-700 border-amber-300 text-xs">Teacher Graded</Badge>}
+                <Badge variant="outline" className="text-[10px] sm:text-xs">{currentQuestion.marks || defaultMark} mark(s)</Badge>
               </div>
-              <button onClick={() => toggleFlag(currentQuestion.id)} className={cn("p-1.5 sm:p-2 rounded-lg transition", flaggedQuestions.has(currentQuestion.id) ? "bg-amber-100 text-amber-700" : "hover:bg-gray-100 text-gray-400")}>
+              <button onClick={() => toggleFlag(currentQuestion.id)} className={cn("p-1 rounded-lg transition", flaggedQuestions.has(currentQuestion.id) ? "bg-amber-100 text-amber-700" : "hover:bg-gray-100 text-gray-400")}>
                 <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
               </button>
             </div>
-            <h4 className="text-base sm:text-lg font-medium mb-4 sm:mb-6">{currentIndex + 1}. {currentQuestion.type === 'theory' ? (currentQuestion as TheoryQuestion).question : (currentQuestion as Question).question}</h4>
+            <h4 className="text-sm sm:text-base lg:text-lg font-medium mb-3 sm:mb-4 lg:mb-6">{currentIndex + 1}. {currentQuestion.type === 'theory' ? (currentQuestion as TheoryQuestion).question : (currentQuestion as Question).question}</h4>
             {currentQuestion.type === 'theory' ? (
               <div>
                 <Alert className="mb-3 sm:mb-4 bg-amber-50 border-amber-200">
                   <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-700 text-sm">This question will be graded by your teacher. Be detailed in your answer.</AlertDescription>
+                  <AlertDescription className="text-amber-700 text-[11px] sm:text-sm">This question will be graded by your teacher. Be detailed in your answer.</AlertDescription>
                 </Alert>
-                <Textarea value={theoryAnswers[currentQuestion.id] || ''} onChange={(e) => handleTheoryAnswerChange(currentQuestion.id, e.target.value)} placeholder="Type your answer here..." rows={4} className="w-full" />
+                <Textarea value={theoryAnswers[currentQuestion.id] || ''} onChange={(e) => handleTheoryAnswerChange(currentQuestion.id, e.target.value)} placeholder="Type your answer here..." rows={4} className="w-full text-sm" />
               </div>
             ) : (
-              <RadioGroup value={selectedAnswers[currentQuestion.id] || ''} onValueChange={(v) => handleAnswerSelect(currentQuestion.id, v)} className="space-y-2 sm:space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {(currentQuestion as Question).options?.map((option, idx) => (
-                  <div key={idx} className="flex items-center space-x-2 sm:space-x-3 p-2 sm:p-3 rounded-lg border hover:bg-gray-50 cursor-pointer transition-colors">
-                    <RadioGroupItem value={option} id={`preview-${currentQuestion.id}-${idx}`} />
-                    <Label htmlFor={`preview-${currentQuestion.id}-${idx}`} className="flex-1 cursor-pointer text-sm sm:text-base">
+                  <label key={idx} className={cn(
+                    "flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-all",
+                    selectedAnswers[currentQuestion.id] === option ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"
+                  )}>
+                    <input
+                      type="radio"
+                      name={`question-${currentQuestion.id}`}
+                      value={option}
+                      checked={selectedAnswers[currentQuestion.id] === option}
+                      onChange={() => handleAnswerSelect(currentQuestion.id, option)}
+                      className="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                    />
+                    <span className="text-xs sm:text-sm flex-1">
                       <span className="font-medium mr-1 sm:mr-2">{String.fromCharCode(65 + idx)}.</span> {option}
-                    </Label>
-                  </div>
+                    </span>
+                  </label>
                 ))}
-              </RadioGroup>
+              </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Footer - Mobile responsive */}
       <div className="bg-white border-t p-3 sm:p-4 flex justify-between items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex - 1)} disabled={currentIndex === 0} className="text-xs sm:text-sm">
-          <ChevronLeft className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Previous
+        <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex - 1)} disabled={currentIndex === 0} className="h-8 sm:h-9 text-xs sm:text-sm">
+          <ChevronLeft className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Prev
         </Button>
-        <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 sm:gap-2"><Shield className="h-3 w-3 sm:h-4 sm:w-4 hidden sm:block" /> Secure Mode</div>
+        <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3 hidden sm:block" /> Secure Mode</div>
         {currentIndex === totalQuestions - 1 ? (
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm"><CheckCheck className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" /> Submit Exam</Button>
+          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-8 sm:h-9 text-xs sm:text-sm"><CheckCheck className="mr-1 h-3 w-3" /> Submit</Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex + 1)} className="text-xs sm:text-sm">Next <ChevronRight className="ml-1 sm:ml-2 h-3 w-3 sm:h-4 sm:w-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex + 1)} className="h-8 sm:h-9 text-xs sm:text-sm">Next <ChevronRight className="ml-1 h-3 w-3" /></Button>
         )}
       </div>
       {examDetails.instructions && (
         <div className="bg-blue-50 p-3 sm:p-4 border-t border-blue-200">
-          <p className="text-xs sm:text-sm text-blue-800 font-medium mb-1">Instructions:</p>
-          <p className="text-xs sm:text-sm text-blue-700 whitespace-pre-line">{examDetails.instructions}</p>
+          <p className="text-[11px] sm:text-sm text-blue-800 font-medium mb-1">Instructions:</p>
+          <p className="text-[10px] sm:text-xs text-blue-700 whitespace-pre-line">{examDetails.instructions}</p>
         </div>
       )}
     </div>
@@ -350,6 +381,12 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
     question: '',
     marks: 5
   })
+
+  // ✅ AUTO-CALCULATION - Calculate totals dynamically
+  const totalObjectiveMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0)
+  const totalTheoryMarks = hasTheory ? theoryQuestions.reduce((sum, q) => sum + (q.marks || 0), 0) : 0
+  const totalMarks = totalObjectiveMarks + totalTheoryMarks
+  const totalQuestionsCount = questions.length + (hasTheory ? theoryQuestions.length : 0)
 
   const availableSubjects = useMemo(() => {
     if (!examDetails.class) return []
@@ -583,22 +620,67 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
       const teacherName = profileData?.full_name || teacherProfile?.full_name || session.user.email?.split('@')[0] || 'Teacher'
       const department = profileData?.department || teacherProfile?.department || 'General'
 
+      // ✅ AUTO-CALCULATE totals from questions
+      let objectiveCount = 0
+      let objectiveMarks = 0
+      questions.forEach(q => {
+        objectiveCount++
+        objectiveMarks += q.marks || 0
+      })
+
+      let theoryCount = 0
+      let theoryMarks = 0
+      if (hasTheory) {
+        theoryQuestions.forEach(q => {
+          theoryCount++
+          theoryMarks += q.marks || 0
+        })
+      }
+
+      const totalQuestionsCount = objectiveCount + theoryCount
+      const totalMarksSum = objectiveMarks + theoryMarks
+
+      // Build questions array for JSONB storage
+      const questionsArray: any[] = []
+      
+      questions.forEach((q, idx) => {
+        questionsArray.push({
+          id: crypto.randomUUID(),
+          type: 'mcq',
+          question: q.question,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          marks: q.marks,
+          order: idx + 1
+        })
+      })
+      
+      if (hasTheory) {
+        theoryQuestions.forEach((q, idx) => {
+          questionsArray.push({
+            id: crypto.randomUUID(),
+            type: 'theory',
+            question: q.question,
+            marks: q.marks,
+            order: objectiveCount + idx + 1
+          })
+        })
+      }
+
       const examData = {
         title: examDetails.title,
-        duration: examDetails.duration || 60,
-        subject: examDetails.subject || 'General',
-        class: examDetails.class || 'Not Assigned',
-        total_questions: questions.length + (hasTheory ? theoryQuestions.length : 0),
-        total_marks: 60,
-        passing_percentage: examDetails.pass_mark || 50,
-        instructions: examDetails.instructions || '',
-        has_theory: hasTheory,
-        questions: questions,
-        theory_questions: hasTheory ? theoryQuestions : null,
+        duration: examDetails.duration,
+        subject: examDetails.subject,
+        class: examDetails.class,
+        total_questions: totalQuestionsCount,
+        total_marks: totalMarksSum,
+        pass_mark: examDetails.pass_mark,
+        instructions: examDetails.instructions,
         randomize_questions: examDetails.randomize_questions,
         randomize_options: examDetails.randomize_options,
+        has_theory: hasTheory,
         status: submitForApproval ? 'pending' : 'draft',
-        submitted_at: submitForApproval ? new Date().toISOString() : null,
+        questions: questionsArray,
         created_by: createdBy,
         teacher_name: teacherName,
         department: department,
@@ -612,15 +694,8 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
         .select()
         .single()
 
-      if (examError) {
-        console.error('Supabase error:', examError)
-        toast.error(examError.message || 'Database error')
-        return
-      }
+      if (examError) throw examError
 
-      const examId = examResult.id
-      console.log('✅ Exam created with ID:', examId)
-      
       if (submitForApproval) {
         try {
           const { data: admins } = await supabase
@@ -634,24 +709,20 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
               message: `${examDetails.title} (${examDetails.subject} - ${examDetails.class}) by ${teacherName} is pending approval.`,
               type: 'exam_approval',
               user_id: admin.id,
-              exam_id: examId,
+              exam_id: examResult.id,
               class: examDetails.class,
               subject: examDetails.subject,
               read: false,
               action_url: `/admin?tab=exams`,
               created_at: new Date().toISOString()
             }))
-
             await supabase.from('notifications').insert(notifications)
-            console.log('✅ Admin notifications sent')
           }
         } catch (e) {
           console.log('Notification error (non-critical):', e)
         }
         
-        toast.success('Exam submitted for approval!', {
-          description: 'Admin will review and publish your exam.'
-        })
+        toast.success(`Exam submitted for approval! Total: ${totalMarksSum} marks from ${totalQuestionsCount} questions.`)
       } else {
         toast.success('Exam saved as draft!')
       }
@@ -668,131 +739,122 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="w-[95vw] sm:max-w-[1000px] h-[90vh] flex flex-col p-0 overflow-hidden">
-        {/* Fixed Header - Not Sticky */}
+      <DialogContent className="w-[95vw] max-w-[1200px] h-[90vh] flex flex-col p-0 overflow-hidden">
         <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 flex-shrink-0">
           <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            <FileText className="h-5 w-5" />
+            <GraduationCap className="h-5 w-5 text-emerald-600" />
             Create New Exam
           </DialogTitle>
-          <DialogDescription className="text-sm">
-            Create a CBT exam with multiple choice questions and optional theory section. Upload DOC, DOCX, PDF, or TXT files.
+          <DialogDescription className="text-xs sm:text-sm">
+            Create a CBT exam with objective and optional theory questions
           </DialogDescription>
         </DialogHeader>
 
-        {/* Tabs - Scrollable on mobile */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
           <div className="px-4 sm:px-6 flex-shrink-0 overflow-x-auto">
-            <TabsList className="grid w-full grid-cols-5 min-w-[500px] sm:min-w-0">
-              <TabsTrigger value="details" className="text-xs sm:text-sm px-2">1. Details</TabsTrigger>
-              <TabsTrigger value="questions" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">2. Objective ({questions.length})</TabsTrigger>
-              <TabsTrigger value="theory" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">3. Theory ({theoryQuestions.length})</TabsTrigger>
-              <TabsTrigger value="preview" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">4. Preview</TabsTrigger>
-              <TabsTrigger value="summary" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">5. Summary</TabsTrigger>
+            <TabsList className="grid w-full min-w-[500px] sm:min-w-0 grid-cols-5">
+              <TabsTrigger value="details" className="text-xs sm:text-sm px-2">Details</TabsTrigger>
+              <TabsTrigger value="questions" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">
+                Objective ({questions.length})
+              </TabsTrigger>
+              <TabsTrigger value="theory" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">
+                Theory ({theoryQuestions.length})
+              </TabsTrigger>
+              <TabsTrigger value="preview" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">
+                Preview
+              </TabsTrigger>
+              <TabsTrigger value="summary" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">
+                Summary
+              </TabsTrigger>
             </TabsList>
           </div>
 
-          {/* Scrollable Content Area */}
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4">
-            {/* DETAILS TAB */}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+            {/* Details Tab */}
             <TabsContent value="details" className="space-y-4 mt-0">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div><Label>Exam Title *</Label><Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" /></div>
-                <div><Label>Class *</Label><Select value={examDetails.class} onValueChange={(v) => setExamDetails({ ...examDetails, class: v, subject: '' })}><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
-                <div><Label>Subject *</Label><Select value={examDetails.subject} onValueChange={(v) => setExamDetails({ ...examDetails, subject: v })} disabled={!examDetails.class}><SelectTrigger><SelectValue placeholder={examDetails.class ? "Select subject" : "Select class first"} /></SelectTrigger><SelectContent>{availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent></Select></div>
-                <div><Label>Duration (minutes) *</Label><Input type="number" min="1" max="240" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} /></div>
-                <div><Label>Pass Mark (%)</Label><Input type="number" min="0" max="100" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} /></div>
+                <div className="sm:col-span-2">
+                  <Label className="text-sm font-medium">Exam Title *</Label>
+                  <Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" className="mt-1.5" />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Class *</Label>
+                  <Select value={examDetails.class} onValueChange={(v) => setExamDetails({ ...examDetails, class: v, subject: '' })}>
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select class" /></SelectTrigger>
+                    <SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Subject *</Label>
+                  <Select value={examDetails.subject} onValueChange={(v) => setExamDetails({ ...examDetails, subject: v })} disabled={!examDetails.class}>
+                    <SelectTrigger className="mt-1.5"><SelectValue placeholder={examDetails.class ? "Select subject" : "Select class first"} /></SelectTrigger>
+                    <SelectContent>{availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Duration (minutes) *</Label>
+                  <Input type="number" min="1" max="240" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} className="mt-1.5" />
+                </div>
+                <div>
+                  <Label className="text-sm font-medium">Pass Mark (%)</Label>
+                  <Input type="number" min="0" max="100" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} className="mt-1.5" />
+                </div>
               </div>
 
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <Label className="mb-2 block">Default Mark per Question (Objective = 20 marks total)</Label>
-                <RadioGroup value={defaultMark.toString()} onValueChange={(v) => { setDefaultMark(parseFloat(v)); setCurrentQuestion({ ...currentQuestion, marks: parseFloat(v) }) }} className="flex flex-col sm:flex-row gap-4 sm:gap-6">
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="1" id="mark1" /><Label htmlFor="mark1">1 Mark (20 questions)</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="0.5" id="mark05" /><Label htmlFor="mark05">0.5 Mark (40 questions)</Label></div>
+              <div className="p-4 bg-muted/30 rounded-lg">
+                <Label className="text-sm font-medium mb-2 block">Default Mark per Objective Question</Label>
+                <RadioGroup value={defaultMark.toString()} onValueChange={(v) => { setDefaultMark(parseFloat(v)); setCurrentQuestion({ ...currentQuestion, marks: parseFloat(v) }) }} className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="1" id="mark1" /><Label htmlFor="mark1">1 Mark each</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="0.5" id="mark05" /><Label htmlFor="mark05">0.5 Mark each</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="2" id="mark2" /><Label htmlFor="mark2">2 Marks each</Label></div>
                 </RadioGroup>
+                <p className="text-xs text-muted-foreground mt-2">
+                  {questions.length} objective questions × {defaultMark} = {questions.length * defaultMark} marks
+                </p>
               </div>
 
-              {/* ANTI-CHEATING SETTINGS */}
               <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-200 space-y-3">
-                <Label className="text-base font-semibold flex items-center gap-2">
-                  <Shuffle className="h-4 w-4 text-blue-600" />
-                  Anti-Cheating Settings
-                </Label>
-                
+                <Label className="text-sm font-semibold flex items-center gap-2"><Shuffle className="h-4 w-4 text-blue-600" /> Anti-Cheating Settings</Label>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <Label>Randomize Question Order</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Each student gets questions in a different random order
-                    </p>
-                  </div>
-                  <Switch
-                    checked={examDetails.randomize_questions}
-                    onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_questions: v })}
-                  />
+                  <div><Label className="text-sm">Randomize Question Order</Label><p className="text-xs text-muted-foreground">Each student gets questions in random order</p></div>
+                  <Switch checked={examDetails.randomize_questions} onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_questions: v })} />
                 </div>
-                
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div>
-                    <Label>Randomize Options (A,B,C,D)</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Shuffles multiple choice options for each student
-                    </p>
-                  </div>
-                  <Switch
-                    checked={examDetails.randomize_options}
-                    onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_options: v })}
-                  />
+                  <div><Label className="text-sm">Randomize Options</Label><p className="text-xs text-muted-foreground">Shuffles A,B,C,D options for each student</p></div>
+                  <Switch checked={examDetails.randomize_options} onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_options: v })} />
                 </div>
-                
-                <Alert className="mt-2 bg-blue-100 border-blue-300">
-                  <Shield className="h-4 w-4 text-blue-600" />
-                  <AlertDescription className="text-blue-700 text-xs">
-                    These settings prevent cheating by ensuring no two students see the exact same exam layout.
-                  </AlertDescription>
-                </Alert>
               </div>
 
-              <div><Label>Instructions (Optional)</Label><Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} placeholder="Enter exam instructions..." rows={3} /></div>
+              <div><Label className="text-sm font-medium">Instructions</Label><Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} placeholder="Enter exam instructions..." rows={3} className="mt-1.5" /></div>
+              
               <div className="flex justify-end">
                 <Button onClick={() => setActiveTab('questions')} disabled={!examDetails.title || !examDetails.class || !examDetails.subject}>Next: Add Questions <ChevronRight className="ml-2 h-4 w-4" /></Button>
               </div>
             </TabsContent>
 
-            {/* OBJECTIVE TAB */}
+            {/* Objective Questions Tab */}
             <TabsContent value="questions" className="space-y-4 mt-0">
-              <div className="flex flex-wrap gap-2 border-b pb-3">
-                <Button variant={uploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('bulk')} className="text-xs sm:text-sm"><Sparkles className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Bulk Paste</Button>
-                <Button variant={uploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('manual')} className="text-xs sm:text-sm"><Plus className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Manual Entry</Button>
+              <div className="flex gap-2 border-b pb-3">
+                <Button variant={uploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('bulk')}><Sparkles className="mr-1 h-3 w-3" />Bulk</Button>
+                <Button variant={uploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('manual')}><Plus className="mr-1 h-3 w-3" />Manual</Button>
               </div>
 
               {uploadMode === 'bulk' ? (
                 <div className="space-y-4">
                   <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                    <span>Upload DOC, DOCX, PDF, TXT or paste questions.</span>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={insertObjectiveExample} className="text-xs"><Wand2 className="mr-1 h-3 w-3" /> Example</Button>
-                      <Button variant="outline" size="sm" onClick={() => downloadTemplate('objective')} className="text-xs"><Download className="mr-1 h-3 w-3" /> Template</Button>
-                    </div>
+                    <span>Upload or paste objective questions</span>
+                    <div className="flex gap-2"><Button variant="outline" size="sm" onClick={insertObjectiveExample}>Example</Button><Button variant="outline" size="sm" onClick={() => downloadTemplate('objective')}>Template</Button></div>
                   </AlertDescription></Alert>
-
-                  <div>
-                    <Label>Upload File</Label>
-                    <input ref={fileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleFileUpload} className="hidden" />
-                    <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-primary/50 transition-colors">
-                      {isParsingFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload</p><p className="text-xs">.doc, .docx, .pdf, .txt</p></>}
-                    </div>
+                  <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary">
+                    {isParsingFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload (.doc, .docx, .pdf, .txt)</p></>}
                   </div>
-
-                  <div>
-                    <Label>Or Paste Questions</Label>
-                    <Textarea value={bulkQuestionsText} onChange={(e) => setBulkQuestionsText(e.target.value)} placeholder="1. Question text\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: 0.5" rows={8} className="font-mono text-xs sm:text-sm" />
-                    <Button onClick={parseBulkQuestions} className="mt-2 w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
-                  </div>
+                  <input ref={fileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleFileUpload} className="hidden" />
+                  <Textarea value={bulkQuestionsText} onChange={(e) => setBulkQuestionsText(e.target.value)} placeholder="1. Question\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: 0.5" rows={8} className="font-mono text-sm" />
+                  <Button onClick={parseBulkQuestions} className="w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
                   {parseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{parseError}</AlertDescription></Alert>}
                 </div>
               ) : (
-                <>
+                <div className="space-y-4">
                   <div className="flex gap-2">
                     <Badge className={cn("cursor-pointer", currentQuestion.type === 'mcq' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'mcq', options: ['', '', '', ''], marks: defaultMark })}>MCQ</Badge>
                     <Badge className={cn("cursor-pointer", currentQuestion.type === 'true_false' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'true_false', options: ['True', 'False'], marks: defaultMark })}>True/False</Badge>
@@ -802,32 +864,26 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
                     <div className="space-y-2">
                       <Label>Options</Label>
                       {currentQuestion.options?.map((option, index) => (
-                        <div key={index} className="flex items-center gap-2">
-                          <span className="w-6">{String.fromCharCode(65 + index)}.</span>
-                          <Input value={option} onChange={(e) => { const newOpts = [...(currentQuestion.options || [])]; newOpts[index] = e.target.value; setCurrentQuestion({ ...currentQuestion, options: newOpts }) }} />
-                        </div>
+                        <div key={index} className="flex items-center gap-2"><span className="w-6">{String.fromCharCode(65 + index)}.</span><Input value={option} onChange={(e) => { const newOpts = [...(currentQuestion.options || [])]; newOpts[index] = e.target.value; setCurrentQuestion({ ...currentQuestion, options: newOpts }) }} /></div>
                       ))}
                     </div>
                   )}
-                  <div>
-                    <Label>Correct Answer</Label>
+                  <div><Label>Correct Answer</Label>
                     {currentQuestion.type === 'mcq' ? (
                       <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
                         <SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger>
                         <SelectContent>{currentQuestion.options?.map((opt, i) => opt ? <SelectItem key={i} value={opt}>{String.fromCharCode(65 + i)}. {opt}</SelectItem> : null)}</SelectContent>
                       </Select>
-                    ) : currentQuestion.type === 'true_false' ? (
+                    ) : (
                       <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
                         <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent><SelectItem value="True">True</SelectItem><SelectItem value="False">False</SelectItem></SelectContent>
                       </Select>
-                    ) : (
-                      <Input value={currentQuestion.correct_answer} onChange={(e) => setCurrentQuestion({ ...currentQuestion, correct_answer: e.target.value })} />
                     )}
                   </div>
                   <div><Label>Marks</Label><Input type="number" step="0.5" min="0.5" value={currentQuestion.marks} onChange={(e) => setCurrentQuestion({ ...currentQuestion, marks: parseFloat(e.target.value) || defaultMark })} /></div>
                   <Button onClick={addQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Question</Button>
-                </>
+                </div>
               )}
 
               {questions.length > 0 && (
@@ -836,8 +892,8 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
                   <div className="max-h-[200px] overflow-y-auto space-y-2">
                     {questions.map((q, i) => (
                       <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
-                        <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs">{q.type} • {q.marks} mark(s)</p></div>
-                        <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)} className="flex-shrink-0 ml-2"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                        <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs text-muted-foreground">{q.marks} mark(s)</p></div>
+                        <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                       </div>
                     ))}
                   </div>
@@ -845,101 +901,84 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
               )}
 
               <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
-                <Button variant="outline" onClick={() => setActiveTab('details')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                <Button onClick={() => setActiveTab('theory')} size="sm">Next: Theory <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                <Button variant="outline" onClick={() => setActiveTab('details')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
+                <Button onClick={() => setActiveTab('theory')}>Next: Theory <ChevronRight className="ml-2 h-4 w-4" /></Button>
               </div>
             </TabsContent>
 
-            {/* THEORY TAB */}
+            {/* Theory Tab */}
             <TabsContent value="theory" className="space-y-4 mt-0">
               {!hasTheory ? (
-                <div className="text-center py-6 sm:py-8 space-y-4">
-                  <Brain className="h-12 sm:h-16 w-12 sm:w-16 mx-auto text-muted-foreground" />
+                <div className="text-center py-8 space-y-4">
+                  <Brain className="h-16 w-16 mx-auto text-muted-foreground" />
                   <div><h3 className="text-lg font-semibold">Theory Questions Disabled</h3><p className="text-sm text-muted-foreground">Enable theory questions to add essay-type questions</p></div>
                   <div className="flex items-center justify-center gap-3 p-4 bg-muted rounded-lg"><span>Include Theory Questions</span><Switch checked={hasTheory} onCheckedChange={setHasTheory} /></div>
-                  <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setActiveTab('questions')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                    <Button onClick={() => setActiveTab('preview')} disabled={questions.length === 0} size="sm">Skip to Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
-                  </div>
+                  <div className="flex justify-between pt-4"><Button variant="outline" onClick={() => setActiveTab('questions')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button><Button onClick={() => setActiveTab('preview')} disabled={questions.length === 0}>Skip to Preview <ChevronRight className="ml-2 h-4 w-4" /></Button></div>
                 </div>
               ) : (
                 <>
-                  <div className="flex flex-wrap gap-2 border-b pb-3">
-                    <Button variant={theoryUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('bulk')} className="text-xs sm:text-sm"><Sparkles className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Bulk Paste</Button>
-                    <Button variant={theoryUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('manual')} className="text-xs sm:text-sm"><Plus className="mr-1 sm:mr-2 h-3 sm:h-4 w-3 sm:w-4" />Manual Entry</Button>
+                  <div className="flex gap-2 border-b pb-3">
+                    <Button variant={theoryUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('bulk')}><Sparkles className="mr-1 h-3 w-3" />Bulk</Button>
+                    <Button variant={theoryUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('manual')}><Plus className="mr-1 h-3 w-3" />Manual</Button>
                   </div>
 
                   {theoryUploadMode === 'bulk' ? (
                     <div className="space-y-4">
                       <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                        <span>Upload DOC, DOCX, PDF, TXT or paste theory questions.</span>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm" onClick={insertTheoryExample} className="text-xs">Example</Button>
-                          <Button variant="outline" size="sm" onClick={() => downloadTemplate('theory')} className="text-xs">Template</Button>
-                        </div>
+                        <span>Upload or paste theory questions</span>
+                        <div className="flex gap-2"><Button variant="outline" size="sm" onClick={insertTheoryExample}>Example</Button><Button variant="outline" size="sm" onClick={() => downloadTemplate('theory')}>Template</Button></div>
                       </AlertDescription></Alert>
-
-                      <div>
-                        <Label>Upload File</Label>
-                        <input ref={theoryFileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleTheoryFileUpload} className="hidden" />
-                        <div onClick={() => theoryFileInputRef.current?.click()} className="border-2 border-dashed border-muted-foreground/25 rounded-lg p-6 sm:p-8 text-center cursor-pointer hover:border-primary/50 transition-colors">
-                          {isParsingTheoryFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload</p><p className="text-xs">.doc, .docx, .pdf, .txt</p></>}
-                        </div>
+                      <div onClick={() => theoryFileInputRef.current?.click()} className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary">
+                        {isParsingTheoryFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload (.doc, .docx, .pdf, .txt)</p></>}
                       </div>
-
-                      <div>
-                        <Label>Paste Theory Questions</Label>
-                        <Textarea value={bulkTheoryText} onChange={(e) => setBulkTheoryText(e.target.value)} placeholder="1. Explain the factors of production.\nMarks: 10" rows={8} className="font-mono text-xs sm:text-sm" />
-                        <Button onClick={parseBulkTheory} className="mt-2 w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
-                      </div>
+                      <input ref={theoryFileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleTheoryFileUpload} className="hidden" />
+                      <Textarea value={bulkTheoryText} onChange={(e) => setBulkTheoryText(e.target.value)} placeholder="1. Explain the importance of education.\nMarks: 10" rows={8} className="font-mono text-sm" />
+                      <Button onClick={parseBulkTheory} className="w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
                       {theoryParseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{theoryParseError}</AlertDescription></Alert>}
                     </div>
                   ) : (
-                    <>
+                    <div className="space-y-4">
                       <div><Label>Theory Question</Label><Textarea value={currentTheoryQuestion.question} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, question: e.target.value })} rows={4} /></div>
                       <div><Label>Marks</Label><Input type="number" min="1" max="100" value={currentTheoryQuestion.marks} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, marks: parseInt(e.target.value) || 5 })} /></div>
                       <Button onClick={addTheoryQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Theory Question</Button>
-                    </>
+                    </div>
                   )}
 
                   {theoryQuestions.length > 0 && (
                     <div className="space-y-2 mt-4">
-                      <Label>Added Theory Questions ({theoryQuestions.length})</Label>
+                      <Label>Theory Questions ({theoryQuestions.length})</Label>
                       <div className="max-h-[200px] overflow-y-auto space-y-2">
                         {theoryQuestions.map((q, i) => (
                           <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
-                            <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs">{q.marks} marks</p></div>
-                            <Button variant="ghost" size="icon" onClick={() => removeTheoryQuestion(q.id)} className="flex-shrink-0 ml-2"><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs text-muted-foreground">{q.marks} marks</p></div>
+                            <Button variant="ghost" size="icon" onClick={() => removeTheoryQuestion(q.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
-                    <Button variant="outline" onClick={() => setActiveTab('questions')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                    <Button onClick={() => setActiveTab('preview')} size="sm">Next: CBT Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                  <div className="flex justify-between pt-4">
+                    <Button variant="outline" onClick={() => setActiveTab('questions')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
+                    <Button onClick={() => setActiveTab('preview')}>Next: Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
                   </div>
                 </>
               )}
             </TabsContent>
 
-            {/* CBT PREVIEW TAB */}
+            {/* Preview Tab */}
             <TabsContent value="preview" className="mt-0">
               <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-lg font-semibold flex items-center gap-2"><MonitorPlay className="h-5 w-5 text-primary" />Student CBT Preview</h3>
-                  <p className="text-sm text-muted-foreground">This is exactly how students will see and take this exam</p>
-                </div>
-                <Button variant="outline" onClick={() => setActiveTab('summary')} size="sm">Next: Summary <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                <div><h3 className="text-lg font-semibold flex items-center gap-2"><MonitorPlay className="h-5 w-5 text-primary" />Student CBT Preview</h3><p className="text-sm text-muted-foreground">How students will see this exam</p></div>
+                <Button variant="outline" onClick={() => setActiveTab('summary')}>Next: Summary <ChevronRight className="ml-2 h-4 w-4" /></Button>
               </div>
               <CBTPreview examDetails={examDetails} questions={questions} theoryQuestions={theoryQuestions} hasTheory={hasTheory} defaultMark={defaultMark} />
             </TabsContent>
 
-            {/* SUMMARY TAB */}
+            {/* Summary Tab */}
             <TabsContent value="summary" className="space-y-4 mt-0">
               <Card>
-                <CardHeader><CardTitle>Exam Summary</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5 text-emerald-600" />Exam Summary</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div><p className="text-sm text-muted-foreground">Title</p><p className="font-medium">{examDetails.title || 'Untitled'}</p></div>
@@ -947,27 +986,52 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
                     <div><p className="text-sm text-muted-foreground">Subject</p><p className="font-medium">{examDetails.subject}</p></div>
                     <div><p className="text-sm text-muted-foreground">Duration</p><p className="font-medium">{examDetails.duration} minutes</p></div>
                     <div><p className="text-sm text-muted-foreground">Pass Mark</p><p className="font-medium">{examDetails.pass_mark}%</p></div>
-                    <div><p className="text-sm text-muted-foreground">Total Marks</p><p className="font-medium">60</p></div>
-                    <div><p className="text-sm text-muted-foreground">Randomize Questions</p><Badge variant={examDetails.randomize_questions ? 'default' : 'outline'}>{examDetails.randomize_questions ? 'Yes' : 'No'}</Badge></div>
-                    <div><p className="text-sm text-muted-foreground">Randomize Options</p><Badge variant={examDetails.randomize_options ? 'default' : 'outline'}>{examDetails.randomize_options ? 'Yes' : 'No'}</Badge></div>
+                    <div className="bg-emerald-50 p-3 rounded-lg"><p className="text-sm text-emerald-700 font-semibold">Total Marks</p><p className="text-2xl font-bold text-emerald-700">{totalMarks}</p></div>
                   </div>
-                  <div className="border-t pt-4"><p className="text-sm text-muted-foreground">Objective Questions</p><p className="font-medium">{questions.length} questions</p></div>
-                  {hasTheory && <div><p className="text-sm text-muted-foreground">Theory Questions</p><p className="font-medium">{theoryQuestions.length} questions</p></div>}
+                  
+                  <div className="border-t pt-4">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm font-medium">Objective Questions</span>
+                      <span className="text-sm font-bold">{questions.length} questions • {totalObjectiveMarks} marks</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: totalMarks > 0 ? (totalObjectiveMarks / totalMarks) * 100 : 0 }} />
+                    </div>
+                  </div>
+                  
+                  {hasTheory && (
+                    <div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-medium">Theory Questions</span>
+                        <span className="text-sm font-bold">{theoryQuestions.length} questions • {totalTheoryMarks} marks</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div className="bg-purple-600 h-2 rounded-full" style={{ width: totalMarks > 0 ? (totalTheoryMarks / totalMarks) * 100 : 0 }} />
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="bg-slate-50 p-4 rounded-lg mt-2">
+                    <h4 className="font-semibold text-sm mb-2">Settings</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <span>Randomize Questions:</span><Badge variant={examDetails.randomize_questions ? 'default' : 'outline'}>{examDetails.randomize_questions ? 'Yes' : 'No'}</Badge>
+                      <span>Randomize Options:</span><Badge variant={examDetails.randomize_options ? 'default' : 'outline'}>{examDetails.randomize_options ? 'Yes' : 'No'}</Badge>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
               <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setActiveTab('preview')} size="sm"><ChevronLeft className="mr-2 h-4 w-4" />Back to Preview</Button>
+                <Button variant="outline" onClick={() => setActiveTab('preview')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
               </div>
             </TabsContent>
           </div>
 
-          {/* Fixed Footer */}
           <DialogFooter className="flex-shrink-0 p-4 sm:p-6 border-t flex flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={() => handleOpenChange(false)} size="sm" className="w-full sm:w-auto">Cancel</Button>
-            <Button variant="outline" onClick={() => handleSubmit(false)} disabled={loading} size="sm" className="w-full sm:w-auto">
+            <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => handleSubmit(false)} disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft
             </Button>
-            <Button onClick={() => handleSubmit(true)} disabled={loading} size="sm" className="w-full sm:w-auto">
+            <Button onClick={() => handleSubmit(true)} disabled={loading} className="bg-emerald-600 hover:bg-emerald-700">
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}Submit for Approval
             </Button>
           </DialogFooter>

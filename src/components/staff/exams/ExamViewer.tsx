@@ -1,169 +1,73 @@
-// components/staff/exams/ExamViewer.tsx - COMPLETELY FIXED
+// components/staff/exams/ExamViewer.tsx - COMPLETE WITH AUTO-CALCULATION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Skeleton } from '@/components/ui/skeleton'
-import { supabase } from '@/lib/supabase'
+import { Progress } from '@/components/ui/progress'
 import { 
-  ArrowLeft, 
-  Edit, 
-  Send, 
-  Clock, 
-  BookOpen, 
-  Award, 
-  Shuffle, 
-  FileText,
-  Brain,
-  CheckCircle,
-  AlertCircle,
-  Eye,
-  Play,
-  Calculator,
-  RefreshCw
+  ArrowLeft, Edit, Send, Calendar, Clock, 
+  BookOpen, Award, CheckCircle, AlertCircle, 
+  Eye, Loader2, Calculator, Shuffle, RotateCcw,
+  Users, FileText, Brain, HelpCircle
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
-import { motion, AnimatePresence } from 'framer-motion'
+import { Skeleton } from '@/components/ui/skeleton'
+import { cn } from '@/lib/utils'
 
-interface ExamViewerProps {
-  examId: string
-  onBack: () => void
-  onEdit: () => void
-  onSubmitForApproval: (id: string) => void
+interface Question {
+  id: string
+  type: string
+  question: string
+  options?: string[]
+  correct_answer?: string
+  marks: number
+  order: number
 }
 
-interface ExamDetails {
+interface Exam {
   id: string
   title: string
   subject: string
   class: string
   duration: number
-  status: string
-  total_questions: number
-  total_marks: number
-  has_theory: boolean
-  created_at: string
-  description: string
-  instructions: string
+  pass_mark: number
   shuffle_questions: boolean
   shuffle_options: boolean
-  pass_mark: number
-  created_by?: string
-  teacher_name?: string
+  has_theory: boolean
+  status: string
+  created_at: string
+  description?: string
+  instructions?: string
+  questions?: Question[]
+  total_questions?: number
+  total_marks?: number
 }
 
-interface Question {
-  id: string
-  question_text: string
-  question_type: string
-  options: string[]
-  correct_answer: string
-  points: number
-  order_number: number
-}
-
-interface TheoryQuestion {
-  id: string
-  question_text: string
-  points: number
-  order_number: number
-}
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'published':
-      return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
-        <CheckCircle className="h-3 w-3 mr-1" /> Published
-      </Badge>
-    case 'pending':
-      return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-0">
-        <Clock className="h-3 w-3 mr-1" /> Pending Approval
-      </Badge>
-    case 'draft':
-      return <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-0">
-        <FileText className="h-3 w-3 mr-1" /> Draft
-      </Badge>
-    default:
-      return <Badge>{status}</Badge>
-  }
-}
-
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('en-NG', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-// Loading Skeleton Component
-function ExamViewerLoading({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <Skeleton className="h-8 w-64" />
-            <Skeleton className="h-4 w-32 mt-2" />
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Skeleton className="h-10 w-20" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-      </div>
-      
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[1, 2, 3, 4].map((i) => (
-          <Skeleton key={i} className="h-24 rounded-xl" />
-        ))}
-      </div>
-      
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-6 w-32" />
-          <Skeleton className="h-4 w-48" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-32 w-full" />
-        </CardContent>
-      </Card>
-    </div>
-  )
+interface ExamViewerProps {
+  examId: string
+  onBack: () => void
+  onEdit: () => void
+  onSubmitForApproval: (id: string) => Promise<void>
 }
 
 export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: ExamViewerProps) {
   const router = useRouter()
-  const [mounted, setMounted] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
-  const [exam, setExam] = useState<ExamDetails | null>(null)
+  const [exam, setExam] = useState<Exam | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
-  const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([])
   const [activeTab, setActiveTab] = useState('overview')
   const [submitting, setSubmitting] = useState(false)
 
-  // Fix hydration: Set mounted on client
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  // Load exam details with real-time updates
   const loadExamDetails = useCallback(async () => {
     if (!examId) return
     
     setLoading(true)
     try {
-      // Load exam details
       const { data: examData, error: examError } = await supabase
         .from('exams')
         .select('*')
@@ -171,99 +75,51 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
         .single()
 
       if (examError) throw examError
-      setExam(examData)
-
-      // Load questions
-      const { data: questionsData, error: questionsError } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('exam_id', examId)
-        .order('order_number', { ascending: true })
-
-      if (questionsError) throw questionsError
-
-      if (questionsData) {
-        const objectiveQuestions = questionsData.filter((q: any) => 
-          !q.question_type || q.question_type === 'objective' || q.question_type === 'mcq'
-        )
-        const theoryOnes = questionsData.filter((q: any) => 
-          q.question_type === 'theory' || q.question_type === 'essay'
-        )
-
-        // Parse options for objective questions
-        const parsedObjective = objectiveQuestions.map((q: any) => {
-          let options = q.options
-          if (typeof options === 'string') {
-            try {
-              options = JSON.parse(options)
-            } catch {
-              options = ['', '', '', '']
-            }
-          }
-          return { ...q, options: options || ['', '', '', ''] }
-        })
-
-        setQuestions(parsedObjective)
-        setTheoryQuestions(theoryOnes)
+      
+      // Extract questions from JSONB
+      let extractedQuestions: Question[] = []
+      if (examData.questions && Array.isArray(examData.questions)) {
+        extractedQuestions = examData.questions.map((q: any, idx: number) => ({
+          id: q.id || crypto.randomUUID(),
+          type: q.type || 'objective',
+          question: q.question || q.question_text,
+          options: q.options,
+          correct_answer: q.correct_answer,
+          marks: q.marks || q.points || 0.5,
+          order: q.order || idx + 1
+        }))
       }
+      
+      setExam(examData)
+      setQuestions(extractedQuestions)
+      
+      // ✅ Auto-calculate totals from JSONB
+      const totalMarks = extractedQuestions.reduce((sum, q) => sum + (q.marks || 0), 0)
+      const totalQCount = extractedQuestions.length
+      
+      console.log('📊 Exam loaded:', { 
+        title: examData.title, 
+        totalQuestions: totalQCount, 
+        totalMarks,
+        questionsCount: extractedQuestions.length 
+      })
+      
     } catch (error) {
       console.error('Error loading exam:', error)
       toast.error('Failed to load exam details')
     } finally {
       setLoading(false)
-      setRefreshing(false)
     }
   }, [examId])
 
-  // Initial load
   useEffect(() => {
-    if (mounted && examId) {
-      loadExamDetails()
-    }
-  }, [mounted, examId, loadExamDetails])
-
-  // Real-time subscription for exam updates
-  useEffect(() => {
-    if (!mounted || !examId) return
-
-    const subscription = supabase
-      .channel(`exam_${examId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'exams',
-          filter: `id=eq.${examId}`
-        },
-        (payload) => {
-          setExam(payload.new as ExamDetails)
-          toast.info('Exam status updated')
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'questions',
-          filter: `exam_id=eq.${examId}`
-        },
-        () => {
-          loadExamDetails()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [mounted, examId, loadExamDetails])
+    loadExamDetails()
+  }, [loadExamDetails])
 
   const handleSubmit = async () => {
     if (!exam) return
     
-    if (questions.length === 0 && theoryQuestions.length === 0) {
+    if (questions.length === 0) {
       toast.error('Cannot submit an exam with no questions')
       return
     }
@@ -272,335 +128,305 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
     try {
       await onSubmitForApproval(examId)
       setExam({ ...exam, status: 'pending' })
+      toast.success('Exam submitted for approval')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleRefresh = () => {
-    setRefreshing(true)
-    loadExamDetails()
-    toast.success('Refreshed exam data')
+  const getStatusBadge = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'published':
+        return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
+          <CheckCircle className="h-3 w-3 mr-1" /> Published
+        </Badge>
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-0">
+          <Clock className="h-3 w-3 mr-1" /> Pending
+        </Badge>
+      case 'draft':
+        return <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-0">
+          <FileText className="h-3 w-3 mr-1" /> Draft
+        </Badge>
+      default:
+        return <Badge variant="outline">{status || 'Draft'}</Badge>
+    }
   }
 
-  const totalQuestions = questions.length + theoryQuestions.length
-  const totalObjectiveMarks = questions.reduce((sum, q) => sum + (q.points || 1), 0)
-  const totalTheoryMarks = theoryQuestions.reduce((sum, q) => sum + (q.points || 5), 0)
-  const totalMarks = totalObjectiveMarks + totalTheoryMarks
-
-  // Don't render until mounted to prevent hydration mismatch
-  if (!mounted) {
-    return <ExamViewerLoading onBack={onBack} />
+  const formatDate = (date: string) => {
+    if (!date) return 'Not set'
+    return new Date(date).toLocaleDateString('en-NG', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    })
   }
+
+  // ✅ Auto-calculate totals from questions array
+  const objectiveQuestions = questions.filter(q => q.type === 'objective' || q.type === 'mcq')
+  const theoryQuestions = questions.filter(q => q.type === 'theory')
+  const objectiveCount = objectiveQuestions.length
+  const theoryCount = theoryQuestions.length
+  const totalQuestions = questions.length
+  const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0)
+  const passPercentage = exam?.pass_mark || 50
+  const pointsNeeded = Math.ceil((passPercentage / 100) * totalMarks)
 
   if (loading) {
-    return <ExamViewerLoading onBack={onBack} />
+    return (
+      <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-8 rounded-full" />
+            <div><Skeleton className="h-6 w-48" /><Skeleton className="h-4 w-32 mt-1" /></div>
+          </div>
+          <div className="flex gap-2"><Skeleton className="h-9 w-20" /><Skeleton className="h-9 w-20" /></div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
+        </div>
+        <Skeleton className="h-96 w-full rounded-xl" />
+      </div>
+    )
   }
 
   if (!exam) {
     return (
-      <motion.div 
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="space-y-6"
-      >
-        <div className="flex items-center gap-3 pt-2">
-          <Button variant="ghost" size="icon" onClick={onBack}>
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <h1 className="text-2xl font-bold">Exam Not Found</h1>
-        </div>
-        <Card>
-          <CardContent className="py-12 text-center">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <p className="text-slate-600 dark:text-slate-400">
-              The exam you're looking for doesn't exist or has been deleted.
-            </p>
-            <Button onClick={onBack} className="mt-4">
-              Go Back
-            </Button>
-          </CardContent>
-        </Card>
-      </motion.div>
+      <div className="text-center py-12">
+        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+        <p className="text-muted-foreground">Exam not found</p>
+        <Button onClick={onBack} className="mt-4">Go Back</Button>
+      </div>
     )
   }
 
   return (
-    <AnimatePresence mode="wait">
-      <motion.div 
-        key="exam-viewer"
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        className="space-y-6"
-      >
-        {/* Header with proper spacing */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pt-2">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={onBack} className="shrink-0">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-            <div className="min-w-0">
-              <div className="flex items-center gap-3 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white truncate">
-                  {exam.title}
-                </h1>
-                {getStatusBadge(exam.status)}
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                {exam.subject} • {exam.class}
-              </p>
+    <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4 sm:space-y-6">
+      
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-base sm:text-lg md:text-xl font-bold">{exam.title}</h1>
+              {getStatusBadge(exam.status)}
             </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-              <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
-              Refresh
-            </Button>
-            {exam.status === 'draft' && (
-              <>
-                <Button variant="outline" onClick={onEdit}>
-                  <Edit className="mr-2 h-4 w-4" /> Edit
-                </Button>
-                <Button 
-                  onClick={handleSubmit} 
-                  disabled={submitting}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  {submitting ? 'Submitting...' : 'Submit for Approval'}
-                </Button>
-              </>
-            )}
-            {exam.status === 'published' && (
-              <Button onClick={() => router.push(`/staff/exams/${examId}/scores`)}>
-                <Calculator className="mr-2 h-4 w-4" />
-                Enter Scores
-              </Button>
-            )}
-            <Button variant="outline" onClick={() => router.push(`/staff/exams/${examId}/preview`)}>
-              <Eye className="mr-2 h-4 w-4" />
-              Preview
-            </Button>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+              {exam.subject} • {exam.class}
+            </p>
           </div>
         </div>
-
-        {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-3">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="objective">Objective ({questions.length})</TabsTrigger>
-            {exam.has_theory && (
-              <TabsTrigger value="theory">Theory ({theoryQuestions.length})</TabsTrigger>
-            )}
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4 mt-6">
-            {/* Stats Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950/30 dark:to-blue-900/30">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center">
-                      <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Total Questions</p>
-                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{totalQuestions}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/30 dark:to-amber-900/30">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-amber-100 dark:bg-amber-900/50 flex items-center justify-center">
-                      <Award className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Total Marks</p>
-                      <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{totalMarks}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950/30 dark:to-green-900/30">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
-                      <Clock className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Duration</p>
-                      <p className="text-2xl font-bold text-green-700 dark:text-green-300">{exam.duration} min</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950/30 dark:to-purple-900/30">
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-900/50 flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">Pass Mark</p>
-                      <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{exam.pass_mark}%</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Details Card */}
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle>Exam Details</CardTitle>
-                <CardDescription>Created on {formatDate(exam.created_at)}</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Subject</p>
-                    <p className="text-slate-600 dark:text-slate-400">{exam.subject || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Class</p>
-                    <p className="text-slate-600 dark:text-slate-400">{exam.class || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Shuffle Questions</p>
-                    <p className="text-slate-600 dark:text-slate-400">
-                      {exam.shuffle_questions ? (
-                        <span className="flex items-center gap-1"><Shuffle className="h-3 w-3" /> Yes</span>
-                      ) : 'No'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">Shuffle Options</p>
-                    <p className="text-slate-600 dark:text-slate-400">
-                      {exam.shuffle_options ? (
-                        <span className="flex items-center gap-1"><Shuffle className="h-3 w-3" /> Yes</span>
-                      ) : 'No'}
-                    </p>
-                  </div>
-                </div>
-                
-                {(exam.description || exam.instructions) && (
-                  <div>
-                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Instructions</p>
-                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
-                      <p className="text-sm text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
-                        {exam.description || exam.instructions || 'No instructions provided.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Objective Questions Tab */}
-          <TabsContent value="objective" className="mt-6">
-            <Card className="border-0 shadow-sm">
-              <CardHeader className="pb-3">
-                <CardTitle>Objective Questions</CardTitle>
-                <CardDescription>
-                  {questions.length} questions • {totalObjectiveMarks} marks total
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {questions.length === 0 ? (
-                  <div className="text-center py-12">
-                    <BookOpen className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                    <p className="text-slate-500">No objective questions yet</p>
-                    <Button variant="link" onClick={onEdit} className="mt-2">
-                      Add questions
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {questions.map((q, idx) => (
-                      <div key={q.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:shadow-sm transition-shadow">
-                        <div className="flex items-start justify-between gap-3">
-                          <p className="font-medium flex-1">
-                            <span className="text-slate-500 mr-2">{idx + 1}.</span>
-                            {q.question_text}
-                          </p>
-                          <Badge variant="outline">{q.points} pts</Badge>
-                        </div>
-                        {q.options && q.options.length > 0 && (
-                          <div className="ml-6 mt-3 space-y-1">
-                            {q.options.map((opt, optIdx) => (
-                              opt && (
-                                <p key={optIdx} className="text-sm">
-                                  <span className="font-medium mr-2">{String.fromCharCode(65 + optIdx)}.</span>
-                                  {opt}
-                                  {String.fromCharCode(65 + optIdx) === q.correct_answer && (
-                                    <Badge className="ml-2 bg-green-100 text-green-700 text-xs border-0">Correct</Badge>
-                                  )}
-                                </p>
-                              )
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Theory Questions Tab */}
-          {exam.has_theory && (
-            <TabsContent value="theory" className="mt-6">
-              <Card className="border-0 shadow-sm">
-                <CardHeader className="pb-3">
-                  <CardTitle>Theory Questions</CardTitle>
-                  <CardDescription>
-                    {theoryQuestions.length} questions • {totalTheoryMarks} marks total
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {theoryQuestions.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Brain className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <p className="text-slate-500">No theory questions yet</p>
-                      <Button variant="link" onClick={onEdit} className="mt-2">
-                        Add theory questions
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {theoryQuestions.map((q, idx) => (
-                        <div key={q.id} className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl hover:shadow-sm transition-shadow">
-                          <div className="flex items-start justify-between gap-3">
-                            <p className="font-medium flex-1">
-                              <span className="text-slate-500 mr-2">{idx + 1}.</span>
-                              {q.question_text}
-                            </p>
-                            <Badge variant="outline">{q.points} pts</Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
+        
+        <div className="flex flex-wrap gap-2">
+          {exam.status === 'draft' && (
+            <>
+              <Button variant="outline" size="sm" onClick={onEdit} className="h-8 sm:h-9 text-xs">
+                <Edit className="h-3.5 w-3.5 mr-1" /> Edit
+              </Button>
+              <Button size="sm" onClick={handleSubmit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs">
+                {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
+                Submit
+              </Button>
+            </>
           )}
-        </Tabs>
-      </motion.div>
-    </AnimatePresence>
-  )
-}
+          {exam.status === 'published' && (
+            <Button size="sm" onClick={() => router.push(`/staff/exams/${examId}/scores`)} className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs">
+              <Calculator className="h-3.5 w-3.5 mr-1" /> Enter Scores
+            </Button>
+          )}
+          <Button variant="outline" size="sm" onClick={() => router.push(`/staff/exams/${examId}/preview`)} className="h-8 sm:h-9 text-xs">
+            <Eye className="h-3.5 w-3.5 mr-1" /> Preview
+          </Button>
+        </div>
+      </div>
 
-// Helper function for className merging
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ')
+      {/* Stats Cards - Auto-calculated */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+        <Card>
+          <CardContent className="p-2.5 sm:p-3 text-center">
+            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mx-auto mb-1" />
+            <p className="text-base sm:text-lg font-bold">{totalQuestions}</p>
+            <p className="text-[9px] sm:text-xs text-muted-foreground">Total Questions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-2.5 sm:p-3 text-center">
+            <Award className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mx-auto mb-1" />
+            <p className="text-base sm:text-lg font-bold">{totalMarks}</p>
+            <p className="text-[9px] sm:text-xs text-muted-foreground">Total Marks</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-2.5 sm:p-3 text-center">
+            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 mx-auto mb-1" />
+            <p className="text-base sm:text-lg font-bold">{exam.duration}</p>
+            <p className="text-[9px] sm:text-xs text-muted-foreground">Minutes</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-2.5 sm:p-3 text-center">
+            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 mx-auto mb-1" />
+            <p className="text-base sm:text-lg font-bold">{exam.pass_mark}%</p>
+            <p className="text-[9px] sm:text-xs text-muted-foreground">Pass Mark</p>
+          </CardContent>
+        </Card>
+        <Card className="col-span-2 sm:col-span-1">
+          <CardContent className="p-2.5 sm:p-3">
+            <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5">Points Needed</p>
+            <Progress value={passPercentage} className="h-1.5 sm:h-2 mb-1" />
+            <p className="text-xs font-medium">Need {pointsNeeded}/{totalMarks} points</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Question Breakdown */}
+      <div className="flex flex-wrap gap-2">
+        <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1.5">
+          <span className="text-[10px] sm:text-xs">
+            📝 Objective: {objectiveCount} questions • {objectiveQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
+            {objectiveCount > 0 && ` (${(objectiveQuestions.reduce((sum, q) => sum + q.marks, 0) / objectiveCount).toFixed(1)} pts avg)`}
+          </span>
+        </div>
+        {theoryCount > 0 && (
+          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] sm:text-xs">
+              ✍️ Theory: {theoryCount} questions • {theoryQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
+              {theoryCount > 0 && ` (${(theoryQuestions.reduce((sum, q) => sum + q.marks, 0) / theoryCount).toFixed(1)} pts avg)`}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full max-w-[280px] sm:max-w-md grid-cols-2 h-auto p-1">
+          <TabsTrigger value="overview" className="text-xs sm:text-sm py-1.5">Overview</TabsTrigger>
+          <TabsTrigger value="questions" className="text-xs sm:text-sm py-1.5">
+            Questions ({totalQuestions})
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Overview Tab */}
+        <TabsContent value="overview" className="space-y-4 mt-4">
+          <Card>
+            <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
+              <CardTitle className="text-base sm:text-lg">Exam Details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 px-3 sm:px-5 pb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div><p className="text-[10px] text-muted-foreground">Created</p><p className="text-xs">{formatDate(exam.created_at)}</p></div>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div><p className="text-[10px] text-muted-foreground">Subject</p><p className="text-xs">{exam.subject}</p></div>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div><p className="text-[10px] text-muted-foreground">Class</p><p className="text-xs">{exam.class}</p></div>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                  <Shuffle className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div><p className="text-[10px] text-muted-foreground">Shuffle Questions</p><p className="text-xs">{exam.shuffle_questions ? 'Yes' : 'No'}</p></div>
+                </div>
+                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
+                  <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+                  <div><p className="text-[10px] text-muted-foreground">Shuffle Options</p><p className="text-xs">{exam.shuffle_options ? 'Yes' : 'No'}</p></div>
+                </div>
+              </div>
+              
+              {exam.instructions && (
+                <div className="mt-2 p-3 bg-slate-50 rounded-lg">
+                  <p className="text-[10px] text-muted-foreground mb-1">Instructions</p>
+                  <p className="text-xs">{exam.instructions}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Questions Tab */}
+        <TabsContent value="questions" className="mt-4 space-y-4">
+          {/* Objective Questions */}
+          {objectiveQuestions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <CardTitle className="text-sm sm:text-base">Objective Questions</CardTitle>
+                  <Badge variant="outline" className="text-[10px] sm:text-xs">
+                    {objectiveQuestions.reduce((sum, q) => sum + q.marks, 0)} total marks
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-5 pb-4 space-y-3">
+                {objectiveQuestions.map((q, idx) => (
+                  <div key={q.id} className="p-3 bg-slate-50 rounded-lg">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-xs sm:text-sm font-medium flex-1">
+                        {idx + 1}. {q.question}
+                      </p>
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {q.marks} pt{q.marks !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                    {q.options && q.options.length > 0 && (
+                      <div className="mt-2 space-y-1 pl-2">
+                        {q.options.map((opt, optIdx) => (
+                          <p key={optIdx} className="text-[11px] sm:text-xs">
+                            {String.fromCharCode(65 + optIdx)}. {opt}
+                            {opt === q.correct_answer && <CheckCircle className="h-3 w-3 text-green-600 inline ml-1" />}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Theory Questions */}
+          {theoryQuestions.length > 0 && (
+            <Card>
+              <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
+                <div className="flex justify-between items-center flex-wrap gap-2">
+                  <CardTitle className="text-sm sm:text-base">Theory Questions</CardTitle>
+                  <Badge variant="outline" className="text-[10px] sm:text-xs">
+                    {theoryQuestions.reduce((sum, q) => sum + q.marks, 0)} total marks
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-5 pb-4 space-y-3">
+                {theoryQuestions.map((q, idx) => (
+                  <div key={q.id} className="p-3 bg-slate-50 rounded-lg">
+                    <div className="flex justify-between items-start gap-2">
+                      <p className="text-xs sm:text-sm font-medium flex-1">
+                        {idx + 1}. {q.question}
+                      </p>
+                      <Badge variant="outline" className="text-[10px] shrink-0">
+                        {q.marks} pt{q.marks !== 1 ? 's' : ''}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          )}
+
+          {totalQuestions === 0 && (
+            <div className="text-center py-8">
+              <HelpCircle className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">No questions added to this exam yet</p>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
 }
