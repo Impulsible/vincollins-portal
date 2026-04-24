@@ -148,10 +148,8 @@ export default function StudentClassmatesPage() {
                 <StudentClassRoster 
                   studentClass={profile?.class}
                   studentId={profile?.id}
-                  showHeader={true}
-                  title={`Classmates (${profile?.class})`}
+                  compact={false}
                   onClassmateClick={(classmate) => {
-                    // Optional: Handle click to view classmate profile
                     console.log('Clicked classmate:', classmate)
                   }}
                 />
