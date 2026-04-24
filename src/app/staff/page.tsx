@@ -1,7 +1,7 @@
-// app/staff/page.tsx - FULLY RESPONSIVE ALL SCREENS, PROPER MOBILE SPACING
+// app/staff/page.tsx - PRODUCTION STAFF DASHBOARD
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import StaffWelcomeBanner from '@/components/staff/StaffWelcomeBanner'
@@ -12,46 +12,106 @@ import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import { 
   MonitorPlay, FileText, BookOpen, Users, ArrowRight, 
-  Loader2, CheckCircle2, Calculator, Plus,
-  GraduationCap, FileCheck, Briefcase, Eye
+  Loader2, Calculator, Plus,
+  GraduationCap, FileCheck, Briefcase
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 
 // ============================================
-// LOADING COMPONENT
+// TYPES
 // ============================================
-function StaffDashboardLoading() {
+interface DashboardStats {
+  totalStudents: number
+  activeStudents: number
+  activeClasses: number
+  pendingCAScores: number
+  publishedExams: number
+  totalExams: number
+  totalAssignments: number
+  totalNotes: number
+  reportCardsGenerated: number
+  averagePerformance: number
+  classBreakdown: { name: string; count: number }[]
+}
+
+interface TermInfo {
+  termName: string
+  sessionYear: string
+  currentWeek: number
+  totalWeeks: number
+  weekProgress: number
+  displayWeek: string
+}
+
+// ============================================
+// CONSTANTS
+// ============================================
+const TERM_START = new Date('2026-05-04')
+const TERM_END = new Date('2026-08-01')
+const TOTAL_WEEKS = 13
+
+const DEFAULT_STATS: DashboardStats = {
+  totalStudents: 0,
+  activeStudents: 0,
+  activeClasses: 0,
+  pendingCAScores: 0,
+  publishedExams: 0,
+  totalExams: 0,
+  totalAssignments: 0,
+  totalNotes: 0,
+  reportCardsGenerated: 0,
+  averagePerformance: 0,
+  classBreakdown: []
+}
+
+// ============================================
+// LOADING SKELETON
+// ============================================
+function DashboardSkeleton() {
   return (
-    <div className="min-h-[60vh] flex items-center justify-center px-4">
-      <div className="text-center w-full max-w-sm">
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="text-center space-y-3 sm:space-y-4">
         <motion.div 
           animate={{ rotate: 360 }} 
           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           className="mx-auto w-fit"
         >
-          <Briefcase className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 text-emerald-600" />
+          <Briefcase className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 text-emerald-600/80" />
         </motion.div>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-3 sm:mt-4 text-slate-600 dark:text-slate-400 text-sm sm:text-base font-medium"
-        >
+        <p className="text-sm sm:text-base text-muted-foreground font-medium">
           Loading Dashboard...
-        </motion.p>
-        <div className="flex justify-center gap-1.5 mt-3 sm:mt-4">
+        </p>
+        <div className="flex justify-center gap-1.5">
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-400"
+              className="h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-emerald-400/80"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+// ============================================
+// EMPTY STATE
+// ============================================
+function EmptyState({ 
+  icon: Icon, 
+  title
+}: { 
+  icon: any
+  title: string
+}) {
+  return (
+    <div className="text-center py-6 sm:py-8">
+      <Icon className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/30 mx-auto mb-2" />
+      <p className="text-xs sm:text-sm text-muted-foreground">{title}</p>
     </div>
   )
 }
@@ -68,190 +128,150 @@ function StaffDashboardContent() {
   const [notes, setNotes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  
-  const [stats, setStats] = useState({
-    totalStudents: 0,
-    activeStudents: 0,
-    activeClasses: 0,
-    pendingCAScores: 0,
-    publishedExams: 0,
-    totalExams: 0,
-    totalAssignments: 0,
-    totalNotes: 0,
-    reportCardsGenerated: 0,
-    averagePerformance: 0,
-    classBreakdown: [] as { name: string; count: number }[]
-  })
-
-  const [termInfo, setTermInfo] = useState({
+  const [stats, setStats] = useState<DashboardStats>(DEFAULT_STATS)
+  const [termInfo, setTermInfo] = useState<TermInfo>({
     termName: 'Third Term',
     sessionYear: '2025/2026',
     currentWeek: 0,
-    totalWeeks: 13,
+    totalWeeks: TOTAL_WEEKS,
     weekProgress: 0,
-    startDate: '2026-05-04',
-    endDate: '2026-08-01',
     displayWeek: 'Starts May 4'
   })
 
-  useEffect(() => {
-    checkAuth()
+  // Calculate term week
+  const calculateTermWeek = useCallback(() => {
+    const now = new Date()
+    
+    if (now < TERM_START) return { week: 0, progress: 0, display: 'Starts May 4' }
+    if (now > TERM_END) return { week: TOTAL_WEEKS, progress: 100, display: 'Term Ended' }
+
+    const elapsed = now.getTime() - TERM_START.getTime()
+    const weekMs = 7 * 24 * 60 * 60 * 1000
+    const week = Math.min(Math.floor(elapsed / weekMs) + 1, TOTAL_WEEKS)
+    
+    return {
+      week,
+      progress: (week / TOTAL_WEEKS) * 100,
+      display: `Week ${week}/${TOTAL_WEEKS}`
+    }
   }, [])
 
-  const checkAuth = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.replace('/portal')
-        return
-      }
-      
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-      
-      if (profileData) {
-        if (profileData.role !== 'staff' && profileData.role !== 'admin' && profileData.role !== 'teacher') {
-          toast.error('Access denied. Staff only.')
+  // Auth check and data loading
+  useEffect(() => {
+    const initialize = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session) {
           router.replace('/portal')
           return
         }
+        
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+        
+        if (!profileData || !['staff', 'admin', 'teacher'].includes(profileData.role)) {
+          toast.error('Access denied')
+          router.replace('/portal')
+          return
+        }
+
         setProfile(profileData)
-        await loadAllData(profileData.id)
-        loadTermInfo()
+        
+        const { week, progress, display } = calculateTermWeek()
+        setTermInfo(prev => ({ ...prev, currentWeek: week, weekProgress: progress, displayWeek: display }))
+
+        await loadDashboardData(profileData.id)
+      } catch (error) {
+        console.error('Init error:', error)
+        router.replace('/portal')
+      } finally {
+        setLoading(false)
       }
-    } catch (error) {
-      console.error('Auth error:', error)
-      router.replace('/portal')
-    } finally {
-      setLoading(false)
     }
-  }
 
-  const loadTermInfo = () => {
+    initialize()
+  }, [router, calculateTermWeek])
+
+  const loadDashboardData = async (userId: string) => {
     try {
-      const TERM_START_DATE = new Date('2026-05-04')
-      const TERM_END_DATE = new Date('2026-08-01')
-      const today = new Date()
-      const totalWeeks = 13
-      
-      let currentWeek: number, weekProgress: number, displayWeek: string
-      
-      if (today < TERM_START_DATE) {
-        currentWeek = 0
-        weekProgress = 0
-        displayWeek = 'Starts May 4'
-      } else if (today > TERM_END_DATE) {
-        currentWeek = totalWeeks
-        weekProgress = 100
-        displayWeek = 'Term Ended'
-      } else {
-        const msPerWeek = 7 * 24 * 60 * 60 * 1000
-        const weeksPassed = Math.floor((today.getTime() - TERM_START_DATE.getTime()) / msPerWeek) + 1
-        currentWeek = Math.min(Math.max(1, weeksPassed), totalWeeks)
-        weekProgress = (currentWeek / totalWeeks) * 100
-        displayWeek = `Week ${currentWeek}/${totalWeeks}`
-      }
-
-      setTermInfo({
-        termName: 'Third Term',
-        sessionYear: '2025/2026',
-        currentWeek: currentWeek,
-        totalWeeks: totalWeeks,
-        weekProgress: weekProgress,
-        startDate: TERM_START_DATE.toISOString(),
-        endDate: TERM_END_DATE.toISOString(),
-        displayWeek: displayWeek
-      })
-
-    } catch (error) {
-      console.error('Error loading term info:', error)
-    }
-  }
-
-  const loadAllData = async (userId: string) => {
-    try {
-      const [examsRes, assignmentsRes, notesRes, studentsRes, pendingCARes, classScoresRes] = await Promise.all([
+      const [
+        { data: examsData },
+        { data: assignmentsData },
+        { data: notesData },
+        { data: studentsData },
+        { count: pendingCA },
+        { data: scoresData }
+      ] = await Promise.all([
         supabase.from('exams').select('*').eq('created_by', userId).order('created_at', { ascending: false }),
         supabase.from('assignments').select('*').eq('created_by', userId).order('created_at', { ascending: false }).limit(5),
         supabase.from('notes').select('*').eq('created_by', userId).order('created_at', { ascending: false }).limit(4),
         supabase.from('profiles').select('*').eq('role', 'student'),
         supabase.from('ca_scores').select('*', { count: 'exact', head: true }).eq('teacher_id', userId).eq('status', 'pending'),
-        supabase.from('ca_scores').select('total_score, student_id')
+        supabase.from('ca_scores').select('total_score')
       ])
-      
-      const examsData = examsRes.data || []
-      const studentsData = studentsRes.data || []
-      
-      setExams(examsData)
-      setAssignments(assignmentsRes.data || [])
-      setNotes(notesRes.data || [])
-      
-      const publishedExams = examsData.filter(e => e.status === 'published').length
-      
+
+      const exams = examsData || []
+      const assignments = assignmentsData || []
+      const notes = notesData || []
+      const students = studentsData || []
+      const scores = scoresData || []
+
+      setExams(exams)
+      setAssignments(assignments)
+      setNotes(notes)
+
+      // Calculate class breakdown
       const classMap = new Map<string, number>()
-      studentsData.forEach((student: any) => {
-        if (student.class) {
-          classMap.set(student.class, (classMap.get(student.class) || 0) + 1)
-        }
+      students.forEach((s: any) => {
+        if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1)
       })
-      
-      const classBreakdown = Array.from(classMap.entries())
+
+      const breakdown = Array.from(classMap.entries())
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count)
-      
-      const activeClasses = classMap.size
-      const activeStudents = studentsData.filter(s => s.is_active !== false).length
-      
-      const scoresData = classScoresRes.data || []
-      const averagePerformance = scoresData.length > 0
-        ? Math.round(scoresData.reduce((sum, s) => sum + (s.total_score || 0), 0) / scoresData.length)
+
+      // Calculate average performance
+      const avgPerf = scores.length > 0
+        ? Math.round(scores.reduce((sum, s) => sum + (s.total_score || 0), 0) / scores.length)
         : 0
-      
+
       setStats({
-        totalStudents: studentsData.length,
-        activeStudents: activeStudents,
-        activeClasses: activeClasses,
-        pendingCAScores: pendingCARes.count || 0,
-        publishedExams: publishedExams,
-        totalExams: examsData.length,
-        totalAssignments: (assignmentsRes.data || []).length,
-        totalNotes: (notesRes.data || []).length,
+        totalStudents: students.length,
+        activeStudents: students.filter(s => s.is_active !== false).length,
+        activeClasses: classMap.size,
+        pendingCAScores: pendingCA || 0,
+        publishedExams: exams.filter(e => e.status === 'published').length,
+        totalExams: exams.length,
+        totalAssignments: assignments.length,
+        totalNotes: notes.length,
         reportCardsGenerated: 0,
-        averagePerformance: averagePerformance,
-        classBreakdown: classBreakdown
+        averagePerformance: avgPerf,
+        classBreakdown: breakdown
       })
-      
+
     } catch (error) {
-      console.error('Error loading data:', error)
-      toast.error('Failed to load dashboard data')
+      console.error('Data load error:', error)
+      toast.error('Failed to load dashboard')
     }
   }
 
   const handleRefresh = async () => {
     setRefreshing(true)
-    if (profile?.id) {
-      await loadAllData(profile.id)
-    }
+    if (profile?.id) await loadDashboardData(profile.id)
     toast.success('Dashboard refreshed')
     setRefreshing(false)
   }
 
-  const handleExamClick = (examId: string) => {
-    router.push(`/staff/exams/${examId}`)
-  }
-
-  if (loading) {
-    return <StaffDashboardLoading />
-  }
+  if (loading) return <DashboardSkeleton />
 
   return (
-    <div className="w-full min-h-screen overflow-x-hidden bg-slate-50/50 dark:bg-slate-950/50">
-      
-      {/* BANNER - Full width, close to header */}
-      <div className="w-full px-0.5 sm:px-1 pt-0.5 sm:pt-1">
+    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950/50">
+      {/* Banner Section */}
+      <div className="px-1 pt-1 sm:px-2 sm:pt-2">
         <StaffWelcomeBanner 
           profile={profile} 
           stats={{
@@ -269,86 +289,78 @@ function StaffDashboardContent() {
         />
       </div>
 
-      {/* CONTENT AREA */}
-      <div className="w-full max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pb-20 sm:pb-8">
-        <div className="space-y-3 sm:space-y-4 md:space-y-5 mt-3 sm:mt-4 md:mt-5">
+      {/* Main Content */}
+      <div className="max-w-[1800px] mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pb-16 sm:pb-8">
+        <div className="space-y-4 sm:space-y-5 mt-3 sm:mt-4">
           
-          {/* ACTION BUTTONS - 2x2 on mobile, 4 across on sm+ */}
+          {/* Quick Actions Bar */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <Button 
-              onClick={() => router.push('/staff/exams')} 
-              className="bg-emerald-600 hover:bg-emerald-700 h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+              onClick={() => router.push('/staff/exams')}
+              className="h-9 sm:h-10 text-[11px] sm:text-xs md:text-sm bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
               Create Exam
             </Button>
             <Button 
-              onClick={() => router.push('/staff/assignments/create')} 
-              variant="outline" 
-              className="h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+              onClick={() => router.push('/staff/assignments/create')}
+              variant="outline"
+              className="h-9 sm:h-10 text-[11px] sm:text-xs md:text-sm"
             >
               <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
-              New Assignment
+              Assignment
             </Button>
             <Button 
-              onClick={() => router.push('/staff/notes/create')} 
-              variant="outline" 
-              className="h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+              onClick={() => router.push('/staff/notes/create')}
+              variant="outline"
+              className="h-9 sm:h-10 text-[11px] sm:text-xs md:text-sm"
             >
               <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
               Add Notes
             </Button>
             <Button 
-              onClick={handleRefresh} 
-              variant="outline" 
-              className="h-9 sm:h-10 w-full text-[11px] sm:text-xs md:text-sm"
+              onClick={handleRefresh}
+              variant="outline"
+              className="h-9 sm:h-10 text-[11px] sm:text-xs md:text-sm"
               disabled={refreshing}
             >
               <Loader2 className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5", refreshing && "animate-spin")} />
-              Refresh
+              {refreshing ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
-          
-          {/* MAIN CONTENT - Stack on mobile, side by side on lg+ */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
+
+          {/* Dashboard Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
             
-            {/* LEFT COLUMN */}
-            <div className="lg:col-span-2 space-y-3 sm:space-y-4 md:space-y-5">
+            {/* Main Content - 2 columns */}
+            <div className="lg:col-span-2 space-y-4 sm:space-y-5">
               
               {/* Recent Exams */}
               <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                <CardHeader className="flex-row items-center justify-between p-3 sm:p-4 md:p-5 pb-2 sm:pb-3">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
                     <MonitorPlay className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
                     <span className="truncate">Recent Exams</span>
                   </CardTitle>
-                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 flex-shrink-0">
-                    <Link href="/staff/exams" className="flex items-center">
+                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs h-7 sm:h-8">
+                    <Link href="/staff/exams">
                       View All <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
+                <CardContent className="p-3 sm:p-4 md:p-5 pt-0 sm:pt-1">
                   {exams.length === 0 ? (
-                    <div className="text-center py-6 sm:py-8">
-                      <MonitorPlay className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-muted-foreground text-xs sm:text-sm">No exams created yet</p>
-                      <Button 
-                        variant="link" 
-                        size="sm" 
-                        className="mt-2 text-xs text-emerald-600"
-                        onClick={() => router.push('/staff/exams')}
-                      >
-                        Create your first exam
-                      </Button>
-                    </div>
+                    <EmptyState 
+                      icon={MonitorPlay} 
+                      title="No exams created yet"
+                    />
                   ) : (
                     <div className="space-y-1.5 sm:space-y-2">
-                      {exams.slice(0, 5).map((exam: any) => (
+                      {exams.slice(0, 5).map((exam) => (
                         <div 
                           key={exam.id} 
-                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2 p-2 sm:p-2.5 md:p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/80 transition-colors active:scale-[0.98]"
-                          onClick={() => handleExamClick(exam.id)}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-2 sm:p-2.5 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted/80 transition-colors active:scale-[0.98]"
+                          onClick={() => router.push(`/staff/exams/${exam.id}`)}
                         >
                           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
                             <div className="p-1 sm:p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded-md flex-shrink-0">
@@ -379,29 +391,26 @@ function StaffDashboardContent() {
 
               {/* Recent Assignments */}
               <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                <CardHeader className="flex-row items-center justify-between p-3 sm:p-4 md:p-5 pb-2 sm:pb-3">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
                     <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 flex-shrink-0" />
                     <span className="truncate">Recent Assignments</span>
                   </CardTitle>
-                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 flex-shrink-0">
-                    <Link href="/staff/assignments" className="flex items-center">
+                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs h-7 sm:h-8">
+                    <Link href="/staff/assignments">
                       View All <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
+                <CardContent className="p-3 sm:p-4 md:p-5 pt-0 sm:pt-1">
                   {assignments.length === 0 ? (
-                    <div className="text-center py-4 sm:py-6">
-                      <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-muted-foreground text-xs sm:text-sm">No assignments yet</p>
-                    </div>
+                    <EmptyState icon={FileText} title="No assignments yet" />
                   ) : (
                     <div className="space-y-1.5 sm:space-y-2">
-                      {assignments.map((assignment: any) => (
+                      {assignments.map((assignment) => (
                         <div 
                           key={assignment.id} 
-                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 md:p-3 bg-muted/50 rounded-lg hover:bg-muted/80 transition-colors"
+                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-muted/50 rounded-lg"
                         >
                           <div className="p-1 sm:p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-md flex-shrink-0">
                             <FileText className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
@@ -420,34 +429,31 @@ function StaffDashboardContent() {
               </Card>
             </div>
 
-            {/* RIGHT COLUMN */}
-            <div className="space-y-3 sm:space-y-4 md:space-y-5">
+            {/* Sidebar - 1 column */}
+            <div className="space-y-4 sm:space-y-5">
               
               {/* Recent Notes */}
               <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
-                <CardHeader className="flex flex-row items-center justify-between pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                <CardHeader className="flex-row items-center justify-between p-3 sm:p-4 pb-2 sm:pb-3">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
                     <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
                     <span className="truncate">Recent Notes</span>
                   </CardTitle>
-                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs md:text-sm h-7 sm:h-8 flex-shrink-0">
-                    <Link href="/staff/notes" className="flex items-center">
+                  <Button variant="ghost" size="sm" asChild className="text-[10px] sm:text-xs h-7 sm:h-8">
+                    <Link href="/staff/notes">
                       View All <ArrowRight className="ml-1 h-3 w-3" />
                     </Link>
                   </Button>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
+                <CardContent className="p-3 sm:p-4 pt-0 sm:pt-1">
                   {notes.length === 0 ? (
-                    <div className="text-center py-4">
-                      <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground/30 mx-auto mb-2" />
-                      <p className="text-muted-foreground text-xs sm:text-sm">No notes yet</p>
-                    </div>
+                    <EmptyState icon={BookOpen} title="No notes yet" />
                   ) : (
-                    <div className="space-y-1.5 max-h-[180px] sm:max-h-[220px] md:max-h-[250px] overflow-y-auto">
-                      {notes.map((note: any) => (
+                    <div className="space-y-1.5 max-h-[200px] sm:max-h-[240px] md:max-h-[280px] overflow-y-auto">
+                      {notes.map((note) => (
                         <div 
                           key={note.id} 
-                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-muted/50 rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
+                          className="flex items-center gap-2 sm:gap-3 p-2 sm:p-2.5 bg-muted/50 rounded-lg"
                         >
                           <div className="p-1 sm:p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-md flex-shrink-0">
                             <BookOpen className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />
@@ -467,33 +473,36 @@ function StaffDashboardContent() {
 
               {/* Class Overview */}
               <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
-                <CardHeader className="pb-2 px-3 sm:px-4 md:px-5 pt-3 sm:pt-4 md:pt-5">
-                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-1.5 sm:gap-2">
+                <CardHeader className="p-3 sm:p-4 pb-2">
+                  <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
                     <GraduationCap className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 flex-shrink-0" />
                     <span className="truncate">Class Overview</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-3 sm:px-4 md:px-5 pb-3 sm:pb-4 md:pb-5">
+                <CardContent className="p-3 sm:p-4 pt-0">
                   <div className="space-y-2 sm:space-y-3">
-                    <div className="flex items-center justify-between p-2 bg-muted/40 rounded-lg">
-                      <span className="text-xs sm:text-sm text-muted-foreground">Total Students</span>
-                      <span className="font-bold text-sm sm:text-base">{stats.totalStudents}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-muted/40 rounded-lg">
-                      <span className="text-xs sm:text-sm text-muted-foreground">Active Classes</span>
-                      <span className="font-bold text-sm sm:text-base">{stats.activeClasses}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-2 bg-muted/40 rounded-lg">
-                      <span className="text-xs sm:text-sm text-muted-foreground">Active Students</span>
-                      <span className="font-bold text-sm sm:text-base text-emerald-600 dark:text-emerald-400">{stats.activeStudents}</span>
-                    </div>
+                    {[
+                      { label: 'Total Students', value: stats.totalStudents },
+                      { label: 'Active Classes', value: stats.activeClasses },
+                      { label: 'Active Students', value: stats.activeStudents, highlight: true }
+                    ].map((item, i) => (
+                      <div key={i} className="flex justify-between items-center p-2 bg-muted/40 rounded-lg">
+                        <span className="text-xs sm:text-sm text-muted-foreground">{item.label}</span>
+                        <span className={cn(
+                          "font-bold text-sm sm:text-base",
+                          item.highlight && "text-emerald-600 dark:text-emerald-400"
+                        )}>
+                          {item.value}
+                        </span>
+                      </div>
+                    ))}
                     
                     {stats.classBreakdown.length > 0 && (
                       <div className="pt-2 border-t">
-                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">Students per Class</p>
-                        <div className="space-y-1 max-h-[120px] sm:max-h-[150px] overflow-y-auto">
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">By Class</p>
+                        <div className="space-y-1 max-h-[120px] overflow-y-auto">
                           {stats.classBreakdown.slice(0, 5).map((cls) => (
-                            <div key={cls.name} className="flex items-center justify-between px-2 py-1 rounded-md hover:bg-muted/40">
+                            <div key={cls.name} className="flex justify-between items-center px-2 py-1 rounded-md hover:bg-muted/40">
                               <span className="text-xs sm:text-sm truncate mr-2">{cls.name}</span>
                               <Badge variant="outline" className="text-[10px] sm:text-xs flex-shrink-0">{cls.count}</Badge>
                             </div>
@@ -502,8 +511,8 @@ function StaffDashboardContent() {
                       </div>
                     )}
                     
-                    <div className="pt-1">
-                      <div className="flex items-center justify-between mb-1">
+                    <div>
+                      <div className="flex justify-between items-center mb-1">
                         <span className="text-[10px] sm:text-xs text-muted-foreground">Avg Performance</span>
                         <span className="text-[10px] sm:text-xs font-medium">{stats.averagePerformance}%</span>
                       </div>
@@ -526,14 +535,14 @@ function StaffDashboardContent() {
               {/* Quick Actions */}
               <Card className="shadow-sm border-slate-200/60 dark:border-slate-700/30">
                 <CardContent className="p-3 sm:p-4">
-                  <h3 className="text-xs sm:text-sm font-semibold mb-2 sm:mb-3 flex items-center gap-1.5 sm:gap-2">
-                    <Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600 dark:text-slate-400 flex-shrink-0" />
+                  <h3 className="text-xs sm:text-sm font-semibold mb-2 sm:mb-3 flex items-center gap-2">
+                    <Briefcase className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
                     Quick Actions
                   </h3>
                   <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    <Button 
-                      variant="outline" 
-                      className="h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-1.5 text-xs sm:text-sm hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
+                    <Button
+                      variant="outline"
+                      className="h-auto py-3 flex-col gap-1 text-xs hover:border-amber-300 dark:hover:border-amber-700 transition-colors"
                       onClick={() => router.push('/staff/ca-scores')}
                     >
                       <Calculator className="h-5 w-5 sm:h-6 sm:w-6 text-amber-600 dark:text-amber-400" />
@@ -542,9 +551,9 @@ function StaffDashboardContent() {
                         {stats.pendingCAScores} pending
                       </span>
                     </Button>
-                    <Button 
-                      variant="outline" 
-                      className="h-auto py-3 sm:py-4 flex-col gap-1 sm:gap-1.5 text-xs sm:text-sm hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                    <Button
+                      variant="outline"
+                      className="h-auto py-3 flex-col gap-1 text-xs hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
                       onClick={() => router.push('/staff/report-cards')}
                     >
                       <FileCheck className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
@@ -563,11 +572,11 @@ function StaffDashboardContent() {
 }
 
 // ============================================
-// MAIN EXPORT
+// PAGE EXPORT
 // ============================================
 export default function StaffDashboardPage() {
   return (
-    <Suspense fallback={<StaffDashboardLoading />}>
+    <Suspense fallback={<DashboardSkeleton />}>
       <StaffDashboardContent />
     </Suspense>
   )
