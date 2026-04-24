@@ -1,223 +1,262 @@
-// components/student/ClassmatesTab.tsx - Add supabase import
+// app/student/page.tsx - SIMPLIFIED VERSION
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'  // ← ADD THIS IMPORT
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Input } from '@/components/ui/input'
-import { 
-  Users, Search, ArrowRight, ChevronRight, 
-  GraduationCap, Mail, User, BookOpen, MapPin
-} from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { supabase } from '@/lib/supabase'
+import { Header } from '@/components/layout/header'
+import { StudentSidebar } from '@/components/student/StudentSidebar'
+import { OverviewTab } from '@/components/student/OverviewTab'
+import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
-import Link from 'next/link'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
+import { 
+  LayoutDashboard, 
+  BookOpen, 
+  Award, 
+  Users
+} from 'lucide-react'
 
-interface Classmate {
-  id: string
-  full_name: string
-  email: string
-  vin_id?: string
-  photo_url?: string
-  class: string
-  department?: string
+// Simple loading skeleton component
+function DashboardSkeleton() {
+  return (
+    <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4 sm:space-y-6">
+      <Skeleton className="h-48 w-full rounded-2xl" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
+        {[1, 2, 3, 4].map(i => (
+          <Skeleton key={i} className="h-20 sm:h-24 w-full rounded-xl" />
+        ))}
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+        <div className="space-y-4 sm:space-y-6">
+          <Skeleton className="h-80 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
+        </div>
+      </div>
+    </div>
+  )
 }
 
-interface ClassmatesTabProps {
-  profile: any
-  stats?: any
-  router?: any
-  setStats?: any
-  setBannerStats?: any
-  checkReportCardStatus?: any
-  displayTotalSubjects?: number
-  profileDisplayName?: string
-  handleTabChange?: (tab: string) => void
-  reportCardStatus?: any
-  bannerStats?: any
-}
-
-export function ClassmatesTab({ profile, router }: ClassmatesTabProps) {
+export default function StudentDashboardPage() {
+  const router = useRouter()
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
-  const [classmates, setClassmates] = useState<Classmate[]>([])
-  const [searchQuery, setSearchQuery] = useState('')
-  
-  // Limit to 4 for dashboard view
-  const displayClassmates = classmates.slice(0, 4)
-  const totalClassmates = classmates.length
+  const [profile, setProfile] = useState<any>(null)
+  const [stats, setStats] = useState<any>({
+    availableExams: [],
+    classmates: [],
+    recentAttempts: [],
+    passedExams: 0,
+    failedExams: 0,
+    completedExams: 0
+  })
+  const [bannerStats, setBannerStats] = useState<any>({
+    availableExams: 0,
+    totalExams: 0,
+    completedExams: 0,
+    averageScore: 0
+  })
+  const [reportCardStatus, setReportCardStatus] = useState<any>(null)
 
   useEffect(() => {
-    loadClassmates()
-  }, [profile?.class])
+    loadProfileAndData()
+  }, [])
 
-  const loadClassmates = async () => {
-    if (!profile?.class) return
-    
-    setLoading(true)
+  const loadProfileAndData = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email, vin_id, photo_url, class, department')
-        .eq('class', profile.class)
-        .eq('role', 'student')
-        .neq('id', profile.id)
-        .order('full_name')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/portal')
+        return
+      }
 
-      if (error) throw error
-      setClassmates(data || [])
+      // Load profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      if (profileData) {
+        setProfile(profileData)
+        
+        // Load classmates
+        const { data: classmates } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
+          .eq('class', profileData.class)
+          .eq('role', 'student')
+          .neq('id', profileData.id)
+          .limit(6)
+
+        // Load available exams
+        const { data: exams } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('status', 'published')
+          .limit(10)
+
+        setStats({
+          availableExams: exams || [],
+          classmates: classmates || [],
+          recentAttempts: [],
+          passedExams: 0,
+          failedExams: 0,
+          completedExams: 0
+        })
+
+        setBannerStats({
+          availableExams: exams?.length || 0,
+          totalExams: exams?.length || 0,
+          completedExams: 0,
+          averageScore: 0
+        })
+      }
     } catch (error) {
-      console.error('Error loading classmates:', error)
+      console.error('Error loading data:', error)
     } finally {
       setLoading(false)
     }
   }
 
-  const getInitials = (name: string) => {
-    if (!name) return 'ST'
-    const parts = name.split(' ')
-    return parts.length >= 2 
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase()
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/portal')
   }
 
-  const filteredClassmates = classmates.filter(classmate =>
-    classmate.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    classmate.email?.toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const formatProfileForHeader = () => {
+    if (!profile) return undefined
+    return {
+      id: profile.id,
+      name: profile.full_name,
+      email: profile.email,
+      role: 'student' as const,
+      avatar: profile.photo_url || undefined,
+      isAuthenticated: true
+    }
+  }
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Users className="h-5 w-5 text-emerald-600" />
-            Your Classmates
-          </CardTitle>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/student/classmates">
-              View All <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-24 mt-1" />
-                </div>
-              </div>
-            ))}
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <Header onLogout={handleLogout} />
+        <div className="flex">
+          <div className="hidden lg:block w-72" />
+          <div className="flex-1">
+            <main className="pt-20 lg:pt-24 pb-8">
+              <DashboardSkeleton />
+            </main>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
-  if (classmates.length === 0) {
+  if (!profile) {
     return (
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Users className="h-5 w-5 text-emerald-600" />
-            Your Classmates
-          </CardTitle>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/student/classmates">
-              View All <ArrowRight className="ml-1 h-4 w-4" />
-            </Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-            <p className="text-muted-foreground">No classmates found</p>
-            <p className="text-xs text-muted-foreground mt-1">You're the only student in your class</p>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <Header onLogout={handleLogout} />
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <div className="text-center">
+            <p className="text-slate-500">Redirecting to login...</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Users className="h-5 w-5 text-emerald-600" />
-          Your Classmates
-          <Badge variant="secondary" className="ml-2">
-            {totalClassmates}
-          </Badge>
-        </CardTitle>
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/student/classmates">
-            View All <ArrowRight className="ml-1 h-4 w-4" />
-          </Link>
-        </Button>
-      </CardHeader>
-      <CardContent>
-        {/* Search - only show if there are many classmates */}
-        {classmates.length > 4 && (
-          <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search classmates..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        )}
-        
-        <div className="space-y-3">
-          {displayClassmates.map((classmate) => (
-            <div 
-              key={classmate.id} 
-              className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-              onClick={() => router?.push(`/student/classmates?student=${classmate.id}`)}
-            >
-              <Avatar className="h-10 w-10 ring-1 ring-slate-200">
-                <AvatarImage src={classmate.photo_url} />
-                <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white text-sm">
-                  {getInitials(classmate.full_name)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm truncate">{classmate.full_name}</p>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-0.5">
-                    <GraduationCap className="h-3 w-3" />
-                    {classmate.class}
-                  </span>
-                  {classmate.department && (
-                    <span className="flex items-center gap-0.5">
-                      <BookOpen className="h-3 w-3" />
-                      {classmate.department}
-                    </span>
-                  )}
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden w-full">
+      <Header user={formatProfileForHeader()} onLogout={handleLogout} />
+      
+      <div className="flex flex-1 w-full overflow-x-hidden">
+        <StudentSidebar 
+          profile={profile}
+          onLogout={handleLogout}
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />
+
+        <div className={cn(
+          "flex-1 transition-all duration-300 w-full overflow-x-hidden",
+          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+        )}>
+          <main className="pt-16 lg:pt-20 pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
+            <div className="max-w-7xl mx-auto">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
+                  <TabsTrigger value="overview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
+                    <LayoutDashboard className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="exams" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
+                    <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Exams
+                  </TabsTrigger>
+                  <TabsTrigger value="results" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
+                    <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Results
+                  </TabsTrigger>
+                  <TabsTrigger value="classmates" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
+                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                    Classmates
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="overview">
+                  <OverviewTab 
+                    profile={profile}
+                    stats={stats}
+                    bannerStats={bannerStats}
+                    reportCardStatus={reportCardStatus}
+                    welcomeBannerProfile={profile}
+                    handleTabChange={setActiveTab}
+                    router={router}
+                  />
+                </TabsContent>
+
+                <TabsContent value="exams">
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold mb-2">My Exams</h3>
+                      <p className="text-muted-foreground">Your exams will appear here</p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="results">
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Award className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <h3 className="text-lg font-semibold mb-2">My Results</h3>
+                      <p className="text-muted-foreground">Your results will appear here</p>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="classmates">
+                  <ClassmatesTab 
+                    profile={profile}
+                    stats={stats}
+                    handleTabChange={setActiveTab}
+                    router={router}
+                  />
+                </TabsContent>
+              </Tabs>
             </div>
-          ))}
+          </main>
         </div>
-        
-        {classmates.length > 4 && (
-          <div className="text-center pt-3 mt-2">
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/student/classmates" className="text-muted-foreground">
-                View all {totalClassmates} classmates
-                <ChevronRight className="ml-1 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
