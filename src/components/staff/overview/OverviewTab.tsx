@@ -6,7 +6,7 @@
 
 import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
-import { StaffWelcomeBanner } from '@/components/staff/StaffWelcomeBanner'
+import StaffWelcomeBanner from '@/components/staff/StaffWelcomeBanner'
 import { QuickActions } from '@/components/staff/overview/QuickActions'
 import { PendingTasksAlert } from '@/components/staff/overview/PendingTasksAlert'
 import { DashboardGrid } from '@/components/staff/overview/DashboardGrid'
