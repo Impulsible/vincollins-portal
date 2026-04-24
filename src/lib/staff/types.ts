@@ -76,9 +76,11 @@ export interface StaffProfile {
   email: string
   role: 'teacher' | 'admin' | 'principal' | 'staff'
   department?: string
+  position?: string        // ✅ ADDED
   subjects?: string[]
   classes?: string[]
-  photo_url?: string
+  class?: string | null    // ✅ ADDED
+  photo_url?: string | null // ✅ UPDATED to allow null
   phone?: string
   joined_date?: string
   employee_id?: string

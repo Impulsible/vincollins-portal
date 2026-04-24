@@ -1,104 +1,68 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// src/app/student/classmates/page.tsx - FIXED SIDEBAR PROFILE DATA
+// src/app/student/page.tsx
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
-import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { ArrowLeft, Users } from 'lucide-react'
-import { StudentClassRoster } from '@/components/student/StudentClassRoster'
+import { GraduationCap } from 'lucide-react'
 
-interface StudentProfile {
-  id: string
-  first_name: string | null
-  middle_name?: string | null
-  last_name: string | null
-  full_name: string
-  display_name?: string | null
-  email: string
-  class: string
-  photo_url?: string | null
-  vin_id?: string | null  // ✅ Allow null
-  department?: string | null
-  admission_year?: number | null  // ✅ Allow null
-}
+// Hooks
+import { useStudentProfile } from './hooks/useStudentProfile'
+import { useDashboardData } from './hooks/useDashboardData'
 
-function StudentClassmatesContent() {
+// Components
+import { OverviewTab } from '@/components/student/OverviewTab'
+import { ExamsTab } from '@/components/student/ExamsTab'
+import { ResultsTab } from '@/components/student/ResultsTab'
+import { AssignmentsTab } from '@/components/student/AssignmentsTab'
+import { NotesTab } from '@/components/student/NotesTab'
+import { ClassmatesTab } from '@/components/student/ClassmatesTab'
+import { ProfileTab } from '@/components/student/ProfileTab'
+import { ReportCardTab } from '@/components/student/ReportCardTab'
+import { MobileBottomNav } from '@/components/student/MobileBottomNav'
+import { LoadingState } from '@/components/student/LoadingState'
+
+// Types
+import { WelcomeBannerProfile, ReportCardStatus, StudentProfile } from './types'
+
+// Utils
+import { getBestDisplayName } from './utils/nameFormatter'
+import { getSubjectCountForClass } from './utils/constants'
+
+function StudentDashboardContent() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<StudentProfile | null>(null)
+  const { profile, authChecking, setProfile } = useStudentProfile()
+  const { 
+    loading, 
+    stats, 
+    bannerStats, 
+    termProgress, 
+    loadDashboardData,
+    setStats,
+    setBannerStats 
+  } = useDashboardData(profile)
+  
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [reportCardStatus, setReportCardStatus] = useState<ReportCardStatus | null>(null)
 
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/portal')
-          return
-        }
+  const displayTotalSubjects = useMemo(() => {
+    if (termProgress?.total_subjects) return termProgress.total_subjects
+    if (!profile?.class) return 17
+    return getSubjectCountForClass(profile.class)
+  }, [profile?.class, termProgress])
 
-        // ✅ Fetch ALL profile fields
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select(`
-            id, 
-            first_name, 
-            middle_name, 
-            last_name, 
-            full_name, 
-            display_name, 
-            email, 
-            class, 
-            photo_url, 
-            vin_id, 
-            department, 
-            admission_year,
-            role
-          `)
-          .eq('id', user.id)
-          .single()
-
-        if (profileData) {
-          console.log('📋 Profile data fetched:', profileData) // Debug log
-          
-          setProfile({
-            id: profileData.id,
-            first_name: profileData.first_name,
-            middle_name: profileData.middle_name,
-            last_name: profileData.last_name,
-            full_name: profileData.full_name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim(),
-            display_name: profileData.display_name,
-            email: profileData.email,
-            class: profileData.class,
-            photo_url: profileData.photo_url,
-            vin_id: profileData.vin_id,  // ✅ Pass VIN ID
-            department: profileData.department,
-            admission_year: profileData.admission_year  // ✅ Pass admission year
-          })
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error)
-        toast.error('Failed to load profile')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchProfile()
-  }, [router])
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut({ scope: 'local' })
-    toast.success('Logged out successfully')
-    router.push('/portal')
-  }
+  const profileDisplayName = useMemo(() => {
+    if (!profile) return 'Student'
+    return getBestDisplayName(profile, 'Student')
+  }, [profile])
 
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
@@ -112,82 +76,154 @@ function StudentClassmatesContent() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-        <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            >
-              <Users className="h-12 w-12 text-emerald-600 mx-auto" />
-            </motion.div>
-            <p className="mt-4 text-slate-600 text-lg font-medium">Loading Classmates...</p>
-          </div>
-        </div>
-      </div>
-    )
+  const checkReportCardStatus = useCallback(async () => {
+    if (!profile?.id) return
+    try {
+      const { data, error } = await supabase
+        .from('report_cards')
+        .select('id, status, term, academic_year, average_score')
+        .eq('student_id', profile.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+        
+      if (error) {
+        if (error.code === '42703') {
+          const { data: basicData } = await supabase
+            .from('report_cards')
+            .select('id, status')
+            .eq('student_id', profile.id)
+            .limit(1)
+            .maybeSingle()
+          if (basicData) {
+            setReportCardStatus({
+              id: basicData.id,
+              status: basicData.status,
+              term: 'Current Term',
+              academic_year: '2025/2026'
+            })
+          }
+          return
+        }
+        throw error
+      }
+      if (data) {
+        const grade = data.average_score && data.average_score >= 75 ? 'A1' : 
+                     data.average_score && data.average_score >= 70 ? 'B2' :
+                     data.average_score && data.average_score >= 65 ? 'B3' :
+                     data.average_score && data.average_score >= 60 ? 'C4' :
+                     data.average_score && data.average_score >= 55 ? 'C5' :
+                     data.average_score && data.average_score >= 50 ? 'C6' :
+                     data.average_score && data.average_score >= 45 ? 'D7' :
+                     data.average_score && data.average_score >= 40 ? 'E8' : 'F9'
+        setReportCardStatus({
+          id: data.id,
+          status: data.status,
+          term: data.term,
+          academic_year: data.academic_year,
+          average_score: data.average_score,
+          grade
+        })
+      } else {
+        setReportCardStatus(null)
+      }
+    } catch (error: any) {
+      console.warn('Error checking report card status:', error.message)
+      setReportCardStatus(null)
+    }
+  }, [profile?.id])
+
+  useEffect(() => {
+    if (!profile?.id) return
+    const channel = supabase
+      .channel('student-dashboard-updates')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts', filter: `student_id=eq.${profile.id}` }, () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'student_term_progress', filter: `student_id=eq.${profile.id}` }, () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'assignments' }, () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'notes' }, () => loadDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'profiles', filter: `class=eq.${profile.class}` }, () => loadDashboardData())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'report_cards', filter: `student_id=eq.${profile.id}` }, () => checkReportCardStatus())
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', filter: `id=eq.${profile.id}` }, (payload) => {
+        if (payload.new.photo_url) {
+          setProfile(prev => prev ? { ...prev, photo_url: payload.new.photo_url } : null)
+        }
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [profile?.id, profile?.class, loadDashboardData, checkReportCardStatus, setProfile])
+
+  useEffect(() => {
+    if (!authChecking && profile) {
+      loadDashboardData()
+      checkReportCardStatus()
+    }
+  }, [authChecking, profile, loadDashboardData, checkReportCardStatus])
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab)
+    setMobileMenuOpen(false)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut({ scope: 'local' })
+    toast.success('Logged out successfully')
+    window.location.replace('/portal')
+  }
+
+  const getWelcomeBannerProfile = (): WelcomeBannerProfile | null => {
+    if (!profile) return null
+    return {
+      full_name: profile.full_name,
+      display_name: profile.display_name,
+      class: profile.class,
+      department: profile.department || undefined,
+      photo_url: profile.photo_url || undefined,
+      subject_count: displayTotalSubjects
+    }
+  }
+
+  const finalBannerStats = {
+    ...bannerStats,
+    totalSubjects: displayTotalSubjects || bannerStats.totalSubjects
+  }
+
+  if (authChecking || loading) {
+    return <LoadingState profile={profile} onLogout={handleLogout} />
+  }
+
+  const tabProps = {
+    profile,
+    stats,
+    bannerStats: finalBannerStats,
+    reportCardStatus,
+    displayTotalSubjects,
+    profileDisplayName,
+    handleTabChange,
+    router,
+    setStats,
+    setBannerStats,
+    checkReportCardStatus
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-      
-      <div className="flex">
-        {/* ✅ Pass FULL profile to sidebar */}
-        <StudentSidebar 
-          profile={profile}  // Now includes vin_id and admission_year
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab="classmates"
-          setActiveTab={(tab) => {
-            if (tab === 'overview') router.push('/student')
-            else if (tab === 'exams') router.push('/student/exams')
-            else if (tab === 'results') router.push('/student/results')
-            else if (tab === 'assignments') router.push('/student/assignments')
-            else if (tab === 'courses') router.push('/student/courses')
-            else if (tab === 'classmates') router.push('/student/classmates')
-            else if (tab === 'report-card') router.push('/student/report-card')
-            else if (tab === 'profile') router.push('/student/profile')
-            else if (tab === 'notifications') router.push('/student/notifications')
-            else if (tab === 'settings') router.push('/student/settings')
-            else if (tab === 'help') router.push('/student/help')
-          }}
-        />
-
-        <main className={cn(
-          "flex-1 pt-16 lg:pt-20 pb-8 min-h-screen transition-all duration-300",
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-        )}>
-          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-6xl">
-            
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
-                  <Users className="h-6 w-6 text-emerald-600" />
-                  Class Roster
-                </h1>
-                <p className="text-sm text-slate-500 mt-1">
-                  View all students in {profile?.class || 'your class'}
-                </p>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
-            </div>
-
-            {/* Class Roster */}
-            <StudentClassRoster 
-              studentClass={profile?.class}
-              studentId={profile?.id}
-              compact={false}
-            />
-
+      <MobileBottomNav activeTab={activeTab} onTabChange={handleTabChange} mobileMenuOpen={mobileMenuOpen} setMobileMenuOpen={setMobileMenuOpen} />
+      <div className="flex w-full overflow-x-hidden">
+        <StudentSidebar profile={profile} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab={activeTab} setActiveTab={handleTabChange} />
+        <main className={cn("flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300 w-full overflow-x-hidden", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
+          <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-full overflow-x-hidden">
+            <AnimatePresence mode="wait">
+              {activeTab === 'overview' && <OverviewTab {...tabProps} welcomeBannerProfile={getWelcomeBannerProfile()} />}
+              {activeTab === 'exams' && <ExamsTab {...tabProps} />}
+              {activeTab === 'results' && <ResultsTab {...tabProps} />}
+              {activeTab === 'assignments' && <AssignmentsTab {...tabProps} />}
+              {activeTab === 'notes' && <NotesTab {...tabProps} />}
+              {activeTab === 'classmates' && <ClassmatesTab {...tabProps} />}
+              {activeTab === 'profile' && <ProfileTab {...tabProps} />}
+              {activeTab === 'report-card' && <ReportCardTab {...tabProps} />}
+            </AnimatePresence>
           </div>
         </main>
       </div>
@@ -195,22 +231,24 @@ function StudentClassmatesContent() {
   )
 }
 
-export default function StudentClassmatesPage() {
+export default function StudentDashboardPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          >
-            <Users className="h-12 w-12 text-emerald-600 mx-auto" />
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+            <GraduationCap className="h-12 w-12 text-emerald-600 mx-auto" />
           </motion.div>
-          <p className="mt-4 text-slate-600 text-lg font-medium">Loading Classmates...</p>
+          <p className="mt-4 text-slate-600 text-lg font-medium">Loading Student Dashboard...</p>
+          <div className="flex justify-center gap-1 mt-4">
+            {[0, 1, 2].map((i) => (
+              <motion.div key={i} className="h-2 w-2 rounded-full bg-emerald-400" animate={{ y: [0, -8, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }} />
+            ))}
+          </div>
         </div>
       </div>
     }>
-      <StudentClassmatesContent />
+      <StudentDashboardContent />
     </Suspense>
   )
 }

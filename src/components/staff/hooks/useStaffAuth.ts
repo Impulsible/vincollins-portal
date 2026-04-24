@@ -43,6 +43,7 @@ export function useStaffAuth() {
             id: session.user.id,
             full_name: formatFullName(rawFullName),
             email: profileData?.email || session.user.email || '',
+            role: profileData?.role || 'teacher',
             department: profileData?.department || 'General',
             position: profileData?.position || 'Teacher',
             photo_url: profileData?.photo_url || null,

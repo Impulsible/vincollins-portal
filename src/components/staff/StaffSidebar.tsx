@@ -1,22 +1,21 @@
-/* eslint-disable react-hooks/exhaustive-deps */
-// components/staff/StaffSidebar.tsx - UPDATED ROUTES
+/* eslint-disable react/no-unescaped-entities */
+// components/staff/StaffSidebar.tsx - NO LOADING STATE, OPENS IMMEDIATELY
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 import {
-  LayoutDashboard, BookOpen, FileText, Users, Settings,
+  LayoutDashboard, BookOpen, FileText, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
-  Notebook, Sparkles, UserCircle, CalendarDays,
-  Bell, Award, HelpCircle, Loader2, ClipboardList
+  Sparkles, User, CalendarDays,
+  Bell, HelpCircle, ClipboardList, Notebook
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,17 +27,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
 
 interface StaffProfile {
   id?: string
   full_name?: string
-  first_name?: string
-  last_name?: string
+  display_name?: string | null
+  first_name?: string | null
+  last_name?: string | null
   email?: string
-  department?: string
   photo_url?: string | null
   avatar_url?: string | null
+  department?: string
   role?: string
 }
 
@@ -63,7 +63,6 @@ interface NavigationItem {
 interface SidebarStats {
   studentCount: number
   examCount: number
-  department?: string
 }
 
 const primaryNavigation: NavigationItem[] = [
@@ -72,52 +71,72 @@ const primaryNavigation: NavigationItem[] = [
   { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks', route: '/staff/assignments' },
   { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
   { id: 'attendance', name: 'Attendance', icon: ClipboardList, description: 'Track Records', route: '/staff/attendance' },
-  { id: 'students', name: 'Students', icon: Users, description: 'Class Roster', route: '/staff/students' },
+  { id: 'students', name: 'Students', icon: User, description: 'Class Roster', route: '/staff/students' },
+  { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class Schedule', route: '/staff/schedule' },
 ]
 
 const secondaryNavigation: NavigationItem[] = [
-  { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class & Event Schedule', route: '/staff/schedule' },
-  { id: 'profile', name: 'Profile', icon: UserCircle, description: 'Your Account', route: '/staff/profile' },
   { id: 'notifications', name: 'Notifications', icon: Bell, description: 'Updates & Alerts', route: '/staff/notifications' },
+  { id: 'profile', name: 'Profile', icon: User, description: 'Account Details', route: '/staff/profile' },
   { id: 'settings', name: 'Settings', icon: Settings, description: 'Preferences', route: '/staff/settings' },
   { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance', route: '/staff/help' },
 ]
 
-const formatDisplayName = (profile: StaffProfile | null): string => {
+// Get first name from profile
+const getFirstName = (profile?: StaffProfile | null): string => {
+  if (profile?.first_name) {
+    const firstName = profile.first_name.trim()
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+  }
+  
   if (profile?.full_name) {
-    return profile.full_name.replace(/\./g, ' ').replace(/\s+/g, ' ').trim()
-      .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+    const formattedName = profile.full_name.replace(/[._]/g, ' ').replace(/\s+/g, ' ').trim()
+    const firstName = formattedName.split(' ')[0]
+    return firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
   }
-  if (profile?.first_name && profile?.last_name) {
-    return `${profile.first_name} ${profile.last_name}`.replace(/\./g, ' ').trim()
-      .split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
-  }
-  if (profile?.first_name) return profile.first_name
-  return 'Teacher Name'
+  
+  return 'Teacher'
 }
 
-const getInitials = (profile: StaffProfile | null): string => {
-  const displayName = formatDisplayName(profile)
+// Get display name
+const getDisplayName = (profile?: StaffProfile | null): string => {
+  if (profile?.display_name) {
+    return profile.display_name
+  }
+  
+  if (profile?.first_name && profile?.last_name) {
+    const firstName = profile.first_name.trim()
+    const lastName = profile.last_name.trim()
+    return `${firstName} ${lastName}`.split(' ').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
+  }
+  
+  if (profile?.full_name) {
+    return profile.full_name
+  }
+  
+  return 'Staff Member'
+}
+
+// Get initials for avatar
+const getInitials = (profile?: StaffProfile | null): string => {
+  const displayName = profile?.display_name || profile?.full_name || 'Teacher'
   const names = displayName.split(' ')
+  
   if (names.length >= 2) {
     return (names[0][0] + names[names.length - 1][0]).toUpperCase()
   }
   return displayName.slice(0, 2).toUpperCase()
 }
 
-const getFirstName = (profile: StaffProfile | null): string => {
-  const displayName = formatDisplayName(profile)
-  return displayName.split(' ')[0]
-}
-
+// Get role display
 const getRoleDisplay = (role?: string): string => {
   if (role === 'admin') return 'Administrator'
-  if (role === 'staff' || role === 'teacher') return 'Teacher'
-  return role || 'Staff'
+  if (role === 'teacher' || role === 'staff') return 'Teacher'
+  return 'Staff'
 }
 
 export function StaffSidebar({ 
-  profile: initialProfile, 
+  profile, 
   onLogout, 
   collapsed, 
   onToggle, 
@@ -127,13 +146,48 @@ export function StaffSidebar({
   const router = useRouter()
   const pathname = usePathname()
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
-  const [localProfile, setLocalProfile] = useState<StaffProfile | null>(initialProfile)
   
+  // Use the profile directly from props - no loading state
+  const firstName = getFirstName(profile)
+  const displayName = getDisplayName(profile)
+  const initials = getInitials(profile)
+  const avatarUrl = profile?.photo_url || undefined
+  const userEmail = profile?.email || ''
+  const userRole = profile?.role
+  const department = profile?.department
+
+  // Stats - initialize with empty values, they'll update when data loads
   const [stats, setStats] = useState<SidebarStats>({ studentCount: 0, examCount: 0 })
-  const [loadingStats, setLoadingStats] = useState(true)
-  
-  const statsFetchedRef = useRef(false)
-  const profileFetchedRef = useRef(false)
+
+  // Fetch stats in background (doesn't block sidebar rendering)
+  useEffect(() => {
+    const fetchStats = async () => {
+      if (!profile?.id) return
+      
+      try {
+        // Get student count
+        const { count: studentsCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('role', 'student')
+
+        // Get exam count for this teacher
+        const { count: examsCount } = await supabase
+          .from('exams')
+          .select('*', { count: 'exact', head: true })
+          .eq('created_by', profile.id)
+
+        setStats({
+          studentCount: studentsCount || 0,
+          examCount: examsCount || 0
+        })
+      } catch (error) {
+        console.error('Error fetching stats:', error)
+      }
+    }
+
+    fetchStats()
+  }, [profile?.id])
 
   // Sync active tab with pathname
   useEffect(() => {
@@ -151,10 +205,10 @@ export function StaffSidebar({
       setActiveTab('students')
     } else if (pathname?.startsWith('/staff/schedule')) {
       setActiveTab('schedule')
-    } else if (pathname?.startsWith('/staff/profile')) {
-      setActiveTab('profile')
     } else if (pathname?.startsWith('/staff/notifications')) {
       setActiveTab('notifications')
+    } else if (pathname?.startsWith('/staff/profile')) {
+      setActiveTab('profile')
     } else if (pathname?.startsWith('/staff/settings')) {
       setActiveTab('settings')
     } else if (pathname?.startsWith('/staff/help')) {
@@ -162,136 +216,11 @@ export function StaffSidebar({
     }
   }, [pathname, setActiveTab])
 
-  // Update local profile when prop changes
-  useEffect(() => {
-    if (initialProfile) {
-      setLocalProfile(initialProfile)
-    }
-  }, [initialProfile])
-
-  // Fetch profile if not provided
-  useEffect(() => {
-    const fetchProfile = async () => {
-      if (profileFetchedRef.current) return
-      if (localProfile?.id && localProfile?.full_name) return
-      
-      profileFetchedRef.current = true
-      
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.user) return
-
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('id, full_name, first_name, last_name, email, department, photo_url, avatar_url, role')
-          .eq('id', session.user.id)
-          .single()
-
-        if (profileData) {
-          setLocalProfile(profileData)
-        }
-      } catch (error) {
-        console.error('Error fetching profile:', error)
-      }
-    }
-
-    fetchProfile()
-  }, [])
-
-  // Fetch stats
-  useEffect(() => {
-    if (statsFetchedRef.current) return
-    if (!localProfile?.id) return
-
-    statsFetchedRef.current = true
-
-    const fetchStats = async () => {
-      setLoadingStats(true)
-      try {
-        // Get student count
-        const { count: studentsCount } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('role', 'student')
-
-        if (studentsCount !== null) {
-          setStats(prev => ({ ...prev, studentCount: studentsCount }))
-        }
-
-        // Get exam count
-        const { count: examsCount } = await supabase
-          .from('exams')
-          .select('*', { count: 'exact', head: true })
-          .eq('created_by', localProfile.id)
-
-        if (examsCount !== null) {
-          setStats(prev => ({ ...prev, examCount: examsCount }))
-        }
-
-        // Get department if not in profile
-        let department = localProfile.department
-        if (!department) {
-          const { data: teacherData } = await supabase
-            .from('teacher_profiles')
-            .select('department')
-            .eq('id', localProfile.id)
-            .single()
-          
-          department = teacherData?.department
-        }
-        
-        setStats(prev => ({ ...prev, department: department || 'General' }))
-      } catch (error) {
-        console.error('Error fetching sidebar stats:', error)
-      } finally {
-        setLoadingStats(false)
-      }
-    }
-
-    fetchStats()
-
-    // Real-time subscriptions
-    const studentsChannel = supabase
-      .channel('students-changes-sidebar')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'profiles', filter: 'role=eq.student' },
-        async () => {
-          const { count } = await supabase
-            .from('profiles')
-            .select('*', { count: 'exact', head: true })
-            .eq('role', 'student')
-          if (count !== null) setStats(prev => ({ ...prev, studentCount: count }))
-        }
-      )
-      .subscribe()
-
-    const examsChannel = supabase
-      .channel('exams-changes-sidebar')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'exams', filter: `created_by=eq.${localProfile.id}` },
-        async () => {
-          const { count } = await supabase
-            .from('exams')
-            .select('*', { count: 'exact', head: true })
-            .eq('created_by', localProfile.id)
-          if (count !== null) setStats(prev => ({ ...prev, examCount: count }))
-        }
-      )
-      .subscribe()
-
-    return () => {
-      studentsChannel.unsubscribe()
-      examsChannel.unsubscribe()
-    }
-  }, [localProfile?.id])
-
   const handleLogoutClick = () => {
     setShowSignOutConfirm(true)
   }
 
-  const confirmSignOut = () => {
+  const confirmSignOut = async () => {
     setShowSignOutConfirm(false)
     onLogout()
   }
@@ -300,11 +229,6 @@ export function StaffSidebar({
     setActiveTab(tabId)
     router.push(route)
   }
-
-  const displayName = formatDisplayName(localProfile)
-  const firstName = getFirstName(localProfile)
-  const initials = getInitials(localProfile)
-  const avatarUrl = localProfile?.photo_url || localProfile?.avatar_url || undefined
 
   const renderNavItem = (item: NavigationItem) => {
     const isActive = activeTab === item.id
@@ -371,6 +295,184 @@ export function StaffSidebar({
     return <div key={item.id}>{buttonContent}</div>
   }
 
+  const sidebarContent = (
+    <>
+      <div className="pt-6" />
+      
+      {/* Logo Section */}
+      <div className={cn(
+        "relative px-5 pb-4 border-b border-slate-200 dark:border-slate-800",
+        collapsed ? "flex justify-center" : ""
+      )}>
+        <div className="relative flex items-center gap-3">
+          <div className="relative">
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl blur opacity-30" />
+            <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg">
+              <GraduationCap className="h-5 w-5 text-white" />
+            </div>
+          </div>
+          {!collapsed && (
+            <div className="overflow-hidden">
+              <h2 className="font-bold text-base text-slate-900 dark:text-white">
+                Vincollins College
+              </h2>
+              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Sparkles className="h-3 w-3 text-amber-500" />
+                Staff Portal
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Profile Section */}
+      <div className={cn(
+        "relative px-5 py-5 border-b border-slate-200 dark:border-slate-800",
+        "bg-gradient-to-b from-emerald-50/50 via-white to-transparent dark:from-emerald-950/20 dark:via-slate-900 dark:to-transparent",
+        collapsed ? "flex justify-center" : ""
+      )}>
+        {collapsed ? (
+          <div className="relative">
+            <Avatar className="h-12 w-12 ring-3 ring-white dark:ring-slate-900 shadow-xl">
+              <AvatarImage src={avatarUrl} alt={displayName} />
+              <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-lg">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="absolute -bottom-1 -right-1">
+              <div className="relative h-3 w-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 w-full">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Avatar className="h-16 w-16 ring-3 ring-white dark:ring-slate-900 shadow-xl">
+                  <AvatarImage src={avatarUrl} alt={displayName} />
+                  <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-xl">
+                    {initials}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="absolute -bottom-1 -right-1">
+                  <div className="relative h-3.5 w-3.5 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
+                </div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
+                  Welcome back,
+                </p>
+                <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">
+                  {firstName}!
+                </h3>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div>
+                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+                  {displayName}
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                  {userEmail}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5">
+                <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] shadow-sm">
+                  {getRoleDisplay(userRole)}
+                </Badge>
+                {department && (
+                  <Badge variant="outline" className="text-[10px] border-emerald-200 dark:border-emerald-800">
+                    {department}
+                  </Badge>
+                )}
+              </div>
+
+              {/* Stats - updates in background */}
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
+                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Students</p>
+                  <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                    {stats.studentCount}
+                  </p>
+                </div>
+                <div className="bg-teal-50 dark:bg-teal-950/30 rounded-lg p-2">
+                  <p className="text-[9px] text-teal-600 dark:text-teal-400 font-medium">My Exams</p>
+                  <p className="text-xs font-bold text-teal-700 dark:text-teal-300">
+                    {stats.examCount}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Primary Navigation */}
+      <div className="px-3 py-3 space-y-1">
+        {!collapsed && (
+          <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+            Main
+          </p>
+        )}
+        {primaryNavigation.map(renderNavItem)}
+      </div>
+
+      {!collapsed && <Separator className="mx-3 my-2 bg-slate-200 dark:bg-slate-800" />}
+
+      {/* Secondary Navigation */}
+      <div className="px-3 py-3 space-y-1">
+        {!collapsed && (
+          <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+            Account
+          </p>
+        )}
+        {secondaryNavigation.map(renderNavItem)}
+      </div>
+
+      {/* Sign Out Button */}
+      <div className="p-3 mt-2 border-t border-slate-200 dark:border-slate-800">
+        {collapsed ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                onClick={handleLogoutClick}
+                className="w-full justify-center h-9 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 group rounded-lg transition-all"
+              >
+                <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" className="ml-2">
+              <p className="font-medium">Sign Out</p>
+              <p className="text-xs text-slate-400">End your session</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Button
+            variant="ghost"
+            onClick={handleLogoutClick}
+            className="w-full justify-start h-11 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 group rounded-xl transition-all"
+          >
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center group-hover:bg-red-100 dark:group-hover:bg-red-950/50 transition-colors">
+                <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
+              </div>
+              <div className="flex-1 text-left">
+                <span className="text-sm font-medium block">Sign Out</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
+                  End your session
+                </span>
+              </div>
+            </div>
+          </Button>
+        )}
+      </div>
+
+      <div className="h-4" />
+    </>
+  )
+
   return (
     <>
       <aside 
@@ -381,186 +483,7 @@ export function StaffSidebar({
       >
         <TooltipProvider>
           <ScrollArea className="h-full">
-            <div className="pt-6" />
-            
-            {/* Logo Section */}
-            <div className={cn(
-              "relative px-5 pb-4 border-b border-slate-200 dark:border-slate-800",
-              collapsed ? "flex justify-center" : ""
-            )}>
-              <div className="relative flex items-center gap-3">
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl blur opacity-30" />
-                  <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg">
-                    <GraduationCap className="h-5 w-5 text-white" />
-                  </div>
-                </div>
-                {!collapsed && (
-                  <div className="overflow-hidden">
-                    <h2 className="font-bold text-base text-slate-900 dark:text-white">
-                      Vincollins College
-                    </h2>
-                    <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <Sparkles className="h-3 w-3 text-amber-500" />
-                      Teacher Portal
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Profile Section */}
-            <div className={cn(
-              "relative px-5 py-5 border-b border-slate-200 dark:border-slate-800",
-              "bg-gradient-to-b from-emerald-50/50 via-white to-transparent dark:from-emerald-950/20 dark:via-slate-900 dark:to-transparent",
-              collapsed ? "flex justify-center" : ""
-            )}>
-              {collapsed ? (
-                <div className="relative">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-30" />
-                  <Avatar className="h-12 w-12 ring-3 ring-white dark:ring-slate-900 shadow-xl">
-                    <AvatarImage src={avatarUrl} alt={displayName} />
-                    <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-lg">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-1 -right-1">
-                    <div className="relative h-3 w-3 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-4 w-full">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full blur opacity-30" />
-                      <Avatar className="h-16 w-16 ring-3 ring-white dark:ring-slate-900 shadow-xl">
-                        <AvatarImage src={avatarUrl} alt={displayName} />
-                        <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-xl">
-                          {initials}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -bottom-1 -right-1">
-                        <div className="relative h-3.5 w-3.5 bg-green-500 rounded-full ring-2 ring-white dark:ring-slate-900" />
-                      </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">
-                        Welcome back,
-                      </p>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">
-                        {firstName}!
-                      </h3>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
-                        {displayName}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                        {localProfile?.email || 'teacher@vincollins.edu.ng'}
-                      </p>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1.5">
-                      <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] shadow-sm">
-                        {getRoleDisplay(localProfile?.role)}
-                      </Badge>
-                      <Badge variant="outline" className="text-[10px] border-emerald-200 dark:border-emerald-800">
-                        {stats.department || 'General'}
-                      </Badge>
-                    </div>
-
-                    {/* Stats Cards */}
-                    <div className="grid grid-cols-2 gap-2 pt-2">
-                      <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
-                        <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Students</p>
-                        {loadingStats ? (
-                          <Skeleton className="h-4 w-8 mt-1 bg-emerald-200 dark:bg-emerald-800" />
-                        ) : (
-                          <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                            {stats.studentCount}
-                          </p>
-                        )}
-                      </div>
-                      <div className="bg-teal-50 dark:bg-teal-950/30 rounded-lg p-2">
-                        <p className="text-[9px] text-teal-600 dark:text-teal-400 font-medium">My Exams</p>
-                        {loadingStats ? (
-                          <Skeleton className="h-4 w-8 mt-1 bg-teal-200 dark:bg-teal-800" />
-                        ) : (
-                          <p className="text-xs font-bold text-teal-700 dark:text-teal-300">
-                            {stats.examCount}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Primary Navigation */}
-            <div className="px-3 py-3 space-y-1">
-              {!collapsed && (
-                <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                  Main
-                </p>
-              )}
-              {primaryNavigation.map(renderNavItem)}
-            </div>
-
-            {!collapsed && <Separator className="mx-3 my-2 bg-slate-200 dark:bg-slate-800" />}
-
-            {/* Secondary Navigation */}
-            <div className="px-3 py-3 space-y-1">
-              {!collapsed && (
-                <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                  More
-                </p>
-              )}
-              {secondaryNavigation.map(renderNavItem)}
-            </div>
-
-            {/* Logout Button */}
-            <div className="p-3 mt-2 border-t border-slate-200 dark:border-slate-800">
-              {collapsed ? (
-                <Tooltip delayDuration={0}>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      onClick={handleLogoutClick}
-                      className="w-full justify-center h-9 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 group rounded-lg transition-all"
-                    >
-                      <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right" className="ml-2">
-                    Sign Out
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button
-                  variant="ghost"
-                  onClick={handleLogoutClick}
-                  className="w-full justify-start h-11 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 group rounded-xl transition-all"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center group-hover:bg-red-100 dark:group-hover:bg-red-950/50 transition-colors">
-                      <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
-                    </div>
-                    <div className="flex-1 text-left">
-                      <span className="text-sm font-medium block">Sign Out</span>
-                      <span className="text-[10px] text-slate-400 dark:text-slate-500 block">
-                        End your session
-                      </span>
-                    </div>
-                  </div>
-                </Button>
-              )}
-            </div>
-
-            <div className="h-4" />
+            {sidebarContent}
           </ScrollArea>
 
           <button 
@@ -587,7 +510,7 @@ export function StaffSidebar({
               Sign Out?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-slate-500">
-              Are you sure you want to sign out of your account?
+              Are you sure you want to sign out of your account? You'll need to log in again to access your dashboard.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">

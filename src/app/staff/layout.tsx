@@ -1,13 +1,14 @@
-// app/staff/layout.tsx - FIXED SCROLLING
+// app/staff/layout.tsx - HYDRATION-SAFE LOADER
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { StaffSidebar } from '@/components/staff/StaffSidebar'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
-import { Briefcase, GraduationCap, Menu, X } from 'lucide-react'
+import { Briefcase, Menu, X } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 interface StaffProfile {
   id: string
@@ -37,6 +38,8 @@ interface StaffContextType {
   sidebarCollapsed: boolean
   setSidebarCollapsed: (collapsed: boolean) => void
   handleLogout: () => Promise<void>
+  activeTab: string
+  setActiveTab: (tab: string) => void
 }
 
 const defaultStats: StaffStats = {
@@ -58,39 +61,26 @@ export const useStaffContext = () => {
   return context
 }
 
-function StaffLayoutLoading() {
+// Simple loading component without framer-motion to avoid hydration issues
+function StaffLoadingState() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
       <div className="text-center">
-        <motion.div 
-          animate={{ rotate: 360 }} 
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        >
-          <Briefcase className="h-16 w-16 text-emerald-600 mx-auto" />
-        </motion.div>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.3 }}
-          className="mt-4 text-slate-600 dark:text-slate-400 text-lg font-medium"
-        >
-          Loading Staff Portal...
-        </motion.p>
-        <motion.p 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.6 }}
-          className="mt-2 text-slate-500 dark:text-slate-500 text-sm"
-        >
-          Preparing your teaching space ✨
-        </motion.p>
+        <div className="inline-block">
+          <Briefcase className="h-16 w-16 text-emerald-600 animate-spin-slow" />
+        </div>
+        <div className="mt-4 text-slate-600 dark:text-slate-400 text-lg font-medium">
+          Loading Staff Dashboard
+        </div>
+        <div className="mt-2 text-slate-500 dark:text-slate-500 text-sm">
+          Preparing your teaching workspace
+        </div>
         <div className="flex justify-center gap-1.5 mt-4">
           {[0, 1, 2].map((i) => (
-            <motion.div
+            <div
               key={i}
-              className="h-2.5 w-2.5 rounded-full bg-emerald-400"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+              className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s`, animationDuration: '0.6s' }}
             />
           ))}
         </div>
@@ -109,12 +99,14 @@ export default function StaffLayout({
   const [profile, setProfile] = useState<StaffProfile | null>(null)
   const [stats, setStats] = useState<StaffStats>(defaultStats)
   const [loading, setLoading] = useState(true)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(true)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(false)
   const [isHydrated, setIsHydrated] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
+  const [mounted, setMounted] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
     setIsHydrated(true)
     const saved = localStorage.getItem('staff-sidebar-collapsed')
     if (saved !== null) {
@@ -240,12 +232,26 @@ export default function StaffLayout({
     router.push('/portal')
   }
 
-  if (loading) {
-    return <StaffLayoutLoading />
+  // Format profile for MobileBottomNav
+  const navProfile = profile ? {
+    full_name: profile.full_name,
+    email: profile.email,
+    photo_url: profile.photo_url || profile.avatar_url,
+  } : null
+
+  // Show loading state only after mount to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="text-center">
+          <Briefcase className="h-16 w-16 text-emerald-600 mx-auto animate-pulse" />
+        </div>
+      </div>
+    )
   }
 
-  if (!isHydrated) {
-    return null
+  if (loading) {
+    return <StaffLoadingState />
   }
 
   return (
@@ -255,25 +261,46 @@ export default function StaffLayout({
       refreshData, 
       sidebarCollapsed, 
       setSidebarCollapsed,
-      handleLogout
+      handleLogout,
+      activeTab,
+      setActiveTab
     }}>
-      {/* Mobile Header - Fixed at top */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex items-center px-4">
-        <button
+      {/* Mobile menu button - only visible on mobile */}
+      <div className="lg:hidden fixed top-4 left-4 z-50">
+        <Button
+          variant="outline"
+          size="icon"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+          className="bg-white shadow-lg rounded-full h-10 w-10"
         >
-          {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-        <div className="flex items-center gap-2 ml-3">
-          <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center">
-            <GraduationCap className="h-4 w-4 text-white" />
-          </div>
-          <span className="font-semibold text-sm text-slate-900 dark:text-white">Staff Portal</span>
-        </div>
+          {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+        </Button>
       </div>
 
-      {/* Desktop Sidebar - Fixed */}
+      {/* Mobile sidebar drawer overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Mobile sidebar drawer */}
+      <div className={`lg:hidden fixed top-0 left-0 h-full z-50 transition-transform duration-300 ease-in-out ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+        <StaffSidebar 
+          profile={profile}
+          onLogout={handleLogout}
+          collapsed={false}
+          onToggle={() => {}}
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab)
+            setMobileMenuOpen(false)
+          }}
+        />
+      </div>
+
+      {/* DESKTOP LAYOUT - Fixed sidebar on left */}
       <div className="hidden lg:block">
         <StaffSidebar 
           profile={profile}
@@ -285,14 +312,33 @@ export default function StaffLayout({
         />
       </div>
 
-      {/* Main Content Area - Full width on mobile, offset on desktop */}
-      <div className={`
-        w-full
-        pt-14 lg:pt-0
-        transition-all duration-300 ease-in-out
-        ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}
-      `}>
-        {children}
+      {/* DESKTOP MAIN CONTENT - Minimal spacing */}
+      <div className="hidden lg:block min-h-screen bg-slate-50 dark:bg-slate-950" style={{ marginLeft: sidebarCollapsed ? '80px' : '288px' }}>
+        <main className="min-h-screen">
+          <div>
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* MOBILE MAIN CONTENT - Full width, with bottom padding for bottom nav */}
+      <div className="lg:hidden min-h-screen bg-slate-50 dark:bg-slate-950">
+        <main className="min-h-screen">
+          <div className="pt-2 pb-20 px-3">
+            {children}
+          </div>
+        </main>
+      </div>
+
+      {/* Mobile Bottom Navigation - Only visible on mobile */}
+      <div className="lg:hidden">
+        <MobileBottomNav 
+          role="staff"
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
+          profile={navProfile}
+          onLogout={handleLogout}
+        />
       </div>
     </StaffContext.Provider>
   )
