@@ -1,22 +1,170 @@
+// src/hooks/student/useDashboardData.ts - FULLY FIXED
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// ✅ FIXED: Import from app/student/types (not @/types/student)
-import { 
-  StudentProfile, 
-  PerformanceStats, 
-  BannerStats, 
-  TermProgressData, 
-  Exam, 
-  ExamAttempt, 
-  Assignment, 
-  StudyNote, 
-  Classmate 
-} from '@/app/student/types'
+// Define types directly in the file to avoid import issues
+export interface StudentProfile {
+  id: string
+  full_name: string
+  first_name?: string | null
+  last_name?: string | null
+  middle_name?: string | null
+  display_name?: string | null
+  email: string
+  class: string
+  department?: string | null
+  photo_url?: string | null
+  vin_id?: string | null
+  admission_year?: number | null
+  subject_count?: number | null
+  role?: string
+}
 
-// ✅ FIXED: Import from app/student/utils (not @/utils/student)
-import { formatFullName, formatDisplayName } from '@/app/student/utils/nameFormatter'
-import { TERM_NAMES, calculateGrade, getSubjectCountForClass } from '@/app/student/utils/constants'
+export interface ExamAttempt {
+  id: string
+  exam_id: string
+  exam_title: string
+  exam_subject: string
+  status: string
+  percentage: number
+  is_passed: boolean
+  total_score: number
+  term: string
+  session_year: string
+}
+
+export interface PerformanceStats {
+  totalExams: number
+  completedExams: number
+  averageScore: number
+  passedExams: number
+  failedExams: number
+  pendingResults: number
+  recentAttempts: ExamAttempt[]
+  availableExams: any[]
+  recentAssignments: any[]
+  recentNotes: any[]
+  allAssignments: any[]
+  allNotes: any[]
+  classmates: any[]
+}
+
+export interface BannerStats {
+  completedExams: number
+  averageScore: number
+  availableExams: number
+  totalExams: number
+  totalSubjects: number
+  currentGrade: string
+  gradeColor: string
+  currentTerm: string
+  sessionYear: string
+}
+
+export interface TermProgressData {
+  completed_exams: number
+  average_score: number
+  grade: string
+  total_subjects: number
+  term: string
+  session_year: string
+  student_id: string
+}
+
+export interface Exam {
+  id: string
+  title: string
+  subject: string
+  class: string
+  duration: number
+  status: string
+  total_questions?: number
+  total_marks?: number
+  pass_mark?: number
+  starts_at?: string
+  ends_at?: string
+  created_at: string
+}
+
+export interface Assignment {
+  id: string
+  title: string
+  subject: string
+  description?: string
+  due_date: string
+  total_marks?: number
+  file_url?: string | null
+  created_at: string
+  teacher_name?: string | null
+  class?: string | null
+}
+
+export interface StudyNote {
+  id: string
+  title: string
+  subject: string
+  description?: string
+  file_url?: string | null
+  created_at: string
+  teacher_name?: string | null
+  class?: string | null
+}
+
+export interface Classmate {
+  id: string
+  first_name?: string | null
+  last_name?: string | null
+  full_name: string
+  display_name?: string | null
+  email: string
+  class: string
+  vin_id?: string
+  photo_url?: string | null
+  department?: string
+  admission_year?: number
+}
+
+// Helper functions
+function formatFullName(firstName?: string | null, lastName?: string | null, middleName?: string | null, fallback?: string): string {
+  if (firstName && lastName) {
+    const parts = [firstName]
+    if (middleName) parts.push(middleName)
+    parts.push(lastName)
+    return parts.filter(Boolean).join(' ')
+  }
+  return fallback || 'Student'
+}
+
+function formatDisplayName(firstName?: string | null, lastName?: string | null, middleName?: string | null): string {
+  if (firstName && lastName) {
+    const parts = [lastName, firstName]
+    if (middleName) parts.push(middleName)
+    return parts.filter(Boolean).join(' ')
+  }
+  return firstName || lastName || 'Student'
+}
+
+const TERM_NAMES: Record<string, string> = {
+  first: 'First Term',
+  second: 'Second Term',
+  third: 'Third Term'
+}
+
+function calculateGrade(percentage: number): { grade: string; color: string; description: string } {
+  if (percentage >= 80) return { grade: 'A', color: 'text-green-600', description: 'Excellent' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-yellow-600', description: 'Good' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600', description: 'Pass' }
+  return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+}
+
+function getSubjectCountForClass(className: string): number {
+  if (!className) return 17
+  const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
+  if (normalizedClass.startsWith('JSS')) return 17
+  if (normalizedClass.startsWith('SS')) return 10
+  return 17
+}
 
 export function useDashboardData(profile: StudentProfile | null) {
   const [loading, setLoading] = useState(true)
@@ -91,24 +239,14 @@ export function useDashboardData(profile: StudentProfile | null) {
           .eq('session_year', currentTerm.session_year)
           .maybeSingle()
         progressData = data
-        console.log('📊 Progress Data from DB:', progressData)
       } catch (error) {
         console.warn('student_term_progress table not available:', error)
       }
 
-      // Use database values or fallbacks
       let completedExamsFromDB = progressData?.completed_exams || 0
       let averageScoreFromDB = progressData?.average_score || 0
       let gradeFromDB = progressData?.grade || 'N/A'
       const totalSubjectsFromDB = progressData?.total_subjects || totalSubjects
-
-      // Force fix for specific student
-      if (profile.id === '5f131c1b-db28-4e32-9bd1-b5f2122c08a1') {
-        completedExamsFromDB = 1
-        averageScoreFromDB = 70
-        gradeFromDB = 'B'
-        console.log('🔴 FORCE FIX APPLIED FOR LAILA')
-      }
 
       if (progressData) {
         setTermProgress(progressData as TermProgressData)
@@ -245,12 +383,12 @@ export function useDashboardData(profile: StudentProfile | null) {
         console.warn('Notes table not available:', error)
       }
 
-      // Load classmates
+      // Load classmates - FIXED: Added class property
       let mappedClassmates: Classmate[] = []
       try {
         const { data: classmatesData } = await supabase
           .from('profiles')
-          .select('id, first_name, middle_name, last_name, full_name, display_name, email, photo_url, vin_id')
+          .select('id, first_name, middle_name, last_name, full_name, display_name, email, photo_url, vin_id, class')
           .eq('class', studentClass)
           .neq('id', profile.id)
           .order('full_name', { ascending: true })
@@ -264,7 +402,8 @@ export function useDashboardData(profile: StudentProfile | null) {
           display_name: c.display_name || formatDisplayName(c.first_name, c.last_name, c.middle_name),
           email: c.email,
           photo_url: c.photo_url,
-          vin_id: c.vin_id
+          vin_id: c.vin_id,
+          class: c.class  // ✅ FIXED: Added the missing class property
         }))
       } catch (error) {
         console.warn('Profiles/classmates query failed:', error)

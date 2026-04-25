@@ -1,4 +1,4 @@
-// app/student/page.tsx - Clean professional version
+// app/student/page.tsx - Clean professional version with proper spacing
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -16,19 +16,19 @@ import {
   Award
 } from 'lucide-react'
 
-// Loading skeleton component
+// Loading skeleton component with proper spacing
 function DashboardSkeleton() {
   return (
-    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-      <Skeleton className="h-40 sm:h-48 md:h-56 w-full rounded-2xl" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
-          <Skeleton className="h-64 sm:h-72 w-full rounded-xl" />
-          <Skeleton className="h-64 sm:h-72 w-full rounded-xl" />
+    <div className="w-full px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
+      <Skeleton className="h-40 sm:h-48 w-full rounded-2xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <Skeleton className="h-64 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
-        <div className="space-y-6 sm:space-y-8">
-          <Skeleton className="h-80 sm:h-96 w-full rounded-xl" />
-          <Skeleton className="h-64 sm:h-72 w-full rounded-xl" />
+        <div className="space-y-4 sm:space-y-6">
+          <Skeleton className="h-80 w-full rounded-xl" />
+          <Skeleton className="h-64 w-full rounded-xl" />
         </div>
       </div>
     </div>
@@ -67,7 +67,6 @@ export default function StudentDashboardPage() {
         return
       }
 
-      // Load profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -86,7 +85,7 @@ export default function StudentDashboardPage() {
           .neq('id', profileData.id)
           .limit(6)
 
-        // Load available exams FILTERED BY STUDENT'S CLASS
+        // Load available exams filtered by student's class
         const { data: exams } = await supabase
           .from('exams')
           .select('*')
@@ -101,7 +100,6 @@ export default function StudentDashboardPage() {
           .eq('student_id', profileData.id)
           .order('created_at', { ascending: false })
 
-        // Calculate exam stats
         const passedExams = attempts?.filter(a => 
           a.status === 'passed' || (a.score && a.total_points && (a.score / a.total_points) * 100 >= 50)
         ).length || 0
@@ -112,7 +110,6 @@ export default function StudentDashboardPage() {
         
         const completedExams = attempts?.length || 0
 
-        // Load assignments
         const { data: assignments } = await supabase
           .from('assignments')
           .select('*')
@@ -120,7 +117,6 @@ export default function StudentDashboardPage() {
           .order('created_at', { ascending: false })
           .limit(10)
 
-        // Load notes
         const { data: notes } = await supabase
           .from('notes')
           .select('*')
@@ -172,7 +168,7 @@ export default function StudentDashboardPage() {
         <div className="flex">
           <div className="hidden lg:block w-72" />
           <div className="flex-1">
-            <main className="pt-20 sm:pt-24 lg:pt-28 pb-8">
+            <main className="pt-[72px] lg:pt-20 pb-8">
               <DashboardSkeleton />
             </main>
           </div>
@@ -212,7 +208,8 @@ export default function StudentDashboardPage() {
           "flex-1 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-20 sm:pt-24 lg:pt-28 pb-8 sm:pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
+          {/* ✅ Fixed top padding for header spacing */}
+          <main className="pt-[72px] lg:pt-20 pb-8 px-4 sm:px-6 w-full overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
               {activeSection === 'overview' && (
                 <OverviewTab 
@@ -232,21 +229,21 @@ export default function StudentDashboardPage() {
               )}
 
               {activeSection === 'exams' && (
-                <Card className="border-0 shadow-md">
-                  <CardContent className="py-12 sm:py-16 text-center">
-                    <BookOpen className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2">My Exams</h3>
-                    <p className="text-sm sm:text-base text-muted-foreground">Your exams will appear here</p>
+                <Card className="border-0 shadow-md mt-2">
+                  <CardContent className="py-12 text-center">
+                    <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <h3 className="text-lg font-semibold mb-2">My Exams</h3>
+                    <p className="text-sm text-muted-foreground">Your exams will appear here</p>
                   </CardContent>
                 </Card>
               )}
 
               {activeSection === 'results' && (
-                <Card className="border-0 shadow-md">
-                  <CardContent className="py-12 sm:py-16 text-center">
-                    <Award className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2">My Results</h3>
-                    <p className="text-sm sm:text-base text-muted-foreground">Your results will appear here</p>
+                <Card className="border-0 shadow-md mt-2">
+                  <CardContent className="py-12 text-center">
+                    <Award className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <h3 className="text-lg font-semibold mb-2">My Results</h3>
+                    <p className="text-sm text-muted-foreground">Your results will appear here</p>
                   </CardContent>
                 </Card>
               )}

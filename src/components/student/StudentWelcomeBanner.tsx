@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/student/StudentWelcomeBanner.tsx - SYNCED WITH ONLINE STATUS & PHOTO
+// components/student/StudentWelcomeBanner.tsx - HYDRATION SAFE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -44,7 +44,7 @@ interface StudentWelcomeBannerProps {
   stats: StudentStats | null
 }
 
-// Simple Grading
+// Simple Grading (move outside component to avoid recreation)
 const calculateGrade = (percentage: number): { grade: string; color: string; description: string } => {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
   if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
@@ -53,7 +53,6 @@ const calculateGrade = (percentage: number): { grade: string; color: string; des
   return { grade: 'F', color: 'text-red-600', description: 'Fail' }
 }
 
-// FIXED: Helper function outside component
 const getSubjectCountForClass = (className: string): number => {
   if (!className) return 17
   const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
@@ -62,10 +61,32 @@ const getSubjectCountForClass = (className: string): number => {
   return 17
 }
 
+// Static greeting messages (no time dependency)
+const getStaticGreeting = () => {
+  return { text: 'Welcome', emoji: '👋', message: 'Welcome to your dashboard!' }
+}
+
 export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerProps) {
-  const [currentTime, setCurrentTime] = useState(new Date())
+  const [mounted, setMounted] = useState(false)
+  const [greeting, setGreeting] = useState(getStaticGreeting())
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [avatarError, setAvatarError] = useState(false)
+
+  // Set mounted state for hydration safety
+  useEffect(() => {
+    setMounted(true)
+    setCurrentTime(new Date())
+    
+    // Update greeting based on actual time after mount
+    const hour = new Date().getHours()
+    let newGreeting
+    if (hour < 12) newGreeting = { text: 'Good Morning', emoji: '🌅', message: 'Ready to learn something new today?' }
+    else if (hour < 17) newGreeting = { text: 'Good Afternoon', emoji: '☀️', message: 'Keep pushing forward!' }
+    else if (hour < 21) newGreeting = { text: 'Good Evening', emoji: '🌙', message: 'Time to review what you learned!' }
+    else newGreeting = { text: 'Good Night', emoji: '🌙', message: 'Rest well and prepare for tomorrow!' }
+    setGreeting(newGreeting)
+  }, [])
 
   // Track online/offline status
   useEffect(() => {
@@ -83,7 +104,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     }
   }, [])
 
-  // Also check presence from database if profile exists
+  // Check presence from database
   useEffect(() => {
     if (!profile?.id) return
     
@@ -106,22 +127,13 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     checkPresence()
   }, [profile?.id])
 
+  // Update time every minute only after mount
   useEffect(() => {
+    if (!mounted) return
     const timer = setInterval(() => setCurrentTime(new Date()), 60000)
     return () => clearInterval(timer)
-  }, [])
+  }, [mounted])
 
-  const getGreeting = () => {
-    const hour = currentTime.getHours()
-    if (hour < 12) return { text: 'Good Morning', emoji: '🌅', message: 'Ready to learn something new today?' }
-    if (hour < 17) return { text: 'Good Afternoon', emoji: '☀️', message: 'Keep pushing forward!' }
-    if (hour < 21) return { text: 'Good Evening', emoji: '🌙', message: 'Time to review what you learned!' }
-    return { text: 'Good Night', emoji: '🌙', message: 'Rest well and prepare for tomorrow!' }
-  }
-
-  const greeting = getGreeting()
-  
-  // FIXED: Properly extract first name - take the FIRST word
   const studentFullName = profile?.full_name || 'Student'
   const nameParts = studentFullName.trim().split(/\s+/)
   const firstName = nameParts[0] || 'Student'
@@ -129,21 +141,14 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const studentClass = profile?.class || 'Not Assigned'
   const studentDepartment = profile?.department || 'General'
   
-  // FIXED: Use stats.totalSubjects FIRST, fallback to calculated value
-  // This ensures the banner respects the value passed from the parent
   const totalSubjects = stats?.totalSubjects || getSubjectCountForClass(studentClass)
 
-  // Debug log to verify
-  console.log('📊 Banner - Class:', studentClass)
-  console.log('📊 Banner - stats.totalSubjects:', stats?.totalSubjects)
-  console.log('📊 Banner - Final totalSubjects:', totalSubjects)
-
-  const formattedDate = currentTime.toLocaleDateString('en-NG', {
+  const formattedDate = currentTime?.toLocaleDateString('en-NG', {
     weekday: 'long',
     year: 'numeric',
     month: 'long',
     day: 'numeric'
-  })
+  }) || 'Loading...'
 
   const completedExams = stats?.completedExams ?? 0
   const averageScore = stats?.averageScore ?? 0
@@ -184,6 +189,15 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const statusDisplay = getStatusDisplay()
   const StatusIcon = statusDisplay.icon
 
+  // ✅ Show simple placeholder on server to prevent hydration mismatch
+  if (!mounted) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 shadow-2xl mb-8">
+        <div className="h-[280px] sm:h-[320px] animate-pulse bg-white/5 rounded-xl" />
+      </div>
+    )
+  }
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: -20 }}
@@ -201,7 +215,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <span className="text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">
               {formattedDate}
             </span>
-            {/* FIXED: Wrapped Badge in span to avoid ref warning */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -271,7 +284,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
                 {avatarLetter}
               </AvatarFallback>
             </Avatar>
-            {/* FIXED: Wrapped indicator in span */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -358,7 +370,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           </div>
         </div>
         
-        {/* Subject Progress Bar - Uses correct totalSubjects */}
+        {/* Subject Progress Bar */}
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-300">Term Subject Progress</span>

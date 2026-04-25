@@ -1,18 +1,149 @@
+// src/hooks/student/useDashboardData.ts - COMPLETE FIXED VERSION
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import { 
-  StudentProfile, 
-  PerformanceStats, 
-  BannerStats, 
-  TermProgressData, 
-  Exam, 
-  ExamAttempt, 
-  Assignment, 
-  StudyNote, 
-  Classmate 
-} from '@/app/student/types'
-import { formatFullName, formatDisplayName } from '@/app/student/utils/nameFormatter'
-import { TERM_NAMES, calculateGrade, getSubjectCountForClass } from '@/app/student/utils/constants'
+
+// Define all types inline to avoid import issues
+interface StudentProfile {
+  id: string
+  full_name: string
+  class: string
+  email: string
+  subject_count?: number | null
+  photo_url?: string | null
+}
+
+interface PerformanceStats {
+  totalExams: number
+  completedExams: number
+  averageScore: number
+  passedExams: number
+  failedExams: number
+  pendingResults: number
+  recentAttempts: any[]
+  availableExams: any[]
+  recentAssignments: any[]
+  recentNotes: any[]
+  allAssignments: any[]
+  allNotes: any[]
+  classmates: any[]
+}
+
+interface BannerStats {
+  completedExams: number
+  averageScore: number
+  availableExams: number
+  totalExams: number
+  totalSubjects: number
+  currentGrade: string
+  gradeColor: string
+  currentTerm: string
+  sessionYear: string
+}
+
+interface TermProgressData {
+  completed_exams: number
+  average_score: number
+  grade: string
+  total_subjects: number
+  term: string
+  session_year: string
+  student_id: string
+}
+
+interface Exam {
+  id: string
+  title: string
+  subject: string
+  class: string
+  duration: number
+  status: string
+  starts_at?: string
+  ends_at?: string
+  created_at: string
+}
+
+interface ExamAttempt {
+  id: string
+  exam_id: string
+  exam_title: string
+  exam_subject: string
+  status: string
+  percentage: number
+  is_passed: boolean
+  total_score: number
+  term: string
+  session_year: string
+}
+
+interface Assignment {
+  id: string
+  title: string
+  subject: string
+  due_date: string
+  created_at: string
+  class?: string | null
+  file_url?: string | null
+}
+
+interface StudyNote {
+  id: string
+  title: string
+  subject: string
+  created_at: string
+  class?: string | null
+  file_url?: string | null
+}
+
+interface Classmate {
+  id: string
+  full_name: string
+  display_name?: string | null
+  email: string
+  photo_url?: string | null
+  class: string
+  vin_id?: string
+}
+
+function formatFullName(firstName?: string | null, lastName?: string | null, middleName?: string | null, fallback?: string): string {
+  if (firstName && lastName) {
+    const parts = [firstName]
+    if (middleName) parts.push(middleName)
+    parts.push(lastName)
+    return parts.filter(Boolean).join(' ')
+  }
+  return fallback || 'Student'
+}
+
+function formatDisplayName(firstName?: string | null, lastName?: string | null, middleName?: string | null): string {
+  if (firstName && lastName) {
+    const parts = [lastName, firstName]
+    if (middleName) parts.push(middleName)
+    return parts.filter(Boolean).join(' ')
+  }
+  return firstName || lastName || 'Student'
+}
+
+const TERM_NAMES: Record<string, string> = {
+  first: 'First Term',
+  second: 'Second Term',
+  third: 'Third Term'
+}
+
+function calculateGrade(percentage: number): { grade: string; color: string; description: string } {
+  if (percentage >= 80) return { grade: 'A', color: 'text-green-600', description: 'Excellent' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-yellow-600', description: 'Good' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600', description: 'Pass' }
+  return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+}
+
+function getSubjectCountForClass(className: string): number {
+  if (!className) return 17
+  const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
+  if (normalizedClass.startsWith('JSS')) return 17
+  if (normalizedClass.startsWith('SS')) return 10
+  return 17
+}
 
 export function useDashboardData(profile: StudentProfile | null) {
   const [loading, setLoading] = useState(true)
@@ -93,12 +224,6 @@ export function useDashboardData(profile: StudentProfile | null) {
       let averageScoreFromDB = progressData?.average_score || 0
       let gradeFromDB = progressData?.grade || 'N/A'
       const totalSubjectsFromDB = progressData?.total_subjects || totalSubjects
-
-      if (profile.id === '5f131c1b-db28-4e32-9bd1-b5f2122c08a1') {
-        completedExamsFromDB = 1
-        averageScoreFromDB = 70
-        gradeFromDB = 'B'
-      }
 
       if (progressData) {
         setTermProgress(progressData as TermProgressData)
@@ -190,13 +315,10 @@ export function useDashboardData(profile: StudentProfile | null) {
               id: a.id,
               title: a.title || 'Untitled',
               subject: a.subject || 'General',
-              description: a.description || '',
               due_date: a.due_date || a.created_at,
-              total_marks: a.total_marks || 0,
-              file_url: a.file_url || null,
               created_at: a.created_at,
-              teacher_name: a.teacher_name || null,
-              class: a.class || null
+              class: a.class || null,
+              file_url: a.file_url || null
             }))
         }
       } catch (error) {
@@ -220,11 +342,9 @@ export function useDashboardData(profile: StudentProfile | null) {
               id: n.id,
               title: n.title || 'Untitled',
               subject: n.subject || 'General',
-              description: n.description || '',
-              file_url: n.file_url || null,
               created_at: n.created_at,
-              teacher_name: n.teacher_name || null,
-              class: n.class || null
+              class: n.class || null,
+              file_url: n.file_url || null
             }))
         }
       } catch (error) {
@@ -235,20 +355,18 @@ export function useDashboardData(profile: StudentProfile | null) {
       try {
         const { data: classmatesData } = await supabase
           .from('profiles')
-          .select('id, first_name, middle_name, last_name, full_name, display_name, email, photo_url, vin_id')
+          .select('id, first_name, middle_name, last_name, full_name, display_name, email, photo_url, vin_id, class')
           .eq('class', studentClass)
           .neq('id', profile.id)
           .order('full_name', { ascending: true })
 
         mappedClassmates = (classmatesData || []).map((c: any) => ({
           id: c.id,
-          first_name: c.first_name,
-          middle_name: c.middle_name,
-          last_name: c.last_name,
           full_name: c.full_name || formatFullName(c.first_name, c.last_name, c.middle_name, 'Student'),
           display_name: c.display_name || formatDisplayName(c.first_name, c.last_name, c.middle_name),
           email: c.email,
           photo_url: c.photo_url,
+          class: c.class,
           vin_id: c.vin_id
         }))
       } catch (error) {
