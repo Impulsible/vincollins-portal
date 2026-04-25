@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/assignments/page.tsx - FULLY RESPONSIVE ACROSS ALL SCREEN SIZES
+// app/student/assignments/page.tsx - FULLY RESPONSIVE WITH PROPER BOTTOM SPACING
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,7 +22,7 @@ import {
   Loader2, FileText, Search, Calendar, Clock,
   Download, Eye, ChevronRight, BookOpen,
   User, ArrowLeft, Home, CheckCircle,
-  AlertCircle, Upload, Paperclip, Filter, X, Award
+  AlertCircle, Upload, Paperclip, Filter, X, Award, Inbox
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, isPast, isFuture, differenceInDays } from 'date-fns'
@@ -367,7 +367,7 @@ export default function StudentAssignmentsPage() {
           "flex-1 transition-all duration-300 overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-20 lg:pt-24 pb-12">
+          <main className="min-h-[calc(100vh-64px)] pt-20 lg:pt-24 pb-12">
             <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 max-w-7xl mx-auto">
               
               {/* Breadcrumb */}
@@ -485,20 +485,32 @@ export default function StudentAssignmentsPage() {
                 </div>
               </div>
 
-              {/* Assignments List - Responsive */}
-              <div className="space-y-3">
+              {/* Assignments List - Responsive with proper bottom spacing */}
+              <div className="space-y-3 pb-8">
                 {filteredAssignments.length === 0 ? (
                   <Card className="border-0 shadow-lg bg-white">
-                    <CardContent className="text-center py-12 sm:py-16">
-                      <FileText className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+                    <CardContent className="text-center py-12 sm:py-16 md:py-20">
+                      <div className="w-20 h-20 sm:w-24 sm:h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Inbox className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400" />
+                      </div>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
                         No assignments found
                       </h3>
-                      <p className="text-xs sm:text-sm text-muted-foreground px-4">
+                      <p className="text-sm text-muted-foreground max-w-md mx-auto px-4">
                         {activeTab === 'all' 
-                          ? 'No assignments available for your class.'
-                          : `No ${activeTab} assignments.`}
+                          ? 'No assignments have been created for your class yet. Check back later for new assignments.'
+                          : `No ${activeTab} assignments available at the moment.`}
                       </p>
+                      {activeTab !== 'all' && stats.total > 0 && (
+                        <Button 
+                          variant="link" 
+                          size="sm" 
+                          onClick={() => setActiveTab('all')}
+                          className="mt-4 text-emerald-600"
+                        >
+                          View all assignments
+                        </Button>
+                      )}
                     </CardContent>
                   </Card>
                 ) : (

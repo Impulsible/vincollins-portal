@@ -1,5 +1,5 @@
 // ============================================
-// STUDENT REPORT CARD PAGE - FIXED
+// STUDENT REPORT CARD PAGE - FULLY FIXED
 // ============================================
 
 'use client'
@@ -8,7 +8,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
-import { Footer } from '@/components/layout/footer'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -29,7 +28,7 @@ import {
   Loader2, Award, Download, Printer, FileText,
   GraduationCap, Calendar, TrendingUp, Target,
   CheckCircle, Clock, AlertCircle, BookOpen,
-  RefreshCw, Sparkles, User, XCircle, Home
+  RefreshCw, Sparkles, User, XCircle, Home, Lock
 } from 'lucide-react'
 
 // ============================================
@@ -47,6 +46,8 @@ interface StudentProfile {
   vin_id?: string
   photo_url?: string
   admission_year?: number
+  current_term?: string
+  current_session?: string
 }
 
 interface SubjectScore {
@@ -100,6 +101,15 @@ interface TermOption {
   session_year: string
   label: string
   available: boolean
+  isCurrentTerm: boolean
+}
+
+// Term order type
+type TermOrderMap = {
+  [key: string]: number
+  first: number
+  second: number
+  third: number
 }
 
 // ============================================
@@ -118,11 +128,6 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
   }
 }
 
-const getFirstName = (fullName: string): string => {
-  if (!fullName) return 'Student'
-  return fullName.split(' ')[0]
-}
-
 const getInitials = (name: string): string => {
   if (!name) return 'S'
   const parts = name.split(' ')
@@ -134,9 +139,20 @@ const getTermLabel = (term: string): string => {
   const terms: Record<string, string> = {
     'first': 'First Term',
     'second': 'Second Term',
-    'third': 'Third Term'
+    'third': 'Third Term',
+    '1st': 'First Term',
+    '2nd': 'Second Term',
+    '3rd': 'Third Term'
   }
-  return terms[term] || term
+  return terms[term?.toLowerCase()] || term
+}
+
+const normalizeTermForCompare = (term: string): string => {
+  const t = term?.toLowerCase() || ''
+  if (t === 'first' || t === '1st') return 'first'
+  if (t === 'second' || t === '2nd') return 'second'
+  if (t === 'third' || t === '3rd') return 'third'
+  return t
 }
 
 const getStatusBadge = (status: string) => {
@@ -167,6 +183,13 @@ const getGradeColor = (grade: string): string => {
   }
 }
 
+// Term order with proper typing
+const termOrder: TermOrderMap = {
+  first: 1,
+  second: 2,
+  third: 3
+}
+
 // ============================================
 // MAIN COMPONENT
 // ============================================
@@ -181,14 +204,10 @@ export default function StudentReportCardPage() {
   const [reportCard, setReportCard] = useState<ReportCard | null>(null)
   const [availableTerms, setAvailableTerms] = useState<TermOption[]>([])
   const [selectedTerm, setSelectedTerm] = useState<string>('')
-  const [gradingScale, setGradingScale] = useState<any[]>([])
   const [schoolSettings, setSchoolSettings] = useState<any>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // Refs to prevent infinite loops
-  const termsLoadedRef = useRef(false)
   const isMountedRef = useRef(true)
-  const initialLoadDoneRef = useRef(false)
 
   // ============================================
   // AUTH CHECK
@@ -199,7 +218,6 @@ export default function StudentReportCardPage() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (!session?.user) {
-          console.log('No active session, redirecting to portal')
           if (isMountedRef.current) window.location.replace('/portal')
           return
         }
@@ -216,25 +234,20 @@ export default function StudentReportCardPage() {
           return
         }
 
-        // Get student-specific data
-        const { data: studentData } = await supabase
-          .from('students')
-          .select('class, vin_id, department')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
         if (isMountedRef.current) {
           setProfile({
             id: session.user.id,
-            full_name: profileData.full_name || session.user.user_metadata?.full_name || 'Student',
+            full_name: profileData.full_name || 'Student',
             first_name: profileData.first_name,
             last_name: profileData.last_name,
             email: profileData.email || session.user.email || '',
-            class: studentData?.class || profileData.class || 'Not Assigned',
-            department: studentData?.department || profileData.department || 'General',
-            vin_id: studentData?.vin_id || profileData.vin_id,
+            class: profileData.class || 'Not Assigned',
+            department: profileData.department || 'General',
+            vin_id: profileData.vin_id,
             photo_url: profileData.photo_url,
-            admission_year: profileData.admission_year
+            admission_year: profileData.admission_year,
+            current_term: profileData.current_term || 'third',
+            current_session: profileData.current_session || '2025/2026'
           })
           setAuthChecking(false)
         }
@@ -249,145 +262,104 @@ export default function StudentReportCardPage() {
   }, [router])
 
   // ============================================
-  // LOAD AVAILABLE TERMS
+  // LOAD AVAILABLE TERMS (Only current term until published)
   // ============================================
   const loadAvailableTerms = useCallback(async () => {
-    if (!profile?.id) {
-      if (isMountedRef.current) setLoading(false)
-      return
-    }
-    
-    if (termsLoadedRef.current) {
-      if (isMountedRef.current) setLoading(false)
-      return
-    }
+    if (!profile?.id) return
     
     setError(null)
     
     try {
+      const currentTermNorm = normalizeTermForCompare(profile.current_term || 'third')
+      const currentSession = profile.current_session || '2025/2026'
+      
       const { data, error } = await supabase
         .from('report_cards')
-        .select('term, session_year, status, created_at')
+        .select('term, session_year, status, published_at')
         .eq('student_id', profile.id)
-        .order('created_at', { ascending: false })
+        .order('published_at', { ascending: false })
 
       if (error) {
-        // Handle missing session_year column
-        if (error.code === '42703') {
-          console.warn('session_year column missing, deriving from created_at')
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('report_cards')
-            .select('term, status, created_at')
-            .eq('student_id', profile.id)
-            .order('created_at', { ascending: false })
-
-          if (fallbackError) {
-            console.error('Error loading terms:', fallbackError)
-            if (isMountedRef.current) {
-              setError('Failed to load available terms')
-              setLoading(false)
-            }
-            return
-          }
-
-          const terms: TermOption[] = (fallbackData || []).map((rc: any) => {
-            const createdAt = new Date(rc.created_at)
-            const year = createdAt.getFullYear()
-            const month = createdAt.getMonth()
-            const sessionYear = month >= 7 ? `${year}/${year + 1}` : `${year - 1}/${year}`
-            
-            return {
-              term: rc.term,
-              session_year: sessionYear,
-              label: `${getTermLabel(rc.term)} ${sessionYear}`,
-              available: rc.status === 'published'
-            }
-          })
-
-          // Remove duplicates
-          const uniqueTerms = terms.filter((term, index, self) => 
-            index === self.findIndex(t => t.term === term.term && t.session_year === term.session_year)
-          )
-
-          if (isMountedRef.current) {
-            setAvailableTerms(uniqueTerms)
-            termsLoadedRef.current = true
-            
-            const publishedTerm = uniqueTerms.find(t => t.available)
-            if (publishedTerm) {
-              setSelectedTerm(`${publishedTerm.term}|${publishedTerm.session_year}`)
-            } else if (uniqueTerms.length > 0) {
-              setSelectedTerm(`${uniqueTerms[0].term}|${uniqueTerms[0].session_year}`)
-            }
-            setLoading(false)
-          }
-          return
-        }
-        
         console.error('Error loading terms:', error)
         if (isMountedRef.current) {
-          setError('Failed to load available terms')
+          setError('Failed to load report card data')
           setLoading(false)
         }
         return
       }
 
-      // Normal processing
-      const terms: TermOption[] = (data || []).map((rc: any) => {
-        let sessionYear = rc.session_year
-        if (!sessionYear && rc.created_at) {
-          const createdAt = new Date(rc.created_at)
-          const year = createdAt.getFullYear()
-          const month = createdAt.getMonth()
-          sessionYear = month >= 7 ? `${year}/${year + 1}` : `${year - 1}/${year}`
-        }
-        
-        return {
-          term: rc.term,
-          session_year: sessionYear || '2024/2025',
-          label: `${getTermLabel(rc.term)} ${sessionYear || '2024/2025'}`,
-          available: rc.status === 'published'
-        }
-      })
-
-      // Remove duplicates
-      const uniqueTerms = terms.filter((term, index, self) => 
-        index === self.findIndex(t => t.term === term.term && t.session_year === term.session_year)
+      const currentTermReport = (data || []).find(rc => 
+        normalizeTermForCompare(rc.term) === currentTermNorm && 
+        rc.session_year === currentSession
       )
+      
+      const isCurrentTermPublished = currentTermReport?.status === 'published'
+      
+      let terms: TermOption[] = []
+      
+      if (isCurrentTermPublished) {
+        const publishedReports = (data || []).filter(rc => rc.status === 'published')
+        const uniqueTerms = new Map()
+        
+        publishedReports.forEach(rc => {
+          const key = `${rc.term}|${rc.session_year}`
+          if (!uniqueTerms.has(key)) {
+            uniqueTerms.set(key, {
+              term: rc.term,
+              session_year: rc.session_year,
+              label: `${getTermLabel(rc.term)} ${rc.session_year}`,
+              available: true,
+              isCurrentTerm: normalizeTermForCompare(rc.term) === currentTermNorm
+            })
+          }
+        })
+        
+        terms = Array.from(uniqueTerms.values())
+        // Sort by term order using the typed object with safe access
+        terms.sort((a, b) => {
+          const aOrder = termOrder[normalizeTermForCompare(a.term) as keyof TermOrderMap] || 0
+          const bOrder = termOrder[normalizeTermForCompare(b.term) as keyof TermOrderMap] || 0
+          return aOrder - bOrder
+        })
+      } else {
+        terms = [{
+          term: profile.current_term || 'third',
+          session_year: currentSession,
+          label: `${getTermLabel(profile.current_term || 'third')} ${currentSession}`,
+          available: false,
+          isCurrentTerm: true
+        }]
+      }
 
       if (isMountedRef.current) {
-        setAvailableTerms(uniqueTerms)
-        termsLoadedRef.current = true
+        setAvailableTerms(terms)
         
-        const publishedTerm = uniqueTerms.find(t => t.available)
-        if (publishedTerm) {
-          setSelectedTerm(`${publishedTerm.term}|${publishedTerm.session_year}`)
-        } else if (uniqueTerms.length > 0) {
-          setSelectedTerm(`${uniqueTerms[0].term}|${uniqueTerms[0].session_year}`)
+        if (terms.length > 0) {
+          const firstPublished = terms.find(t => t.available)
+          if (firstPublished) {
+            setSelectedTerm(`${firstPublished.term}|${firstPublished.session_year}`)
+          } else if (terms[0]) {
+            setSelectedTerm(`${terms[0].term}|${terms[0].session_year}`)
+          }
         }
         setLoading(false)
       }
     } catch (error) {
       console.error('Error loading terms:', error)
       if (isMountedRef.current) {
-        setError('Failed to load available terms')
+        setError('Failed to load report card data')
         setLoading(false)
       }
     }
-  }, [profile?.id])
+  }, [profile?.id, profile?.current_term, profile?.current_session])
 
   // ============================================
   // LOAD REPORT CARD
   // ============================================
   const loadReportCard = useCallback(async () => {
-    if (!profile?.id || !selectedTerm) {
-      return
-    }
+    if (!profile?.id || !selectedTerm) return
     
-    if (isMountedRef.current) {
-      setLoading(true)
-      setError(null)
-    }
+    if (isMountedRef.current) setLoading(true)
     
     try {
       const [term, sessionYear] = selectedTerm.split('|')
@@ -397,34 +369,30 @@ export default function StudentReportCardPage() {
         .select('*')
         .eq('student_id', profile.id)
         .eq('term', term)
+        .eq('session_year', sessionYear)
         .maybeSingle()
 
       if (rcError) {
         console.error('Error loading report card:', rcError)
         if (isMountedRef.current) {
           setError('Failed to load report card')
-          toast.error('Failed to load report card')
           setLoading(false)
         }
         return
       }
 
       if (rcData && isMountedRef.current) {
-        // Load grading scale from settings
         const { data: settingsData } = await supabase
-          .from('report_card_settings')
+          .from('school_settings')
           .select('*')
-          .eq('term', term)
           .maybeSingle()
 
         if (settingsData) {
-          setGradingScale(settingsData.grading_scale || [])
           setSchoolSettings(settingsData)
         }
 
         const attendance = rcData.attendance_summary || { total_days: 0, present: 0, absent: 0 }
         
-        // Ensure subject_scores is an array
         const subjectScores = Array.isArray(rcData.subject_scores) 
           ? rcData.subject_scores 
           : (rcData.subjects_data || [])
@@ -434,11 +402,11 @@ export default function StudentReportCardPage() {
           student_id: rcData.student_id,
           class: rcData.class,
           term: rcData.term,
-          session_year: rcData.session_year || sessionYear || '2024/2025',
+          session_year: rcData.session_year || sessionYear,
           subject_scores: subjectScores,
           teacher_comments: rcData.teacher_comments || '',
           status: rcData.status,
-          published_at: rcData.published_at || rcData.generated_at,
+          published_at: rcData.published_at || rcData.created_at,
           principal_comments: rcData.principal_comments,
           admin_comments: rcData.admin_comments,
           attendance_summary: {
@@ -469,7 +437,6 @@ export default function StudentReportCardPage() {
       console.error('Error loading report card:', error)
       if (isMountedRef.current) {
         setError('Failed to load report card')
-        toast.error('Failed to load report card')
         setLoading(false)
       }
     }
@@ -479,14 +446,13 @@ export default function StudentReportCardPage() {
   // EFFECTS
   // ============================================
   useEffect(() => {
-    if (!authChecking && profile && !initialLoadDoneRef.current) {
-      initialLoadDoneRef.current = true
+    if (!authChecking && profile) {
       loadAvailableTerms()
     }
   }, [authChecking, profile, loadAvailableTerms])
 
   useEffect(() => {
-    if (selectedTerm && profile) {
+    if (selectedTerm && profile && !loading) {
       loadReportCard()
     }
   }, [selectedTerm, profile, loadReportCard])
@@ -504,150 +470,17 @@ export default function StudentReportCardPage() {
     window.print()
   }
 
-  const handleDownloadPDF = async () => {
-    toast.loading('Generating PDF...')
-    
-    try {
-      // Create a printable version
-      const printWindow = window.open('', '_blank')
-      
-      if (printWindow && reportCard) {
-        const html = generatePrintableHTML(reportCard, profile)
-        printWindow.document.write(html)
-        printWindow.document.close()
-        
-        toast.success('PDF ready! Use Print → Save as PDF')
-      }
-    } catch (error) {
-      console.error('Error generating PDF:', error)
-      toast.error('Failed to generate PDF')
-    }
-  }
-
-  const generatePrintableHTML = (reportCard: ReportCard, profile: StudentProfile | null) => {
-    const overallStats = calculateOverallStats()
-    
-    return `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Report Card - ${getTermLabel(reportCard.term)} ${reportCard.session_year}</title>
-          <style>
-            body { font-family: Arial, sans-serif; padding: 40px; max-width: 1200px; margin: 0 auto; }
-            .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #059669; padding-bottom: 20px; }
-            .school-name { font-size: 28px; font-weight: bold; color: #059669; }
-            .report-title { font-size: 18px; color: #666; margin: 10px 0; }
-            .student-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; padding: 20px; background: #f5f5f5; border-radius: 8px; }
-            table { width: 100%; border-collapse: collapse; margin: 20px 0; }
-            th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
-            th { background: #f0f0f0; font-weight: bold; }
-            .summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin: 20px 0; }
-            .summary-card { padding: 20px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border-radius: 8px; text-align: center; }
-            .comments { margin: 20px 0; padding: 20px; background: #f9f9f9; border-radius: 8px; }
-            .footer { margin-top: 40px; text-align: center; color: #666; border-top: 1px solid #ddd; padding-top: 20px; }
-            .grade-A { color: #059669; font-weight: bold; }
-            .grade-B { color: #2563eb; font-weight: bold; }
-            .grade-C { color: #d97706; font-weight: bold; }
-            .print-btn { margin-bottom: 20px; padding: 10px 20px; background: #059669; color: white; border: none; border-radius: 6px; cursor: pointer; }
-            @media print {
-              .print-btn { display: none; }
-            }
-          </style>
-        </head>
-        <body>
-          <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
-          
-          <div class="header">
-            <div class="school-name">Vincollins College</div>
-            <div class="report-title">Academic Report Card</div>
-            <div>${getTermLabel(reportCard.term)} - ${reportCard.session_year}</div>
-          </div>
-          
-          <div class="student-info">
-            <div><strong>Student Name:</strong> ${profile?.full_name || 'N/A'}</div>
-            <div><strong>Class:</strong> ${reportCard.class}</div>
-            <div><strong>VIN:</strong> ${profile?.vin_id || 'N/A'}</div>
-            <div><strong>Department:</strong> ${profile?.department || 'General'}</div>
-          </div>
-          
-          <table>
-            <thead>
-              <tr>
-                <th>Subject</th>
-                <th>CA1</th>
-                <th>CA2</th>
-                <th>Exam</th>
-                <th>Total</th>
-                <th>Grade</th>
-                <th>Remark</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${reportCard.subject_scores.map(s => `
-                <tr>
-                  <td>${s.subject}</td>
-                  <td>${s.ca1 || '-'}</td>
-                  <td>${s.ca2 || '-'}</td>
-                  <td>${s.exam || '-'}</td>
-                  <td><strong>${s.total}</strong></td>
-                  <td class="grade-${s.grade}">${s.grade}</td>
-                  <td>${s.remark || '-'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-          
-          <div class="summary">
-            <div class="summary-card">
-              <div>Average Score</div>
-              <div style="font-size: 32px; font-weight: bold;">${overallStats?.average || 0}%</div>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);">
-              <div>Overall Grade</div>
-              <div style="font-size: 32px; font-weight: bold;">${overallStats?.grade || 'N/A'}</div>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #d97706 0%, #b45309 100%);">
-              <div>Total Subjects</div>
-              <div style="font-size: 32px; font-weight: bold;">${overallStats?.totalSubjects || 0}</div>
-            </div>
-            <div class="summary-card" style="background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);">
-              <div>Attendance</div>
-              <div style="font-size: 32px; font-weight: bold;">${reportCard.attendance_summary ? Math.round((reportCard.attendance_summary.present / reportCard.attendance_summary.total_days) * 100) || 0 : 0}%</div>
-            </div>
-          </div>
-          
-          <div class="comments">
-            <h3>Class Teacher's Comment</h3>
-            <p>"${reportCard.teacher_comments || 'No comment provided.'}"</p>
-            
-            ${reportCard.principal_comments ? `
-              <h3 style="margin-top: 20px;">Principal's Comment</h3>
-              <p>"${reportCard.principal_comments}"</p>
-            ` : ''}
-          </div>
-          
-          <div class="footer">
-            <p>Generated on ${new Date().toLocaleDateString()}</p>
-            <p>Vincollins College - Official Report Card</p>
-          </div>
-        </body>
-      </html>
-    `
+  const handleDownloadPDF = () => {
+    toast.info('Click Print and select "Save as PDF"')
+    window.print()
   }
 
   const handleRefresh = () => {
-    termsLoadedRef.current = false
-    initialLoadDoneRef.current = false
     setError(null)
     setLoading(true)
     setReportCard(null)
-    setAvailableTerms([])
-    setSelectedTerm('')
-    
-    if (profile) {
-      loadAvailableTerms()
-    }
-    toast.success('Refreshing report card...')
+    loadAvailableTerms()
+    toast.success('Refreshing...')
   }
 
   const calculateOverallStats = () => {
@@ -672,7 +505,7 @@ export default function StudentReportCardPage() {
     : 0
 
   // ============================================
-  // RENDER LOADING STATE
+  // RENDER
   // ============================================
   if (authChecking) {
     return (
@@ -685,9 +518,6 @@ export default function StudentReportCardPage() {
     )
   }
 
-  // ============================================
-  // MAIN RENDER
-  // ============================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 print:bg-white">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
@@ -719,7 +549,7 @@ export default function StudentReportCardPage() {
                   <Avatar className="h-14 w-14 sm:h-16 sm:w-16 ring-2 ring-emerald-500/20 shadow-lg">
                     <AvatarImage src={profile?.photo_url || undefined} />
                     <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white text-xl font-bold">
-                      {profile?.full_name ? getInitials(profile.full_name) : 'S'}
+                      {getInitials(profile?.full_name || 'S')}
                     </AvatarFallback>
                   </Avatar>
                   <div>
@@ -727,7 +557,7 @@ export default function StudentReportCardPage() {
                       Report Card
                     </h1>
                     <p className="text-muted-foreground mt-1">
-                      View and download your academic reports
+                      View your academic performance
                     </p>
                   </div>
                 </div>
@@ -774,19 +604,26 @@ export default function StudentReportCardPage() {
                       <SelectContent>
                         {availableTerms.length === 0 ? (
                           <div className="p-2 text-center text-sm text-gray-500">
-                            No terms available
+                            Loading...
                           </div>
                         ) : (
                           availableTerms.map((term) => (
                             <SelectItem 
                               key={`${term.term}|${term.session_year}`} 
                               value={`${term.term}|${term.session_year}`}
+                              disabled={!term.available}
                             >
                               <div className="flex items-center gap-2">
                                 {term.label}
                                 {!term.available && (
-                                  <Badge variant="outline" className="text-yellow-600 text-[10px]">
+                                  <Badge variant="outline" className="text-amber-600 text-[10px]">
+                                    <Lock className="h-2 w-2 mr-0.5" />
                                     Pending
+                                  </Badge>
+                                )}
+                                {term.isCurrentTerm && term.available && (
+                                  <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">
+                                    Current
                                   </Badge>
                                 )}
                               </div>
@@ -802,6 +639,16 @@ export default function StudentReportCardPage() {
                       </div>
                     )}
                   </div>
+                  
+                  {availableTerms.length === 1 && !availableTerms[0]?.available && (
+                    <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                      <p className="text-sm text-amber-700 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Your report card for {availableTerms[0]?.label} is being prepared. 
+                        Please check back later.
+                      </p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -826,7 +673,7 @@ export default function StudentReportCardPage() {
                   </Button>
                 </CardContent>
               </Card>
-            ) : reportCard ? (
+            ) : reportCard && reportCard.status === 'published' ? (
               <div className="space-y-6">
                 {/* Student Info Card */}
                 <Card className="border-0 shadow-sm bg-white">
@@ -1027,27 +874,23 @@ export default function StudentReportCardPage() {
                 <CardContent className="text-center py-16">
                   <Award className="h-12 w-12 text-slate-400 mx-auto mb-4" />
                   <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    No report card available
+                    No Report Card Available
                   </h3>
                   <p className="text-muted-foreground">
-                    {availableTerms.length === 0 
-                      ? 'Your report card for this term has not been published yet.'
-                      : 'Select a different term to view your report card.'}
+                    {availableTerms.length === 0 || (availableTerms[0] && !availableTerms[0].available)
+                      ? 'Your report card is being prepared. Please check back later.'
+                      : 'Select a term to view your report card.'}
                   </p>
-                  {availableTerms.length === 0 && (
-                    <Button onClick={() => router.push('/student')} variant="outline" className="mt-4">
-                      <Home className="h-4 w-4 mr-2" />
-                      Back to Dashboard
-                    </Button>
-                  )}
+                  <Button onClick={() => router.push('/student')} variant="outline" className="mt-4">
+                    <Home className="h-4 w-4 mr-2" />
+                    Back to Dashboard
+                  </Button>
                 </CardContent>
               </Card>
             )}
           </div>
         </main>
       </div>
-      
-      <Footer />
     </div>
   )
 }

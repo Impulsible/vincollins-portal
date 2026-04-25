@@ -191,10 +191,10 @@ export default function StudentDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
       <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
-      <div className="flex flex-1 w-full overflow-x-hidden">
+      <div className="flex w-full overflow-x-hidden">
         <StudentSidebar 
           profile={profile}
           onLogout={handleLogout}
@@ -208,8 +208,8 @@ export default function StudentDashboardPage() {
           "flex-1 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          {/* ✅ Fixed top padding for header spacing */}
-          <main className="pt-[72px] lg:pt-20 pb-8 px-4 sm:px-6 w-full overflow-x-hidden">
+          {/* ✅ Fixed top padding for header spacing - NO footer */}
+          <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-20 pb-12 px-4 sm:px-6 w-full overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
               {activeSection === 'overview' && (
                 <OverviewTab 

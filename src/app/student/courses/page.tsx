@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/courses/page.tsx - FIXED: Breadcrumb properly below header
+// app/student/courses/page.tsx - FIXED: Hidden white hamburger menu on mobile
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -23,7 +23,8 @@ import { cn } from '@/lib/utils'
 import {
   Loader2, FileText, Search, BookOpen, Download,
   Eye, ChevronRight, Home,
-  Filter, File, Video, Headphones, Image, Menu, X
+  Filter, File, Video, Headphones, Image,
+  X
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -75,7 +76,6 @@ export default function StudentCoursesPage() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
   
@@ -220,36 +220,9 @@ export default function StudentCoursesPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
         
-        {/* Mobile Sidebar Toggle */}
-        <button
-          className="lg:hidden fixed top-16 left-3 z-50 bg-white p-2 rounded-lg shadow-md border"
-          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-        >
-          {mobileSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-
-        {/* Mobile Sidebar Overlay */}
-        {mobileSidebarOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/50 top-16" onClick={() => setMobileSidebarOpen(false)} />
-        )}
-
-        {/* Mobile Sidebar */}
-        <div className={cn(
-          "lg:hidden fixed top-16 left-0 z-50 h-[calc(100vh-64px)] w-72 bg-white shadow-xl transition-transform duration-300 overflow-y-auto",
-          mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}>
-          <StudentSidebar
-            profile={profile}
-            onLogout={handleLogout}
-            collapsed={false}
-            onToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-            activeTab="courses"
-            setActiveTab={() => {}}
-          />
-        </div>
-        
+        {/* Main Content - No hamburger menu at all */}
         <div className="flex">
-          {/* Desktop Sidebar */}
+          {/* Desktop Sidebar - Hidden on mobile */}
           <div className="hidden lg:block">
             <StudentSidebar 
               profile={profile}
@@ -261,20 +234,22 @@ export default function StudentCoursesPage() {
             />
           </div>
 
-          {/* Main Content Area */}
+          {/* Main Content Area - Full width on mobile, left margin only on desktop */}
           <div className={cn(
             "flex-1 transition-all duration-300 w-full min-h-screen",
+            // Only apply margin on desktop
+            "lg:ml-0",
             sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
           )}>
-            {/* Header spacer - critical for fixed header */}
+            {/* Header spacer */}
             <div className="h-14 sm:h-16 lg:h-[72px]" />
             
             <main className="pb-20 px-4 sm:px-6 lg:px-8">
               <div className="max-w-7xl mx-auto">
                 
-                {/* Breadcrumb - properly spaced below header */}
+                {/* Breadcrumb */}
                 <div className="pt-2 pb-4">
-                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground flex-wrap">
                     <Link href="/student" className="hover:text-emerald-600 transition-colors flex items-center gap-1">
                       <Home className="h-4 w-4" />
                       <span>Dashboard</span>

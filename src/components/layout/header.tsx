@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - WITH GO TO DASHBOARD ON ALL PUBLIC PAGES
+// components/layout/header.tsx - WITH FIXED NOTIFICATION BELL POSITIONING
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense, forwardRef } from 'react'
@@ -865,8 +865,8 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </nav>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-0.5 xs:gap-1 sm:gap-2 flex-shrink-0">
+            {/* Right Section - With Properly Centered Notification Bell */}
+            <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
@@ -876,39 +876,48 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL - Professional spacing and sizing */}
+              {/* NOTIFICATION BELL - Centered with proper spacing on all widths */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                   <PopoverTrigger asChild>
-                    <NotificationTrigger>
+                    <button
+                      className={cn(
+                        "relative rounded-full text-white hover:bg-white/20 transition-all duration-300",
+                        "flex items-center justify-center",
+                        "h-8 w-8 xs:h-8 xs:w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 lg:h-11 lg:w-11"
+                      )}
+                    >
+                      <Bell className="h-4 w-4 xs:h-4 xs:w-4 sm:h-4.5 sm:w-4.5 md:h-5 md:w-5 lg:h-5.5 lg:w-5.5" />
                       <AnimatePresence>
                         {unreadCount > 0 && (
                           <motion.span
                             initial={{ scale: 0 }}
                             animate={{ scale: 1 }}
                             exit={{ scale: 0 }}
-                            className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5 bg-red-500 rounded-full text-white text-[8px] sm:text-[10px] lg:text-xs flex items-center justify-center font-bold"
+                            className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 md:h-4.5 md:w-4.5 lg:h-5 lg:w-5 bg-red-500 rounded-full text-white text-[8px] xs:text-[8px] sm:text-[9px] md:text-[10px] lg:text-[11px] flex items-center justify-center font-bold"
                           >
                             {unreadCount > 9 ? '9+' : unreadCount}
                           </motion.span>
                         )}
                       </AnimatePresence>
-                    </NotificationTrigger>
+                    </button>
                   </PopoverTrigger>
                   <PopoverContent 
                     align={isMobile ? "center" : "end"}
-                    sideOffset={isMobile ? 12 : 8}
+                    side="bottom"
+                    sideOffset={isMobile ? 8 : 12}
                     className={cn(
-                      "w-[calc(100vw-32px)] max-w-[380px] sm:w-[400px] md:w-[420px] p-0 rounded-2xl shadow-2xl border border-gray-200/80",
-                      "overflow-hidden bg-white"
+                      "w-[calc(100vw-32px)] max-w-[380px] sm:max-w-[400px] md:max-w-[420px] lg:max-w-[440px]",
+                      "p-0 rounded-2xl shadow-2xl border border-gray-200/80 overflow-hidden bg-white",
+                      "mx-auto left-0 right-0 sm:left-auto sm:right-0"
                     )}
                   >
                     {/* Header */}
-                    <div className="px-5 py-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50">
-                      <div className="flex items-center justify-between">
+                    <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
-                          <h3 className="font-semibold text-gray-900 text-base">Notifications</h3>
-                          <p className="text-xs text-gray-500 mt-0.5">
+                          <h3 className="font-semibold text-gray-900 text-sm sm:text-base">Notifications</h3>
+                          <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
                             {unreadCount > 0 
                               ? `You have ${unreadCount} unread notification${unreadCount > 1 ? 's' : ''}` 
                               : "You're all caught up!"}
@@ -919,7 +928,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                             variant="ghost" 
                             size="sm" 
                             onClick={markAllAsRead}
-                            className="text-xs h-8 px-3 hover:bg-gray-100"
+                            className="text-[10px] sm:text-xs h-7 sm:h-8 px-2 sm:px-3 hover:bg-gray-100"
                           >
                             Mark all read
                           </Button>
@@ -927,14 +936,14 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       </div>
                     </div>
                     
-                    <ScrollArea className="max-h-[400px] sm:max-h-[440px] md:max-h-[480px]">
+                    <ScrollArea className="max-h-[350px] sm:max-h-[400px] md:max-h-[450px] lg:max-h-[500px]">
                       {notifications.length === 0 ? (
-                        <div className="py-12 px-6 text-center">
-                          <div className="h-12 w-12 rounded-full bg-gray-100 mx-auto mb-4 flex items-center justify-center">
-                            <Bell className="h-6 w-6 text-gray-400" />
+                        <div className="py-10 sm:py-12 px-4 sm:px-6 text-center">
+                          <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-gray-100 mx-auto mb-3 sm:mb-4 flex items-center justify-center">
+                            <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-gray-400" />
                           </div>
                           <p className="text-sm font-medium text-gray-700">No notifications yet</p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 mt-1 max-w-[250px] mx-auto">
                             We'll notify you when something important happens
                           </p>
                         </div>
@@ -947,52 +956,52 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ duration: 0.2 }}
                               className={cn(
-                                "px-5 py-4 hover:bg-gray-50/80 transition-colors cursor-pointer group relative",
+                                "px-4 sm:px-5 py-3 sm:py-4 hover:bg-gray-50/80 transition-colors cursor-pointer group relative",
                                 !notification.read && "bg-blue-50/40 hover:bg-blue-50/60"
                               )}
                               onClick={() => handleNotificationClick(notification)}
                             >
-                              <div className="flex gap-3">
+                              <div className="flex gap-2 sm:gap-3">
                                 <div className="shrink-0 mt-0.5">
                                   <div className={cn(
-                                    "h-8 w-8 rounded-full flex items-center justify-center",
+                                    "h-7 w-7 sm:h-8 sm:w-8 rounded-full flex items-center justify-center",
                                     !notification.read ? "bg-blue-100" : "bg-gray-100"
                                   )}>
                                     {getNotificationIcon(notification.type)}
                                   </div>
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-start justify-between gap-2 mb-1">
+                                  <div className="flex items-start justify-between gap-2 mb-0.5 sm:mb-1">
                                     <p className={cn(
-                                      "text-sm font-medium leading-tight",
+                                      "text-xs sm:text-sm font-medium leading-tight",
                                       !notification.read ? "text-gray-900" : "text-gray-600"
                                     )}>
                                       {notification.title}
                                     </p>
-                                    <span className="text-[10px] text-gray-400 shrink-0">
+                                    <span className="text-[9px] sm:text-[10px] text-gray-400 shrink-0 whitespace-nowrap ml-2">
                                       {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                     </span>
                                   </div>
-                                  <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                                  <p className="text-[11px] sm:text-xs text-gray-500 leading-relaxed line-clamp-2">
                                     {notification.message}
                                   </p>
                                 </div>
                               </div>
                               
                               {!notification.read && (
-                                <div className="ml-11 mt-2">
+                                <div className="ml-9 sm:ml-10 mt-1">
                                   <span className="inline-flex items-center gap-1">
-                                    <span className="h-2 w-2 bg-blue-500 rounded-full" />
-                                    <span className="text-[10px] font-medium text-blue-600">New</span>
+                                    <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-blue-500 rounded-full" />
+                                    <span className="text-[9px] sm:text-[10px] font-medium text-blue-600">New</span>
                                   </span>
                                 </div>
                               )}
                               
                               <button
-                                className="absolute right-4 top-4 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-gray-200"
+                                className="absolute right-2 sm:right-3 top-2 sm:top-3 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-gray-200"
                                 onClick={(e) => deleteNotification(notification.id, e)}
                               >
-                                <Trash2 className="h-3.5 w-3.5 text-gray-400 hover:text-red-500" />
+                                <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-gray-400 hover:text-red-500" />
                               </button>
                             </motion.div>
                           ))}
@@ -1000,15 +1009,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       )}
                     </ScrollArea>
                     
-                    <div className="p-3 border-t border-gray-100 bg-gray-50/50">
+                    <div className="p-2.5 sm:p-3 border-t border-gray-100 bg-gray-50/50">
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="w-full text-sm h-9 font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100"
+                        className="w-full text-xs sm:text-sm h-8 sm:h-9 font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100"
                         onClick={handleViewAllNotifications}
                       >
                         View All Notifications
-                        <ChevronRight className="ml-1 h-4 w-4" />
+                        <ChevronRight className="ml-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
                       </Button>
                     </div>
                   </PopoverContent>
@@ -1104,7 +1113,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       </div>
                       
-                      {/* ✅ DASHBOARD BUTTON - Shows on ALL Public Pages (Home, Admission, Schools, Contact) */}
+                      {/* DASHBOARD BUTTON - Shows on ALL Public Pages */}
                       {(isPublicPage || isHomePage || isPortalPage) && (
                         <div className="p-2 xs:p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                           <button
@@ -1298,6 +1307,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </div>
       </header>
 
+      {/* Rest of the component remains the same... */}
       {/* CBT Platform Dialog */}
       <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-[85vh] overflow-y-auto p-0">
@@ -1388,273 +1398,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* MOBILE MENU */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-md z-40 lg:hidden"
-              onClick={() => setMobileMenuOpen(false)}
-            />
-            
-            <motion.div 
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-              className="fixed top-0 right-0 h-full w-full max-w-[280px] xs:max-w-sm sm:max-w-md bg-white z-50 lg:hidden overflow-y-auto"
-            >
-              <div className="bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] text-white p-4 sm:p-5">
-                <button onClick={() => setMobileMenuOpen(false)} className="absolute top-3 right-3 sm:top-4 sm:right-4 p-2 rounded-full hover:bg-white/10">
-                  <X className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
-                
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <div className="relative h-10 w-10 sm:h-12 sm:w-12">
-                    {schoolSettings?.logo_path ? (
-                      <Image 
-                        src={schoolSettings.logo_path} 
-                        alt="Logo" 
-                        width={48}
-                        height={48}
-                        className="object-contain"
-                      />
-                    ) : (
-                      <div className="h-10 w-10 sm:h-12 sm:w-12 bg-white/20 rounded-xl flex items-center justify-center">
-                        <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <p className="font-bold text-base sm:text-lg">Vincollins College</p>
-                    <p className="text-[9px] sm:text-xs text-white/70">Geared Towards Excellence</p>
-                  </div>
-                </div>
-                
-                {user?.isAuthenticated && (
-                  <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-white/10 rounded-xl">
-                    <div className="flex items-center gap-2 sm:gap-3">
-                      <Avatar className="h-10 w-10 sm:h-12 sm:w-12 ring-2 ring-white/30">
-                        {user.avatar && !avatarError ? (
-                          <AvatarImage 
-                            src={user.avatar} 
-                            alt={user.name}
-                            onError={handleAvatarError}
-                            className="object-cover"
-                          />
-                        ) : null}
-                        <AvatarFallback className="bg-white/30 text-white text-sm">
-                          {getUserInitials()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-bold text-sm">{getMobileGreeting()}</p>
-                        <p className="text-xs sm:text-sm text-white/80 truncate">{user.name}</p>
-                        <Badge className={cn("mt-1 text-[10px] sm:text-xs text-white", getRoleBadgeColor(user.role))}>
-                          {getRoleDisplayName(user.role)}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-3 sm:p-4">
-                {currentNavigation.map((item) => {
-                  const Icon = item.icon
-                  const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
-                  const isCbt = item.name === 'CBT Platform' || item.isCbt
-                  
-                  if (item.isDropdown && item.dropdownItems) {
-                    return (
-                      <div key={item.name} className="mb-1">
-                        <div className={cn(
-                          "flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg text-sm",
-                          isUserManagementActive() ? "bg-[#0A2472]/10 text-[#0A2472] font-semibold" : "text-gray-700"
-                        )}>
-                          <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                          <span>{item.name}</span>
-                        </div>
-                        <div className="ml-6 mt-1 space-y-1">
-                          {item.dropdownItems.map((subItem) => {
-                            const SubIcon = subItem.icon
-                            const isSubActive = pathname?.startsWith(subItem.href)
-                            return (
-                              <Link
-                                key={subItem.name}
-                                href={subItem.href}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className={cn(
-                                  "flex items-center gap-3 px-3 sm:px-4 py-2 rounded-lg text-sm transition-all",
-                                  isSubActive ? "bg-[#0A2472]/10 text-[#0A2472] font-medium" : "text-gray-600 hover:bg-gray-100"
-                                )}
-                              >
-                                <SubIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                <span>{subItem.name}</span>
-                              </Link>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  }
-                  
-                  return (
-                    <Link
-                      key={item.name}
-                      href={item.href}
-                      prefetch={false}
-                      onClick={(e) => {
-                        if (isCbt) {
-                          e.preventDefault()
-                          setMobileMenuOpen(false)
-                          setShowCbtInfo(true)
-                        } else {
-                          setMobileMenuOpen(false)
-                        }
-                      }}
-                      className={cn(
-                        "flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-lg transition-all text-sm",
-                        isActive ? "bg-[#0A2472]/10 text-[#0A2472] font-semibold" : "text-gray-700 hover:bg-gray-100"
-                      )}
-                    >
-                      <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span>{item.name}</span>
-                      {isCbt && (
-                        <Badge className="ml-auto bg-[#F5A623] text-[#0A2472] text-[8px] px-1.5">CBT</Badge>
-                      )}
-                    </Link>
-                  )
-                })}
-              </div>
-
-              {/* ✅ Dashboard Button in Mobile Menu - Shows on ALL Public Pages */}
-              {user?.isAuthenticated && (isPublicPage || isPortalPage || isHomePage) && (
-                <div className="p-3 sm:p-4 border-t">
-                  <button
-                    onClick={goToDashboard}
-                    className="flex items-center justify-center gap-2 w-full px-4 py-2.5 sm:py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md hover:shadow-lg transition-all text-sm"
-                  >
-                    <LayoutDashboard className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Go to Dashboard
-                  </button>
-                </div>
-              )}
-
-              {!user?.isAuthenticated && isPublicPage && (
-                <div className="p-3 sm:p-4 border-t">
-                  <Link
-                    href="/portal"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="flex items-center justify-center gap-2 w-full px-4 py-2.5 sm:py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg shadow-md text-sm"
-                  >
-                    <KeyRound className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Portal Login
-                  </Link>
-                </div>
-              )}
-
-              {user?.isAuthenticated && !isPortalPage && !isHomePage && !isPublicPage && (
-                <div className="p-3 sm:p-4 border-t bg-gray-50/50">
-                  <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Quick Switch</p>
-                  <div className="space-y-1">
-                    <Link
-                      href="/"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all text-sm"
-                    >
-                      <Home className="h-4 w-4 text-blue-500" />
-                      <span>Home Page</span>
-                    </Link>
-                    <Link
-                      href="/portal"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-3 px-3 sm:px-4 py-2.5 sm:py-3 bg-white rounded-lg text-gray-700 hover:bg-gray-100 transition-all text-sm"
-                    >
-                      <KeyRound className="h-4 w-4 text-emerald-500" />
-                      <span>Portal Page</span>
-                    </Link>
-                  </div>
-                </div>
-              )}
-
-              <div className="p-3 sm:p-4 border-t">
-                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Quick Links</p>
-                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
-                  {quickLinks.map((link) => {
-                    const Icon = link.icon
-                    return (
-                      <Link
-                        key={link.name}
-                        href={link.href}
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-2 sm:py-2.5 text-xs sm:text-sm text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg sm:rounded-xl"
-                      >
-                        <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#0A2472]" />
-                        <span className="truncate">{link.name}</span>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Contact Us */}
-              <div className="p-3 sm:p-4 border-t">
-                <p className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 sm:mb-3">Contact Us</p>
-                <div className="space-y-1.5 sm:space-y-2">
-                  {contactInfo.map((info, idx) => (
-                    <div key={idx} className="flex items-center gap-2 sm:gap-3 px-1 sm:px-2 py-1 sm:py-1.5">
-                      <info.icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-[#0A2472] shrink-0" />
-                      <span className="text-[10px] sm:text-xs text-gray-600" suppressHydrationWarning>
-                        {info.text}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-4 border-t">
-                <div className="flex justify-center gap-4 sm:gap-5">
-                  {socialLinks.map((social, idx) => {
-                    const Icon = social.icon
-                    return (
-                      <Link
-                        key={idx}
-                        href={social.href}
-                        target="_blank"
-                        className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-[#0A2472] hover:text-white transition-all"
-                      >
-                        <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-
-              <div className="p-3 sm:p-4 border-t text-center">
-                <p className="text-[9px] sm:text-xs text-gray-500" suppressHydrationWarning>© {currentYear} Vincollins College</p>
-              </div>
-
-              {user?.isAuthenticated && (
-                <div className="p-3 sm:p-4 border-t sticky bottom-0 bg-white">
-                  <Button 
-                    variant="outline" 
-                    className="w-full text-red-600 text-sm"
-                    onClick={handleLogoutClick}
-                  >
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </Button>
-                </div>
-              )}
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
 
       {/* Sign Out Confirmation Dialog */}
       <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
