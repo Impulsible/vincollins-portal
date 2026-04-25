@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/courses/page.tsx - FIXED: Hydration error resolved with NoSSR wrapper
+// app/student/courses/page.tsx - FIXED: Breadcrumb properly below header
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -133,7 +133,6 @@ export default function StudentCoursesPage() {
         toast.error('Access denied'); router.push('/portal'); return
       }
 
-      // Include ALL fields needed by the sidebar including admission_year
       const studentProfile: StudentProfile = {
         id: profileData.id,
         full_name: profileData.full_name || 'Student',
@@ -150,7 +149,6 @@ export default function StudentCoursesPage() {
       }
       setProfile(studentProfile)
 
-      // Load notes for student's class
       const { data: notesData } = await supabase
         .from('notes')
         .select('*')
@@ -158,7 +156,6 @@ export default function StudentCoursesPage() {
         .eq('status', 'published')
         .order('created_at', { ascending: false })
 
-      // Load teacher names
       const teacherIds = [...new Set((notesData || []).map(n => n.created_by).filter(Boolean))]
       const teacherMap: Record<string, string> = {}
       if (teacherIds.length > 0) {
@@ -184,7 +181,6 @@ export default function StudentCoursesPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Filter notes
   useEffect(() => {
     let filtered = [...notes]
     if (subjectFilter !== 'all') filtered = filtered.filter(n => n.subject === subjectFilter)
@@ -207,7 +203,7 @@ export default function StudentCoursesPage() {
       <NoSSR>
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
           <Header onLogout={handleLogout} />
-          <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+          <div className="flex items-center justify-center min-h-[calc(100vh-64px)] pt-16">
             <div className="text-center">
               <Loader2 className="h-8 w-8 sm:h-10 sm:w-10 animate-spin text-emerald-600 mx-auto" />
               <p className="mt-3 text-sm sm:text-base text-slate-500">Loading study materials...</p>
@@ -221,12 +217,12 @@ export default function StudentCoursesPage() {
   // ========== RENDER ==========
   return (
     <NoSSR>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
         
         {/* Mobile Sidebar Toggle */}
         <button
-          className="lg:hidden fixed top-20 left-3 z-50 bg-white p-2 rounded-lg shadow-md border"
+          className="lg:hidden fixed top-16 left-3 z-50 bg-white p-2 rounded-lg shadow-md border"
           onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
         >
           {mobileSidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -234,27 +230,25 @@ export default function StudentCoursesPage() {
 
         {/* Mobile Sidebar Overlay */}
         {mobileSidebarOpen && (
-          <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setMobileSidebarOpen(false)} />
+          <div className="lg:hidden fixed inset-0 z-40 bg-black/50 top-16" onClick={() => setMobileSidebarOpen(false)} />
         )}
 
         {/* Mobile Sidebar */}
         <div className={cn(
-          "lg:hidden fixed top-0 left-0 z-50 h-full w-72 bg-white shadow-xl transition-transform duration-300",
+          "lg:hidden fixed top-16 left-0 z-50 h-[calc(100vh-64px)] w-72 bg-white shadow-xl transition-transform duration-300 overflow-y-auto",
           mobileSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}>
-          <div className="pt-20">
-            <StudentSidebar
-              profile={profile}
-              onLogout={handleLogout}
-              collapsed={false}
-              onToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)}
-              activeTab="courses"
-              setActiveTab={() => {}}
-            />
-          </div>
+          <StudentSidebar
+            profile={profile}
+            onLogout={handleLogout}
+            collapsed={false}
+            onToggle={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+            activeTab="courses"
+            setActiveTab={() => {}}
+          />
         </div>
         
-        <div className="flex flex-1">
+        <div className="flex">
           {/* Desktop Sidebar */}
           <div className="hidden lg:block">
             <StudentSidebar 
@@ -267,98 +261,113 @@ export default function StudentCoursesPage() {
             />
           </div>
 
-          <div className={cn("flex-1 transition-all duration-300 w-full overflow-x-hidden", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
-            <main className="pt-[72px] lg:pt-20 pb-24 lg:pb-12 px-3 sm:px-4 lg:px-6 xl:px-8">
-              <div className="container mx-auto max-w-7xl">
+          {/* Main Content Area */}
+          <div className={cn(
+            "flex-1 transition-all duration-300 w-full min-h-screen",
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          )}>
+            {/* Header spacer - critical for fixed header */}
+            <div className="h-14 sm:h-16 lg:h-[72px]" />
+            
+            <main className="pb-20 px-4 sm:px-6 lg:px-8">
+              <div className="max-w-7xl mx-auto">
                 
-                {/* Breadcrumb */}
-                <motion.div 
-                  initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-                  className="mb-4 sm:mb-6 flex items-center justify-between flex-wrap gap-2"
-                >
-                  <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
-                    <Link href="/student" className="hover:text-primary flex items-center gap-1">
-                      <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                      <span className="hidden sm:inline">Dashboard</span>
+                {/* Breadcrumb - properly spaced below header */}
+                <div className="pt-2 pb-4">
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Link href="/student" className="hover:text-emerald-600 transition-colors flex items-center gap-1">
+                      <Home className="h-4 w-4" />
+                      <span>Dashboard</span>
                     </Link>
-                    <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    <span className="text-foreground font-medium truncate">My Courses & Notes</span>
-                  </div>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    {profile?.class} • {filteredNotes.length} materials
-                  </p>
-                </motion.div>
-
-                {/* Header & Filters - Responsive */}
-                <div className="flex flex-col gap-3 sm:gap-4 mb-4 sm:mb-6">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
-                    <div>
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Study Materials</h1>
-                      <p className="text-xs sm:text-sm text-muted-foreground">Access notes shared by your teachers</p>
-                    </div>
-                    <Badge className="self-start sm:self-center text-[10px] sm:text-xs">{profile?.class}</Badge>
-                  </div>
-                  
-                  {/* Search & Filter Bar - Stack on mobile */}
-                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
-                      <Input
-                        placeholder="Search notes..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8 sm:pl-9 w-full bg-white h-9 sm:h-10 text-xs sm:text-sm"
-                      />
-                      {searchQuery && (
-                        <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                          <X className="h-3.5 w-3.5 text-slate-400" />
-                        </button>
-                      )}
-                    </div>
-                    
-                    <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-                      <SelectTrigger className="w-full sm:w-[160px] bg-white h-9 sm:h-10 text-xs sm:text-sm">
-                        <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        <SelectValue placeholder="Subject" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Subjects</SelectItem>
-                        {availableSubjects.map(subject => (
-                          <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <ChevronRight className="h-4 w-4" />
+                    <span>My Courses & Notes</span>
+                    <ChevronRight className="h-4 w-4" />
+                    <span className="text-foreground font-medium">{profile?.class}</span>
                   </div>
                 </div>
 
-                {/* Notes Grid - Responsive columns */}
+                {/* Page Header */}
+                <div className="mb-6">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Study Materials</h1>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Access notes and resources shared by your teachers
+                  </p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100">
+                      {profile?.class}
+                    </Badge>
+                    <span className="text-xs text-slate-500">
+                      {filteredNotes.length} materials
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Search & Filter Bar */}
+                <div className="flex flex-col sm:flex-row gap-3 mb-8">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Search by title, subject, or description..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 w-full bg-white h-10 text-sm rounded-lg border-slate-200 focus:ring-emerald-500"
+                    />
+                    {searchQuery && (
+                      <button 
+                        onClick={() => setSearchQuery('')} 
+                        className="absolute right-3 top-1/2 -translate-y-1/2"
+                      >
+                        <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                    <SelectTrigger className="w-full sm:w-[160px] bg-white h-10 text-sm rounded-lg">
+                      <Filter className="h-4 w-4 mr-2 text-slate-400" />
+                      <SelectValue placeholder="Subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Subjects</SelectItem>
+                      {availableSubjects.map(subject => (
+                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Notes Grid */}
                 {filteredNotes.length === 0 ? (
-                  <Card className="border-0 shadow-sm bg-white">
-                    <CardContent className="text-center py-12 sm:py-16 lg:py-20">
+                  <Card className="border shadow-sm bg-white rounded-xl">
+                    <CardContent className="text-center py-12">
                       {notes.length === 0 ? (
                         <>
-                          <BookOpen className="h-10 w-10 sm:h-12 sm:w-12 text-slate-300 mx-auto mb-3 sm:mb-4" />
-                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">No study notes available</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+                          <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                          <h3 className="text-base font-semibold text-gray-900 mb-1">No study notes available</h3>
+                          <p className="text-sm text-muted-foreground">
                             Check back later for study materials from your teachers.
                           </p>
                         </>
                       ) : (
                         <>
-                          <Search className="h-10 w-10 sm:h-12 sm:w-12 text-slate-300 mx-auto mb-3 sm:mb-4" />
-                          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">No results found</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground">
+                          <Search className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                          <h3 className="text-base font-semibold text-gray-900 mb-1">No results found</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
                             Try adjusting your search or filter
                           </p>
-                          <Button variant="outline" size="sm" className="mt-3 sm:mt-4" onClick={() => { setSearchQuery(''); setSubjectFilter('all') }}>
-                            Clear Filters
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => { setSearchQuery(''); setSubjectFilter('all') }}
+                          >
+                            Clear filters
                           </Button>
                         </>
                       )}
                     </CardContent>
                   </Card>
                 ) : (
-                  <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {filteredNotes.map((note, index) => {
                       const FileIcon = getFileIcon(note.file_name)
                       const colors = getSubjectColor(note.subject)
@@ -368,45 +377,47 @@ export default function StudentCoursesPage() {
                           key={note.id}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.03 }}
+                          transition={{ delay: Math.min(index * 0.03, 0.3) }}
                         >
-                          <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-all h-full flex flex-col group">
-                            <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 pt-3 sm:pt-4">
-                              <div className="flex items-start gap-2 sm:gap-3">
-                                <div className={cn("h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0", colors.bg)}>
-                                  <FileIcon className={cn("h-5 w-5 sm:h-6 sm:w-6", colors.icon)} />
+                          <Card className="border shadow-sm bg-white hover:shadow-md transition-all h-full flex flex-col rounded-xl">
+                            <CardHeader className="pb-2 px-4 pt-4">
+                              <div className="flex items-start gap-3">
+                                <div className={cn("h-10 w-10 rounded-lg flex items-center justify-center shrink-0", colors.bg)}>
+                                  <FileIcon className={cn("h-4 w-4", colors.icon)} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <CardTitle className="text-sm sm:text-base font-semibold truncate">{note.title}</CardTitle>
-                                  <CardDescription className="flex items-center gap-1 mt-0.5 sm:mt-1">
-                                    <Badge variant="outline" className="text-[10px] sm:text-xs">{note.subject}</Badge>
-                                  </CardDescription>
+                                  <CardTitle className="text-sm font-semibold truncate">{note.title}</CardTitle>
+                                  <Badge variant="outline" className="text-[10px] mt-1">
+                                    {note.subject}
+                                  </Badge>
                                 </div>
                               </div>
                             </CardHeader>
-                            <CardContent className="flex-1 flex flex-col px-3 sm:px-4 pb-3 sm:pb-4">
-                              <p className="text-xs sm:text-sm text-slate-600 line-clamp-2 mb-2 sm:mb-3">
-                                {note.description || 'No description provided.'}
+                            <CardContent className="flex-1 flex flex-col px-4 pb-4">
+                              <p className="text-xs text-slate-600 line-clamp-2 mb-3">
+                                {note.description || 'No description provided'}
                               </p>
-                              <div className="flex items-center justify-between mt-auto pt-2 sm:pt-3 border-t">
-                                <span className="text-[10px] sm:text-xs text-slate-500 truncate mr-1">
+                              <div className="flex items-center justify-between mt-auto pt-2 border-t">
+                                <span className="text-[10px] text-slate-500 truncate">
                                   {note.teacher_name}
                                 </span>
-                                <div className="flex gap-0.5 sm:gap-1 shrink-0">
+                                <div className="flex gap-1">
                                   <Button
-                                    variant="ghost" size="icon"
-                                    className="h-7 w-7 sm:h-8 sm:w-8"
+                                    variant="ghost" 
+                                    size="sm"
+                                    className="h-7 w-7 p-0"
                                     onClick={() => { setSelectedNote(note); setShowDetailsDialog(true) }}
                                   >
-                                    <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                    <Eye className="h-3.5 w-3.5" />
                                   </Button>
                                   {note.file_url && (
                                     <Button
-                                      variant="ghost" size="icon"
-                                      className="h-7 w-7 sm:h-8 sm:w-8"
+                                      variant="ghost" 
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
                                       onClick={() => window.open(note.file_url, '_blank')}
                                     >
-                                      <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                      <Download className="h-3.5 w-3.5" />
                                     </Button>
                                   )}
                                 </div>
@@ -423,15 +434,15 @@ export default function StudentCoursesPage() {
           </div>
         </div>
 
-        {/* Note Details Dialog - Responsive */}
+        {/* Note Details Dialog */}
         <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
-          <DialogContent className="w-[95vw] max-w-lg sm:max-w-xl lg:max-w-2xl max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+          <DialogContent className="w-[90vw] max-w-md rounded-xl p-5">
             {selectedNote && (
               <>
-                <DialogHeader className="space-y-2 sm:space-y-3">
-                  <DialogTitle className="text-lg sm:text-xl">{selectedNote.title}</DialogTitle>
-                  <DialogDescription className="flex flex-wrap gap-1 sm:gap-2 text-xs sm:text-sm">
-                    <Badge variant="outline">{selectedNote.subject}</Badge>
+                <DialogHeader>
+                  <DialogTitle className="text-lg font-bold">{selectedNote.title}</DialogTitle>
+                  <DialogDescription className="flex flex-wrap items-center gap-2 text-xs">
+                    <Badge variant="secondary">{selectedNote.subject}</Badge>
                     <span>•</span>
                     <span>{selectedNote.teacher_name}</span>
                     <span>•</span>
@@ -439,22 +450,24 @@ export default function StudentCoursesPage() {
                   </DialogDescription>
                 </DialogHeader>
                 
-                <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
+                <div className="space-y-3 py-3">
                   <div>
-                    <h4 className="font-semibold text-sm sm:text-base mb-1 sm:mb-2">Description</h4>
-                    <p className="text-xs sm:text-sm text-slate-600 bg-slate-50 p-3 sm:p-4 rounded-lg">
+                    <h4 className="font-semibold text-xs mb-1">Description</h4>
+                    <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg">
                       {selectedNote.description || 'No description provided.'}
                     </p>
                   </div>
                   
                   {selectedNote.file_url && (
-                    <div>
-                      <h4 className="font-semibold text-sm sm:text-base mb-1 sm:mb-2">Attachment</h4>
-                      <Button variant="outline" className="w-full h-9 sm:h-10 text-xs sm:text-sm" onClick={() => window.open(selectedNote.file_url, '_blank')}>
-                        <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                        {selectedNote.file_name || 'Download File'}
-                      </Button>
-                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      className="w-full"
+                      onClick={() => window.open(selectedNote.file_url, '_blank')}
+                    >
+                      <Download className="h-3.5 w-3.5 mr-2" />
+                      {selectedNote.file_name || 'Download'}
+                    </Button>
                   )}
                 </div>
               </>
