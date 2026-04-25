@@ -3,7 +3,7 @@
 
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { StudentProfile, Classmate, StudyNote, Assignment } from '../types'
+import type { StudentProfile, Classmate, StudyNote, Assignment, PerformanceStats, BannerStats, TermProgressData } from '../types'
 
 export interface ExamAttempt {
   id: string
@@ -20,49 +20,21 @@ export interface ExamAttempt {
   completed_at?: string
 }
 
-export interface PerformanceStats {
-  totalExams: number
-  completedExams: number
-  averageScore: number
-  passedExams: number
-  failedExams: number
-  pendingResults: number
+// 🔥 FIXED: Extended stats interface for internal use
+export interface DashboardStats extends PerformanceStats {
   recentAttempts: ExamAttempt[]
-  availableExams: any[]
+  availableExamsList: any[]  // Renamed to avoid conflict with number type
   recentAssignments: Assignment[]
   recentNotes: StudyNote[]
-  allAssignments: Assignment[]  // Ensure this is always an array
-  allNotes: StudyNote[]         // Ensure this is always an array
+  allAssignments: Assignment[]
+  allNotes: StudyNote[]
   classmates: Classmate[]
-}
-
-export interface BannerStats {
-  completedExams: number
-  averageScore: number
-  availableExams: number
-  totalExams: number
-  totalSubjects: number
-  currentGrade: string
-  gradeColor: string
-  currentTerm: string
-  sessionYear: string
-}
-
-export interface TermProgress {
-  term: string
-  session_year: string
-  completed_exams: number
-  total_exams: number
-  average_score: number
-  subjects_passed: number
-  subjects_failed: number
-  total_subjects?: number
 }
 
 export function useDashboardData(profile: StudentProfile | null) {
   const [loading, setLoading] = useState(true)
-  const [termProgress, setTermProgress] = useState<TermProgress | null>(null)
-  const [stats, setStats] = useState<PerformanceStats>({
+  const [termProgress, setTermProgress] = useState<TermProgressData | null>(null)
+  const [stats, setStats] = useState<DashboardStats>({
     totalExams: 0,
     completedExams: 0,
     averageScore: 0,
@@ -70,11 +42,11 @@ export function useDashboardData(profile: StudentProfile | null) {
     failedExams: 0,
     pendingResults: 0,
     recentAttempts: [],
-    availableExams: [],
-    recentAssignments: [],  // Initialize as empty array
-    recentNotes: [],        // Initialize as empty array
-    allAssignments: [],     // Initialize as empty array
-    allNotes: [],           // Initialize as empty array
+    availableExamsList: [],  // 🔥 Renamed from availableExams
+    recentAssignments: [],
+    recentNotes: [],
+    allAssignments: [],
+    allNotes: [],
     classmates: []
   })
 
@@ -98,11 +70,12 @@ export function useDashboardData(profile: StudentProfile | null) {
     
     setLoading(true)
     try {
-      // Fetch available exams
+      // Fetch available exams - FILTERED BY CLASS
       const { data: exams, error: examsError } = await supabase
         .from('exams')
         .select('*')
         .eq('status', 'published')
+        .eq('class', profile.class) // 🔥 Filter by student's class
         .order('created_at', { ascending: false })
         .limit(10)
 
@@ -130,7 +103,7 @@ export function useDashboardData(profile: StudentProfile | null) {
         ? completedAttempts.reduce((sum, a) => sum + (a.percentage || 0), 0) / completedAttempts.length
         : 0
 
-      // Fetch assignments - ensure we always have an array
+      // Fetch assignments
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select('*')
@@ -143,7 +116,6 @@ export function useDashboardData(profile: StudentProfile | null) {
         console.error('Error fetching assignments:', assignmentsError)
       }
 
-      // Map assignments to Assignment type (ensure it's always an array)
       const assignments: Assignment[] = (assignmentsData || []).map(assignment => ({
         id: assignment.id,
         title: assignment.title,
@@ -162,15 +134,6 @@ export function useDashboardData(profile: StudentProfile | null) {
         updated_at: assignment.updated_at
       }))
 
-      // Fetch all assignments (without limit for counting)
-      const { data: allAssignmentsData, error: allAssignmentsError } = await supabase
-        .from('assignments')
-        .select('id', { count: 'exact', head: true })
-        .eq('class', profile.class)
-        .eq('status', 'published')
-
-      const allAssignmentsCount = allAssignmentsData?.length || 0
-
       // Fetch notes/study materials
       const { data: notesData, error: notesError } = await supabase
         .from('study_notes')
@@ -184,7 +147,6 @@ export function useDashboardData(profile: StudentProfile | null) {
         console.error('Error fetching notes:', notesError)
       }
 
-      // Map notes to StudyNote type (ensure it's always an array)
       const recentNotes: StudyNote[] = (notesData || []).map(note => ({
         id: note.id,
         title: note.title,
@@ -203,15 +165,6 @@ export function useDashboardData(profile: StudentProfile | null) {
         updated_at: note.updated_at
       }))
 
-      // Fetch all notes (without limit for counting)
-      const { data: allNotesData, error: allNotesError } = await supabase
-        .from('study_notes')
-        .select('id', { count: 'exact', head: true })
-        .eq('class', profile.class)
-        .eq('status', 'published')
-
-      const allNotesCount = allNotesData?.length || 0
-
       // Fetch classmates
       const { data: classmatesData, error: classmatesError } = await supabase
         .from('profiles')
@@ -225,7 +178,6 @@ export function useDashboardData(profile: StudentProfile | null) {
         console.error('Error fetching classmates:', classmatesError)
       }
 
-      // Map classmates to Classmate type (ensure it's always an array)
       const classmates: Classmate[] = (classmatesData || []).map(c => ({
         id: c.id,
         full_name: c.full_name || '',
@@ -240,7 +192,7 @@ export function useDashboardData(profile: StudentProfile | null) {
         role: c.role || 'student'
       }))
 
-      // Update stats with all arrays properly initialized
+      // Update stats
       setStats({
         totalExams: exams?.length || 0,
         completedExams: completedAttempts.length,
@@ -249,11 +201,11 @@ export function useDashboardData(profile: StudentProfile | null) {
         failedExams: failedAttempts.length,
         pendingResults: (attempts?.filter(a => a.status === 'pending') || []).length,
         recentAttempts: (attempts || []) as ExamAttempt[],
-        availableExams: exams || [],
+        availableExamsList: exams || [],  // 🔥 Renamed
         recentAssignments: assignments,
         recentNotes: recentNotes,
-        allAssignments: assignments,  // Store the assignments array
-        allNotes: recentNotes,        // Store the notes array
+        allAssignments: assignments,
+        allNotes: recentNotes,
         classmates: classmates
       })
 
@@ -262,7 +214,7 @@ export function useDashboardData(profile: StudentProfile | null) {
         ...prev,
         completedExams: completedAttempts.length,
         averageScore: Math.round(averageScore),
-        availableExams: exams?.length || 0,
+        availableExams: exams?.length || 0,  // 🔥 Number for banner
         totalExams: exams?.length || 0,
         currentTerm: profile.current_term || 'Third Term',
         sessionYear: profile.session_year || '2025/2026'

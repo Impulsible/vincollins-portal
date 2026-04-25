@@ -140,24 +140,30 @@ export interface TermProgress {
   total_subjects?: number
 }
 
-// 🔥 ADDED: Banner Stats Interface
-export interface BannerStats {
-  availableExams: number
+// 🔥 UPDATED: Performance Stats Interface
+export interface PerformanceStats {
   totalExams: number
   completedExams: number
   averageScore: number
-}
-
-// 🔥 ADDED: Performance Stats Interface
-export interface PerformanceStats {
   passedExams: number
   failedExams: number
-  completedExams: number
-  availableExams: number
-  passRate: number
+  pendingResults: number
 }
 
-// 🔥 ADDED: Term Progress Data Interface
+// 🔥 UPDATED: Banner Stats Interface
+export interface BannerStats {
+  completedExams: number
+  averageScore: number
+  availableExams: number
+  totalExams: number
+  totalSubjects: number
+  currentGrade: string
+  gradeColor: string
+  currentTerm: string
+  sessionYear: string
+}
+
+// 🔥 UPDATED: Term Progress Data Interface
 export interface TermProgressData {
   term: string
   session_year: string
@@ -166,9 +172,10 @@ export interface TermProgressData {
   average_score: number
   subjects_passed: number
   subjects_failed: number
+  total_subjects?: number
 }
 
-// 🔥 ADDED: Exam Interface
+// Exam Interface
 export interface Exam {
   id: string
   title: string
