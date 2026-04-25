@@ -20,10 +20,9 @@ export interface ExamAttempt {
   completed_at?: string
 }
 
-// 🔥 FIXED: Extended stats interface for internal use
 export interface DashboardStats extends PerformanceStats {
   recentAttempts: ExamAttempt[]
-  availableExamsList: any[]  // Renamed to avoid conflict with number type
+  availableExams: any[]
   recentAssignments: Assignment[]
   recentNotes: StudyNote[]
   allAssignments: Assignment[]
@@ -42,7 +41,7 @@ export function useDashboardData(profile: StudentProfile | null) {
     failedExams: 0,
     pendingResults: 0,
     recentAttempts: [],
-    availableExamsList: [],  // 🔥 Renamed from availableExams
+    availableExams: [],
     recentAssignments: [],
     recentNotes: [],
     allAssignments: [],
@@ -75,7 +74,7 @@ export function useDashboardData(profile: StudentProfile | null) {
         .from('exams')
         .select('*')
         .eq('status', 'published')
-        .eq('class', profile.class) // 🔥 Filter by student's class
+        .eq('class', profile.class)
         .order('created_at', { ascending: false })
         .limit(10)
 
@@ -134,6 +133,13 @@ export function useDashboardData(profile: StudentProfile | null) {
         updated_at: assignment.updated_at
       }))
 
+      // Fetch all assignments count
+      const { count: allAssignmentsCount } = await supabase
+        .from('assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('class', profile.class)
+        .eq('status', 'published')
+
       // Fetch notes/study materials
       const { data: notesData, error: notesError } = await supabase
         .from('study_notes')
@@ -164,6 +170,13 @@ export function useDashboardData(profile: StudentProfile | null) {
         created_at: note.created_at,
         updated_at: note.updated_at
       }))
+
+      // Fetch all notes count
+      const { count: allNotesCount } = await supabase
+        .from('study_notes')
+        .select('*', { count: 'exact', head: true })
+        .eq('class', profile.class)
+        .eq('status', 'published')
 
       // Fetch classmates
       const { data: classmatesData, error: classmatesError } = await supabase
@@ -201,7 +214,7 @@ export function useDashboardData(profile: StudentProfile | null) {
         failedExams: failedAttempts.length,
         pendingResults: (attempts?.filter(a => a.status === 'pending') || []).length,
         recentAttempts: (attempts || []) as ExamAttempt[],
-        availableExamsList: exams || [],  // 🔥 Renamed
+        availableExams: exams || [],
         recentAssignments: assignments,
         recentNotes: recentNotes,
         allAssignments: assignments,
@@ -210,25 +223,27 @@ export function useDashboardData(profile: StudentProfile | null) {
       })
 
       // Update banner stats
-      setBannerStats(prev => ({
-        ...prev,
+      setBannerStats({
         completedExams: completedAttempts.length,
         averageScore: Math.round(averageScore),
-        availableExams: exams?.length || 0,  // 🔥 Number for banner
+        availableExams: exams?.length || 0,
         totalExams: exams?.length || 0,
+        totalSubjects: profile.subject_count || 17,
+        currentGrade: 'N/A',
+        gradeColor: 'text-gray-400',
         currentTerm: profile.current_term || 'Third Term',
         sessionYear: profile.session_year || '2025/2026'
-      }))
+      })
 
       // Calculate term progress
       if (exams && exams.length > 0) {
-        const currentTerm = profile.current_term || bannerStats.currentTerm
+        const currentTerm = profile.current_term || 'Third Term'
         const termExams = exams.filter(e => e.term === currentTerm)
         const termAttempts = (attempts || []).filter(a => a.term === currentTerm)
         
         setTermProgress({
           term: currentTerm,
-          session_year: profile.session_year || bannerStats.sessionYear,
+          session_year: profile.session_year || '2025/2026',
           completed_exams: termAttempts.filter(a => a.status === 'completed').length,
           total_exams: termExams.length,
           average_score: termAttempts.length > 0
@@ -245,7 +260,7 @@ export function useDashboardData(profile: StudentProfile | null) {
     } finally {
       setLoading(false)
     }
-  }, [profile?.id, profile?.class, profile?.current_term, profile?.session_year, bannerStats.currentTerm])
+  }, [profile?.id, profile?.class, profile?.current_term, profile?.session_year])
 
   return { 
     loading, 
