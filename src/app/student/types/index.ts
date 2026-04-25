@@ -79,7 +79,7 @@ export interface StudyNote {
   updated_at?: string
 }
 
-// Assignment Interface - ADD THIS
+// Assignment Interface
 export interface Assignment {
   id: string
   title: string
@@ -138,4 +138,74 @@ export interface TermProgress {
   subjects_passed: number
   subjects_failed: number
   total_subjects?: number
+}
+
+// 🔥 ADDED: Banner Stats Interface
+export interface BannerStats {
+  availableExams: number
+  totalExams: number
+  completedExams: number
+  averageScore: number
+}
+
+// 🔥 ADDED: Performance Stats Interface
+export interface PerformanceStats {
+  passedExams: number
+  failedExams: number
+  completedExams: number
+  availableExams: number
+  passRate: number
+}
+
+// 🔥 ADDED: Term Progress Data Interface
+export interface TermProgressData {
+  term: string
+  session_year: string
+  completed_exams: number
+  total_exams: number
+  average_score: number
+  subjects_passed: number
+  subjects_failed: number
+}
+
+// 🔥 ADDED: Exam Interface
+export interface Exam {
+  id: string
+  title: string
+  subject: string
+  class: string
+  status: string
+  duration: number
+  total_questions: number
+  total_points: number
+  pass_mark: number
+  description?: string
+  instructions?: string
+  has_theory?: boolean
+  questions?: any
+  theory_questions?: any
+  is_published?: boolean
+  published_at?: string
+  published_by?: string
+  starts_at?: string
+  ends_at?: string
+  created_by?: string
+  teacher_name?: string
+  department?: string
+  created_at?: string
+  updated_at?: string
+  total_marks?: number
+  tab_switch_limit?: number
+  auto_submit_on_violation?: boolean
+  proctoring_enabled?: boolean
+  face_detection_required?: boolean
+  fullscreen_required?: boolean
+  total_attempts?: number
+  average_score?: number
+  passing_percentage?: number
+  max_attempts?: number
+  randomize_questions?: boolean
+  randomize_options?: boolean
+  term?: string
+  session_year?: string
 }
