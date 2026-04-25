@@ -1,3 +1,4 @@
+// src/app/layout.tsx
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
@@ -62,7 +63,6 @@ export const metadata: Metadata = {
   authors: [{ name: 'Mrs. Joy Adaobi Nnoli' }],
   creator: 'Vincollins Schools',
   publisher: 'Vincollins Schools',
-  // ✅ FIXED: Disable format detection to prevent iOS hydration errors
   formatDetection: { 
     email: false, 
     address: false, 
@@ -182,9 +182,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        {/* ✅ ADDED: Prevents iOS from auto-detecting and modifying phone numbers, emails, and addresses */}
         <meta name="format-detection" content="telephone=no, email=no, address=no" />
-        
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://mvittkvxtasayycmzgha.supabase.co" />

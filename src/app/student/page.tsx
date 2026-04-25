@@ -1,4 +1,4 @@
-// app/student/page.tsx - SIMPLIFIED VERSION
+// app/student/page.tsx - Clean professional version
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -9,34 +9,26 @@ import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { OverviewTab } from '@/components/student/OverviewTab'
 import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { 
-  LayoutDashboard, 
   BookOpen, 
-  Award, 
-  Users
+  Award
 } from 'lucide-react'
 
-// Simple loading skeleton component
+// Loading skeleton component
 function DashboardSkeleton() {
   return (
-    <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4 sm:space-y-6">
-      <Skeleton className="h-48 w-full rounded-2xl" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3">
-        {[1, 2, 3, 4].map(i => (
-          <Skeleton key={i} className="h-20 sm:h-24 w-full rounded-xl" />
-        ))}
-      </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+    <div className="w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+      <Skeleton className="h-40 sm:h-48 md:h-56 w-full rounded-2xl" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
+        <div className="lg:col-span-2 space-y-6 sm:space-y-8">
+          <Skeleton className="h-64 sm:h-72 w-full rounded-xl" />
+          <Skeleton className="h-64 sm:h-72 w-full rounded-xl" />
         </div>
-        <div className="space-y-4 sm:space-y-6">
-          <Skeleton className="h-80 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
+        <div className="space-y-6 sm:space-y-8">
+          <Skeleton className="h-80 sm:h-96 w-full rounded-xl" />
+          <Skeleton className="h-64 sm:h-72 w-full rounded-xl" />
         </div>
       </div>
     </div>
@@ -46,22 +38,20 @@ function DashboardSkeleton() {
 export default function StudentDashboardPage() {
   const router = useRouter()
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeSection, setActiveSection] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [stats, setStats] = useState<any>({
     availableExams: [],
     classmates: [],
     recentAttempts: [],
+    allAssignments: [],
+    recentAssignments: [],
+    allNotes: [],
+    recentNotes: [],
     passedExams: 0,
     failedExams: 0,
     completedExams: 0
-  })
-  const [bannerStats, setBannerStats] = useState<any>({
-    availableExams: 0,
-    totalExams: 0,
-    completedExams: 0,
-    averageScore: 0
   })
   const [reportCardStatus, setReportCardStatus] = useState<any>(null)
 
@@ -87,7 +77,7 @@ export default function StudentDashboardPage() {
       if (profileData) {
         setProfile(profileData)
         
-        // Load classmates
+        // Load classmates from same class
         const { data: classmates } = await supabase
           .from('profiles')
           .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
@@ -96,27 +86,59 @@ export default function StudentDashboardPage() {
           .neq('id', profileData.id)
           .limit(6)
 
-        // Load available exams
+        // Load available exams FILTERED BY STUDENT'S CLASS
         const { data: exams } = await supabase
           .from('exams')
           .select('*')
           .eq('status', 'published')
+          .eq('class', profileData.class)
+          .limit(10)
+
+        // Load exam attempts for this student
+        const { data: attempts } = await supabase
+          .from('exam_attempts')
+          .select('*')
+          .eq('student_id', profileData.id)
+          .order('created_at', { ascending: false })
+
+        // Calculate exam stats
+        const passedExams = attempts?.filter(a => 
+          a.status === 'passed' || (a.score && a.total_points && (a.score / a.total_points) * 100 >= 50)
+        ).length || 0
+        
+        const failedExams = attempts?.filter(a => 
+          a.status === 'failed' || (a.score && a.total_points && (a.score / a.total_points) * 100 < 50)
+        ).length || 0
+        
+        const completedExams = attempts?.length || 0
+
+        // Load assignments
+        const { data: assignments } = await supabase
+          .from('assignments')
+          .select('*')
+          .eq('class', profileData.class)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        // Load notes
+        const { data: notes } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('class', profileData.class)
+          .order('created_at', { ascending: false })
           .limit(10)
 
         setStats({
           availableExams: exams || [],
           classmates: classmates || [],
-          recentAttempts: [],
-          passedExams: 0,
-          failedExams: 0,
-          completedExams: 0
-        })
-
-        setBannerStats({
-          availableExams: exams?.length || 0,
-          totalExams: exams?.length || 0,
-          completedExams: 0,
-          averageScore: 0
+          recentAttempts: attempts?.slice(0, 5) || [],
+          allAssignments: assignments || [],
+          recentAssignments: assignments?.slice(0, 5) || [],
+          allNotes: notes || [],
+          recentNotes: notes?.slice(0, 5) || [],
+          passedExams,
+          failedExams,
+          completedExams
         })
       }
     } catch (error) {
@@ -150,7 +172,7 @@ export default function StudentDashboardPage() {
         <div className="flex">
           <div className="hidden lg:block w-72" />
           <div className="flex-1">
-            <main className="pt-20 lg:pt-24 pb-8">
+            <main className="pt-20 sm:pt-24 lg:pt-28 pb-8">
               <DashboardSkeleton />
             </main>
           </div>
@@ -182,77 +204,61 @@ export default function StudentDashboardPage() {
           onLogout={handleLogout}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
+          activeTab={activeSection}
+          setActiveTab={setActiveSection}
         />
 
         <div className={cn(
           "flex-1 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-16 lg:pt-20 pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
+          <main className="pt-20 sm:pt-24 lg:pt-28 pb-8 sm:pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full max-w-2xl grid-cols-4 bg-white/80 backdrop-blur-sm p-1 rounded-xl">
-                  <TabsTrigger value="overview" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
-                    <LayoutDashboard className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger value="exams" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
-                    <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Exams
-                  </TabsTrigger>
-                  <TabsTrigger value="results" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
-                    <Award className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Results
-                  </TabsTrigger>
-                  <TabsTrigger value="classmates" className="data-[state=active]:bg-emerald-600 data-[state=active]:text-white rounded-lg text-xs sm:text-sm">
-                    <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                    Classmates
-                  </TabsTrigger>
-                </TabsList>
+              {activeSection === 'overview' && (
+                <OverviewTab 
+                  profile={profile}
+                  stats={stats}
+                  bannerStats={{
+                    availableExams: stats.availableExams?.length || 0,
+                    totalExams: stats.availableExams?.length || 0,
+                    completedExams: stats.completedExams || 0,
+                    averageScore: 0
+                  }}
+                  reportCardStatus={reportCardStatus}
+                  welcomeBannerProfile={profile}
+                  handleTabChange={setActiveSection}
+                  router={router}
+                />
+              )}
 
-                <TabsContent value="overview">
-                  <OverviewTab 
-                    profile={profile}
-                    stats={stats}
-                    bannerStats={bannerStats}
-                    reportCardStatus={reportCardStatus}
-                    welcomeBannerProfile={profile}
-                    handleTabChange={setActiveTab}
-                    router={router}
-                  />
-                </TabsContent>
+              {activeSection === 'exams' && (
+                <Card className="border-0 shadow-md">
+                  <CardContent className="py-12 sm:py-16 text-center">
+                    <BookOpen className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2">My Exams</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground">Your exams will appear here</p>
+                  </CardContent>
+                </Card>
+              )}
 
-                <TabsContent value="exams">
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                      <h3 className="text-lg font-semibold mb-2">My Exams</h3>
-                      <p className="text-muted-foreground">Your exams will appear here</p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+              {activeSection === 'results' && (
+                <Card className="border-0 shadow-md">
+                  <CardContent className="py-12 sm:py-16 text-center">
+                    <Award className="h-12 w-12 sm:h-16 sm:w-16 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+                    <h3 className="text-lg sm:text-xl font-semibold mb-2">My Results</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground">Your results will appear here</p>
+                  </CardContent>
+                </Card>
+              )}
 
-                <TabsContent value="results">
-                  <Card>
-                    <CardContent className="py-12 text-center">
-                      <Award className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-                      <h3 className="text-lg font-semibold mb-2">My Results</h3>
-                      <p className="text-muted-foreground">Your results will appear here</p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="classmates">
-                  <ClassmatesTab 
-                    profile={profile}
-                    stats={stats}
-                    handleTabChange={setActiveTab}
-                    router={router}
-                  />
-                </TabsContent>
-              </Tabs>
+              {activeSection === 'classmates' && (
+                <ClassmatesTab 
+                  profile={profile}
+                  stats={stats}
+                  handleTabChange={setActiveSection}
+                  router={router}
+                />
+              )}
             </div>
           </main>
         </div>
