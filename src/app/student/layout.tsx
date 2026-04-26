@@ -23,6 +23,9 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   const [activeTab, setActiveTab] = useState('overview')
   const [profile, setProfile] = useState<StudentProfile | null>(null)
 
+  // Check if current route is an exam page (CBT interface)
+  const isExamPage = pathname?.startsWith('/student/exam/')
+
   // Sync active tab with pathname
   useEffect(() => {
     if (pathname === '/student') setActiveTab('overview')
@@ -60,6 +63,12 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     router.push('/portal')
   }
 
+  // For exam pages, render ONLY children (no nav, no sidebar)
+  if (isExamPage) {
+    return <>{children}</>
+  }
+
+  // For all other student pages, render with nav
   return (
     <>
       {children}

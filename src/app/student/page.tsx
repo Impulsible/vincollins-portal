@@ -1,7 +1,7 @@
 // app/student/page.tsx - Clean professional version with proper spacing
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
@@ -11,12 +11,8 @@ import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { 
-  BookOpen, 
-  Award
-} from 'lucide-react'
+import { BookOpen, Award } from 'lucide-react'
 
-// Loading skeleton component with proper spacing
 function DashboardSkeleton() {
   return (
     <div className="w-full px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
@@ -33,6 +29,14 @@ function DashboardSkeleton() {
       </div>
     </div>
   )
+}
+
+function calculateGrade(percentage: number): { grade: string; color: string } {
+  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600' }
+  return { grade: 'F', color: 'text-red-600' }
 }
 
 export default function StudentDashboardPage() {
@@ -54,12 +58,9 @@ export default function StudentDashboardPage() {
     completedExams: 0
   })
   const [reportCardStatus, setReportCardStatus] = useState<any>(null)
+  const [termProgress, setTermProgress] = useState<any>(null)
 
-  useEffect(() => {
-    loadProfileAndData()
-  }, [])
-
-  const loadProfileAndData = async () => {
+  const loadProfileAndData = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
@@ -76,7 +77,20 @@ export default function StudentDashboardPage() {
       if (profileData) {
         setProfile(profileData)
         
-        // Load classmates from same class
+        // Load term progress for grade and average
+        const { data: progress } = await supabase
+          .from('student_term_progress')
+          .select('*')
+          .eq('student_id', profileData.id)
+          .eq('term', 'third')
+          .eq('session_year', '2025/2026')
+          .maybeSingle()
+        
+        if (progress) {
+          setTermProgress(progress)
+        }
+
+        // Load classmates
         const { data: classmates } = await supabase
           .from('profiles')
           .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
@@ -85,30 +99,42 @@ export default function StudentDashboardPage() {
           .neq('id', profileData.id)
           .limit(6)
 
-        // Load available exams filtered by student's class
+        // Load published exams
         const { data: exams } = await supabase
           .from('exams')
           .select('*')
           .eq('status', 'published')
           .eq('class', profileData.class)
-          .limit(10)
+          .limit(20)
 
-        // Load exam attempts for this student
+        // Load exam attempts
         const { data: attempts } = await supabase
           .from('exam_attempts')
           .select('*')
           .eq('student_id', profileData.id)
           .order('created_at', { ascending: false })
 
-        const passedExams = attempts?.filter(a => 
-          a.status === 'passed' || (a.score && a.total_points && (a.score / a.total_points) * 100 >= 50)
-        ).length || 0
+        // Calculate completed exams
+        const completedAttempts = attempts?.filter((a: any) => 
+          ['completed', 'pending_theory', 'graded'].includes(a.status)
+        ) || []
         
-        const failedExams = attempts?.filter(a => 
-          a.status === 'failed' || (a.score && a.total_points && (a.score / a.total_points) * 100 < 50)
-        ).length || 0
+        const passedExams = completedAttempts.filter((a: any) => 
+          a.is_passed === true || (a.percentage && a.percentage >= 50)
+        ).length
         
-        const completedExams = attempts?.length || 0
+        const failedExams = completedAttempts.filter((a: any) => 
+          a.is_passed === false || (a.percentage && a.percentage < 50)
+        ).length
+
+        // Calculate average score from attempts
+        const avgScore = completedAttempts.length > 0
+          ? Math.round(completedAttempts.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0) / completedAttempts.length)
+          : 0
+
+        // Calculate available exams (not yet taken)
+        const takenExamIds = completedAttempts.map((a: any) => a.exam_id)
+        const availableExams = (exams || []).filter((e: any) => !takenExamIds.includes(e.id))
 
         const { data: assignments } = await supabase
           .from('assignments')
@@ -125,16 +151,18 @@ export default function StudentDashboardPage() {
           .limit(10)
 
         setStats({
-          availableExams: exams || [],
+          availableExams,
           classmates: classmates || [],
-          recentAttempts: attempts?.slice(0, 5) || [],
+          recentAttempts: completedAttempts.slice(0, 5),
+          allAttempts: attempts || [],
           allAssignments: assignments || [],
           recentAssignments: assignments?.slice(0, 5) || [],
           allNotes: notes || [],
           recentNotes: notes?.slice(0, 5) || [],
           passedExams,
           failedExams,
-          completedExams
+          completedExams: completedAttempts.length,
+          averageScore: avgScore,
         })
       }
     } catch (error) {
@@ -142,7 +170,32 @@ export default function StudentDashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [router])
+
+  // Initial load
+  useEffect(() => {
+    loadProfileAndData()
+  }, [loadProfileAndData])
+
+  // Refresh when tab regains focus (student returns from CBT)
+  useEffect(() => {
+    const handleFocus = () => {
+      loadProfileAndData()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [loadProfileAndData])
+
+  // Refresh when visibility changes
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        loadProfileAndData()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [loadProfileAndData])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -160,6 +213,14 @@ export default function StudentDashboardPage() {
       isAuthenticated: true
     }
   }
+
+  // Compute banner stats with grades
+  const completedExams = stats.completedExams || 0
+  const totalExams = stats.availableExams?.length + completedExams || 0
+  const availableExams = stats.availableExams?.length || 0
+  const avgScore = termProgress?.average_score || stats.averageScore || 0
+  const gradeInfo = calculateGrade(avgScore)
+  const currentGrade = termProgress?.grade || gradeInfo.grade
 
   if (loading) {
     return (
@@ -208,7 +269,6 @@ export default function StudentDashboardPage() {
           "flex-1 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          {/* ✅ Fixed top padding for header spacing - NO footer */}
           <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-20 pb-12 px-4 sm:px-6 w-full overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
               {activeSection === 'overview' && (
@@ -216,10 +276,14 @@ export default function StudentDashboardPage() {
                   profile={profile}
                   stats={stats}
                   bannerStats={{
-                    availableExams: stats.availableExams?.length || 0,
-                    totalExams: stats.availableExams?.length || 0,
-                    completedExams: stats.completedExams || 0,
-                    averageScore: 0
+                    availableExams: availableExams,
+                    totalExams: totalExams,
+                    completedExams: completedExams,
+                    averageScore: avgScore,
+                    currentGrade: currentGrade,
+                    gradeColor: gradeInfo.color,
+                    passedExams: stats.passedExams || 0,
+                    failedExams: stats.failedExams || 0,
                   }}
                   reportCardStatus={reportCardStatus}
                   welcomeBannerProfile={profile}
