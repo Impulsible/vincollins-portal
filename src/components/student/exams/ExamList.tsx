@@ -36,12 +36,13 @@ export function ExamList({
         const config = getSubjectConfig(exam.subject)
 
         return (
-          <div key={exam.id} className="h-full">
+          <div key={exam.id} className={viewMode === 'grid' ? 'h-full' : ''}>
             <ExamCard
               exam={exam}
               attempt={attempt}
               status={status}
               config={config}
+              viewMode={viewMode}
               onTakeExam={onTakeExam}
               onViewResult={onViewResult}
             />
