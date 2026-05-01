@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen,
-  Wifi, WifiOff
+  Wifi, WifiOff, AlertCircle
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -37,6 +37,7 @@ interface StudentStats {
   totalSubjects?: number
   currentGrade?: string
   gradeColor?: string
+  pendingTheoryCount?: number
 }
 
 interface StudentWelcomeBannerProps {
@@ -44,7 +45,6 @@ interface StudentWelcomeBannerProps {
   stats: StudentStats | null
 }
 
-// Simple Grading (move outside component to avoid recreation)
 const calculateGrade = (percentage: number): { grade: string; color: string; description: string } => {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
   if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
@@ -61,7 +61,6 @@ const getSubjectCountForClass = (className: string): number => {
   return 17
 }
 
-// Static greeting messages (no time dependency)
 const getStaticGreeting = () => {
   return { text: 'Welcome', emoji: '👋', message: 'Welcome to your dashboard!' }
 }
@@ -73,12 +72,10 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const [isOnline, setIsOnline] = useState(true)
   const [avatarError, setAvatarError] = useState(false)
 
-  // Set mounted state for hydration safety
   useEffect(() => {
     setMounted(true)
     setCurrentTime(new Date())
     
-    // Update greeting based on actual time after mount
     const hour = new Date().getHours()
     let newGreeting
     if (hour < 12) newGreeting = { text: 'Good Morning', emoji: '🌅', message: 'Ready to learn something new today?' }
@@ -88,7 +85,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     setGreeting(newGreeting)
   }, [])
 
-  // Track online/offline status
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
@@ -104,7 +100,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     }
   }, [])
 
-  // Check presence from database
   useEffect(() => {
     if (!profile?.id) return
     
@@ -127,7 +122,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     checkPresence()
   }, [profile?.id])
 
-  // Update time every minute only after mount
   useEffect(() => {
     if (!mounted) return
     const timer = setInterval(() => setCurrentTime(new Date()), 60000)
@@ -153,6 +147,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const completedExams = stats?.completedExams ?? 0
   const averageScore = stats?.averageScore ?? 0
   const availableExams = stats?.availableExams ?? 0
+  const pendingTheoryCount = stats?.pendingTheoryCount ?? 0
 
   const gradeInfo = stats?.currentGrade && stats?.gradeColor 
     ? { grade: stats.currentGrade, color: stats.gradeColor, description: '' }
@@ -170,26 +165,15 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
 
   const getStatusDisplay = () => {
     if (isOnline) {
-      return {
-        icon: Wifi,
-        color: 'bg-emerald-500',
-        ringColor: 'ring-emerald-500/30',
-        text: 'Online'
-      }
+      return { icon: Wifi, color: 'bg-emerald-500', ringColor: 'ring-emerald-500/30', text: 'Online' }
     } else {
-      return {
-        icon: WifiOff,
-        color: 'bg-gray-400',
-        ringColor: 'ring-gray-400/30',
-        text: 'Offline'
-      }
+      return { icon: WifiOff, color: 'bg-gray-400', ringColor: 'ring-gray-400/30', text: 'Offline' }
     }
   }
 
   const statusDisplay = getStatusDisplay()
   const StatusIcon = statusDisplay.icon
 
-  // ✅ Show simple placeholder on server to prevent hydration mismatch
   if (!mounted) {
     return (
       <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 shadow-2xl mb-8">
@@ -304,8 +288,23 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
         </div>
       </div>
       
+      {/* Pending Theory Notice */}
+      {pendingTheoryCount > 0 && (
+        <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-center gap-3">
+          <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
+          <div>
+            <p className="text-sm text-amber-200 font-medium">
+              {pendingTheoryCount} exam{pendingTheoryCount !== 1 ? 's' : ''} pending theory grading
+            </p>
+            <p className="text-xs text-amber-300/80">
+              Your objective scores are ready. Theory answers will be graded by your teacher soon.
+            </p>
+          </div>
+        </div>
+      )}
+      
       {/* Stats Section */}
-      <div className="relative z-10 mt-6 pt-4 border-t border-white/15">
+      <div className="relative z-10 mt-4 pt-4 border-t border-white/15">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">

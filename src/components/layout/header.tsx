@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// components/layout/header.tsx - WITH FIXED NOTIFICATION BELL POSITIONING
+// components/layout/header.tsx - WITH MOBILE MENU & RETRY LOGIC
 'use client'
 
 import { useState, useEffect, useRef, useCallback, Suspense, forwardRef } from 'react'
@@ -190,13 +190,6 @@ const adminNavigation: NavigationItem[] = [
   { name: 'Monitor', href: '/admin/monitor', icon: Activity },
 ]
 
-const quickLinks = [
-  { name: 'Academic Calendar', href: '/calendar', icon: Calendar },
-  { name: 'E-Library', href: '/library', icon: BookOpen },
-  { name: 'Student Portal', href: '/portal', icon: GraduationCap },
-  { name: 'Staff Portal', href: '/portal', icon: Users },
-]
-
 const socialLinks = [
   { icon: Facebook, href: 'https://facebook.com/vincollins', label: 'Facebook' },
   { icon: Twitter, href: 'https://twitter.com/vincollins', label: 'Twitter' },
@@ -297,6 +290,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
   const [avatarError, setAvatarError] = useState(false)
   const profileDropdownRef = useRef<HTMLDivElement>(null)
+  const mobileMenuRef = useRef<HTMLDivElement>(null)
   
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -319,6 +313,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                        pathname === '/admission' || 
                        pathname === '/schools' || 
                        pathname === '/contact'
+  
+  // Check if on a dashboard page
+  const isDashboardPage = !isPublicPage && !isPortalPage && !isHomePage
 
   // Mobile detection effect
   useEffect(() => {
@@ -474,12 +471,21 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Fetch user with avatar support
+  // Fetch user with avatar support - WITH RETRY LOGIC
   useEffect(() => {
     const fetchUser = async () => {
       setLoading(true)
       try {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+        let { data: { session } } = await supabase.auth.getSession()
+        let sessionError = null
+        
+        // Retry once if session is null (handles lock conflicts)
+        if (!session) {
+          await new Promise(resolve => setTimeout(resolve, 2000))
+          const retry = await supabase.auth.getSession()
+          session = retry.data.session
+          sessionError = retry.error
+        }
         
         if (sessionError || !session) {
           setUser(null)
@@ -583,6 +589,19 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
       document.body.style.overflow = 'unset'
     }
     return () => { document.body.style.overflow = 'unset' }
+  }, [mobileMenuOpen])
+
+  // Close mobile menu on escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMobileMenuOpen(false)
+      }
+    }
+    if (mobileMenuOpen) {
+      window.addEventListener('keydown', handleEscape)
+    }
+    return () => window.removeEventListener('keydown', handleEscape)
   }, [mobileMenuOpen])
 
   // FIXED: Navigation logic - Public pages ALWAYS show public navigation
@@ -865,7 +884,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               </div>
             </nav>
 
-            {/* Right Section - With Properly Centered Notification Bell */}
+            {/* Right Section */}
             <div className="flex items-center gap-1 xs:gap-1.5 sm:gap-2 md:gap-3 flex-shrink-0">
               <Button
                 variant="ghost"
@@ -876,7 +895,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                 <Search className="h-3.5 w-3.5 sm:h-4 sm:w-4 lg:h-5 lg:w-5" />
               </Button>
 
-              {/* NOTIFICATION BELL - Centered with proper spacing on all widths */}
+              {/* NOTIFICATION BELL */}
               {user?.isAuthenticated && !isPortalPage && !isHomePage && (
                 <Popover open={notificationOpen} onOpenChange={setNotificationOpen}>
                   <PopoverTrigger asChild>
@@ -912,7 +931,6 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                       "mx-auto left-0 right-0 sm:left-auto sm:right-0"
                     )}
                   >
-                    {/* Header */}
                     <div className="px-4 sm:px-5 py-3 sm:py-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div>
@@ -1062,12 +1080,10 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                   {profileOpen && (
                     <div className={cn(
                       "absolute bg-white rounded-xl shadow-2xl border border-gray-100 overflow-hidden z-50",
-                      "top-full mt-2",
-                      "right-0",
+                      "top-full mt-2 right-0",
                       "w-[260px] xs:w-[280px] sm:w-72 md:w-80 lg:w-80",
                       "max-w-[calc(100vw-2rem)]"
                     )}>
-                      {/* User Info Header */}
                       <div className="p-2 xs:p-3 sm:p-4 border-b border-gray-100 bg-gradient-to-r from-blue-50 to-indigo-50">
                         <div className="flex items-center gap-2 xs:gap-2.5 sm:gap-3">
                           <Avatar className={cn(
@@ -1075,12 +1091,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                             "h-10 w-10 xs:h-11 xs:w-11 sm:h-12 sm:w-12 lg:h-14 lg:w-14"
                           )}>
                             {user.avatar && !avatarError ? (
-                              <AvatarImage 
-                                src={user.avatar} 
-                                alt={user.name}
-                                onError={handleAvatarError}
-                                className="object-cover"
-                              />
+                              <AvatarImage src={user.avatar} alt={user.name} onError={handleAvatarError} className="object-cover" />
                             ) : null}
                             <AvatarFallback className={cn(
                               "bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold",
@@ -1090,30 +1101,19 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                             </AvatarFallback>
                           </Avatar>
                           <div className="flex-1 min-w-0">
-                            <p className={cn(
-                              "font-semibold text-gray-900 truncate",
-                              "text-xs xs:text-sm sm:text-base"
-                            )}>
+                            <p className={cn("font-semibold text-gray-900 truncate", "text-xs xs:text-sm sm:text-base")}>
                               {user.name}
                             </p>
-                            <p className={cn(
-                              "text-gray-500 truncate",
-                              "text-[10px] xs:text-xs sm:text-sm"
-                            )}>
+                            <p className={cn("text-gray-500 truncate", "text-[10px] xs:text-xs sm:text-sm")}>
                               {user.email}
                             </p>
-                            <Badge className={cn(
-                              "mt-1 xs:mt-1.5 text-white",
-                              "text-[10px] xs:text-xs",
-                              getRoleBadgeColor(user.role)
-                            )}>
+                            <Badge className={cn("mt-1 xs:mt-1.5 text-white", "text-[10px] xs:text-xs", getRoleBadgeColor(user.role))}>
                               {getRoleDisplayName(user.role)}
                             </Badge>
                           </div>
                         </div>
                       </div>
                       
-                      {/* DASHBOARD BUTTON - Shows on ALL Public Pages */}
                       {(isPublicPage || isHomePage || isPortalPage) && (
                         <div className="p-2 xs:p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-amber-100">
                           <button
@@ -1137,15 +1137,11 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       )}
                       
-                      {/* Main Menu Items */}
                       {!isPortalPage && !isHomePage && !isPublicPage && (
                         <div className="py-1">
                           <Link 
                             href={user.role === 'student' ? '/student/profile' : user.role === 'admin' ? '/admin/settings' : '/staff'} 
-                            className={cn(
-                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
-                              "text-xs xs:text-sm"
-                            )}
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 text-xs xs:text-sm"
                             onClick={() => setProfileOpen(false)}
                           >
                             <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
@@ -1154,10 +1150,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           
                           <Link 
                             href={user.role === 'student' ? '/student/notifications' : '/staff/notifications'}
-                            className={cn(
-                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
-                              "text-xs xs:text-sm"
-                            )}
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 text-xs xs:text-sm"
                             onClick={() => setProfileOpen(false)}
                           >
                             <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
@@ -1169,10 +1162,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                           
                           <Link 
                             href={user.role === 'student' ? '/student/settings' : user.role === 'admin' ? '/admin/settings' : '/staff/settings'} 
-                            className={cn(
-                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3",
-                              "text-xs xs:text-sm"
-                            )}
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 text-xs xs:text-sm"
                             onClick={() => setProfileOpen(false)}
                           >
                             <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-gray-400" />
@@ -1181,22 +1171,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         </div>
                       )}
                       
-                      {/* Quick Links Section */}
                       <div className="py-1 border-t border-gray-100">
-                        <p className={cn(
-                          "px-3 sm:px-4 py-1 sm:py-2 font-semibold text-gray-400 uppercase tracking-wider",
-                          "text-[9px] xs:text-[10px] sm:text-xs"
-                        )}>
+                        <p className="px-3 sm:px-4 py-1 sm:py-2 font-semibold text-gray-400 uppercase tracking-wider text-[9px] xs:text-[10px] sm:text-xs">
                           Quick Links
                         </p>
                         
                         {pathname !== '/' && (
                           <Link 
                             href="/" 
-                            className={cn(
-                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group",
-                              "text-xs xs:text-sm"
-                            )}
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group text-xs xs:text-sm"
                             onClick={() => setProfileOpen(false)}
                           >
                             <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
@@ -1213,10 +1196,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         {pathname !== '/portal' && (
                           <Link 
                             href="/portal" 
-                            className={cn(
-                              "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group",
-                              "text-xs xs:text-sm"
-                            )}
+                            className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-3 group text-xs xs:text-sm"
                             onClick={() => setProfileOpen(false)}
                           >
                             <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
@@ -1231,16 +1211,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
                         )}
                       </div>
                       
-                      {/* Sign Out */}
                       <div className="border-t border-gray-100"></div>
                       
                       <div className="p-2">
                         <button 
                           onClick={handleLogoutClick}
-                          className={cn(
-                            "w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3",
-                            "text-xs xs:text-sm"
-                          )}
+                          className="w-full px-3 sm:px-4 py-2 sm:py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg transition-colors flex items-center gap-3 text-xs xs:text-sm"
                         >
                           <LogOut className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           <span>Sign Out</span>
@@ -1263,11 +1239,40 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
               {/* Hamburger Menu Button */}
               <button
-                className="lg:hidden relative h-8 w-8 xs:h-9 xs:w-9 sm:h-10 sm:w-10 flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95 ml-0.5"
-                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                type="button"
+                className="lg:hidden relative h-10 w-10 min-w-[40px] flex items-center justify-center rounded-full transition-all duration-300 text-white hover:bg-white/20 active:scale-95 ml-0.5 z-50 pointer-events-auto"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  setMobileMenuOpen(prev => !prev)
+                }}
                 aria-label={mobileMenuOpen ? "Close menu" : "Open menu"}
+                aria-expanded={mobileMenuOpen}
+                style={{ touchAction: 'manipulation' }}
               >
-                {mobileMenuOpen ? <X className="h-4 w-4 sm:h-5 sm:w-5" /> : <Menu className="h-4 w-4 sm:h-5 sm:w-5" />}
+                <AnimatePresence mode="wait">
+                  {mobileMenuOpen ? (
+                    <motion.div
+                      key="close"
+                      initial={{ rotate: -90, opacity: 0 }}
+                      animate={{ rotate: 0, opacity: 1 }}
+                      exit={{ rotate: 90, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <X className="h-5 w-5" />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="menu"
+                      initial={{ rotate: 90, opacity: 0 }}
+                      animate={{ rotate: 0, opacity: 1 }}
+                      exit={{ rotate: -90, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Menu className="h-5 w-5" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </button>
             </div>
           </div>
@@ -1307,7 +1312,372 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </div>
       </header>
 
-      {/* Rest of the component remains the same... */}
+      {/* MOBILE MENU - UPDATED: All content in ScrollArea, Sign Out at bottom */}
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+            
+            {/* Mobile Menu Panel */}
+            <motion.div
+              ref={mobileMenuRef}
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              className="fixed top-0 right-0 h-full w-[300px] xs:w-[320px] sm:w-[380px] bg-white z-50 shadow-2xl lg:hidden flex flex-col"
+            >
+              {/* Mobile Menu Header - Fixed */}
+              <div className="flex-shrink-0 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] p-4 sm:p-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {schoolSettings?.logo_path ? (
+                    <Image src={schoolSettings.logo_path} alt="Logo" width={40} height={40} className="rounded-lg" />
+                  ) : (
+                    <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center">
+                      <GraduationCap className="h-5 w-5 text-white" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-white font-semibold text-sm">Vincollins College</p>
+                    {user?.isAuthenticated && (
+                      <p className="text-white/70 text-xs">{getMobileGreeting()}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
+                  aria-label="Close menu"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* User Info (if authenticated) - Fixed */}
+              {user?.isAuthenticated && (
+                <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12 ring-2 ring-primary/20">
+                      {user.avatar && !avatarError ? (
+                        <AvatarImage src={user.avatar} alt={user.name} onError={handleAvatarError} />
+                      ) : null}
+                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
+                        {getUserInitials()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm truncate">{user.name}</p>
+                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                      <Badge className={`mt-1 text-xs ${getRoleBadgeColor(user.role)}`}>
+                        {getRoleDisplayName(user.role)}
+                      </Badge>
+                    </div>
+                  </div>
+                  
+                  {/* Dashboard Button for public pages */}
+                  {(isPublicPage || isHomePage || isPortalPage) && (
+                    <button
+                      onClick={goToDashboard}
+                      className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+                    >
+                      <LayoutDashboard className="h-4 w-4" />
+                      {user?.role === 'admin' ? 'Admin Dashboard' : 
+                       user?.role === 'teacher' ? 'Teacher Dashboard' : 
+                       'Student Dashboard'}
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Scrollable Content - ALL content including Sign Out */}
+              <ScrollArea className="flex-1">
+                <nav className="p-4">
+                  {/* Navigation Items */}
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                    Navigation
+                  </p>
+                  <div className="space-y-1">
+                    {currentNavigation.map((item) => {
+                      const Icon = item.icon
+                      const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
+                      const isCbt = item.name === 'CBT Platform' || item.isCbt
+
+                      if (item.isDropdown && item.dropdownItems) {
+                        return (
+                          <div key={item.name} className="mb-2">
+                            <div className="flex items-center gap-3 px-3 py-2.5 text-gray-700 font-medium text-sm">
+                              <Icon className="h-4 w-4 text-gray-400" />
+                              <span className="flex-1">{item.name}</span>
+                            </div>
+                            <div className="ml-4 pl-6 space-y-1 border-l-2 border-gray-100">
+                              {item.dropdownItems.map((subItem) => {
+                                const SubIcon = subItem.icon
+                                const isSubActive = pathname?.startsWith(subItem.href)
+                                return (
+                                  <Link
+                                    key={subItem.name}
+                                    href={subItem.href}
+                                    onClick={() => setMobileMenuOpen(false)}
+                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                      isSubActive 
+                                        ? 'bg-primary/10 text-primary font-medium' 
+                                        : 'text-gray-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    <SubIcon className="h-4 w-4" />
+                                    <span>{subItem.name}</span>
+                                  </Link>
+                                )
+                              })}
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          onClick={(e) => {
+                            if (isCbt) {
+                              e.preventDefault()
+                              setShowCbtInfo(true)
+                            }
+                            setMobileMenuOpen(false)
+                          }}
+                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                            isActive 
+                              ? 'bg-primary/10 text-primary shadow-sm' 
+                              : 'text-gray-700 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Icon className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-gray-400'}`} />
+                          <span className="flex-1">{item.name}</span>
+                          {isCbt && (
+                            <Badge className="bg-[#F5A623] text-[#0A2472] text-[10px] py-0 px-1.5 font-bold">
+                              CBT
+                            </Badge>
+                          )}
+                          {isActive && (
+                            <motion.div 
+                              layoutId="mobileActiveIndicator"
+                              className="h-2 w-2 rounded-full bg-primary" 
+                            />
+                          )}
+                        </Link>
+                      )
+                    })}
+                  </div>
+
+                  {/* ============================================ */}
+                  {/* PUBLIC PAGES ONLY: Navigate To & Quick Links */}
+                  {/* ============================================ */}
+                  {!isDashboardPage && (
+                    <>
+                      {/* Divider */}
+                      <div className="my-4 border-t border-gray-100" />
+
+                      {/* Page Navigation - Home & Portal - ONLY on public pages */}
+                      {!user?.isAuthenticated && (
+                        <>
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                            Navigate To
+                          </p>
+                          <div className="space-y-1 mb-4">
+                            {pathname !== '/' && (
+                              <Link
+                                href="/"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors group"
+                              >
+                                <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
+                                  <Home className="h-3.5 w-3.5 text-blue-500" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">Home Page</p>
+                                  <p className="text-[10px] text-gray-400">Return to main website</p>
+                                </div>
+                                <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                              </Link>
+                            )}
+                            
+                            {pathname !== '/portal' && (
+                              <Link
+                                href="/portal"
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors group"
+                              >
+                                <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
+                                  <KeyRound className="h-3.5 w-3.5 text-emerald-500" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="font-medium text-sm">Portal Login</p>
+                                  <p className="text-[10px] text-gray-400">Login or switch account</p>
+                                </div>
+                                <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
+                              </Link>
+                            )}
+                          </div>
+                        </>
+                      )}
+
+                      {/* Quick Links - ONLY on public pages */}
+                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                        Quick Links
+                      </p>
+                      <div className="space-y-1">
+                        <Link
+                          href="/calendar"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          <Calendar className="h-4 w-4 text-gray-400" />
+                          <span>Academic Calendar</span>
+                        </Link>
+                        <Link
+                          href="/library"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                        >
+                          <BookOpen className="h-4 w-4 text-gray-400" />
+                          <span>E-Library</span>
+                        </Link>
+                      </div>
+
+                      {/* Search on Mobile - ONLY on public pages */}
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <form onSubmit={(e) => {
+                          e.preventDefault()
+                          if (searchQuery.trim()) {
+                            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+                            setMobileMenuOpen(false)
+                            setSearchQuery('')
+                          }
+                        }}>
+                          <div className="relative">
+                            <Input
+                              type="search"
+                              placeholder="Search..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="w-full bg-gray-50 border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm"
+                            />
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          </div>
+                        </form>
+                      </div>
+
+                      {/* Notifications Link for authenticated users on public pages */}
+                      {user?.isAuthenticated && (
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                          <button
+                            onClick={() => {
+                              setMobileMenuOpen(false)
+                              const role = user?.role || 'student'
+                              router.push(role === 'student' ? '/student/notifications' : '/staff/notifications')
+                            }}
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors w-full"
+                          >
+                            <Bell className="h-4 w-4 text-gray-400" />
+                            <span className="flex-1 text-left">Notifications</span>
+                            {unreadCount > 0 && (
+                              <Badge className="bg-red-500 text-white text-xs">{unreadCount}</Badge>
+                            )}
+                          </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {/* ============================================ */}
+                  {/* ALL PAGES: Contact Info, Social Links, Copyright, Sign Out */}
+                  {/* ============================================ */}
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    {/* Contact Info */}
+                    <div className="space-y-2 mb-4">
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                        Contact Info
+                      </p>
+                      {contactInfo.map((info, idx) => {
+                        const Icon = info.icon
+                        return (
+                          <div key={idx} className="flex items-center gap-2 text-xs text-gray-500">
+                            <Icon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                            <span className="truncate">{info.text}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+
+                    {/* Social Links */}
+                    <div className="flex items-center justify-center gap-3 mb-4">
+                      {socialLinks.map((social, idx) => {
+                        const Icon = social.icon
+                        return (
+                          <a
+                            key={idx}
+                            href={social.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-[#0A2472] hover:text-white transition-colors"
+                            aria-label={social.label}
+                          >
+                            <Icon className="h-4 w-4" />
+                          </a>
+                        )
+                      })}
+                    </div>
+
+                    {/* Copyright */}
+                    <div className="text-center mb-4">
+                      <p className="text-[10px] text-gray-400">
+                        © {currentYear} Vincollins College
+                      </p>
+                      <p className="text-[9px] text-gray-300 mt-0.5">
+                        Geared Towards Excellence
+                      </p>
+                    </div>
+
+                    {/* Login Button for non-authenticated users */}
+                    {!user?.isAuthenticated && (
+                      <Link
+                        href="/portal"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] rounded-xl font-semibold shadow-md hover:shadow-lg transition-all mb-3"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                        Portal Login
+                      </Link>
+                    )}
+
+                    {/* Sign Out button for authenticated users - ALWAYS VISIBLE AT BOTTOM */}
+                    {user?.isAuthenticated && (
+                      <button
+                        onClick={handleLogoutClick}
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium text-sm transition-colors"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        Sign Out
+                      </button>
+                    )}
+                  </div>
+                </nav>
+              </ScrollArea>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* CBT Platform Dialog */}
       <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
         <DialogContent className="max-w-[95vw] sm:max-w-2xl md:max-w-4xl lg:max-w-5xl max-h-[85vh] overflow-y-auto p-0">

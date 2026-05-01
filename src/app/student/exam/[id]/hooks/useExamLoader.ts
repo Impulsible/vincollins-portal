@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 
-// Fisher-Yates shuffle for objectives only
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
   for (let i = shuffled.length - 1; i > 0; i--) {
@@ -13,6 +12,28 @@ function shuffleArray<T>(array: T[]): T[] {
     ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   return shuffled
+}
+
+const MAX_UNLOADS = 3
+
+function calcScore(questions: any[], answers: Record<string, string>) {
+  const obj = questions.filter((q: any) => q.type !== "theory")
+  let score = 0, tp = 0, correct = 0, incorrect = 0, unanswered = 0
+  obj.forEach((q: any) => {
+    const pts = Number(q.points || 1)
+    tp += pts
+    const ans = answers[q.id]
+    const ca = String(q.correct_answer || "").trim()
+    if (ans?.trim()) {
+      if (ans.trim().toLowerCase() === ca.toLowerCase()) { score += pts; correct++ }
+      else { incorrect++ }
+    } else { unanswered++ }
+  })
+  return { score, total: tp, percentage: tp > 0 ? Math.round((score / tp) * 100) : 0, correct, incorrect, unanswered }
+}
+
+function calcTheoryTotal(questions: any[]) {
+  return questions.filter((q: any) => q.type === "theory").reduce((s: number, q: any) => s + Number(q.points || 1), 0)
 }
 
 export function useExamLoader(examId: string, router: ReturnType<typeof useRouter>) {
@@ -29,6 +50,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
   const [resumeData, setResumeData] = useState<any>(null)
   const [examTerminated, setExamTerminated] = useState(false)
   const [noAttemptsLeft, setNoAttemptsLeft] = useState(false)
+  const [unloadCount, setUnloadCount] = useState(0)
   const loadedRef = useRef(false)
 
   const loadExam = useCallback(async () => {
@@ -36,8 +58,14 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
     loadedRef.current = true
     setLoading(true)
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push("/portal"); return }
+      let { data: { session } } = await supabase.auth.getSession()
+      // ✅ RETRY ONCE if session is null (handles temporary rate limits)
+      if (!session) {
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        const retry = await supabase.auth.getSession()
+        session = retry.data.session
+        if (!session) { router.push("/portal"); return }
+      }
 
       const { data: ud } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
       if (ud) setProfile(ud)
@@ -50,35 +78,25 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       const mcqQuestions = ed.questions || []
       const theoryQuestions = ed.theory_questions || []
 
-      // ===== PROCESS MCQ QUESTIONS =====
-      // Shuffle options per question
-      // Then shuffle question order (for new attempts)
       let mcqList = mcqQuestions.map((q: any, i: number) => ({
-        id: q.id,
-        question_text: q.question,
+        id: q.id, question_text: q.question,
         type: q.type === "mcq" ? "objective" : q.type,
-        options: shuffleArray(q.options || []), // ✅ Options shuffled
+        options: shuffleArray(q.options || []),
         correct_answer: q.correct_answer || "",
         points: Number(q.marks || 0.5),
-        order_number: i + 1, // Sequential for MCQs
-        is_theory: false,
+        order_number: i + 1, is_theory: false,
       }))
 
-      // ===== PROCESS THEORY QUESTIONS =====
-      // NO shuffle for theory
-      // Numbering starts from 1 (independent of MCQs)
       let theoryList = theoryQuestions.map((q: any, i: number) => ({
-        id: q.id,
-        question_text: q.question,
-        type: "theory" as const,
-        options: [],
-        correct_answer: "",
+        id: q.id, question_text: q.question,
+        type: "theory" as const, options: [], correct_answer: "",
         points: Number(q.marks || 10),
-        order_number: i + 1, // ✅ Theory starts from 1
-        is_theory: true,
+        order_number: i + 1, is_theory: true,
       }))
 
-      // ===== CHECK EXISTING ATTEMPTS =====
+      const allQ = [...mcqList, ...theoryList]
+      setAllQuestions(allQ)
+
       const { data: existingAttempts } = await supabase
         .from("exam_attempts")
         .select("*")
@@ -89,18 +107,15 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       const completedAttempts = (existingAttempts || []).filter(
         (a: any) => ["completed", "pending_theory", "graded", "terminated"].includes(a.status)
       )
-      const totalAttemptsUsed = existingAttempts?.length || 0
-      const hasActiveAttempt = (existingAttempts || []).some((a: any) => a.status === "in-progress")
+      const hasActiveAttempt = (existingAttempts || []).some((a: any) => a.status === "in_progress")
+      const completedCount = completedAttempts.length
 
-      // ===== MAX ATTEMPTS CHECK =====
-      if (completedAttempts.length >= maxAttempts && !hasActiveAttempt) {
+      if (completedCount >= maxAttempts && !hasActiveAttempt) {
         setHasCompletedAttempt(true)
-        setAttemptsUsed(totalAttemptsUsed)
+        setAttemptsUsed(completedCount)
         setNoAttemptsLeft(true)
-        
         const latest = completedAttempts[0]
         if (latest.status === "terminated") setExamTerminated(true)
-        
         const ts = (latest.objective_score || 0) + (latest.theory_score || 0)
         const tp = (latest.objective_total || 0) + (latest.theory_total || 0)
         setExamResult({
@@ -109,43 +124,94 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           correct: latest.correct_count || 0,
           incorrect: latest.incorrect_count || 0,
           unanswered: latest.unanswered_count || 0,
-          objective_score: latest.objective_score || 0,
-          objective_total: latest.objective_total || 0,
-          theory_score: latest.theory_score || 0,
-          theory_total: latest.theory_total || 0,
           is_passed: latest.is_passed || false,
           passing_percentage: ed.passing_percentage || 50,
           status: latest.status,
-          attempts_used: totalAttemptsUsed,
-          max_attempts: maxAttempts,
+          attempts_used: completedCount, max_attempts: maxAttempts,
           submitted_at: latest.submitted_at,
         })
         setLoading(false)
         return
       }
 
-      // ===== HANDLE ATTEMPTS =====
       if (existingAttempts && existingAttempts.length > 0) {
         const latest = existingAttempts[0]
-        setAttemptsUsed(totalAttemptsUsed)
+        setAttemptsUsed(completedCount)
 
         if (latest.status === "terminated" || latest.is_auto_submitted) {
           setHasCompletedAttempt(true)
           setExamTerminated(true)
+          const ts = (latest.objective_score || 0) + (latest.theory_score || 0)
+          const tp = (latest.objective_total || 0) + (latest.theory_total || 0)
           setExamResult({
-            score: 0, total: 0, percentage: 0,
-            correct: 0, incorrect: 0, unanswered: 0,
-            is_passed: false,
+            score: ts, total: tp,
+            percentage: tp > 0 ? Math.round((ts / tp) * 100) : 0,
+            correct: latest.correct_count || 0,
+            incorrect: latest.incorrect_count || 0,
+            unanswered: latest.unanswered_count || 0,
+            is_passed: latest.is_passed || false,
             passing_percentage: ed.passing_percentage || 50,
-            status: "terminated",
-            attempts_used: totalAttemptsUsed,
-            max_attempts: maxAttempts,
+            status: latest.status,
+            attempts_used: completedCount, max_attempts: maxAttempts,
             submitted_at: latest.submitted_at,
           })
-        }
-        // RESUME - Keep original order
-        else if (latest.status === "in-progress") {
-          setAllQuestions([...mcqList, ...theoryList])
+        } else if (latest.status === "in_progress") {
+          const newUnloadCount = (latest.unload_count || 0) + 1
+          setUnloadCount(newUnloadCount)
+
+          if (newUnloadCount >= MAX_UNLOADS) {
+            const existingAnswers = latest.answers || {}
+            const result = calcScore(allQ, existingAnswers)
+            const theoryTotal = calcTheoryTotal(allQ)
+            const passingScore = ed.passing_percentage || 50
+            const isPassed = result.percentage >= passingScore
+
+            const objectiveAnswers: Record<string, string> = {}
+            const theoryAnswers: Record<string, string> = {}
+            allQ.forEach((q: any) => {
+              if (q.type === "theory") theoryAnswers[q.id] = existingAnswers[q.id] || ""
+              else objectiveAnswers[q.id] = existingAnswers[q.id] || ""
+            })
+
+            await supabase.from('exam_attempts').update({
+              status: ed.has_theory ? 'pending_theory' : 'completed',
+              submitted_at: new Date().toISOString(),
+              is_auto_submitted: true,
+              auto_submit_reason: 'Excessive page refreshes - suspicious activity',
+              unload_count: newUnloadCount,
+              answers: objectiveAnswers,
+              theory_answers: theoryAnswers,
+              objective_score: result.score,
+              objective_total: result.total,
+              theory_total: theoryTotal,
+              total_score: result.score,
+              total_marks: result.total + theoryTotal,
+              percentage: result.percentage,
+              is_passed: isPassed,
+              correct_count: result.correct,
+              incorrect_count: result.incorrect,
+              unanswered_count: result.unanswered,
+            }).eq('id', latest.id)
+
+            setHasCompletedAttempt(true)
+            setAttemptsUsed(completedCount + 1)
+            setExamResult({
+              score: result.score, total: result.total + theoryTotal,
+              percentage: result.percentage,
+              correct: result.correct, incorrect: result.incorrect,
+              unanswered: result.unanswered,
+              is_passed: isPassed,
+              passing_percentage: passingScore,
+              status: ed.has_theory ? 'pending_theory' : 'completed',
+              attempts_used: completedCount + 1, max_attempts: maxAttempts,
+              submitted_at: new Date().toISOString(),
+            })
+            setLoading(false)
+            return
+          }
+
+          await supabase.from('exam_attempts').update({ unload_count: newUnloadCount }).eq('id', latest.id)
+
           const elapsed = Math.floor((Date.now() - new Date(latest.started_at).getTime()) / 1000)
           setResumeData({
             attemptId: latest.id,
@@ -153,11 +219,10 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             timeLeft: Math.max(0, (ed.duration * 60) - elapsed),
             tabSwitches: latest.tab_switches || 0,
             fullscreenExits: latest.fullscreen_exits || 0,
+            unloadCount: newUnloadCount,
           })
           setShowResumeDialog(true)
-        }
-        // COMPLETED
-        else if (["completed", "pending_theory", "graded"].includes(latest.status)) {
+        } else if (["completed", "pending_theory", "graded"].includes(latest.status)) {
           setHasCompletedAttempt(true)
           const ts = (latest.objective_score || 0) + (latest.theory_score || 0)
           const tp = (latest.objective_total || 0) + (latest.theory_total || 0)
@@ -167,25 +232,16 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             correct: latest.correct_count || 0,
             incorrect: latest.incorrect_count || 0,
             unanswered: latest.unanswered_count || 0,
-            objective_score: latest.objective_score || 0,
-            objective_total: latest.objective_total || 0,
-            theory_score: latest.theory_score || 0,
-            theory_total: latest.theory_total || 0,
             is_passed: latest.is_passed || false,
             passing_percentage: ed.passing_percentage || 50,
             status: latest.status,
-            attempts_used: totalAttemptsUsed,
-            max_attempts: maxAttempts,
-            graded_by: latest.graded_by,
-            graded_at: latest.graded_at,
+            attempts_used: completedCount, max_attempts: maxAttempts,
+            graded_by: latest.graded_by, graded_at: latest.graded_at,
             submitted_at: latest.submitted_at,
           })
         }
       } else {
-        // ===== NEW ATTEMPT =====
-        // Shuffle ONLY MCQs (questions AND options already shuffled)
-        // Theory stays in original order
-        setAllQuestions([...shuffleArray(mcqList), ...theoryList])
+        setAllQuestions(shuffleArray(allQ))
         setAttemptsUsed(0)
         setHasCompletedAttempt(false)
       }
@@ -207,6 +263,11 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       return null
     }
     setAttemptId(resumeData.attemptId)
+    try {
+      const elem = document.documentElement
+      if (elem.requestFullscreen) await elem.requestFullscreen()
+      else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
+    } catch (e) {}
     toast.success("Exam resumed!")
     return resumeData
   }
@@ -217,7 +278,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
     attemptId, setAttemptId, attemptsUsed,
     resumeData, showResumeDialog, setShowResumeDialog,
     examTerminated, setExamTerminated,
-    noAttemptsLeft,
+    noAttemptsLeft, unloadCount,
     handleResumeExam,
     handleStartNewAttempt: () => setShowResumeDialog(false),
     handleDiscardAndStart: () => setShowResumeDialog(false),

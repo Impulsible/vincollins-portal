@@ -19,20 +19,20 @@ export function ObjectiveAnswer({ options, selectedValue, onChange }: ObjectiveA
             key={idx}
             onClick={() => onChange(opt)}
             className={cn(
-              "w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all",
+              "w-full flex items-center gap-3 p-3.5 rounded-xl border-2 text-left transition-all duration-150",
               isSelected
                 ? "border-blue-500 bg-blue-50 shadow-sm"
-                : "border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50"
+                : "border-slate-100 bg-white hover:border-slate-300 hover:bg-slate-50"
             )}
           >
             <div className={cn(
-              "h-8 w-8 rounded-lg flex items-center justify-center text-sm font-bold shrink-0",
-              isSelected ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-500"
+              "h-7 w-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
+              isSelected ? "bg-blue-600 text-white shadow-sm" : "bg-slate-100 text-slate-500"
             )}>
               {letters[idx]}
             </div>
             <span className={cn(
-              "text-base",
+              "text-sm leading-snug",
               isSelected ? "text-blue-700 font-medium" : "text-slate-700"
             )}>
               {opt}

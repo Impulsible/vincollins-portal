@@ -53,10 +53,8 @@ const nextConfig = {
   compress: true,
   productionBrowserSourceMaps: false,
   
-  env: {
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  },
+  // Remove the env section - it's unnecessary and can cause issues
+  // Next.js automatically loads .env.local files
   
   experimental: {
     optimizeCss: true,
@@ -75,14 +73,38 @@ const nextConfig = {
       };
     }
     
-    // ✅ Add source map warnings to ignore list
+    // Fix Watchpack errors on Windows - Add system folders to ignore
+    config.watchOptions = {
+      ignored: [
+        '**/node_modules',
+        '**/.git',
+        '**/.next',
+        '**/System Volume Information',
+        '**/pagefile.sys',
+        '**/hiberfil.sys',
+        '**/swapfile.sys',
+        'C:/System Volume Information',
+        'C:/pagefile.sys',
+        'C:/hiberfil.sys',
+        'C:/swapfile.sys',
+        'C:/Windows',
+        'C:/Program Files',
+        'C:/Program Files (x86)',
+      ],
+      poll: false,
+    };
+    
+    // Add source map warnings and Watchpack errors to ignore list
     config.ignoreWarnings = [
       { module: /node_modules\/@radix-ui\/react-slot/ },
       { module: /node_modules\/@radix-ui\/react-popover/ },
-      // Ignore source map warnings
       { message: /Failed to parse source map/ },
       { message: /Source map error/ },
       { file: /LayoutGroupContext\.mjs\.map/ },
+      { message: /Watchpack Error/ },
+      { message: /EINVAL: invalid argument/ },
+      { message: /lstat/ },
+      { message: /System Volume Information/ },
     ];
     
     return config;

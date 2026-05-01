@@ -41,3 +41,16 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+
+C:\System Volume Information
+C:\pagefile.sys
+C:\swapfile.sys
+
+
+# System files
+pagefile.sys
+hiberfil.sys
+swapfile.sys
+.DS_Store
+Thumbs.db

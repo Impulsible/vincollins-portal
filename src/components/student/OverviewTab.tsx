@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { ArrowRight, BarChart3, MonitorPlay, Trophy, XCircle, ChevronRight, FileCheck } from 'lucide-react'
+import { ArrowRight, BarChart3, MonitorPlay, Trophy, XCircle, ChevronRight, FileCheck, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { RecentActivityCard } from './RecentActivityCard'
 import { ClassmatesPreviewCard } from './ClassmatesPreviewCard'
@@ -46,6 +46,7 @@ export function OverviewTab({
     ...stats,
     availableExams: stats?.availableExams || [],
     recentAttempts: stats?.recentAttempts || [],
+    allAttempts: stats?.allAttempts || [],
     classmates: stats?.classmates || [],
     recentAssignments: stats?.recentAssignments || [],
     allAssignments: stats?.allAssignments || [],
@@ -54,6 +55,11 @@ export function OverviewTab({
     completedExams: stats?.completedExams || 0,
     passedExams: stats?.passedExams || 0,
     failedExams: stats?.failedExams || 0,
+  }
+  
+  // Helper to check if exam has an attempt
+  const getExamAttempt = (examId: string) => {
+    return (safeStats.allAttempts || []).find((a: any) => a.exam_id === examId)
   }
   
   const getStatusBadge = (status: string, isPassed?: boolean) => {
@@ -68,6 +74,8 @@ export function OverviewTab({
       case 'pending_theory':
       case 'submitted':
         return <Badge className="bg-yellow-100 text-yellow-700 text-xs shrink-0 border-yellow-200">Pending</Badge>
+      case 'in_progress':
+        return <Badge className="bg-blue-100 text-blue-700 text-xs shrink-0 border-blue-200">In Progress</Badge>
       default:
         return <Badge variant="outline" className="text-xs shrink-0">{status}</Badge>
     }
@@ -256,30 +264,46 @@ export function OverviewTab({
                   </div>
                 ) : (
                   <div className="space-y-3 sm:space-y-4">
-                    {safeStats.availableExams.slice(0, 3).map((exam: any) => (
-                      <div 
-                        key={exam.id} 
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm sm:text-base mb-2">{exam.title}</p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Badge variant="outline" className="text-xs font-medium">{exam.subject}</Badge>
-                            <span className="text-xs text-slate-500 flex items-center gap-1">
-                              <span className="inline-block w-1 h-1 bg-slate-400 rounded-full"></span>
-                              {exam.duration} mins
-                            </span>
-                          </div>
-                        </div>
-                        <Button 
-                          size="sm" 
-                          onClick={() => handleTakeExam(exam.id)} 
-                          className="bg-emerald-600 hover:bg-emerald-700 shrink-0 w-full sm:w-auto px-6"
+                    {safeStats.availableExams.slice(0, 3).map((exam: any) => {
+                      const attempt = getExamAttempt(exam.id)
+                      const isInProgress = attempt?.status === 'in_progress'
+                      return (
+                        <div 
+                          key={exam.id} 
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all duration-200 border border-transparent hover:border-slate-200"
                         >
-                          Start Exam
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-medium text-sm sm:text-base">{exam.title}</p>
+                              {isInProgress && (
+                                <Badge className="bg-blue-100 text-blue-700 text-xs">Resume</Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge variant="outline" className="text-xs font-medium">{exam.subject}</Badge>
+                              <span className="text-xs text-slate-500 flex items-center gap-1">
+                                <span className="inline-block w-1 h-1 bg-slate-400 rounded-full"></span>
+                                {exam.duration} mins
+                              </span>
+                            </div>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            onClick={() => handleTakeExam(exam.id)} 
+                            className={cn(
+                              "shrink-0 w-full sm:w-auto px-6",
+                              isInProgress ? "bg-blue-600 hover:bg-blue-700" : "bg-emerald-600 hover:bg-emerald-700"
+                            )}
+                          >
+                            {isInProgress ? (
+                              <><RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Resume Exam</>
+                            ) : (
+                              'Start Exam'
+                            )}
+                          </Button>
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>

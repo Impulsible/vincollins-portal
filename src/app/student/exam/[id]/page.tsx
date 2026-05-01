@@ -1,3 +1,4 @@
+// src/app/student/exam/[id]/page.tsx
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
@@ -35,18 +36,11 @@ export default function TakeExamPage() {
   const examEndedRef = useRef(false)
 
   const [examState, setExamState] = useState<ExamState>({
-    currentIndex: 0,
-    answers: {},
-    flaggedQuestions: new Set(),
-    examStarted: false,
-    examEnded: false,
-    showInstructions: true,
-    showQuestionPalette: false,
-    showSubmitDialog: false,
-    showResultDialog: false,
-    showFullscreenPrompt: false,
-    startingExam: false,
-    isSubmitting: false,
+    currentIndex: 0, answers: {}, flaggedQuestions: new Set(),
+    examStarted: false, examEnded: false, showInstructions: true,
+    showQuestionPalette: false, showSubmitDialog: false,
+    showResultDialog: false, showFullscreenPrompt: false,
+    startingExam: false, isSubmitting: false,
   })
 
   const {
@@ -65,14 +59,19 @@ export default function TakeExamPage() {
     () => handleSubmit(true, 'Time expired')
   )
 
-  const { tabSwitches, fullscreenExits, fullscreen, setFullscreen, showFullscreenPrompt, setShowFullscreenPrompt, securityViolated, examTerminated: securityTerminated, enterFullscreen } = useExamSecurity(
-    examState.examStarted, examEndedRef,
-    () => handleSubmit(true, 'Security violation')
+  // ✅ FIXED: Pass initial violations and attemptId for persistence
+  const { tabSwitches, fullscreenExits, fullscreen, setFullscreen, showFullscreenPrompt, setShowFullscreenPrompt, enterFullscreen } = useExamSecurity(
+    examState.examStarted,
+    examEndedRef,
+    () => handleSubmit(true, 'Security violation'),
+    resumeData?.tabSwitches || 0,
+    resumeData?.fullscreenExits || 0,
+    attemptId
   )
 
   const { autoSaving, lastSaved } = useAutoSave(attemptId, examState.examStarted, examState.answers, allQuestions, examEndedRef)
 
-  const isTerminated = examTerminated || securityTerminated
+  const isTerminated = examTerminated
 
   const theoryQuestionCount = allQuestions.filter(q => q.type === 'theory').length
   const requiredTheory = exam?.required_theory_count || theoryQuestionCount
@@ -83,44 +82,81 @@ export default function TakeExamPage() {
   const requiredUnanswered = Math.max(0, requiredTotal - answeredCount)
   const progressPercentage = requiredTotal > 0 ? Math.min(100, (answeredCount / requiredTotal) * 100) : (allQuestions.length > 0 ? (answeredCount / allQuestions.length) * 100 : 0)
 
-  // Redirect to exam list when result dialog closes
   useEffect(() => {
     if (!examState.showResultDialog && hasCompletedAttempt && !examState.examStarted) {
       router.push('/student/exams')
     }
   }, [examState.showResultDialog])
 
+  // ===== START EXAM =====
+  const startExam = async () => {
+    setExamState(prev => ({ ...prev, startingExam: true }))
+    try {
+      const elem = document.documentElement
+      if (elem.requestFullscreen) await elem.requestFullscreen()
+      else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
+      setFullscreen(true)
+      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: att, error: insertError } = await supabase
+          .from('exam_attempts')
+          .insert({
+            exam_id: examId, student_id: session.user.id,
+            student_name: profile?.full_name || session.user.email?.split('@')[0] || 'Student',
+            student_email: session.user.email || '', student_class: profile?.class || '',
+            status: 'in_progress', started_at: new Date().toISOString(),
+            tab_switches: 0, fullscreen_exits: 0, unload_count: 0,
+            attempt_number: attemptsUsed + 1,
+            term: exam?.term || CURRENT_TERM, session_year: exam?.session_year || CURRENT_SESSION,
+          }).select('id').single()
+
+        if (insertError) {
+          console.error('Insert error:', insertError)
+          toast.error('Failed to start exam')
+          setExamState(prev => ({ ...prev, startingExam: false }))
+          return
+        }
+        if (att) setAttemptId(att.id)
+      }
+
+      setExamState(prev => ({ ...prev, examStarted: true, showInstructions: false, startingExam: false }))
+      setTimeLeft((exam?.duration || 30) * 60)
+      examEndedRef.current = false
+      toast.success('Exam started! Good luck!')
+    } catch (error: any) {
+      toast.error('Failed to start exam')
+      setExamState(prev => ({ ...prev, startingExam: false }))
+    }
+  }
+
+  // ===== RESUME EXAM =====
+  const onResumeExam = async () => {
+    const data = await handleResumeExam()
+    if (data) {
+      setAttemptId(data.attemptId)
+      setTimeLeft(data.timeLeft)
+      setExamState(prev => ({ ...prev, answers: data.answers || {}, examStarted: true, showInstructions: false }))
+      examEndedRef.current = false
+      setShowResumeDialog(false)
+    }
+  }
+
+  // ===== SUBMIT EXAM =====
   const handleSubmit = useCallback(async (isAuto = false, reason = 'manual') => {
     if (isSubmittingRef.current || examEndedRef.current) return
     isSubmittingRef.current = true
     examEndedRef.current = true
 
     setExamState(prev => ({ ...prev, examEnded: true, isSubmitting: true, showSubmitDialog: false }))
-    
     if (document.fullscreenElement) { try { await document.exitFullscreen() } catch (e) {} }
 
     try {
-      if (attemptId) {
-        await supabase.from('exam_attempts').update({
-          status: isAuto ? 'terminated' : (exam?.has_theory ? 'pending_theory' : 'completed'),
-          submitted_at: new Date().toISOString(),
-          is_auto_submitted: isAuto,
-          auto_submit_reason: isAuto ? reason : null,
-          tab_switches: tabSwitches,
-          fullscreen_exits: fullscreenExits,
-        }).eq('id', attemptId)
-      }
-
-      if (isAuto) {
-        setExamTerminated(true)
-        setExamState(prev => ({ ...prev, examStarted: false, isSubmitting: false }))
-        toast.error('Exam terminated due to: ' + reason)
-        return
-      }
-
       const result = calculateScore(allQuestions, examState.answers)
+      const theoryTotal = calculateTheoryTotal(allQuestions)
       const passingScore = exam?.passing_percentage || 50
       const isPassed = result.percentage >= passingScore
+
       const objectiveAnswers: Record<string, string> = {}
       const theoryAnswers: Record<string, string> = {}
       allQuestions.forEach((q: any) => {
@@ -130,78 +166,39 @@ export default function TakeExamPage() {
 
       const hasTheory = exam?.has_theory && theoryQuestionCount > 0
       const status = hasTheory ? 'pending_theory' : 'completed'
-      const theoryTotal = calculateTheoryTotal(allQuestions)
 
       if (attemptId) {
         await supabase.from('exam_attempts').update({
+          status: status, submitted_at: new Date().toISOString(),
+          is_auto_submitted: isAuto, auto_submit_reason: isAuto ? reason : null,
+          tab_switches: tabSwitches, fullscreen_exits: fullscreenExits,
           answers: objectiveAnswers, theory_answers: theoryAnswers,
           objective_score: result.score, objective_total: result.total,
           theory_total: theoryTotal, total_score: result.score,
           total_marks: result.total + theoryTotal, percentage: result.percentage,
-          is_passed: isPassed, status: status,
-          submitted_at: new Date().toISOString(),
-          correct_count: result.correct, incorrect_count: result.incorrect,
-          unanswered_count: result.unanswered,
+          is_passed: isPassed, correct_count: result.correct,
+          incorrect_count: result.incorrect, unanswered_count: result.unanswered,
         }).eq('id', attemptId)
       }
 
       const finalResult: ExamResult = {
         ...result, theory_score: 0, theory_total: theoryTotal,
         is_passed: isPassed, passing_percentage: passingScore, status: status,
-        attempts_used: attemptsUsed + 1, max_attempts: 1,
+        attempts_used: attemptsUsed + 1, max_attempts: exam?.max_attempts || 1,
         submitted_at: new Date().toISOString(),
       }
+
       setExamResult(finalResult)
       setExamState(prev => ({ ...prev, examStarted: false, isSubmitting: false, showResultDialog: true }))
-      toast.success(hasTheory ? 'Exam submitted! Theory answers will be graded.' : 'Exam submitted successfully!')
-    } catch (error) {
+      toast.success(isAuto ? 'Exam submitted due to: ' + reason : hasTheory ? 'Exam submitted! Theory answers will be graded.' : 'Exam submitted successfully!')
+    } catch (error: any) {
       console.error('Submit error:', error)
       toast.error('Failed to submit exam')
       setExamState(prev => ({ ...prev, isSubmitting: false }))
       isSubmittingRef.current = false
       examEndedRef.current = false
     }
-  }, [allQuestions, examState.answers, exam, attemptId, tabSwitches, fullscreenExits, attemptsUsed, profile, examId, requiredTheory, theoryQuestionCount, setExamTerminated])
-
-  const startExam = async () => {
-    setExamState(prev => ({ ...prev, startingExam: true }))
-    try {
-      const elem = document.documentElement
-      if (elem.requestFullscreen) await elem.requestFullscreen()
-      else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
-      setFullscreen(true)
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        const { data: att } = await supabase.from('exam_attempts').insert({
-          exam_id: examId, student_id: session.user.id,
-          student_name: profile?.full_name || session.user.email?.split('@')[0] || 'Student',
-          student_email: session.user.email, student_class: profile?.class,
-          status: 'in-progress', started_at: new Date().toISOString(),
-          tab_switches: 0, fullscreen_exits: 0, attempt_number: 1,
-          term: exam?.term || CURRENT_TERM, session_year: exam?.session_year || CURRENT_SESSION,
-        }).select('id').single()
-        if (att) setAttemptId(att.id)
-      }
-      setExamState(prev => ({ ...prev, examStarted: true, showInstructions: false, startingExam: false }))
-      setTimeLeft((exam?.duration || 30) * 60)
-      examEndedRef.current = false
-      toast.success('Exam started! Good luck!')
-    } catch (error) {
-      toast.error('Failed to start exam')
-      setExamState(prev => ({ ...prev, startingExam: false }))
-    }
-  }
-
-  const onResumeExam = async () => {
-    const data = await handleResumeExam()
-    if (data) {
-      setAttemptId(data.attemptId)
-      setExamState(prev => ({ ...prev, answers: data.answers || {}, examStarted: true, showInstructions: false }))
-      setTimeLeft(data.timeLeft)
-      examEndedRef.current = false
-      setShowResumeDialog(false)
-    }
-  }
+  }, [allQuestions, examState.answers, exam, attemptId, tabSwitches, fullscreenExits, attemptsUsed, profile, examId, theoryQuestionCount])
 
   const updateAnswer = (questionId: string, value: string) => {
     setExamState(prev => ({ ...prev, answers: { ...prev.answers, [questionId]: value } }))
@@ -226,6 +223,7 @@ export default function TakeExamPage() {
     setExamState(prev => ({ ...prev, currentIndex: index, showQuestionPalette: false }))
   }
 
+  // ===== RENDER =====
   if (loading) return <LoadingView />
   if (loadError) return <ErrorView message={loadError} onBack={() => router.push('/student')} />
 
@@ -237,15 +235,9 @@ export default function TakeExamPage() {
             <XCircle className="h-10 w-10 text-red-500" />
           </div>
           <h2 className="text-xl font-bold text-red-700 mb-2">Exam Terminated</h2>
-          <p className="text-red-600 mb-1">Your exam has been terminated due to:</p>
-          <p className="text-red-800 font-semibold mb-4">Security Policy Violation</p>
-          <p className="text-slate-500 text-sm mb-6">
-            Violating exam rules results in automatic termination.
-            This attempt has been recorded.
-          </p>
-          <Button onClick={() => router.push('/student/exams')} className="w-full rounded-xl">
-            Back to Exams
-          </Button>
+          <p className="text-red-600 mb-4">Security Policy Violation</p>
+          <p className="text-slate-500 text-sm mb-6">This attempt has been recorded with your current score.</p>
+          <Button onClick={() => router.push('/student/exams')} className="w-full rounded-xl">Back to Exams</Button>
         </Card>
       </div>
     )
@@ -254,11 +246,12 @@ export default function TakeExamPage() {
   if (showResumeDialog) {
     return (
       <ResumeDialog
-        resumeData={resumeData}
-        totalQuestions={allQuestions.length}
+        resumeData={resumeData} totalQuestions={allQuestions.length}
         onResume={onResumeExam}
         onNewAttempt={() => { setShowResumeDialog(false); startExam() }}
         onDiscard={() => { setShowResumeDialog(false); setExamState(prev => ({ ...prev, showInstructions: true })) }}
+        maxAttempts={exam?.max_attempts || 1} attemptsUsed={attemptsUsed}
+        unloadCount={resumeData?.unloadCount || 0}
       />
     )
   }
@@ -305,25 +298,16 @@ export default function TakeExamPage() {
       <SubmitDialog
         open={examState.showSubmitDialog}
         onOpenChange={(open: boolean) => setExamState(prev => ({ ...prev, showSubmitDialog: open }))}
-        answeredCount={answeredCount}
-        totalQuestions={requiredTotal}
-        unansweredCount={requiredUnanswered}
-        isSubmitting={examState.isSubmitting}
+        answeredCount={answeredCount} totalQuestions={requiredTotal}
+        unansweredCount={requiredUnanswered} isSubmitting={examState.isSubmitting}
         onSubmit={() => handleSubmit(false)}
         theoryInfo={theoryQuestionCount > 0 && requiredTheory < theoryQuestionCount ? {
-          required: requiredTheory,
-          total: theoryQuestionCount,
-          answered: answeredTheoryCount
+          required: requiredTheory, total: theoryQuestionCount, answered: answeredTheoryCount
         } : undefined}
       />
       <ResultDialog
         open={examState.showResultDialog}
-        onOpenChange={(open: boolean) => {
-          setExamState(prev => ({ ...prev, showResultDialog: open }))
-          if (!open) {
-            router.push('/student/exams')
-          }
-        }}
+        onOpenChange={(open: boolean) => { setExamState(prev => ({ ...prev, showResultDialog: open })); if (!open) router.push('/student/exams') }}
         examResult={examResult}
       />
     </>

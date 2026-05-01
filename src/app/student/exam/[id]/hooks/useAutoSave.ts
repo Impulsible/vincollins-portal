@@ -14,9 +14,19 @@ export function useAutoSave(aid: string|null, started: boolean, answers: Record<
     try {
       const ta: Record<string,string> = {}
       for (const q of questions) { if (q.type === "theory") ta[q.id] = answers[q.id] || "" }
-      await supabase.from("exam_attempts").update({ answers, theory_answers: ta, last_saved_at: new Date().toISOString() }).eq("id", aid)
-      setSaved(new Date())
-    } catch(e) { console.error(e) }
+      const { error } = await supabase.from("exam_attempts").update({ 
+        answers, 
+        theory_answers: ta, 
+        last_auto_save: new Date().toISOString() 
+      }).eq("id", aid)
+      if (error) {
+        console.error("Auto-save error:", error.message)
+      } else {
+        setSaved(new Date())
+      }
+    } catch(e) { 
+      // Silent fail - auto-save errors shouldn't disrupt the exam
+    }
     finally { setSaving(false) }
   }, [aid, started, answers, questions, endedRef])
   useEffect(() => { if (!started || endedRef.current) return; ref.current = setInterval(doSave, AUTO_SAVE_INTERVAL); return () => { if(ref.current) clearInterval(ref.current) } }, [started, doSave, endedRef])

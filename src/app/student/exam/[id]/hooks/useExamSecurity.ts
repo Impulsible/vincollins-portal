@@ -2,22 +2,38 @@
 
 import { useState, useEffect, useCallback, useRef } from "react"
 import { toast } from "sonner"
+import { supabase } from "@/lib/supabase"
 import { TAB_SWITCH_LIMIT, FULLSCREEN_EXIT_LIMIT } from "../constants"
 
 export function useExamSecurity(
   examStarted: boolean,
   examEndedRef: React.MutableRefObject<boolean>,
-  onViolation: () => void
+  onViolation: () => void,
+  initialTabSwitches: number = 0,
+  initialFullscreenExits: number = 0,
+  attemptId?: string | null
 ) {
-  const [tabSwitches, setTabSwitches] = useState(0)
-  const [fullscreenExits, setFullscreenExits] = useState(0)
+  const [tabSwitches, setTabSwitches] = useState(initialTabSwitches)
+  const [fullscreenExits, setFullscreenExits] = useState(initialFullscreenExits)
   const [fullscreen, setFullscreen] = useState(false)
   const [showFullscreenPrompt, setShowFullscreenPrompt] = useState(false)
   const [securityViolated, setSecurityViolated] = useState(false)
   const [examTerminated, setExamTerminated] = useState(false)
   const violationRef = useRef(false)
+  const blurCountRef = useRef(0)
+  const attemptIdRef = useRef(attemptId)
 
-  // Trigger violation only once
+  useEffect(() => { attemptIdRef.current = attemptId }, [attemptId])
+
+  const persistViolation = async (type: 'tab' | 'fullscreen', count: number) => {
+    if (!attemptIdRef.current) return
+    try {
+      await supabase.from('exam_attempts').update(
+        type === 'tab' ? { tab_switches: count } : { fullscreen_exits: count }
+      ).eq('id', attemptIdRef.current)
+    } catch (e) {}
+  }
+
   const triggerViolation = useCallback((reason: string) => {
     if (violationRef.current || examTerminated) return
     violationRef.current = true
@@ -27,122 +43,93 @@ export function useExamSecurity(
     setTimeout(() => onViolation(), 300)
   }, [onViolation, examTerminated])
 
-  // Reset when exam starts
   useEffect(() => {
     if (examStarted) {
       violationRef.current = false
       setExamTerminated(false)
+      blurCountRef.current = 0
     }
   }, [examStarted])
 
-  // Tab switch detection
+  // Tab switch detection + persist
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
-
-    const handleVisibilityChange = () => {
+    const h = () => {
       if (document.hidden && !examEndedRef.current && !examTerminated) {
         setTabSwitches(prev => {
           const n = prev + 1
-          if (n === 1) toast.warning("⚠️ Tab switch detected! (" + n + "/" + TAB_SWITCH_LIMIT + ")")
-          else if (n === 2) toast.error("🚨 FINAL WARNING! (" + n + "/" + TAB_SWITCH_LIMIT + ")")
+          persistViolation('tab', n)
+          if (n === 1) toast.warning("Tab switch! (" + n + "/" + TAB_SWITCH_LIMIT + ")")
+          else if (n === 2) toast.error("Final warning! (" + n + "/" + TAB_SWITCH_LIMIT + ")")
           else if (n >= TAB_SWITCH_LIMIT) triggerViolation("Tab switch limit exceeded")
           return n
         })
       }
     }
-
-    document.addEventListener("visibilitychange", handleVisibilityChange)
-    return () => document.removeEventListener("visibilitychange", handleVisibilityChange)
+    document.addEventListener("visibilitychange", h)
+    return () => document.removeEventListener("visibilitychange", h)
   }, [examStarted, examTerminated, triggerViolation, examEndedRef])
 
-  // Fullscreen detection
+  // Fullscreen detection + persist
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
-
-    const handleFullscreenChange = () => {
+    const h = () => {
       const fs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement)
       setFullscreen(fs)
       if (!fs && !examEndedRef.current && !examTerminated) {
         setFullscreenExits(prev => {
           const n = prev + 1
-          if (n === 1) { toast.warning("⚠️ Fullscreen exited! (" + n + "/" + FULLSCREEN_EXIT_LIMIT + ")"); setShowFullscreenPrompt(true) }
-          else if (n === 2) { toast.error("🚨 FINAL WARNING! (" + n + "/" + FULLSCREEN_EXIT_LIMIT + ")"); setShowFullscreenPrompt(true) }
+          persistViolation('fullscreen', n)
+          if (n === 1) { toast.warning("Fullscreen exit! (" + n + "/" + FULLSCREEN_EXIT_LIMIT + ")"); setShowFullscreenPrompt(true) }
+          else if (n === 2) { toast.error("Final warning! (" + n + "/" + FULLSCREEN_EXIT_LIMIT + ")"); setShowFullscreenPrompt(true) }
           else if (n >= FULLSCREEN_EXIT_LIMIT) triggerViolation("Fullscreen exit limit exceeded")
           return n
         })
       }
     }
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange)
-    document.addEventListener("webkitfullscreenchange", handleFullscreenChange)
+    document.addEventListener("fullscreenchange", h)
+    document.addEventListener("webkitfullscreenchange", h)
     return () => {
-      document.removeEventListener("fullscreenchange", handleFullscreenChange)
-      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange)
+      document.removeEventListener("fullscreenchange", h)
+      document.removeEventListener("webkitfullscreenchange", h)
     }
   }, [examStarted, examTerminated, triggerViolation, examEndedRef])
 
-  // Window blur (minimize/alt+tab)
+  // Window blur
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
-    let blurCount = 0
-
-    const handleBlur = () => {
+    const h = () => {
       if (examEndedRef.current || examTerminated) return
-      blurCount++
-      if (blurCount >= 2) triggerViolation("Window focus lost multiple times")
-      else if (blurCount === 1) toast.warning("⚠️ Window lost focus! Do not leave the exam")
+      blurCountRef.current++
+      if (blurCountRef.current >= 2) triggerViolation("Window focus lost multiple times")
+      else if (blurCountRef.current === 1) toast.warning("Window lost focus! Do not leave the exam")
     }
-
-    window.addEventListener("blur", handleBlur)
-    return () => window.removeEventListener("blur", handleBlur)
+    window.addEventListener("blur", h)
+    return () => window.removeEventListener("blur", h)
   }, [examStarted, examTerminated, triggerViolation, examEndedRef])
 
-  // Back/Forward/Refresh detection
+  // BeforeUnload - just warn
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
-
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (!examTerminated) {
-        triggerViolation("Attempted to leave exam page")
-      }
+    const h = (e: BeforeUnloadEvent) => {
       e.preventDefault()
-      e.returnValue = ""
+      e.returnValue = "You have an exam in progress!"
     }
+    window.addEventListener("beforeunload", h)
+    return () => window.removeEventListener("beforeunload", h)
+  }, [examStarted, examTerminated, examEndedRef])
 
-    const handlePopState = () => {
-      if (!examTerminated) {
-        triggerViolation("Browser back/forward navigation detected")
-      }
-    }
-
-    window.addEventListener("beforeunload", handleBeforeUnload)
-    window.addEventListener("popstate", handlePopState)
-
-    return () => {
-      window.removeEventListener("beforeunload", handleBeforeUnload)
-      window.removeEventListener("popstate", handlePopState)
-    }
-  }, [examStarted, examTerminated, triggerViolation, examEndedRef])
-
-  // Keyboard shortcuts blocked
+  // Keyboard blocked
   useEffect(() => {
     if (!examStarted || examTerminated) return
-
-    const handleKeydown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && ["c","v","x","p","a","s","r","w","t","n","h","j","q"].includes(e.key.toLowerCase())) {
-        e.preventDefault()
-      }
-      if (e.key === "F5" || e.key === "F12" || (e.ctrlKey && e.key === "F5")) {
-        e.preventDefault()
-        triggerViolation("Refresh/F12 attempt detected")
-      }
+    const keydown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && ["c","v","x","p","a","s","r","w","t","n"].includes(e.key.toLowerCase())) e.preventDefault()
+      if (e.key === "F5" || e.key === "F12" || (e.ctrlKey && e.key === "F5")) e.preventDefault()
       if (e.altKey) e.preventDefault()
-      if (e.key === "Escape") e.preventDefault()
     }
-
-    document.addEventListener("keydown", handleKeydown, true)
-    return () => document.removeEventListener("keydown", handleKeydown, true)
-  }, [examStarted, examTerminated, triggerViolation])
+    document.addEventListener("keydown", keydown, true)
+    return () => document.removeEventListener("keydown", keydown, true)
+  }, [examStarted, examTerminated])
 
   // Context menu blocked
   useEffect(() => {
@@ -164,14 +151,8 @@ export function useExamSecurity(
   }, [])
 
   return {
-    tabSwitches,
-    fullscreenExits,
-    fullscreen,
-    setFullscreen,
-    showFullscreenPrompt,
-    setShowFullscreenPrompt,
-    securityViolated,
-    examTerminated,
-    enterFullscreen,
+    tabSwitches, fullscreenExits, fullscreen, setFullscreen,
+    showFullscreenPrompt, setShowFullscreenPrompt,
+    securityViolated, examTerminated, enterFullscreen,
   }
 }

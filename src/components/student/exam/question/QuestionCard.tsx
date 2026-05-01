@@ -26,42 +26,40 @@ export function QuestionCard({
 }: QuestionCardProps) {
   const questionType = question.type || 'objective'
   const isTheory = questionType === 'theory'
-  
-  // Use order_number for display, fallback to questionIndex + 1
-  const displayNumber = question.order_number || (questionIndex + 1)
+  const displayNumber = questionIndex + 1
 
   return (
     <Card className="border border-slate-200 shadow-sm bg-white rounded-2xl overflow-hidden">
-      {/* Question Header */}
-      <div className="flex items-center justify-between px-5 py-3 bg-slate-50 border-b border-slate-100">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3.5 bg-slate-50/50 border-b border-slate-100">
         <div className="flex items-center gap-3">
           <div className={cn(
-            "h-8 w-8 rounded-lg flex items-center justify-center",
-            isTheory ? "bg-purple-100" : "bg-blue-100"
+            "h-9 w-9 rounded-lg flex items-center justify-center",
+            isTheory ? "bg-purple-50" : "bg-blue-50"
           )}>
             {isTheory ? (
-              <FileText className="h-4 w-4 text-purple-600" />
+              <FileText className="h-5 w-5 text-purple-500" />
             ) : (
-              <Hash className="h-4 w-4 text-blue-600" />
+              <Hash className="h-5 w-5 text-blue-500" />
             )}
           </div>
-          <span className="font-semibold text-slate-700 text-sm">
-            {isTheory ? 'Theory ' : 'Question '}{displayNumber}
+          <span className="font-bold text-slate-800 text-base">
+            {isTheory ? 'Theory' : 'Question'} {displayNumber}
           </span>
           <Badge variant="outline" className={cn(
-            "text-xs font-medium",
+            "text-xs font-semibold px-2.5 py-0.5",
             isTheory 
               ? "bg-purple-50 text-purple-600 border-purple-200"
               : "bg-blue-50 text-blue-600 border-blue-200"
           )}>
-            {isTheory ? 'Theory' : 'Objective'}
+            {isTheory ? 'Theory' : 'MCQ'}
           </Badge>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1.5 text-sm text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg">
+          <div className="flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 px-3 py-1 rounded-lg font-semibold">
             <Award className="h-4 w-4" />
-            <span className="font-medium">{formatPoints(question.points || 1)}</span>
+            <span>{formatPoints(question.points || 1)}</span>
           </div>
           <button
             onClick={onToggleFlag}
@@ -69,10 +67,11 @@ export function QuestionCard({
               "p-2 rounded-lg transition-colors",
               isFlagged 
                 ? "bg-amber-100 text-amber-600" 
-                : "hover:bg-slate-100 text-slate-400"
+                : "hover:bg-slate-100 text-slate-300"
             )}
+            title={isFlagged ? "Unflag" : "Flag for review"}
           >
-            <Flag className="h-4 w-4" fill={isFlagged ? "currentColor" : "none"} />
+            <Flag className="h-5 w-5" fill={isFlagged ? "currentColor" : "none"} />
           </button>
         </div>
       </div>
@@ -80,34 +79,21 @@ export function QuestionCard({
       <CardContent className="p-5 sm:p-6">
         {/* Question Text */}
         <div className={cn(
-          "rounded-xl p-5 mb-5 border",
-          isTheory ? "bg-purple-50 border-purple-100" : "bg-slate-50 border-slate-100"
+          "rounded-xl p-5 mb-5 border-2",
+          isTheory ? "bg-purple-50/50 border-purple-100" : "bg-slate-50 border-slate-100"
         )}>
-          <p className="text-slate-700 leading-relaxed text-base">
+          <p className="text-slate-800 leading-relaxed text-lg font-medium">
             {question.question_text || question.question}
           </p>
         </div>
 
-        {/* Answer - key forces re-render on question change */}
+        {/* Answer Area */}
         {isTheory ? (
-          <TheoryAnswer 
-            key={question.id}
-            answer={answer} 
-            onChange={onAnswer} 
-            examId={examId} 
-            studentId={studentId} 
-          />
+          <TheoryAnswer key={question.id} answer={answer} onChange={onAnswer} examId={examId} studentId={studentId} />
         ) : question.options && question.options.length > 0 ? (
-          <ObjectiveAnswer 
-            options={question.options} 
-            selectedValue={answer} 
-            onChange={onAnswer} 
-          />
+          <ObjectiveAnswer options={question.options} selectedValue={answer} onChange={onAnswer} />
         ) : (
-          <TextAnswer 
-            answer={answer} 
-            onChange={onAnswer} 
-          />
+          <TextAnswer answer={answer} onChange={onAnswer} />
         )}
       </CardContent>
     </Card>

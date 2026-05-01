@@ -62,10 +62,13 @@ export default function StudentDashboardPage() {
 
   const loadProfileAndData = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      let { data: { session } } = await supabase.auth.getSession()
+      
       if (!session) {
-        router.push('/portal')
-        return
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        const retry = await supabase.auth.getSession()
+        session = retry.data.session
+        if (!session) { router.push('/portal'); return }
       }
 
       const { data: profileData } = await supabase
@@ -77,7 +80,6 @@ export default function StudentDashboardPage() {
       if (profileData) {
         setProfile(profileData)
         
-        // Load term progress for grade and average
         const { data: progress } = await supabase
           .from('student_term_progress')
           .select('*')
@@ -86,11 +88,8 @@ export default function StudentDashboardPage() {
           .eq('session_year', '2025/2026')
           .maybeSingle()
         
-        if (progress) {
-          setTermProgress(progress)
-        }
+        if (progress) setTermProgress(progress)
 
-        // Load classmates
         const { data: classmates } = await supabase
           .from('profiles')
           .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
@@ -99,7 +98,6 @@ export default function StudentDashboardPage() {
           .neq('id', profileData.id)
           .limit(6)
 
-        // Load published exams
         const { data: exams } = await supabase
           .from('exams')
           .select('*')
@@ -107,34 +105,74 @@ export default function StudentDashboardPage() {
           .eq('class', profileData.class)
           .limit(20)
 
-        // Load exam attempts
         const { data: attempts } = await supabase
           .from('exam_attempts')
           .select('*')
           .eq('student_id', profileData.id)
           .order('created_at', { ascending: false })
 
-        // Calculate completed exams
-        const completedAttempts = attempts?.filter((a: any) => 
-          ['completed', 'pending_theory', 'graded'].includes(a.status)
-        ) || []
+        const examIds = [...new Set((attempts || []).map((a: any) => a.exam_id))]
+        let examMap: Record<string, any> = {}
         
-        const passedExams = completedAttempts.filter((a: any) => 
+        if (examIds.length > 0) {
+          const { data: examDetails } = await supabase
+            .from('exams')
+            .select('id, title, subject')
+            .in('id', examIds)
+          examDetails?.forEach((e: any) => { examMap[e.id] = e })
+        }
+
+        const enrichedAttempts = (attempts || []).map((a: any) => ({
+          ...a,
+          exam_title: examMap[a.exam_id]?.title || 'Exam',
+          exam_subject: examMap[a.exam_id]?.subject || 'Unknown Subject',
+        }))
+
+        // All submitted attempts (for average calculation - includes pending_theory)
+        const allSubmitted = enrichedAttempts.filter((a: any) => {
+          if (['completed', 'pending_theory', 'graded'].includes(a.status)) return true
+          if (a.is_auto_submitted) {
+            if (a.auto_submit_reason?.toLowerCase().includes('time')) return true
+            const unloadCount = a.unload_count || 0
+            const tabSwitches = a.tab_switches || 0
+            const fullscreenExits = a.fullscreen_exits || 0
+            if (unloadCount >= 3 || tabSwitches >= 3 || fullscreenExits >= 3) return true
+            return false
+          }
+          return false
+        })
+        
+        // Truly completed (for term progress - excludes pending_theory)
+        const trulyCompleted = allSubmitted.filter((a: any) => 
+          ['completed', 'graded'].includes(a.status) || 
+          (a.is_auto_submitted && a.auto_submit_reason?.toLowerCase().includes('time'))
+        )
+        
+        // Count pending theory for banner notice
+        const pendingTheoryCount = enrichedAttempts.filter((a: any) => 
+          a.status === 'pending_theory'
+        ).length
+        
+        const passedExams = allSubmitted.filter((a: any) => 
           a.is_passed === true || (a.percentage && a.percentage >= 50)
         ).length
         
-        const failedExams = completedAttempts.filter((a: any) => 
-          a.is_passed === false || (a.percentage && a.percentage < 50)
+        const failedExams = allSubmitted.filter((a: any) => 
+          a.is_passed === false && a.percentage !== null && a.percentage < 50
         ).length
 
-        // Calculate average score from attempts
-        const avgScore = completedAttempts.length > 0
-          ? Math.round(completedAttempts.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0) / completedAttempts.length)
+        // ✅ Average from ALL submitted exams (includes pending_theory with objective scores)
+        const displayAvgScore = allSubmitted.length > 0
+          ? Math.round((allSubmitted.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0) / allSubmitted.length) * 100) / 100
           : 0
 
-        // Calculate available exams (not yet taken)
-        const takenExamIds = completedAttempts.map((a: any) => a.exam_id)
-        const availableExams = (exams || []).filter((e: any) => !takenExamIds.includes(e.id))
+        // ✅ True average from only completed/graded (for term progress)
+        const trueAvgScore = trulyCompleted.length > 0
+          ? Math.round((trulyCompleted.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0) / trulyCompleted.length) * 100) / 100
+          : 0
+
+        const completedAndGradedIds = allSubmitted.map((a: any) => a.exam_id)
+        const availableExams = (exams || []).filter((e: any) => !completedAndGradedIds.includes(e.id))
 
         const { data: assignments } = await supabase
           .from('assignments')
@@ -153,16 +191,19 @@ export default function StudentDashboardPage() {
         setStats({
           availableExams,
           classmates: classmates || [],
-          recentAttempts: completedAttempts.slice(0, 5),
-          allAttempts: attempts || [],
+          recentAttempts: enrichedAttempts.slice(0, 10),
+          allAttempts: enrichedAttempts,
           allAssignments: assignments || [],
           recentAssignments: assignments?.slice(0, 5) || [],
           allNotes: notes || [],
           recentNotes: notes?.slice(0, 5) || [],
           passedExams,
           failedExams,
-          completedExams: completedAttempts.length,
-          averageScore: avgScore,
+          completedExams: allSubmitted.length,
+          trulyCompletedCount: trulyCompleted.length,
+          averageScore: displayAvgScore,
+          trueAverageScore: trueAvgScore,
+          pendingTheoryCount,
         })
       }
     } catch (error) {
@@ -172,26 +213,17 @@ export default function StudentDashboardPage() {
     }
   }, [router])
 
-  // Initial load
-  useEffect(() => {
-    loadProfileAndData()
-  }, [loadProfileAndData])
+  useEffect(() => { loadProfileAndData() }, [loadProfileAndData])
 
-  // Refresh when tab regains focus (student returns from CBT)
   useEffect(() => {
-    const handleFocus = () => {
-      loadProfileAndData()
-    }
+    const handleFocus = () => loadProfileAndData()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
   }, [loadProfileAndData])
 
-  // Refresh when visibility changes
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        loadProfileAndData()
-      }
+      if (document.visibilityState === 'visible') loadProfileAndData()
     }
     document.addEventListener('visibilitychange', handleVisibility)
     return () => document.removeEventListener('visibilitychange', handleVisibility)
@@ -214,13 +246,14 @@ export default function StudentDashboardPage() {
     }
   }
 
-  // Compute banner stats with grades
+  // ✅ Banner shows all submitted exams count and average
   const completedExams = stats.completedExams || 0
-  const totalExams = stats.availableExams?.length + completedExams || 0
+  const totalExams = termProgress?.total_subjects || (stats.availableExams?.length + completedExams) || 0
   const availableExams = stats.availableExams?.length || 0
-  const avgScore = termProgress?.average_score || stats.averageScore || 0
+  const avgScore = stats.averageScore ?? 0
   const gradeInfo = calculateGrade(avgScore)
-  const currentGrade = termProgress?.grade || gradeInfo.grade
+  const currentGrade = gradeInfo.grade
+  const pendingTheoryCount = stats.pendingTheoryCount || 0
 
   if (loading) {
     return (
@@ -229,9 +262,7 @@ export default function StudentDashboardPage() {
         <div className="flex">
           <div className="hidden lg:block w-72" />
           <div className="flex-1">
-            <main className="pt-[72px] lg:pt-20 pb-8">
-              <DashboardSkeleton />
-            </main>
+            <main className="pt-[72px] lg:pt-20 pb-8"><DashboardSkeleton /></main>
           </div>
         </div>
       </div>
@@ -243,9 +274,7 @@ export default function StudentDashboardPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <p className="text-slate-500">Redirecting to login...</p>
-          </div>
+          <div className="text-center"><p className="text-slate-500">Redirecting to login...</p></div>
         </div>
       </div>
     )
@@ -257,33 +286,22 @@ export default function StudentDashboardPage() {
       
       <div className="flex w-full overflow-x-hidden">
         <StudentSidebar 
-          profile={profile}
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab={activeSection}
-          setActiveTab={setActiveSection}
+          profile={profile} onLogout={handleLogout}
+          collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          activeTab={activeSection} setActiveTab={setActiveSection}
         />
 
-        <div className={cn(
-          "flex-1 transition-all duration-300 w-full overflow-x-hidden",
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-        )}>
+        <div className={cn("flex-1 transition-all duration-300 w-full overflow-x-hidden", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
           <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-20 pb-12 px-4 sm:px-6 w-full overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
               {activeSection === 'overview' && (
                 <OverviewTab 
-                  profile={profile}
-                  stats={stats}
+                  profile={profile} stats={stats}
                   bannerStats={{
-                    availableExams: availableExams,
-                    totalExams: totalExams,
-                    completedExams: completedExams,
-                    averageScore: avgScore,
-                    currentGrade: currentGrade,
-                    gradeColor: gradeInfo.color,
-                    passedExams: stats.passedExams || 0,
-                    failedExams: stats.failedExams || 0,
+                    availableExams, totalExams, completedExams,
+                    averageScore: avgScore, currentGrade, gradeColor: gradeInfo.color,
+                    passedExams: stats.passedExams || 0, failedExams: stats.failedExams || 0,
+                    pendingTheoryCount,
                   }}
                   reportCardStatus={reportCardStatus}
                   welcomeBannerProfile={profile}
@@ -291,7 +309,6 @@ export default function StudentDashboardPage() {
                   router={router}
                 />
               )}
-
               {activeSection === 'exams' && (
                 <Card className="border-0 shadow-md mt-2">
                   <CardContent className="py-12 text-center">
@@ -301,7 +318,6 @@ export default function StudentDashboardPage() {
                   </CardContent>
                 </Card>
               )}
-
               {activeSection === 'results' && (
                 <Card className="border-0 shadow-md mt-2">
                   <CardContent className="py-12 text-center">
@@ -311,14 +327,8 @@ export default function StudentDashboardPage() {
                   </CardContent>
                 </Card>
               )}
-
               {activeSection === 'classmates' && (
-                <ClassmatesTab 
-                  profile={profile}
-                  stats={stats}
-                  handleTabChange={setActiveSection}
-                  router={router}
-                />
+                <ClassmatesTab profile={profile} stats={stats} handleTabChange={setActiveSection} router={router} />
               )}
             </div>
           </main>
