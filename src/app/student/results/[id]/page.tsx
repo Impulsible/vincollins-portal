@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx - INDIVIDUAL EXAM RESULT DETAIL PAGE
+// app/student/results/[id]/page.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -6,22 +6,18 @@ import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
   Loader2, Award, Clock, CheckCircle, XCircle, BookOpen,
-  GraduationCap, Calendar, Target, Trophy, ArrowLeft,
-  Home, ChevronRight, FileText, PenTool, Brain,
-  AlertCircle, Download, Printer, Share2
+  GraduationCap, Calendar, Target, ArrowLeft,
+  Home, ChevronRight, PenTool, Calculator, AlertCircle
 } from 'lucide-react'
 import Link from 'next/link'
-import { format } from 'date-fns'
 
 interface ExamResult {
   id: string
@@ -33,25 +29,24 @@ interface ExamResult {
   percentage: number
   total_score: number
   total_marks: number
-  objective_score?: number
-  objective_total?: number
-  theory_score?: number | null
-  theory_total?: number
+  objective_score: number
+  objective_total: number
+  theory_score: number | null
+  theory_total: number
+  ca1_score: number | null
+  ca2_score: number | null
+  grand_total: number
+  grand_total_marks: number
   is_passed: boolean
   started_at: string
-  completed_at?: string
-  submitted_at?: string
+  submitted_at: string
   attempt_number: number
-  passing_percentage?: number
-  time_spent?: number
-  correct_count?: number
-  incorrect_count?: number
-  unanswered_count?: number
-  answers?: Record<string, any>
-  theory_answers?: Record<string, any>
-  teacher_feedback?: any
-  graded_by?: string
-  graded_at?: string
+  passing_percentage: number
+  time_spent: number
+  correct_count: number
+  incorrect_count: number
+  unanswered_count: number
+  teacher_feedback: string | null
 }
 
 interface StudentProfile {
@@ -60,20 +55,7 @@ interface StudentProfile {
   email: string
   class: string
   department: string
-  vin_id?: string
   photo_url?: string
-}
-
-interface Question {
-  id: string
-  question_text: string
-  type: 'objective' | 'theory'
-  options?: string[]
-  correct_answer?: string
-  points?: number
-  student_answer?: string
-  is_correct?: boolean
-  feedback?: string
 }
 
 export default function StudentResultDetailPage() {
@@ -85,14 +67,6 @@ export default function StudentResultDetailPage() {
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [result, setResult] = useState<ExamResult | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-
-  const getInitials = (name?: string): string => {
-    if (!name) return 'S'
-    const parts = name.trim().split(/\s+/)
-    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase()
-    return parts[0].slice(0, 2).toUpperCase()
-  }
 
   const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
@@ -124,19 +98,10 @@ export default function StudentResultDetailPage() {
     return `${secs}s`
   }
 
-  const formatDate = (dateString?: string) => {
-    if (!dateString) return 'N/A'
-    try {
-      return format(new Date(dateString), 'MMMM dd, yyyy • hh:mm a')
-    } catch {
-      return new Date(dateString).toLocaleString()
-    }
-  }
-
   const loadResult = useCallback(async () => {
     if (!examId) return
-    
     setLoading(true)
+    
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/portal'); return }
@@ -160,7 +125,6 @@ export default function StudentResultDetailPage() {
         email: profileData.email,
         class: profileData.class || 'Not Assigned',
         department: profileData.department || 'General',
-        vin_id: profileData.vin_id,
         photo_url: profileData.photo_url
       })
 
@@ -175,7 +139,6 @@ export default function StudentResultDetailPage() {
         .single()
 
       if (attemptError || !attemptData) {
-        console.error('Error loading attempt:', attemptError)
         toast.error('Result not found')
         router.push('/student/results')
         return
@@ -188,56 +151,57 @@ export default function StudentResultDetailPage() {
         .eq('id', attemptData.exam_id)
         .single()
 
-      // Load questions
-      let questionList: Question[] = []
+      // Parse theory feedback for theory score
+      let theoryScore: number | null = null
+      let teacherFeedback: string | null = null
       
-      // Parse MCQ questions
-      if (examData?.questions) {
-        const questionsData = typeof examData.questions === 'string' 
-          ? JSON.parse(examData.questions) 
-          : examData.questions
+      if (attemptData.theory_feedback) {
+        const feedback = typeof attemptData.theory_feedback === 'string' 
+          ? JSON.parse(attemptData.theory_feedback) 
+          : attemptData.theory_feedback
         
-        const answers = attemptData.answers || {}
-        const answerResults = attemptData.answer_results || {}
-        
-        const mcqQuestions = questionsData.map((q: any, index: number) => ({
-          id: q.id || `q-${index}`,
-          question_text: q.question || q.question_text || 'No question text',
-          type: q.type || 'objective',
-          options: q.options || [],
-          correct_answer: q.correct_answer || q.answer,
-          points: Number(q.marks || q.points || 0.5),
-          student_answer: answers[q.id] || '',
-          is_correct: answerResults[q.id]?.is_correct || false
-        }))
-        
-        questionList = [...questionList, ...mcqQuestions]
+        if (feedback?.total?.score !== undefined) {
+          theoryScore = Number(feedback.total.score)
+        }
+        if (feedback?.total?.feedback) {
+          teacherFeedback = feedback.total.feedback
+        }
       }
 
-      // Parse Theory questions
-      if (examData?.theory_questions) {
-        const theoryData = typeof examData.theory_questions === 'string'
-          ? JSON.parse(examData.theory_questions)
-          : examData.theory_questions
-        
-        const theoryAnswers = attemptData.theory_answers || {}
-        const theoryFeedback = attemptData.theory_feedback || {}
-        
-        const theoryQuestions = theoryData.map((q: any, index: number) => ({
-          id: q.id || `theory-${index}`,
-          question_text: q.question || q.question_text || 'No question text',
-          type: 'theory' as const,
-          points: Number(q.marks || q.points || 5),
-          student_answer: theoryAnswers[q.id] || '',
-          feedback: theoryFeedback[q.id] || ''
-        }))
-        
-        questionList = [...questionList, ...theoryQuestions]
+      // Try to load CA scores (will be null if not entered yet)
+      let ca1Score: number | null = null
+      let ca2Score: number | null = null
+      
+      const { data: caData } = await supabase
+        .from('ca_scores')
+        .select('*')
+        .eq('student_id', session.user.id)
+        .eq('exam_id', examId)
+        .maybeSingle()
+      
+      if (caData) {
+        ca1Score = Number(caData.ca1_score) || null
+        ca2Score = Number(caData.ca2_score) || null
       }
 
-      setQuestions(questionList)
+      // Calculate scores
+      const objectiveScore = Number(attemptData.objective_score) || 0
+      const objectiveTotal = Number(attemptData.objective_total) || 20
+      const theoryTotal = Number(attemptData.theory_total) || 40
+      const examTotalMarks = objectiveTotal + theoryTotal // 60
+      const examScore = objectiveScore + (theoryScore || 0)
+      
+      // Grand total including CAs (when available)
+      const ca1 = ca1Score || 0
+      const ca2 = ca2Score || 0
+      const grandTotalMarks = examTotalMarks + 40 // 60 + 40 = 100
+      const grandTotalScore = examScore + ca1 + ca2
+      
+      // Percentage based on grand total if CAs exist, otherwise exam only
+      const displayPercentage = (ca1Score !== null && ca2Score !== null) 
+        ? Math.round((grandTotalScore / grandTotalMarks) * 100)
+        : attemptData.percentage || 0
 
-      // Use actual values from database
       setResult({
         id: attemptData.id,
         exam_id: attemptData.exam_id,
@@ -245,18 +209,19 @@ export default function StudentResultDetailPage() {
         exam_subject: examData?.subject || 'Unknown Subject',
         exam_class: examData?.class || 'N/A',
         status: attemptData.status,
-        percentage: attemptData.percentage || 0,
-        total_score: Number(attemptData.total_score) || 0,
-        total_marks: Number(attemptData.total_marks) || 60,
-        objective_score: Number(attemptData.objective_score) || 0,
-        objective_total: Number(attemptData.objective_total) || 20,
-        theory_score: attemptData.theory_score !== null && attemptData.theory_score !== undefined 
-          ? Number(attemptData.theory_score) 
-          : null,
-        theory_total: Number(attemptData.theory_total) || 40,
+        percentage: displayPercentage,
+        total_score: examScore,
+        total_marks: examTotalMarks,
+        objective_score: objectiveScore,
+        objective_total: objectiveTotal,
+        theory_score: theoryScore,
+        theory_total: theoryTotal,
+        ca1_score: ca1Score,
+        ca2_score: ca2Score,
+        grand_total: grandTotalScore,
+        grand_total_marks: grandTotalMarks,
         is_passed: attemptData.is_passed || false,
         started_at: attemptData.started_at,
-        completed_at: attemptData.completed_at,
         submitted_at: attemptData.submitted_at,
         attempt_number: attemptData.attempt_number || 1,
         passing_percentage: examData?.passing_percentage || 50,
@@ -264,11 +229,7 @@ export default function StudentResultDetailPage() {
         correct_count: attemptData.correct_count,
         incorrect_count: attemptData.incorrect_count,
         unanswered_count: attemptData.unanswered_count,
-        answers: attemptData.answers,
-        theory_answers: attemptData.theory_answers,
-        teacher_feedback: attemptData.theory_feedback,
-        graded_by: attemptData.graded_by,
-        graded_at: attemptData.graded_at
+        teacher_feedback: teacherFeedback
       })
 
     } catch (error) {
@@ -289,9 +250,9 @@ export default function StudentResultDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
+        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center">
             <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto" />
             <p className="mt-4 text-slate-600">Loading result details...</p>
@@ -303,7 +264,7 @@ export default function StudentResultDetailPage() {
 
   if (!result) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
           <Card className="max-w-md w-full">
@@ -320,12 +281,9 @@ export default function StudentResultDetailPage() {
   }
 
   const gradeInfo = calculateGrade(result.percentage)
-  const objectiveQuestions = questions.filter(q => q.type === 'objective')
-  const theoryQuestions = questions.filter(q => q.type === 'theory')
   const isTheoryPending = result.status === 'pending_theory'
-  const theoryScoreDisplay = result.theory_score !== null && result.theory_score !== undefined 
-    ? `${result.theory_score}/${result.theory_total || 40}` 
-    : 'Pending'
+  const hasCA = result.ca1_score !== null && result.ca2_score !== null
+  const theoryDisplay = result.theory_score !== null ? `${result.theory_score}/${result.theory_total}` : 'Pending'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
@@ -349,18 +307,16 @@ export default function StudentResultDetailPage() {
             
             {/* Breadcrumb */}
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-              className="mb-4 sm:mb-6 mt-2 sm:mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
+              className="mb-4 sm:mb-6 mt-2 sm:mt-4 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                 <Link href="/student" className="hover:text-primary flex items-center gap-1">
                   <Home className="h-3.5 w-3.5" /><span className="hidden sm:inline">Dashboard</span>
                 </Link>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                <Link href="/student/exams" className="hover:text-primary">Exams</Link>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-foreground font-medium truncate max-w-[200px]">{result.exam_title}</span>
               </div>
-              <Button variant="outline" size="sm" onClick={() => router.push('/student/exams')} className="h-9 text-xs px-3">
-                <ArrowLeft className="h-4 w-4 mr-1.5" />Back to Exams
+              <Button variant="outline" size="sm" onClick={() => router.push('/student/exams')} className="h-9 text-xs">
+                <ArrowLeft className="h-4 w-4 mr-1.5" />Back
               </Button>
             </motion.div>
 
@@ -374,38 +330,33 @@ export default function StudentResultDetailPage() {
                 <CardContent className="p-5 lg:p-6">
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="min-w-0 flex-1">
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2 break-words">{result.exam_title}</h1>
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{result.exam_title}</h1>
                       <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                        <Badge className="bg-primary/10 text-primary text-xs"><BookOpen className="h-3.5 w-3.5 mr-1" />{result.exam_subject}</Badge>
-                        <Badge variant="outline" className="text-xs"><GraduationCap className="h-3.5 w-3.5 mr-1" />{result.exam_class}</Badge>
-                        <Badge variant="outline" className="text-xs"><Calendar className="h-3.5 w-3.5 mr-1" />{formatDate(result.submitted_at)}</Badge>
+                        <Badge className="bg-primary/10 text-primary"><BookOpen className="h-3.5 w-3.5 mr-1" />{result.exam_subject}</Badge>
+                        <Badge variant="outline"><GraduationCap className="h-3.5 w-3.5 mr-1" />{result.exam_class}</Badge>
+                        {result.ca1_score !== null && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                            <Calculator className="h-3.5 w-3.5 mr-1" />CA Scores Available
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="text-center lg:text-right shrink-0">
                       <div className="flex items-center gap-3 justify-center lg:justify-end">
-                        <div className="text-center">
-                          <span className={cn("text-4xl sm:text-5xl lg:text-6xl font-bold", gradeInfo.color)}>
-                            {result.percentage}%
-                          </span>
-                          <p className="text-xs text-slate-500 mt-1">Overall</p>
-                        </div>
-                        <div className={cn(
-                          "px-4 py-2 rounded-full text-center",
-                          result.is_passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
-                        )}>
+                        <span className={cn("text-4xl sm:text-5xl lg:text-6xl font-bold", gradeInfo.color)}>
+                          {result.percentage}%
+                        </span>
+                        <div className={cn("px-4 py-2 rounded-full", result.is_passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
                           <span className="text-2xl font-bold">{gradeInfo.grade}</span>
-                          <p className="text-xs">Grade</p>
                         </div>
                       </div>
                       <p className="text-sm text-slate-500 mt-2">
-                        Total Score: {result.total_score}/{result.total_marks} • Passing: {result.passing_percentage}%
+                        {hasCA 
+                          ? `Total: ${result.grand_total}/${result.grand_total_marks}` 
+                          : `Score: ${result.total_score}/${result.total_marks}`
+                        } • Pass: {result.passing_percentage}%
                       </p>
-                      <div className="flex items-center gap-2 mt-1 justify-center lg:justify-end text-xs text-slate-500">
-                        <span>MCQ: {result.objective_score || 0}/{result.objective_total || 20}</span>
-                        <span>•</span>
-                        <span>Theory: {theoryScoreDisplay}</span>
-                      </div>
-                      <Badge className={cn("mt-2 text-xs", result.is_passed ? "bg-green-500 text-white" : "bg-red-500 text-white")}>
+                      <Badge className={cn("mt-2", result.is_passed ? "bg-green-500" : "bg-red-500")}>
                         {result.is_passed ? <><CheckCircle className="h-3 w-3 mr-1" /> Passed</> : <><XCircle className="h-3 w-3 mr-1" /> Failed</>}
                       </Badge>
                     </div>
@@ -414,130 +365,94 @@ export default function StudentResultDetailPage() {
               </Card>
             </motion.div>
 
-            {/* Stats Grid */}
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6"
-            >
-              {[
-                { 
-                  label: 'Time Spent', 
-                  value: formatTime(result.time_spent), 
-                  icon: Clock, 
-                  color: 'text-blue-500' 
-                },
-                { 
-                  label: 'MCQ Score', 
-                  value: `${result.objective_score || 0}/${result.objective_total || 20}`, 
-                  icon: Target, 
-                  color: 'text-blue-600' 
-                },
-                { 
-                  label: 'Theory Score', 
-                  value: theoryScoreDisplay, 
-                  icon: PenTool, 
-                  color: 'text-purple-600' 
-                },
-                { 
-                  label: 'Total Score', 
-                  value: `${result.total_score}/${result.total_marks}`, 
-                  icon: Award, 
-                  color: 'text-amber-500' 
-                },
-              ].map((stat, i) => (
-                <Card key={i} className="border-0 shadow-sm bg-white">
-                  <CardContent className="p-4 flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500">{stat.label}</p>
-                      <p className="text-lg font-bold">{stat.value}</p>
+            {/* Score Breakdown */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-6">
+              <Card className="border-0 shadow-lg bg-white">
+                <CardContent className="p-5 lg:p-6">
+                  <h3 className="text-lg font-semibold mb-4">Score Breakdown</h3>
+                  
+                  <div className="space-y-3">
+                    {/* CA Scores (if available) */}
+                    {hasCA && (
+                      <>
+                        <ScoreRow label="CA 1" score={result.ca1_score!} total={20} color="bg-blue-500" icon={Calculator} />
+                        <ScoreRow label="CA 2" score={result.ca2_score!} total={20} color="bg-indigo-500" icon={Calculator} />
+                        <div className="border-t border-slate-100 pt-2">
+                          <ScoreRow label="CA Total" score={result.ca1_score! + result.ca2_score!} total={40} color="bg-purple-500" icon={Award} bold />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Exam Scores */}
+                    <ScoreRow label="MCQ" score={result.objective_score} total={result.objective_total} color="bg-blue-500" icon={Target} />
+                    <ScoreRow 
+                      label="Theory" 
+                      score={result.theory_score} 
+                      total={result.theory_total} 
+                      color="bg-purple-500" 
+                      icon={PenTool}
+                      pending={isTheoryPending}
+                    />
+                    
+                    {/* Total */}
+                    <div className="border-t-2 border-slate-200 pt-3 mt-3">
+                      <ScoreRow 
+                        label={hasCA ? "Final Total" : "Total"} 
+                        score={hasCA ? result.grand_total : result.total_score} 
+                        total={hasCA ? result.grand_total_marks : result.total_marks} 
+                        color="bg-emerald-500" 
+                        icon={Award} 
+                        bold 
+                      />
                     </div>
-                    <stat.icon className={cn("h-8 w-8 opacity-50", stat.color)} />
-                  </CardContent>
-                </Card>
-              ))}
+                  </div>
+                </CardContent>
+              </Card>
             </motion.div>
 
-            {/* MCQ Performance Bar */}
-            {objectiveQuestions.length > 0 && (
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
-                <Card className="border-0 shadow-sm bg-white">
-                  <CardContent className="p-5">
-                    <h3 className="text-sm font-semibold mb-3">MCQ Performance</h3>
-                    <div className="flex h-3 rounded-full overflow-hidden">
-                      {(result.correct_count || 0) > 0 && (
-                        <div 
-                          className="bg-emerald-500 h-full" 
-                          style={{ width: `${((result.correct_count || 0) / (objectiveQuestions.length || 1)) * 100}%` }} 
-                        />
-                      )}
-                      {(result.incorrect_count || 0) > 0 && (
-                        <div 
-                          className="bg-red-500 h-full" 
-                          style={{ width: `${((result.incorrect_count || 0) / (objectiveQuestions.length || 1)) * 100}%` }} 
-                        />
-                      )}
-                      {(result.unanswered_count || 0) > 0 && (
-                        <div 
-                          className="bg-slate-300 h-full" 
-                          style={{ width: `${((result.unanswered_count || 0) / (objectiveQuestions.length || 1)) * 100}%` }} 
-                        />
-                      )}
+            {/* MCQ Stats */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
+              <Card className="border-0 shadow-sm bg-white">
+                <CardContent className="p-5">
+                  <h3 className="text-sm font-semibold mb-3">MCQ Performance</h3>
+                  <div className="grid grid-cols-3 gap-4 text-center">
+                    <div>
+                      <p className="text-2xl font-bold text-emerald-600">{result.correct_count}</p>
+                      <p className="text-xs text-slate-500">Correct</p>
                     </div>
-                    <div className="flex justify-between text-xs text-slate-500 mt-2">
-                      <span className="text-emerald-600">✓ {result.correct_count || 0} Correct</span>
-                      <span className="text-red-500">✗ {result.incorrect_count || 0} Wrong</span>
-                      <span className="text-slate-400">— {result.unanswered_count || 0} Skipped</span>
+                    <div>
+                      <p className="text-2xl font-bold text-red-500">{result.incorrect_count}</p>
+                      <p className="text-xs text-slate-500">Wrong</p>
                     </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+                    <div>
+                      <p className="text-2xl font-bold text-slate-400">{result.unanswered_count}</p>
+                      <p className="text-xs text-slate-500">Skipped</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-            {/* Theory pending notice */}
+            {/* Theory Pending Notice */}
             {isTheoryPending && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
                   <Clock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-amber-700 text-sm font-medium">Theory Answers Pending Grading</p>
-                    <p className="text-amber-600 text-xs mt-1">
-                      Your theory answers are pending grading by your instructor. 
-                      Current score ({result.total_score}/{result.total_marks}) reflects only the MCQ portion. 
-                      Final score will be updated once theory grading is complete.
-                    </p>
+                    <p className="text-amber-700 text-sm font-medium">Theory Pending Grading</p>
+                    <p className="text-amber-600 text-xs mt-1">Your theory answers are awaiting grading. Final score will update once graded.</p>
                   </div>
                 </div>
               </motion.div>
             )}
 
-            {/* Teacher Feedback (if theory is graded) */}
-            {!isTheoryPending && result.teacher_feedback && (
+            {/* Teacher Feedback */}
+            {result.teacher_feedback && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
                 <Card className="border-0 shadow-sm bg-white">
                   <CardContent className="p-5">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <FileText className="h-4 w-4 text-purple-500" />
-                      Teacher Feedback
-                    </h3>
-                    {typeof result.teacher_feedback === 'string' ? (
-                      <p className="text-sm text-slate-600">{result.teacher_feedback}</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {Object.entries(result.teacher_feedback).map(([key, value]: [string, any]) => (
-                          <div key={key} className="text-sm">
-                            <span className="font-medium text-slate-700">Q{key}:</span>{' '}
-                            <span className="text-slate-600">{typeof value === 'string' ? value : JSON.stringify(value)}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {result.graded_by && (
-                      <p className="text-xs text-slate-400 mt-2">
-                        Graded by: {result.graded_by} • {formatDate(result.graded_at)}
-                      </p>
-                    )}
+                    <h3 className="text-sm font-semibold mb-2">Teacher Feedback</h3>
+                    <p className="text-sm text-slate-600">{result.teacher_feedback}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -550,6 +465,43 @@ export default function StudentResultDetailPage() {
             </motion.div>
           </div>
         </main>
+      </div>
+    </div>
+  )
+}
+
+// Score Row Component
+function ScoreRow({ 
+  label, score, total, color, icon: Icon, bold = false, pending = false 
+}: { 
+  label: string
+  score: number | null
+  total: number
+  color: string
+  icon: any
+  bold?: boolean
+  pending?: boolean
+}) {
+  const displayScore = score !== null && score !== undefined ? score : 0
+  const percentage = total > 0 ? (displayScore / total) * 100 : 0
+
+  return (
+    <div className="flex items-center gap-3">
+      <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", color.replace('bg-', 'bg-') + '/10')}>
+        <Icon className={cn("h-4 w-4", color.replace('bg-', 'text-'))} />
+      </div>
+      <div className="flex-1">
+        <div className="flex items-center justify-between">
+          <span className={cn("text-sm", bold && "font-semibold")}>{label}</span>
+          <span className={cn("text-sm", bold && "font-semibold")}>
+            {pending ? 'Pending' : `${displayScore}/${total}`}
+          </span>
+        </div>
+        {!pending && (
+          <div className="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
+            <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${percentage}%` }} />
+          </div>
+        )}
       </div>
     </div>
   )

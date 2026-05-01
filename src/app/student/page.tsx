@@ -1,4 +1,4 @@
-// app/student/page.tsx - Clean professional version with proper spacing
+// app/student/page.tsx - Updated with CA scores integration
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -80,6 +80,7 @@ export default function StudentDashboardPage() {
       if (profileData) {
         setProfile(profileData)
         
+        // Load term progress
         const { data: progress } = await supabase
           .from('student_term_progress')
           .select('*')
@@ -90,6 +91,7 @@ export default function StudentDashboardPage() {
         
         if (progress) setTermProgress(progress)
 
+        // Load classmates
         const { data: classmates } = await supabase
           .from('profiles')
           .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
@@ -98,6 +100,7 @@ export default function StudentDashboardPage() {
           .neq('id', profileData.id)
           .limit(6)
 
+        // Load exams
         const { data: exams } = await supabase
           .from('exams')
           .select('*')
@@ -105,12 +108,28 @@ export default function StudentDashboardPage() {
           .eq('class', profileData.class)
           .limit(20)
 
+        // Load exam attempts
         const { data: attempts } = await supabase
           .from('exam_attempts')
           .select('*')
           .eq('student_id', profileData.id)
           .order('created_at', { ascending: false })
 
+        // Load CA scores for this student
+        const { data: caScores } = await supabase
+          .from('ca_scores')
+          .select('*')
+          .eq('student_id', profileData.id)
+
+        // Create CA scores map by exam_id
+        const caScoresMap: Record<string, any> = {}
+        caScores?.forEach((ca: any) => {
+          if (ca.exam_id) {
+            caScoresMap[ca.exam_id] = ca
+          }
+        })
+
+        // Get exam details for attempts
         const examIds = [...new Set((attempts || []).map((a: any) => a.exam_id))]
         let examMap: Record<string, any> = {}
         
@@ -122,13 +141,34 @@ export default function StudentDashboardPage() {
           examDetails?.forEach((e: any) => { examMap[e.id] = e })
         }
 
-        const enrichedAttempts = (attempts || []).map((a: any) => ({
-          ...a,
-          exam_title: examMap[a.exam_id]?.title || 'Exam',
-          exam_subject: examMap[a.exam_id]?.subject || 'Unknown Subject',
-        }))
+        // Enrich attempts with exam info and CA scores
+        const enrichedAttempts = (attempts || []).map((a: any) => {
+          const caScore = caScoresMap[a.exam_id]
+          const examScore = Number(a.total_score) || 0
+          const ca1Score = caScore?.ca1_score ? Number(caScore.ca1_score) : 0
+          const ca2Score = caScore?.ca2_score ? Number(caScore.ca2_score) : 0
+          const grandTotal = ca1Score + ca2Score + examScore
+          const grandTotalMax = caScore ? 100 : 60
+          
+          // Use CA percentage if available for display, otherwise exam percentage
+          let displayPercentage = a.percentage || 0
+          if (caScore && caScore.total_score) {
+            displayPercentage = Math.round((Number(caScore.total_score) / 100) * 100)
+          }
+          
+          return {
+            ...a,
+            exam_title: examMap[a.exam_id]?.title || 'Exam',
+            exam_subject: examMap[a.exam_id]?.subject || 'Unknown Subject',
+            ca_score: caScore || null,
+            grand_total: grandTotal,
+            grand_total_max: grandTotalMax,
+            display_percentage: displayPercentage,
+            has_ca: !!caScore
+          }
+        })
 
-        // All submitted attempts (for average calculation - includes pending_theory)
+        // All submitted attempts (for average calculation)
         const allSubmitted = enrichedAttempts.filter((a: any) => {
           if (['completed', 'pending_theory', 'graded'].includes(a.status)) return true
           if (a.is_auto_submitted) {
@@ -142,38 +182,57 @@ export default function StudentDashboardPage() {
           return false
         })
         
-        // Truly completed (for term progress - excludes pending_theory)
+        // Truly completed (for term progress)
         const trulyCompleted = allSubmitted.filter((a: any) => 
           ['completed', 'graded'].includes(a.status) || 
           (a.is_auto_submitted && a.auto_submit_reason?.toLowerCase().includes('time'))
         )
         
-        // Count pending theory for banner notice
+        // Pending theory count
         const pendingTheoryCount = enrichedAttempts.filter((a: any) => 
           a.status === 'pending_theory'
         ).length
         
-        const passedExams = allSubmitted.filter((a: any) => 
-          a.is_passed === true || (a.percentage && a.percentage >= 50)
-        ).length
+        // Pass/Fail with CA scores considered
+        const passedExams = allSubmitted.filter((a: any) => {
+          if (a.has_ca && a.ca_score?.grade) {
+            return !['F'].includes(a.ca_score.grade)
+          }
+          return a.is_passed === true || (a.percentage && a.percentage >= 50)
+        }).length
         
-        const failedExams = allSubmitted.filter((a: any) => 
-          a.is_passed === false && a.percentage !== null && a.percentage < 50
-        ).length
+        const failedExams = allSubmitted.filter((a: any) => {
+          if (a.has_ca && a.ca_score?.grade) {
+            return a.ca_score.grade === 'F'
+          }
+          return a.is_passed === false && a.percentage !== null && a.percentage < 50
+        }).length
 
-        // ✅ Average from ALL submitted exams (includes pending_theory with objective scores)
+        // ✅ Average using CA scores when available, otherwise exam scores
         const displayAvgScore = allSubmitted.length > 0
-          ? Math.round((allSubmitted.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0) / allSubmitted.length) * 100) / 100
+          ? Math.round((allSubmitted.reduce((sum: number, a: any) => {
+              if (a.has_ca && a.ca_score?.total_score) {
+                return sum + Number(a.ca_score.total_score) // CA total is /100
+              }
+              return sum + (a.percentage || 0)
+            }, 0) / allSubmitted.length) * 100) / 100
           : 0
 
-        // ✅ True average from only completed/graded (for term progress)
+        // True average from completed/graded (for term progress)
         const trueAvgScore = trulyCompleted.length > 0
-          ? Math.round((trulyCompleted.reduce((sum: number, a: any) => sum + (a.percentage || 0), 0) / trulyCompleted.length) * 100) / 100
+          ? Math.round((trulyCompleted.reduce((sum: number, a: any) => {
+              if (a.has_ca && a.ca_score?.total_score) {
+                return sum + Number(a.ca_score.total_score)
+              }
+              return sum + (a.percentage || 0)
+            }, 0) / trulyCompleted.length) * 100) / 100
           : 0
 
+        // Available exams (not yet submitted)
         const completedAndGradedIds = allSubmitted.map((a: any) => a.exam_id)
         const availableExams = (exams || []).filter((e: any) => !completedAndGradedIds.includes(e.id))
 
+        // Load assignments and notes
         const { data: assignments } = await supabase
           .from('assignments')
           .select('*')
@@ -204,6 +263,8 @@ export default function StudentDashboardPage() {
           averageScore: displayAvgScore,
           trueAverageScore: trueAvgScore,
           pendingTheoryCount,
+          caScoresCount: caScores?.length || 0,
+          subjectsWithCA: [...new Set(caScores?.map((ca: any) => ca.subject) || [])],
         })
       }
     } catch (error) {
@@ -215,6 +276,7 @@ export default function StudentDashboardPage() {
 
   useEffect(() => { loadProfileAndData() }, [loadProfileAndData])
 
+  // Refresh on focus/visibility
   useEffect(() => {
     const handleFocus = () => loadProfileAndData()
     window.addEventListener('focus', handleFocus)
@@ -246,7 +308,6 @@ export default function StudentDashboardPage() {
     }
   }
 
-  // ✅ Banner shows all submitted exams count and average
   const completedExams = stats.completedExams || 0
   const totalExams = termProgress?.total_subjects || (stats.availableExams?.length + completedExams) || 0
   const availableExams = stats.availableExams?.length || 0
@@ -302,6 +363,8 @@ export default function StudentDashboardPage() {
                     averageScore: avgScore, currentGrade, gradeColor: gradeInfo.color,
                     passedExams: stats.passedExams || 0, failedExams: stats.failedExams || 0,
                     pendingTheoryCount,
+                    caScoresCount: stats.caScoresCount || 0,
+                    subjectsWithCA: stats.subjectsWithCA || [],
                   }}
                   reportCardStatus={reportCardStatus}
                   welcomeBannerProfile={profile}

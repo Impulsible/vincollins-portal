@@ -1,7 +1,7 @@
 // src/app/student/exams/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
@@ -55,6 +55,27 @@ export default function StudentExamsPage() {
     setMounted(true)
   }, [])
 
+  // Refresh data when returning to this page (after taking exam)
+  useEffect(() => {
+    if (!mounted) return
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        if (selectedTermSession) {
+          loadData(selectedTermSession.term, selectedTermSession.session_year)
+        } else {
+          loadData()
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [mounted, loadData, selectedTermSession])
+
   const handleTakeExam = (examId: string) => {
     const attempt = examAttempts[examId]
     router.push(
@@ -79,6 +100,14 @@ export default function StudentExamsPage() {
     if (tab === 'results') router.push('/student/results')
     if (tab === 'classmates') router.push('/student/classmates')
   }
+
+  const handleRefresh = useCallback(() => {
+    if (selectedTermSession) {
+      loadData(selectedTermSession.term, selectedTermSession.session_year)
+    } else {
+      loadData()
+    }
+  }, [loadData, selectedTermSession])
 
   const displayedExams = filteredExams.filter((exam) => {
     switch (activeTab) {
@@ -148,13 +177,7 @@ export default function StudentExamsPage() {
                 availableTerms={availableTerms}
                 selectedTermSession={selectedTermSession}
                 onTermChange={handleTermSessionChange}
-                onRefresh={() => {
-                  if (selectedTermSession) {
-                    loadData(selectedTermSession.term, selectedTermSession.session_year)
-                  } else {
-                    loadData()
-                  }
-                }}
+                onRefresh={handleRefresh}
               />
 
               <SubjectFilter
