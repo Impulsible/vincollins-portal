@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx
+// app/student/results/[id]/page.tsx - COMPLETE BEAUTIFUL RESULT PAGE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -9,13 +9,15 @@ import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
   Loader2, Award, Clock, CheckCircle, XCircle, BookOpen,
   GraduationCap, Calendar, Target, ArrowLeft,
-  Home, ChevronRight, PenTool, Calculator, AlertCircle
+  Home, ChevronRight, PenTool, Calculator, AlertCircle,
+  Trophy, Star, TrendingUp, FileText, Sparkles
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -80,12 +82,12 @@ export default function StudentResultDetailPage() {
     }
   }
 
-  const calculateGrade = (percentage: number): { grade: string; color: string } => {
-    if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
-    if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
-    if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
-    if (percentage >= 50) return { grade: 'P', color: 'text-orange-600' }
-    return { grade: 'F', color: 'text-red-600' }
+  const calculateGrade = (percentage: number): { grade: string; color: string; bgColor: string; icon: any } => {
+    if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: Trophy }
+    if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Star }
+    if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: TrendingUp }
+    if (percentage >= 50) return { grade: 'P', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: Award }
+    return { grade: 'F', color: 'text-red-600', bgColor: 'bg-red-50', icon: AlertCircle }
   }
 
   const formatTime = (seconds?: number): string => {
@@ -93,9 +95,20 @@ export default function StudentResultDetailPage() {
     const hours = Math.floor(seconds / 3600)
     const minutes = Math.floor((seconds % 3600) / 60)
     const secs = seconds % 60
-    if (hours > 0) return `${hours}h ${minutes}m ${secs}s`
+    if (hours > 0) return `${hours}h ${minutes}m`
     if (minutes > 0) return `${minutes}m ${secs}s`
     return `${secs}s`
+  }
+
+  const formatDate = (dateString?: string): string => {
+    if (!dateString) return 'N/A'
+    try {
+      const date = new Date(dateString)
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit'
+      })
+    } catch { return 'N/A' }
   }
 
   const loadResult = useCallback(async () => {
@@ -106,7 +119,6 @@ export default function StudentResultDetailPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/portal'); return }
 
-      // Load profile
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -128,7 +140,6 @@ export default function StudentResultDetailPage() {
         photo_url: profileData.photo_url
       })
 
-      // Load attempt
       const { data: attemptData, error: attemptError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -144,14 +155,12 @@ export default function StudentResultDetailPage() {
         return
       }
 
-      // Load exam details
       const { data: examData } = await supabase
         .from('exams')
         .select('*')
         .eq('id', attemptData.exam_id)
         .single()
 
-      // Parse theory feedback for theory score
       let theoryScore: number | null = null
       let teacherFeedback: string | null = null
       
@@ -168,9 +177,10 @@ export default function StudentResultDetailPage() {
         }
       }
 
-      // Try to load CA scores (will be null if not entered yet)
       let ca1Score: number | null = null
       let ca2Score: number | null = null
+      let caObjectiveScore: number | null = null
+      let caTheoryScore: number | null = null
       
       const { data: caData } = await supabase
         .from('ca_scores')
@@ -180,24 +190,24 @@ export default function StudentResultDetailPage() {
         .maybeSingle()
       
       if (caData) {
-        ca1Score = Number(caData.ca1_score) || null
-        ca2Score = Number(caData.ca2_score) || null
+        ca1Score = caData.ca1_score !== null ? Number(caData.ca1_score) : null
+        ca2Score = caData.ca2_score !== null ? Number(caData.ca2_score) : null
+        caObjectiveScore = caData.exam_objective_score !== null ? Number(caData.exam_objective_score) : null
+        caTheoryScore = caData.exam_theory_score !== null ? Number(caData.exam_theory_score) : null
       }
 
-      // Calculate scores
-      const objectiveScore = Number(attemptData.objective_score) || 0
+      const objectiveScore = caObjectiveScore !== null ? caObjectiveScore : (Number(attemptData.objective_score) || 0)
+      const finalTheoryScore = caTheoryScore !== null ? caTheoryScore : theoryScore
       const objectiveTotal = Number(attemptData.objective_total) || 20
       const theoryTotal = Number(attemptData.theory_total) || 40
-      const examTotalMarks = objectiveTotal + theoryTotal // 60
-      const examScore = objectiveScore + (theoryScore || 0)
+      const examTotalMarks = objectiveTotal + theoryTotal
+      const examScore = objectiveScore + (finalTheoryScore || 0)
       
-      // Grand total including CAs (when available)
       const ca1 = ca1Score || 0
       const ca2 = ca2Score || 0
-      const grandTotalMarks = examTotalMarks + 40 // 60 + 40 = 100
-      const grandTotalScore = examScore + ca1 + ca2
+      const grandTotalMarks = 20 + 20 + 20 + 40
+      const grandTotalScore = ca1 + ca2 + objectiveScore + (finalTheoryScore || 0)
       
-      // Percentage based on grand total if CAs exist, otherwise exam only
       const displayPercentage = (ca1Score !== null && ca2Score !== null) 
         ? Math.round((grandTotalScore / grandTotalMarks) * 100)
         : attemptData.percentage || 0
@@ -214,7 +224,7 @@ export default function StudentResultDetailPage() {
         total_marks: examTotalMarks,
         objective_score: objectiveScore,
         objective_total: objectiveTotal,
-        theory_score: theoryScore,
+        theory_score: finalTheoryScore,
         theory_total: theoryTotal,
         ca1_score: ca1Score,
         ca2_score: ca2Score,
@@ -267,12 +277,16 @@ export default function StudentResultDetailPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
-          <Card className="max-w-md w-full">
+          <Card className="max-w-md w-full border-0 shadow-xl">
             <CardContent className="text-center py-12">
-              <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+              <div className="h-16 w-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-8 w-8 text-red-400" />
+              </div>
               <h3 className="text-lg font-semibold mb-2">Result Not Found</h3>
-              <p className="text-slate-500 text-sm mb-4">No submission found for this exam.</p>
-              <Button onClick={() => router.push('/student/results')} size="sm">Back to Results</Button>
+              <p className="text-slate-500 text-sm mb-6">No submission found for this exam.</p>
+              <Button onClick={() => router.push('/student/results')} size="sm" className="rounded-full">
+                Back to Results
+              </Button>
             </CardContent>
           </Card>
         </div>
@@ -281,9 +295,11 @@ export default function StudentResultDetailPage() {
   }
 
   const gradeInfo = calculateGrade(result.percentage)
+  const GradeIcon = gradeInfo.icon
   const isTheoryPending = result.status === 'pending_theory'
   const hasCA = result.ca1_score !== null && result.ca2_score !== null
   const theoryDisplay = result.theory_score !== null ? `${result.theory_score}/${result.theory_total}` : 'Pending'
+  const caTotal = (result.ca1_score || 0) + (result.ca2_score || 0)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
@@ -309,56 +325,116 @@ export default function StudentResultDetailPage() {
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
               className="mb-4 sm:mb-6 mt-2 sm:mt-4 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Link href="/student" className="hover:text-primary flex items-center gap-1">
+                <Link href="/student" className="hover:text-primary flex items-center gap-1 transition-colors">
                   <Home className="h-3.5 w-3.5" /><span className="hidden sm:inline">Dashboard</span>
                 </Link>
                 <ChevronRight className="h-3.5 w-3.5" />
+                <Link href="/student/exams" className="hover:text-primary transition-colors">Exams</Link>
+                <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-foreground font-medium truncate max-w-[200px]">{result.exam_title}</span>
               </div>
-              <Button variant="outline" size="sm" onClick={() => router.push('/student/exams')} className="h-9 text-xs">
-                <ArrowLeft className="h-4 w-4 mr-1.5" />Back
+              <Button variant="outline" size="sm" onClick={() => router.push('/student/exams')} 
+                className="h-9 text-xs rounded-full hover:bg-slate-100">
+                <ArrowLeft className="h-4 w-4 mr-1.5" />Back to Exams
               </Button>
             </motion.div>
 
-            {/* Result Header */}
+            {/* Hero Result Card */}
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
               <Card className={cn(
-                "border-0 shadow-lg overflow-hidden",
-                result.is_passed ? "bg-gradient-to-br from-green-50 to-emerald-50 border-l-4 border-l-green-500"
-                : "bg-gradient-to-br from-red-50 to-rose-50 border-l-4 border-l-red-500"
+                "border-0 shadow-xl overflow-hidden relative",
+                result.is_passed 
+                  ? "bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50" 
+                  : "bg-gradient-to-br from-red-50 via-rose-50 to-pink-50"
               )}>
-                <CardContent className="p-5 lg:p-6">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                {/* Decorative elements */}
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
+                
+                <CardContent className="p-5 sm:p-6 lg:p-8 relative">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     <div className="min-w-0 flex-1">
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{result.exam_title}</h1>
-                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm">
-                        <Badge className="bg-primary/10 text-primary"><BookOpen className="h-3.5 w-3.5 mr-1" />{result.exam_subject}</Badge>
-                        <Badge variant="outline"><GraduationCap className="h-3.5 w-3.5 mr-1" />{result.exam_class}</Badge>
-                        {result.ca1_score !== null && (
-                          <Badge variant="outline" className="bg-blue-50 text-blue-700">
-                            <Calculator className="h-3.5 w-3.5 mr-1" />CA Scores Available
+                      {/* Status Pills */}
+                      <div className="flex flex-wrap items-center gap-2 mb-3">
+                        <Badge className={cn(
+                          "text-xs font-medium px-3 py-1 rounded-full",
+                          result.is_passed 
+                            ? "bg-emerald-100 text-emerald-700" 
+                            : "bg-red-100 text-red-700"
+                        )}>
+                          {result.is_passed ? <CheckCircle className="h-3.5 w-3.5 mr-1" /> : <XCircle className="h-3.5 w-3.5 mr-1" />}
+                          {result.is_passed ? 'Passed' : 'Failed'}
+                        </Badge>
+                        
+                        {hasCA ? (
+                          <Badge className="bg-blue-100 text-blue-700 text-xs font-medium px-3 py-1 rounded-full">
+                            <Sparkles className="h-3.5 w-3.5 mr-1" />CA Scores Included
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs px-3 py-1 rounded-full">
+                            <AlertCircle className="h-3.5 w-3.5 mr-1" />CA Scores Pending
+                          </Badge>
+                        )}
+                        
+                        {isTheoryPending && (
+                          <Badge className="bg-purple-100 text-purple-700 text-xs font-medium px-3 py-1 rounded-full">
+                            <Clock className="h-3.5 w-3.5 mr-1" />Theory Pending
                           </Badge>
                         )}
                       </div>
-                    </div>
-                    <div className="text-center lg:text-right shrink-0">
-                      <div className="flex items-center gap-3 justify-center lg:justify-end">
-                        <span className={cn("text-4xl sm:text-5xl lg:text-6xl font-bold", gradeInfo.color)}>
-                          {result.percentage}%
+                      
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{result.exam_title}</h1>
+                      
+                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-slate-600">
+                        <span className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1">
+                          <BookOpen className="h-3.5 w-3.5" />{result.exam_subject}
                         </span>
-                        <div className={cn("px-4 py-2 rounded-full", result.is_passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
-                          <span className="text-2xl font-bold">{gradeInfo.grade}</span>
+                        <span className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1">
+                          <GraduationCap className="h-3.5 w-3.5" />{result.exam_class}
+                        </span>
+                        <span className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1">
+                          <Calendar className="h-3.5 w-3.5" />{formatDate(result.submitted_at)}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Big Score Display */}
+                    <div className="text-center shrink-0">
+                      <div className={cn(
+                        "inline-flex items-center gap-4 p-6 rounded-3xl",
+                        result.is_passed ? "bg-white/70" : "bg-white/70"
+                      )}>
+                        <div className="text-center">
+                          <div className={cn("text-5xl sm:text-6xl lg:text-7xl font-black", gradeInfo.color)}>
+                            {result.percentage}%
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1 font-medium">
+                            {hasCA ? 'Final Grade' : 'Exam Score'}
+                          </p>
+                        </div>
+                        <div className={cn(
+                          "h-16 w-16 sm:h-20 sm:w-20 rounded-2xl flex items-center justify-center",
+                          gradeInfo.bgColor
+                        )}>
+                          <div className="text-center">
+                            <GradeIcon className={cn("h-8 w-8 sm:h-10 sm:w-10 mx-auto", gradeInfo.color)} />
+                            <span className={cn("text-2xl sm:text-3xl font-black", gradeInfo.color)}>{gradeInfo.grade}</span>
+                          </div>
                         </div>
                       </div>
-                      <p className="text-sm text-slate-500 mt-2">
+                      
+                      <p className="text-sm text-slate-500 mt-3">
                         {hasCA 
-                          ? `Total: ${result.grand_total}/${result.grand_total_marks}` 
-                          : `Score: ${result.total_score}/${result.total_marks}`
-                        } • Pass: {result.passing_percentage}%
+                          ? `${result.grand_total}/${result.grand_total_marks} marks • Pass at ${result.passing_percentage}%`
+                          : `${result.total_score}/${result.total_marks} marks (exam only) • Pass at ${result.passing_percentage}%`
+                        }
                       </p>
-                      <Badge className={cn("mt-2", result.is_passed ? "bg-green-500" : "bg-red-500")}>
-                        {result.is_passed ? <><CheckCircle className="h-3 w-3 mr-1" /> Passed</> : <><XCircle className="h-3 w-3 mr-1" /> Failed</>}
-                      </Badge>
+                      
+                      {hasCA && (
+                        <p className="text-xs text-blue-600 mt-1 font-medium">
+                          CA1: {result.ca1_score} + CA2: {result.ca2_score} + Exam: {result.total_score} = {result.grand_total}/100
+                        </p>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -366,67 +442,232 @@ export default function StudentResultDetailPage() {
             </motion.div>
 
             {/* Score Breakdown */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-6">
-              <Card className="border-0 shadow-lg bg-white">
-                <CardContent className="p-5 lg:p-6">
-                  <h3 className="text-lg font-semibold mb-4">Score Breakdown</h3>
-                  
-                  <div className="space-y-3">
-                    {/* CA Scores (if available) */}
-                    {hasCA && (
-                      <>
-                        <ScoreRow label="CA 1" score={result.ca1_score!} total={20} color="bg-blue-500" icon={Calculator} />
-                        <ScoreRow label="CA 2" score={result.ca2_score!} total={20} color="bg-indigo-500" icon={Calculator} />
-                        <div className="border-t border-slate-100 pt-2">
-                          <ScoreRow label="CA Total" score={result.ca1_score! + result.ca2_score!} total={40} color="bg-purple-500" icon={Award} bold />
-                        </div>
-                      </>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.1 }} className="mb-6">
+              <Card className="border-0 shadow-lg bg-white overflow-hidden">
+                {/* Card Header */}
+                <div className="bg-gradient-to-r from-slate-50 to-white px-5 sm:px-6 py-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-slate-500" />
+                      Score Breakdown
+                    </h3>
+                    {hasCA ? (
+                      <Badge className="bg-emerald-100 text-emerald-700 text-xs rounded-full px-3 py-1">
+                        <CheckCircle className="h-3 w-3 mr-1" />Complete with CA
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs rounded-full px-3 py-1">
+                        <AlertCircle className="h-3 w-3 mr-1" />Awaiting CA Scores
+                      </Badge>
                     )}
-
-                    {/* Exam Scores */}
-                    <ScoreRow label="MCQ" score={result.objective_score} total={result.objective_total} color="bg-blue-500" icon={Target} />
-                    <ScoreRow 
-                      label="Theory" 
-                      score={result.theory_score} 
-                      total={result.theory_total} 
-                      color="bg-purple-500" 
-                      icon={PenTool}
-                      pending={isTheoryPending}
-                    />
+                  </div>
+                </div>
+                
+                <CardContent className="p-5 sm:p-6">
+                  {/* CA Notice when not available */}
+                  {!hasCA && (
+                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 mb-6">
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                          <AlertCircle className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-amber-800">Continuous Assessment Not Yet Added</p>
+                          <p className="text-sm text-amber-700 mt-1">
+                            Your final grade will include CA1 (20 marks) + CA2 (20 marks) = 40 marks 
+                            combined with your exam score (60 marks) for a total of 100 marks. 
+                            Current score shown is exam only.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  
+                  <div className="space-y-4">
+                    {/* CA Scores Section */}
+                    {hasCA && (
+                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-5 border border-blue-100">
+                        <div className="flex items-center gap-2 mb-4">
+                          <div className="h-8 w-8 rounded-lg bg-blue-500 flex items-center justify-center">
+                            <Calculator className="h-4 w-4 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-blue-900">Continuous Assessment</p>
+                            <p className="text-xs text-blue-600">40 marks total</p>
+                          </div>
+                          <Badge className="ml-auto bg-blue-200 text-blue-700 text-xs rounded-full">
+                            {caTotal}/40
+                          </Badge>
+                        </div>
+                        
+                        <ScoreRow 
+                          label="CA 1" score={result.ca1_score!} total={20} 
+                          color="from-blue-400 to-blue-500" icon={Star} 
+                        />
+                        <div className="mt-3">
+                          <ScoreRow 
+                            label="CA 2" score={result.ca2_score!} total={20} 
+                            color="from-indigo-400 to-indigo-500" icon={Star} 
+                          />
+                        </div>
+                      </div>
+                    )}
                     
-                    {/* Total */}
-                    <div className="border-t-2 border-slate-200 pt-3 mt-3">
+                    {/* Exam Scores Section */}
+                    <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 sm:p-5 border border-purple-100">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="h-8 w-8 rounded-lg bg-purple-500 flex items-center justify-center">
+                          <PenTool className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-purple-900">Examination</p>
+                          <p className="text-xs text-purple-600">60 marks total</p>
+                        </div>
+                        <Badge className="ml-auto bg-purple-200 text-purple-700 text-xs rounded-full">
+                          {result.total_score}/{result.total_marks}
+                        </Badge>
+                      </div>
+                      
                       <ScoreRow 
-                        label={hasCA ? "Final Total" : "Total"} 
-                        score={hasCA ? result.grand_total : result.total_score} 
-                        total={hasCA ? result.grand_total_marks : result.total_marks} 
-                        color="bg-emerald-500" 
-                        icon={Award} 
-                        bold 
+                        label="MCQ (Objective)" score={result.objective_score} 
+                        total={result.objective_total} 
+                        color="from-purple-400 to-purple-500" icon={Target} 
                       />
+                      <div className="mt-3">
+                        <ScoreRow 
+                          label="Theory" score={result.theory_score} 
+                          total={result.theory_total} 
+                          color="from-violet-400 to-violet-500" icon={FileText}
+                          pending={isTheoryPending}
+                        />
+                      </div>
+                    </div>
+                    
+                    {/* Final Total */}
+                    <div className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-xl p-4 sm:p-5 border-2 border-slate-200">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            "h-10 w-10 rounded-xl flex items-center justify-center",
+                            hasCA ? "bg-emerald-500" : "bg-amber-500"
+                          )}>
+                            <Trophy className="h-5 w-5 text-white" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900">
+                              {hasCA ? 'Final Grade' : 'Current Score (Exam Only)'}
+                            </p>
+                            <p className="text-xs text-slate-500">
+                              {hasCA 
+                                ? `CA1 + CA2 + MCQ + Theory = ${result.grand_total}/${result.grand_total_marks}`
+                                : `Awaiting CA scores for final /100 grade`
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <span className={cn(
+                            "text-3xl font-black",
+                            hasCA ? gradeInfo.color : "text-amber-600"
+                          )}>
+                            {hasCA ? result.grand_total : result.total_score}
+                          </span>
+                          <span className="text-lg text-slate-400 font-semibold">
+                            /{hasCA ? result.grand_total_marks : result.total_marks}
+                          </span>
+                        </div>
+                      </div>
+                      
+                      {!hasCA && (
+                        <div className="mt-3 pt-3 border-t border-slate-200">
+                          <p className="text-xs text-amber-600 text-center">
+                            ⚠️ Final grade will be out of 100 marks once CA scores are added
+                          </p>
+                        </div>
+                      )}
+                      
+                      {hasCA && (
+                        <div className="mt-3 pt-3 border-t border-slate-200">
+                          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
+                            <span className="bg-white rounded-full px-2 py-0.5">CA1: {result.ca1_score}</span>
+                            <span>+</span>
+                            <span className="bg-white rounded-full px-2 py-0.5">CA2: {result.ca2_score}</span>
+                            <span>+</span>
+                            <span className="bg-white rounded-full px-2 py-0.5">MCQ: {result.objective_score}</span>
+                            <span>+</span>
+                            <span className="bg-white rounded-full px-2 py-0.5">Theory: {result.theory_score || 0}</span>
+                            <span>=</span>
+                            <span className="bg-emerald-100 text-emerald-700 rounded-full px-3 py-0.5 font-bold">{result.grand_total}/100</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </motion.div>
 
-            {/* MCQ Stats */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
+            {/* Quick Stats Row */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.15 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              {[
+                { label: 'Time Spent', value: formatTime(result.time_spent), icon: Clock, color: 'bg-blue-50 text-blue-600' },
+                { label: 'Correct', value: result.correct_count, icon: CheckCircle, color: 'bg-emerald-50 text-emerald-600' },
+                { label: 'Wrong', value: result.incorrect_count, icon: XCircle, color: 'bg-red-50 text-red-600' },
+                { label: 'Skipped', value: result.unanswered_count, icon: AlertCircle, color: 'bg-slate-50 text-slate-500' },
+              ].map((stat, i) => (
+                <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow">
+                  <CardContent className="p-4 flex items-center gap-3">
+                    <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", stat.color.split(' ')[0])}>
+                      <stat.icon className={cn("h-5 w-5", stat.color.split(' ')[1])} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">{stat.label}</p>
+                      <p className="text-lg font-bold">{stat.value}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </motion.div>
+
+            {/* MCQ Performance Bar */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.2 }} className="mb-6">
               <Card className="border-0 shadow-sm bg-white">
                 <CardContent className="p-5">
-                  <h3 className="text-sm font-semibold mb-3">MCQ Performance</h3>
-                  <div className="grid grid-cols-3 gap-4 text-center">
-                    <div>
-                      <p className="text-2xl font-bold text-emerald-600">{result.correct_count}</p>
-                      <p className="text-xs text-slate-500">Correct</p>
+                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
+                    <Target className="h-4 w-4 text-blue-500" />
+                    MCQ Performance Distribution
+                  </h3>
+                  
+                  <div className="flex h-4 rounded-full overflow-hidden mb-3">
+                    {(result.correct_count || 0) > 0 && (
+                      <div className="bg-emerald-500 h-full transition-all duration-500" 
+                        style={{ width: `${((result.correct_count || 0) / ((result.correct_count || 0) + (result.incorrect_count || 0) + (result.unanswered_count || 0) || 1)) * 100}%` }} />
+                    )}
+                    {(result.incorrect_count || 0) > 0 && (
+                      <div className="bg-red-500 h-full transition-all duration-500" 
+                        style={{ width: `${((result.incorrect_count || 0) / ((result.correct_count || 0) + (result.incorrect_count || 0) + (result.unanswered_count || 0) || 1)) * 100}%` }} />
+                    )}
+                    {(result.unanswered_count || 0) > 0 && (
+                      <div className="bg-slate-300 h-full transition-all duration-500" 
+                        style={{ width: `${((result.unanswered_count || 0) / ((result.correct_count || 0) + (result.incorrect_count || 0) + (result.unanswered_count || 0) || 1)) * 100}%` }} />
+                    )}
+                  </div>
+                  
+                  <div className="flex justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
+                      <span className="text-slate-600">Correct ({result.correct_count || 0})</span>
                     </div>
-                    <div>
-                      <p className="text-2xl font-bold text-red-500">{result.incorrect_count}</p>
-                      <p className="text-xs text-slate-500">Wrong</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-red-500" />
+                      <span className="text-slate-600">Wrong ({result.incorrect_count || 0})</span>
                     </div>
-                    <div>
-                      <p className="text-2xl font-bold text-slate-400">{result.unanswered_count}</p>
-                      <p className="text-xs text-slate-500">Skipped</p>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 rounded-full bg-slate-300" />
+                      <span className="text-slate-600">Skipped ({result.unanswered_count || 0})</span>
                     </div>
                   </div>
                 </CardContent>
@@ -436,11 +677,15 @@ export default function StudentResultDetailPage() {
             {/* Theory Pending Notice */}
             {isTheoryPending && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-                  <Clock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-amber-700 text-sm font-medium">Theory Pending Grading</p>
-                    <p className="text-amber-600 text-xs mt-1">Your theory answers are awaiting grading. Final score will update once graded.</p>
+                <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                      <Clock className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-purple-800">Theory Answers Pending Grading</p>
+                      <p className="text-sm text-purple-700 mt-1">Your theory answers are being reviewed by your instructor. Scores will update once grading is complete.</p>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -451,18 +696,33 @@ export default function StudentResultDetailPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
                 <Card className="border-0 shadow-sm bg-white">
                   <CardContent className="p-5">
-                    <h3 className="text-sm font-semibold mb-2">Teacher Feedback</h3>
-                    <p className="text-sm text-slate-600">{result.teacher_feedback}</p>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-purple-600" />
+                      </div>
+                      Teacher Feedback
+                    </h3>
+                    <div className="bg-slate-50 rounded-lg p-4 mt-3">
+                      <p className="text-sm text-slate-700 italic">"{result.teacher_feedback}"</p>
+                    </div>
                   </CardContent>
                 </Card>
               </motion.div>
             )}
 
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-              <Button onClick={() => router.push('/student/exams')} className="w-full rounded-xl">
+            {/* Back Button */}
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.25 }}>
+              <Button 
+                onClick={() => router.push('/student/exams')} 
+                className="w-full rounded-xl h-12 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white font-medium shadow-lg hover:shadow-xl transition-all"
+              >
                 <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
               </Button>
             </motion.div>
+            
+            {/* Bottom spacing */}
+            <div className="h-8" />
           </div>
         </main>
       </div>
@@ -470,7 +730,7 @@ export default function StudentResultDetailPage() {
   )
 }
 
-// Score Row Component
+// Beautiful Score Row Component
 function ScoreRow({ 
   label, score, total, color, icon: Icon, bold = false, pending = false 
 }: { 
@@ -486,20 +746,35 @@ function ScoreRow({
   const percentage = total > 0 ? (displayScore / total) * 100 : 0
 
   return (
-    <div className="flex items-center gap-3">
-      <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center shrink-0", color.replace('bg-', 'bg-') + '/10')}>
-        <Icon className={cn("h-4 w-4", color.replace('bg-', 'text-'))} />
+    <div className={cn(
+      "flex items-center gap-3 p-2 rounded-lg transition-all duration-200",
+      bold && "bg-white/50"
+    )}>
+      <div className={cn(
+        "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-br",
+        color
+      )}>
+        <Icon className="h-4 w-4 text-white" />
       </div>
-      <div className="flex-1">
-        <div className="flex items-center justify-between">
-          <span className={cn("text-sm", bold && "font-semibold")}>{label}</span>
-          <span className={cn("text-sm", bold && "font-semibold")}>
-            {pending ? 'Pending' : `${displayScore}/${total}`}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-1">
+          <span className={cn("text-sm", bold ? "font-bold" : "font-medium")}>
+            {label}
+          </span>
+          <span className={cn("text-sm ml-2", bold ? "font-bold" : "font-medium")}>
+            {pending ? (
+              <span className="text-purple-500 animate-pulse">Pending</span>
+            ) : (
+              <span>{displayScore}<span className="text-slate-400">/{total}</span></span>
+            )}
           </span>
         </div>
         {!pending && (
-          <div className="h-1.5 bg-slate-100 rounded-full mt-1 overflow-hidden">
-            <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${percentage}%` }} />
+          <div className="h-2 bg-slate-200/50 rounded-full overflow-hidden">
+            <div 
+              className={cn("h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r", color)}
+              style={{ width: `${Math.min(percentage, 100)}%` }} 
+            />
           </div>
         )}
       </div>

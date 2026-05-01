@@ -37,6 +37,9 @@ export interface ExamAttempt {
   status: 'completed' | 'in_progress' | 'abandoned' | 'graded' | 'pending_theory' | 'terminated'
   percentage?: number
   total_score?: number
+  total_marks?: number
+  objective_score?: number
+  theory_feedback?: any
   term?: string
   session_year?: string
 }
@@ -61,6 +64,7 @@ export interface StatsState {
   totalSubjects: number
   termName: string
   sessionYear: string
+  pendingTheoryCount?: number
 }
 
 export type ViewMode = 'grid' | 'list'
