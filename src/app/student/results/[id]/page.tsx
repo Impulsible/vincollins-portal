@@ -35,7 +35,7 @@ interface ExamResult {
   total_marks: number
   objective_score?: number
   objective_total?: number
-  theory_score?: number
+  theory_score?: number | null
   theory_total?: number
   is_passed: boolean
   started_at: string
@@ -49,7 +49,7 @@ interface ExamResult {
   unanswered_count?: number
   answers?: Record<string, any>
   theory_answers?: Record<string, any>
-  teacher_feedback?: string
+  teacher_feedback?: any
   graded_by?: string
   graded_at?: string
 }
@@ -164,7 +164,7 @@ export default function StudentResultDetailPage() {
         photo_url: profileData.photo_url
       })
 
-      // ✅ FIXED: Look up by exam_id + student_id, not by attempt id
+      // Load attempt
       const { data: attemptData, error: attemptError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -191,6 +191,7 @@ export default function StudentResultDetailPage() {
       // Load questions
       let questionList: Question[] = []
       
+      // Parse MCQ questions
       if (examData?.questions) {
         const questionsData = typeof examData.questions === 'string' 
           ? JSON.parse(examData.questions) 
@@ -199,32 +200,36 @@ export default function StudentResultDetailPage() {
         const answers = attemptData.answers || {}
         const answerResults = attemptData.answer_results || {}
         
-        questionList = questionsData.map((q: any, index: number) => ({
+        const mcqQuestions = questionsData.map((q: any, index: number) => ({
           id: q.id || `q-${index}`,
           question_text: q.question || q.question_text || 'No question text',
           type: q.type || 'objective',
           options: q.options || [],
           correct_answer: q.correct_answer || q.answer,
-          points: q.points || q.marks || 1,
+          points: Number(q.marks || q.points || 0.5),
           student_answer: answers[q.id] || '',
           is_correct: answerResults[q.id]?.is_correct || false
         }))
+        
+        questionList = [...questionList, ...mcqQuestions]
       }
 
+      // Parse Theory questions
       if (examData?.theory_questions) {
         const theoryData = typeof examData.theory_questions === 'string'
           ? JSON.parse(examData.theory_questions)
           : examData.theory_questions
         
         const theoryAnswers = attemptData.theory_answers || {}
+        const theoryFeedback = attemptData.theory_feedback || {}
         
         const theoryQuestions = theoryData.map((q: any, index: number) => ({
           id: q.id || `theory-${index}`,
           question_text: q.question || q.question_text || 'No question text',
           type: 'theory' as const,
-          points: q.points || q.marks || 5,
+          points: Number(q.marks || q.points || 5),
           student_answer: theoryAnswers[q.id] || '',
-          feedback: attemptData.theory_feedback?.[q.id] || ''
+          feedback: theoryFeedback[q.id] || ''
         }))
         
         questionList = [...questionList, ...theoryQuestions]
@@ -232,6 +237,7 @@ export default function StudentResultDetailPage() {
 
       setQuestions(questionList)
 
+      // Use actual values from database
       setResult({
         id: attemptData.id,
         exam_id: attemptData.exam_id,
@@ -240,12 +246,14 @@ export default function StudentResultDetailPage() {
         exam_class: examData?.class || 'N/A',
         status: attemptData.status,
         percentage: attemptData.percentage || 0,
-        total_score: attemptData.total_score || 0,
-        total_marks: examData?.total_marks || attemptData.total_marks || 100,
-        objective_score: attemptData.objective_score,
-        objective_total: attemptData.objective_total,
-        theory_score: attemptData.theory_score,
-        theory_total: attemptData.theory_total,
+        total_score: Number(attemptData.total_score) || 0,
+        total_marks: Number(attemptData.total_marks) || 60,
+        objective_score: Number(attemptData.objective_score) || 0,
+        objective_total: Number(attemptData.objective_total) || 20,
+        theory_score: attemptData.theory_score !== null && attemptData.theory_score !== undefined 
+          ? Number(attemptData.theory_score) 
+          : null,
+        theory_total: Number(attemptData.theory_total) || 40,
         is_passed: attemptData.is_passed || false,
         started_at: attemptData.started_at,
         completed_at: attemptData.completed_at,
@@ -258,7 +266,7 @@ export default function StudentResultDetailPage() {
         unanswered_count: attemptData.unanswered_count,
         answers: attemptData.answers,
         theory_answers: attemptData.theory_answers,
-        teacher_feedback: attemptData.teacher_feedback,
+        teacher_feedback: attemptData.theory_feedback,
         graded_by: attemptData.graded_by,
         graded_at: attemptData.graded_at
       })
@@ -314,6 +322,10 @@ export default function StudentResultDetailPage() {
   const gradeInfo = calculateGrade(result.percentage)
   const objectiveQuestions = questions.filter(q => q.type === 'objective')
   const theoryQuestions = questions.filter(q => q.type === 'theory')
+  const isTheoryPending = result.status === 'pending_theory'
+  const theoryScoreDisplay = result.theory_score !== null && result.theory_score !== undefined 
+    ? `${result.theory_score}/${result.theory_total || 40}` 
+    : 'Pending'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
@@ -329,14 +341,13 @@ export default function StudentResultDetailPage() {
           setActiveTab={() => {}}
         />
 
-        {/* UPDATED: Increased top padding to match header height */}
         <main className={cn(
           "flex-1 pt-[72px] lg:pt-24 pb-24 lg:pb-12 px-3 sm:px-4 lg:px-6 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
           <div className="container mx-auto max-w-5xl">
             
-            {/* Breadcrumb - UPDATED: Added top margin for extra spacing */}
+            {/* Breadcrumb */}
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
               className="mb-4 sm:mb-6 mt-2 sm:mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
               <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
@@ -372,12 +383,28 @@ export default function StudentResultDetailPage() {
                     </div>
                     <div className="text-center lg:text-right shrink-0">
                       <div className="flex items-center gap-3 justify-center lg:justify-end">
-                        <span className={cn("text-4xl sm:text-5xl lg:text-6xl font-bold", gradeInfo.color)}>{result.percentage}%</span>
-                        <div className={cn("px-4 py-2 rounded-full", result.is_passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700")}>
+                        <div className="text-center">
+                          <span className={cn("text-4xl sm:text-5xl lg:text-6xl font-bold", gradeInfo.color)}>
+                            {result.percentage}%
+                          </span>
+                          <p className="text-xs text-slate-500 mt-1">Overall</p>
+                        </div>
+                        <div className={cn(
+                          "px-4 py-2 rounded-full text-center",
+                          result.is_passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                        )}>
                           <span className="text-2xl font-bold">{gradeInfo.grade}</span>
+                          <p className="text-xs">Grade</p>
                         </div>
                       </div>
-                      <p className="text-sm text-slate-500 mt-2">Score: {result.total_score}/{result.total_marks} • Pass: {result.passing_percentage}%</p>
+                      <p className="text-sm text-slate-500 mt-2">
+                        Total Score: {result.total_score}/{result.total_marks} • Passing: {result.passing_percentage}%
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 justify-center lg:justify-end text-xs text-slate-500">
+                        <span>MCQ: {result.objective_score || 0}/{result.objective_total || 20}</span>
+                        <span>•</span>
+                        <span>Theory: {theoryScoreDisplay}</span>
+                      </div>
                       <Badge className={cn("mt-2 text-xs", result.is_passed ? "bg-green-500 text-white" : "bg-red-500 text-white")}>
                         {result.is_passed ? <><CheckCircle className="h-3 w-3 mr-1" /> Passed</> : <><XCircle className="h-3 w-3 mr-1" /> Failed</>}
                       </Badge>
@@ -387,45 +414,132 @@ export default function StudentResultDetailPage() {
               </Card>
             </motion.div>
 
-            {/* Stats */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6">
+            {/* Stats Grid */}
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }} 
+              animate={{ opacity: 1, y: 0 }} 
+              transition={{ delay: 0.1 }}
+              className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4 mb-6"
+            >
               {[
-                { label: 'Time Spent', value: formatTime(result.time_spent), icon: Clock, color: 'text-blue-500' },
-                { label: 'Objective', value: `${result.objective_score || 0}/${result.objective_total || 0}`, icon: Target, color: 'text-blue-600' },
-                { label: 'Theory', value: `${result.theory_score || 0}/${result.theory_total || 0}`, icon: PenTool, color: 'text-purple-600' },
-                { label: 'Status', value: result.status === 'graded' ? 'Graded' : result.status === 'pending_theory' ? 'Pending' : 'Completed', icon: Award, color: 'text-amber-500' },
+                { 
+                  label: 'Time Spent', 
+                  value: formatTime(result.time_spent), 
+                  icon: Clock, 
+                  color: 'text-blue-500' 
+                },
+                { 
+                  label: 'MCQ Score', 
+                  value: `${result.objective_score || 0}/${result.objective_total || 20}`, 
+                  icon: Target, 
+                  color: 'text-blue-600' 
+                },
+                { 
+                  label: 'Theory Score', 
+                  value: theoryScoreDisplay, 
+                  icon: PenTool, 
+                  color: 'text-purple-600' 
+                },
+                { 
+                  label: 'Total Score', 
+                  value: `${result.total_score}/${result.total_marks}`, 
+                  icon: Award, 
+                  color: 'text-amber-500' 
+                },
               ].map((stat, i) => (
-                <Card key={i} className="border-0 shadow-sm bg-white"><CardContent className="p-4 flex items-center justify-between">
-                  <div><p className="text-xs text-slate-500">{stat.label}</p><p className="text-lg font-bold">{stat.value}</p></div>
-                  <stat.icon className={cn("h-8 w-8 opacity-50", stat.color)} />
-                </CardContent></Card>
+                <Card key={i} className="border-0 shadow-sm bg-white">
+                  <CardContent className="p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-slate-500">{stat.label}</p>
+                      <p className="text-lg font-bold">{stat.value}</p>
+                    </div>
+                    <stat.icon className={cn("h-8 w-8 opacity-50", stat.color)} />
+                  </CardContent>
+                </Card>
               ))}
             </motion.div>
 
-            {/* Correct/Incorrect/Unanswered Bar */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
-              <Card className="border-0 shadow-sm bg-white"><CardContent className="p-5">
-                <div className="flex h-3 rounded-full overflow-hidden">
-                  {result.correct_count! > 0 && <div className="bg-emerald-500 h-full" style={{ width: `${((result.correct_count || 0) / (questions.length || 1)) * 100}%` }} />}
-                  {result.incorrect_count! > 0 && <div className="bg-red-500 h-full" style={{ width: `${((result.incorrect_count || 0) / (questions.length || 1)) * 100}%` }} />}
-                  {result.unanswered_count! > 0 && <div className="bg-slate-300 h-full" style={{ width: `${((result.unanswered_count || 0) / (questions.length || 1)) * 100}%` }} />}
-                </div>
-                <div className="flex justify-between text-xs text-slate-500 mt-2">
-                  <span className="text-emerald-600">✓ {result.correct_count || 0} Correct</span>
-                  <span className="text-red-500">✗ {result.incorrect_count || 0} Wrong</span>
-                  <span className="text-slate-400">— {result.unanswered_count || 0} Skipped</span>
-                </div>
-              </CardContent></Card>
-            </motion.div>
+            {/* MCQ Performance Bar */}
+            {objectiveQuestions.length > 0 && (
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mb-6">
+                <Card className="border-0 shadow-sm bg-white">
+                  <CardContent className="p-5">
+                    <h3 className="text-sm font-semibold mb-3">MCQ Performance</h3>
+                    <div className="flex h-3 rounded-full overflow-hidden">
+                      {(result.correct_count || 0) > 0 && (
+                        <div 
+                          className="bg-emerald-500 h-full" 
+                          style={{ width: `${((result.correct_count || 0) / (objectiveQuestions.length || 1)) * 100}%` }} 
+                        />
+                      )}
+                      {(result.incorrect_count || 0) > 0 && (
+                        <div 
+                          className="bg-red-500 h-full" 
+                          style={{ width: `${((result.incorrect_count || 0) / (objectiveQuestions.length || 1)) * 100}%` }} 
+                        />
+                      )}
+                      {(result.unanswered_count || 0) > 0 && (
+                        <div 
+                          className="bg-slate-300 h-full" 
+                          style={{ width: `${((result.unanswered_count || 0) / (objectiveQuestions.length || 1)) * 100}%` }} 
+                        />
+                      )}
+                    </div>
+                    <div className="flex justify-between text-xs text-slate-500 mt-2">
+                      <span className="text-emerald-600">✓ {result.correct_count || 0} Correct</span>
+                      <span className="text-red-500">✗ {result.incorrect_count || 0} Wrong</span>
+                      <span className="text-slate-400">— {result.unanswered_count || 0} Skipped</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
 
             {/* Theory pending notice */}
-            {result.status === 'pending_theory' && (
+            {isTheoryPending && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-                  <Clock className="h-5 w-5 text-amber-500 shrink-0" />
-                  <p className="text-amber-700 text-sm">Your theory answers are pending grading by your instructor. Final score will be updated once grading is complete.</p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+                  <Clock className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-amber-700 text-sm font-medium">Theory Answers Pending Grading</p>
+                    <p className="text-amber-600 text-xs mt-1">
+                      Your theory answers are pending grading by your instructor. 
+                      Current score ({result.total_score}/{result.total_marks}) reflects only the MCQ portion. 
+                      Final score will be updated once theory grading is complete.
+                    </p>
+                  </div>
                 </div>
+              </motion.div>
+            )}
+
+            {/* Teacher Feedback (if theory is graded) */}
+            {!isTheoryPending && result.teacher_feedback && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
+                <Card className="border-0 shadow-sm bg-white">
+                  <CardContent className="p-5">
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-purple-500" />
+                      Teacher Feedback
+                    </h3>
+                    {typeof result.teacher_feedback === 'string' ? (
+                      <p className="text-sm text-slate-600">{result.teacher_feedback}</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {Object.entries(result.teacher_feedback).map(([key, value]: [string, any]) => (
+                          <div key={key} className="text-sm">
+                            <span className="font-medium text-slate-700">Q{key}:</span>{' '}
+                            <span className="text-slate-600">{typeof value === 'string' ? value : JSON.stringify(value)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {result.graded_by && (
+                      <p className="text-xs text-slate-400 mt-2">
+                        Graded by: {result.graded_by} • {formatDate(result.graded_at)}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
               </motion.div>
             )}
 

@@ -22,12 +22,15 @@ export function ExamList({
   onTakeExam,
   onViewResult,
 }: ExamListProps) {
+  if (exams.length === 0) return null
+
   return (
     <div
       className={cn(
+        "pb-8 sm:pb-12 lg:pb-16", // Add bottom padding
         viewMode === 'grid'
           ? "grid gap-4 sm:gap-5 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          : "space-y-3 sm:space-y-4"
+          : "flex flex-col gap-3 sm:gap-4"
       )}
     >
       {exams.map((exam) => {
@@ -36,17 +39,16 @@ export function ExamList({
         const config = getSubjectConfig(exam.subject)
 
         return (
-          <div key={exam.id} className={viewMode === 'grid' ? 'h-full' : ''}>
-            <ExamCard
-              exam={exam}
-              attempt={attempt}
-              status={status}
-              config={config}
-              viewMode={viewMode}
-              onTakeExam={onTakeExam}
-              onViewResult={onViewResult}
-            />
-          </div>
+          <ExamCard
+            key={exam.id}
+            exam={exam}
+            attempt={attempt}
+            status={status}
+            config={config}
+            viewMode={viewMode}
+            onTakeExam={onTakeExam}
+            onViewResult={onViewResult}
+          />
         )
       })}
     </div>
