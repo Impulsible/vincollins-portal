@@ -1312,371 +1312,373 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
         </div>
       </header>
 
-      {/* MOBILE MENU - UPDATED: All content in ScrollArea, Sign Out at bottom */}
-      <AnimatePresence>
-        {mobileMenuOpen && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
-              onClick={() => setMobileMenuOpen(false)}
-            />
+      {/* MOBILE MENU - UPDATED: Full width on small screens, proper content alignment */}
+<AnimatePresence>
+  {mobileMenuOpen && (
+    <>
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden"
+        onClick={() => setMobileMenuOpen(false)}
+      />
+      
+      {/* Mobile Menu Panel */}
+      <motion.div
+        ref={mobileMenuRef}
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+        className="fixed top-0 right-0 h-full w-full xs:w-[320px] sm:w-[380px] bg-white z-50 shadow-2xl lg:hidden flex flex-col"
+      >
+        {/* Mobile Menu Header - Fixed */}
+        <div className="flex-shrink-0 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] p-4 sm:p-6 flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            {schoolSettings?.logo_path ? (
+              <Image src={schoolSettings.logo_path} alt="Logo" width={40} height={40} className="rounded-lg flex-shrink-0" />
+            ) : (
+              <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <GraduationCap className="h-5 w-5 text-white" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-white font-semibold text-sm truncate">Vincollins College</p>
+              {user?.isAuthenticated && (
+                <p className="text-white/70 text-xs truncate">{getMobileGreeting()}</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors flex-shrink-0 ml-2"
+            aria-label="Close menu"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* User Info (if authenticated) - Fixed */}
+        {user?.isAuthenticated && (
+          <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+            <div className="flex items-center gap-3">
+              <Avatar className="h-12 w-12 ring-2 ring-primary/20 flex-shrink-0">
+                {user.avatar && !avatarError ? (
+                  <AvatarImage src={user.avatar} alt={user.name} onError={handleAvatarError} />
+                ) : null}
+                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
+                  {getUserInitials()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-900 text-sm truncate">{user.name}</p>
+                <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                <Badge className={`mt-1 text-xs inline-block ${getRoleBadgeColor(user.role)}`}>
+                  {getRoleDisplayName(user.role)}
+                </Badge>
+              </div>
+            </div>
             
-            {/* Mobile Menu Panel */}
-            <motion.div
-              ref={mobileMenuRef}
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed top-0 right-0 h-full w-[300px] xs:w-[320px] sm:w-[380px] bg-white z-50 shadow-2xl lg:hidden flex flex-col"
-            >
-              {/* Mobile Menu Header - Fixed */}
-              <div className="flex-shrink-0 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] p-4 sm:p-6 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {schoolSettings?.logo_path ? (
-                    <Image src={schoolSettings.logo_path} alt="Logo" width={40} height={40} className="rounded-lg" />
-                  ) : (
-                    <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center">
-                      <GraduationCap className="h-5 w-5 text-white" />
+            {/* Dashboard Button for public pages */}
+            {(isPublicPage || isHomePage || isPortalPage) && (
+              <button
+                onClick={goToDashboard}
+                className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+              >
+                <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+                <span className="truncate">
+                  {user?.role === 'admin' ? 'Admin Dashboard' : 
+                   user?.role === 'teacher' ? 'Teacher Dashboard' : 
+                   'Student Dashboard'}
+                </span>
+                <ArrowRight className="h-4 w-4 flex-shrink-0" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Scrollable Content - ALL content including Sign Out */}
+        <ScrollArea className="flex-1">
+          <nav className="p-4">
+            {/* Navigation Items */}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+              Navigation
+            </p>
+            <div className="space-y-1">
+              {currentNavigation.map((item) => {
+                const Icon = item.icon
+                const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
+                const isCbt = item.name === 'CBT Platform' || item.isCbt
+
+                if (item.isDropdown && item.dropdownItems) {
+                  return (
+                    <div key={item.name} className="mb-2">
+                      <div className="flex items-center gap-3 px-3 py-2.5 text-gray-700 font-medium text-sm">
+                        <Icon className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span className="flex-1 truncate">{item.name}</span>
+                      </div>
+                      <div className="ml-4 pl-6 space-y-1 border-l-2 border-gray-100">
+                        {item.dropdownItems.map((subItem) => {
+                          const SubIcon = subItem.icon
+                          const isSubActive = pathname?.startsWith(subItem.href)
+                          return (
+                            <Link
+                              key={subItem.name}
+                              href={subItem.href}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                                isSubActive 
+                                  ? 'bg-primary/10 text-primary font-medium' 
+                                  : 'text-gray-600 hover:bg-gray-50'
+                              }`}
+                            >
+                              <SubIcon className="h-4 w-4 flex-shrink-0" />
+                              <span className="truncate">{subItem.name}</span>
+                            </Link>
+                          )
+                        })}
+                      </div>
                     </div>
-                  )}
-                  <div>
-                    <p className="text-white font-semibold text-sm">Vincollins College</p>
-                    {user?.isAuthenticated && (
-                      <p className="text-white/70 text-xs">{getMobileGreeting()}</p>
+                  )
+                }
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.href}
+                    onClick={(e) => {
+                      if (isCbt) {
+                        e.preventDefault()
+                        setShowCbtInfo(true)
+                      }
+                      setMobileMenuOpen(false)
+                    }}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                      isActive 
+                        ? 'bg-primary/10 text-primary shadow-sm' 
+                        : 'text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    <Icon className={`h-4 w-4 flex-shrink-0 ${isActive ? 'text-primary' : 'text-gray-400'}`} />
+                    <span className="flex-1 truncate">{item.name}</span>
+                    {isCbt && (
+                      <Badge className="bg-[#F5A623] text-[#0A2472] text-[10px] py-0 px-1.5 font-bold flex-shrink-0">
+                        CBT
+                      </Badge>
                     )}
-                  </div>
+                    {isActive && (
+                      <motion.div 
+                        layoutId="mobileActiveIndicator"
+                        className="h-2 w-2 rounded-full bg-primary flex-shrink-0" 
+                      />
+                    )}
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* ============================================ */}
+            {/* PUBLIC PAGES ONLY: Navigate To & Quick Links */}
+            {/* ============================================ */}
+            {!isDashboardPage && (
+              <>
+                {/* Divider */}
+                <div className="my-4 border-t border-gray-100" />
+
+                {/* Page Navigation - Home & Portal - ONLY on public pages for non-authenticated users */}
+                {!user?.isAuthenticated && (
+                  <>
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                      Navigate To
+                    </p>
+                    <div className="space-y-1 mb-4">
+                      {pathname !== '/' && (
+                        <Link
+                          href="/"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors group"
+                        >
+                          <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors flex-shrink-0">
+                            <Home className="h-3.5 w-3.5 text-blue-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">Home Page</p>
+                            <p className="text-[10px] text-gray-400 truncate">Return to main website</p>
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+                        </Link>
+                      )}
+                      
+                      {pathname !== '/portal' && (
+                        <Link
+                          href="/portal"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors group"
+                        >
+                          <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors flex-shrink-0">
+                            <KeyRound className="h-3.5 w-3.5 text-emerald-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-sm truncate">Portal Login</p>
+                            <p className="text-[10px] text-gray-400 truncate">Login or switch account</p>
+                          </div>
+                          <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors flex-shrink-0" />
+                        </Link>
+                      )}
+                    </div>
+                  </>
+                )}
+
+                {/* Quick Links - ONLY on public pages */}
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                  Quick Links
+                </p>
+                <div className="space-y-1">
+                  <Link
+                    href="/calendar"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <Calendar className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">Academic Calendar</span>
+                  </Link>
+                  <Link
+                    href="/library"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+                  >
+                    <BookOpen className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                    <span className="truncate">E-Library</span>
+                  </Link>
                 </div>
-                <button
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
-                  aria-label="Close menu"
-                >
-                  <X className="h-4 w-4" />
-                </button>
+
+                {/* Search on Mobile - ONLY on public pages */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <form onSubmit={(e) => {
+                    e.preventDefault()
+                    if (searchQuery.trim()) {
+                      router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
+                      setMobileMenuOpen(false)
+                      setSearchQuery('')
+                    }
+                  }}>
+                    <div className="relative">
+                      <Input
+                        type="search"
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full bg-gray-50 border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm"
+                      />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
+                  </form>
+                </div>
+
+                {/* Notifications Link for authenticated users on public pages */}
+                {user?.isAuthenticated && (
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <button
+                      onClick={() => {
+                        setMobileMenuOpen(false)
+                        const role = user?.role || 'student'
+                        router.push(role === 'student' ? '/student/notifications' : '/staff/notifications')
+                      }}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors w-full"
+                    >
+                      <Bell className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="flex-1 text-left truncate">Notifications</span>
+                      {unreadCount > 0 && (
+                        <Badge className="bg-red-500 text-white text-xs flex-shrink-0">{unreadCount}</Badge>
+                      )}
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* ============================================ */}
+            {/* ALL PAGES: Contact Info, Social Links, Copyright, Sign Out */}
+            {/* ============================================ */}
+            
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              {/* Contact Info */}
+              <div className="space-y-2 mb-4">
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2">
+                  Contact Info
+                </p>
+                {contactInfo.map((info, idx) => {
+                  const Icon = info.icon
+                  return (
+                    <div key={idx} className="flex items-start gap-2 px-2 text-xs text-gray-500">
+                      <Icon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <span className="break-words">{info.text}</span>
+                    </div>
+                  )
+                })}
               </div>
 
-              {/* User Info (if authenticated) - Fixed */}
-              {user?.isAuthenticated && (
-                <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-                      {user.avatar && !avatarError ? (
-                        <AvatarImage src={user.avatar} alt={user.name} onError={handleAvatarError} />
-                      ) : null}
-                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
-                        {getUserInitials()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm truncate">{user.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                      <Badge className={`mt-1 text-xs ${getRoleBadgeColor(user.role)}`}>
-                        {getRoleDisplayName(user.role)}
-                      </Badge>
-                    </div>
-                  </div>
-                  
-                  {/* Dashboard Button for public pages */}
-                  {(isPublicPage || isHomePage || isPortalPage) && (
-                    <button
-                      onClick={goToDashboard}
-                      className="mt-3 w-full px-4 py-2.5 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
+              {/* Social Links */}
+              <div className="flex items-center justify-center gap-3 mb-4">
+                {socialLinks.map((social, idx) => {
+                  const Icon = social.icon
+                  return (
+                    <a
+                      key={idx}
+                      href={social.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-[#0A2472] hover:text-white transition-colors flex-shrink-0"
+                      aria-label={social.label}
                     >
-                      <LayoutDashboard className="h-4 w-4" />
-                      {user?.role === 'admin' ? 'Admin Dashboard' : 
-                       user?.role === 'teacher' ? 'Teacher Dashboard' : 
-                       'Student Dashboard'}
-                      <ArrowRight className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
+                      <Icon className="h-4 w-4" />
+                    </a>
+                  )
+                })}
+              </div>
+
+              {/* Copyright */}
+              <div className="text-center mb-4">
+                <p className="text-[10px] text-gray-400">
+                  © {currentYear} Vincollins College
+                </p>
+                <p className="text-[9px] text-gray-300 mt-0.5">
+                  Geared Towards Excellence
+                </p>
+              </div>
+
+              {/* Login Button for non-authenticated users */}
+              {!user?.isAuthenticated && (
+                <Link
+                  href="/portal"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] rounded-xl font-semibold shadow-md hover:shadow-lg transition-all mb-3 text-sm"
+                >
+                  <KeyRound className="h-4 w-4 flex-shrink-0" />
+                  <span>Portal Login</span>
+                </Link>
               )}
 
-              {/* Scrollable Content - ALL content including Sign Out */}
-              <ScrollArea className="flex-1">
-                <nav className="p-4">
-                  {/* Navigation Items */}
-                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                    Navigation
-                  </p>
-                  <div className="space-y-1">
-                    {currentNavigation.map((item) => {
-                      const Icon = item.icon
-                      const isActive = isNavActive(item.href) || (item.isDropdown && isUserManagementActive())
-                      const isCbt = item.name === 'CBT Platform' || item.isCbt
-
-                      if (item.isDropdown && item.dropdownItems) {
-                        return (
-                          <div key={item.name} className="mb-2">
-                            <div className="flex items-center gap-3 px-3 py-2.5 text-gray-700 font-medium text-sm">
-                              <Icon className="h-4 w-4 text-gray-400" />
-                              <span className="flex-1">{item.name}</span>
-                            </div>
-                            <div className="ml-4 pl-6 space-y-1 border-l-2 border-gray-100">
-                              {item.dropdownItems.map((subItem) => {
-                                const SubIcon = subItem.icon
-                                const isSubActive = pathname?.startsWith(subItem.href)
-                                return (
-                                  <Link
-                                    key={subItem.name}
-                                    href={subItem.href}
-                                    onClick={() => setMobileMenuOpen(false)}
-                                    className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                                      isSubActive 
-                                        ? 'bg-primary/10 text-primary font-medium' 
-                                        : 'text-gray-600 hover:bg-gray-50'
-                                    }`}
-                                  >
-                                    <SubIcon className="h-4 w-4" />
-                                    <span>{subItem.name}</span>
-                                  </Link>
-                                )
-                              })}
-                            </div>
-                          </div>
-                        )
-                      }
-
-                      return (
-                        <Link
-                          key={item.name}
-                          href={item.href}
-                          onClick={(e) => {
-                            if (isCbt) {
-                              e.preventDefault()
-                              setShowCbtInfo(true)
-                            }
-                            setMobileMenuOpen(false)
-                          }}
-                          className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                            isActive 
-                              ? 'bg-primary/10 text-primary shadow-sm' 
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <Icon className={`h-4 w-4 ${isActive ? 'text-primary' : 'text-gray-400'}`} />
-                          <span className="flex-1">{item.name}</span>
-                          {isCbt && (
-                            <Badge className="bg-[#F5A623] text-[#0A2472] text-[10px] py-0 px-1.5 font-bold">
-                              CBT
-                            </Badge>
-                          )}
-                          {isActive && (
-                            <motion.div 
-                              layoutId="mobileActiveIndicator"
-                              className="h-2 w-2 rounded-full bg-primary" 
-                            />
-                          )}
-                        </Link>
-                      )
-                    })}
-                  </div>
-
-                  {/* ============================================ */}
-                  {/* PUBLIC PAGES ONLY: Navigate To & Quick Links */}
-                  {/* ============================================ */}
-                  {!isDashboardPage && (
-                    <>
-                      {/* Divider */}
-                      <div className="my-4 border-t border-gray-100" />
-
-                      {/* Page Navigation - Home & Portal - ONLY on public pages */}
-                      {!user?.isAuthenticated && (
-                        <>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                            Navigate To
-                          </p>
-                          <div className="space-y-1 mb-4">
-                            {pathname !== '/' && (
-                              <Link
-                                href="/"
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors group"
-                              >
-                                <div className="h-7 w-7 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                                  <Home className="h-3.5 w-3.5 text-blue-500" />
-                                </div>
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm">Home Page</p>
-                                  <p className="text-[10px] text-gray-400">Return to main website</p>
-                                </div>
-                                <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                              </Link>
-                            )}
-                            
-                            {pathname !== '/portal' && (
-                              <Link
-                                href="/portal"
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors group"
-                              >
-                                <div className="h-7 w-7 rounded-lg bg-emerald-50 flex items-center justify-center group-hover:bg-emerald-100 transition-colors">
-                                  <KeyRound className="h-3.5 w-3.5 text-emerald-500" />
-                                </div>
-                                <div className="flex-1">
-                                  <p className="font-medium text-sm">Portal Login</p>
-                                  <p className="text-[10px] text-gray-400">Login or switch account</p>
-                                </div>
-                                <ChevronRight className="h-3.5 w-3.5 text-gray-300 group-hover:text-gray-500 transition-colors" />
-                              </Link>
-                            )}
-                          </div>
-                        </>
-                      )}
-
-                      {/* Quick Links - ONLY on public pages */}
-                      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
-                        Quick Links
-                      </p>
-                      <div className="space-y-1">
-                        <Link
-                          href="/calendar"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          <Calendar className="h-4 w-4 text-gray-400" />
-                          <span>Academic Calendar</span>
-                        </Link>
-                        <Link
-                          href="/library"
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-                        >
-                          <BookOpen className="h-4 w-4 text-gray-400" />
-                          <span>E-Library</span>
-                        </Link>
-                      </div>
-
-                      {/* Search on Mobile - ONLY on public pages */}
-                      <div className="mt-4 pt-4 border-t border-gray-100">
-                        <form onSubmit={(e) => {
-                          e.preventDefault()
-                          if (searchQuery.trim()) {
-                            router.push(`/search?q=${encodeURIComponent(searchQuery.trim())}`)
-                            setMobileMenuOpen(false)
-                            setSearchQuery('')
-                          }
-                        }}>
-                          <div className="relative">
-                            <Input
-                              type="search"
-                              placeholder="Search..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="w-full bg-gray-50 border-gray-200 rounded-xl py-2.5 pl-10 pr-4 text-sm"
-                            />
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          </div>
-                        </form>
-                      </div>
-
-                      {/* Notifications Link for authenticated users on public pages */}
-                      {user?.isAuthenticated && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <button
-                            onClick={() => {
-                              setMobileMenuOpen(false)
-                              const role = user?.role || 'student'
-                              router.push(role === 'student' ? '/student/notifications' : '/staff/notifications')
-                            }}
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50 transition-colors w-full"
-                          >
-                            <Bell className="h-4 w-4 text-gray-400" />
-                            <span className="flex-1 text-left">Notifications</span>
-                            {unreadCount > 0 && (
-                              <Badge className="bg-red-500 text-white text-xs">{unreadCount}</Badge>
-                            )}
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-
-                  {/* ============================================ */}
-                  {/* ALL PAGES: Contact Info, Social Links, Copyright, Sign Out */}
-                  {/* ============================================ */}
-                  
-                  <div className="mt-4 pt-4 border-t border-gray-100">
-                    {/* Contact Info */}
-                    <div className="space-y-2 mb-4">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
-                        Contact Info
-                      </p>
-                      {contactInfo.map((info, idx) => {
-                        const Icon = info.icon
-                        return (
-                          <div key={idx} className="flex items-center gap-2 text-xs text-gray-500">
-                            <Icon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                            <span className="truncate">{info.text}</span>
-                          </div>
-                        )
-                      })}
-                    </div>
-
-                    {/* Social Links */}
-                    <div className="flex items-center justify-center gap-3 mb-4">
-                      {socialLinks.map((social, idx) => {
-                        const Icon = social.icon
-                        return (
-                          <a
-                            key={idx}
-                            href={social.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-[#0A2472] hover:text-white transition-colors"
-                            aria-label={social.label}
-                          >
-                            <Icon className="h-4 w-4" />
-                          </a>
-                        )
-                      })}
-                    </div>
-
-                    {/* Copyright */}
-                    <div className="text-center mb-4">
-                      <p className="text-[10px] text-gray-400">
-                        © {currentYear} Vincollins College
-                      </p>
-                      <p className="text-[9px] text-gray-300 mt-0.5">
-                        Geared Towards Excellence
-                      </p>
-                    </div>
-
-                    {/* Login Button for non-authenticated users */}
-                    {!user?.isAuthenticated && (
-                      <Link
-                        href="/portal"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-[#F5A623] to-[#F5A623]/90 text-[#0A2472] rounded-xl font-semibold shadow-md hover:shadow-lg transition-all mb-3"
-                      >
-                        <KeyRound className="h-4 w-4" />
-                        Portal Login
-                      </Link>
-                    )}
-
-                    {/* Sign Out button for authenticated users - ALWAYS VISIBLE AT BOTTOM */}
-                    {user?.isAuthenticated && (
-                      <button
-                        onClick={handleLogoutClick}
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium text-sm transition-colors"
-                      >
-                        <LogOut className="h-4 w-4" />
-                        Sign Out
-                      </button>
-                    )}
-                  </div>
-                </nav>
-              </ScrollArea>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+              {/* Sign Out button for authenticated users - ALWAYS VISIBLE AT BOTTOM */}
+              {user?.isAuthenticated && (
+                <button
+                  onClick={handleLogoutClick}
+                  className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium text-sm transition-colors"
+                >
+                  <LogOut className="h-4 w-4 flex-shrink-0" />
+                  <span>Sign Out</span>
+                </button>
+              )}
+            </div>
+          </nav>
+        </ScrollArea>
+      </motion.div>
+    </>
+  )}
+</AnimatePresence>
 
       {/* CBT Platform Dialog */}
       <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
