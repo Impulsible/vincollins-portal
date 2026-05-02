@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx - FIXED CA SCORE CALCULATION
+// app/student/results/[id]/page.tsx - FIXED: USES ACTUAL EXAM SCORES
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -102,6 +102,7 @@ export default function StudentResultDetailPage() {
         photo_url: pd.photo_url || undefined
       })
 
+      // Get exam attempt - this has the REAL scores
       const { data: att } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -123,7 +124,7 @@ export default function StudentResultDetailPage() {
         .eq('id', att.exam_id)
         .maybeSingle()
 
-      // Get theory score from feedback
+      // Get REAL theory score from theory_feedback (teacher graded)
       let theoryScore: number | null = null
       let teacherFeedback: string | null = null
 
@@ -135,36 +136,29 @@ export default function StudentResultDetailPage() {
         } catch { /* ignore */ }
       }
 
-      // Get CA scores
+      // Get CA scores - ONLY ca1 and ca2, not exam scores
       const { data: ca } = await supabase
         .from('ca_scores')
-        .select('*')
+        .select('ca1_score, ca2_score, total_score')
         .eq('student_id', session.user.id)
         .eq('exam_id', examId)
         .maybeSingle()
 
-      // Determine scores - prefer CA scores if available
-      let objScore = Number(att.objective_score) || 0
-      let finalTheory = theoryScore
-      let ca1: number | null = null
-      let ca2: number | null = null
-
-      if (ca) {
-        if (ca.exam_objective_score != null) objScore = Number(ca.exam_objective_score)
-        if (ca.exam_theory_score != null) finalTheory = Number(ca.exam_theory_score)
-        if (ca.ca1_score != null) ca1 = Number(ca.ca1_score)
-        if (ca.ca2_score != null) ca2 = Number(ca.ca2_score)
-      }
-
+      // REAL scores from exam_attempts
+      const objScore = Number(att.objective_score) || 0
       const objTotal = Number(att.objective_total) || 20
       const thTotal = Number(att.theory_total) || 40
-      const examScore = objScore + (finalTheory || 0)
+      const examScore = objScore + (theoryScore || 0)
+      
+      // CA scores (only CA1 and CA2)
+      const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
+      const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
       const c1 = ca1 || 0
       const c2 = ca2 || 0
-      const grandScore = c1 + c2 + objScore + (finalTheory || 0)
+      const grandScore = c1 + c2 + objScore + (theoryScore || 0)
       const hasCA = ca1 !== null && ca2 !== null
 
-      // Calculate percentage based on what's available
+      // Calculate percentage
       const totalScore = hasCA ? grandScore : examScore
       const totalMarks = hasCA ? 100 : (objTotal + thTotal)
       const percentage = hasCA
@@ -181,9 +175,9 @@ export default function StudentResultDetailPage() {
         percentage: percentage,
         total_score: totalScore,
         total_marks: totalMarks,
-        objective_score: objScore,
+        objective_score: Math.round(objScore), // Round 0.5 → 1
         objective_total: objTotal,
-        theory_score: finalTheory,
+        theory_score: theoryScore,
         theory_total: thTotal,
         ca1_score: ca1,
         ca2_score: ca2,
@@ -214,26 +208,15 @@ export default function StudentResultDetailPage() {
     router.push('/portal')
   }
 
-  // ─── Loading State ──────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
         <div className="flex w-full">
           <div className="hidden lg:block">
-            <StudentSidebar
-              profile={null}
-              onLogout={handleLogout}
-              collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-              activeTab="results"
-              setActiveTab={() => {}}
-            />
+            <StudentSidebar profile={null} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="results" setActiveTab={() => {}} />
           </div>
-          <div className={cn(
-            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]",
-            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-          )}>
+          <div className={cn("flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
             <div className="text-center px-4">
               <div className="relative mx-auto mb-6 h-16 w-16">
                 <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
@@ -249,36 +232,21 @@ export default function StudentResultDetailPage() {
     )
   }
 
-  // ─── Error State ────────────────────────────────────
   if (error || !result) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
         <div className="flex w-full">
           <div className="hidden lg:block">
-            <StudentSidebar
-              profile={null}
-              onLogout={handleLogout}
-              collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-              activeTab="results"
-              setActiveTab={() => {}}
-            />
+            <StudentSidebar profile={null} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="results" setActiveTab={() => {}} />
           </div>
-          <div className={cn(
-            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)] px-4",
-            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-          )}>
+          <div className={cn("flex-1 flex items-center justify-center min-h-[calc(100vh-64px)] px-4", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
             <Card className="max-w-sm w-full border-0 shadow-sm">
               <CardContent className="text-center py-10">
-                <div className="h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-                  <AlertCircle className="h-7 w-7 text-red-400" />
-                </div>
+                <div className="h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4"><AlertCircle className="h-7 w-7 text-red-400" /></div>
                 <h3 className="font-semibold text-slate-800 mb-1">Result Not Found</h3>
                 <p className="text-sm text-slate-500 mb-6">{error || 'No submission found for this exam.'}</p>
-                <Button onClick={() => router.push('/student/exams')} size="sm" className="w-full">
-                  <ArrowLeft className="h-4 w-4 mr-2" />Back to Exams
-                </Button>
+                <Button onClick={() => router.push('/student/exams')} size="sm" className="w-full"><ArrowLeft className="h-4 w-4 mr-2" />Back to Exams</Button>
               </CardContent>
             </Card>
           </div>
@@ -295,32 +263,12 @@ export default function StudentResultDetailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
-      <Header
-        user={{
-          id: profile?.id || '',
-          name: profile?.full_name || '',
-          email: profile?.email || '',
-          role: 'student' as const,
-          avatar: profile?.photo_url || undefined,
-          isAuthenticated: true
-        }}
-        onLogout={handleLogout}
-      />
+      <Header user={{ id: profile?.id || '', name: profile?.full_name || '', email: profile?.email || '', role: 'student' as const, avatar: profile?.photo_url || undefined, isAuthenticated: true }} onLogout={handleLogout} />
 
       <div className="flex w-full overflow-x-hidden">
-        <StudentSidebar
-          profile={profile}
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab="results"
-          setActiveTab={() => {}}
-        />
+        <StudentSidebar profile={profile} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="results" setActiveTab={() => {}} />
 
-        <main className={cn(
-          "flex-1 pt-[72px] lg:pt-24 pb-20 px-4 sm:px-6 lg:px-8 transition-all duration-300 w-full max-w-full",
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-        )}>
+        <main className={cn("flex-1 pt-[72px] lg:pt-24 pb-20 px-4 sm:px-6 lg:px-8 transition-all duration-300 w-full max-w-full", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
           <div className="w-full max-w-3xl mx-auto">
 
             <nav className="flex items-center justify-between gap-2 mb-6 mt-2">
@@ -331,9 +279,7 @@ export default function StudentResultDetailPage() {
                 <li><ChevronRight className="h-3 w-3 shrink-0" /></li>
                 <li className="text-slate-800 font-medium truncate">{result.exam_title}</li>
               </ol>
-              <Button variant="ghost" size="sm" onClick={() => router.push('/student/exams')} className="h-8 text-xs shrink-0">
-                <ArrowLeft className="h-3.5 w-3.5 mr-1" />Back
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => router.push('/student/exams')} className="h-8 text-xs shrink-0"><ArrowLeft className="h-3.5 w-3.5 mr-1" />Back</Button>
             </nav>
 
             <Card className="border-0 shadow-sm mb-5 overflow-hidden">
@@ -345,11 +291,7 @@ export default function StudentResultDetailPage() {
                         {isPassed ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
                         {isPassed ? 'Passed' : 'Failed'}
                       </Badge>
-                      {theoryPending && (
-                        <Badge variant="outline" className="text-xs text-purple-600 border-purple-200">
-                          <Clock className="h-3 w-3 mr-1" />Theory Pending
-                        </Badge>
-                      )}
+                      {theoryPending && <Badge variant="outline" className="text-xs text-purple-600 border-purple-200"><Clock className="h-3 w-3 mr-1" />Theory Pending</Badge>}
                     </div>
                     <h1 className="text-lg sm:text-xl font-bold text-slate-900 break-words">{result.exam_title}</h1>
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-2">
@@ -360,9 +302,7 @@ export default function StudentResultDetailPage() {
                   </div>
 
                   <div className="flex items-center gap-3 justify-center sm:justify-end shrink-0">
-                    <span className={cn("text-4xl sm:text-5xl font-bold tracking-tight", grade.c)}>
-                      {result.percentage}<span className="text-xl">%</span>
-                    </span>
+                    <span className={cn("text-4xl sm:text-5xl font-bold tracking-tight", grade.c)}>{result.percentage}<span className="text-xl">%</span></span>
                     <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center border-2", grade.bg, grade.bc)}>
                       <span className={cn("text-2xl font-bold", grade.c)}>{grade.g}</span>
                     </div>
@@ -396,10 +336,7 @@ export default function StudentResultDetailPage() {
                 <Card key={i} className="border-0 shadow-sm">
                   <CardContent className="p-3 sm:p-4 flex items-center gap-3">
                     <s.i className={cn("h-5 w-5 shrink-0", s.c || 'text-slate-400')} />
-                    <div className="min-w-0">
-                      <p className="text-[11px] text-slate-400 uppercase tracking-wide">{s.l}</p>
-                      <p className="text-base sm:text-lg font-semibold text-slate-800">{s.v}</p>
-                    </div>
+                    <div className="min-w-0"><p className="text-[11px] text-slate-400 uppercase tracking-wide">{s.l}</p><p className="text-base sm:text-lg font-semibold text-slate-800">{s.v}</p></div>
                   </CardContent>
                 </Card>
               ))}
@@ -426,22 +363,15 @@ export default function StudentResultDetailPage() {
             {theoryPending && (
               <div className="flex items-start gap-3 bg-purple-50 border border-purple-100 rounded-xl p-4 mb-5">
                 <Clock className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium text-purple-800">Theory Answers Pending</p>
-                  <p className="text-xs text-purple-600 mt-0.5">Your theory answers are being reviewed. The final score will update once grading is complete.</p>
-                </div>
+                <div><p className="text-sm font-medium text-purple-800">Theory Answers Pending</p><p className="text-xs text-purple-600 mt-0.5">Your theory answers are being reviewed. The final score will update once grading is complete.</p></div>
               </div>
             )}
 
             {result.teacher_feedback && (
               <Card className="border-0 shadow-sm mb-5">
                 <CardContent className="p-4 sm:p-5">
-                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-slate-400" />Teacher Feedback
-                  </h3>
-                  <div className="bg-slate-50 rounded-lg p-4">
-                    <p className="text-sm text-slate-600 italic leading-relaxed">&ldquo;{result.teacher_feedback}&rdquo;</p>
-                  </div>
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2"><FileText className="h-4 w-4 text-slate-400" />Teacher Feedback</h3>
+                  <div className="bg-slate-50 rounded-lg p-4"><p className="text-sm text-slate-600 italic leading-relaxed">&ldquo;{result.teacher_feedback}&rdquo;</p></div>
                 </CardContent>
               </Card>
             )}
@@ -449,7 +379,6 @@ export default function StudentResultDetailPage() {
             <Button onClick={() => router.push('/student/exams')} className="w-full h-11 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-xl transition-colors">
               <ArrowLeft className="h-4 w-4 mr-2" />Back to Exams
             </Button>
-
             <div className="h-8" />
           </div>
         </main>
@@ -458,19 +387,13 @@ export default function StudentResultDetailPage() {
   )
 }
 
-function ScoreLine({ label, value, max, bold, pending }: {
-  label: string; value: number | null; max: number; bold?: boolean; pending?: boolean
-}) {
+function ScoreLine({ label, value, max, bold, pending }: { label: string; value: number | null; max: number; bold?: boolean; pending?: boolean }) {
   const v = value ?? 0
   return (
     <div className={cn("flex items-center justify-between py-1", bold && "font-semibold")}>
       <span className={cn("text-slate-600", bold && "text-slate-900")}>{label}</span>
       <span className={cn("tabular-nums", bold ? "text-slate-900 text-base" : "text-slate-700 text-sm")}>
-        {pending ? (
-          <span className="text-purple-500 text-xs font-medium">Pending</span>
-        ) : (
-          <>{v}<span className="text-slate-400">/{max}</span></>
-        )}
+        {pending ? <span className="text-purple-500 text-xs font-medium">Pending</span> : <>{v}<span className="text-slate-400">/{max}</span></>}
       </span>
     </div>
   )
