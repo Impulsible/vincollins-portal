@@ -71,7 +71,7 @@ export default function LoginPage() {
       }
 
       // If user context already has a user, redirect
-      if (user && !hasRedirected.current) {
+      if (user && user.role && !hasRedirected.current) {
         const redirectMap: Record<string, string> = {
           admin: '/admin',
           teacher: '/staff',
