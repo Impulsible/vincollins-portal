@@ -10,26 +10,7 @@ import { OverviewTab } from '@/components/student/OverviewTab'
 import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { BookOpen, Award } from 'lucide-react'
-
-function DashboardSkeleton() {
-  return (
-    <div className="w-full px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
-      <Skeleton className="h-40 sm:h-48 w-full rounded-2xl" />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-        </div>
-        <div className="space-y-4 sm:space-y-6">
-          <Skeleton className="h-80 w-full rounded-xl" />
-          <Skeleton className="h-64 w-full rounded-xl" />
-        </div>
-      </div>
-    </div>
-  )
-}
+import { BookOpen, Award, LayoutDashboard } from 'lucide-react'
 
 function calculateGrade(percentage: number): { grade: string; color: string } {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
@@ -150,7 +131,6 @@ export default function StudentDashboardPage() {
           const grandTotal = ca1Score + ca2Score + examScore
           const grandTotalMax = caScore ? 100 : 60
           
-          // Use CA percentage if available for display, otherwise exam percentage
           let displayPercentage = a.percentage || 0
           if (caScore && caScore.total_score) {
             displayPercentage = Math.round((Number(caScore.total_score) / 100) * 100)
@@ -196,23 +176,23 @@ export default function StudentDashboardPage() {
         // Pass/Fail with CA scores considered
         const passedExams = allSubmitted.filter((a: any) => {
           if (a.has_ca && a.ca_score?.grade) {
-            return !['F'].includes(a.ca_score.grade)
+            return !['F9'].includes(a.ca_score.grade)
           }
           return a.is_passed === true || (a.percentage && a.percentage >= 50)
         }).length
         
         const failedExams = allSubmitted.filter((a: any) => {
           if (a.has_ca && a.ca_score?.grade) {
-            return a.ca_score.grade === 'F'
+            return a.ca_score.grade === 'F9'
           }
           return a.is_passed === false && a.percentage !== null && a.percentage < 50
         }).length
 
-        // ✅ Average using CA scores when available, otherwise exam scores
+        // Average using CA scores when available, otherwise exam scores
         const displayAvgScore = allSubmitted.length > 0
           ? Math.round((allSubmitted.reduce((sum: number, a: any) => {
               if (a.has_ca && a.ca_score?.total_score) {
-                return sum + Number(a.ca_score.total_score) // CA total is /100
+                return sum + Number(a.ca_score.total_score)
               }
               return sum + (a.percentage || 0)
             }, 0) / allSubmitted.length) * 100) / 100
@@ -276,7 +256,6 @@ export default function StudentDashboardPage() {
 
   useEffect(() => { loadProfileAndData() }, [loadProfileAndData])
 
-  // Refresh on focus/visibility
   useEffect(() => {
     const handleFocus = () => loadProfileAndData()
     window.addEventListener('focus', handleFocus)
@@ -318,12 +297,32 @@ export default function StudentDashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
-        <div className="flex">
-          <div className="hidden lg:block w-72" />
-          <div className="flex-1">
-            <main className="pt-[72px] lg:pt-20 pb-8"><DashboardSkeleton /></main>
+        <div className="flex w-full">
+          <div className="hidden lg:block">
+            <StudentSidebar
+              profile={null}
+              onLogout={handleLogout}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              activeTab={activeSection}
+              setActiveTab={setActiveSection}
+            />
+          </div>
+          <div className={cn(
+            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]",
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          )}>
+            <div className="text-center px-4">
+              <div className="relative mx-auto mb-6 h-16 w-16">
+                <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+                <LayoutDashboard className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Dashboard</h2>
+              <p className="text-sm text-slate-500">Please wait while we load your dashboard...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -332,7 +331,7 @@ export default function StudentDashboardPage() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center"><p className="text-slate-500">Redirecting to login...</p></div>
@@ -342,7 +341,7 @@ export default function StudentDashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden w-full">
       <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
       <div className="flex w-full overflow-x-hidden">
@@ -353,7 +352,7 @@ export default function StudentDashboardPage() {
         />
 
         <div className={cn("flex-1 transition-all duration-300 w-full overflow-x-hidden", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
-          <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-20 pb-12 px-4 sm:px-6 w-full overflow-x-hidden">
+          <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
             <div className="max-w-7xl mx-auto">
               {activeSection === 'overview' && (
                 <OverviewTab 
@@ -373,20 +372,20 @@ export default function StudentDashboardPage() {
                 />
               )}
               {activeSection === 'exams' && (
-                <Card className="border-0 shadow-md mt-2">
+                <Card className="border-0 shadow-sm mt-2">
                   <CardContent className="py-12 text-center">
-                    <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold mb-2">My Exams</h3>
-                    <p className="text-sm text-muted-foreground">Your exams will appear here</p>
+                    <p className="text-sm text-slate-500">Go to Exams tab to view your exams</p>
                   </CardContent>
                 </Card>
               )}
               {activeSection === 'results' && (
-                <Card className="border-0 shadow-md mt-2">
+                <Card className="border-0 shadow-sm mt-2">
                   <CardContent className="py-12 text-center">
-                    <Award className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                    <Award className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                     <h3 className="text-lg font-semibold mb-2">My Results</h3>
-                    <p className="text-sm text-muted-foreground">Your results will appear here</p>
+                    <p className="text-sm text-slate-500">Go to Results tab to view your results</p>
                   </CardContent>
                 </Card>
               )}

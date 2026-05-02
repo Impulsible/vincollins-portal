@@ -17,7 +17,7 @@ import { SubjectFilter } from '@/components/student/exams/SubjectFilter'
 import { ExamTabs } from '@/components/student/exams/ExamTabs'
 import { ExamList } from '@/components/student/exams/ExamList'
 import { EmptyExamsState } from '@/components/student/exams/EmptyExamsState'
-import { ExamsSkeleton } from '@/components/student/exams/ExamsSkeleton'
+import { BookOpen } from 'lucide-react'
 
 export default function StudentExamsPage() {
   const router = useRouter()
@@ -55,7 +55,6 @@ export default function StudentExamsPage() {
     setMounted(true)
   }, [])
 
-  // Refresh data when returning to this page (after taking exam)
   useEffect(() => {
     if (!mounted) return
 
@@ -70,7 +69,6 @@ export default function StudentExamsPage() {
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
@@ -122,24 +120,38 @@ export default function StudentExamsPage() {
     }
   })
 
-  const availableCount = filteredExams.filter(
-    (e) => getExamStatus(e) === 'available'
-  ).length
-  const upcomingCount = filteredExams.filter(
-    (e) => getExamStatus(e) === 'upcoming'
-  ).length
-  const completedCount = filteredExams.filter(
-    (e) => getExamStatus(e) === 'completed'
-  ).length
+  const availableCount = filteredExams.filter((e) => getExamStatus(e) === 'available').length
+  const upcomingCount = filteredExams.filter((e) => getExamStatus(e) === 'upcoming').length
+  const completedCount = filteredExams.filter((e) => getExamStatus(e) === 'completed').length
 
   if (!mounted || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
-        <div className="flex">
-          <div className="hidden lg:block w-72" />
-          <div className="flex-1">
-            <ExamsSkeleton />
+        <div className="flex w-full">
+          <div className="hidden lg:block">
+            <StudentSidebar
+              profile={null}
+              onLogout={handleLogout}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              activeTab="exams"
+              setActiveTab={handleTabChange}
+            />
+          </div>
+          <div className={cn(
+            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]",
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          )}>
+            <div className="text-center px-4">
+              <div className="relative mx-auto mb-6 h-16 w-16">
+                <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+                <BookOpen className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Exams</h2>
+              <p className="text-sm text-slate-500">Please wait while we fetch your exams...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -147,7 +159,7 @@ export default function StudentExamsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-slate-50">
       <Header onLogout={handleLogout} />
 
       <div className="flex w-full overflow-x-hidden">
@@ -164,7 +176,7 @@ export default function StudentExamsPage() {
           "flex-1 transition-all duration-300 w-full overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-[72px] lg:pt-20 pb-8 sm:pb-12 lg:pb-16 px-4 sm:px-6">
+          <main className="pt-[72px] lg:pt-24 pb-16 sm:pb-20 px-4 sm:px-6 lg:px-8">
             <div className="max-w-[1600px] mx-auto">
               <ExamsHeader
                 profile={profile}

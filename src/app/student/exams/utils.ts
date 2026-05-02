@@ -1,3 +1,4 @@
+// src/app/student/exams/utils.ts
 import { SUBJECT_CONFIG, DEFAULT_SUBJECT_CONFIG } from "./constants"
 import type { SubjectConfig } from "./types"
 
@@ -9,12 +10,26 @@ export function getSubjectCountForClass(className: string): number {
   return 17
 }
 
+// Overall Term Grade (used in dashboard banner & term progress)
 export function calculateGrade(percentage: number): { grade: string; color: string } {
   if (percentage >= 80) return { grade: "A", color: "text-emerald-600" }
   if (percentage >= 70) return { grade: "B", color: "text-blue-600" }
   if (percentage >= 60) return { grade: "C", color: "text-amber-600" }
   if (percentage >= 50) return { grade: "P", color: "text-orange-600" }
   return { grade: "F", color: "text-red-600" }
+}
+
+// WAEC Subject Grade (used in result detail page & staff CA scores)
+export function calculateWAECGrade(percentage: number): { grade: string; color: string } {
+  if (percentage >= 75) return { grade: "A1", color: "text-emerald-600" }
+  if (percentage >= 70) return { grade: "B2", color: "text-blue-600" }
+  if (percentage >= 65) return { grade: "B3", color: "text-sky-600" }
+  if (percentage >= 60) return { grade: "C4", color: "text-teal-600" }
+  if (percentage >= 55) return { grade: "C5", color: "text-amber-600" }
+  if (percentage >= 50) return { grade: "C6", color: "text-orange-500" }
+  if (percentage >= 45) return { grade: "D7", color: "text-yellow-600" }
+  if (percentage >= 40) return { grade: "E8", color: "text-red-400" }
+  return { grade: "F9", color: "text-red-600" }
 }
 
 export function getSubjectConfig(subject: string): SubjectConfig {

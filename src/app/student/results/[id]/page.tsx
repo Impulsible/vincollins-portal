@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx - COMPLETE BEAUTIFUL RESULT PAGE
+// app/student/results/[id]/page.tsx - PROFESSIONAL RESULT PAGE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -9,242 +9,180 @@ import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { toast } from 'sonner'
-import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
-  Loader2, Award, Clock, CheckCircle, XCircle, BookOpen,
-  GraduationCap, Calendar, Target, ArrowLeft,
-  Home, ChevronRight, PenTool, Calculator, AlertCircle,
-  Trophy, Star, TrendingUp, FileText, Sparkles
+  Clock, CheckCircle, XCircle, BookOpen,
+  GraduationCap, Calendar, ArrowLeft,
+  Home, ChevronRight, AlertCircle, FileText
 } from 'lucide-react'
 import Link from 'next/link'
 
+// ─── Types ────────────────────────────────────────────
 interface ExamResult {
-  id: string
-  exam_id: string
-  exam_title: string
-  exam_subject: string
-  exam_class: string
-  status: string
-  percentage: number
-  total_score: number
-  total_marks: number
-  objective_score: number
-  objective_total: number
-  theory_score: number | null
-  theory_total: number
-  ca1_score: number | null
-  ca2_score: number | null
-  grand_total: number
-  grand_total_marks: number
-  is_passed: boolean
-  started_at: string
-  submitted_at: string
-  attempt_number: number
-  passing_percentage: number
-  time_spent: number
-  correct_count: number
-  incorrect_count: number
-  unanswered_count: number
-  teacher_feedback: string | null
+  id: string; exam_id: string; exam_title: string; exam_subject: string
+  exam_class: string; status: string; percentage: number; total_score: number
+  total_marks: number; objective_score: number; objective_total: number
+  theory_score: number | null; theory_total: number
+  ca1_score: number | null; ca2_score: number | null
+  grand_total: number; grand_total_marks: number
+  is_passed: boolean; submitted_at: string; passing_percentage: number
+  time_spent: number; correct_count: number; incorrect_count: number
+  unanswered_count: number; teacher_feedback: string | null
 }
 
 interface StudentProfile {
-  id: string
-  full_name: string
-  email: string
-  class: string
-  department: string
-  photo_url?: string
+  id: string; full_name: string; email: string; class: string
+  department: string; photo_url?: string
 }
 
+// ─── Constants ────────────────────────────────────────
+const getGrade = (pct: number) => {
+  if (pct >= 75) return { g: 'A1', c: 'text-emerald-600', bg: 'bg-emerald-50', bc: 'border-emerald-300' }
+  if (pct >= 70) return { g: 'B2', c: 'text-blue-600', bg: 'bg-blue-50', bc: 'border-blue-300' }
+  if (pct >= 65) return { g: 'B3', c: 'text-sky-600', bg: 'bg-sky-50', bc: 'border-sky-300' }
+  if (pct >= 60) return { g: 'C4', c: 'text-teal-600', bg: 'bg-teal-50', bc: 'border-teal-300' }
+  if (pct >= 55) return { g: 'C5', c: 'text-amber-600', bg: 'bg-amber-50', bc: 'border-amber-300' }
+  if (pct >= 50) return { g: 'C6', c: 'text-orange-500', bg: 'bg-orange-50', bc: 'border-orange-300' }
+  if (pct >= 45) return { g: 'D7', c: 'text-yellow-600', bg: 'bg-yellow-50', bc: 'border-yellow-300' }
+  if (pct >= 40) return { g: 'E8', c: 'text-red-400', bg: 'bg-red-50', bc: 'border-red-300' }
+  return { g: 'F9', c: 'text-red-600', bg: 'bg-red-100', bc: 'border-red-400' }
+}
+
+const fmtTime = (s?: number) => {
+  if (!s) return '—'
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60)
+  return h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${s % 60}s` : `${s}s`
+}
+
+const fmtDate = (d?: string) => {
+  if (!d) return '—'
+  try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return '—' }
+}
+
+// ─── Component ────────────────────────────────────────
 export default function StudentResultDetailPage() {
   const router = useRouter()
   const params = useParams()
   const examId = params.id as string
-  
+
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [result, setResult] = useState<ExamResult | null>(null)
-
-  const formatProfileForHeader = (profile: StudentProfile | null) => {
-    if (!profile) return undefined
-    return {
-      id: profile.id,
-      name: profile.full_name,
-      email: profile.email,
-      role: 'student' as const,
-      avatar: profile.photo_url || undefined,
-      isAuthenticated: true
-    }
-  }
-
-  const calculateGrade = (percentage: number): { grade: string; color: string; bgColor: string; icon: any } => {
-    if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', bgColor: 'bg-emerald-50', icon: Trophy }
-    if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', bgColor: 'bg-blue-50', icon: Star }
-    if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', bgColor: 'bg-amber-50', icon: TrendingUp }
-    if (percentage >= 50) return { grade: 'P', color: 'text-orange-600', bgColor: 'bg-orange-50', icon: Award }
-    return { grade: 'F', color: 'text-red-600', bgColor: 'bg-red-50', icon: AlertCircle }
-  }
-
-  const formatTime = (seconds?: number): string => {
-    if (!seconds) return 'N/A'
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    if (hours > 0) return `${hours}h ${minutes}m`
-    if (minutes > 0) return `${minutes}m ${secs}s`
-    return `${secs}s`
-  }
-
-  const formatDate = (dateString?: string): string => {
-    if (!dateString) return 'N/A'
-    try {
-      const date = new Date(dateString)
-      return date.toLocaleDateString('en-US', { 
-        year: 'numeric', month: 'short', day: 'numeric',
-        hour: '2-digit', minute: '2-digit'
-      })
-    } catch { return 'N/A' }
-  }
+  const [error, setError] = useState<string | null>(null)
 
   const loadResult = useCallback(async () => {
     if (!examId) return
     setLoading(true)
-    
+    setError(null)
+
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/portal'); return }
 
-      const { data: profileData } = await supabase
+      const { data: pd } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
         .maybeSingle()
 
-      if (!profileData || profileData.role !== 'student') {
-        toast.error('Access denied')
-        router.push('/portal')
+      if (!pd) {
+        setError('Profile not found')
+        setLoading(false)
         return
       }
 
       setProfile({
-        id: profileData.id,
-        full_name: profileData.full_name || 'Student',
-        email: profileData.email,
-        class: profileData.class || 'Not Assigned',
-        department: profileData.department || 'General',
-        photo_url: profileData.photo_url
+        id: pd.id,
+        full_name: pd.full_name || 'Student',
+        email: pd.email || '',
+        class: pd.class || '—',
+        department: pd.department || '—',
+        photo_url: pd.photo_url || undefined
       })
 
-      const { data: attemptData, error: attemptError } = await supabase
+      const { data: att } = await supabase
         .from('exam_attempts')
         .select('*')
         .eq('exam_id', examId)
         .eq('student_id', session.user.id)
         .order('created_at', { ascending: false })
         .limit(1)
-        .single()
+        .maybeSingle()
 
-      if (attemptError || !attemptData) {
-        toast.error('Result not found')
-        router.push('/student/results')
+      if (!att) {
+        setError('No submission found for this exam')
+        setLoading(false)
         return
       }
 
-      const { data: examData } = await supabase
+      const { data: exam } = await supabase
         .from('exams')
         .select('*')
-        .eq('id', attemptData.exam_id)
-        .single()
+        .eq('id', att.exam_id)
+        .maybeSingle()
 
       let theoryScore: number | null = null
       let teacherFeedback: string | null = null
-      
-      if (attemptData.theory_feedback) {
-        const feedback = typeof attemptData.theory_feedback === 'string' 
-          ? JSON.parse(attemptData.theory_feedback) 
-          : attemptData.theory_feedback
-        
-        if (feedback?.total?.score !== undefined) {
-          theoryScore = Number(feedback.total.score)
-        }
-        if (feedback?.total?.feedback) {
-          teacherFeedback = feedback.total.feedback
-        }
+
+      if (att.theory_feedback) {
+        try {
+          const fb = typeof att.theory_feedback === 'string' ? JSON.parse(att.theory_feedback) : att.theory_feedback
+          if (fb?.total?.score !== undefined) theoryScore = Number(fb.total.score)
+          if (fb?.total?.feedback) teacherFeedback = fb.total.feedback
+        } catch { /* ignore */ }
       }
 
-      let ca1Score: number | null = null
-      let ca2Score: number | null = null
-      let caObjectiveScore: number | null = null
-      let caTheoryScore: number | null = null
-      
-      const { data: caData } = await supabase
+      const { data: ca } = await supabase
         .from('ca_scores')
         .select('*')
         .eq('student_id', session.user.id)
         .eq('exam_id', examId)
         .maybeSingle()
-      
-      if (caData) {
-        ca1Score = caData.ca1_score !== null ? Number(caData.ca1_score) : null
-        ca2Score = caData.ca2_score !== null ? Number(caData.ca2_score) : null
-        caObjectiveScore = caData.exam_objective_score !== null ? Number(caData.exam_objective_score) : null
-        caTheoryScore = caData.exam_theory_score !== null ? Number(caData.exam_theory_score) : null
-      }
 
-      const objectiveScore = caObjectiveScore !== null ? caObjectiveScore : (Number(attemptData.objective_score) || 0)
-      const finalTheoryScore = caTheoryScore !== null ? caTheoryScore : theoryScore
-      const objectiveTotal = Number(attemptData.objective_total) || 20
-      const theoryTotal = Number(attemptData.theory_total) || 40
-      const examTotalMarks = objectiveTotal + theoryTotal
-      const examScore = objectiveScore + (finalTheoryScore || 0)
-      
-      const ca1 = ca1Score || 0
-      const ca2 = ca2Score || 0
-      const grandTotalMarks = 20 + 20 + 20 + 40
-      const grandTotalScore = ca1 + ca2 + objectiveScore + (finalTheoryScore || 0)
-      
-      const displayPercentage = (ca1Score !== null && ca2Score !== null) 
-        ? Math.round((grandTotalScore / grandTotalMarks) * 100)
-        : attemptData.percentage || 0
+      const objScore = ca?.exam_objective_score != null ? Number(ca.exam_objective_score) : (Number(att.objective_score) || 0)
+      const finalTheory = ca?.exam_theory_score != null ? Number(ca.exam_theory_score) : theoryScore
+      const objTotal = Number(att.objective_total) || 20
+      const thTotal = Number(att.theory_total) || 40
+      const examScore = objScore + (finalTheory || 0)
+      const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
+      const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
+      const c1 = ca1 || 0; const c2 = ca2 || 0
+      const grandScore = c1 + c2 + objScore + (finalTheory || 0)
+      const hasCA = ca1 !== null && ca2 !== null
+      const dispPct = hasCA ? Math.round((grandScore / 100) * 100) / 100 : (att.percentage || 0)
 
       setResult({
-        id: attemptData.id,
-        exam_id: attemptData.exam_id,
-        exam_title: examData?.title || 'Unknown Exam',
-        exam_subject: examData?.subject || 'Unknown Subject',
-        exam_class: examData?.class || 'N/A',
-        status: attemptData.status,
-        percentage: displayPercentage,
-        total_score: examScore,
-        total_marks: examTotalMarks,
-        objective_score: objectiveScore,
-        objective_total: objectiveTotal,
-        theory_score: finalTheoryScore,
-        theory_total: theoryTotal,
-        ca1_score: ca1Score,
-        ca2_score: ca2Score,
-        grand_total: grandTotalScore,
-        grand_total_marks: grandTotalMarks,
-        is_passed: attemptData.is_passed || false,
-        started_at: attemptData.started_at,
-        submitted_at: attemptData.submitted_at,
-        attempt_number: attemptData.attempt_number || 1,
-        passing_percentage: examData?.passing_percentage || 50,
-        time_spent: attemptData.time_spent,
-        correct_count: attemptData.correct_count,
-        incorrect_count: attemptData.incorrect_count,
-        unanswered_count: attemptData.unanswered_count,
+        id: att.id,
+        exam_id: att.exam_id,
+        exam_title: exam?.title || 'Untitled Exam',
+        exam_subject: exam?.subject || '—',
+        exam_class: exam?.class || '—',
+        status: att.status,
+        percentage: Math.round(dispPct),
+        total_score: hasCA ? grandScore : examScore,
+        total_marks: hasCA ? 100 : (objTotal + thTotal),
+        objective_score: objScore,
+        objective_total: objTotal,
+        theory_score: finalTheory,
+        theory_total: thTotal,
+        ca1_score: ca1,
+        ca2_score: ca2,
+        grand_total: grandScore,
+        grand_total_marks: 100,
+        is_passed: att.is_passed || false,
+        submitted_at: att.submitted_at,
+        passing_percentage: exam?.passing_percentage || 50,
+        time_spent: att.time_spent,
+        correct_count: att.correct_count || 0,
+        incorrect_count: att.incorrect_count || 0,
+        unanswered_count: att.unanswered_count || 0,
         teacher_feedback: teacherFeedback
       })
-
-    } catch (error) {
-      console.error('Error loading result:', error)
-      toast.error('Failed to load result')
+    } catch (err) {
+      console.error('Failed to load result:', err)
+      setError('Failed to load result. Please try again.')
     } finally {
       setLoading(false)
     }
@@ -254,59 +192,105 @@ export default function StudentResultDetailPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' })
-    toast.success('Logged out successfully')
+    toast.success('Logged out')
     router.push('/portal')
   }
 
+  // ─── Loading State ──────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-emerald-600 mx-auto" />
-            <p className="mt-4 text-slate-600">Loading result details...</p>
+        <div className="flex w-full">
+          <div className="hidden lg:block">
+            <StudentSidebar
+              profile={null}
+              onLogout={handleLogout}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              activeTab="results"
+              setActiveTab={() => {}}
+            />
+          </div>
+          <div className={cn(
+            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]",
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          )}>
+            <div className="text-center px-4">
+              <div className="relative mx-auto mb-6 h-16 w-16">
+                <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+                <FileText className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
+              </div>
+              <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Your Result</h2>
+              <p className="text-sm text-slate-500">Please wait while we fetch your exam details...</p>
+            </div>
           </div>
         </div>
       </div>
     )
   }
 
-  if (!result) {
+  // ─── Error State ────────────────────────────────────
+  if (error || !result) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
-          <Card className="max-w-md w-full border-0 shadow-xl">
-            <CardContent className="text-center py-12">
-              <div className="h-16 w-16 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="h-8 w-8 text-red-400" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">Result Not Found</h3>
-              <p className="text-slate-500 text-sm mb-6">No submission found for this exam.</p>
-              <Button onClick={() => router.push('/student/results')} size="sm" className="rounded-full">
-                Back to Results
-              </Button>
-            </CardContent>
-          </Card>
+        <div className="flex w-full">
+          <div className="hidden lg:block">
+            <StudentSidebar
+              profile={null}
+              onLogout={handleLogout}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              activeTab="results"
+              setActiveTab={() => {}}
+            />
+          </div>
+          <div className={cn(
+            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)] px-4",
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          )}>
+            <Card className="max-w-sm w-full border-0 shadow-sm">
+              <CardContent className="text-center py-10">
+                <div className="h-14 w-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="h-7 w-7 text-red-400" />
+                </div>
+                <h3 className="font-semibold text-slate-800 mb-1">Result Not Found</h3>
+                <p className="text-sm text-slate-500 mb-6">{error || 'No submission found for this exam.'}</p>
+                <Button onClick={() => router.push('/student/exams')} size="sm" className="w-full">
+                  <ArrowLeft className="h-4 w-4 mr-2" />Back to Exams
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     )
   }
 
-  const gradeInfo = calculateGrade(result.percentage)
-  const GradeIcon = gradeInfo.icon
-  const isTheoryPending = result.status === 'pending_theory'
+  const grade = getGrade(result.percentage)
+  const theoryPending = result.status === 'pending_theory'
   const hasCA = result.ca1_score !== null && result.ca2_score !== null
-  const theoryDisplay = result.theory_score !== null ? `${result.theory_score}/${result.theory_total}` : 'Pending'
-  const caTotal = (result.ca1_score || 0) + (result.ca2_score || 0)
+  const isPassed = result.percentage >= 40
+  const totalQ = result.correct_count + result.incorrect_count + result.unanswered_count
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
-      <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-      
+    <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
+      <Header
+        user={{
+          id: profile?.id || '',
+          name: profile?.full_name || '',
+          email: profile?.email || '',
+          role: 'student' as const,
+          avatar: profile?.photo_url || undefined,
+          isAuthenticated: true
+        }}
+        onLogout={handleLogout}
+      />
+
       <div className="flex w-full overflow-x-hidden">
-        <StudentSidebar 
+        <StudentSidebar
           profile={profile}
           onLogout={handleLogout}
           collapsed={sidebarCollapsed}
@@ -316,412 +300,138 @@ export default function StudentResultDetailPage() {
         />
 
         <main className={cn(
-          "flex-1 pt-[72px] lg:pt-24 pb-24 lg:pb-12 px-3 sm:px-4 lg:px-6 transition-all duration-300 w-full overflow-x-hidden",
+          "flex-1 pt-[72px] lg:pt-24 pb-20 px-4 sm:px-6 lg:px-8 transition-all duration-300 w-full max-w-full",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <div className="container mx-auto max-w-5xl">
-            
-            {/* Breadcrumb */}
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-              className="mb-4 sm:mb-6 mt-2 sm:mt-4 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                <Link href="/student" className="hover:text-primary flex items-center gap-1 transition-colors">
-                  <Home className="h-3.5 w-3.5" /><span className="hidden sm:inline">Dashboard</span>
-                </Link>
-                <ChevronRight className="h-3.5 w-3.5" />
-                <Link href="/student/exams" className="hover:text-primary transition-colors">Exams</Link>
-                <ChevronRight className="h-3.5 w-3.5" />
-                <span className="text-foreground font-medium truncate max-w-[200px]">{result.exam_title}</span>
-              </div>
-              <Button variant="outline" size="sm" onClick={() => router.push('/student/exams')} 
-                className="h-9 text-xs rounded-full hover:bg-slate-100">
-                <ArrowLeft className="h-4 w-4 mr-1.5" />Back to Exams
-              </Button>
-            </motion.div>
+          <div className="w-full max-w-3xl mx-auto">
 
-            {/* Hero Result Card */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-              <Card className={cn(
-                "border-0 shadow-xl overflow-hidden relative",
-                result.is_passed 
-                  ? "bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50" 
-                  : "bg-gradient-to-br from-red-50 via-rose-50 to-pink-50"
-              )}>
-                {/* Decorative elements */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2" />
-                <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
-                
-                <CardContent className="p-5 sm:p-6 lg:p-8 relative">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                    <div className="min-w-0 flex-1">
-                      {/* Status Pills */}
-                      <div className="flex flex-wrap items-center gap-2 mb-3">
-                        <Badge className={cn(
-                          "text-xs font-medium px-3 py-1 rounded-full",
-                          result.is_passed 
-                            ? "bg-emerald-100 text-emerald-700" 
-                            : "bg-red-100 text-red-700"
-                        )}>
-                          {result.is_passed ? <CheckCircle className="h-3.5 w-3.5 mr-1" /> : <XCircle className="h-3.5 w-3.5 mr-1" />}
-                          {result.is_passed ? 'Passed' : 'Failed'}
+            <nav className="flex items-center justify-between gap-2 mb-6 mt-2">
+              <ol className="flex items-center gap-1.5 text-xs text-slate-500 min-w-0">
+                <li><Link href="/student" className="hover:text-slate-700 transition-colors"><Home className="h-3.5 w-3.5" /></Link></li>
+                <li><ChevronRight className="h-3 w-3 shrink-0" /></li>
+                <li><Link href="/student/exams" className="hover:text-slate-700 transition-colors truncate">Exams</Link></li>
+                <li><ChevronRight className="h-3 w-3 shrink-0" /></li>
+                <li className="text-slate-800 font-medium truncate">{result.exam_title}</li>
+              </ol>
+              <Button variant="ghost" size="sm" onClick={() => router.push('/student/exams')} className="h-8 text-xs shrink-0">
+                <ArrowLeft className="h-3.5 w-3.5 mr-1" />Back
+              </Button>
+            </nav>
+
+            <Card className="border-0 shadow-sm mb-5 overflow-hidden">
+              <CardContent className="p-5 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <Badge className={cn("text-xs font-medium", isPassed ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700")}>
+                        {isPassed ? <CheckCircle className="h-3 w-3 mr-1" /> : <XCircle className="h-3 w-3 mr-1" />}
+                        {isPassed ? 'Passed' : 'Failed'}
+                      </Badge>
+                      {theoryPending && (
+                        <Badge variant="outline" className="text-xs text-purple-600 border-purple-200">
+                          <Clock className="h-3 w-3 mr-1" />Theory Pending
                         </Badge>
-                        
-                        {hasCA ? (
-                          <Badge className="bg-blue-100 text-blue-700 text-xs font-medium px-3 py-1 rounded-full">
-                            <Sparkles className="h-3.5 w-3.5 mr-1" />CA Scores Included
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs px-3 py-1 rounded-full">
-                            <AlertCircle className="h-3.5 w-3.5 mr-1" />CA Scores Pending
-                          </Badge>
-                        )}
-                        
-                        {isTheoryPending && (
-                          <Badge className="bg-purple-100 text-purple-700 text-xs font-medium px-3 py-1 rounded-full">
-                            <Clock className="h-3.5 w-3.5 mr-1" />Theory Pending
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 mb-2">{result.exam_title}</h1>
-                      
-                      <div className="flex flex-wrap items-center gap-2 text-xs sm:text-sm text-slate-600">
-                        <span className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1">
-                          <BookOpen className="h-3.5 w-3.5" />{result.exam_subject}
-                        </span>
-                        <span className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1">
-                          <GraduationCap className="h-3.5 w-3.5" />{result.exam_class}
-                        </span>
-                        <span className="flex items-center gap-1.5 bg-white/60 rounded-full px-3 py-1">
-                          <Calendar className="h-3.5 w-3.5" />{formatDate(result.submitted_at)}
-                        </span>
-                      </div>
-                    </div>
-                    
-                    {/* Big Score Display */}
-                    <div className="text-center shrink-0">
-                      <div className={cn(
-                        "inline-flex items-center gap-4 p-6 rounded-3xl",
-                        result.is_passed ? "bg-white/70" : "bg-white/70"
-                      )}>
-                        <div className="text-center">
-                          <div className={cn("text-5xl sm:text-6xl lg:text-7xl font-black", gradeInfo.color)}>
-                            {result.percentage}%
-                          </div>
-                          <p className="text-xs text-slate-500 mt-1 font-medium">
-                            {hasCA ? 'Final Grade' : 'Exam Score'}
-                          </p>
-                        </div>
-                        <div className={cn(
-                          "h-16 w-16 sm:h-20 sm:w-20 rounded-2xl flex items-center justify-center",
-                          gradeInfo.bgColor
-                        )}>
-                          <div className="text-center">
-                            <GradeIcon className={cn("h-8 w-8 sm:h-10 sm:w-10 mx-auto", gradeInfo.color)} />
-                            <span className={cn("text-2xl sm:text-3xl font-black", gradeInfo.color)}>{gradeInfo.grade}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-slate-500 mt-3">
-                        {hasCA 
-                          ? `${result.grand_total}/${result.grand_total_marks} marks • Pass at ${result.passing_percentage}%`
-                          : `${result.total_score}/${result.total_marks} marks (exam only) • Pass at ${result.passing_percentage}%`
-                        }
-                      </p>
-                      
-                      {hasCA && (
-                        <p className="text-xs text-blue-600 mt-1 font-medium">
-                          CA1: {result.ca1_score} + CA2: {result.ca2_score} + Exam: {result.total_score} = {result.grand_total}/100
-                        </p>
                       )}
                     </div>
+                    <h1 className="text-lg sm:text-xl font-bold text-slate-900 break-words">{result.exam_title}</h1>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 mt-2">
+                      <span className="flex items-center gap-1"><BookOpen className="h-3.5 w-3.5" />{result.exam_subject}</span>
+                      <span className="flex items-center gap-1"><GraduationCap className="h-3.5 w-3.5" />{result.exam_class}</span>
+                      <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{fmtDate(result.submitted_at)}</span>
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
 
-            {/* Score Breakdown */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.1 }} className="mb-6">
-              <Card className="border-0 shadow-lg bg-white overflow-hidden">
-                {/* Card Header */}
-                <div className="bg-gradient-to-r from-slate-50 to-white px-5 sm:px-6 py-4 border-b">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-lg font-semibold flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-slate-500" />
-                      Score Breakdown
-                    </h3>
-                    {hasCA ? (
-                      <Badge className="bg-emerald-100 text-emerald-700 text-xs rounded-full px-3 py-1">
-                        <CheckCircle className="h-3 w-3 mr-1" />Complete with CA
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs rounded-full px-3 py-1">
-                        <AlertCircle className="h-3 w-3 mr-1" />Awaiting CA Scores
-                      </Badge>
-                    )}
+                  <div className="flex items-center gap-3 justify-center sm:justify-end shrink-0">
+                    <span className={cn("text-4xl sm:text-5xl font-bold tracking-tight", grade.c)}>
+                      {result.percentage}<span className="text-xl">%</span>
+                    </span>
+                    <div className={cn("h-16 w-16 rounded-2xl flex items-center justify-center border-2", grade.bg, grade.bc)}>
+                      <span className={cn("text-2xl font-bold", grade.c)}>{grade.g}</span>
+                    </div>
                   </div>
                 </div>
-                
-                <CardContent className="p-5 sm:p-6">
-                  {/* CA Notice when not available */}
-                  {!hasCA && (
-                    <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-4 mb-6">
-                      <div className="flex items-start gap-3">
-                        <div className="h-10 w-10 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                          <AlertCircle className="h-5 w-5 text-amber-600" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-amber-800">Continuous Assessment Not Yet Added</p>
-                          <p className="text-sm text-amber-700 mt-1">
-                            Your final grade will include CA1 (20 marks) + CA2 (20 marks) = 40 marks 
-                            combined with your exam score (60 marks) for a total of 100 marks. 
-                            Current score shown is exam only.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="space-y-4">
-                    {/* CA Scores Section */}
-                    {hasCA && (
-                      <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-4 sm:p-5 border border-blue-100">
-                        <div className="flex items-center gap-2 mb-4">
-                          <div className="h-8 w-8 rounded-lg bg-blue-500 flex items-center justify-center">
-                            <Calculator className="h-4 w-4 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-semibold text-blue-900">Continuous Assessment</p>
-                            <p className="text-xs text-blue-600">40 marks total</p>
-                          </div>
-                          <Badge className="ml-auto bg-blue-200 text-blue-700 text-xs rounded-full">
-                            {caTotal}/40
-                          </Badge>
-                        </div>
-                        
-                        <ScoreRow 
-                          label="CA 1" score={result.ca1_score!} total={20} 
-                          color="from-blue-400 to-blue-500" icon={Star} 
-                        />
-                        <div className="mt-3">
-                          <ScoreRow 
-                            label="CA 2" score={result.ca2_score!} total={20} 
-                            color="from-indigo-400 to-indigo-500" icon={Star} 
-                          />
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Exam Scores Section */}
-                    <div className="bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl p-4 sm:p-5 border border-purple-100">
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className="h-8 w-8 rounded-lg bg-purple-500 flex items-center justify-center">
-                          <PenTool className="h-4 w-4 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-purple-900">Examination</p>
-                          <p className="text-xs text-purple-600">60 marks total</p>
-                        </div>
-                        <Badge className="ml-auto bg-purple-200 text-purple-700 text-xs rounded-full">
-                          {result.total_score}/{result.total_marks}
-                        </Badge>
-                      </div>
-                      
-                      <ScoreRow 
-                        label="MCQ (Objective)" score={result.objective_score} 
-                        total={result.objective_total} 
-                        color="from-purple-400 to-purple-500" icon={Target} 
-                      />
-                      <div className="mt-3">
-                        <ScoreRow 
-                          label="Theory" score={result.theory_score} 
-                          total={result.theory_total} 
-                          color="from-violet-400 to-violet-500" icon={FileText}
-                          pending={isTheoryPending}
-                        />
-                      </div>
-                    </div>
-                    
-                    {/* Final Total */}
-                    <div className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-xl p-4 sm:p-5 border-2 border-slate-200">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={cn(
-                            "h-10 w-10 rounded-xl flex items-center justify-center",
-                            hasCA ? "bg-emerald-500" : "bg-amber-500"
-                          )}>
-                            <Trophy className="h-5 w-5 text-white" />
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900">
-                              {hasCA ? 'Final Grade' : 'Current Score (Exam Only)'}
-                            </p>
-                            <p className="text-xs text-slate-500">
-                              {hasCA 
-                                ? `CA1 + CA2 + MCQ + Theory = ${result.grand_total}/${result.grand_total_marks}`
-                                : `Awaiting CA scores for final /100 grade`
-                              }
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className={cn(
-                            "text-3xl font-black",
-                            hasCA ? gradeInfo.color : "text-amber-600"
-                          )}>
-                            {hasCA ? result.grand_total : result.total_score}
-                          </span>
-                          <span className="text-lg text-slate-400 font-semibold">
-                            /{hasCA ? result.grand_total_marks : result.total_marks}
-                          </span>
-                        </div>
-                      </div>
-                      
-                      {!hasCA && (
-                        <div className="mt-3 pt-3 border-t border-slate-200">
-                          <p className="text-xs text-amber-600 text-center">
-                            ⚠️ Final grade will be out of 100 marks once CA scores are added
-                          </p>
-                        </div>
-                      )}
-                      
-                      {hasCA && (
-                        <div className="mt-3 pt-3 border-t border-slate-200">
-                          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500">
-                            <span className="bg-white rounded-full px-2 py-0.5">CA1: {result.ca1_score}</span>
-                            <span>+</span>
-                            <span className="bg-white rounded-full px-2 py-0.5">CA2: {result.ca2_score}</span>
-                            <span>+</span>
-                            <span className="bg-white rounded-full px-2 py-0.5">MCQ: {result.objective_score}</span>
-                            <span>+</span>
-                            <span className="bg-white rounded-full px-2 py-0.5">Theory: {result.theory_score || 0}</span>
-                            <span>=</span>
-                            <span className="bg-emerald-100 text-emerald-700 rounded-full px-3 py-0.5 font-bold">{result.grand_total}/100</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
 
-            {/* Quick Stats Row */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.15 }} className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                <div className="space-y-2 pt-4 border-t border-slate-100">
+                  {hasCA && (
+                    <>
+                      <ScoreLine label="CA 1" value={result.ca1_score!} max={20} />
+                      <ScoreLine label="CA 2" value={result.ca2_score!} max={20} />
+                      <div className="py-1" />
+                    </>
+                  )}
+                  <ScoreLine label="Objective" value={result.objective_score} max={result.objective_total} />
+                  <ScoreLine label="Theory" value={result.theory_score} max={result.theory_total} pending={theoryPending} />
+                  <div className="pt-3 mt-3 border-t border-slate-200">
+                    <ScoreLine label="Total" value={result.total_score} max={result.total_marks} bold />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
               {[
-                { label: 'Time Spent', value: formatTime(result.time_spent), icon: Clock, color: 'bg-blue-50 text-blue-600' },
-                { label: 'Correct', value: result.correct_count, icon: CheckCircle, color: 'bg-emerald-50 text-emerald-600' },
-                { label: 'Wrong', value: result.incorrect_count, icon: XCircle, color: 'bg-red-50 text-red-600' },
-                { label: 'Skipped', value: result.unanswered_count, icon: AlertCircle, color: 'bg-slate-50 text-slate-500' },
-              ].map((stat, i) => (
-                <Card key={i} className="border-0 shadow-sm hover:shadow-md transition-shadow">
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center", stat.color.split(' ')[0])}>
-                      <stat.icon className={cn("h-5 w-5", stat.color.split(' ')[1])} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-500">{stat.label}</p>
-                      <p className="text-lg font-bold">{stat.value}</p>
+                { l: 'Time Spent', v: fmtTime(result.time_spent), i: Clock },
+                { l: 'Correct', v: result.correct_count, i: CheckCircle, c: 'text-emerald-600' },
+                { l: 'Wrong', v: result.incorrect_count, i: XCircle, c: 'text-red-500' },
+                { l: 'Skipped', v: result.unanswered_count, i: AlertCircle, c: 'text-slate-400' },
+              ].map((s, i) => (
+                <Card key={i} className="border-0 shadow-sm">
+                  <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+                    <s.i className={cn("h-5 w-5 shrink-0", s.c || 'text-slate-400')} />
+                    <div className="min-w-0">
+                      <p className="text-[11px] text-slate-400 uppercase tracking-wide">{s.l}</p>
+                      <p className="text-base sm:text-lg font-semibold text-slate-800">{s.v}</p>
                     </div>
                   </CardContent>
                 </Card>
               ))}
-            </motion.div>
+            </div>
 
-            {/* MCQ Performance Bar */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.2 }} className="mb-6">
-              <Card className="border-0 shadow-sm bg-white">
-                <CardContent className="p-5">
-                  <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                    <Target className="h-4 w-4 text-blue-500" />
-                    MCQ Performance Distribution
-                  </h3>
-                  
-                  <div className="flex h-4 rounded-full overflow-hidden mb-3">
-                    {(result.correct_count || 0) > 0 && (
-                      <div className="bg-emerald-500 h-full transition-all duration-500" 
-                        style={{ width: `${((result.correct_count || 0) / ((result.correct_count || 0) + (result.incorrect_count || 0) + (result.unanswered_count || 0) || 1)) * 100}%` }} />
-                    )}
-                    {(result.incorrect_count || 0) > 0 && (
-                      <div className="bg-red-500 h-full transition-all duration-500" 
-                        style={{ width: `${((result.incorrect_count || 0) / ((result.correct_count || 0) + (result.incorrect_count || 0) + (result.unanswered_count || 0) || 1)) * 100}%` }} />
-                    )}
-                    {(result.unanswered_count || 0) > 0 && (
-                      <div className="bg-slate-300 h-full transition-all duration-500" 
-                        style={{ width: `${((result.unanswered_count || 0) / ((result.correct_count || 0) + (result.incorrect_count || 0) + (result.unanswered_count || 0) || 1)) * 100}%` }} />
-                    )}
+            {totalQ > 0 && (
+              <Card className="border-0 shadow-sm mb-5">
+                <CardContent className="p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-4">MCQ Performance</h3>
+                  <div className="flex h-2.5 rounded-full overflow-hidden mb-3">
+                    <div className="bg-emerald-500 h-full" style={{ width: `${(result.correct_count / totalQ) * 100}%` }} />
+                    <div className="bg-red-400 h-full" style={{ width: `${(result.incorrect_count / totalQ) * 100}%` }} />
+                    <div className="bg-slate-200 h-full" style={{ width: `${(result.unanswered_count / totalQ) * 100}%` }} />
                   </div>
-                  
-                  <div className="flex justify-between text-xs">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-emerald-500" />
-                      <span className="text-slate-600">Correct ({result.correct_count || 0})</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-red-500" />
-                      <span className="text-slate-600">Wrong ({result.incorrect_count || 0})</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-slate-300" />
-                      <span className="text-slate-600">Skipped ({result.unanswered_count || 0})</span>
-                    </div>
+                  <div className="flex justify-between text-xs text-slate-500">
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Correct ({result.correct_count})</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-400" />Wrong ({result.incorrect_count})</span>
+                    <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-slate-200" />Skipped ({result.unanswered_count})</span>
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
+            )}
 
-            {/* Theory Pending Notice */}
-            {isTheoryPending && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                <div className="bg-gradient-to-r from-purple-50 to-violet-50 border border-purple-200 rounded-xl p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                      <Clock className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-purple-800">Theory Answers Pending Grading</p>
-                      <p className="text-sm text-purple-700 mt-1">Your theory answers are being reviewed by your instructor. Scores will update once grading is complete.</p>
-                    </div>
-                  </div>
+            {theoryPending && (
+              <div className="flex items-start gap-3 bg-purple-50 border border-purple-100 rounded-xl p-4 mb-5">
+                <Clock className="h-5 w-5 text-purple-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-purple-800">Theory Answers Pending</p>
+                  <p className="text-xs text-purple-600 mt-0.5">Your theory answers are being reviewed. The final score will update once grading is complete.</p>
                 </div>
-              </motion.div>
+              </div>
             )}
 
-            {/* Teacher Feedback */}
             {result.teacher_feedback && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
-                <Card className="border-0 shadow-sm bg-white">
-                  <CardContent className="p-5">
-                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                      <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                        <FileText className="h-4 w-4 text-purple-600" />
-                      </div>
-                      Teacher Feedback
-                    </h3>
-                    <div className="bg-slate-50 rounded-lg p-4 mt-3">
-                      <p className="text-sm text-slate-700 italic">"{result.teacher_feedback}"</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </motion.div>
+              <Card className="border-0 shadow-sm mb-5">
+                <CardContent className="p-4 sm:p-5">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-slate-400" />Teacher Feedback
+                  </h3>
+                  <div className="bg-slate-50 rounded-lg p-4">
+                    <p className="text-sm text-slate-600 italic leading-relaxed">&ldquo;{result.teacher_feedback}&rdquo;</p>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
-            {/* Back Button */}
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} 
-              transition={{ delay: 0.25 }}>
-              <Button 
-                onClick={() => router.push('/student/exams')} 
-                className="w-full rounded-xl h-12 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white font-medium shadow-lg hover:shadow-xl transition-all"
-              >
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
-              </Button>
-            </motion.div>
-            
-            {/* Bottom spacing */}
+            <Button onClick={() => router.push('/student/exams')} className="w-full h-11 bg-slate-800 hover:bg-slate-900 text-white text-sm font-medium rounded-xl transition-colors">
+              <ArrowLeft className="h-4 w-4 mr-2" />Back to Exams
+            </Button>
+
             <div className="h-8" />
           </div>
         </main>
@@ -730,54 +440,20 @@ export default function StudentResultDetailPage() {
   )
 }
 
-// Beautiful Score Row Component
-function ScoreRow({ 
-  label, score, total, color, icon: Icon, bold = false, pending = false 
-}: { 
-  label: string
-  score: number | null
-  total: number
-  color: string
-  icon: any
-  bold?: boolean
-  pending?: boolean
+function ScoreLine({ label, value, max, bold, pending }: {
+  label: string; value: number | null; max: number; bold?: boolean; pending?: boolean
 }) {
-  const displayScore = score !== null && score !== undefined ? score : 0
-  const percentage = total > 0 ? (displayScore / total) * 100 : 0
-
+  const v = value ?? 0
   return (
-    <div className={cn(
-      "flex items-center gap-3 p-2 rounded-lg transition-all duration-200",
-      bold && "bg-white/50"
-    )}>
-      <div className={cn(
-        "h-9 w-9 rounded-lg flex items-center justify-center shrink-0 bg-gradient-to-br",
-        color
-      )}>
-        <Icon className="h-4 w-4 text-white" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-1">
-          <span className={cn("text-sm", bold ? "font-bold" : "font-medium")}>
-            {label}
-          </span>
-          <span className={cn("text-sm ml-2", bold ? "font-bold" : "font-medium")}>
-            {pending ? (
-              <span className="text-purple-500 animate-pulse">Pending</span>
-            ) : (
-              <span>{displayScore}<span className="text-slate-400">/{total}</span></span>
-            )}
-          </span>
-        </div>
-        {!pending && (
-          <div className="h-2 bg-slate-200/50 rounded-full overflow-hidden">
-            <div 
-              className={cn("h-full rounded-full transition-all duration-700 ease-out bg-gradient-to-r", color)}
-              style={{ width: `${Math.min(percentage, 100)}%` }} 
-            />
-          </div>
+    <div className={cn("flex items-center justify-between py-1", bold && "font-semibold")}>
+      <span className={cn("text-slate-600", bold && "text-slate-900")}>{label}</span>
+      <span className={cn("tabular-nums", bold ? "text-slate-900 text-base" : "text-slate-700 text-sm")}>
+        {pending ? (
+          <span className="text-purple-500 text-xs font-medium">Pending</span>
+        ) : (
+          <>{v}<span className="text-slate-400">/{max}</span></>
         )}
-      </div>
+      </span>
     </div>
   )
 }

@@ -1,82 +1,99 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/staff/exams/[id]/submissions/page.tsx - FIXED
+// app/staff/exams/[id]/submissions/page.tsx - RESPONSIVE WITH CLASS GROUPING & WAEC GRADES
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Progress } from '@/components/ui/progress'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
-  ArrowLeft,
-  Search,
-  Eye,
-  Edit,
-  CheckCircle,
-  Clock,
-  AlertCircle,
-  Loader2,
-  RefreshCw,
-  Users,
-  BookOpen,
-  FileText,
-  Award,
-  ChevronRight,
-  Download,
+  ArrowLeft, Search, CheckCircle, Clock, AlertCircle,
+  Loader2, RefreshCw, Users, BookOpen, Award, Download, Eye, ChevronRight
 } from 'lucide-react'
-import { useStaffContext } from '@/app/staff/layout'
 
+// ─── WAEC Grade ───────────────────────────────────────
+const getWAECGrade = (pct: number): string => {
+  if (pct >= 75) return 'A1'
+  if (pct >= 70) return 'B2'
+  if (pct >= 65) return 'B3'
+  if (pct >= 60) return 'C4'
+  if (pct >= 55) return 'C5'
+  if (pct >= 50) return 'C6'
+  if (pct >= 45) return 'D7'
+  if (pct >= 40) return 'E8'
+  return 'F9'
+}
+
+const getGradeBadge = (pct: number) => {
+  const g = getWAECGrade(pct)
+  const colors: Record<string, string> = {
+    'A1': 'bg-emerald-100 text-emerald-700',
+    'B2': 'bg-blue-100 text-blue-700',
+    'B3': 'bg-sky-100 text-sky-700',
+    'C4': 'bg-teal-100 text-teal-700',
+    'C5': 'bg-amber-100 text-amber-700',
+    'C6': 'bg-orange-100 text-orange-700',
+    'D7': 'bg-yellow-100 text-yellow-700',
+    'E8': 'bg-red-100 text-red-400',
+    'F9': 'bg-red-200 text-red-600',
+  }
+  return <Badge className={cn("text-xs", colors[g] || 'bg-slate-100')}>{g}</Badge>
+}
+
+const getScoreColor = (pct: number) => {
+  if (pct >= 70) return 'text-green-600'
+  if (pct >= 50) return 'text-amber-600'
+  return 'text-red-600'
+}
+
+// ─── Helpers ──────────────────────────────────────────
+const getInitials = (name: string) => {
+  if (!name) return 'ST'
+  const parts = name.split(' ')
+  return parts.length >= 2 ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase() : name.slice(0, 2).toUpperCase()
+}
+
+const getTheoryScore = (sub: any): number | null => {
+  if (sub.theory_feedback?.total?.score !== undefined) return Number(sub.theory_feedback.total.score)
+  return null
+}
+
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'in_progress': return <Badge className="bg-blue-100 text-blue-700 text-xs"><Clock className="mr-1 h-3 w-3 inline" />In Progress</Badge>
+    case 'completed': return <Badge className="bg-green-100 text-green-700 text-xs"><CheckCircle className="mr-1 h-3 w-3 inline" />Completed</Badge>
+    case 'pending_theory': return <Badge className="bg-amber-100 text-amber-700 text-xs"><AlertCircle className="mr-1 h-3 w-3 inline" />Pending Theory</Badge>
+    case 'graded': return <Badge className="bg-purple-100 text-purple-700 text-xs"><Award className="mr-1 h-3 w-3 inline" />Graded</Badge>
+    default: return <Badge variant="outline" className="text-xs">{status}</Badge>
+  }
+}
+
+// ─── Types ────────────────────────────────────────────
 interface Submission {
-  id: string
-  student_id: string
-  student_name: string
-  student_email: string
-  student_class: string
-  photo_url?: string
-  status: 'in_progress' | 'completed' | 'pending_theory' | 'graded'
-  started_at: string
+  id: string; student_id: string; student_name: string; student_email: string
+  student_class: string; photo_url?: string
+  status: string; objective_score: number; objective_total: number
+  theory_feedback?: any; theory_total: number
+  total_score: number; percentage: number; is_passed: boolean
   submitted_at: string | null
-  objective_score: number
-  objective_total: number
-  theory_score: number | null
-  theory_total: number
-  total_score: number
-  percentage: number
-  grade?: string
-  is_passed: boolean
-  attempt_number: number
 }
 
-interface Exam {
-  id: string
-  title: string
-  subject: string
-  class: string
-  duration: number
-  total_questions: number
-  total_marks: number
-  has_theory: boolean
-  status: string
-  teacher_name: string
-}
+interface Exam { id: string; title: string; subject: string; class: string }
 
+// ─── Main ─────────────────────────────────────────────
 export default function ExamSubmissionsPage() {
   const router = useRouter()
   const params = useParams()
@@ -87,408 +104,227 @@ export default function ExamSubmissionsPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [activeTab, setActiveTab] = useState('all')
-  
-  // Get sidebarCollapsed from context
-  const { sidebarCollapsed, profile } = useStaffContext()
 
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/portal')
-        return
-      }
+      if (!session) { router.push('/portal'); return }
 
-      // Load exam details
-      const { data: examData, error: examError } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('id', examId)
-        .single()
-
-      if (examError) throw examError
+      const { data: examData } = await supabase.from('exams').select('id, title, subject, class').eq('id', examId).single()
       setExam(examData)
 
-      // Load submissions
-      const { data: submissionsData, error: submissionsError } = await supabase
-        .from('exam_attempts')
-        .select('*')
-        .eq('exam_id', examId)
+      const { data: subs } = await supabase.from('exam_attempts').select('*').eq('exam_id', examId)
         .order('submitted_at', { ascending: false, nullsFirst: false })
-        .order('started_at', { ascending: false })
 
-      if (submissionsError) throw submissionsError
-
-      // Get student photos
-      const submissionsWithPhotos = await Promise.all(
-        (submissionsData || []).map(async (sub) => {
-          const { data: studentData } = await supabase
-            .from('profiles')
-            .select('photo_url')
-            .eq('id', sub.student_id)
-            .single()
-
-          return {
-            ...sub,
-            photo_url: studentData?.photo_url || null
-          }
-        })
-      )
-
-      setSubmissions(submissionsWithPhotos)
-
-    } catch (error: any) {
-      console.error('Error loading data:', error)
-      toast.error(error.message || 'Failed to load submissions')
-    } finally {
-      setLoading(false)
-    }
+      const enriched = await Promise.all((subs || []).map(async (sub: any) => {
+        const { data: student } = await supabase.from('profiles').select('photo_url').eq('id', sub.student_id).single()
+        const tScore = getTheoryScore(sub)
+        const objTotal = Number(sub.objective_total) || 20
+        const thTotal = Number(sub.theory_total) || 40
+        const totalScore = (Number(sub.objective_score) || 0) + (tScore || 0)
+        const totalMarks = objTotal + thTotal
+        const pct = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : (sub.percentage || 0)
+        return {
+          id: sub.id, student_id: sub.student_id,
+          student_name: sub.student_name || 'Unknown',
+          student_email: sub.student_email || '',
+          student_class: sub.student_class || '—',
+          photo_url: student?.photo_url || null,
+          status: sub.status,
+          objective_score: Number(sub.objective_score) || 0,
+          objective_total: objTotal,
+          theory_feedback: sub.theory_feedback,
+          theory_total: thTotal,
+          total_score: totalScore,
+          percentage: pct,
+          is_passed: sub.is_passed || pct >= 50,
+          submitted_at: sub.submitted_at
+        }
+      }))
+      setSubmissions(enriched)
+    } catch (e: any) { toast.error(e.message || 'Failed to load') }
+    finally { setLoading(false) }
   }, [examId, router])
 
-  useEffect(() => {
-    loadData()
-  }, [loadData])
+  useEffect(() => { loadData() }, [loadData])
 
-  const getInitials = (name: string) => {
-    if (!name) return 'ST'
-    const parts = name.split(' ')
-    return parts.length >= 2 
-      ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-      : name.slice(0, 2).toUpperCase()
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'in_progress':
-        return <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"><Clock className="mr-1 h-3 w-3" />In Progress</Badge>
-      case 'completed':
-        return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"><CheckCircle className="mr-1 h-3 w-3" />Completed</Badge>
-      case 'pending_theory':
-        return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400"><AlertCircle className="mr-1 h-3 w-3" />Pending Theory</Badge>
-      case 'graded':
-        return <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400"><Award className="mr-1 h-3 w-3" />Graded</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  const getScoreColor = (percentage: number) => {
-    if (percentage >= 70) return 'text-green-600 dark:text-green-400'
-    if (percentage >= 50) return 'text-yellow-600 dark:text-yellow-400'
-    return 'text-red-600 dark:text-red-400'
-  }
-
-  const filteredSubmissions = submissions.filter(sub => {
-    const matchesSearch = 
-      sub.student_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      sub.student_email?.toLowerCase().includes(searchQuery.toLowerCase())
-    
-    if (activeTab === 'all') return matchesSearch
-    if (activeTab === 'completed') return matchesSearch && sub.status === 'completed'
-    if (activeTab === 'pending_theory') return matchesSearch && sub.status === 'pending_theory'
-    if (activeTab === 'graded') return matchesSearch && sub.status === 'graded'
-    if (activeTab === 'in_progress') return matchesSearch && sub.status === 'in_progress'
-    
-    return matchesSearch
+  // ─── Filtering ──────────────────────────────────────
+  const filtered = submissions.filter(s => {
+    const q = searchQuery.toLowerCase()
+    const match = s.student_name.toLowerCase().includes(q) || s.student_email.toLowerCase().includes(q)
+    if (activeTab === 'all') return match
+    return match && s.status === activeTab
   })
 
+  // ─── Group by class ─────────────────────────────────
+  const groupedByClass = filtered.reduce((acc: Record<string, Submission[]>, s) => {
+    const cls = s.student_class || 'Unknown'
+    if (!acc[cls]) acc[cls] = []
+    acc[cls].push(s)
+    return acc
+  }, {})
+
+  const classOrder = Object.keys(groupedByClass).sort()
+
+  // ─── Stats ──────────────────────────────────────────
   const stats = {
     total: submissions.length,
-    completed: submissions.filter(s => s.status === 'completed').length,
-    pendingTheory: submissions.filter(s => s.status === 'pending_theory').length,
+    pending: submissions.filter(s => s.status === 'pending_theory').length,
     graded: submissions.filter(s => s.status === 'graded').length,
-    inProgress: submissions.filter(s => s.status === 'in_progress').length,
-    averageScore: submissions.filter(s => s.status === 'completed' || s.status === 'graded').length > 0
-      ? Math.round(submissions.filter(s => s.status === 'completed' || s.status === 'graded')
-          .reduce((sum, s) => sum + s.percentage, 0) / 
-          submissions.filter(s => s.status === 'completed' || s.status === 'graded').length)
-      : 0
+    completed: submissions.filter(s => s.status === 'completed').length,
+    avgScore: submissions.filter(s => s.status === 'graded').length > 0
+      ? Math.round(submissions.filter(s => s.status === 'graded').reduce((sum, s) => sum + s.percentage, 0) / submissions.filter(s => s.status === 'graded').length) : 0
   }
 
-  const handleEnterScores = () => {
-    router.push(`/staff/exams/${examId}/scores`)
-  }
-
-  const handleViewSubmission = (submissionId: string) => {
-    router.push(`/staff/exams/${examId}/submissions/${submissionId}`)
+  const handleView = (submissionId: string) => {
+    window.location.href = `/staff/exams/${examId}/submissions/${submissionId}`
   }
 
   const handleExport = () => {
-    const csvData = filteredSubmissions.map(s => ({
-      Name: s.student_name,
-      Email: s.student_email,
-      Class: s.student_class,
-      Status: s.status,
-      'Objective Score': `${s.objective_score}/${s.objective_total}`,
-      'Theory Score': s.theory_score ? `${s.theory_score}/${s.theory_total}` : 'Pending',
-      'Total Score': `${s.total_score}/${s.objective_total + s.theory_total}`,
-      Percentage: `${s.percentage}%`,
-      Grade: s.grade || 'N/A',
-      Passed: s.is_passed ? 'Yes' : 'No',
-      Submitted: s.submitted_at ? new Date(s.submitted_at).toLocaleDateString() : 'N/A'
-    }))
-
-    const csv = [
-      Object.keys(csvData[0] || {}).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
-    ].join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
+    const csv = [['Name', 'Class', 'Status', 'Objective', 'Theory', 'Total', '%', 'Grade', 'Passed'].join(',')]
+    filtered.forEach(s => {
+      const tScore = getTheoryScore(s)
+      csv.push([s.student_name, s.student_class, s.status, `${s.objective_score}/${s.objective_total}`, tScore !== null ? `${tScore}/${s.theory_total}` : 'Pending', `${s.total_score}/${s.objective_total + s.theory_total}`, `${s.percentage}%`, getWAECGrade(s.percentage), s.is_passed ? 'Yes' : 'No'].join(','))
+    })
+    const blob = new Blob([csv.join('\n')], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${exam?.title}_submissions.csv`
-    a.click()
+    const a = document.createElement('a'); a.href = url; a.download = `${exam?.title}_submissions.csv`; a.click()
     URL.revokeObjectURL(url)
-    
-    toast.success('Export complete!')
+    toast.success('Exported!')
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    )
-  }
+  if (loading) return <div className="flex items-center justify-center h-96"><Loader2 className="h-10 w-10 animate-spin text-emerald-600" /></div>
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-6"
-      >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.push('/staff/exams')}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
-            </Button>
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
-                {exam?.title}
-              </h1>
-              <p className="text-gray-500 dark:text-gray-400">
-                {exam?.subject} • {exam?.class} • {exam?.total_marks} marks
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={loadData}>
-              <RefreshCw className="mr-2 h-4 w-4" /> Refresh
-            </Button>
-            <Button variant="outline" onClick={handleExport}>
-              <Download className="mr-2 h-4 w-4" /> Export CSV
-            </Button>
-            <Button onClick={handleEnterScores} className="bg-primary hover:bg-primary/90">
-              <Edit className="mr-2 h-4 w-4" /> Enter Scores
-            </Button>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="outline" size="sm" onClick={() => router.push('/staff/exams')} className="shrink-0"><ArrowLeft className="mr-1.5 h-4 w-4" />Back</Button>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 truncate">{exam?.title}</h1>
+            <p className="text-xs sm:text-sm text-slate-500 truncate">{exam?.subject} • {exam?.class}</p>
           </div>
         </div>
-      </motion.div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={loadData}><RefreshCw className="mr-1.5 h-4 w-4" />Refresh</Button>
+          <Button variant="outline" size="sm" onClick={handleExport}><Download className="mr-1.5 h-4 w-4" />Export</Button>
+        </div>
+      </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
-              </div>
-              <Users className="h-5 w-5 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Completed</p>
-                <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
-              </div>
-              <CheckCircle className="h-5 w-5 text-green-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Pending Theory</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.pendingTheory}</p>
-              </div>
-              <AlertCircle className="h-5 w-5 text-yellow-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Graded</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.graded}</p>
-              </div>
-              <Award className="h-5 w-5 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Avg Score</p>
-                <p className="text-2xl font-bold">{stats.averageScore}%</p>
-              </div>
-              <BookOpen className="h-5 w-5 text-primary" />
-            </div>
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+        {[
+          { l: 'Total', v: stats.total, i: Users, c: 'text-blue-600 bg-blue-50' },
+          { l: 'Pending', v: stats.pending, i: AlertCircle, c: 'text-amber-600 bg-amber-50' },
+          { l: 'Graded', v: stats.graded, i: Award, c: 'text-purple-600 bg-purple-50' },
+          { l: 'Avg', v: `${stats.avgScore}%`, i: BookOpen, c: 'text-emerald-600 bg-emerald-50' },
+        ].map((s, i) => (
+          <Card key={i} className="border-0 shadow-sm">
+            <CardContent className="p-3 sm:p-4 flex items-center gap-3">
+              <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0", s.c.split(' ')[1])}><s.i className={cn("h-4 w-4", s.c.split(' ')[0])} /></div>
+              <div className="min-w-0"><p className="text-[11px] text-slate-500">{s.l}</p><p className="text-lg font-bold">{s.v}</p></div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
-      {/* Search and Tabs */}
-      <div className="space-y-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-          <Input
-            placeholder="Search by student name or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 bg-white dark:bg-slate-900"
-          />
+      {/* Search & Tabs */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input placeholder="Search students..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-9 text-sm bg-white" />
         </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="flex-wrap">
-            <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
-            <TabsTrigger value="completed">Completed ({stats.completed})</TabsTrigger>
-            <TabsTrigger value="pending_theory">Pending Theory ({stats.pendingTheory})</TabsTrigger>
-            <TabsTrigger value="graded">Graded ({stats.graded})</TabsTrigger>
-            <TabsTrigger value="in_progress">In Progress ({stats.inProgress})</TabsTrigger>
-          </TabsList>
-        </Tabs>
       </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="flex-wrap h-auto gap-1 bg-transparent p-0">
+          {['all', 'pending_theory', 'graded', 'completed', 'in_progress'].map(tab => (
+            <TabsTrigger key={tab} value={tab} className="text-xs px-3 py-1.5 rounded-lg data-[state=active]:bg-slate-200">
+              {tab === 'all' ? 'All' : tab === 'pending_theory' ? 'Pending Theory' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+              <Badge variant="secondary" className="ml-1.5 text-[10px]">{tab === 'all' ? stats.total : submissions.filter(s => s.status === tab).length}</Badge>
+            </TabsTrigger>
+          ))}
+        </TabsList>
+      </Tabs>
 
-      {/* Submissions Table */}
-      <Card>
-        <CardContent className="p-0">
-          {filteredSubmissions.length === 0 ? (
-            <div className="text-center py-12">
-              <Users className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
-              <p className="text-gray-500 dark:text-gray-400">No submissions found</p>
+      {/* Grouped by Class */}
+      {filtered.length === 0 ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="text-center py-12"><Users className="h-10 w-10 text-slate-300 mx-auto mb-2" /><p className="text-slate-500 text-sm">No submissions found</p></CardContent>
+        </Card>
+      ) : (
+        classOrder.map(cls => (
+          <div key={cls} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-slate-200 text-slate-700 text-xs font-semibold px-2.5 py-1">{cls}</Badge>
+              <span className="text-xs text-slate-400">{groupedByClass[cls].length} student{groupedByClass[cls].length !== 1 ? 's' : ''}</span>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-center">Objective</TableHead>
-                    <TableHead className="text-center">Theory</TableHead>
-                    <TableHead className="text-center">Total</TableHead>
-                    <TableHead className="text-center">Grade</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredSubmissions.map((submission) => (
-                    <TableRow key={submission.id}>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-8 w-8">
-                            <AvatarImage src={submission.photo_url || undefined} />
-                            <AvatarFallback>{getInitials(submission.student_name)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{submission.student_name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">{submission.student_email}</p>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>{submission.student_class}</TableCell>
-                      <TableCell>{getStatusBadge(submission.status)}</TableCell>
-                      <TableCell className="text-center">
-                        {submission.objective_score}/{submission.objective_total}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {submission.theory_score !== null 
-                          ? `${submission.theory_score}/${submission.theory_total}`
-                          : <span className="text-yellow-600 dark:text-yellow-400">Pending</span>
-                        }
-                      </TableCell>
-                      <TableCell className="text-center font-medium">
-                        <span className={getScoreColor(submission.percentage)}>
-                          {submission.total_score}/{submission.objective_total + submission.theory_total}
-                        </span>
-                        <span className="text-xs text-gray-500 ml-1">({submission.percentage}%)</span>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {submission.grade ? (
-                          <Badge variant={submission.is_passed ? 'default' : 'destructive'}>
-                            {submission.grade}
-                          </Badge>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleViewSubmission(submission.id)}
-                        >
-                          <Eye className="mr-1 h-4 w-4" /> View
-                          <ChevronRight className="ml-1 h-3 w-3" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="text-xs sm:text-sm">Student</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-center hidden sm:table-cell">Objective</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-center">Theory</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-center">Total</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-center">Grade</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-center">Status</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupedByClass[cls].map(s => {
+                        const tScore = getTheoryScore(s)
+                        return (
+                          <TableRow key={s.id} className="hover:bg-slate-50">
+                            <TableCell>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Avatar className="h-7 w-7 shrink-0 hidden sm:flex">
+                                  <AvatarImage src={s.photo_url || undefined} />
+                                  <AvatarFallback className="text-[10px]">{getInitials(s.student_name)}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="font-medium text-xs sm:text-sm truncate">{s.student_name}</p>
+                                  <p className="text-[10px] text-slate-500 truncate sm:hidden">{s.student_class}</p>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-center text-xs sm:text-sm hidden sm:table-cell">{s.objective_score}/{s.objective_total}</TableCell>
+                            <TableCell className="text-center text-xs sm:text-sm">
+                              {tScore !== null ? `${tScore}/${s.theory_total}` : <span className="text-amber-500 text-xs">Pending</span>}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <span className={cn("font-semibold text-xs sm:text-sm", getScoreColor(s.percentage))}>{s.total_score}/{s.objective_total + s.theory_total}</span>
+                              <span className="text-[10px] text-slate-400 ml-1">({s.percentage}%)</span>
+                            </TableCell>
+                            <TableCell className="text-center">{getGradeBadge(s.percentage)}</TableCell>
+                            <TableCell className="text-center">{getStatusBadge(s.status)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" onClick={() => handleView(s.id)} className="h-7 text-xs"><Eye className="mr-1 h-3 w-3" />View</Button>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ))
+      )}
 
       {/* Progress Summary */}
       {submissions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Submission Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Overall Completion</span>
-                  <span>
-                    {stats.completed + stats.graded + stats.pendingTheory} of {stats.total} students
-                  </span>
-                </div>
-                <Progress 
-                  value={stats.total > 0 ? ((stats.completed + stats.graded + stats.pendingTheory) / stats.total) * 100 : 0} 
-                  className="h-2" 
-                />
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Grading Progress</span>
-                  <span>
-                    {stats.graded} of {stats.completed + stats.pendingTheory} graded
-                  </span>
-                </div>
-                <Progress 
-                  value={stats.completed + stats.pendingTheory > 0 
-                    ? (stats.graded / (stats.completed + stats.pendingTheory)) * 100 
-                    : 0
-                  } 
-                  className="h-2" 
-                />
-              </div>
+        <Card className="border-0 shadow-sm">
+          <CardHeader className="pb-2"><CardTitle className="text-sm">Submission Progress</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <div className="flex justify-between text-xs mb-1"><span>Grading Progress</span><span>{stats.graded} of {stats.pending + stats.graded + stats.completed}</span></div>
+              <Progress value={stats.pending + stats.graded + stats.completed > 0 ? (stats.graded / (stats.pending + stats.graded + stats.completed)) * 100 : 0} className="h-2" />
             </div>
           </CardContent>
         </Card>

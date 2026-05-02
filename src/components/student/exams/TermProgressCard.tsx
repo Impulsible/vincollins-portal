@@ -24,14 +24,17 @@ export function TermProgressCard({
   const completionPercentage = stats.totalSubjects > 0 
     ? Math.round((stats.completed / stats.totalSubjects) * 100) : 0
 
-  // High contrast grade colors
   const getGradeStyle = (grade: string) => {
     switch (grade) {
-      case 'A': return "bg-emerald-50 text-emerald-700 border-emerald-300"
-      case 'B': return "bg-blue-50 text-blue-700 border-blue-300"
-      case 'C': return "bg-amber-50 text-amber-700 border-amber-300"
-      case 'P': return "bg-orange-50 text-orange-700 border-orange-300"
-      case 'F': return "bg-red-50 text-red-700 border-red-300"
+      case 'A1': return "bg-emerald-50 text-emerald-700 border-emerald-300"
+      case 'B2': return "bg-blue-50 text-blue-700 border-blue-300"
+      case 'B3': return "bg-sky-50 text-sky-700 border-sky-300"
+      case 'C4': return "bg-teal-50 text-teal-700 border-teal-300"
+      case 'C5': return "bg-amber-50 text-amber-700 border-amber-300"
+      case 'C6': return "bg-orange-50 text-orange-700 border-orange-300"
+      case 'D7': return "bg-yellow-50 text-yellow-700 border-yellow-300"
+      case 'E8': return "bg-red-50 text-red-400 border-red-300"
+      case 'F9': return "bg-red-100 text-red-600 border-red-400"
       default: return "bg-slate-50 text-slate-600 border-slate-300"
     }
   }
@@ -68,13 +71,13 @@ export function TermProgressCard({
                 {stats.completed}/{stats.totalSubjects} Completed
               </Badge>
               
-              {stats.completed > 0 && (
+              {stats.completed > 0 && stats.currentGrade !== 'N/A' && (
                 <Badge className={cn(
                   "text-xs sm:text-sm font-semibold border px-3 py-1 rounded-full",
                   getGradeStyle(stats.currentGrade)
                 )}>
                   <Award className="h-3.5 w-3.5 mr-1" />
-                  Grade {stats.currentGrade}
+                  {stats.currentGrade}
                 </Badge>
               )}
             </div>
