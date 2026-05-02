@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - WITH CORRECT SCHOOL LOGO (NO WHITE FILTER)
+// app/portal/page.tsx - FIXED LOGIN REDIRECT
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -32,7 +32,7 @@ interface SchoolSettings {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { user, loading: userLoading } = useUser()
+  const { user, loading: userLoading, refreshUser } = useUser()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -53,24 +53,21 @@ export default function LoginPage() {
     role: 'student' | 'teacher' | 'admin'
     redirectPath: string
   } | null>(null)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [showLoginForm, setShowLoginForm] = useState(false)
   
   const loginInProgress = useRef(false)
   const hasRedirected = useRef(false)
-  const authCheckDone = useRef(false)
 
   // Check if already authenticated - redirect to dashboard
   useEffect(() => {
-    if (authCheckDone.current) return
-    
     const checkAuth = async () => {
       // Don't redirect while login is in progress
       if (loginInProgress.current) {
-        setIsCheckingAuth(false)
+        setShowLoginForm(false)
         return
       }
 
-      // If user context already has a user, redirect
+      // If user context already has a user, redirect immediately
       if (user && user.role && !hasRedirected.current) {
         const redirectMap: Record<string, string> = {
           admin: '/admin',
@@ -88,14 +85,12 @@ export default function LoginPage() {
         return
       }
 
-      // If no user in context, check session directly (only once)
-      if (!user && !authCheckDone.current) {
-        authCheckDone.current = true
-        
+      // If no user in context, check session directly
+      if (!user && !hasRedirected.current) {
         try {
           const { data: { session } } = await supabase.auth.getSession()
           
-          if (session && !hasRedirected.current) {
+          if (session) {
             const { data: profile } = await supabase
               .from('profiles')
               .select('role')
@@ -119,7 +114,8 @@ export default function LoginPage() {
         }
       }
       
-      setIsCheckingAuth(false)
+      // Show login form when confirmed not authenticated
+      setShowLoginForm(true)
     }
 
     checkAuth()
@@ -173,6 +169,8 @@ export default function LoginPage() {
       // Validate inputs
       if (!cleanEmail || !cleanPassword) {
         setError('Please enter both email and password.')
+        loginInProgress.current = false
+        setLoading(false)
         return
       }
 
@@ -195,16 +193,17 @@ export default function LoginPage() {
         } else {
           setError('Login failed. Please check your credentials and try again.')
         }
+        loginInProgress.current = false
+        setLoading(false)
         return
       }
 
       if (!signInData?.user) {
         setError('Login failed. No user data received. Please try again.')
+        loginInProgress.current = false
+        setLoading(false)
         return
       }
-
-      // Small delay to ensure session is properly established
-      await new Promise(resolve => setTimeout(resolve, 800))
 
       // Get user profile directly from database
       const { data: profile, error: profileError } = await supabase
@@ -229,6 +228,8 @@ export default function LoginPage() {
                                  mappedRole.charAt(0).toUpperCase() + mappedRole.slice(1)
         setError(`This account is registered as ${roleDisplayName}. Please select the correct tab above.`)
         await supabase.auth.signOut()
+        loginInProgress.current = false
+        setLoading(false)
         return
       }
 
@@ -258,18 +259,26 @@ export default function LoginPage() {
       }
       
       const redirectPath = redirectMap[mappedRole] || '/student'
-
-      // Reset auth check flag so we don't interfere with redirect
-      authCheckDone.current = true
       
-      // Show success modal
+      // Refresh user context
+      if (refreshUser) {
+        await refreshUser()
+      }
+      
+      // Show success modal briefly then redirect
       setLoginSuccessData({
         userName: formattedName,
         role: mappedRole as 'student' | 'teacher' | 'admin',
         redirectPath: redirectPath
       })
       setShowSuccessModal(true)
-      setSuccessMessage('Login successful! Redirecting...')
+      
+      // Auto redirect after 2 seconds
+      setTimeout(() => {
+        setShowSuccessModal(false)
+        hasRedirected.current = true
+        router.push(redirectPath)
+      }, 2000)
 
     } catch (err: any) {
       console.error('Unexpected login error:', err)
@@ -299,14 +308,6 @@ export default function LoginPage() {
       case 'admin': return <Shield className="h-4 w-4" />
       case 'teacher': return <Users className="h-4 w-4" />
       default: return <GraduationCap className="h-4 w-4" />
-    }
-  }
-
-  const getRoleRingColor = () => {
-    switch (selectedRole) {
-      case 'admin': return 'ring-purple-500'
-      case 'teacher': return 'ring-blue-500'
-      default: return 'ring-emerald-500'
     }
   }
 
@@ -367,10 +368,6 @@ export default function LoginPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => {
-              setShowSuccessModal(false)
-              goToDashboard()
-            }}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
@@ -395,19 +392,6 @@ export default function LoginPage() {
               </div>
 
               <div className="relative p-8">
-                {/* Close button */}
-                <button
-                  onClick={() => {
-                    setShowSuccessModal(false)
-                    goToDashboard()
-                  }}
-                  className="absolute top-4 right-4 h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                >
-                  <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-
                 <div className="flex flex-col items-center text-center">
                   {/* Success icon */}
                   <motion.div
@@ -416,9 +400,7 @@ export default function LoginPage() {
                     transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
                     className="mb-6"
                   >
-                    <div 
-                      className="relative"
-                    >
+                    <div className="relative">
                       <div 
                         className="w-28 h-28 rounded-full flex items-center justify-center text-6xl relative z-10"
                         style={{ 
@@ -460,34 +442,18 @@ export default function LoginPage() {
                     </p>
                     
                     <p className="text-sm text-gray-400">
-                      {config.message}
+                      Redirecting to dashboard...
                     </p>
-                  </motion.div>
-                  
-                  {/* Action buttons */}
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="flex flex-col gap-3 w-full mt-8"
-                  >
-                    <Button
-                      onClick={goToDashboard}
-                      className="w-full py-6 text-base font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                      style={{ 
-                        background: `linear-gradient(135deg, ${config.color}, ${config.color}dd)`,
-                      }}
-                    >
-                      <span>Go to Dashboard</span>
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
                     
-                    <button
-                      onClick={() => setShowSuccessModal(false)}
-                      className="text-sm text-gray-400 hover:text-gray-600 transition-colors py-2"
-                    >
-                      Stay on this page
-                    </button>
+                    {/* Loading indicator */}
+                    <div className="flex justify-center mt-4">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                      >
+                        <Loader2 className="h-6 w-6" style={{ color: config.color }} />
+                      </motion.div>
+                    </div>
                   </motion.div>
                 </div>
               </div>
@@ -498,19 +464,9 @@ export default function LoginPage() {
     )
   }
 
-  // Loading state
-  if (isCheckingAuth || userLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        >
-          <Loader2 className="h-10 w-10 text-primary" />
-        </motion.div>
-        <p className="mt-4 text-sm text-gray-500">Checking authentication...</p>
-      </div>
-    )
+  // If not showing login form yet, show nothing (prevents skeleton flash)
+  if (!showLoginForm) {
+    return null
   }
 
   return (
@@ -594,7 +550,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* RIGHT SIDE - LOGIN FORM (COMPLETELY UNCHANGED) */}
+            {/* RIGHT SIDE - LOGIN FORM */}
             <div className="w-full lg:w-[45%] xl:w-[40%] bg-white flex items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-8">
               <div className="w-full max-w-md">
                 <motion.div
