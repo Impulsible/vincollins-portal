@@ -1,4 +1,4 @@
-// components/staff/StaffWelcomeBanner.tsx - PROFESSIONAL, RESPONSIVE & HYDRATION SAFE
+// components/staff/StaffWelcomeBanner.tsx - PRODUCTION DASHBOARD BANNER (WIDER)
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -6,9 +6,9 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Progress } from '@/components/ui/progress'
 import { 
-  GraduationCap, Quote, Calendar, Award, 
-  Flame, Sparkles, Clock, CheckCircle2, Users,
-  FileText, BookOpen, FileCheck
+  GraduationCap, Quote, Calendar, Flame, 
+  Clock, CheckCircle2, Users,
+  FileText, BookOpen, FileCheck, Sparkles
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -68,244 +68,239 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
   useEffect(() => {
     setMounted(true)
     setCurrentTime(new Date())
-    const randomIndex = Math.floor(Math.random() * quotes.length)
-    setCurrentQuote(quotes[randomIndex])
+    setCurrentQuote(quotes[Math.floor(Math.random() * quotes.length)])
     
     const timer = setInterval(() => setCurrentTime(new Date()), 60000)
     const quoteTimer = setInterval(() => {
-      const newIndex = Math.floor(Math.random() * quotes.length)
-      setCurrentQuote(quotes[newIndex])
+      setCurrentQuote(quotes[Math.floor(Math.random() * quotes.length)])
     }, 1800000)
     
-    return () => {
-      clearInterval(timer)
-      clearInterval(quoteTimer)
-    }
+    return () => { clearInterval(timer); clearInterval(quoteTimer) }
   }, [])
 
   const getGreeting = useCallback(() => {
     if (!currentTime) return { text: 'Welcome', emoji: '👋' }
     const hour = currentTime.getHours()
-    if (hour < 12) return { text: 'Good Morning', emoji: '🌅' }
-    if (hour < 17) return { text: 'Good Afternoon', emoji: '☀️' }
-    if (hour < 21) return { text: 'Good Evening', emoji: '🌆' }
-    return { text: 'Good Night', emoji: '🌙' }
+    if (hour < 12) return { text: 'Good morning', emoji: '🌅' }
+    if (hour < 17) return { text: 'Good afternoon', emoji: '☀️' }
+    return { text: 'Good evening', emoji: '🌙' }
   }, [currentTime])
   
-  const getFirstName = (): string => {
-    const fullName = profile?.full_name || profile?.name || ''
-    if (!fullName) return 'Teacher'
-    return fullName.split(' ')[0]
-  }
-  
-  const firstName = getFirstName()
+  const firstName = (profile?.full_name || profile?.name || 'Teacher').split(' ')[0]
   
   const getInitials = (): string => {
     const fullName = profile?.full_name || profile?.name || ''
     if (!fullName) return 'ST'
     const names = fullName.split(' ')
-    if (names.length >= 2) {
-      return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-    }
-    return fullName.slice(0, 2).toUpperCase()
+    return names.length >= 2 
+      ? (names[0][0] + names[names.length - 1][0]).toUpperCase()
+      : fullName.slice(0, 2).toUpperCase()
   }
 
-  const formattedDate = currentTime?.toLocaleDateString('en-NG', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-  }) || 'Loading...'
+  const formattedDate = useMemo(() => {
+    if (!currentTime) return ''
+    return currentTime.toLocaleDateString('en-NG', {
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+    })
+  }, [currentTime])
 
   const pendingGrading = stats?.pendingGrading || 0
-  const avatarUrl = profile?.photo_url || profile?.avatar_url || undefined
-  
-  const getRoleDisplay = (role?: string): string => {
-    if (role === 'admin') return 'Administrator'
-    if (role === 'staff' || role === 'teacher') return 'Teacher'
-    return role || 'Staff'
-  }
-
-  const weekDisplay = useMemo(() => {
-    if (termInfo?.displayWeek) return termInfo.displayWeek
-    if (termInfo) return `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}`
-    return 'Week 0/13'
-  }, [termInfo])
-
   const greeting = getGreeting()
+  const weekDisplay = termInfo?.displayWeek || (termInfo ? `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}` : '')
+  const roleDisplay = profile?.role === 'admin' ? 'Administrator' : profile?.role === 'staff' || profile?.role === 'teacher' ? 'Teacher' : profile?.role || 'Staff'
 
-  // Show nothing on server to prevent hydration mismatch
   if (!mounted) {
     return (
-      <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 mt-2">
-        <div className="h-[280px] sm:h-[320px] md:h-[360px] bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 rounded-2xl animate-pulse" />
+      <div className="px-4 sm:px-6 lg:px-8 pt-4">
+        <div className="h-[260px] sm:h-[280px] lg:h-[300px] bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 rounded-[2rem] animate-pulse" />
       </div>
     )
   }
 
   return (
-    <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 mt-2">
-      <div className={cn(
-        "relative overflow-hidden rounded-2xl",
-        "bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900",
-        "p-4 sm:p-5 md:p-6 text-white shadow-2xl border border-slate-600/30",
-        "w-full"
-      )}>
-        {/* Background decorative elements */}
-        <div className="absolute top-0 right-0 w-48 h-48 sm:w-64 sm:h-64 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-40 h-40 sm:w-56 sm:h-56 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
+    <div className="pt-4">
+      <div className="relative overflow-hidden rounded-[2rem] bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 shadow-xl border border-slate-700/30 mx-3 sm:mx-4 lg:mx-5">
         
-        <div className="relative z-10">
-          {/* Top Row: Date & Week */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-3 sm:mb-4">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <span className="text-lg sm:text-xl md:text-2xl">{greeting.emoji}</span>
-              <span className="text-[10px] sm:text-xs font-medium bg-white/10 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-gray-200">
-                {formattedDate}
-              </span>
-              <span className="text-[10px] sm:text-xs font-medium bg-amber-500/20 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-amber-200">
-                <Clock className="inline h-2.5 w-2.5 sm:h-3 sm:w-3 mr-0.5 sm:mr-1" />
-                {weekDisplay}
-              </span>
-            </div>
-            
-            {/* Mobile Avatar */}
-            <div className="relative md:hidden">
-              <Avatar className="h-8 w-8 sm:h-10 sm:w-10 ring-2 ring-white/20">
-                <AvatarImage src={avatarUrl} />
-                <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-700 text-white font-bold text-xs sm:text-sm">
-                  {getInitials()}
-                </AvatarFallback>
-              </Avatar>
-            </div>
-          </div>
-
-          {/* Main Content: Greeting, Quote, Badges */}
-          <div className="flex flex-col md:flex-row gap-3 sm:gap-4 md:gap-6">
-            <div className="flex-1">
-              <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-1 sm:mb-2 text-white">
-                {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300">{firstName}</span>!
-              </h1>
-              
-              <div className="mb-2 sm:mb-3">
-                <div className="flex items-start gap-1.5 sm:gap-2">
-                  <Quote className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300 shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-gray-200 text-xs sm:text-sm italic leading-relaxed line-clamp-2">
-                      "{currentQuote.text}"
-                    </p>
-                    <p className="text-[10px] sm:text-xs text-amber-200/80 mt-0.5 sm:mt-1 font-medium">
-                      — {currentQuote.author}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2 sm:mt-3">
-                <Badge className="bg-white/10 text-gray-200 border border-white/20 text-[10px] sm:text-xs">
-                  <GraduationCap className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
-                  {profile?.department || 'General'}
-                </Badge>
-                <Badge className="bg-white/10 text-gray-200 border border-white/20 text-[10px] sm:text-xs">
-                  <Sparkles className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
-                  {getRoleDisplay(profile?.role)}
-                </Badge>
-              </div>
-            </div>
-            
-            {/* Desktop Avatar */}
-            <div className="hidden md:block relative group shrink-0">
-              <Avatar className="h-14 w-14 sm:h-16 sm:w-16 lg:h-20 lg:w-20 ring-4 ring-white/20 shadow-xl">
-                <AvatarImage src={avatarUrl} />
-                <AvatarFallback className="bg-gradient-to-br from-amber-600 to-orange-700 text-white text-base sm:text-lg lg:text-xl font-bold">
-                  {getInitials()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-1 ring-2 ring-slate-800">
-                <div className="h-1.5 w-1.5 lg:h-2 lg:w-2 bg-white rounded-full animate-pulse" />
-              </div>
-            </div>
-          </div>
-          
-          {/* Stats Cards - Responsive Grid */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4 mt-4 sm:mt-5 lg:mt-6 pt-3 sm:pt-4 border-t border-white/15">
-            <div className="bg-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 hover:bg-white/15 transition-colors">
-              <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-                <p className="text-base sm:text-lg lg:text-xl font-bold text-white">{stats?.publishedExams || 0}</p>
-                <CheckCircle2 className="h-3 w-3 sm:h-4 sm:w-4 text-emerald-300 opacity-80" />
-              </div>
-              <p className="text-[8px] sm:text-[10px] lg:text-xs text-gray-300">Published Exams</p>
-            </div>
-            
-            <div className="bg-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 hover:bg-white/15 transition-colors">
-              <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-                <p className="text-base sm:text-lg lg:text-xl font-bold text-white">{stats?.activeStudents || stats?.totalStudents || 0}</p>
-                <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-300 opacity-80" />
-              </div>
-              <p className="text-[8px] sm:text-[10px] lg:text-xs text-gray-300">Active Students</p>
-            </div>
-            
-            <div className="bg-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 hover:bg-white/15 transition-colors">
-              <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-                <p className={cn("text-base sm:text-lg lg:text-xl font-bold", pendingGrading > 0 ? "text-amber-300" : "text-white")}>
-                  {pendingGrading}
-                </p>
-                {pendingGrading > 0 ? (
-                  <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-amber-400 opacity-80" />
-                ) : (
-                  <Award className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 opacity-60" />
+        {/* Large Background Accents */}
+        <div className="absolute -top-20 -right-20 w-[400px] h-[400px] bg-gradient-to-br from-amber-500/10 to-orange-600/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-20 w-[350px] h-[350px] bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/3 w-64 h-64 bg-gradient-to-br from-blue-500/8 to-purple-500/8 rounded-full blur-3xl" />
+        
+        {/* Subtle pattern overlay */}
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMiI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
+        
+        <div className="relative p-5 sm:p-7 lg:p-9">
+          {/* Header with Date & Avatar */}
+          <div className="flex items-start justify-between gap-6 mb-5 sm:mb-7">
+            <div className="flex-1 min-w-0">
+              {/* Date & Week Badge Row */}
+              <div className="flex flex-wrap items-center gap-2.5 mb-4">
+                <span className="text-2xl sm:text-3xl" role="img" aria-label={greeting.text}>
+                  {greeting.emoji}
+                </span>
+                <span className="text-xs sm:text-sm text-slate-400 font-medium tracking-wide">
+                  {formattedDate}
+                </span>
+                {weekDisplay && (
+                  <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-amber-300/90 bg-amber-400/10 px-2.5 py-1 rounded-full border border-amber-400/20">
+                    <Clock className="h-3.5 w-3.5" />
+                    {weekDisplay}
+                  </span>
                 )}
               </div>
-              <p className="text-[8px] sm:text-[10px] lg:text-xs text-gray-300">Pending Grading</p>
+
+              {/* Main Greeting */}
+              <div className="mb-4">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">
+                  {greeting.text},{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-400">
+                    {firstName}
+                  </span>
+                  <span className="ml-2">👋</span>
+                </h1>
+              </div>
+
+              {/* Quote */}
+              <div className="flex items-start gap-2.5 mb-4 max-w-2xl">
+                <Quote className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400/60 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm sm:text-base text-slate-300 italic leading-relaxed line-clamp-2">
+                    "{currentQuote.text}"
+                  </p>
+                  <p className="text-xs sm:text-sm text-slate-500 mt-1 font-medium">
+                    — {currentQuote.author}
+                  </p>
+                </div>
+              </div>
+
+              {/* Badges */}
+              <div className="flex items-center gap-2.5">
+                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-slate-300 bg-slate-700/60 px-3 py-1.5 rounded-lg border border-slate-600/30">
+                  <GraduationCap className="h-4 w-4" />
+                  {profile?.department || 'General Department'}
+                </span>
+                <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-slate-300 bg-slate-700/60 px-3 py-1.5 rounded-lg border border-slate-600/30">
+                  <Sparkles className="h-4 w-4" />
+                  {roleDisplay}
+                </span>
+              </div>
             </div>
 
-            <div className="bg-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 hover:bg-white/15 transition-colors">
-              <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-                <p className="text-base sm:text-lg lg:text-xl font-bold text-white">{stats?.reportCardsGenerated || 0}</p>
-                <FileCheck className="h-3 w-3 sm:h-4 sm:w-4 text-purple-300 opacity-80" />
+            {/* Avatar */}
+            <div className="hidden sm:block shrink-0 relative">
+              <Avatar className="h-20 w-20 lg:h-24 lg:w-24 ring-[3px] ring-slate-600/50 shadow-2xl">
+                <AvatarImage src={profile?.photo_url || profile?.avatar_url || undefined} />
+                <AvatarFallback className="bg-gradient-to-br from-amber-500 to-orange-600 text-white text-xl lg:text-2xl font-bold">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 lg:w-6 lg:h-6 bg-emerald-500 rounded-full ring-[3px] ring-slate-800 flex items-center justify-center">
+                <div className="w-2 h-2 lg:w-2.5 lg:h-2.5 bg-white rounded-full animate-pulse" />
               </div>
-              <p className="text-[8px] sm:text-[10px] lg:text-xs text-gray-300">Report Cards</p>
-            </div>
-
-            <div className="bg-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 hover:bg-white/15 transition-colors">
-              <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-                <p className="text-base sm:text-lg lg:text-xl font-bold text-white">{stats?.totalAssignments || 0}</p>
-                <FileText className="h-3 w-3 sm:h-4 sm:w-4 text-pink-300 opacity-80" />
-              </div>
-              <p className="text-[8px] sm:text-[10px] lg:text-xs text-gray-300">Assignments</p>
-            </div>
-
-            <div className="bg-white/10 rounded-lg sm:rounded-xl p-2 sm:p-3 hover:bg-white/15 transition-colors">
-              <div className="flex items-center justify-between mb-0.5 sm:mb-1">
-                <p className="text-base sm:text-lg lg:text-xl font-bold text-white">{stats?.totalNotes || 0}</p>
-                <BookOpen className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-300 opacity-80" />
-              </div>
-              <p className="text-[8px] sm:text-[10px] lg:text-xs text-gray-300">Study Notes</p>
             </div>
           </div>
-          
-          {/* Term Progress Bar */}
-          {termInfo && termInfo.currentWeek > 0 && (
-            <div className="mt-3 sm:mt-4 lg:mt-5">
-              <div className="flex items-center justify-between mb-1">
-                <div className="flex items-center gap-1.5 sm:gap-2">
-                  <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-300" />
-                  <span className="text-[10px] sm:text-xs text-gray-300">{termInfo.termName} Progress</span>
+
+          {/* Stats Cards - Larger & More Refined */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 pt-5 sm:pt-6 border-t border-slate-700/40">
+            <div className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3.5 sm:p-4 border border-slate-700/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{stats?.publishedExams || 0}</span>
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Published Exams</p>
+            </div>
+
+            <div className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3.5 sm:p-4 border border-slate-700/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{stats?.activeStudents || stats?.totalStudents || 0}</span>
+                <Users className="h-5 w-5 text-blue-400" />
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Active Students</p>
+            </div>
+
+            <div className={cn(
+              "hover:bg-white/10 transition-colors rounded-xl p-3.5 sm:p-4 border",
+              pendingGrading > 0 
+                ? "bg-amber-500/10 border-amber-500/30" 
+                : "bg-white/5 border-slate-700/30"
+            )}>
+              <div className="flex items-center justify-between mb-2">
+                <span className={cn(
+                  "text-xl sm:text-2xl lg:text-3xl font-bold",
+                  pendingGrading > 0 ? "text-amber-400" : "text-white"
+                )}>
+                  {pendingGrading}
+                </span>
+                {pendingGrading > 0 ? (
+                  <Flame className="h-5 w-5 text-amber-400" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5 text-slate-500" />
+                )}
+              </div>
+              <p className={cn(
+                "text-[11px] sm:text-xs font-medium",
+                pendingGrading > 0 ? "text-amber-400/80" : "text-slate-400"
+              )}>
+                Pending Grading
+              </p>
+            </div>
+
+            <div className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3.5 sm:p-4 border border-slate-700/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{stats?.reportCardsGenerated || 0}</span>
+                <FileCheck className="h-5 w-5 text-purple-400" />
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Report Cards</p>
+            </div>
+
+            <div className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3.5 sm:p-4 border border-slate-700/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{stats?.totalAssignments || 0}</span>
+                <FileText className="h-5 w-5 text-pink-400" />
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Assignments</p>
+            </div>
+
+            <div className="bg-white/5 hover:bg-white/10 transition-colors rounded-xl p-3.5 sm:p-4 border border-slate-700/30">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xl sm:text-2xl lg:text-3xl font-bold text-white">{stats?.totalNotes || 0}</span>
+                <BookOpen className="h-5 w-5 text-cyan-400" />
+              </div>
+              <p className="text-[11px] sm:text-xs text-slate-400 font-medium">Study Notes</p>
+            </div>
+          </div>
+
+          {/* Bottom Section: Progress & Alert */}
+          <div className="mt-5 sm:mt-6 space-y-3">
+            {/* Term Progress */}
+            {termInfo && termInfo.currentWeek > 0 && (
+              <div className="bg-slate-700/20 rounded-xl p-3.5 sm:p-4 border border-slate-700/30">
+                <div className="flex items-center justify-between mb-2.5">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-amber-400" />
+                    <span className="text-sm text-slate-300 font-medium">{termInfo.termName} Progress</span>
+                  </div>
+                  <span className="text-sm text-slate-400 font-medium">{weekDisplay}</span>
                 </div>
-                <span className="text-[10px] sm:text-xs text-gray-300">{weekDisplay}</span>
+                <Progress value={termInfo.weekProgress} className="h-2 bg-slate-600/50 [&>div]:bg-gradient-to-r [&>div]:from-amber-400 [&>div]:to-amber-500 [&>div]:transition-all [&>div]:duration-700" />
               </div>
-              <Progress value={termInfo.weekProgress} className="h-1.5 sm:h-2 bg-white/20 [&>div]:bg-gradient-to-r [&>div]:from-amber-400 [&>div]:to-amber-500" />
-            </div>
-          )}
-          
-          {/* Pending Grading Alert */}
-          {pendingGrading > 0 && (
-            <div className="mt-3 sm:mt-4 p-2 sm:p-3 bg-amber-500/20 border border-amber-500/40 rounded-lg sm:rounded-xl">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                <Flame className="h-3 w-3 sm:h-4 sm:w-4 text-amber-400" />
-                <p className="text-[10px] sm:text-xs text-amber-200">
-                  You have <span className="font-bold">{pendingGrading}</span> submission{pendingGrading !== 1 ? 's' : ''} waiting to be graded
-                </p>
+            )}
+
+            {/* Pending Grading Alert */}
+            {pendingGrading > 0 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3.5 sm:p-4 flex items-center gap-3">
+                <div className="p-2 bg-amber-500/20 rounded-lg shrink-0">
+                  <Flame className="h-5 w-5 text-amber-400" />
+                </div>
+                <div>
+                  <p className="text-sm text-amber-200 font-medium">
+                    {pendingGrading} submission{pendingGrading !== 1 ? 's' : ''} waiting for grading
+                  </p>
+                  <p className="text-xs text-amber-400/70 mt-0.5">Review and grade pending theory submissions</p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>

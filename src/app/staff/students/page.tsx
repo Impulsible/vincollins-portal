@@ -1,26 +1,23 @@
-// app/staff/students/page.tsx - FULLY RESPONSIVE, NO HORIZONTAL SCROLL
+// app/staff/students/page.tsx - PROFESSIONAL STUDENT ROSTER
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { StudentRoster } from '@/components/staff/StudentRoster'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { 
-  Search, Filter, Download, RefreshCw, 
-  Users, Loader2
+  Search, Download, RefreshCw, Users, Loader2,
+  GraduationCap, Home, ChevronRight, Filter
 } from 'lucide-react'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 export default function StudentsPage() {
   const router = useRouter()
@@ -32,40 +29,20 @@ export default function StudentsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [classes, setClasses] = useState<string[]>([])
   const [stats, setStats] = useState({ total: 0, active: 0, classes: 0 })
-  const [profile, setProfile] = useState<any>(null)
 
   useEffect(() => {
-    checkAuth()
+    loadData()
   }, [])
 
-  const checkAuth = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.replace('/portal')
-        return
-      }
-      
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-      
-      if (profileData) {
-        setProfile(profileData)
-        await loadStudents()
-      }
-    } catch (error) {
-      console.error('Auth error:', error)
-      router.replace('/portal')
-    }
-  }
-
-  const loadStudents = async (showToast = false) => {
+  const loadData = async (showToast = false) => {
     try {
       setRefreshing(true)
-      
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        window.location.href = '/portal'
+        return
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -101,20 +78,20 @@ export default function StudentsPage() {
 
   useEffect(() => {
     let filtered = [...students]
-    
+
     if (selectedClass !== 'all') {
       filtered = filtered.filter(s => s.class === selectedClass)
     }
-    
+
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(s => 
+      filtered = filtered.filter(s =>
         s.full_name?.toLowerCase().includes(query) ||
         s.email?.toLowerCase().includes(query) ||
         s.vin_id?.toLowerCase().includes(query)
       )
     }
-    
+
     setFilteredStudents(filtered)
   }, [students, searchQuery, selectedClass])
 
@@ -129,7 +106,7 @@ export default function StudentsPage() {
         s.is_active !== false ? 'Active' : 'Inactive'
       ])
     ].map(row => row.join(',')).join('\n')
-    
+
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -140,104 +117,200 @@ export default function StudentsPage() {
     toast.success('Roster exported successfully')
   }
 
+  const getInitials = (name: string) => {
+    if (!name) return 'ST'
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+  }
+
+  const groupedStudents = filteredStudents.reduce((acc: Record<string, any[]>, student) => {
+    const cls = student.class || 'Unassigned'
+    if (!acc[cls]) acc[cls] = []
+    acc[cls].push(student)
+    return acc
+  }, {})
+
+  const classOrder = Object.keys(groupedStudents).sort()
+
   if (loading) {
     return (
-      <div className="w-full flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="relative mx-auto mb-6 h-16 w-16">
+            <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+            <Users className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
+          </div>
+          <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Students</h2>
+          <p className="text-sm text-slate-500">Please wait while we fetch the student roster...</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full overflow-x-hidden">
-      <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 md:py-5 space-y-4 sm:space-y-5 md:space-y-6">
-        
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-900 dark:text-white truncate">
-              Student Roster
-            </h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1">
+    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500">
+        <Link href="/staff" className="hover:text-emerald-600 transition-colors flex items-center gap-1">
+          <Home className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline">Dashboard</span>
+        </Link>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+        <span className="text-slate-800 font-medium">Students</span>
+      </nav>
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-blue-100 rounded-xl">
+            <Users className="h-5 w-5 text-blue-600" />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Student Roster</h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
               {filteredStudents.length} of {stats.total} students • {stats.classes} classes
             </p>
           </div>
-          
-          <div className="flex items-center gap-2 shrink-0">
-            <Button variant="outline" size="sm" onClick={handleExport} className="h-8 sm:h-9 text-xs sm:text-sm">
-              <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-              <span className="hidden xs:inline">Export</span>
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => loadStudents(true)} disabled={refreshing} className="h-8 sm:h-9">
-              <RefreshCw className={cn("h-3.5 w-3.5 sm:h-4 sm:w-4", refreshing && "animate-spin")} />
-            </Button>
-          </div>
         </div>
-
-        {/* Stats Cards - Responsive grid */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-          <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
-            <CardContent className="p-2.5 sm:p-3 md:p-4 text-center">
-              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-blue-700 dark:text-blue-400">
-                {stats.total}
-              </p>
-              <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">Total Students</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30">
-            <CardContent className="p-2.5 sm:p-3 md:p-4 text-center">
-              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-emerald-700 dark:text-emerald-400">
-                {stats.active}
-              </p>
-              <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">Active Students</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
-            <CardContent className="p-2.5 sm:p-3 md:p-4 text-center">
-              <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-purple-700 dark:text-purple-400">
-                {stats.classes}
-              </p>
-              <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">Classes</p>
-            </CardContent>
-          </Card>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} className="h-9 text-xs">
+            <Download className="h-3.5 w-3.5 mr-1.5" />
+            Export
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => loadData(true)} disabled={refreshing} className="h-9">
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+          </Button>
         </div>
+      </div>
 
-        {/* Search & Filter Section */}
-        <Card className="w-full overflow-hidden">
-          <CardContent className="p-3 sm:p-4">
-            <div className="flex flex-col sm:flex-row gap-3 w-full">
-              <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by name, email, or VIN..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-white dark:bg-slate-800 w-full"
-                />
-              </div>
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger className="w-full sm:w-[180px] h-9 sm:h-10 text-sm">
-                  <Filter className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2 shrink-0" />
-                  <SelectValue placeholder="Filter by class" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Classes</SelectItem>
-                  {classes.map(cls => (
-                    <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-3 gap-3">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-3 sm:p-4 text-center bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">{stats.total}</p>
+            <p className="text-[10px] sm:text-xs text-blue-600/70">Total Students</p>
           </CardContent>
         </Card>
-
-        {/* Student Roster Table */}
-        <Card className="w-full overflow-hidden">
-          <CardContent className="p-0 overflow-x-auto">
-            <StudentRoster students={filteredStudents} fullView />
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-3 sm:p-4 text-center bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl">
+            <p className="text-xl sm:text-2xl font-bold text-emerald-700">{stats.active}</p>
+            <p className="text-[10px] sm:text-xs text-emerald-600/70">Active Students</p>
+          </CardContent>
+        </Card>
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-3 sm:p-4 text-center bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl">
+            <p className="text-xl sm:text-2xl font-bold text-purple-700">{stats.classes}</p>
+            <p className="text-[10px] sm:text-xs text-purple-600/70">Classes</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* Search & Filter */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Input
+                placeholder="Search by name, email, or VIN..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9 h-9 text-sm bg-white"
+              />
+            </div>
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger className="h-9 text-sm w-full sm:w-[180px] bg-white">
+                <Filter className="h-3.5 w-3.5 mr-1.5" />
+                <SelectValue placeholder="All Classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Classes</SelectItem>
+                {classes.map(cls => (
+                  <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Student List - Grouped by Class */}
+      {filteredStudents.length === 0 ? (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="text-center py-12">
+            <Users className="h-10 w-10 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500">No students found</p>
+          </CardContent>
+        </Card>
+      ) : (
+        classOrder.map(cls => (
+          <div key={cls} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Badge className="bg-slate-200 text-slate-700 font-semibold px-2.5 py-1 text-xs">
+                {cls}
+              </Badge>
+              <span className="text-xs text-slate-400">
+                {groupedStudents[cls].length} student{groupedStudents[cls].length !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <Card className="border-0 shadow-sm overflow-hidden">
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-slate-50 hover:bg-slate-50">
+                        <TableHead className="text-xs font-semibold">Student</TableHead>
+                        <TableHead className="text-xs hidden sm:table-cell">Email</TableHead>
+                        <TableHead className="text-center text-xs hidden md:table-cell">VIN</TableHead>
+                        <TableHead className="text-center text-xs">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupedStudents[cls].map(student => (
+                        <TableRow key={student.id} className="hover:bg-slate-50/50">
+                          <TableCell>
+                            <div className="flex items-center gap-2.5">
+                              <Avatar className="h-7 w-7">
+                                <AvatarFallback className="text-[10px] bg-blue-100 text-blue-700">
+                                  {getInitials(student.full_name)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="text-xs sm:text-sm font-medium truncate max-w-[150px]">
+                                  {student.full_name}
+                                </p>
+                                <p className="text-[10px] text-slate-400 sm:hidden">
+                                  {student.email}
+                                </p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs text-slate-500 hidden sm:table-cell">
+                            {student.email || '—'}
+                          </TableCell>
+                          <TableCell className="text-center text-xs text-slate-500 hidden md:table-cell">
+                            {student.vin_id || '—'}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={cn(
+                              "text-[10px]",
+                              student.is_active !== false
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-red-100 text-red-600'
+                            )}>
+                              {student.is_active !== false ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ))
+      )}
     </div>
   )
 }
