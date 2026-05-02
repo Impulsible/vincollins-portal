@@ -71,7 +71,7 @@ export default function LoginPage() {
       }
 
       // If user context already has a user, redirect
-      if (user?.isAuthenticated && !hasRedirected.current) {
+      if (user && !hasRedirected.current) {
         const redirectMap: Record<string, string> = {
           admin: '/admin',
           teacher: '/staff',
@@ -89,7 +89,7 @@ export default function LoginPage() {
       }
 
       // If no user in context, check session directly (only once)
-      if (!user?.isAuthenticated && !authCheckDone.current) {
+      if (!user && !authCheckDone.current) {
         authCheckDone.current = true
         
         try {

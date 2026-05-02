@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
-import { Save, Search, Edit, Trash2, Users, Loader2, RefreshCw } from 'lucide-react'
+import { Save, Search, Edit, Trash2, Users, Loader2, RefreshCw, Send } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -102,6 +102,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [autoFetching, setAutoFetching] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
   const [scoreEntries, setScoreEntries] = useState<Record<string, any>>({})
   const [editingScore, setEditingScore] = useState<any>(null)
@@ -351,6 +352,31 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
+  // ─── SUBMIT FOR REVIEW ──────────────────────────────
+  const handleSubmitForReview = async () => {
+    if (!selectedExamId) { toast.error('Select an exam first'); return }
+    
+    setSubmitting(true)
+    try {
+      // Update all ca_scores for this exam to status 'submitted'
+      const { error } = await supabase
+        .from('ca_scores')
+        .update({ status: 'submitted', updated_at: new Date().toISOString() })
+        .eq('exam_id', selectedExamId)
+        .eq('teacher_id', staffProfile.id)
+      
+      if (error) throw error
+      
+      toast.success('Scores submitted for admin review!')
+      await loadExistingScores()
+    } catch (error) {
+      console.error('Submit error:', error)
+      toast.error('Failed to submit scores')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   // ─── SCORE HANDLING ─────────────────────────────────
   const handleScoreChange = (studentId: string, field: string, value: string) => {
     const maxValues: Record<string, number> = {
@@ -560,10 +586,18 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               <Button
                 onClick={handleSave}
                 disabled={saving || students.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-700 h-9 flex-1 text-sm"
+                className="bg-emerald-600 hover:bg-emerald-700 h-9 text-sm"
               >
                 <Save className="h-4 w-4 mr-1.5" />
                 Save All
+              </Button>
+              <Button
+                onClick={handleSubmitForReview}
+                disabled={submitting || students.length === 0}
+                className="bg-blue-600 hover:bg-blue-700 h-9 text-sm"
+              >
+                <Send className="h-4 w-4 mr-1.5" />
+                {submitting ? 'Submitting...' : 'Submit'}
               </Button>
               <Button
                 variant="outline"
