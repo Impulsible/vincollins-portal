@@ -1,5 +1,4 @@
-// src/app/student/exams/types.ts
-
+// src/app/student/exams/types.ts - UPDATED
 export interface Exam {
   id: string
   title: string
@@ -42,6 +41,8 @@ export interface ExamAttempt {
   theory_feedback?: any
   term?: string
   session_year?: string
+  ca_total_score?: number
+  ca_percentage?: number
 }
 
 export interface TermProgress {

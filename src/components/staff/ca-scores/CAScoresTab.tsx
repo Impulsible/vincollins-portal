@@ -1,4 +1,4 @@
-// src/components/staff/ca-scores/index.tsx - FULL PRODUCTION WITH FIXED UPSERT
+// src/components/staff/ca-scores/index.tsx - FINAL WORKING VERSION
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -396,27 +396,18 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
         if (ca1Score === 0 && ca2Score === 0 && examScore === 0) continue
 
-        const totalScore = ca1Score + ca2Score + examScore
-        const percentage = Math.round((totalScore / 100) * 100)
-        const grade = getGrade(percentage)
-        const remark = entry.remark || getRemark(grade)
-
+        // Only send raw scores - triggers handle grade, remark, total_score
         scoresToSave.push({
           student_id: student.id,
-          exam_id: selectedExamId,
           subject: selectedSubject,
           term: selectedTerm,
           academic_year: selectedYear,
-          class: selectedClass,
           ca1_score: ca1Score,
           ca2_score: ca2Score,
           exam_objective_score: Math.round(examScore * 0.33),
           exam_theory_score: Math.round(examScore * 0.67),
-          total_score: totalScore,
-          grade: grade,
-          remark: remark,
-          teacher_id: staffProfile.id,
-          updated_at: new Date().toISOString()
+          exam_id: selectedExamId,
+          teacher_id: staffProfile.id
         })
       }
 
@@ -427,9 +418,15 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       }
 
       for (const score of scoresToSave) {
-        await supabase
+        const { error: upsertError } = await supabase
           .from('ca_scores')
-          .upsert(score, { onConflict: 'student_id,subject,term,academic_year' })
+          .upsert(score)
+
+        if (upsertError) {
+          console.error('Upsert error:', upsertError)
+          toast.error(`Save failed: ${upsertError.message}`)
+          throw upsertError
+        }
       }
 
       toast.success(`Saved ${scoresToSave.length} student scores`)
@@ -677,12 +674,11 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                             <TableHead className="text-center text-xs w-[90px]">Exam /60</TableHead>
                             <TableHead className="text-center text-xs w-[80px]">Total /100</TableHead>
                             <TableHead className="text-center text-xs w-[60px]">Grade</TableHead>
-                            <TableHead className="text-xs w-[140px]">Remark</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {groupedStudents[cls].map(student => {
-                            const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '', remark: '' }
+                            const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '' }
                             const ca1Score = parseFloat(entry.ca1) || 0
                             const ca2Score = parseFloat(entry.ca2) || 0
                             const examScore = parseFloat(entry.exam) || 0
@@ -744,18 +740,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                       {grade}
                                     </Badge>
                                   )}
-                                </TableCell>
-                                <TableCell>
-                                  <Input
-                                    type="text"
-                                    value={entry.remark}
-                                    onChange={v => setScoreEntries(prev => ({
-                                      ...prev,
-                                      [student.id]: { ...prev[student.id], remark: v.target.value }
-                                    }))}
-                                    className="h-8 text-xs"
-                                    placeholder={grade ? getRemark(grade) : 'Optional'}
-                                  />
                                 </TableCell>
                               </TableRow>
                             )
@@ -956,22 +940,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               onClick={async () => {
                 if (!editingScore) return
 
-                const totalScore = (editingScore.ca1_score || 0) + (editingScore.ca2_score || 0) + (editingScore.exam_objective_score || 0) + (editingScore.exam_theory_score || 0)
-                const percentage = Math.round((totalScore / 100) * 100)
-                const grade = getGrade(percentage)
-                const remark = editingScore.remark || getRemark(grade)
-
                 const { error } = await supabase
                   .from('ca_scores')
                   .update({
                     ca1_score: editingScore.ca1_score,
                     ca2_score: editingScore.ca2_score,
                     exam_objective_score: editingScore.exam_objective_score,
-                    exam_theory_score: editingScore.exam_theory_score,
-                    total_score: totalScore,
-                    grade: grade,
-                    remark: remark,
-                    updated_at: new Date().toISOString()
+                    exam_theory_score: editingScore.exam_theory_score
                   })
                   .eq('id', editingScore.id)
 

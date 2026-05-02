@@ -58,12 +58,14 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
           <div className="space-y-2">
             {attempts.slice(0, 5).map((attempt, index) => {
               const isInProgress = attempt.status === 'in_progress'
+              const displayPct = attempt.display_percentage || attempt.ca_percentage || attempt.percentage || 0
+              const isPassed = displayPct >= 40
+              
               return (
                 <div 
                   key={attempt.id || index} 
                   className="p-3.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 transition-colors cursor-pointer"
                   onClick={() => {
-                    // ✅ Fixed: In-progress goes to exam, completed goes to results
                     if (isInProgress) {
                       router.push(`/student/exam/${attempt.exam_id}`)
                     } else {
@@ -86,7 +88,7 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                           <RefreshCw className="h-3 w-3 mr-1" /> In Progress
                         </Badge>
                       ) : (
-                        getStatusBadge(attempt.status, attempt.is_passed)
+                        getStatusBadge(attempt.status, isPassed)
                       )}
                     </div>
                   </div>
@@ -96,8 +98,8 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                       {!isInProgress && (
                         <span className="flex items-center gap-1">
                           <Trophy className="h-3 w-3" />
-                          <span className={cn("font-bold", getScoreColor(attempt.percentage || 0))}>
-                            {attempt.percentage || 0}%
+                          <span className={cn("font-bold", getScoreColor(displayPct))}>
+                            {Math.round(displayPct)}%
                           </span>
                         </span>
                       )}

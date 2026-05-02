@@ -58,7 +58,10 @@ export function StaffProvider({ children }: { children: ReactNode }) {
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
-        if (!session) return
+        if (!session) {
+          setLoading(false)
+          return
+        }
 
         const { data } = await supabase
           .from('profiles')

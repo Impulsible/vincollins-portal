@@ -1,4 +1,4 @@
-// app/staff/layout.tsx - WITH NOTIFICATION DROPDOWN
+// app/staff/layout.tsx - FIXED - NO type=eq.theory ERROR
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react'
@@ -18,12 +18,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu, 
   DropdownMenuContent, 
-  DropdownMenuItem, // Remove duplicate - only one instance
+  DropdownMenuItem,
   DropdownMenuLabel, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import router from 'next/router'
 
 // ============================================
 // TYPES
@@ -38,7 +37,7 @@ interface StaffStats {
   totalExams: number; publishedExams: number; pendingExams: number; draftExams: number
   totalStudents?: number; totalClasses?: number; totalAssignments?: number
   totalNotes?: number; pendingGrading?: number; averagePerformance?: number
-  pendingTheoryCount?: number // Add this optional property
+  pendingTheoryCount?: number
 }
 
 interface StaffContextType {
@@ -55,8 +54,7 @@ interface StaffContextType {
 const defaultStats: StaffStats = {
   totalExams: 0, publishedExams: 0, pendingExams: 0, draftExams: 0,
   totalStudents: 0, totalClasses: 0, totalAssignments: 0, totalNotes: 0,
-  pendingGrading: 0, averagePerformance: 0,
-  pendingTheoryCount: 0 // Add default value
+  pendingGrading: 0, averagePerformance: 0, pendingTheoryCount: 0
 }
 
 const StaffContext = createContext<StaffContextType | null>(null)
@@ -94,6 +92,8 @@ function StaffLoadingState() {
 // DESKTOP TOP BAR
 // ============================================
 function DesktopTopBar({ profile, activeTab, handleLogout }: { profile: StaffProfile | null; activeTab: string; handleLogout: () => Promise<void> }) {
+  const router = useRouter()
+  
   const getPageTitle = (tab: string) => {
     const titles: Record<string, string> = {
       'overview': 'Dashboard Overview', 'exams': 'Exams Management', 'assignments': 'Assignments',
@@ -121,7 +121,6 @@ function DesktopTopBar({ profile, activeTab, handleLogout }: { profile: StaffPro
           </div>
         </div>
         <div className="flex items-center gap-2 lg:gap-4 shrink-0">
-          {/* Notification Dropdown - REPLACED BELL ICON */}
           {profile?.id && <NotificationDropdown userId={profile.id} />}
           
           <DropdownMenu>
@@ -257,12 +256,11 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       let pendingGradingCount = 0
       try { const { count } = await supabase.from('ca_scores').select('*', { count: 'exact', head: true }).eq('teacher_id', session.user.id); pendingGradingCount = count || 0 } catch {}
 
+      // FIXED: Count pending theory from exam_attempts, NOT exams
       let pendingTheoryCount = 0
       try { 
-        const { count } = await supabase.from('exams').select('*', { count: 'exact', head: true })
-          .eq('created_by', session.user.id)
-          .eq('status', 'pending')
-          .eq('type', 'theory'); 
+        const { count } = await supabase.from('exam_attempts').select('*', { count: 'exact', head: true })
+          .eq('status', 'pending_theory')
         pendingTheoryCount = count || 0 
       } catch {}
 

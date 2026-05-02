@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx - PROFESSIONAL RESULT PAGE
+// app/student/results/[id]/page.tsx - FIXED CA SCORE CALCULATION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -123,6 +123,7 @@ export default function StudentResultDetailPage() {
         .eq('id', att.exam_id)
         .maybeSingle()
 
+      // Get theory score from feedback
       let theoryScore: number | null = null
       let teacherFeedback: string | null = null
 
@@ -134,6 +135,7 @@ export default function StudentResultDetailPage() {
         } catch { /* ignore */ }
       }
 
+      // Get CA scores
       const { data: ca } = await supabase
         .from('ca_scores')
         .select('*')
@@ -141,17 +143,33 @@ export default function StudentResultDetailPage() {
         .eq('exam_id', examId)
         .maybeSingle()
 
-      const objScore = ca?.exam_objective_score != null ? Number(ca.exam_objective_score) : (Number(att.objective_score) || 0)
-      const finalTheory = ca?.exam_theory_score != null ? Number(ca.exam_theory_score) : theoryScore
+      // Determine scores - prefer CA scores if available
+      let objScore = Number(att.objective_score) || 0
+      let finalTheory = theoryScore
+      let ca1: number | null = null
+      let ca2: number | null = null
+
+      if (ca) {
+        if (ca.exam_objective_score != null) objScore = Number(ca.exam_objective_score)
+        if (ca.exam_theory_score != null) finalTheory = Number(ca.exam_theory_score)
+        if (ca.ca1_score != null) ca1 = Number(ca.ca1_score)
+        if (ca.ca2_score != null) ca2 = Number(ca.ca2_score)
+      }
+
       const objTotal = Number(att.objective_total) || 20
       const thTotal = Number(att.theory_total) || 40
       const examScore = objScore + (finalTheory || 0)
-      const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
-      const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
-      const c1 = ca1 || 0; const c2 = ca2 || 0
+      const c1 = ca1 || 0
+      const c2 = ca2 || 0
       const grandScore = c1 + c2 + objScore + (finalTheory || 0)
       const hasCA = ca1 !== null && ca2 !== null
-      const dispPct = hasCA ? Math.round((grandScore / 100) * 100) / 100 : (att.percentage || 0)
+
+      // Calculate percentage based on what's available
+      const totalScore = hasCA ? grandScore : examScore
+      const totalMarks = hasCA ? 100 : (objTotal + thTotal)
+      const percentage = hasCA
+        ? Math.round((grandScore / 100) * 100)
+        : (att.percentage || Math.round((examScore / (objTotal + thTotal)) * 100))
 
       setResult({
         id: att.id,
@@ -160,9 +178,9 @@ export default function StudentResultDetailPage() {
         exam_subject: exam?.subject || '—',
         exam_class: exam?.class || '—',
         status: att.status,
-        percentage: Math.round(dispPct),
-        total_score: hasCA ? grandScore : examScore,
-        total_marks: hasCA ? 100 : (objTotal + thTotal),
+        percentage: percentage,
+        total_score: totalScore,
+        total_marks: totalMarks,
         objective_score: objScore,
         objective_total: objTotal,
         theory_score: finalTheory,
@@ -171,7 +189,7 @@ export default function StudentResultDetailPage() {
         ca2_score: ca2,
         grand_total: grandScore,
         grand_total_marks: 100,
-        is_passed: att.is_passed || false,
+        is_passed: percentage >= 40,
         submitted_at: att.submitted_at,
         passing_percentage: exam?.passing_percentage || 50,
         time_spent: att.time_spent,
