@@ -5,10 +5,6 @@ import { WelcomeBanner } from '@/components/admin/dashboard/WelcomeBanner'
 import { StatsCards } from '@/components/admin/dashboard/StatsCards'
 import { QuickActions } from '@/components/admin/dashboard/QuickActions'
 import { RecentActivityFeed } from '@/components/admin/dashboard/RecentActivityFeed'
-import { TopPerformersCard } from '@/components/admin/dashboard/TopPerformersCard'
-import { UpcomingScheduleCard } from '@/components/admin/dashboard/UpcomingScheduleCard'
-import { AttendanceLeaderboard } from '@/components/admin/attendance/AttendanceLeaderboard'
-import { CBTStatus } from '@/components/admin/dashboard/CBTStatus'
 import { Button } from '@/components/ui/button'
 import { Bell, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -88,17 +84,7 @@ export function AdminOverview({ profile, stats, students, pendingExamsCount, onN
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <div className="grid gap-4 sm:gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-4 sm:space-y-6 overflow-hidden">
-            <AttendanceLeaderboard students={students} />
-            <RecentActivityFeed />
-          </div>
-          <div className="space-y-4 sm:space-y-6 overflow-hidden">
-            <CBTStatus />
-            <TopPerformersCard students={students} />
-            <UpcomingScheduleCard />
-          </div>
-        </div>
+        <RecentActivityFeed />
       </motion.div>
     </motion.div>
   )
