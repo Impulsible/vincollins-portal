@@ -1,60 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/dashboard/RecentActivityFeed.tsx
+// components/admin/dashboard/RecentActivityFeed.tsx - GROUPED & IMPACTFUL
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { 
-  Activity, 
-  UserPlus, 
-  FileText, 
-  GraduationCap, 
-  Award, 
-  Clock,
-  BookOpen,
-  Users,
-  CheckCircle,
-  AlertCircle,
-  RefreshCw,
-  Eye,
-  Trash2,
-  MoreVertical,
-  Calendar,
-  Bell,
-  TrendingUp
+  Activity, UserPlus, FileText, Award, Clock,
+  BookOpen, Users, CheckCircle, RefreshCw,
+  Trash2, MoreVertical, Bell, MonitorPlay,
+  FileCheck, MessageSquare, GraduationCap, TrendingUp
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
-import { formatDistanceToNow, format } from 'date-fns'
+import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns'
 import { toast } from 'sonner'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-type ActivityType = 'student' | 'staff' | 'exam' | 'result' | 'attendance' | 'submission' | 'system'
-
-interface ActivityMetadata {
-  student_name?: string
-  staff_name?: string
-  exam_title?: string
-  class?: string
-  score?: number
-  status?: string
-  count?: number
-  position?: string
-  rate?: number
-}
+type ActivityType = 'student' | 'staff' | 'exam' | 'result' | 'submission' | 'system' | 'inquiry' | 'report'
 
 interface ActivityItem {
   id: string
@@ -64,340 +35,139 @@ interface ActivityItem {
   timestamp: string
   read: boolean
   action_url?: string
-  metadata?: ActivityMetadata
+  metadata?: Record<string, any>
 }
 
-const activityIcons: Record<ActivityType, { icon: typeof UserPlus; color: string; gradient: string }> = {
-  student: { icon: UserPlus, color: 'bg-blue-100 text-blue-600 dark:bg-blue-950/30 dark:text-blue-400', gradient: 'from-blue-500 to-cyan-500' },
-  staff: { icon: Users, color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/30 dark:text-purple-400', gradient: 'from-purple-500 to-pink-500' },
-  exam: { icon: BookOpen, color: 'bg-amber-100 text-amber-600 dark:bg-amber-950/30 dark:text-amber-400', gradient: 'from-amber-500 to-orange-500' },
-  result: { icon: Award, color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/30 dark:text-emerald-400', gradient: 'from-emerald-500 to-teal-500' },
-  attendance: { icon: CheckCircle, color: 'bg-green-100 text-green-600 dark:bg-green-950/30 dark:text-green-400', gradient: 'from-green-500 to-emerald-500' },
-  submission: { icon: FileText, color: 'bg-rose-100 text-rose-600 dark:bg-rose-950/30 dark:text-rose-400', gradient: 'from-rose-500 to-red-500' },
-  system: { icon: Bell, color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400', gradient: 'from-slate-500 to-gray-500' },
+const activityConfig: Record<ActivityType, { icon: any; color: string; bg: string; label: string }> = {
+  student: { icon: UserPlus, color: 'text-blue-600', bg: 'bg-blue-50 border-blue-200', label: 'Student' },
+  staff: { icon: Users, color: 'text-purple-600', bg: 'bg-purple-50 border-purple-200', label: 'Staff' },
+  exam: { icon: MonitorPlay, color: 'text-amber-600', bg: 'bg-amber-50 border-amber-200', label: 'Exam' },
+  result: { icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50 border-emerald-200', label: 'Result' },
+  submission: { icon: FileText, color: 'text-rose-600', bg: 'bg-rose-50 border-rose-200', label: 'Submission' },
+  system: { icon: Bell, color: 'text-slate-600', bg: 'bg-slate-50 border-slate-200', label: 'System' },
+  inquiry: { icon: MessageSquare, color: 'text-teal-600', bg: 'bg-teal-50 border-teal-200', label: 'Inquiry' },
+  report: { icon: FileCheck, color: 'text-indigo-600', bg: 'bg-indigo-50 border-indigo-200', label: 'Report' },
+}
+
+function getInitials(name: string): string {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+function groupActivitiesByDate(activities: ActivityItem[]) {
+  const groups: { label: string; items: ActivityItem[] }[] = []
+  const today: ActivityItem[] = []
+  const yesterday: ActivityItem[] = []
+  const thisWeek: ActivityItem[] = []
+  const older: ActivityItem[] = []
+
+  activities.forEach(activity => {
+    const date = new Date(activity.timestamp)
+    if (isToday(date)) today.push(activity)
+    else if (isYesterday(date)) yesterday.push(activity)
+    else if (date > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)) thisWeek.push(activity)
+    else older.push(activity)
+  })
+
+  if (today.length) groups.push({ label: 'Today', items: today })
+  if (yesterday.length) groups.push({ label: 'Yesterday', items: yesterday })
+  if (thisWeek.length) groups.push({ label: 'This Week', items: thisWeek })
+  if (older.length) groups.push({ label: 'Older', items: older })
+
+  return groups
 }
 
 export function RecentActivityFeed() {
   const [activities, setActivities] = useState<ActivityItem[]>([])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [filter, setFilter] = useState<string>('all')
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [activeFilter, setActiveFilter] = useState<string>('all')
+  const [expanded, setExpanded] = useState(true)
 
-  // Generate mock activities
-  const generateMockActivities = (): ActivityItem[] => {
-    const now = new Date()
-    return [
-      {
-        id: '1',
-        type: 'student' as ActivityType,
-        title: 'New Student Registered',
-        description: 'John Doe has been enrolled in SS 2 Science',
-        timestamp: new Date(now.getTime() - 15 * 60000).toISOString(),
-        read: false,
-        metadata: { student_name: 'John Doe', class: 'SS 2 Science' }
-      },
-      {
-        id: '2',
-        type: 'exam' as ActivityType,
-        title: 'Exam Published',
-        description: 'Mathematics CBT exam for SS 3 is now live',
-        timestamp: new Date(now.getTime() - 45 * 60000).toISOString(),
-        read: false,
-        metadata: { exam_title: 'Mathematics CBT', class: 'SS 3' }
-      },
-      {
-        id: '3',
-        type: 'submission' as ActivityType,
-        title: 'New Submission',
-        description: '15 students submitted English Language exam',
-        timestamp: new Date(now.getTime() - 2 * 3600000).toISOString(),
-        read: true,
-        metadata: { exam_title: 'English Language', count: 15 }
-      },
-      {
-        id: '4',
-        type: 'staff' as ActivityType,
-        title: 'Staff Member Added',
-        description: 'Dr. Sarah Johnson joined as Senior Teacher',
-        timestamp: new Date(now.getTime() - 5 * 3600000).toISOString(),
-        read: true,
-        metadata: { staff_name: 'Dr. Sarah Johnson', position: 'Senior Teacher' }
-      },
-      {
-        id: '5',
-        type: 'result' as ActivityType,
-        title: 'Results Released',
-        description: 'SS 2 Chemistry results have been published',
-        timestamp: new Date(now.getTime() - 24 * 3600000).toISOString(),
-        read: true,
-        metadata: { exam_title: 'Chemistry', class: 'SS 2' }
-      },
-      {
-        id: '6',
-        type: 'attendance' as ActivityType,
-        title: 'High Attendance Today',
-        description: '94% attendance rate across all classes',
-        timestamp: new Date(now.getTime() - 24 * 3600000).toISOString(),
-        read: true,
-        metadata: { rate: 94 }
-      }
-    ]
-  }
-
-  // Helper to create activity
-  const createActivity = async (activity: Partial<ActivityItem>) => {
-    try {
-      await supabase.from('activities').insert({
-        ...activity,
-        created_at: new Date().toISOString(),
-        read: false
-      })
-    } catch (error) {
-      console.error('Error creating activity:', error)
-    }
-  }
-
-  // Load activities
   const loadActivities = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) setRefreshing(true)
-    
     try {
-      // Try to fetch from activities table
-      const { data, error } = await supabase
-        .from('activities')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50)
-
-      if (error) {
-        // If table doesn't exist, use mock data
-        if (error.code === '42P01') {
-          const mockActivities = generateMockActivities()
-          setActivities(mockActivities)
-          setUnreadCount(mockActivities.filter(a => !a.read).length)
-        } else {
-          console.error('Error loading activities:', error)
-          toast.error('Failed to load activities')
-        }
-      } else if (data) {
-        const formattedActivities = data.map((item: any): ActivityItem => ({
+      const { data } = await supabase.from('activity_logs').select('*').order('created_at', { ascending: false }).limit(100)
+      if (data) {
+        const formatted = data.map((item: any): ActivityItem => ({
           id: item.id,
           type: (item.type as ActivityType) || 'system',
-          title: item.title,
-          description: item.description,
+          title: item.title || '',
+          description: item.details || item.description || '',
           timestamp: item.created_at,
           read: item.read || false,
-          action_url: item.action_url,
+          action_url: item.link,
           metadata: item.metadata || {}
         }))
-        setActivities(formattedActivities)
-        setUnreadCount(formattedActivities.filter(a => !a.read).length)
+        setActivities(formatted)
       }
-    } catch (error) {
-      console.error('Error:', error)
-      // Fallback to mock data
-      const mockActivities = generateMockActivities()
-      setActivities(mockActivities)
-      setUnreadCount(mockActivities.filter(a => !a.read).length)
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
+    } catch (error) { console.error('Error:', error) }
+    finally { setLoading(false); setRefreshing(false) }
   }, [])
 
-  // Set up real-time subscription
+  useEffect(() => { loadActivities() }, [loadActivities])
+
   useEffect(() => {
-    loadActivities()
-
-    // Subscribe to real-time changes
     const channel = supabase
-      .channel('activities-channel')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'activities'
-        },
-        (payload) => {
-          console.log('Real-time activity:', payload)
-          
-          if (payload.eventType === 'INSERT') {
-            const newActivity = payload.new as any
-            setActivities(prev => [{
-              id: newActivity.id,
-              type: (newActivity.type as ActivityType) || 'system',
-              title: newActivity.title,
-              description: newActivity.description,
-              timestamp: newActivity.created_at,
-              read: false,
-              action_url: newActivity.action_url,
-              metadata: newActivity.metadata || {}
-            }, ...prev])
-            
-            setUnreadCount(prev => prev + 1)
-            toast.success(newActivity.title, {
-              description: newActivity.description,
-              icon: <Bell className="h-4 w-4" />
-            })
-          } else if (payload.eventType === 'UPDATE') {
-            setActivities(prev => prev.map(activity => 
-              activity.id === payload.new.id 
-                ? { ...activity, ...payload.new, read: payload.new.read }
-                : activity
-            ))
-          }
-        }
-      )
+      .channel('activity-feed-v2')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_logs' }, (payload) => {
+        const newItem = payload.new as any
+        setActivities(prev => [{
+          id: newItem.id, type: (newItem.type as ActivityType) || 'system',
+          title: newItem.title || '', description: newItem.details || '',
+          timestamp: newItem.created_at, read: false,
+          action_url: newItem.link, metadata: {}
+        }, ...prev])
+        toast.success(newItem.title || 'New activity', { description: newItem.details })
+      })
       .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
-    // Also listen for student/staff/exam changes to create activities
-    const studentChannel = supabase
-      .channel('student-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'profiles', filter: 'role=eq.student' },
-        async (payload) => {
-          const activity: Partial<ActivityItem> = {
-            type: 'student' as ActivityType,
-            title: 'New Student Registered',
-            description: `${payload.new.full_name} has been enrolled`,
-            metadata: { student_name: payload.new.full_name, class: payload.new.class }
-          }
-          await createActivity(activity)
-        }
-      )
-      .subscribe()
-
-    const staffChannel = supabase
-      .channel('staff-changes')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'profiles', filter: 'role=eq.staff' },
-        async (payload) => {
-          const activity: Partial<ActivityItem> = {
-            type: 'staff' as ActivityType,
-            title: 'New Staff Member Added',
-            description: `${payload.new.full_name} joined as ${payload.new.position}`,
-            metadata: { staff_name: payload.new.full_name, position: payload.new.position }
-          }
-          await createActivity(activity)
-        }
-      )
-      .subscribe()
-
-    const examChannel = supabase
-      .channel('exam-changes')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'exams' },
-        async (payload) => {
-          if (payload.new.status === 'published' && payload.old.status !== 'published') {
-            const activity: Partial<ActivityItem> = {
-              type: 'exam' as ActivityType,
-              title: 'Exam Published',
-              description: `${payload.new.title} is now available`,
-              metadata: { exam_title: payload.new.title, class: payload.new.class }
-            }
-            await createActivity(activity)
-          }
-        }
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(channel)
-      supabase.removeChannel(studentChannel)
-      supabase.removeChannel(staffChannel)
-      supabase.removeChannel(examChannel)
-    }
-  }, [loadActivities])
-
-  // Mark activity as read
   const markAsRead = async (id: string) => {
-    try {
-      await supabase
-        .from('activities')
-        .update({ read: true })
-        .eq('id', id)
-      
-      setActivities(prev => prev.map(a => 
-        a.id === id ? { ...a, read: true } : a
-      ))
-      setUnreadCount(prev => Math.max(0, prev - 1))
-    } catch (error) {
-      console.error('Error marking as read:', error)
-    }
+    await supabase.from('activity_logs').update({ read: true }).eq('id', id)
+    setActivities(prev => prev.map(a => a.id === id ? { ...a, read: true } : a))
   }
 
-  // Mark all as read
   const markAllAsRead = async () => {
-    try {
-      const unreadIds = activities.filter(a => !a.read).map(a => a.id)
-      if (unreadIds.length === 0) return
-
-      await supabase
-        .from('activities')
-        .update({ read: true })
-        .in('id', unreadIds)
-      
-      setActivities(prev => prev.map(a => ({ ...a, read: true })))
-      setUnreadCount(0)
-      toast.success('All activities marked as read')
-    } catch (error) {
-      console.error('Error marking all as read:', error)
-    }
+    const unreadIds = activities.filter(a => !a.read).map(a => a.id)
+    if (unreadIds.length === 0) return
+    await supabase.from('activity_logs').update({ read: true }).in('id', unreadIds)
+    setActivities(prev => prev.map(a => ({ ...a, read: true })))
+    toast.success('All marked as read')
   }
 
-  // Delete activity
   const deleteActivity = async (id: string) => {
-    try {
-      await supabase.from('activities').delete().eq('id', id)
-      setActivities(prev => prev.filter(a => a.id !== id))
-      toast.success('Activity removed')
-    } catch (error) {
-      console.error('Error deleting activity:', error)
-    }
+    await supabase.from('activity_logs').delete().eq('id', id)
+    setActivities(prev => prev.filter(a => a.id !== id))
   }
 
-  // Filter activities
-  const filteredActivities = filter === 'all' 
-    ? activities 
-    : filter === 'unread'
+  const filteredActivities = activeFilter === 'all'
+    ? activities
+    : activeFilter === 'unread'
       ? activities.filter(a => !a.read)
-      : activities.filter(a => a.type === filter)
+      : activities.filter(a => a.type === activeFilter)
 
-  const filterOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'unread', label: 'Unread' },
-    { value: 'student', label: 'Students' },
-    { value: 'staff', label: 'Staff' },
-    { value: 'exam', label: 'Exams' },
-    { value: 'submission', label: 'Submissions' },
+  const groupedActivities = groupActivitiesByDate(filteredActivities)
+  const unreadCount = activities.filter(a => !a.read).length
+
+  const typeFilters = [
+    { value: 'all', label: 'All', count: activities.length },
+    { value: 'unread', label: 'Unread', count: unreadCount },
+    { value: 'exam', label: 'Exams', count: activities.filter(a => a.type === 'exam').length },
+    { value: 'submission', label: 'Submissions', count: activities.filter(a => a.type === 'submission').length },
+    { value: 'student', label: 'Students', count: activities.filter(a => a.type === 'student').length },
+    { value: 'report', label: 'Reports', count: activities.filter(a => a.type === 'report').length },
   ]
 
   if (loading) {
     return (
-      <Card className="border-0 shadow-md">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Skeleton className="h-5 w-5 rounded-full" />
-              <Skeleton className="h-6 w-32" />
-            </div>
-            <Skeleton className="h-8 w-20" />
-          </div>
-        </CardHeader>
+      <Card className="border-0 shadow-sm">
+        <CardHeader className="pb-3"><div className="h-6 bg-slate-100 rounded w-32 animate-pulse" /></CardHeader>
         <CardContent className="space-y-3">
-          {[1, 2, 3, 4].map((i) => (
+          {[1, 2, 3].map(i => (
             <div key={i} className="flex items-center gap-3 p-3">
-              <Skeleton className="h-10 w-10 rounded-lg" />
-              <div className="flex-1 space-y-2">
-                <Skeleton className="h-4 w-3/4" />
-                <Skeleton className="h-3 w-1/2" />
-              </div>
-              <Skeleton className="h-6 w-16" />
+              <div className="h-10 w-10 bg-slate-100 rounded-xl animate-pulse" />
+              <div className="flex-1 space-y-2"><div className="h-4 bg-slate-100 rounded w-3/4 animate-pulse" /><div className="h-3 bg-slate-100 rounded w-1/2 animate-pulse" /></div>
             </div>
           ))}
         </CardContent>
@@ -406,264 +176,208 @@ export function RecentActivityFeed() {
   }
 
   return (
-    <Card className="border-0 shadow-md overflow-hidden">
-      <CardHeader className="pb-3 bg-gradient-to-r from-muted/30 to-background border-b">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-gradient-to-br from-primary/20 to-secondary/20">
-              <Activity className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <CardTitle className="text-lg flex items-center gap-2">
-                Recent Activity
-                {unreadCount > 0 && (
-                  <Badge className="bg-red-500 text-white text-xs">
-                    {unreadCount} new
-                  </Badge>
-                )}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">Real-time updates from your school</p>
-            </div>
+    <Card className="border-0 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="px-4 sm:px-5 py-3.5 border-b bg-white flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-lg">
+            <Activity className="h-4 w-4 text-white" />
           </div>
-          
-          <div className="flex items-center gap-2">
-            {/* Filter Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="h-8">
-                  Filter
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Filter by type</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {filterOptions.map(option => (
-                  <DropdownMenuItem 
-                    key={option.value}
-                    onClick={() => setFilter(option.value)}
-                    className={cn(filter === option.value && "bg-primary/10")}
-                  >
-                    {option.label}
-                    {filter === option.value && (
-                      <CheckCircle className="ml-auto h-4 w-4 text-primary" />
-                    )}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            {/* Mark all read */}
-            {unreadCount > 0 && (
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={markAllAsRead}
-                className="h-8"
-              >
-                <CheckCircle className="mr-1 h-4 w-4" />
-                Mark all read
-              </Button>
-            )}
-
-            {/* Refresh */}
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => loadActivities(true)}
-              disabled={refreshing}
-              className="h-8 w-8"
-            >
-              <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
-            </Button>
+          <div>
+            <h3 className="text-sm font-bold text-slate-800">Activity Feed</h3>
+            <p className="text-[10px] text-slate-400">
+              {unreadCount > 0 ? `${unreadCount} unread • ` : ''}{activities.length} total
+            </p>
           </div>
         </div>
-      </CardHeader>
-      
-      <CardContent className="p-0">
-        <ScrollArea className="h-[400px]">
-          <div className="divide-y">
-            <AnimatePresence>
-              {filteredActivities.length === 0 ? (
-                <motion.div 
-                  className="flex flex-col items-center justify-center py-16 px-4"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                >
-                  <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mb-4">
-                    <Activity className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-muted-foreground font-medium">No activities yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Activities will appear here in real-time
-                  </p>
-                </motion.div>
-              ) : (
-                filteredActivities.map((activity, index) => {
-                  const IconComponent = activityIcons[activity.type]?.icon || Bell
-                  const colorClass = activityIcons[activity.type]?.color || 'bg-slate-100 text-slate-600'
-                  
-                  return (
-                    <motion.div
-                      key={activity.id}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 20 }}
-                      transition={{ delay: index * 0.05 }}
-                      className={cn(
-                        "group relative flex items-start gap-4 p-4 transition-all duration-200",
-                        "hover:bg-muted/50 cursor-pointer",
-                        !activity.read && "bg-primary/5 border-l-4 border-l-primary"
-                      )}
-                      onClick={() => !activity.read && markAsRead(activity.id)}
-                    >
-                      {/* Icon */}
-                      <div className={cn(
-                        "p-2.5 rounded-xl shrink-0 transition-all duration-200",
-                        "group-hover:scale-105 group-hover:shadow-md",
-                        colorClass
-                      )}>
-                        <IconComponent className="h-4 w-4" />
-                      </div>
+        <div className="flex items-center gap-1">
+          {unreadCount > 0 && (
+            <Button variant="ghost" size="sm" onClick={markAllAsRead} className="h-7 text-[10px] text-slate-500">
+              <CheckCircle className="mr-1 h-3 w-3" />Clear all
+            </Button>
+          )}
+          <Button variant="ghost" size="icon" onClick={() => loadActivities(true)} disabled={refreshing} className="h-7 w-7">
+            <RefreshCw className={cn("h-3.5 w-3.5", refreshing && "animate-spin")} />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setExpanded(!expanded)} className="h-7 w-7">
+            <span className="text-[10px]">{expanded ? '−' : '+'}</span>
+          </Button>
+        </div>
+      </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className={cn(
-                              "font-medium text-sm",
-                              !activity.read && "font-semibold"
-                            )}>
-                              {activity.title}
-                            </p>
-                            <p className="text-sm text-muted-foreground mt-0.5">
-                              {activity.description}
-                            </p>
-                            
-                            {/* Metadata */}
-                            {activity.metadata && (
-                              <div className="flex flex-wrap gap-2 mt-2">
+      {/* Filter Pills */}
+      <div className="px-4 py-2 border-b bg-slate-50/50 flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+        {typeFilters.map(f => (
+          <button
+            key={f.value}
+            onClick={() => setActiveFilter(f.value)}
+            className={cn(
+              "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all shrink-0",
+              activeFilter === f.value
+                ? "bg-slate-800 text-white shadow-sm"
+                : "bg-white text-slate-500 hover:bg-slate-100 border border-slate-200"
+            )}
+          >
+            {f.label}
+            {f.count > 0 && (
+              <span className={cn(
+                "text-[9px] px-1.5 py-0.5 rounded-full",
+                activeFilter === f.value ? "bg-white/20" : "bg-slate-100"
+              )}>
+                {f.count}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Activity List - Grouped by Date */}
+      {expanded && (
+        <ScrollArea className="h-[500px]">
+          {groupedActivities.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                <Activity className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium">No activities</p>
+              <p className="text-xs text-slate-400 mt-1">New activities will appear here</p>
+            </div>
+          ) : (
+            <div className="px-3 py-2">
+              {groupedActivities.map((group, groupIndex) => (
+                <div key={group.label} className="mb-1">
+                  {/* Date Header */}
+                  <div className="flex items-center gap-3 py-2 px-1 sticky top-0 bg-white z-10">
+                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                      {group.label}
+                    </span>
+                    <div className="flex-1 h-px bg-slate-100" />
+                    <span className="text-[10px] text-slate-400">{group.items.length}</span>
+                  </div>
+
+                  {/* Activities in this group */}
+                  <div className="space-y-0.5">
+                    {group.items.map((activity, index) => {
+                      const config = activityConfig[activity.type] || activityConfig.system
+                      const IconComponent = config.icon
+
+                      return (
+                        <motion.div
+                          key={activity.id}
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ delay: (groupIndex * 10 + index) * 0.01 }}
+                          className={cn(
+                            "group relative flex items-start gap-3 p-2.5 rounded-xl transition-all duration-200 cursor-pointer",
+                            "hover:bg-slate-50 border border-transparent hover:border-slate-200",
+                            !activity.read && "bg-gradient-to-r from-blue-50/60 to-white border-blue-100"
+                          )}
+                          onClick={() => !activity.read && markAsRead(activity.id)}
+                        >
+                          {/* Left accent bar for unread */}
+                          {!activity.read && (
+                            <div className="absolute left-0 top-2 bottom-2 w-1 bg-blue-500 rounded-full" />
+                          )}
+
+                          {/* Avatar/Icon */}
+                          <div className={cn(
+                            "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
+                            config.bg
+                          )}>
+                            <IconComponent className={cn("h-4 w-4", config.color)} />
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <p className={cn("text-xs font-semibold", !activity.read && "text-slate-900")}>
+                                    {activity.title}
+                                  </p>
+                                  <Badge className={cn("text-[9px] px-1.5 py-0 border-0", config.bg, config.color)}>
+                                    {config.label}
+                                  </Badge>
+                                </div>
+                                <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">
+                                  {activity.description}
+                                </p>
+                              </div>
+
+                              {/* Time & Actions */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                                  {format(new Date(activity.timestamp), 'h:mm a')}
+                                </span>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={e => e.stopPropagation()}
+                                    >
+                                      <MoreVertical className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-36">
+                                    {!activity.read && (
+                                      <DropdownMenuItem onClick={() => markAsRead(activity.id)}>
+                                        <CheckCircle className="mr-2 h-3.5 w-3.5" />Mark read
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem onClick={() => deleteActivity(activity.id)} className="text-red-600">
+                                      <Trash2 className="mr-2 h-3.5 w-3.5" />Remove
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
+
+                            {/* Metadata badges */}
+                            {activity.metadata && Object.keys(activity.metadata).length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-1.5">
                                 {activity.metadata.student_name && (
-                                  <Badge variant="outline" className="text-xs">
-                                    <Users className="mr-1 h-3 w-3" />
+                                  <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                     {activity.metadata.student_name}
-                                  </Badge>
-                                )}
-                                {activity.metadata.staff_name && (
-                                  <Badge variant="outline" className="text-xs">
-                                    <GraduationCap className="mr-1 h-3 w-3" />
-                                    {activity.metadata.staff_name}
-                                  </Badge>
-                                )}
-                                {activity.metadata.exam_title && (
-                                  <Badge variant="outline" className="text-xs">
-                                    <BookOpen className="mr-1 h-3 w-3" />
-                                    {activity.metadata.exam_title}
-                                  </Badge>
+                                  </span>
                                 )}
                                 {activity.metadata.class && (
-                                  <Badge variant="outline" className="text-xs">
+                                  <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
                                     {activity.metadata.class}
-                                  </Badge>
-                                )}
-                                {activity.metadata.score && (
-                                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">
-                                    <TrendingUp className="mr-1 h-3 w-3" />
-                                    {activity.metadata.score}%
-                                  </Badge>
+                                  </span>
                                 )}
                                 {activity.metadata.count && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {activity.metadata.count} submissions
-                                  </Badge>
-                                )}
-                                {activity.metadata.position && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {activity.metadata.position}
-                                  </Badge>
-                                )}
-                                {activity.metadata.rate && (
-                                  <Badge className="bg-green-100 text-green-700 text-xs">
-                                    {activity.metadata.rate}% attendance
-                                  </Badge>
+                                  <span className="text-[10px] text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded font-medium">
+                                    {activity.metadata.count} students
+                                  </span>
                                 )}
                               </div>
                             )}
                           </div>
-
-                          {/* Time and Actions */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            <div className="flex items-center text-xs text-muted-foreground">
-                              <Clock className="mr-1 h-3 w-3" />
-                              <span title={format(new Date(activity.timestamp), 'PPpp')}>
-                                {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
-                              </span>
-                            </div>
-
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <MoreVertical className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => markAsRead(activity.id)}>
-                                  <CheckCircle className="mr-2 h-4 w-4" />
-                                  Mark as read
-                                </DropdownMenuItem>
-                                {activity.action_url && (
-                                  <DropdownMenuItem>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View details
-                                  </DropdownMenuItem>
-                                )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem 
-                                  onClick={() => deleteActivity(activity.id)}
-                                  className="text-red-600"
-                                >
-                                  <Trash2 className="mr-2 h-4 w-4" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Unread indicator */}
-                      {!activity.read && (
-                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-primary rounded-r-full" />
-                      )}
-                    </motion.div>
-                  )
-                })
-              )}
-            </AnimatePresence>
-          </div>
-        </ScrollArea>
-
-        {/* Footer */}
-        <div className="border-t p-3 bg-muted/20">
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <span>Real-time updates active</span>
+                        </motion.div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
-            <Button variant="link" size="sm" className="h-auto p-0 text-xs">
-              View all activities
-            </Button>
-          </div>
+          )}
+        </ScrollArea>
+      )}
+
+      {/* Footer */}
+      <div className="border-t px-4 py-2 bg-white flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[10px]">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+          </span>
+          <span className="text-slate-400">Live</span>
         </div>
-      </CardContent>
+        <span className="text-[10px] text-slate-400">{filteredActivities.length} activities</span>
+      </div>
     </Card>
   )
 }

@@ -4,11 +4,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Progress } from '@/components/ui/progress'
 import { 
   GraduationCap, Quote, Calendar, Flame, 
   Clock, CheckCircle2, Users, Award,
-  FileText, BookOpen, FileCheck, Sparkles
+  FileText, BookOpen, FileCheck, Sparkles, Timer
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -52,31 +51,77 @@ interface StaffWelcomeBannerProps {
   termInfo?: TermInfo
 }
 
-const quotes = [
-  { text: "Every student can learn, just not on the same day, or in the same way.", author: "George Evans" },
-  { text: "The art of teaching is the art of assisting discovery.", author: "Mark Van Doren" },
-  { text: "Teaching is the one profession that creates all other professions.", author: "Unknown" },
-  { text: "The great teacher inspires.", author: "William Arthur Ward" },
-  { text: "Education is not the filling of a pail, but the lighting of a fire.", author: "William Butler Yeats" },
-  { text: "The dream begins with a teacher who believes in you.", author: "Dan Rather" },
-]
+const STORAGE_KEY = 'staff_session_start'
+
+// ─── Personalized Quotes ──────────────────────────────
+const quotes = {
+  morning: [
+    { text: "Every student can learn, just not on the same day, or in the same way.", author: "George Evans" },
+    { text: "The art of teaching is the art of assisting discovery.", author: "Mark Van Doren" },
+    { text: "The influence of a good teacher can never be erased.", author: "Unknown" },
+    { text: "Your work today shapes the leaders of tomorrow.", author: "Educational Wisdom" },
+    { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
+  ],
+  afternoon: [
+    { text: "Education is not the filling of a pail, but the lighting of a fire.", author: "William Butler Yeats" },
+    { text: "Teaching is the one profession that creates all other professions.", author: "Unknown" },
+    { text: "The roots of education are bitter, but the fruit is sweet.", author: "Aristotle" },
+    { text: "Intelligence plus character — that is the goal of true education.", author: "Martin Luther King Jr." },
+    { text: "The great teacher inspires.", author: "William Arthur Ward" },
+  ],
+  evening: [
+    { text: "What we learn with pleasure we never forget.", author: "Alfred Mercier" },
+    { text: "The dream begins with a teacher who believes in you.", author: "Dan Rather" },
+    { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" },
+    { text: "Learning never exhausts the mind.", author: "Leonardo da Vinci" },
+    { text: "Develop a passion for learning. If you do, you will never cease to grow.", author: "Anthony J. D'Angelo" },
+  ],
+}
+
+const getPersonalizedQuote = (hour: number, firstName: string) => {
+  let quoteSet = quotes.morning
+  if (hour >= 12 && hour < 17) quoteSet = quotes.afternoon
+  if (hour >= 17) quoteSet = quotes.evening
+
+  const dayOfMonth = new Date().getDate()
+  const index = dayOfMonth % quoteSet.length
+  const quote = quoteSet[index]
+  
+  return {
+    text: quote.text.replace(/you/g, firstName),
+    author: quote.author
+  }
+}
 
 export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBannerProps) {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
-  const [currentQuote, setCurrentQuote] = useState(quotes[0])
+  const [sessionStart, setSessionStart] = useState<Date | null>(null)
 
   useEffect(() => {
     setMounted(true)
     setCurrentTime(new Date())
-    setCurrentQuote(quotes[Math.floor(Math.random() * quotes.length)])
-    
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
-    const quoteTimer = setInterval(() => {
-      setCurrentQuote(quotes[Math.floor(Math.random() * quotes.length)])
-    }, 1800000)
-    
-    return () => { clearInterval(timer); clearInterval(quoteTimer) }
+
+    // Session timer
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      setSessionStart(new Date(stored))
+    } else {
+      const start = new Date()
+      localStorage.setItem(STORAGE_KEY, start.toISOString())
+      setSessionStart(start)
+    }
+
+    // Live clock — updates every second
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Clear session on logout/page close
+  useEffect(() => {
+    const handleClear = () => localStorage.removeItem(STORAGE_KEY)
+    window.addEventListener('beforeunload', handleClear)
+    return () => window.removeEventListener('beforeunload', handleClear)
   }, [])
 
   const getGreeting = useCallback(() => {
@@ -86,14 +131,14 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
     if (hour < 17) return { text: 'Good afternoon', emoji: '☀️' }
     return { text: 'Good evening', emoji: '🌙' }
   }, [currentTime])
-  
+
   const firstName = (profile?.full_name || profile?.name || 'Teacher').split(' ')[0]
-  
+
   const getInitials = (): string => {
     const fullName = profile?.full_name || profile?.name || ''
     if (!fullName) return 'ST'
     const names = fullName.split(' ')
-    return names.length >= 2 
+    return names.length >= 2
       ? (names[0][0] + names[names.length - 1][0]).toUpperCase()
       : fullName.slice(0, 2).toUpperCase()
   }
@@ -104,6 +149,26 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
       weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
     })
   }, [currentTime])
+
+  const formattedTime = useMemo(() => {
+    if (!currentTime) return ''
+    return currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }, [currentTime])
+
+  const onlineDuration = useMemo(() => {
+    if (!currentTime || !sessionStart) return '00:00:00'
+    const diffMs = currentTime.getTime() - sessionStart.getTime()
+    const totalSeconds = Math.floor(diffMs / 1000)
+    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
+    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
+    const s = String(totalSeconds % 60).padStart(2, '0')
+    return `${h}:${m}:${s}`
+  }, [currentTime, sessionStart])
+
+  const quote = useMemo(() => {
+    if (!currentTime) return { text: '', author: '' }
+    return getPersonalizedQuote(currentTime.getHours(), firstName)
+  }, [currentTime, firstName])
 
   const pendingGrading = stats?.pendingGrading || 0
   const greeting = getGreeting()
@@ -119,50 +184,64 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
   }
 
   return (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-4 sm:p-5 md:p-6 lg:p-8 text-white shadow-2xl mb-6 sm:mb-8"
+      suppressHydrationWarning
     >
       {/* Background Accents */}
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
-      
+
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
         <div className="flex-1">
           {/* Date & Week Badge Row */}
-          <div className="flex items-center gap-2 mb-2 sm:mb-3">
+          <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3">
             <span className="text-xl sm:text-2xl">{greeting.emoji}</span>
             <span className="text-xs sm:text-sm font-medium bg-white/15 px-2 sm:px-3 py-1 rounded-full backdrop-blur-sm text-white">
               {formattedDate}
             </span>
+            {/* ✅ Live Clock */}
+            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-cyan-400/10 px-2 sm:px-3 py-1 rounded-full text-cyan-200 border border-cyan-400/20">
+              <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              {formattedTime}
+            </span>
+            {/* ✅ Session Timer */}
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/10 px-2 sm:px-3 py-1 rounded-full text-blue-200">
+              <Timer className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              {onlineDuration}
+            </span>
+            {/* Week Badge */}
             {weekDisplay && (
               <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium bg-amber-400/10 px-2 sm:px-3 py-1 rounded-full text-amber-200 border border-amber-400/20">
-                <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                 {weekDisplay}
               </span>
             )}
           </div>
-          
+
           {/* Main Greeting */}
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2 text-white drop-shadow-sm">
             {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
           </h1>
-          
-          {/* Quote */}
-          <div className="flex items-start gap-2 mb-3 sm:mb-4 max-w-2xl">
-            <Quote className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400/60 shrink-0 mt-0.5 sm:mt-1" />
-            <div>
-              <p className="text-gray-200 text-xs sm:text-sm md:text-base italic leading-relaxed line-clamp-2">
-                "{currentQuote.text}"
-              </p>
-              <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-medium">
-                — {currentQuote.author}
-              </p>
+
+          {/* ✅ Personalized Quote */}
+          {quote.text && (
+            <div className="flex items-start gap-2 mb-3 sm:mb-4 max-w-2xl">
+              <Quote className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400/60 shrink-0 mt-0.5 sm:mt-1" />
+              <div>
+                <p className="text-gray-200 text-xs sm:text-sm md:text-base italic leading-relaxed line-clamp-2">
+                  &ldquo;{quote.text}&rdquo;
+                </p>
+                <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-medium">
+                  — {quote.author}
+                </p>
+              </div>
             </div>
-          </div>
-          
+          )}
+
           {/* Badges */}
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             <Badge className="bg-white/15 text-white border-0 text-xs sm:text-sm">
@@ -175,7 +254,7 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
             </Badge>
           </div>
         </div>
-        
+
         {/* Avatar */}
         <div className="relative group hidden sm:block">
           <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 ring-4 ring-white/20 shadow-xl">
@@ -189,7 +268,7 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
           </div>
         </div>
       </div>
-      
+
       {/* Pending Grading Alert */}
       {pendingGrading > 0 && (
         <div className="relative z-10 mt-3 sm:mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3">
@@ -202,11 +281,11 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
           </div>
         </div>
       )}
-      
+
       {/* Stats Section */}
       <div className="relative z-10 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/15">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-          
+
           <div className="group cursor-default bg-white/5 rounded-xl p-2.5 sm:p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
@@ -259,7 +338,7 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
             <p className="text-[10px] sm:text-xs md:text-sm text-gray-300">Avg Performance</p>
           </div>
         </div>
-        
+
         {/* Term Progress Bar */}
         {termInfo && termInfo.currentWeek > 0 && (
           <div className="mt-3 sm:mt-4">
@@ -268,7 +347,7 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
               <span className="text-[10px] sm:text-xs text-gray-300">{weekDisplay}</span>
             </div>
             <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-              <div 
+              <div
                 className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-700"
                 style={{ width: `${termInfo.weekProgress}%` }}
               />

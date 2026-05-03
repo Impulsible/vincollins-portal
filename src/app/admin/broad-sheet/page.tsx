@@ -1,29 +1,22 @@
-// app/staff/admin/broad-sheet/page.tsx - COMPLETE WITH AI GENERATION
+// app/admin/broad-sheet/page.tsx - COMPLETE BROAD SHEET WITH REPORT CARD GENERATION
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
+import { motion } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { 
-  Loader2, CheckCircle, AlertCircle, FileCheck, Eye, Download, 
-  ChevronRight, Home, Users, BookOpen, Search, RefreshCw,
-  Sparkles, Printer
+  Loader2, RefreshCw, Printer, Search, X, FileSpreadsheet,
+  Users, FileDown, Sparkles, FileText, ExternalLink
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import Link from 'next/link'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
-} from '@/components/ui/dialog'
-import { ReportCardTemplate } from '@/components/shared/ReportCardTemplate'
 
 // ─── Types ────────────────────────────────────────────
 interface SubjectScore {
@@ -34,13 +27,13 @@ interface SubjectScore {
   exam_theory: number
   total: number
   grade: string
-  status: string
 }
 
 interface StudentRecord {
   id: string
   name: string
-  subjects: SubjectScore[]
+  vin_id: string
+  subjectMap: Record<string, SubjectScore>
   totalScore: number
   averageScore: number
   grade: string
@@ -49,46 +42,75 @@ interface StudentRecord {
   hasAllSubjects: boolean
 }
 
-interface RatingItem {
-  name: string
-  rating: number
-}
+// ─── Constants ────────────────────────────────────────
+const TERMS = [
+  { value: 'first', label: 'First Term' },
+  { value: 'second', label: 'Second Term' },
+  { value: 'third', label: 'Third Term' },
+]
 
-interface ReportCardFormat {
-  student_name: string
-  admission_number?: string
-  class: string
-  dob?: string
-  gender?: string
-  term: string
-  academic_year: string
-  next_term_begins?: string
-  total_days?: number
-  days_present?: number
-  subject_scores: { subject: string; ca: number; exam: number; total: number; grade: string; remark: string }[]
-  average_score: number
-  total_score: number
-  grade: string
-  remarks: string
-  behavior_ratings: RatingItem[]
-  skill_ratings: RatingItem[]
-  teacher_comments: string
-  principal_comments: string
-}
+const YEARS = ['2024/2025', '2025/2026', '2026/2027']
 
-// ─── AI GENERATION HELPERS ────────────────────────────
-const getWAECGrade = (pct: number): string => {
-  if (pct >= 75) return 'A1'
-  if (pct >= 70) return 'B2'
-  if (pct >= 65) return 'B3'
-  if (pct >= 60) return 'C4'
-  if (pct >= 55) return 'C5'
-  if (pct >= 50) return 'C6'
-  if (pct >= 45) return 'D7'
-  if (pct >= 40) return 'E8'
+const JSS_SUBJECTS = [
+  'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
+  'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
+  'Agricultural Science', 'Home Economics', 'PHE', 'CRS',
+  'French', 'Yoruba', 'Fine Arts', 'Music', 'Security Education'
+]
+
+const SS_SUBJECTS_SCIENCE = [
+  'English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics',
+  'Further Mathematics', 'Agricultural Science', 'Data Processing', 'Civic Education', 'Economics'
+]
+
+const SS_SUBJECTS_ARTS = [
+  'English Language', 'Mathematics', 'Literature in English', 'Government',
+  'CRS', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology'
+]
+
+const SS_SUBJECTS_COMMERCIAL = [
+  'English Language', 'Mathematics', 'Economics', 'Commerce',
+  'Financial Accounting', 'Government', 'Civic Education', 'Data Processing',
+  'Geography', 'Literature in English'
+]
+
+const getWAECGrade = (score: number): string => {
+  if (score >= 75) return 'A1'
+  if (score >= 70) return 'B2'
+  if (score >= 65) return 'B3'
+  if (score >= 60) return 'C4'
+  if (score >= 55) return 'C5'
+  if (score >= 50) return 'C6'
+  if (score >= 45) return 'D7'
+  if (score >= 40) return 'E8'
   return 'F9'
 }
 
+const getGradeColor = (grade: string): string => {
+  if (grade.startsWith('A')) return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+  if (grade.startsWith('B')) return 'bg-blue-100 text-blue-700 border-blue-200'
+  if (grade.startsWith('C')) return 'bg-cyan-100 text-cyan-700 border-cyan-200'
+  if (grade.startsWith('D') || grade.startsWith('E')) return 'bg-amber-100 text-amber-700 border-amber-200'
+  if (grade === 'F9') return 'bg-red-100 text-red-700 border-red-200'
+  return 'bg-slate-100 text-slate-600'
+}
+
+const getExpectedSubjects = (className: string): string[] => {
+  if (!className) return SS_SUBJECTS_SCIENCE
+  const upper = className.toUpperCase()
+  if (upper.startsWith('JSS')) return JSS_SUBJECTS
+  if (upper.includes('SCIENCE') || upper.includes('SC')) return SS_SUBJECTS_SCIENCE
+  if (upper.includes('ART')) return SS_SUBJECTS_ARTS
+  if (upper.includes('COMMERCIAL') || upper.includes('COMM')) return SS_SUBJECTS_COMMERCIAL
+  return SS_SUBJECTS_SCIENCE
+}
+
+const getTermLabel = (term: string): string => {
+  const found = TERMS.find(t => t.value === term)
+  return found?.label || 'Third Term'
+}
+
+// ─── AI REPORT CARD HELPERS ──────────────────────────
 const getSubjectRemark = (grade: string): string => {
   const r: Record<string, string> = {
     'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
@@ -98,398 +120,488 @@ const getSubjectRemark = (grade: string): string => {
   return r[grade] || ''
 }
 
-const getOverallRemark = (avgScore: number): string => {
-  if (avgScore >= 75) return 'Excellent'
-  if (avgScore >= 65) return 'Very Good'
-  if (avgScore >= 55) return 'Good'
-  if (avgScore >= 45) return 'Credit'
-  return 'Fair'
+// Also update the teacher comment to match:
+const generateTeacherComment = (name: string, avg: number): string => {
+  if (avg >= 80) return `Excellent performance! ${name} has demonstrated outstanding academic ability. Keep up the excellent work!`
+  if (avg >= 70) return `Very good performance. ${name} has shown great dedication and consistency. Continue to work hard.`
+  if (avg >= 60) return `Good performance this term. ${name} has potential to do even better with more focus and effort.`
+  if (avg >= 50) return `A satisfactory performance. ${name} can improve with more dedication to studies.`
+  return `${name} needs to work harder and pay more attention in class. Improvement is possible with dedication.`
 }
 
-const generateBehaviorRatings = (avgScore: number): RatingItem[] => {
-  const getRating = (base: number): number => {
-    const adjusted = base + (avgScore - 50) / 25
-    return Math.max(1, Math.min(5, Math.round(adjusted)))
-  }
+// And principal comment:
+const generatePrincipalComment = (avg: number): string => {
+  if (avg >= 80) return 'An excellent performance. Maintain this high standard.'
+  if (avg >= 70) return 'A very good performance. Keep striving for excellence.'
+  if (avg >= 60) return 'A good performance. There is room for improvement.'
+  if (avg >= 50) return 'A satisfactory performance. You can do better with more effort.'
+  return 'Work harder next term. You can do better.'
+}
 
+const generateBehaviorRatings = (avgScore: number): { name: string; rating: number }[] => {
+  const getRating = (base: number): number => Math.max(1, Math.min(5, Math.round(base + (avgScore - 50) / 25)))
   return [
-    { name: 'Honesty', rating: getRating(4) },
-    { name: 'Neatness', rating: getRating(4) },
-    { name: 'Obedience', rating: getRating(3) },
-    { name: 'Orderliness', rating: getRating(4) },
-    { name: 'Diligence', rating: getRating(4) },
-    { name: 'Empathy', rating: getRating(3) },
-    { name: 'Punctuality', rating: getRating(4) },
-    { name: 'Leadership', rating: getRating(3) },
+    { name: 'Honesty', rating: getRating(4) }, { name: 'Neatness', rating: getRating(4) },
+    { name: 'Obedience', rating: getRating(3) }, { name: 'Orderliness', rating: getRating(4) },
+    { name: 'Diligence', rating: getRating(4) }, { name: 'Empathy', rating: getRating(3) },
+    { name: 'Punctuality', rating: getRating(4) }, { name: 'Leadership', rating: getRating(3) },
     { name: 'Politeness', rating: getRating(4) },
   ]
 }
 
-const generateSkillRatings = (avgScore: number): RatingItem[] => {
-  const getRating = (base: number): number => {
-    const adjusted = base + (avgScore - 50) / 25
-    return Math.max(1, Math.min(5, Math.round(adjusted)))
-  }
-
+const generateSkillRatings = (avgScore: number): { name: string; rating: number }[] => {
+  const getRating = (base: number): number => Math.max(1, Math.min(5, Math.round(base + (avgScore - 50) / 25)))
   return [
-    { name: 'Handwriting', rating: getRating(4) },
-    { name: 'Verbal Fluency', rating: getRating(4) },
-    { name: 'Sports', rating: getRating(3) },
-    { name: 'Handling Tools', rating: getRating(3) },
+    { name: 'Handwriting', rating: getRating(4) }, { name: 'Verbal Fluency', rating: getRating(4) },
+    { name: 'Sports', rating: getRating(3) }, { name: 'Handling Tools', rating: getRating(3) },
     { name: 'Club Activities', rating: getRating(4) },
   ]
 }
 
-const generateTeacherComment = (name: string, avg: number, grade: string): string => {
-  if (avg >= 80) return `Excellent performance! ${name} has demonstrated outstanding academic ability. Keep up the excellent work!`
-  if (avg >= 65) return `Very good performance. ${name} has shown great dedication and consistency. Continue to work hard.`
-  if (avg >= 50) return `Good performance this term. ${name} has potential to do even better with more focus and effort.`
-  return `${name} needs to work harder and pay more attention in class. Improvement is possible with dedication.`
+const getOverallRemark = (avgScore: number): string => {
+  if (avgScore >= 80) return 'Excellent'
+  if (avgScore >= 70) return 'Very Good'
+  if (avgScore >= 60) return 'Good'
+  if (avgScore >= 50) return 'Pass'
+  return 'Fail'
 }
 
-const generatePrincipalComment = (avg: number): string => {
-  if (avg >= 80) return 'An excellent performance. Maintain this high standard.'
-  if (avg >= 65) return 'A very good performance. Keep striving for excellence.'
-  if (avg >= 50) return 'A satisfactory performance. There is room for improvement.'
-  return 'Work harder next term. You can do better with more effort.'
-}
-
-// ─── Main Page ────────────────────────────────────────
+// ─── Main Component ───────────────────────────────────
 export default function BroadSheetPage() {
+  const router = useRouter()
+  const [isMounted, setIsMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
+  const [expectedSubjects, setExpectedSubjects] = useState<string[]>(SS_SUBJECTS_SCIENCE)
   const [classes, setClasses] = useState<string[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [selectedTerm, setSelectedTerm] = useState('third')
   const [selectedYear, setSelectedYear] = useState('2025/2026')
   const [searchQuery, setSearchQuery] = useState('')
-  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null)
-  const [showStudentDialog, setShowStudentDialog] = useState(false)
   const [profile, setProfile] = useState<any>(null)
-  const [previewCard, setPreviewCard] = useState<ReportCardFormat | null>(null)
-  const [showPreviewDialog, setShowPreviewDialog] = useState(false)
+  const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
 
-  const TERMS = [
-    { value: 'first', label: 'First Term' },
-    { value: 'second', label: 'Second Term' },
-    { value: 'third', label: 'Third Term' },
-  ]
-
-  const YEARS = ['2024/2025', '2025/2026', '2026/2027']
-
-  const getTermLabel = (term: string): string => {
-    const t: Record<string, string> = { first: 'First Term', second: 'Second Term', third: 'Third Term' }
-    return t[term] || term
-  }
+  useEffect(() => { setIsMounted(true) }, [])
 
   // ─── Init ───────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { window.location.href = '/portal'; return }
-      const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
-      if (data) setProfile(data)
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
-      const { data: studentsData } = await supabase.from('profiles').select('class').eq('role', 'student').not('class', 'is', null)
-      const uniqueClasses = [...new Set((studentsData || []).map(s => s.class).filter(Boolean))] as string[]
-      setClasses(uniqueClasses.sort())
-      if (uniqueClasses.length > 0) setSelectedClass(uniqueClasses[0])
+        const { data: profileData } = await supabase
+          .from('profiles').select('*').eq('id', session.user.id).single()
+        if (profileData) setProfile(profileData)
+
+        const { data: studentsData } = await supabase
+          .from('profiles').select('class').eq('role', 'student').not('class', 'is', null).limit(1000)
+
+        if (studentsData) {
+          const uniqueClasses = [...new Set(studentsData.map(s => s.class).filter(Boolean))] as string[]
+          const sorted = uniqueClasses.sort()
+          setClasses(sorted)
+          if (sorted.length > 0) {
+            setSelectedClass(sorted[0])
+            setExpectedSubjects(getExpectedSubjects(sorted[0]))
+          }
+        }
+      } catch (error) { console.error('Init error:', error) }
     }
     init()
   }, [])
 
   useEffect(() => {
-    if (selectedClass && selectedTerm && selectedYear) loadBroadSheet()
-  }, [selectedClass, selectedTerm, selectedYear])
+    if (selectedClass) setExpectedSubjects(getExpectedSubjects(selectedClass))
+    if (isMounted && selectedClass && selectedTerm && selectedYear) loadBroadSheet()
+  }, [selectedClass, selectedTerm, selectedYear, isMounted])
 
   // ─── Load Broad Sheet ──────────────────────────────
   const loadBroadSheet = async () => {
     setLoading(true)
     try {
-      const { data: classStudents } = await supabase.from('profiles').select('id, full_name, class, vin_id, gender, dob').eq('role', 'student').eq('class', selectedClass).order('full_name')
+      const { data: classStudents, error: studentError } = await supabase
+        .from('profiles').select('id, full_name, class, vin_id')
+        .eq('role', 'student').filter('class', 'eq', selectedClass).order('full_name').limit(500)
+
+      if (studentError) throw studentError
       if (!classStudents || classStudents.length === 0) { setStudents([]); setLoading(false); return }
 
-      const { data: allScores } = await supabase.from('ca_scores').select('*').eq('class', selectedClass).eq('term', selectedTerm).eq('academic_year', selectedYear)
-      const isJSS = selectedClass.toUpperCase().startsWith('JSS')
-      const totalSubjects = isJSS ? 17 : 10
+      const studentIds = classStudents.map(s => s.id)
+
+      const { data: allScores, error: scoresError } = await supabase
+        .from('ca_scores').select('*')
+        .filter('class', 'eq', selectedClass).eq('term', selectedTerm)
+        .eq('academic_year', selectedYear).in('student_id', studentIds).limit(5000)
+
+      if (scoresError) throw scoresError
+
+      const subjectsForClass = getExpectedSubjects(selectedClass)
+      const totalExpected = subjectsForClass.length
 
       const studentRecords: StudentRecord[] = classStudents.map(student => {
         const studentScores = (allScores || []).filter(s => s.student_id === student.id)
-        const subjects: SubjectScore[] = studentScores.map(s => ({
-          subject: s.subject, ca1: s.ca1_score || 0, ca2: s.ca2_score || 0,
-          exam_obj: s.exam_objective_score || 0, exam_theory: s.exam_theory_score || 0,
-          total: s.total_score || 0, grade: s.grade || '—', status: s.status || 'draft'
-        }))
-        const totalScore = subjects.reduce((sum, s) => sum + s.total, 0)
-        const completedSubjects = subjects.length
-        const averageScore = completedSubjects > 0 ? Math.round(totalScore / completedSubjects) : 0
-        const grade = completedSubjects > 0 ? getWAECGrade(averageScore) : '—'
-        return { id: student.id, name: student.full_name, subjects, totalScore, averageScore, grade, completedSubjects, totalSubjects, hasAllSubjects: completedSubjects >= totalSubjects }
+        const subjectMap: Record<string, SubjectScore> = {}
+        studentScores.forEach(s => {
+          subjectMap[s.subject] = {
+            subject: s.subject, ca1: s.ca1_score || 0, ca2: s.ca2_score || 0,
+            exam_obj: s.exam_objective_score || 0, exam_theory: s.exam_theory_score || 0,
+            total: s.total_score || 0, grade: s.grade || '—'
+          }
+        })
+        const scoredSubjects = Object.keys(subjectMap).length
+        const totalScore = Object.values(subjectMap).reduce((sum, s) => sum + s.total, 0)
+        const averageScore = scoredSubjects > 0 ? Math.round(totalScore / scoredSubjects) : 0
+        const grade = scoredSubjects > 0 ? getWAECGrade(averageScore) : '—'
+        return {
+          id: student.id, name: student.full_name, vin_id: student.vin_id || '—',
+          subjectMap, totalScore, averageScore, grade,
+          completedSubjects: scoredSubjects, totalSubjects: totalExpected,
+          hasAllSubjects: scoredSubjects >= totalExpected
+        }
       })
+
+      studentRecords.sort((a, b) => a.name.localeCompare(b.name))
       setStudents(studentRecords)
     } catch (error) { console.error('Error:', error); toast.error('Failed to load broad sheet') }
     finally { setLoading(false) }
   }
 
-  // ─── Generate Report Cards ──────────────────────────
+  // ─── Generate All Report Cards ─────────────────────
   const handleGenerateReportCards = async () => {
-    if (!selectedClass) { toast.error('Select a class'); return }
+    const completeStudents = students.filter(s => s.hasAllSubjects)
+    if (completeStudents.length === 0) { toast.warning('No students have all subjects completed'); return }
+
     setGenerating(true)
+    setGenProgress({ current: 0, total: completeStudents.length })
+    let count = 0
 
     try {
-      const completeStudents = students.filter(s => s.hasAllSubjects)
-      if (completeStudents.length === 0) { toast.warning('No students have all subjects'); setGenerating(false); return }
-
-      let count = 0
       for (const student of completeStudents) {
-        // Get student full profile
-        const { data: studentProfile } = await supabase.from('profiles').select('*').eq('id', student.id).single()
-
-        // Format subjects for report card
-        const formattedSubjects = student.subjects.map(s => {
-          const ca = Math.round((s.ca1 + s.ca2) * (40/40))
-          const exam = Math.round((s.exam_obj + s.exam_theory) * (60/60))
-          const total = s.total
-          return { subject: s.subject, ca, exam, total, grade: s.grade, remark: getSubjectRemark(s.grade) }
-        })
+        const formattedSubjects = expectedSubjects.map(subject => {
+          const score = student.subjectMap[subject]
+          if (!score) return null
+          const ca = Math.round(score.ca1 + score.ca2)
+          const exam = Math.round(score.exam_obj + score.exam_theory)
+          return {
+            name: subject, ca1: score.ca1, ca2: score.ca2,
+            examObj: score.exam_obj, examTheory: score.exam_theory,
+            ca, exam, total: score.total, grade: score.grade,
+            remark: getSubjectRemark(score.grade)
+          }
+        }).filter(Boolean)
 
         const avgScore = student.averageScore
         const grade = getWAECGrade(avgScore)
 
-        // AI-generated content
-        const behaviors = generateBehaviorRatings(avgScore)
-        const skills = generateSkillRatings(avgScore)
-        const teacherComment = generateTeacherComment(student.name, avgScore, grade)
-        const principalComment = generatePrincipalComment(avgScore)
-        const remarks = getOverallRemark(avgScore)
-        const totalScore = student.totalScore
-
-        const reportCardData: ReportCardFormat = {
-          student_name: student.name,
-          admission_number: studentProfile?.vin_id || '—',
-          class: selectedClass,
-          dob: studentProfile?.dob || '—',
-          gender: studentProfile?.gender || '—',
-          term: selectedTerm,
-          academic_year: selectedYear,
-          next_term_begins: '04/05/2026',
-          total_days: 100,
-          days_present: 100,
-          subject_scores: formattedSubjects,
-          average_score: avgScore,
-          total_score: totalScore,
-          grade: grade,
-          remarks: remarks,
-          behavior_ratings: behaviors,
-          skill_ratings: skills,
-          teacher_comments: teacherComment,
-          principal_comments: principalComment,
-        }
-
-        // Save to database
         await supabase.from('report_cards').upsert({
           student_id: student.id,
           student_name: student.name,
-          student_display_name: student.name,
+          student_vin: student.vin_id,                       // ✅ ADMISSION NUMBER
           class: selectedClass,
           term: selectedTerm,
           academic_year: selectedYear,
-          subject_scores: formattedSubjects,
           subjects_data: formattedSubjects,
-          behavior_ratings: behaviors,
-          skill_ratings: skills,
           average_score: avgScore,
-          total_score: totalScore,
+          total_score: student.totalScore,
           grade: grade,
-          remarks: remarks,
-          teacher_comments: teacherComment,
-          principal_comments: principalComment,
+          teacher_comments: generateTeacherComment(student.name, avgScore),
+          principal_comments: generatePrincipalComment(avgScore),
+          behavior_ratings: generateBehaviorRatings(avgScore),
+          skill_ratings: generateSkillRatings(avgScore),
+          remarks: getOverallRemark(avgScore),
+          assessment_data: {
+            daysPresent: 100, daysAbsent: 0,
+            handwriting: 4, sports: 3, creativity: 4, technical: 3,
+            punctuality: 4, neatness: 4, politeness: 4, cooperation: 3, leadership: 3
+          },
           total_subjects: student.completedSubjects,
-          status: 'draft',
           generated_by: profile?.id,
           generated_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, { onConflict: 'student_id,term,academic_year' })
 
         count++
+        setGenProgress({ current: count, total: completeStudents.length })
       }
 
-      toast.success(`Generated ${count} report cards for ${selectedClass}!`)
-    } catch (error) { console.error('Error:', error); toast.error('Failed to generate') }
-    finally { setGenerating(false) }
-  }
-
-  // ─── Preview Report Card ────────────────────────────
-  const handlePreviewReportCard = async (student: StudentRecord) => {
-    const { data: studentProfile } = await supabase.from('profiles').select('*').eq('id', student.id).single()
-    const formattedSubjects = student.subjects.map(s => {
-      const ca = Math.round((s.ca1 + s.ca2) * (40/40))
-      const exam = Math.round((s.exam_obj + s.exam_theory) * (60/60))
-      return { subject: s.subject, ca, exam, total: s.total, grade: s.grade, remark: getSubjectRemark(s.grade) }
-    })
-    const avgScore = student.averageScore
-    const grade = getWAECGrade(avgScore)
-    const preview: ReportCardFormat = {
-      student_name: student.name,
-      admission_number: studentProfile?.vin_id || '—',
-      class: selectedClass,
-      dob: studentProfile?.dob || '—',
-      gender: studentProfile?.gender || '—',
-      term: selectedTerm,
-      academic_year: selectedYear,
-      next_term_begins: '04/05/2026',
-      total_days: 100,
-      days_present: 100,
-      subject_scores: formattedSubjects,
-      average_score: avgScore,
-      total_score: student.totalScore,
-      grade: grade,
-      remarks: getOverallRemark(avgScore),
-      behavior_ratings: generateBehaviorRatings(avgScore),
-      skill_ratings: generateSkillRatings(avgScore),
-      teacher_comments: generateTeacherComment(student.name, avgScore, grade),
-      principal_comments: generatePrincipalComment(avgScore),
+      toast.success(`✅ Generated ${count} report cards for ${selectedClass}!`)
+    } catch (error) {
+      console.error('Generation error:', error)
+      toast.error('Failed to generate report cards')
+    } finally {
+      setGenerating(false)
+      setGenProgress({ current: 0, total: 0 })
     }
-    setPreviewCard(preview)
-    setShowPreviewDialog(true)
   }
 
-  const handlePrint = () => window.print()
+  // ─── Filtered Students ──────────────────────────────
+  const displayedStudents = useMemo(() => {
+    let filtered = students
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase()
+      filtered = filtered.filter(s => s.name.toLowerCase().includes(q) || s.vin_id.toLowerCase().includes(q))
+    }
+    return filtered
+  }, [students, searchQuery])
 
-  // ─── Filter ─────────────────────────────────────────
-  const filteredStudents = students.filter(s => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+  // ─── Stats ──────────────────────────────────────────
+  const stats = useMemo(() => {
+    const complete = students.filter(s => s.hasAllSubjects)
+    const classAvg = complete.length > 0
+      ? Math.round(complete.reduce((sum, s) => sum + s.averageScore, 0) / complete.length) : 0
+    const topScore = complete.length > 0 ? Math.max(...complete.map(s => s.totalScore)) : 0
+    return { total: students.length, complete: complete.length, incomplete: students.length - complete.length, classAvg, topScore }
+  }, [students])
+
+  // ─── Export CSV ─────────────────────────────────────
+  const handleExportCSV = () => {
+    if (displayedStudents.length === 0) { toast.error('No data'); return }
+    const headers = ['Student Name', 'Admission No', ...expectedSubjects, 'Total', 'Average', 'Grade']
+    const rows = displayedStudents.map(s => {
+      const subjects = expectedSubjects.map(sub => { const sc = s.subjectMap[sub]; return sc ? `${sc.total} (${sc.grade})` : '—' })
+      return [s.name, s.vin_id, ...subjects, s.totalScore, `${s.averageScore}%`, s.grade]
+    })
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = `BroadSheet_${selectedClass}_${selectedTerm}_${selectedYear.replace('/', '_')}.csv`; a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Exported!')
+  }
+
+  const handlePrint = () => { if (isMounted) window.print() }
+
+  const displayClass = isMounted ? selectedClass : ''
+  const displayTermLabel = isMounted ? getTermLabel(selectedTerm) : 'Third Term'
+  const displayYear = isMounted ? selectedYear : '2025/2026'
+  const displaySubjectCount = isMounted ? expectedSubjects.length : 10
 
   // ─── Loading ────────────────────────────────────────
-  if (loading && students.length === 0) {
+  if (!isMounted || (loading && students.length === 0)) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <div className="relative mx-auto mb-6 h-16 w-16">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
-            <FileCheck className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
-          </div>
-          <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Broad Sheet</h2>
-          <p className="text-sm text-slate-500">Please wait while we fetch student data...</p>
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="mx-auto mb-6">
+            <FileSpreadsheet className="h-14 w-14 text-emerald-500" />
+          </motion.div>
+          <p className="text-slate-500 font-medium">Loading broad sheet...</p>
         </div>
       </div>
     )
   }
 
+  // ─── Render ─────────────────────────────────────────
   return (
-    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-6">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500">
-        <Link href="/staff" className="hover:text-emerald-600 transition-colors flex items-center gap-1"><Home className="h-3.5 w-3.5" /><span className="hidden sm:inline">Dashboard</span></Link>
-        <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-        <span className="text-slate-800 font-medium">Broad Sheet</span>
-      </nav>
-
+    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-6 print:space-y-1">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-100 rounded-xl"><BookOpen className="h-5 w-5 text-emerald-600" /></div>
+      <div className="no-print">
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Broad Sheet</h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">{selectedClass} • {students.length} students • {students.filter(s => s.hasAllSubjects).length} complete</p>
+            <h2 className="text-lg font-bold text-slate-800">Broad Sheet</h2>
+            <p className="text-sm text-slate-500">{displayClass} • {displayTermLabel} • {displayYear} • {displaySubjectCount} subjects</p>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={loadBroadSheet} className="h-9"><RefreshCw className="h-3.5 w-3.5" /></Button>
-          <Button onClick={handleGenerateReportCards} disabled={generating} className="h-9 text-xs bg-purple-600 hover:bg-purple-700">
-            {generating ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 mr-1.5" />}
-            {generating ? 'Generating...' : 'Generate Report Cards'}
-          </Button>
-        </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="outline" size="sm" onClick={loadBroadSheet} disabled={loading} className="h-8 text-xs">
+              <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} /> Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 text-xs">
+              <FileDown className="h-3.5 w-3.5 mr-1.5" /> Export
+            </Button>
+            <Button size="sm" onClick={handlePrint} className="h-8 text-xs bg-slate-600 hover:bg-slate-700">
+              <Printer className="h-3.5 w-3.5 mr-1.5" /> Print
+            </Button>
+            {/* ✅ GENERATE REPORT CARDS BUTTON */}
+            <Button
+              size="sm"
+              onClick={handleGenerateReportCards}
+              disabled={generating || stats.complete === 0}
+              className="h-8 text-xs bg-purple-600 hover:bg-purple-700"
+            >
+              {generating ? (
+                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> {genProgress.current}/{genProgress.total}</>
+              ) : (
+                <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate All Report Cards</>
+              )}
+            </Button>
+            {/* ✅ LINK TO REPORT CARD APPROVAL */}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => router.push('/admin/report-cards')}
+              className="h-8 text-xs"
+            >
+              <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Report Cards
+            </Button>
+          </div>
+        </motion.div>
       </div>
 
-      {/* Filters */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-3 sm:p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <div><Label className="text-[11px] text-slate-500 mb-1 block">Class</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label className="text-[11px] text-slate-500 mb-1 block">Term</Label><Select value={selectedTerm} onValueChange={setSelectedTerm}><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label className="text-[11px] text-slate-500 mb-1 block">Academic Year</Label><Select value={selectedYear} onValueChange={setSelectedYear}><SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger><SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label className="text-[11px] text-slate-500 mb-1 block">Search</Label><div className="relative"><Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" /><Input placeholder="Search students..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-9 text-sm" /></div></div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-        <Card className="border-0 shadow-sm"><CardContent className="p-3 text-center"><p className="text-[11px] text-slate-400">Total Students</p><p className="text-xl font-bold text-slate-700">{students.length}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-emerald-50"><CardContent className="p-3 text-center"><p className="text-[11px] text-emerald-600">Complete</p><p className="text-xl font-bold text-emerald-700">{students.filter(s => s.hasAllSubjects).length}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-amber-50"><CardContent className="p-3 text-center"><p className="text-[11px] text-amber-600">Incomplete</p><p className="text-xl font-bold text-amber-700">{students.filter(s => !s.hasAllSubjects).length}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-purple-50"><CardContent className="p-3 text-center"><p className="text-[11px] text-purple-600">Ready to Generate</p><p className="text-xl font-bold text-purple-700">{students.filter(s => s.hasAllSubjects).length}</p></CardContent></Card>
-      </div>
-
-      {/* Broad Sheet Table */}
-      <Card className="border-0 shadow-sm overflow-hidden">
-        <CardContent className="p-0">
-          {filteredStudents.length === 0 ? (
-            <div className="text-center py-12"><Users className="h-10 w-10 text-slate-300 mx-auto mb-3" /><p className="text-slate-500">No students found</p></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader><TableRow className="bg-slate-50"><TableHead className="text-xs font-semibold">Student</TableHead><TableHead className="text-center text-xs">Subjects</TableHead><TableHead className="text-center text-xs">Avg Score</TableHead><TableHead className="text-center text-xs">Grade</TableHead><TableHead className="text-center text-xs">Status</TableHead><TableHead className="text-right text-xs">Actions</TableHead></TableRow></TableHeader>
-                <TableBody>
-                  {filteredStudents.map(student => (
-                    <TableRow key={student.id}>
-                      <TableCell className="text-sm font-medium">{student.name}</TableCell>
-                      <TableCell className="text-center text-sm"><span className={cn(student.hasAllSubjects ? 'text-emerald-600' : 'text-amber-600')}>{student.completedSubjects}/{student.totalSubjects}</span></TableCell>
-                      <TableCell className="text-center"><span className="font-semibold text-sm">{student.averageScore}%</span></TableCell>
-                      <TableCell className="text-center">{student.grade !== '—' && <Badge className="text-xs font-semibold bg-purple-100 text-purple-700">{student.grade}</Badge>}</TableCell>
-                      <TableCell className="text-center">{student.hasAllSubjects ? <Badge className="bg-emerald-100 text-emerald-700 text-xs"><CheckCircle className="h-3 w-3 mr-1" />Complete</Badge> : <Badge className="bg-amber-100 text-amber-700 text-xs"><AlertCircle className="h-3 w-3 mr-1" />Incomplete</Badge>}</TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedStudent(student); setShowStudentDialog(true) }} className="h-8 text-xs"><Eye className="h-3.5 w-3.5 mr-1" />View</Button>
-                        {student.hasAllSubjects && (
-                          <Button variant="ghost" size="sm" onClick={() => handlePreviewReportCard(student)} className="h-8 text-xs text-purple-600"><Printer className="h-3.5 w-3.5 mr-1" />Preview</Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Student Detail Dialog */}
-      <Dialog open={showStudentDialog} onOpenChange={setShowStudentDialog}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader><DialogTitle>{selectedStudent?.name} - Subject Scores</DialogTitle></DialogHeader>
-          {selectedStudent && (
-            <div className="space-y-4 py-2">
-              <div className="flex items-center gap-4 text-sm">
-                <Badge className={selectedStudent.hasAllSubjects ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>{selectedStudent.hasAllSubjects ? 'All Subjects Complete' : `${selectedStudent.completedSubjects}/${selectedStudent.totalSubjects} Subjects`}</Badge>
-                <span>Average: <strong>{selectedStudent.averageScore}%</strong></span>
-                <Badge className="text-xs font-semibold bg-purple-100 text-purple-700">{selectedStudent.grade}</Badge>
+      {/* Filters + Stats */}
+      <div className="no-print space-y-3">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-3">
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2">
+              <div>
+                <Label className="text-[10px] text-slate-400 mb-1 block">Class</Label>
+                <Select value={selectedClass} onValueChange={setSelectedClass}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                </Select>
               </div>
-              <Table>
-                <TableHeader><TableRow className="bg-slate-50"><TableHead className="text-xs">Subject</TableHead><TableHead className="text-center text-xs">CA1</TableHead><TableHead className="text-center text-xs">CA2</TableHead><TableHead className="text-center text-xs">Obj</TableHead><TableHead className="text-center text-xs">Theory</TableHead><TableHead className="text-center text-xs">Total</TableHead><TableHead className="text-center text-xs">Grade</TableHead></TableRow></TableHeader>
-                <TableBody>{selectedStudent.subjects.map((s, i) => (<TableRow key={i}><TableCell className="text-sm">{s.subject}</TableCell><TableCell className="text-center text-sm">{s.ca1}</TableCell><TableCell className="text-center text-sm">{s.ca2}</TableCell><TableCell className="text-center text-sm">{s.exam_obj}</TableCell><TableCell className="text-center text-sm">{s.exam_theory}</TableCell><TableCell className="text-center font-semibold text-sm">{s.total}</TableCell><TableCell className="text-center"><Badge className="text-xs">{s.grade}</Badge></TableCell></TableRow>))}</TableBody>
-              </Table>
+              <div>
+                <Label className="text-[10px] text-slate-400 mb-1 block">Term</Label>
+                <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-slate-400 mb-1 block">Year</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-[10px] text-slate-400 mb-1 block">Search</Label>
+                <div className="relative">
+                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Input placeholder="Name or VIN..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-7 h-8 text-xs" />
+                  {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+                </div>
+              </div>
+              <div className="flex items-end">
+                <div className="bg-emerald-50 rounded-lg p-2 text-center w-full border border-emerald-100">
+                  <p className="text-[9px] text-emerald-500 uppercase">Ready</p>
+                  <p className="text-sm font-bold text-emerald-700">{stats.complete}</p>
+                </div>
+              </div>
             </div>
-          )}
-          <DialogFooter><Button variant="outline" onClick={() => setShowStudentDialog(false)}>Close</Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </CardContent>
+        </Card>
 
-      {/* Preview Report Card Dialog */}
-      <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="max-w-[220mm] max-h-[95vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Report Card Preview</DialogTitle>
-          </DialogHeader>
-          {previewCard && <ReportCardTemplate data={previewCard} />}
-          <DialogFooter className="no-print">
-            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>Close</Button>
-            <Button onClick={handlePrint} className="bg-purple-600"><Printer className="h-4 w-4 mr-2" />Print</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        <div className="grid grid-cols-5 gap-2">
+          {[
+            { label: 'Total', value: stats.total, color: 'text-slate-700' },
+            { label: 'Complete', value: stats.complete, color: 'text-emerald-600' },
+            { label: 'Incomplete', value: stats.incomplete, color: 'text-amber-600' },
+            { label: 'Avg', value: `${stats.classAvg}%`, color: 'text-blue-600' },
+            { label: 'Top', value: stats.topScore, color: 'text-purple-600' },
+          ].map((stat, i) => (
+            <div key={i} className="bg-white rounded-lg p-2 text-center shadow-sm border">
+              <p className="text-[9px] text-slate-400 uppercase">{stat.label}</p>
+              <p className={cn("text-sm font-bold", stat.color)}>{stat.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Generation Progress Bar */}
+      {generating && (
+        <div className="no-print bg-purple-50 border border-purple-200 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-purple-700 font-medium">Generating Report Cards...</span>
+            <span className="text-xs text-purple-600">{genProgress.current}/{genProgress.total}</span>
+          </div>
+          <div className="w-full bg-purple-200 rounded-full h-2">
+            <div
+              className="bg-purple-600 h-2 rounded-full transition-all duration-300"
+              style={{ width: `${(genProgress.current / genProgress.total) * 100}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* THE BROAD SHEET TABLE */}
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+        <Card className="border-0 shadow-lg overflow-hidden print:shadow-none print:border">
+          <div className="hidden print:block p-4 text-center border-b">
+            <h1 className="text-xl font-bold">VINCOLLINS EDUCATIONAL INSTITUTE</h1>
+            <p className="text-base font-semibold">Broad Sheet - {selectedClass}</p>
+            <p className="text-xs">{getTermLabel(selectedTerm)} • {selectedYear}</p>
+          </div>
+
+          <div className="overflow-x-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[600px]">
+              <thead>
+                <tr className="bg-slate-100 print:bg-gray-100">
+                  <th className="sticky left-0 z-20 bg-slate-100 print:bg-gray-100 border-b-2 border-slate-200 px-2 sm:px-3 py-2 text-left font-bold text-slate-600 text-[10px] sm:text-xs min-w-[130px] sm:min-w-[160px]">
+                    Student
+                  </th>
+                  {expectedSubjects.map(subject => (
+                    <th key={subject} className="border-b-2 border-slate-200 px-1.5 sm:px-2 py-2 text-center font-bold text-slate-600 text-[9px] sm:text-[10px] whitespace-nowrap min-w-[70px] sm:min-w-[80px]">
+                      {subject.split(' ').map((w, i) => (<span key={i} className="block leading-tight">{w}</span>))}
+                    </th>
+                  ))}
+                  <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Total</th>
+                  <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Avg</th>
+                  <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Grade</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedStudents.length === 0 ? (
+                  <tr>
+                    <td colSpan={expectedSubjects.length + 4} className="text-center py-12">
+                      <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                      <p className="text-slate-500 text-sm">No students found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  displayedStudents.map(student => (
+                    <tr key={student.id} className={cn("border-b border-slate-100 hover:bg-slate-50/50 transition-colors", !student.hasAllSubjects && "bg-amber-50/20")}>
+                      <td className="sticky left-0 z-10 bg-white print:bg-white border-r border-slate-100 px-2 sm:px-3 py-1.5">
+                        <div>
+                          <p className="font-semibold text-[11px] sm:text-xs">{student.name}</p>
+                          <p className="text-[9px] text-slate-400 font-mono">{student.vin_id}</p>
+                          {!student.hasAllSubjects && (
+                            <span className="text-[9px] text-amber-600">{student.completedSubjects}/{student.totalSubjects}</span>
+                          )}
+                        </div>
+                      </td>
+                      {expectedSubjects.map(subject => {
+                        const score = student.subjectMap[subject]
+                        return (
+                          <td key={subject} className="px-1.5 sm:px-2 py-1.5 text-center border-r border-slate-50">
+                            {score ? (
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span className="font-semibold text-[11px] sm:text-xs">{score.total}</span>
+                                <Badge className={cn("text-[8px] leading-none px-1 py-0 border", getGradeColor(score.grade))}>{score.grade}</Badge>
+                              </div>
+                            ) : (
+                              <span className="text-slate-300 text-xs">—</span>
+                            )}
+                          </td>
+                        )
+                      })}
+                      <td className="px-2 py-1.5 text-center font-bold text-[11px] sm:text-xs text-slate-700 border-r border-slate-50">{student.totalScore}</td>
+                      <td className="px-2 py-1.5 text-center font-semibold text-[11px] sm:text-xs text-slate-600 border-r border-slate-50">{student.averageScore}%</td>
+                      <td className="px-2 py-1.5 text-center">
+                        <Badge className={cn("text-[9px] sm:text-[10px] font-bold border", getGradeColor(student.grade))}>{student.grade}</Badge>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="hidden print:block p-3 border-t text-center text-[10px] text-slate-500">
+            Generated {new Date().toLocaleDateString()} • Total: {stats.total} students • Avg: {stats.classAvg}%
+          </div>
+        </Card>
+      </motion.div>
+
+      <style jsx global>{`
+        @media print {
+          .no-print { display: none !important; }
+          body { background: white !important; }
+          @page { size: landscape; margin: 0.5cm; }
+        }
+      `}</style>
     </div>
   )
 }

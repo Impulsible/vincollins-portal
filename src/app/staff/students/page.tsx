@@ -1,4 +1,4 @@
-// app/staff/students/page.tsx - PROFESSIONAL STUDENT ROSTER
+// app/staff/students/page.tsx - PROFESSIONAL STUDENT ROSTER (WITH AVATAR PHOTOS)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,11 +8,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { 
   Search, Download, RefreshCw, Users, Loader2,
-  GraduationCap, Home, ChevronRight, Filter
+  GraduationCap, Home, ChevronRight, Filter, User
 } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -29,6 +29,7 @@ export default function StudentsPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [classes, setClasses] = useState<string[]>([])
   const [stats, setStats] = useState({ total: 0, active: 0, classes: 0 })
+  const [avatarErrors, setAvatarErrors] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     loadData()
@@ -43,9 +44,22 @@ export default function StudentsPage() {
         return
       }
 
+      // Fetch students with photo_url and avatar_url
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select(`
+          id,
+          full_name,
+          email,
+          vin_id,
+          class,
+          role,
+          is_active,
+          photo_url,
+          avatar_url,
+          phone,
+          created_at
+        `)
         .eq('role', 'student')
         .order('full_name')
 
@@ -63,6 +77,9 @@ export default function StudentsPage() {
         active: studentData.filter(s => s.is_active !== false).length,
         classes: uniqueClasses.length
       })
+
+      // Reset avatar errors
+      setAvatarErrors({})
 
       if (showToast) {
         toast.success(`Loaded ${studentData.length} students`)
@@ -119,7 +136,19 @@ export default function StudentsPage() {
 
   const getInitials = (name: string) => {
     if (!name) return 'ST'
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    const names = name.trim().split(/\s+/)
+    if (names.length >= 2) {
+      return (names[0][0] + names[names.length - 1][0]).toUpperCase()
+    }
+    return names[0].slice(0, 2).toUpperCase()
+  }
+
+  const getPhotoUrl = (student: any) => {
+    return student.photo_url || student.avatar_url || null
+  }
+
+  const handleAvatarError = (studentId: string) => {
+    setAvatarErrors(prev => ({ ...prev, [studentId]: true }))
   }
 
   const groupedStudents = filteredStudents.reduce((acc: Record<string, any[]>, student) => {
@@ -259,50 +288,67 @@ export default function StudentsPage() {
                   <Table>
                     <TableHeader>
                       <TableRow className="bg-slate-50 hover:bg-slate-50">
-                        <TableHead className="text-xs font-semibold">Student</TableHead>
+                        <TableHead className="text-xs font-semibold w-[250px] sm:w-auto">Student</TableHead>
                         <TableHead className="text-xs hidden sm:table-cell">Email</TableHead>
                         <TableHead className="text-center text-xs hidden md:table-cell">VIN</TableHead>
                         <TableHead className="text-center text-xs">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {groupedStudents[cls].map(student => (
-                        <TableRow key={student.id} className="hover:bg-slate-50/50">
-                          <TableCell>
-                            <div className="flex items-center gap-2.5">
-                              <Avatar className="h-7 w-7">
-                                <AvatarFallback className="text-[10px] bg-blue-100 text-blue-700">
-                                  {getInitials(student.full_name)}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div className="min-w-0">
-                                <p className="text-xs sm:text-sm font-medium truncate max-w-[150px]">
-                                  {student.full_name}
-                                </p>
-                                <p className="text-[10px] text-slate-400 sm:hidden">
-                                  {student.email}
-                                </p>
+                      {groupedStudents[cls].map(student => {
+                        const photoUrl = getPhotoUrl(student)
+                        const hasAvatarError = avatarErrors[student.id]
+                        
+                        return (
+                          <TableRow key={student.id} className="hover:bg-slate-50/50">
+                            <TableCell>
+                              <div className="flex items-center gap-2.5">
+                                <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-slate-100">
+                                  {/* Show photo if available and no error */}
+                                  {photoUrl && !hasAvatarError ? (
+                                    <AvatarImage 
+                                      src={photoUrl} 
+                                      alt={student.full_name}
+                                      onError={() => handleAvatarError(student.id)}
+                                      className="object-cover"
+                                    />
+                                  ) : null}
+                                  <AvatarFallback className={cn(
+                                    "text-[10px] sm:text-xs font-medium",
+                                    "bg-gradient-to-br from-blue-500 to-indigo-600 text-white"
+                                  )}>
+                                    {getInitials(student.full_name)}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <p className="text-xs sm:text-sm font-medium truncate max-w-[120px] sm:max-w-[180px]">
+                                    {student.full_name}
+                                  </p>
+                                  <p className="text-[10px] text-slate-400 sm:hidden">
+                                    {student.email}
+                                  </p>
+                                </div>
                               </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-xs text-slate-500 hidden sm:table-cell">
-                            {student.email || '—'}
-                          </TableCell>
-                          <TableCell className="text-center text-xs text-slate-500 hidden md:table-cell">
-                            {student.vin_id || '—'}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <Badge className={cn(
-                              "text-[10px]",
-                              student.is_active !== false
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-red-100 text-red-600'
-                            )}>
-                              {student.is_active !== false ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))}
+                            </TableCell>
+                            <TableCell className="text-xs text-slate-500 hidden sm:table-cell">
+                              {student.email || '—'}
+                            </TableCell>
+                            <TableCell className="text-center text-xs text-slate-500 hidden md:table-cell font-mono">
+                              {student.vin_id || '—'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={cn(
+                                "text-[10px] px-2 py-0.5",
+                                student.is_active !== false
+                                  ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-100'
+                                  : 'bg-red-100 text-red-600 hover:bg-red-100'
+                              )}>
+                                {student.is_active !== false ? 'Active' : 'Inactive'}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>

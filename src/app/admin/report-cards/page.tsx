@@ -1,23 +1,15 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-/* eslint-disable @typescript-eslint/no-explicit-any */
-// app/admin/report-cards/page.tsx - ADMIN REPORT CARD APPROVAL DASHBOARD
+// app/admin/report-cards/page.tsx - AUTO-DETECT TERM + LOADING TEXT
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Header } from '@/components/layout/header'
-// Remove this import if AdminSidebar doesn't exist or comment it out
-// import { AdminSidebar } from '@/components/admin/AdminSidebar'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -29,38 +21,23 @@ import {
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
   AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-// Remove Accordion import if it doesn't exist or create the component
-// import {
-//   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
-// } from '@/components/ui/accordion'
-import { Label } from '@/components/ui/label' // Fixed: Added Label import
-import { Progress } from '@/components/ui/progress'
-import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import { 
   Loader2, CheckCircle, XCircle, Eye, FileText,
-  Users, Search, RefreshCw, Award, BookOpen,
-  ChevronRight, Calendar, Filter, Download, Printer,
-  Send, Clock, AlertCircle, TrendingUp, CheckCheck,
-  GraduationCap, ChevronDown, ChevronUp, Sparkles,
-  CheckCircle2, ArrowLeft, Star, User, Mail
+  Users, Search, RefreshCw,
+  Download, Send, Clock, CheckCheck,
+  GraduationCap, ChevronDown, ChevronUp,
+  CheckCircle2, User, FileSpreadsheet
 } from 'lucide-react'
 
-interface AdminProfile {
-  id: string
-  full_name: string
-  email: string
-  photo_url?: string
-}
-
+// ─── Types ────────────────────────────────────────────
 interface ReportCard {
   id: string
   student_id: string
   student_name: string
   student_vin: string
-  student_class: string
   class: string
   term: string
   academic_year: string
@@ -71,16 +48,9 @@ interface ReportCard {
   class_teacher: string
   total_score: number
   average_score: number
-  position: number
-  class_highest: number
-  class_average: number
-  total_students: number
   status: 'pending' | 'approved' | 'published' | 'rejected'
   submitted_at: string
-  approved_at?: string
-  published_at?: string
   rejected_reason?: string
-  submitted_by?: string
 }
 
 interface ClassStats {
@@ -92,1144 +62,575 @@ interface ClassStats {
   rejected: number
 }
 
-interface StudentSummary {
-  id: string
-  name: string
-  vin: string
-  average: number
-  grade: string
-  status: string
+// ─── Auto-Detect Current Term & Session ───────────────
+const getCurrentTermAndSession = () => {
+  const now = new Date()
+  const month = now.getMonth() // 0=January, 11=December
+  const year = now.getFullYear()
+
+  // Nigerian Secondary School Terms:
+  // First Term:  September (8) - December (11)
+  // Second Term: January (0) - April (3)
+  // Third Term:  May (4) - July/August (6/7)
+
+  if (month >= 8) {
+    // September - December = First Term of new session
+    return { term: 'First Term', session: `${year}/${year + 1}` }
+  } else if (month >= 4) {
+    // May - August = Third Term of current session
+    return { term: 'Third Term', session: `${year - 1}/${year}` }
+  } else {
+    // January - April = Second Term of current session
+    return { term: 'Second Term', session: `${year - 1}/${year}` }
+  }
 }
 
-const terms = ['First Term', 'Second Term', 'Third Term']
-const academicYears = ['2024/2025', '2025/2026', '2026/2027']
-const classes = ['all', 'JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+// ─── Constants ────────────────────────────────────────
+const TERMS = ['First Term', 'Second Term', 'Third Term']
+const YEARS = ['2023/2024', '2024/2025', '2025/2026', '2026/2027', '2027/2028']
+const CLASSES = ['all', 'JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
 
+const getStatusBadge = (status: string) => {
+  switch (status) {
+    case 'published': return <Badge className="bg-emerald-100 text-emerald-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+    case 'approved': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
+    case 'pending': return <Badge className="bg-amber-100 text-amber-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+    case 'rejected': return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
+    default: return <Badge variant="outline">{status}</Badge>
+  }
+}
+
+const getGradeColor = (grade: string) => {
+  if (grade?.startsWith('A')) return 'bg-emerald-100 text-emerald-700'
+  if (grade?.startsWith('B')) return 'bg-blue-100 text-blue-700'
+  if (grade?.startsWith('C')) return 'bg-yellow-100 text-yellow-700'
+  return 'bg-slate-100 text-slate-600'
+}
+
+// ─── Detect current term/session on load ──────────────
+const { term: autoTerm, session: autoSession } = getCurrentTermAndSession()
+
+// ─── Main Component ───────────────────────────────────
 export default function AdminReportCardsPage() {
-  const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<AdminProfile | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  
-  // Filters
-  const [selectedClass, setSelectedClass] = useState<string>('all')
-  const [selectedTerm, setSelectedTerm] = useState<string>('First Term')
-  const [selectedYear, setSelectedYear] = useState<string>('2024/2025')
-  const [selectedStatus, setSelectedStatus] = useState<string>('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [loadingText, setLoadingText] = useState('Loading report cards...')
+  const [profile, setProfile] = useState<any>(null)
+  const [reportCards, setReportCards] = useState<ReportCard[]>([])
+  const [classStats, setClassStats] = useState<ClassStats[]>([])
   const [expandedClass, setExpandedClass] = useState<string | null>(null)
   
-  const [reportCards, setReportCards] = useState<ReportCard[]>([])
-  const [filteredCards, setFilteredCards] = useState<ReportCard[]>([])
-  const [classStats, setClassStats] = useState<ClassStats[]>([])
-  const [classSummaries, setClassSummaries] = useState<Record<string, StudentSummary[]>>({})
+  // Filters - initialized with auto-detected values
+  const [selectedClass, setSelectedClass] = useState('all')
+  const [selectedTerm, setSelectedTerm] = useState<string>(autoTerm)
+  const [selectedYear, setSelectedYear] = useState<string>(autoSession)
+  const [selectedStatus, setSelectedStatus] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
+  
+  // Dialogs
   const [selectedCard, setSelectedCard] = useState<ReportCard | null>(null)
   const [showReviewDialog, setShowReviewDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
-  const [showBulkApproveDialog, setShowBulkApproveDialog] = useState(false)
+  const [showBulkDialog, setShowBulkDialog] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
   const [principalComment, setPrincipalComment] = useState('')
-  const [processingAction, setProcessingAction] = useState(false)
-  const [bulkSelectedClass, setBulkSelectedClass] = useState<string>('')
+  const [processing, setProcessing] = useState(false)
+  const [bulkClass, setBulkClass] = useState('')
   
-  const [stats, setStats] = useState({
-    total: 0, pending: 0, approved: 0, published: 0, rejected: 0
-  })
+  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, published: 0, rejected: 0 })
 
-  const formatProfileForHeader = (profile: AdminProfile | null) => {
-    if (!profile) return undefined
-    return {
-      id: profile.id,
-      name: profile.full_name,
-      email: profile.email,
-      role: 'admin' as const,
-      avatar: profile.photo_url || undefined,
-      isAuthenticated: true
-    }
-  }
-
-  const getStatusBadge = (status: string) => {
-    switch (status) {
-      case 'published':
-        return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
-      case 'approved':
-        return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'rejected':
-        return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
-      default:
-        return <Badge variant="outline">{status}</Badge>
-    }
-  }
-
-  const getGradeColor = (grade: string): string => {
-    if (!grade) return ''
-    if (grade.startsWith('A')) return 'text-green-600'
-    if (grade.startsWith('B')) return 'text-blue-600'
-    if (grade.startsWith('C')) return 'text-yellow-600'
-    if (grade.startsWith('D') || grade.startsWith('E')) return 'text-orange-600'
-    if (grade === 'F9') return 'text-red-600'
-    return 'text-gray-600'
-  }
-
-  const getGradeBgColor = (grade: string): string => {
-    if (!grade) return ''
-    if (grade.startsWith('A')) return 'bg-green-100'
-    if (grade.startsWith('B')) return 'bg-blue-100'
-    if (grade.startsWith('C')) return 'bg-yellow-100'
-    if (grade.startsWith('D') || grade.startsWith('E')) return 'bg-orange-100'
-    if (grade === 'F9') return 'bg-red-100'
-    return 'bg-gray-100'
-  }
-
-  // Auth check
+  // ─── Init ───────────────────────────────────────────
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (!session?.user) {
-          router.push('/portal')
-          return
-        }
-
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
-        if (!profileData || profileData.role !== 'admin') {
-          toast.error('Access denied')
-          router.push('/portal')
-          return
-        }
-
-        setProfile({
-          id: session.user.id,
-          full_name: profileData.full_name || 'Administrator',
-          email: profileData.email || session.user.email || '',
-          photo_url: profileData.photo_url
-        })
-      } catch (err) {
-        console.error('Auth check error:', err)
-        router.push('/portal')
-      }
+    const init = async () => {
+      setLoadingText('Verifying your account...')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
+      const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
+      if (data) setProfile(data)
     }
+    init()
+  }, [])
 
-    checkAuth()
-  }, [router])
-
-  // Load report cards
+  // ─── Load Report Cards ──────────────────────────────
   const loadReportCards = useCallback(async () => {
     setLoading(true)
+    setLoadingText(`Loading ${selectedClass === 'all' ? 'all' : selectedClass} report cards...`)
     try {
       let query = supabase
         .from('report_cards')
         .select('*')
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
+        .filter('term', 'eq', selectedTerm)
+        .filter('academic_year', 'eq', selectedYear)
         .order('submitted_at', { ascending: false })
+        .limit(500)
 
-      if (selectedClass !== 'all') {
-        query = query.eq('class', selectedClass)
-      }
+      if (selectedClass !== 'all') query = query.filter('class', 'eq', selectedClass)
+      if (selectedStatus !== 'all') query = query.filter('status', 'eq', selectedStatus)
 
-      if (selectedStatus !== 'all') {
-        query = query.eq('status', selectedStatus)
-      }
-
+      setLoadingText('Fetching report cards from database...')
       const { data, error } = await query
-
       if (error) throw error
 
+      setLoadingText('Processing report card data...')
       const cards: ReportCard[] = (data || []).map((rc: any) => ({
-        id: rc.id,
-        student_id: rc.student_id,
-        student_name: rc.student_name || 'Unknown',
-        student_vin: rc.student_vin || 'N/A',
-        student_class: rc.class,
-        class: rc.class,
-        term: rc.term,
-        academic_year: rc.academic_year,
-        subjects_data: rc.subjects_data || [],
-        assessment_data: rc.assessment_data || {},
-        teacher_comments: rc.teacher_comments || '',
-        principal_comments: rc.principal_comments || '',
+        id: rc.id, student_id: rc.student_id,
+        student_name: rc.student_name || 'Unknown', student_vin: rc.student_vin || 'N/A',
+        class: rc.class, term: rc.term, academic_year: rc.academic_year,
+        subjects_data: rc.subjects_data || [], assessment_data: rc.assessment_data || {},
+        teacher_comments: rc.teacher_comments || '', principal_comments: rc.principal_comments || '',
         class_teacher: rc.class_teacher || 'Unknown',
-        total_score: rc.total_score || 0,
-        average_score: rc.average_score || 0,
-        position: rc.position || 0,
-        class_highest: rc.class_highest || 0,
-        class_average: rc.class_average || 0,
-        total_students: rc.total_students || 1,
-        status: rc.status || 'pending',
-        submitted_at: rc.submitted_at || rc.created_at,
-        approved_at: rc.approved_at,
-        published_at: rc.published_at,
-        rejected_reason: rc.rejected_reason,
-        submitted_by: rc.submitted_by
+        total_score: rc.total_score || 0, average_score: rc.average_score || 0,
+        status: rc.status || 'pending', submitted_at: rc.submitted_at || rc.created_at,
+        rejected_reason: rc.rejected_reason
       }))
 
       setReportCards(cards)
       
-      // Filter by search
-      let filtered = cards
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase()
-        filtered = cards.filter(c => 
-          c.student_name.toLowerCase().includes(query) ||
-          c.student_vin?.toLowerCase().includes(query)
-        )
-      }
-      setFilteredCards(filtered)
-      
-      // Calculate stats
-      const total = cards.length
-      const pending = cards.filter(c => c.status === 'pending').length
-      const approved = cards.filter(c => c.status === 'approved').length
-      const published = cards.filter(c => c.status === 'published').length
-      const rejected = cards.filter(c => c.status === 'rejected').length
-      
-      setStats({ total, pending, approved, published, rejected })
+      // Stats
+      setStats({
+        total: cards.length,
+        pending: cards.filter(c => c.status === 'pending').length,
+        approved: cards.filter(c => c.status === 'approved').length,
+        published: cards.filter(c => c.status === 'published').length,
+        rejected: cards.filter(c => c.status === 'rejected').length,
+      })
 
-      // Calculate class stats (only when viewing all classes)
+      // Class stats
       if (selectedClass === 'all') {
-        const classMap: Record<string, ClassStats> = {}
-        const summaryMap: Record<string, StudentSummary[]> = {}
-        
-        cards.forEach(card => {
-          if (!classMap[card.class]) {
-            classMap[card.class] = {
-              className: card.class,
-              total: 0, pending: 0, approved: 0, published: 0, rejected: 0
-            }
-            summaryMap[card.class] = []
-          }
-          classMap[card.class].total++
-          classMap[card.class][card.status]++
-          
-          summaryMap[card.class].push({
-            id: card.student_id,
-            name: card.student_name,
-            vin: card.student_vin,
-            average: card.average_score,
-            grade: card.average_score >= 75 ? 'A1' : 
-                   card.average_score >= 70 ? 'B2' :
-                   card.average_score >= 65 ? 'B3' :
-                   card.average_score >= 60 ? 'C4' :
-                   card.average_score >= 55 ? 'C5' :
-                   card.average_score >= 50 ? 'C6' :
-                   card.average_score >= 45 ? 'D7' :
-                   card.average_score >= 40 ? 'E8' : 'F9',
-            status: card.status
-          })
+        const map: Record<string, ClassStats> = {}
+        cards.forEach(c => {
+          if (!map[c.class]) map[c.class] = { className: c.class, total: 0, pending: 0, approved: 0, published: 0, rejected: 0 }
+          map[c.class].total++
+          const st = c.status as keyof Pick<ClassStats, 'pending' | 'approved' | 'published' | 'rejected'>
+          if (st in map[c.class]) map[c.class][st]++
         })
-        
-        // Sort summaries by average score
-        Object.keys(summaryMap).forEach(className => {
-          summaryMap[className].sort((a, b) => b.average - a.average)
-        })
-        
-        setClassStats(Object.values(classMap).sort((a, b) => a.className.localeCompare(b.className)))
-        setClassSummaries(summaryMap)
+        setClassStats(Object.values(map).sort((a, b) => a.className.localeCompare(b.className)))
       }
-
     } catch (error) {
-      console.error('Error loading report cards:', error)
+      console.error('Error:', error)
       toast.error('Failed to load report cards')
-    } finally {
-      setLoading(false)
-    }
-  }, [selectedTerm, selectedYear, selectedClass, selectedStatus, searchQuery])
+    } finally { setLoading(false) }
+  }, [selectedTerm, selectedYear, selectedClass, selectedStatus])
 
-  useEffect(() => {
-    if (profile) {
-      loadReportCards()
-    }
-  }, [profile, loadReportCards])
+  useEffect(() => { if (profile) loadReportCards() }, [profile, loadReportCards])
 
-  // Handle Logout
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/portal')
-  }
+  // ─── Filtered Cards ─────────────────────────────────
+  const filteredCards = reportCards.filter(c => {
+    if (!searchQuery) return true
+    const q = searchQuery.toLowerCase()
+    return c.student_name.toLowerCase().includes(q) || c.student_vin?.toLowerCase().includes(q)
+  })
 
-  // View report card details
+  // ─── Actions ────────────────────────────────────────
   const handleViewCard = (card: ReportCard) => {
     setSelectedCard(card)
     setPrincipalComment(card.principal_comments || '')
     setShowReviewDialog(true)
   }
 
-  // Approve single report card
   const handleApproveCard = async () => {
-    if (!selectedCard) return
-    
-    setProcessingAction(true)
+    if (!selectedCard || !profile) return
+    setProcessing(true)
     try {
-      const { error } = await supabase
-        .from('report_cards')
-        .update({
-          status: 'approved',
-          principal_comments: principalComment,
-          approved_by: profile?.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('id', selectedCard.id)
-
+      const { error } = await supabase.from('report_cards').update({
+        status: 'approved', principal_comments: principalComment,
+        approved_by: profile.id, approved_at: new Date().toISOString()
+      }).eq('id', selectedCard.id)
       if (error) throw error
-
-      toast.success(`Report card for ${selectedCard.student_name} approved!`)
+      toast.success('✅ Report card approved!')
       setShowReviewDialog(false)
       loadReportCards()
-    } catch (error) {
-      console.error('Error approving report card:', error)
-      toast.error('Failed to approve report card')
-    } finally {
-      setProcessingAction(false)
-    }
+    } catch (err) { toast.error('Failed to approve') }
+    finally { setProcessing(false) }
   }
 
-  // Publish single report card (makes it visible to student)
   const handlePublishCard = async () => {
-    if (!selectedCard) return
-    
-    setProcessingAction(true)
+    if (!selectedCard || !profile) return
+    setProcessing(true)
     try {
-      const { error } = await supabase
-        .from('report_cards')
-        .update({
-          status: 'published',
-          principal_comments: principalComment,
-          published_by: profile?.id,
-          published_at: new Date().toISOString()
-        })
-        .eq('id', selectedCard.id)
-
+      const { error } = await supabase.from('report_cards').update({
+        status: 'published', principal_comments: principalComment,
+        published_by: profile.id, published_at: new Date().toISOString()
+      }).eq('id', selectedCard.id)
       if (error) throw error
-
-      // Send notification to student
-      await supabase.from('notifications').insert({
-        user_id: selectedCard.student_id,
-        title: 'Report Card Published!',
-        message: `Your ${selectedCard.term} ${selectedCard.academic_year} report card is now available.`,
-        type: 'report_card_published',
-        link: '/student/report-card',
-        metadata: { term: selectedCard.term, academic_year: selectedCard.academic_year }
-      })
-
-      toast.success(`Report card published for ${selectedCard.student_name}!`)
+      toast.success('📢 Report card published to student!')
       setShowReviewDialog(false)
       loadReportCards()
-    } catch (error) {
-      console.error('Error publishing report card:', error)
-      toast.error('Failed to publish report card')
-    } finally {
-      setProcessingAction(false)
-    }
+    } catch (err) { toast.error('Failed to publish') }
+    finally { setProcessing(false) }
   }
 
-  // Reject report card
   const handleRejectCard = async () => {
-    if (!selectedCard || !rejectReason) {
-      toast.error('Please provide a reason for rejection')
-      return
-    }
-    
-    setProcessingAction(true)
+    if (!selectedCard || !rejectReason.trim()) { toast.error('Provide a reason'); return }
+    setProcessing(true)
     try {
-      const { error } = await supabase
-        .from('report_cards')
-        .update({
-          status: 'rejected',
-          rejected_reason: rejectReason,
-          rejected_by: profile?.id,
-          rejected_at: new Date().toISOString()
-        })
-        .eq('id', selectedCard.id)
-
+      const { error } = await supabase.from('report_cards').update({
+        status: 'rejected', rejected_reason: rejectReason,
+        rejected_by: profile?.id, rejected_at: new Date().toISOString()
+      }).eq('id', selectedCard.id)
       if (error) throw error
-
-      // Send notification to teacher
-      await supabase.from('notifications').insert({
-        user_id: selectedCard.submitted_by,
-        title: 'Report Card Rejected',
-        message: `${selectedCard.student_name}'s report card was rejected. Reason: ${rejectReason}`,
-        type: 'report_card_rejected',
-        link: `/staff/students/${selectedCard.student_id}`,
-        metadata: { student_id: selectedCard.student_id, reason: rejectReason }
-      })
-
       toast.success('Report card rejected')
       setShowRejectDialog(false)
       setShowReviewDialog(false)
       setRejectReason('')
       loadReportCards()
-    } catch (error) {
-      console.error('Error rejecting report card:', error)
-      toast.error('Failed to reject report card')
-    } finally {
-      setProcessingAction(false)
-    }
+    } catch (err) { toast.error('Failed to reject') }
+    finally { setProcessing(false) }
   }
 
-  // Bulk approve all pending in a class
   const handleBulkApprove = async () => {
-    if (!bulkSelectedClass) return
-    
-    setProcessingAction(true)
+    if (!bulkClass) return
+    setProcessing(true)
     try {
-      const pendingCards = reportCards.filter(c => 
-        c.class === bulkSelectedClass && c.status === 'pending'
-      )
-      
-      if (pendingCards.length === 0) {
-        toast.info('No pending report cards in this class')
-        setShowBulkApproveDialog(false)
-        setProcessingAction(false)
-        return
-      }
-
-      const { error } = await supabase
-        .from('report_cards')
-        .update({
-          status: 'approved',
-          approved_by: profile?.id,
-          approved_at: new Date().toISOString()
-        })
-        .eq('class', bulkSelectedClass)
-        .eq('status', 'pending')
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-
+      const { error } = await supabase.from('report_cards').update({
+        status: 'approved', approved_by: profile?.id, approved_at: new Date().toISOString()
+      }).filter('class', 'eq', bulkClass).eq('status', 'pending').filter('term', 'eq', selectedTerm).filter('academic_year', 'eq', selectedYear)
       if (error) throw error
-
-      toast.success(`${pendingCards.length} report cards approved for ${bulkSelectedClass}!`)
-      setShowBulkApproveDialog(false)
-      setBulkSelectedClass('')
-      loadReportCards()
-    } catch (error) {
-      console.error('Error bulk approving:', error)
-      toast.error('Failed to bulk approve report cards')
-    } finally {
-      setProcessingAction(false)
-    }
+      toast.success(`✅ All pending in ${bulkClass} approved!`)
+      setShowBulkDialog(false); setBulkClass(''); loadReportCards()
+    } catch (err) { toast.error('Failed') }
+    finally { setProcessing(false) }
   }
 
-  // Bulk publish all approved in a class
   const handleBulkPublish = async () => {
-    if (!bulkSelectedClass) return
-    
-    setProcessingAction(true)
+    if (!bulkClass) return
+    setProcessing(true)
     try {
-      const approvedCards = reportCards.filter(c => 
-        c.class === bulkSelectedClass && c.status === 'approved'
-      )
-      
-      if (approvedCards.length === 0) {
-        toast.info('No approved report cards in this class')
-        setShowBulkApproveDialog(false)
-        setProcessingAction(false)
-        return
-      }
-
-      const { error } = await supabase
-        .from('report_cards')
-        .update({
-          status: 'published',
-          published_by: profile?.id,
-          published_at: new Date().toISOString()
-        })
-        .eq('class', bulkSelectedClass)
-        .eq('status', 'approved')
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-
+      const { error } = await supabase.from('report_cards').update({
+        status: 'published', published_by: profile?.id, published_at: new Date().toISOString()
+      }).filter('class', 'eq', bulkClass).eq('status', 'approved').filter('term', 'eq', selectedTerm).filter('academic_year', 'eq', selectedYear)
       if (error) throw error
-
-      toast.success(`${approvedCards.length} report cards published for ${bulkSelectedClass}!`)
-      setShowBulkApproveDialog(false)
-      setBulkSelectedClass('')
-      loadReportCards()
-    } catch (error) {
-      console.error('Error bulk publishing:', error)
-      toast.error('Failed to bulk publish report cards')
-    } finally {
-      setProcessingAction(false)
-    }
+      toast.success(`📢 All approved in ${bulkClass} published!`)
+      setShowBulkDialog(false); setBulkClass(''); loadReportCards()
+    } catch (err) { toast.error('Failed') }
+    finally { setProcessing(false) }
   }
 
-  // Export class report cards
-  const handleExportClass = (className: string) => {
-    const classCards = reportCards.filter(c => c.class === className)
-    if (classCards.length === 0) {
-      toast.info('No report cards to export')
-      return
-    }
-    
-    const csv = [
-      ['Student Name', 'VIN', 'Average Score', 'Grade', 'Status', 'Teacher', 'Submitted'],
-      ...classCards.map(c => [
-        c.student_name,
-        c.student_vin,
-        `${c.average_score}%`,
-        c.average_score >= 75 ? 'A1' : c.average_score >= 70 ? 'B2' : c.average_score >= 65 ? 'B3' : c.average_score >= 60 ? 'C4' : c.average_score >= 55 ? 'C5' : c.average_score >= 50 ? 'C6' : c.average_score >= 45 ? 'D7' : c.average_score >= 40 ? 'E8' : 'F9',
-        c.status,
-        c.class_teacher,
-        new Date(c.submitted_at).toLocaleDateString()
-      ])
-    ].map(row => row.join(',')).join('\n')
-    
+  const handleExport = (className: string) => {
+    const cards = className === 'all' ? reportCards : reportCards.filter(c => c.class === className)
+    if (!cards.length) { toast.info('No data'); return }
+    const csv = [['Name','VIN','Avg','Grade','Status'].join(','), ...cards.map(c => [c.student_name, c.student_vin, `${c.average_score}%`, c.average_score>=75?'A1':c.average_score>=65?'B2':c.average_score>=50?'C4':'F9', c.status].join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${className}_${selectedTerm}_${selectedYear}_Report_Cards.csv`
-    a.click()
-    window.URL.revokeObjectURL(url)
-    
-    toast.success(`Exported ${classCards.length} report cards`)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `ReportCards_${className}_${selectedTerm}_${selectedYear.replace('/', '_')}.csv`; a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Exported!')
   }
 
-  if (loading && !profile) {
+  // ─── Loading State ──────────────────────────────────
+  if (loading && !reportCards.length) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-        <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        >
+          <FileSpreadsheet className="h-12 w-12 text-blue-500" />
+        </motion.div>
+        <p className="text-slate-600 font-medium text-sm">{loadingText}</p>
+        <div className="flex gap-1">
+          {[0, 1, 2].map(i => (
+            <motion.div
+              key={i}
+              className="h-1.5 w-1.5 rounded-full bg-blue-400"
+              animate={{ y: [0, -6, 0] }}
+              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
         </div>
       </div>
     )
   }
 
+  // ─── Render ─────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-      <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-      
-      <div className="flex">
-        {/* AdminSidebar removed - create or fix the component */}
-        {/* <AdminSidebar 
-          profile={profile}
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab="report-cards"
-          setActiveTab={() => {}}
-        /> */}
-        
-        <main className={cn(
-          "flex-1 pt-16 lg:pt-20 pb-8 min-h-screen transition-all duration-300",
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-        )}>
-          <div className="container mx-auto px-4 lg:px-6 py-6 max-w-7xl">
-            
-            {/* Header */}
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6"
-            >
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                    Report Card Approval
-                  </h1>
-                  <p className="text-muted-foreground mt-1">
-                    Review, approve, and publish student report cards
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={loadReportCards}>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Refresh
-                  </Button>
-                  <Button 
-                    onClick={() => {
-                      setBulkSelectedClass('')
-                      setShowBulkApproveDialog(true)
-                    }}
-                    className="bg-blue-600"
-                  >
-                    <CheckCheck className="h-4 w-4 mr-2" />
-                    Bulk Actions
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
+    <div className="space-y-4 sm:space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-slate-800">Report Card Approval</h2>
+          <p className="text-sm text-slate-500">
+            {selectedTerm} {selectedYear} • {stats.pending} pending • {stats.published} published
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={loadReportCards} className="h-8 text-xs">
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Refresh
+          </Button>
+          <Button size="sm" onClick={() => { setBulkClass(''); setShowBulkDialog(true) }} className="h-8 text-xs bg-blue-600">
+            <CheckCheck className="h-3.5 w-3.5 mr-1.5" />Bulk Actions
+          </Button>
+        </div>
+      </div>
 
-            {/* Stats Cards */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.1 }}
-              className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4 mb-6"
-            >
-              <Card className="border-0 shadow-sm bg-white">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-slate-500">Total</p>
-                      <p className="text-2xl font-bold">{stats.total}</p>
-                    </div>
-                    <FileText className="h-8 w-8 text-slate-400" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm bg-yellow-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-yellow-600">Pending</p>
-                      <p className="text-2xl font-bold text-yellow-700">{stats.pending}</p>
-                    </div>
-                    <Clock className="h-8 w-8 text-yellow-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm bg-blue-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-blue-600">Approved</p>
-                      <p className="text-2xl font-bold text-blue-700">{stats.approved}</p>
-                    </div>
-                    <CheckCircle className="h-8 w-8 text-blue-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm bg-green-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-green-600">Published</p>
-                      <p className="text-2xl font-bold text-green-700">{stats.published}</p>
-                    </div>
-                    <CheckCircle2 className="h-8 w-8 text-green-500" />
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-0 shadow-sm bg-red-50">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs text-red-600">Rejected</p>
-                      <p className="text-2xl font-bold text-red-700">{stats.rejected}</p>
-                    </div>
-                    <XCircle className="h-8 w-8 text-red-500" />
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
+      {/* Stats */}
+      <div className="grid grid-cols-5 gap-2">
+        {[
+          { label: 'Total', value: stats.total, color: 'text-slate-600 bg-slate-50' },
+          { label: 'Pending', value: stats.pending, color: 'text-amber-600 bg-amber-50' },
+          { label: 'Approved', value: stats.approved, color: 'text-blue-600 bg-blue-50' },
+          { label: 'Published', value: stats.published, color: 'text-emerald-600 bg-emerald-50' },
+          { label: 'Rejected', value: stats.rejected, color: 'text-red-600 bg-red-50' },
+        ].map((s, i) => (
+          <div key={i} className={cn("rounded-lg p-2.5 text-center border", s.color)}>
+            <p className="text-[9px] uppercase opacity-70">{s.label}</p>
+            <p className="text-lg font-bold">{s.value}</p>
+          </div>
+        ))}
+      </div>
 
-            {/* Filters */}
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.15 }}
-              className="mb-6"
-            >
-              <Card className="border-0 shadow-sm bg-white">
-                <CardContent className="p-4">
-                  <div className="flex flex-wrap items-center gap-3">
-                    <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {terms.map(term => <SelectItem key={term} value={term}>{term}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={selectedYear} onValueChange={setSelectedYear}>
-                      <SelectTrigger className="w-[150px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {academicYears.map(year => <SelectItem key={year} value={year}>{year}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={selectedClass} onValueChange={setSelectedClass}>
-                      <SelectTrigger className="w-[130px]">
-                        <SelectValue placeholder="Class" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {classes.map(cls => <SelectItem key={cls} value={cls}>{cls === 'all' ? 'All Classes' : cls}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    
-                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Status</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="approved">Approved</SelectItem>
-                        <SelectItem value="published">Published</SelectItem>
-                        <SelectItem value="rejected">Rejected</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    
-                    <div className="relative flex-1 min-w-[200px]">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                      <Input
-                        placeholder="Search student name or VIN..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-9"
-                      />
+      {/* Filters */}
+      <Card className="border-0 shadow-sm">
+        <CardContent className="p-3">
+          <div className="flex flex-wrap gap-2">
+            <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+              <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+              <SelectContent>{TERMS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue /></SelectTrigger>
+              <SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Class" /></SelectTrigger>
+              <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c === 'all' ? 'All Classes' : c}</SelectItem>)}</SelectContent>
+            </Select>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="approved">Approved</SelectItem>
+                <SelectItem value="published">Published</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 min-w-[180px]">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+              <Input placeholder="Search name or VIN..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-7 h-8 text-xs" />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Content */}
+      {selectedClass === 'all' ? (
+        <div className="space-y-3">
+          {classStats.length === 0 ? (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="text-center py-16">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-base font-semibold text-slate-700 mb-1">No report cards found</h3>
+                <p className="text-sm text-slate-500">No report cards for {selectedTerm} {selectedYear}</p>
+              </CardContent>
+            </Card>
+          ) : classStats.map(cs => {
+            const isOpen = expandedClass === cs.className
+            const classCards = reportCards.filter(c => c.class === cs.className && (!searchQuery || c.student_name.toLowerCase().includes(searchQuery.toLowerCase()) || c.student_vin?.toLowerCase().includes(searchQuery.toLowerCase())))
+            return (
+              <Card key={cs.className} className="border-0 shadow-sm overflow-hidden">
+                <button onClick={() => setExpandedClass(isOpen ? null : cs.className)} className="w-full p-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    {isOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
+                    <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <GraduationCap className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <span className="font-semibold text-sm">{cs.className}</span>
+                      <p className="text-xs text-slate-400">{cs.total} students</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            {/* Class Accordions (when viewing all classes) */}
-            {selectedClass === 'all' ? (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-                className="space-y-4"
-              >
-                {classStats.length === 0 ? (
-                  <Card className="border-0 shadow-lg bg-white">
-                    <CardContent className="text-center py-16">
-                      <FileText className="h-12 w-12 text-slate-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                        No report cards found
-                      </h3>
-                      <p className="text-muted-foreground">
-                        No report cards have been submitted for {selectedTerm} {selectedYear} yet.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  classStats.map((classStat) => (
-                    <Card key={classStat.className} className="border-0 shadow-sm bg-white overflow-hidden">
-                      <div 
-                        className="p-4 cursor-pointer hover:bg-slate-50 transition-colors"
-                        onClick={() => setExpandedClass(expandedClass === classStat.className ? null : classStat.className)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                              <GraduationCap className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div>
-                              <h3 className="font-bold text-lg">{classStat.className}</h3>
-                              <p className="text-sm text-slate-500">{classStat.total} students</p>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-6">
-                            <div className="hidden md:flex items-center gap-4">
-                              <div className="text-center">
-                                <p className="text-xs text-slate-500">Pending</p>
-                                <p className="font-bold text-yellow-600">{classStat.pending}</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-xs text-slate-500">Approved</p>
-                                <p className="font-bold text-blue-600">{classStat.approved}</p>
-                              </div>
-                              <div className="text-center">
-                                <p className="text-xs text-slate-500">Published</p>
-                                <p className="font-bold text-green-600">{classStat.published}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleExportClass(classStat.className)
-                                }}
-                              >
-                                <Download className="h-4 w-4" />
-                              </Button>
-                              {expandedClass === classStat.className ? (
-                                <ChevronUp className="h-5 w-5 text-slate-400" />
-                              ) : (
-                                <ChevronDown className="h-5 w-5 text-slate-400" />
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <AnimatePresence>
-                        {expandedClass === classStat.className && (
-                          <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            className="border-t"
-                          >
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead>Student</TableHead>
-                                  <TableHead>VIN</TableHead>
-                                  <TableHead className="text-center">Average</TableHead>
-                                  <TableHead className="text-center">Grade</TableHead>
-                                  <TableHead>Status</TableHead>
-                                  <TableHead>Teacher</TableHead>
-                                  <TableHead className="text-right">Action</TableHead>
-                                </TableRow>
-                              </TableHeader>
-                              <TableBody>
-                                {classSummaries[classStat.className]?.map((student) => {
-                                  const card = reportCards.find(c => c.student_id === student.id)
-                                  return (
-                                    <TableRow key={student.id}>
-                                      <TableCell>
-                                        <div className="flex items-center gap-2">
-                                          <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                            <User className="h-4 w-4 text-slate-500" />
-                                          </div>
-                                          <span className="font-medium">{student.name}</span>
-                                        </div>
-                                      </TableCell>
-                                      <TableCell className="font-mono text-xs">{student.vin}</TableCell>
-                                      <TableCell className="text-center font-bold">{student.average}%</TableCell>
-                                      <TableCell className="text-center">
-                                        <Badge className={cn(getGradeBgColor(student.grade), getGradeColor(student.grade))}>
-                                          {student.grade}
-                                        </Badge>
-                                      </TableCell>
-                                      <TableCell>{getStatusBadge(student.status)}</TableCell>
-                                      <TableCell className="text-sm text-slate-500">{card?.class_teacher || '—'}</TableCell>
-                                      <TableCell className="text-right">
-                                        <Button 
-                                          size="sm" 
-                                          variant="outline"
-                                          onClick={() => card && handleViewCard(card)}
-                                        >
-                                          <Eye className="h-4 w-4 mr-1" />
-                                          Review
-                                        </Button>
-                                      </TableCell>
-                                    </TableRow>
-                                  )
-                                })}
-                              </TableBody>
-                            </Table>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </Card>
-                  ))
-                )}
-              </motion.div>
-            ) : (
-              /* Single Class View - Table */
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.2 }}
-              >
-                <Card className="border-0 shadow-sm bg-white">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{selectedClass} - Report Cards</CardTitle>
-                      <Button variant="outline" size="sm" onClick={() => handleExportClass(selectedClass)}>
-                        <Download className="h-4 w-4 mr-2" />
-                        Export
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    {filteredCards.length === 0 ? (
-                      <div className="text-center py-12">
-                        <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-slate-500">No report cards found</p>
-                      </div>
-                    ) : (
+                  <div className="flex items-center gap-3 text-xs">
+                    <span className="text-amber-600 font-medium">{cs.pending} pending</span>
+                    <span className="text-emerald-600 font-medium">{cs.published} published</span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); handleExport(cs.className) }}>
+                      <Download className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </button>
+                <AnimatePresence>
+                  {isOpen && (
+                    <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="overflow-hidden border-t">
                       <Table>
                         <TableHeader>
-                          <TableRow>
-                            <TableHead>Student</TableHead>
-                            <TableHead>VIN</TableHead>
-                            <TableHead className="text-center">Average</TableHead>
-                            <TableHead className="text-center">Grade</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Teacher</TableHead>
-                            <TableHead className="text-right">Action</TableHead>
+                          <TableRow className="bg-slate-50">
+                            <TableHead className="text-xs">Student</TableHead>
+                            <TableHead className="text-xs">VIN</TableHead>
+                            <TableHead className="text-center text-xs">Avg</TableHead>
+                            <TableHead className="text-xs">Status</TableHead>
+                            <TableHead className="text-right text-xs">Action</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {filteredCards.map((card) => {
-                            const grade = card.average_score >= 75 ? 'A1' : 
-                                         card.average_score >= 70 ? 'B2' :
-                                         card.average_score >= 65 ? 'B3' :
-                                         card.average_score >= 60 ? 'C4' :
-                                         card.average_score >= 55 ? 'C5' :
-                                         card.average_score >= 50 ? 'C6' :
-                                         card.average_score >= 45 ? 'D7' :
-                                         card.average_score >= 40 ? 'E8' : 'F9'
-                            return (
-                              <TableRow key={card.id}>
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-8 w-8 rounded-full bg-slate-100 flex items-center justify-center">
-                                      <User className="h-4 w-4 text-slate-500" />
-                                    </div>
-                                    <span className="font-medium">{card.student_name}</span>
+                          {classCards.map(c => (
+                            <TableRow key={c.id} className="hover:bg-slate-50/50">
+                              <TableCell className="text-xs font-medium">
+                                <div className="flex items-center gap-2">
+                                  <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center">
+                                    <User className="h-3.5 w-3.5 text-slate-500" />
                                   </div>
-                                </TableCell>
-                                <TableCell className="font-mono text-xs">{card.student_vin}</TableCell>
-                                <TableCell className="text-center font-bold">{card.average_score}%</TableCell>
-                                <TableCell className="text-center">
-                                  <Badge className={cn(getGradeBgColor(grade), getGradeColor(grade))}>
-                                    {grade}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>{getStatusBadge(card.status)}</TableCell>
-                                <TableCell className="text-sm text-slate-500">{card.class_teacher}</TableCell>
-                                <TableCell className="text-right">
-                                  <Button 
-                                    size="sm" 
-                                    variant="outline"
-                                    onClick={() => handleViewCard(card)}
-                                  >
-                                    <Eye className="h-4 w-4 mr-1" />
-                                    Review
-                                  </Button>
-                                </TableCell>
-                              </TableRow>
-                            )
-                          })}
+                                  {c.student_name}
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-xs font-mono">{c.student_vin}</TableCell>
+                              <TableCell className="text-center text-xs font-bold">{c.average_score}%</TableCell>
+                              <TableCell>{getStatusBadge(c.status)}</TableCell>
+                              <TableCell className="text-right">
+                                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleViewCard(c)}>
+                                  <Eye className="h-3 w-3 mr-1" />Review
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
                         </TableBody>
                       </Table>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </Card>
+            )
+          })}
+        </div>
+      ) : (
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-0">
+            {filteredCards.length === 0 ? (
+              <div className="text-center py-16">
+                <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-base font-semibold text-slate-700 mb-1">No report cards</h3>
+                <p className="text-sm text-slate-500">No report cards found for {selectedClass}</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-slate-50">
+                    <TableHead className="text-xs">Student</TableHead>
+                    <TableHead className="text-xs">VIN</TableHead>
+                    <TableHead className="text-center text-xs">Avg</TableHead>
+                    <TableHead className="text-xs">Status</TableHead>
+                    <TableHead className="text-xs">Teacher</TableHead>
+                    <TableHead className="text-right text-xs">Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredCards.map(c => (
+                    <TableRow key={c.id} className="hover:bg-slate-50/50">
+                      <TableCell className="text-xs font-medium">{c.student_name}</TableCell>
+                      <TableCell className="text-xs font-mono">{c.student_vin}</TableCell>
+                      <TableCell className="text-center text-xs font-bold">{c.average_score}%</TableCell>
+                      <TableCell>{getStatusBadge(c.status)}</TableCell>
+                      <TableCell className="text-xs text-slate-500">{c.class_teacher}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleViewCard(c)}>
+                          <Eye className="h-3 w-3 mr-1" />Review
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             )}
-          </div>
-        </main>
-      </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Review Report Card Dialog */}
+      {/* Review Dialog */}
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           {selectedCard && (
             <>
               <DialogHeader>
-                <DialogTitle className="flex items-center gap-3">
+                <DialogTitle className="flex items-center gap-2">
                   <User className="h-5 w-5" />
-                  {selectedCard.student_name} - {selectedCard.class}
+                  {selectedCard.student_name}
                 </DialogTitle>
                 <DialogDescription>
-                  {selectedCard.term} {selectedCard.academic_year} | VIN: {selectedCard.student_vin} | 
-                  Teacher: {selectedCard.class_teacher} | 
-                  Submitted: {new Date(selectedCard.submitted_at).toLocaleDateString()}
+                  {selectedCard.class} • VIN: {selectedCard.student_vin} • {selectedCard.term} {selectedCard.academic_year}
                 </DialogDescription>
               </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                {/* Status */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <span className="font-medium">Current Status:</span>
-                  {getStatusBadge(selectedCard.status)}
-                </div>
-
-                {/* Scores Summary */}
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="p-3 bg-blue-50 rounded-lg text-center">
-                    <p className="text-xs text-blue-600">Average Score</p>
-                    <p className="text-2xl font-bold text-blue-700">{selectedCard.average_score}%</p>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">{getStatusBadge(selectedCard.status)}</div>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-blue-50 rounded-lg p-2">
+                    <p className="text-[10px] text-blue-500 uppercase">Average</p>
+                    <p className="text-lg font-bold text-blue-700">{selectedCard.average_score}%</p>
                   </div>
-                  <div className="p-3 bg-green-50 rounded-lg text-center">
-                    <p className="text-xs text-green-600">Total Score</p>
-                    <p className="text-2xl font-bold text-green-700">{selectedCard.total_score}</p>
+                  <div className="bg-emerald-50 rounded-lg p-2">
+                    <p className="text-[10px] text-emerald-500 uppercase">Total</p>
+                    <p className="text-lg font-bold text-emerald-700">{selectedCard.total_score}</p>
                   </div>
-                  <div className="p-3 bg-purple-50 rounded-lg text-center">
-                    <p className="text-xs text-purple-600">Position</p>
-                    <p className="text-2xl font-bold text-purple-700">
-                      {selectedCard.position || '—'} / {selectedCard.total_students || '—'}
-                    </p>
+                  <div className="bg-purple-50 rounded-lg p-2">
+                    <p className="text-[10px] text-purple-500 uppercase">Class</p>
+                    <p className="text-lg font-bold text-purple-700">{selectedCard.class}</p>
                   </div>
                 </div>
-
-                {/* Subjects Table */}
                 <div>
-                  <h4 className="font-semibold mb-2">Subject Scores</h4>
+                  <p className="text-xs font-semibold mb-1">Subject Scores</p>
                   <Table>
                     <TableHeader>
-                      <TableRow>
-                        <TableHead>Subject</TableHead>
-                        <TableHead className="text-center">CA1</TableHead>
-                        <TableHead className="text-center">CA2</TableHead>
-                        <TableHead className="text-center">Exam</TableHead>
-                        <TableHead className="text-center">Total</TableHead>
-                        <TableHead className="text-center">Grade</TableHead>
+                      <TableRow className="bg-slate-50">
+                        <TableHead className="text-xs">Subject</TableHead>
+                        <TableHead className="text-center text-xs">CA</TableHead>
+                        <TableHead className="text-center text-xs">Exam</TableHead>
+                        <TableHead className="text-center text-xs">Total</TableHead>
+                        <TableHead className="text-center text-xs">Grade</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {selectedCard.subjects_data?.map((subject: any, idx: number) => {
-                        const grade = subject.total >= 75 ? 'A1' : 
-                                     subject.total >= 70 ? 'B2' :
-                                     subject.total >= 65 ? 'B3' :
-                                     subject.total >= 60 ? 'C4' :
-                                     subject.total >= 55 ? 'C5' :
-                                     subject.total >= 50 ? 'C6' :
-                                     subject.total >= 45 ? 'D7' :
-                                     subject.total >= 40 ? 'E8' : 'F9'
-                        return (
-                          <TableRow key={idx}>
-                            <TableCell className="font-medium">{subject.name}</TableCell>
-                            <TableCell className="text-center">{subject.ca1 || '-'}</TableCell>
-                            <TableCell className="text-center">{subject.ca2 || '-'}</TableCell>
-                            <TableCell className="text-center">
-                              {(subject.examObj || 0) + (subject.examTheory || 0)}
-                            </TableCell>
-                            <TableCell className="text-center font-bold">{subject.total}</TableCell>
-                            <TableCell className="text-center">
-                              <Badge className={cn(getGradeBgColor(grade), getGradeColor(grade))}>
-                                {subject.grade || grade}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
+                      {selectedCard.subjects_data?.map((s: any, i: number) => (
+                        <TableRow key={i}>
+                          <TableCell className="text-xs font-medium">{s.name}</TableCell>
+                          <TableCell className="text-center text-xs">{s.ca || '-'}</TableCell>
+                          <TableCell className="text-center text-xs">{s.exam || '-'}</TableCell>
+                          <TableCell className="text-center text-xs font-bold">{s.total}</TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={cn("text-[10px]", getGradeColor(s.grade))}>{s.grade}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
-
-                {/* Assessment */}
-                {selectedCard.assessment_data && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-semibold mb-2">Psychomotor Skills</h4>
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span>Handwriting:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.handwriting || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Sports:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.sports || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Creativity:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.creativity || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Technical:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.technical || 3)}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold mb-2">Behavioral Traits</h4>
-                      <div className="space-y-1">
-                        <div className="flex justify-between">
-                          <span>Punctuality:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.punctuality || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Neatness:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.neatness || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Politeness:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.politeness || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Cooperation:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.cooperation || 3)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Leadership:</span>
-                          <span>{'⭐'.repeat(selectedCard.assessment_data.leadership || 3)}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Attendance */}
-                {selectedCard.assessment_data && (
-                  <div>
-                    <h4 className="font-semibold mb-2">Attendance</h4>
-                    <div className="flex gap-6">
-                      <div>
-                        <span className="text-sm text-slate-500">Present:</span>
-                        <span className="ml-2 font-bold text-green-600">{selectedCard.assessment_data.daysPresent || 0}</span>
-                      </div>
-                      <div>
-                        <span className="text-sm text-slate-500">Absent:</span>
-                        <span className="ml-2 font-bold text-red-600">{selectedCard.assessment_data.daysAbsent || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Teacher Comments */}
                 <div>
-                  <h4 className="font-semibold mb-2">Teacher's Comments</h4>
-                  <p className="text-sm bg-slate-50 p-3 rounded-lg">
-                    {selectedCard.teacher_comments || 'No comments provided.'}
-                  </p>
+                  <p className="text-xs font-semibold mb-1">Teacher's Comments</p>
+                  <p className="text-xs bg-slate-50 p-2 rounded-lg">{selectedCard.teacher_comments || 'No comments provided.'}</p>
                 </div>
-
-                {/* Principal Comments Input */}
                 <div>
-                  <h4 className="font-semibold mb-2">Principal's Comments</h4>
+                  <p className="text-xs font-semibold mb-1">Principal's Comments</p>
                   <Textarea
-                    placeholder="Enter principal's comments..."
                     value={principalComment}
-                    onChange={(e) => setPrincipalComment(e.target.value)}
-                    rows={3}
+                    onChange={e => setPrincipalComment(e.target.value)}
+                    rows={2}
+                    className="text-xs"
+                    placeholder="Enter principal's comments..."
                     disabled={selectedCard.status === 'published'}
                   />
                 </div>
-
-                {/* Rejection Reason (if rejected) */}
                 {selectedCard.status === 'rejected' && selectedCard.rejected_reason && (
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <p className="font-medium text-red-700">Rejection Reason:</p>
-                    <p className="text-sm text-red-600">{selectedCard.rejected_reason}</p>
+                  <div className="p-2 bg-red-50 rounded-lg">
+                    <p className="text-xs font-medium text-red-700">Rejection Reason:</p>
+                    <p className="text-xs text-red-600">{selectedCard.rejected_reason}</p>
                   </div>
                 )}
               </div>
-
               <DialogFooter className="flex items-center justify-between">
                 <div>
                   {selectedCard.status === 'pending' && (
-                    <Button 
-                      variant="outline" 
-                      className="text-red-600"
-                      onClick={() => {
-                        setShowReviewDialog(false)
-                        setShowRejectDialog(true)
-                      }}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Reject
+                    <Button variant="outline" size="sm" className="text-red-600"
+                      onClick={() => { setShowReviewDialog(false); setShowRejectDialog(true) }}>
+                      <XCircle className="h-3.5 w-3.5 mr-1" />Reject
                     </Button>
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setShowReviewDialog(false)}>
-                    Close
-                  </Button>
-                  
+                  <Button variant="outline" size="sm" onClick={() => setShowReviewDialog(false)}>Close</Button>
                   {selectedCard.status === 'pending' && (
-                    <Button onClick={handleApproveCard} disabled={processingAction} className="bg-blue-600">
-                      {processingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <CheckCircle className="h-4 w-4 mr-2" />}
-                      Approve
+                    <Button size="sm" className="bg-blue-600" onClick={handleApproveCard} disabled={processing}>
+                      {processing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}Approve
                     </Button>
                   )}
-                  
                   {selectedCard.status === 'approved' && (
-                    <Button onClick={handlePublishCard} disabled={processingAction} className="bg-green-600">
-                      {processingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
-                      Publish to Student
+                    <Button size="sm" className="bg-emerald-600" onClick={handlePublishCard} disabled={processing}>
+                      {processing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}Publish to Student
                     </Button>
                   )}
                 </div>
@@ -1239,7 +640,7 @@ export default function AdminReportCardsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Reject Confirmation Dialog */}
+      {/* Reject Dialog */}
       <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1248,87 +649,60 @@ export default function AdminReportCardsPage() {
               Reject Report Card?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Please provide a reason for rejecting this report card. The teacher will be notified.
+              Please provide a reason for the teacher to review.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
-          <div className="py-4">
-            <Label htmlFor="rejection-reason">Rejection Reason *</Label>
-            <Textarea
-              id="rejection-reason"
-              placeholder="e.g., Scores need review, Missing subjects, etc."
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              rows={3}
-              className="mt-2"
-            />
-          </div>
-          
+          <Textarea
+            value={rejectReason}
+            onChange={e => setRejectReason(e.target.value)}
+            placeholder="e.g., Scores need review, missing subjects..."
+            rows={3}
+            className="text-sm"
+          />
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleRejectCard}
-              disabled={processingAction || !rejectReason}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {processingAction ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
-              Confirm Reject
+            <AlertDialogAction onClick={handleRejectCard} disabled={processing || !rejectReason.trim()} className="bg-red-600 hover:bg-red-700">
+              {processing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : null}
+              Reject
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Bulk Actions Dialog */}
-      <AlertDialog open={showBulkApproveDialog} onOpenChange={setShowBulkApproveDialog}>
+      {/* Bulk Dialog */}
+      <AlertDialog open={showBulkDialog} onOpenChange={setShowBulkDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Bulk Actions</AlertDialogTitle>
             <AlertDialogDescription>
-              Select a class and action to perform on all report cards.
+              Select a class to approve or publish all report cards.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          
-          <div className="py-4 space-y-4">
-            <div>
-              <Label htmlFor="bulk-class">Select Class</Label>
-              <Select value={bulkSelectedClass} onValueChange={setBulkSelectedClass}>
-                <SelectTrigger id="bulk-class" className="mt-2">
-                  <SelectValue placeholder="Choose a class" />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.filter(c => c !== 'all').map(cls => {
-                    const pending = reportCards.filter(c => c.class === cls && c.status === 'pending').length
-                    const approved = reportCards.filter(c => c.class === cls && c.status === 'approved').length
-                    return (
-                      <SelectItem key={cls} value={cls}>
-                        {cls} ({pending} pending, {approved} approved)
-                      </SelectItem>
-                    )
-                  })}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="flex gap-3">
-              <Button 
-                className="flex-1 bg-blue-600"
-                onClick={handleBulkApprove}
-                disabled={!bulkSelectedClass || processingAction}
-              >
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Approve All Pending
-              </Button>
-              <Button 
-                className="flex-1 bg-green-600"
-                onClick={handleBulkPublish}
-                disabled={!bulkSelectedClass || processingAction}
-              >
-                <Send className="h-4 w-4 mr-2" />
-                Publish All Approved
-              </Button>
-            </div>
+          <div className="py-2">
+            <Label className="text-xs mb-1 block">Select Class</Label>
+            <Select value={bulkClass} onValueChange={setBulkClass}>
+              <SelectTrigger><SelectValue placeholder="Choose a class" /></SelectTrigger>
+              <SelectContent>
+                {CLASSES.filter(c => c !== 'all').map(c => {
+                  const pending = reportCards.filter(rc => rc.class === c && rc.status === 'pending').length
+                  const approved = reportCards.filter(rc => rc.class === c && rc.status === 'approved').length
+                  return (
+                    <SelectItem key={c} value={c}>
+                      {c} ({pending} pending, {approved} approved)
+                    </SelectItem>
+                  )
+                })}
+              </SelectContent>
+            </Select>
           </div>
-          
+          <div className="flex gap-2 mt-3">
+            <Button className="flex-1 bg-blue-600 hover:bg-blue-700" size="sm" onClick={handleBulkApprove} disabled={!bulkClass || processing}>
+              <CheckCircle className="h-4 w-4 mr-1" />Approve All Pending
+            </Button>
+            <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" size="sm" onClick={handleBulkPublish} disabled={!bulkClass || processing}>
+              <Send className="h-4 w-4 mr-1" />Publish All Approved
+            </Button>
+          </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
           </AlertDialogFooter>

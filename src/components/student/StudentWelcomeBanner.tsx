@@ -1,23 +1,19 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/student/StudentWelcomeBanner.tsx - HYDRATION SAFE
+// components/student/StudentWelcomeBanner.tsx - HYDRATION SAFE + PERSONALIZED
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen,
-  Wifi, WifiOff, AlertCircle
+  Wifi, WifiOff, AlertCircle, Timer, Quote, Sparkles
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { supabase } from '@/lib/supabase'
 
 interface StudentProfile {
   id?: string
@@ -45,6 +41,44 @@ interface StudentWelcomeBannerProps {
   stats: StudentStats | null
 }
 
+const STORAGE_KEY = 'student_session_start'
+
+// ─── Personalized Quotes ──────────────────────────────
+const quotes = {
+  morning: [
+    { text: "The beautiful thing about learning is that no one can take it away from you.", author: "B.B. King" },
+    { text: "Education is the passport to the future, for tomorrow belongs to those who prepare for it today.", author: "Malcolm X" },
+    { text: "The expert in anything was once a beginner.", author: "Helen Hayes" },
+    { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
+  ],
+  afternoon: [
+    { text: "Success is not final, failure is not fatal: it is the courage to continue that counts.", author: "Winston Churchill" },
+    { text: "The harder you work for something, the greater you'll feel when you achieve it.", author: "Unknown" },
+    { text: "Don't watch the clock; do what it does. Keep going.", author: "Sam Levenson" },
+    { text: "Believe you can and you're halfway there.", author: "Theodore Roosevelt" },
+  ],
+  evening: [
+    { text: "The mind is not a vessel to be filled, but a fire to be kindled.", author: "Plutarch" },
+    { text: "Learning never exhausts the mind.", author: "Leonardo da Vinci" },
+    { text: "What we learn with pleasure we never forget.", author: "Alfred Mercier" },
+  ],
+}
+
+const getPersonalizedQuote = (hour: number, firstName: string) => {
+  let quoteSet = quotes.morning
+  if (hour >= 12 && hour < 17) quoteSet = quotes.afternoon
+  if (hour >= 17) quoteSet = quotes.evening
+
+  const dayOfMonth = new Date().getDate()
+  const index = dayOfMonth % quoteSet.length
+  const quote = quoteSet[index]
+  
+  return {
+    text: quote.text.replace(/you/g, firstName),
+    author: quote.author
+  }
+}
+
 const calculateGrade = (percentage: number): { grade: string; color: string; description: string } => {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
   if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
@@ -61,72 +95,84 @@ const getSubjectCountForClass = (className: string): number => {
   return 17
 }
 
-const getStaticGreeting = () => {
-  return { text: 'Welcome', emoji: '👋', message: 'Welcome to your dashboard!' }
-}
-
 export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerProps) {
   const [mounted, setMounted] = useState(false)
-  const [greeting, setGreeting] = useState(getStaticGreeting())
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
+  const [sessionStart, setSessionStart] = useState<Date | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [avatarError, setAvatarError] = useState(false)
 
   useEffect(() => {
     setMounted(true)
     setCurrentTime(new Date())
-    
-    const hour = new Date().getHours()
-    let newGreeting
-    if (hour < 12) newGreeting = { text: 'Good Morning', emoji: '🌅', message: 'Ready to learn something new today?' }
-    else if (hour < 17) newGreeting = { text: 'Good Afternoon', emoji: '☀️', message: 'Keep pushing forward!' }
-    else if (hour < 21) newGreeting = { text: 'Good Evening', emoji: '🌙', message: 'Time to review what you learned!' }
-    else newGreeting = { text: 'Good Night', emoji: '🌙', message: 'Rest well and prepare for tomorrow!' }
-    setGreeting(newGreeting)
+
+    // Session timer
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      setSessionStart(new Date(stored))
+    } else {
+      const start = new Date()
+      localStorage.setItem(STORAGE_KEY, start.toISOString())
+      setSessionStart(start)
+    }
+
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  // Clear session on logout
+  useEffect(() => {
+    const handleClear = () => localStorage.removeItem(STORAGE_KEY)
+    window.addEventListener('beforeunload', handleClear)
+    return () => window.removeEventListener('beforeunload', handleClear)
   }, [])
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
-    
     setIsOnline(navigator.onLine)
-    
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
-    
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
 
-  useEffect(() => {
-    if (!profile?.id) return
-    
-    const checkPresence = async () => {
-      try {
-        const { data } = await supabase
-          .from('student_presence')
-          .select('status')
-          .eq('student_id', profile.id)
-          .maybeSingle()
-        
-        if (data) {
-          setIsOnline(data.status === 'online')
-        }
-      } catch (error) {
-        console.error('Error checking presence:', error)
-      }
-    }
-    
-    checkPresence()
-  }, [profile?.id])
+  const greeting = useMemo(() => {
+    if (!currentTime) return { text: 'Welcome', emoji: '👋', message: 'Welcome!' }
+    const hour = currentTime.getHours()
+    if (hour < 12) return { text: 'Good Morning', emoji: '🌅', message: 'Ready to learn something new today?' }
+    if (hour < 17) return { text: 'Good Afternoon', emoji: '☀️', message: 'Keep pushing forward!' }
+    if (hour < 21) return { text: 'Good Evening', emoji: '🌙', message: 'Time to review what you learned!' }
+    return { text: 'Good Night', emoji: '🌙', message: 'Rest well and prepare for tomorrow!' }
+  }, [currentTime])
 
-  useEffect(() => {
-    if (!mounted) return
-    const timer = setInterval(() => setCurrentTime(new Date()), 60000)
-    return () => clearInterval(timer)
-  }, [mounted])
+  const quote = useMemo(() => {
+    if (!currentTime) return { text: '', author: '' }
+    const firstName = (profile?.full_name || 'Student').split(' ')[0]
+    return getPersonalizedQuote(currentTime.getHours(), firstName)
+  }, [currentTime, profile?.full_name])
+
+  const formattedDate = useMemo(() => {
+    if (!currentTime) return ''
+    return currentTime.toLocaleDateString('en-NG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+  }, [currentTime])
+
+  const formattedTime = useMemo(() => {
+    if (!currentTime) return ''
+    return currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }, [currentTime])
+
+  const onlineDuration = useMemo(() => {
+    if (!currentTime || !sessionStart) return '00:00:00'
+    const diffMs = currentTime.getTime() - sessionStart.getTime()
+    const totalSeconds = Math.floor(diffMs / 1000)
+    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
+    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
+    const s = String(totalSeconds % 60).padStart(2, '0')
+    return `${h}:${m}:${s}`
+  }, [currentTime, sessionStart])
 
   const studentFullName = profile?.full_name || 'Student'
   const nameParts = studentFullName.trim().split(/\s+/)
@@ -136,13 +182,6 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const studentDepartment = profile?.department || 'General'
   
   const totalSubjects = stats?.totalSubjects || getSubjectCountForClass(studentClass)
-
-  const formattedDate = currentTime?.toLocaleDateString('en-NG', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  }) || 'Loading...'
 
   const completedExams = stats?.completedExams ?? 0
   const averageScore = stats?.averageScore ?? 0
@@ -159,19 +198,9 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const avatarLetter = firstName.charAt(0).toUpperCase()
   const avatarUrl = profile?.photo_url || undefined
 
-  const handleAvatarError = () => {
-    setAvatarError(true)
-  }
-
-  const getStatusDisplay = () => {
-    if (isOnline) {
-      return { icon: Wifi, color: 'bg-emerald-500', ringColor: 'ring-emerald-500/30', text: 'Online' }
-    } else {
-      return { icon: WifiOff, color: 'bg-gray-400', ringColor: 'ring-gray-400/30', text: 'Offline' }
-    }
-  }
-
-  const statusDisplay = getStatusDisplay()
+  const statusDisplay = isOnline 
+    ? { icon: Wifi, color: 'bg-emerald-500', text: 'Online' }
+    : { icon: WifiOff, color: 'bg-gray-400', text: 'Offline' }
   const StatusIcon = statusDisplay.icon
 
   if (!mounted) {
@@ -188,17 +217,30 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 text-white shadow-2xl mb-8"
+      suppressHydrationWarning
     >
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
       
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div className="flex-1">
-          <div className="flex items-center gap-2 mb-3">
+          {/* Date, Time, Session Row */}
+          <div className="flex flex-wrap items-center gap-2 mb-3">
             <span className="text-2xl">{greeting.emoji}</span>
-            <span className="text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">
+            <span className="text-xs sm:text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">
               {formattedDate}
             </span>
+            {/* ✅ Live Clock */}
+            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-cyan-400/10 px-3 py-1 rounded-full text-cyan-200 border border-cyan-400/20">
+              <Clock className="h-3.5 w-3.5" />
+              {formattedTime}
+            </span>
+            {/* ✅ Session Timer */}
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/10 px-3 py-1 rounded-full text-blue-200">
+              <Timer className="h-3.5 w-3.5" />
+              {onlineDuration}
+            </span>
+            {/* Online Status */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -215,20 +257,37 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
                   </span>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{isOnline ? 'You are online and visible' : 'You are currently offline'}</p>
+                  <p>{isOnline ? 'You are online' : 'You are offline'}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
           
+          {/* Greeting */}
           <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white drop-shadow-sm">
             {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
           </h1>
           
-          <p className="text-gray-200 text-sm md:text-base mb-4 max-w-md">
+          <p className="text-gray-200 text-sm md:text-base mb-3 max-w-md">
             {greeting.message}
           </p>
+
+          {/* ✅ Personalized Quote */}
+          {quote.text && (
+            <div className="flex items-start gap-2 mb-3 max-w-xl">
+              <Quote className="h-4 w-4 text-amber-400/60 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-gray-200 text-xs sm:text-sm italic leading-relaxed line-clamp-2">
+                  &ldquo;{quote.text}&rdquo;
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                  — {quote.author}
+                </p>
+              </div>
+            </div>
+          )}
           
+          {/* Badges */}
           <div className="flex flex-wrap gap-2">
             <Badge className="bg-white/15 text-white border-0">
               <GraduationCap className="h-3 w-3 mr-1" />
@@ -247,43 +306,28 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           </div>
         </div>
         
+        {/* Avatar */}
         <div className="relative group">
           <div className={cn(
             "absolute -inset-1 bg-gradient-to-r rounded-full opacity-60 group-hover:opacity-100 blur-md transition duration-300",
-            isOnline 
-              ? "from-emerald-400 to-teal-400" 
-              : "from-gray-400 to-gray-500"
+            isOnline ? "from-emerald-400 to-teal-400" : "from-gray-400 to-gray-500"
           )} />
           <div className="relative">
             <Avatar className="h-24 w-24 md:h-28 md:w-28 ring-4 ring-white/20 shadow-xl">
               {avatarUrl && !avatarError ? (
-                <AvatarImage 
-                  src={avatarUrl} 
-                  alt={firstName}
-                  onError={handleAvatarError}
-                  className="object-cover"
-                />
+                <AvatarImage src={avatarUrl} alt={firstName} onError={() => setAvatarError(true)} className="object-cover" />
               ) : null}
               <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-3xl font-bold">
                 {avatarLetter}
               </AvatarFallback>
             </Avatar>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <span className={cn(
-                    "absolute -bottom-2 -right-2 rounded-full p-1.5 ring-2 ring-white inline-block",
-                    statusDisplay.color,
-                    isOnline && "animate-pulse"
-                  )}>
-                    <StatusIcon className="h-2.5 w-2.5 text-white" />
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{isOnline ? 'Online' : 'Offline'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <span className={cn(
+              "absolute -bottom-2 -right-2 rounded-full p-1.5 ring-2 ring-white inline-block",
+              statusDisplay.color,
+              isOnline && "animate-pulse"
+            )}>
+              <StatusIcon className="h-2.5 w-2.5 text-white" />
+            </span>
           </div>
         </div>
       </div>
@@ -297,7 +341,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
               {pendingTheoryCount} exam{pendingTheoryCount !== 1 ? 's' : ''} pending theory grading
             </p>
             <p className="text-xs text-amber-300/80">
-              Your objective scores are ready. Theory answers will be graded by your teacher soon.
+              Objective scores are ready. Theory answers will be graded by your teacher soon.
             </p>
           </div>
         </div>
@@ -309,9 +353,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
           
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
-                {availableExams}
-              </p>
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">{availableExams}</p>
               <Clock className="h-5 w-5 text-blue-300 opacity-60" />
             </div>
             <p className="text-xs md:text-sm text-gray-300">Available Exams</p>
@@ -319,22 +361,16 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
 
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-green-200 transition-colors">
-                {completedExams}
-              </p>
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-green-200 transition-colors">{completedExams}</p>
               <CheckCircle2 className="h-5 w-5 text-green-300 opacity-60" />
             </div>
-            <p className="text-xs md:text-sm text-gray-300">Exams Completed</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">
-              {completionPercentage}% of term subjects
-            </p>
+            <p className="text-xs md:text-sm text-gray-300">Completed</p>
+            <p className="text-[10px] text-gray-400 mt-0.5">{completionPercentage}% of term</p>
           </div>
 
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
-                {averageScore}%
-              </p>
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">{averageScore}%</p>
               <TrendingUp className="h-5 w-5 text-amber-300 opacity-60" />
             </div>
             <p className="text-xs md:text-sm text-gray-300">Average Score</p>
@@ -347,17 +383,10 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <span className="inline-flex">
-                        <p className={cn(
-                          "text-2xl md:text-3xl font-bold transition-colors",
-                          gradeInfo.color
-                        )}>
-                          {gradeInfo.grade}
-                        </p>
+                        <p className={cn("text-2xl md:text-3xl font-bold", gradeInfo.color)}>{gradeInfo.grade}</p>
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{averageScore}% average - {gradeInfo.description}</p>
-                    </TooltipContent>
+                    <TooltipContent><p>{averageScore}% average - {gradeInfo.description}</p></TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               ) : (
@@ -373,7 +402,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gray-300">Term Subject Progress</span>
-            <span className="text-xs text-gray-300">{completedExams}/{totalSubjects} Subjects</span>
+            <span className="text-xs text-gray-300">{completedExams}/{totalSubjects}</span>
           </div>
           <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
             <div 
