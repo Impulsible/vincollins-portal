@@ -1,7 +1,7 @@
-// src/contexts/StaffContext.tsx
+// src/contexts/StaffContext.tsx - IMPROVED
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 
 interface StaffProfile {
@@ -33,7 +33,7 @@ export function StaffProvider({ children }: { children: ReactNode }) {
   const [pendingGrading, setPendingGrading] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  const loadStats = async (userId: string) => {
+  const loadStats = useCallback(async (userId: string) => {
     try {
       const [studentsRes, examsRes, pendingRes] = await Promise.all([
         supabase.from('profiles').select('*', { count: 'exact', head: true }).eq('role', 'student'),
@@ -47,22 +47,54 @@ export function StaffProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error('Error loading stats:', error)
     }
-  }
+  }, [])
 
-  const refreshStats = async () => {
-    if (!profile?.id) return
-    await loadStats(profile.id)
-  }
+  const refreshStats = useCallback(async () => {
+    if (profile?.id) {
+      await loadStats(profile.id)
+    }
+  }, [profile?.id, loadStats])
 
   useEffect(() => {
+    let isMounted = true
+
     const init = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) {
-          setLoading(false)
+          if (isMounted) setLoading(false)
           return
         }
 
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single()
+
+        if (data && isMounted) {
+          setProfile(data)
+          await loadStats(data.id)
+        }
+      } catch (error) {
+        console.error('Error initializing StaffContext:', error)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    init()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setProfile(null)
+        setTotalStudents(0)
+        setTotalExams(0)
+        setPendingGrading(0)
+      }
+      
+      if (event === 'SIGNED_IN' && session?.user && isMounted) {
         const { data } = await supabase
           .from('profiles')
           .select('*')
@@ -73,15 +105,14 @@ export function StaffProvider({ children }: { children: ReactNode }) {
           setProfile(data)
           await loadStats(data.id)
         }
-      } catch (error) {
-        console.error('Error initializing:', error)
-      } finally {
-        setLoading(false)
       }
-    }
+    })
 
-    init()
-  }, [])
+    return () => {
+      isMounted = false
+      subscription.unsubscribe()
+    }
+  }, [loadStats])
 
   return (
     <StaffContext.Provider value={{ 

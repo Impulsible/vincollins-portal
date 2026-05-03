@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - FIXED LOGIN REDIRECT
+// app/portal/page.tsx - FULL CORRECTED LOGIN PAGE
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Mail, Eye, EyeOff, GraduationCap, Shield, Users,
   Loader2, AlertCircle, KeyRound, ArrowRight, Sparkles,
-  Phone, Mail as MailIcon, CheckCircle, BookOpen, School
+  Phone, Mail as MailIcon, CheckCircle
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -53,75 +53,65 @@ export default function LoginPage() {
     role: 'student' | 'teacher' | 'admin'
     redirectPath: string
   } | null>(null)
-  const [showLoginForm, setShowLoginForm] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   
   const loginInProgress = useRef(false)
   const hasRedirected = useRef(false)
+  const authCheckedOnce = useRef(false)
 
-  // Check if already authenticated - redirect to dashboard
+  // ============================================
+  // CHECK EXISTING AUTH - FIXED
+  // ============================================
   useEffect(() => {
+    if (authCheckedOnce.current) return
+    if (loginInProgress.current) {
+      setIsCheckingAuth(false)
+      return
+    }
+
     const checkAuth = async () => {
-      // Don't redirect while login is in progress
-      if (loginInProgress.current) {
-        setShowLoginForm(false)
-        return
-      }
-
-      // If user context already has a user, redirect immediately
-      if (user && user.role && !hasRedirected.current) {
-        const redirectMap: Record<string, string> = {
-          admin: '/admin',
-          teacher: '/staff',
-          student: '/student',
-        }
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
         
-        hasRedirected.current = true
-        router.replace(redirectMap[user.role] || '/student')
-        return
-      }
-
-      // If user context is still loading, wait
-      if (userLoading) {
-        return
-      }
-
-      // If no user in context, check session directly
-      if (!user && !hasRedirected.current) {
-        try {
-          const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user && !hasRedirected.current) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .maybeSingle()
           
-          if (session) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', session.user.id)
-              .maybeSingle()
-            
-            const role = profile?.role === 'staff' ? 'teacher' : (profile?.role || 'student')
-            
-            const redirectMap: Record<string, string> = {
-              admin: '/admin',
-              teacher: '/staff',
-              student: '/student',
-            }
-            
+          const role = profile?.role || 'student'
+          const mappedRole = role === 'staff' ? 'teacher' : role
+          
+          const redirectMap: Record<string, string> = {
+            admin: '/admin',
+            teacher: '/staff',
+            student: '/student',
+          }
+          
+          const redirectPath = redirectMap[mappedRole] || '/student'
+          
+          if (redirectPath && !hasRedirected.current) {
             hasRedirected.current = true
-            router.replace(redirectMap[role] || '/student')
+            authCheckedOnce.current = true
+            router.replace(redirectPath)
             return
           }
-        } catch (error) {
-          console.error('Auth check error:', error)
         }
+      } catch (error) {
+        console.error('Auth check error:', error)
       }
       
-      // Show login form when confirmed not authenticated
-      setShowLoginForm(true)
+      authCheckedOnce.current = true
+      setIsCheckingAuth(false)
     }
 
     checkAuth()
-  }, [user, userLoading, router])
+  }, [router])
 
-  // Load school settings
+  // ============================================
+  // LOAD SCHOOL SETTINGS
+  // ============================================
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
@@ -147,15 +137,13 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // Login handler
+  // ============================================
+  // LOGIN HANDLER - FIXED
+  // ============================================
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     
-    // Prevent double submission
-    if (loginInProgress.current) {
-      console.log('Login already in progress')
-      return
-    }
+    if (loginInProgress.current) return
     
     loginInProgress.current = true
     setLoading(true)
@@ -166,7 +154,6 @@ export default function LoginPage() {
       const cleanEmail = email.trim().toLowerCase().replace(/\s+/g, '')
       const cleanPassword = password.trim()
 
-      // Validate inputs
       if (!cleanEmail || !cleanPassword) {
         setError('Please enter both email and password.')
         loginInProgress.current = false
@@ -174,16 +161,12 @@ export default function LoginPage() {
         return
       }
 
-      // Sign in with Supabase
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       })
 
       if (signInError) {
-        console.error('Sign in error:', signInError.message)
-        
-        // User-friendly error messages
         if (signInError.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please try again.')
         } else if (signInError.message.includes('Email not confirmed')) {
@@ -205,7 +188,10 @@ export default function LoginPage() {
         return
       }
 
-      // Get user profile directly from database
+      // Small delay for session establishment
+      await new Promise(resolve => setTimeout(resolve, 800))
+
+      // Get profile
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('role, full_name, first_name, last_name')
@@ -216,13 +202,12 @@ export default function LoginPage() {
         console.error('Profile fetch error:', profileError)
       }
 
-      // Determine user role
       const userRole = profile?.role?.toLowerCase() || 
                        signInData.user.user_metadata?.role?.toLowerCase() || 
                        'student'
       const mappedRole = userRole === 'staff' ? 'teacher' : (userRole as 'student' | 'teacher' | 'admin')
       
-      // Check if role matches selected tab
+      // Check role match
       if (mappedRole !== selectedRole) {
         const roleDisplayName = mappedRole === 'teacher' ? 'Teacher/Staff' : 
                                  mappedRole.charAt(0).toUpperCase() + mappedRole.slice(1)
@@ -233,7 +218,7 @@ export default function LoginPage() {
         return
       }
 
-      // Format user name
+      // Format name
       let userName = 'User'
       if (profile?.first_name && profile?.last_name) {
         userName = `${profile.first_name} ${profile.last_name}`
@@ -251,7 +236,7 @@ export default function LoginPage() {
         .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ')
 
-      // Determine redirect path
+      // Redirect paths
       const redirectMap: Record<string, string> = {
         admin: '/admin',
         teacher: '/staff',
@@ -259,33 +244,30 @@ export default function LoginPage() {
       }
       
       const redirectPath = redirectMap[mappedRole] || '/student'
-      
-      // Refresh user context
-      if (refreshUser) {
-        await refreshUser()
-      }
-      
-      // Show success modal briefly then redirect
+
+      // Mark as redirected
+      hasRedirected.current = true
+      authCheckedOnce.current = true
+
+      // Show success modal
       setLoginSuccessData({
         userName: formattedName,
         role: mappedRole as 'student' | 'teacher' | 'admin',
         redirectPath: redirectPath
       })
       setShowSuccessModal(true)
-      
-      // Auto redirect after 2 seconds
-      setTimeout(() => {
-        setShowSuccessModal(false)
-        hasRedirected.current = true
-        router.push(redirectPath)
-      }, 2000)
+      setSuccessMessage('Login successful! Redirecting...')
+
+      // Refresh user context
+      if (refreshUser) {
+        await refreshUser()
+      }
 
     } catch (err: any) {
       console.error('Unexpected login error:', err)
       setError('An unexpected error occurred. Please try again later.')
-    } finally {
-      setLoading(false)
       loginInProgress.current = false
+      setLoading(false)
     }
   }
 
@@ -311,7 +293,9 @@ export default function LoginPage() {
     }
   }
 
-  // Success Modal Component
+  // ============================================
+  // SUCCESS MODAL - FIXED
+  // ============================================
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -355,8 +339,9 @@ export default function LoginPage() {
 
     const goToDashboard = () => {
       setShowSuccessModal(false)
-      hasRedirected.current = true
-      router.push(redirectPath)
+      setLoading(false)
+      loginInProgress.current = false
+      window.location.href = redirectPath
     }
 
     return (
@@ -368,6 +353,7 @@ export default function LoginPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+            onClick={() => goToDashboard()}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
@@ -392,6 +378,16 @@ export default function LoginPage() {
               </div>
 
               <div className="relative p-8">
+                {/* Close button */}
+                <button
+                  onClick={goToDashboard}
+                  className="absolute top-4 right-4 h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+                >
+                  <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+
                 <div className="flex flex-col items-center text-center">
                   {/* Success icon */}
                   <motion.div
@@ -442,18 +438,31 @@ export default function LoginPage() {
                     </p>
                     
                     <p className="text-sm text-gray-400">
-                      Redirecting to dashboard...
+                      {config.message}
                     </p>
+                  </motion.div>
+                  
+                  {/* Action buttons */}
+                  <motion.div
+                    initial={{ y: 20, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="flex flex-col gap-3 w-full mt-8"
+                  >
+                    <Button
+                      onClick={goToDashboard}
+                      className="w-full py-6 text-base font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                      style={{ 
+                        background: `linear-gradient(135deg, ${config.color}, ${config.color}dd)`,
+                      }}
+                    >
+                      <span>Go to Dashboard</span>
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </Button>
                     
-                    {/* Loading indicator */}
-                    <div className="flex justify-center mt-4">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Loader2 className="h-6 w-6" style={{ color: config.color }} />
-                      </motion.div>
-                    </div>
+                    <p className="text-xs text-gray-400">
+                      Auto-redirecting in 3 seconds...
+                    </p>
                   </motion.div>
                 </div>
               </div>
@@ -464,11 +473,38 @@ export default function LoginPage() {
     )
   }
 
-  // If not showing login form yet, show nothing (prevents skeleton flash)
-  if (!showLoginForm) {
-    return null
+  // Auto-redirect after 3 seconds
+  useEffect(() => {
+    if (showSuccessModal && loginSuccessData) {
+      const timer = setTimeout(() => {
+        setShowSuccessModal(false)
+        window.location.href = loginSuccessData.redirectPath
+      }, 3000)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [showSuccessModal, loginSuccessData])
+
+  // ============================================
+  // LOADING STATE
+  // ============================================
+  if (isCheckingAuth || userLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        >
+          <Loader2 className="h-10 w-10 text-primary" />
+        </motion.div>
+        <p className="mt-4 text-sm text-gray-500">Checking authentication...</p>
+      </div>
+    )
   }
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <>
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -476,9 +512,8 @@ export default function LoginPage() {
         
         <div className="flex-1 flex items-stretch pt-16 sm:pt-20">
           <div className="flex w-full">
-            {/* LEFT SIDE - CLEAN IMAGE WITH MINIMAL TEXT (NO BLUE OVERLAY, CORRECT LOGO COLORS) */}
+            {/* LEFT SIDE - IMAGE WITH MINIMAL TEXT */}
             <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative overflow-hidden">
-              {/* Background Image - NO BLUE OVERLAY */}
               <Image
                 src="/images/portal.jpg"
                 alt="Vincollins College Campus"
@@ -492,14 +527,10 @@ export default function LoginPage() {
                 }}
               />
 
-              {/* Subtle dark gradient for text readability only - NO BLUE */}
               <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
-
-              {/* Decorative elements - subtle */}
               <div className="absolute top-20 left-10 w-64 h-64 bg-[#F5A623]/5 rounded-full blur-3xl" />
               <div className="absolute bottom-20 right-10 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
 
-              {/* Content - ONLY badge, school name, and welcome heading */}
               <div className="relative flex flex-col justify-center px-12 xl:px-16 py-12 w-full">
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
@@ -507,13 +538,11 @@ export default function LoginPage() {
                   transition={{ duration: 0.6, ease: "easeOut" }}
                   className="text-white"
                 >
-                  {/* Secure Portal Access Badge */}
                   <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/30 mb-8">
                     <Sparkles className="h-4 w-4 text-yellow-300" />
                     <span className="text-sm font-medium tracking-wide">Secure Portal Access</span>
                   </div>
 
-                  {/* Logo and School Name - WITH CORRECT LOGO COLORS (NO WHITE FILTER) */}
                   <div className="flex items-center gap-4 mb-8">
                     {schoolSettings?.logo_path ? (
                       <div className="relative h-16 w-16 xl:h-20 xl:w-20">
@@ -541,7 +570,6 @@ export default function LoginPage() {
                     </div>
                   </div>
 
-                  {/* Welcome Heading - NO extra text, NO features list */}
                   <h1 className="text-4xl xl:text-5xl 2xl:text-6xl font-bold leading-tight">
                     Welcome to Your{' '}
                     <span className="text-[#F5A623]">Digital Campus</span>
@@ -686,7 +714,6 @@ export default function LoginPage() {
 
                   {/* Login Form */}
                   <form onSubmit={handleLogin} className="space-y-5">
-                    {/* Email Field */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Email Address
@@ -709,7 +736,6 @@ export default function LoginPage() {
                       </div>
                     </div>
 
-                    {/* Password Field */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         Password
@@ -743,7 +769,6 @@ export default function LoginPage() {
                       </div>
                     </div>
 
-                    {/* Submit Button */}
                     <Button
                       type="submit"
                       className={`w-full h-12 text-sm font-semibold text-white shadow-lg hover:shadow-xl transition-all rounded-xl mt-2 ${getRoleColor()}`}

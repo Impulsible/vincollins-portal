@@ -1,10 +1,8 @@
-// src/contexts/UserContext.tsx
+// src/contexts/UserContext.tsx - FINAL FIXED
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { toast } from 'sonner'
 
 // ─── TYPES ───────────────────────────────────────────
 interface UserProfile {
@@ -32,7 +30,7 @@ interface UserContextType {
 }
 
 // ─── CONSTANTS ───────────────────────────────────────
-const AUTH_TIMEOUT = 5000 // 5 seconds timeout for auth operations
+const AUTH_TIMEOUT = 15000
 
 // ─── CONTEXT ─────────────────────────────────────────
 const UserContext = createContext<UserContextType | undefined>(undefined)
@@ -41,12 +39,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
   
-  // Refs for preventing race conditions
   const fetchPromiseRef = useRef<Promise<any> | null>(null)
   const isMountedRef = useRef(true)
   const authTimeoutRef = useRef<NodeJS.Timeout>()
+  const initialLoadDoneRef = useRef(false)
 
   // ─── Fetch User Profile ────────────────────────────
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
@@ -57,7 +54,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         .eq('id', userId)
         .single()
 
-      if (error) throw error
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.log('No profile found')
+          return null
+        }
+        throw error
+      }
       return data as UserProfile
     } catch (err) {
       console.error('Error fetching profile:', err)
@@ -67,41 +70,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   // ─── Load User ──────────────────────────────────────
   const loadUser = useCallback(async () => {
-    // Prevent multiple simultaneous fetches
     if (fetchPromiseRef.current) {
-      console.log('🔒 User fetch already in progress, reusing promise')
       return fetchPromiseRef.current
     }
 
     const fetchPromise = (async () => {
       try {
-        console.log('🔄 Starting user fetch...')
-        
-        // Set timeout for auth check
-        const timeoutPromise = new Promise((_, reject) => {
-          authTimeoutRef.current = setTimeout(() => {
-            reject(new Error('Auth check timeout'))
-          }, AUTH_TIMEOUT)
-        })
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
 
-        // Get session with timeout
-        const { data: { session }, error: sessionError } = await Promise.race([
-          supabase.auth.getSession(),
-          timeoutPromise
-        ]) as any
-
-        // Clear timeout
-        if (authTimeoutRef.current) {
-          clearTimeout(authTimeoutRef.current)
-        }
-
-        if (sessionError) {
-          console.error('Session error:', sessionError)
-          throw sessionError
-        }
+        if (sessionError) throw sessionError
 
         if (!session?.user) {
-          console.log('No active session')
           if (isMountedRef.current) {
             setUser(null)
             setLoading(false)
@@ -109,36 +88,49 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           return null
         }
 
-        console.log('✅ Session found for:', session.user.email)
+        const profilePromise = fetchUserProfile(session.user.id)
+        const timeoutPromise = new Promise<null>((_, reject) => {
+          authTimeoutRef.current = setTimeout(() => {
+            reject(new Error('Profile fetch timeout'))
+          }, AUTH_TIMEOUT)
+        })
 
-        // Fetch user profile
-        const profile = await fetchUserProfile(session.user.id)
-        
-        if (!profile && isMountedRef.current) {
-          console.error('No profile found for user:', session.user.id)
-          setError('Profile not found')
-          setLoading(false)
-          return null
+        const profile = await Promise.race([profilePromise, timeoutPromise])
+
+        if (authTimeoutRef.current) {
+          clearTimeout(authTimeoutRef.current)
+        }
+
+        if (!profile) {
+          const basicProfile: UserProfile = {
+            id: session.user.id,
+            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            email: session.user.email,
+            role: session.user.user_metadata?.role || 'student',
+          }
+          
+          if (isMountedRef.current) {
+            setUser(basicProfile)
+            setError(null)
+            setLoading(false)
+          }
+          return basicProfile
         }
 
         if (isMountedRef.current) {
-          console.log('✅ Profile loaded:', profile?.full_name)
           setUser(profile)
           setError(null)
+          setLoading(false)
         }
 
         return profile
       } catch (err: any) {
-        console.error('❌ Error loading user:', err.message)
-        if (isMountedRef.current) {
-          setError(err.message)
-          setUser(null)
-        }
-        return null
-      } finally {
+        console.error('Error loading user:', err.message)
         if (isMountedRef.current) {
           setLoading(false)
         }
+        return null
+      } finally {
         fetchPromiseRef.current = null
       }
     })()
@@ -150,89 +142,68 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   // ─── Refresh User ───────────────────────────────────
   const refreshUser = useCallback(async () => {
     setLoading(true)
-    fetchPromiseRef.current = null // Clear cached promise
+    fetchPromiseRef.current = null
     await loadUser()
-    if (isMountedRef.current) {
-      toast.success('User data refreshed')
-    }
   }, [loadUser])
 
-  // ─── Sign Out ───────────────────────────────────────
+  // ─── Sign Out (IMMEDIATE REDIRECT) ──────────────────
   const signOut = useCallback(async () => {
     try {
-      console.log('🚪 Signing out...')
-      await supabase.auth.signOut()
+      // Clear state immediately
+      setUser(null)
+      setError(null)
+      setLoading(false)
       
-      if (isMountedRef.current) {
-        setUser(null)
-        setError(null)
-        toast.success('Signed out successfully')
-      }
+      // Sign out from Supabase (fire and forget)
+      supabase.auth.signOut().catch(console.error)
       
-      // Redirect based on role
-      router.replace('/portal')
+      // Immediate hard redirect - don't wait for anything
+      window.location.href = '/portal'
+      
     } catch (err: any) {
       console.error('Sign out error:', err)
-      if (isMountedRef.current) {
-        toast.error('Failed to sign out')
-      }
+      window.location.href = '/portal'
     }
-  }, [router])
+  }, [])
 
   // ─── Auth State Listener ────────────────────────────
   useEffect(() => {
     isMountedRef.current = true
     
-    // Initial load
-    loadUser()
+    if (!initialLoadDoneRef.current) {
+      initialLoadDoneRef.current = true
+      loadUser()
+    }
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log(`🔄 Auth event: ${event}`, session?.user?.email)
+        if (event === 'INITIAL_SESSION') return
 
         switch (event) {
           case 'SIGNED_IN':
-            console.log('✅ User signed in')
             await loadUser()
             break
 
           case 'SIGNED_OUT':
-            console.log('🚪 User signed out')
-            if (isMountedRef.current) {
-              setUser(null)
-              setLoading(false)
-              router.replace('/portal')
-            }
+            setUser(null)
+            setLoading(false)
+            window.location.href = '/portal'
             break
 
           case 'TOKEN_REFRESHED':
-            console.log('🔄 Token refreshed')
-            // Don't reload user on token refresh to prevent flickering
             break
 
           case 'USER_UPDATED':
-            console.log('👤 User updated')
             await loadUser()
             break
 
           case 'PASSWORD_RECOVERY':
-            console.log('🔑 Password recovery')
-            router.push('/reset-password')
+            window.location.href = '/reset-password'
             break
-
-          default:
-            console.log(`⚠️ Unhandled auth event: ${event}`)
-            // For unknown events, verify session is still valid
-            if (!session) {
-              console.log('No session on unknown event, checking...')
-              await loadUser()
-            }
         }
       }
     )
 
-    // Cleanup
     return () => {
       isMountedRef.current = false
       if (authTimeoutRef.current) {
@@ -240,7 +211,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       }
       subscription.unsubscribe()
     }
-  }, [loadUser, router])
+  }, [loadUser])
 
   // ─── Value ──────────────────────────────────────────
   const value: UserContextType = {
