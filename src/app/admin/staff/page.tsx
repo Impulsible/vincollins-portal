@@ -29,7 +29,7 @@ export default function StaffPage() {
 
   // Fetch staff members
   const fetchStaff = useCallback(async () => {
-    setLoading(true)
+    console.log('🔄 Fetching staff...')
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -38,6 +38,8 @@ export default function StaffPage() {
         .order('full_name', { ascending: true })
 
       if (error) throw error
+      
+      console.log('✅ Staff fetched:', data?.length || 0, 'members')
       setStaff((data as Staff[]) || [])
     } catch (error) {
       console.error('Error fetching staff:', error)
@@ -51,34 +53,13 @@ export default function StaffPage() {
     fetchStaff()
   }, [fetchStaff])
 
-  // Handle adding a new staff member
-  const handleAddStaff = async (staffData: any): Promise<{ email: string; password: string; vin_id: string }> => {
-    try {
-      const response = await fetch('/api/admin/users/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...staffData,
-          role: 'staff',
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to create staff member')
-      }
-
-      return {
-        email: result.credentials.email,
-        password: result.credentials.password,
-        vin_id: result.credentials.vin_id,
-      }
-    } catch (error: any) {
-      console.error('Error adding staff:', error)
-      toast.error(error.message || 'Failed to add staff member')
-      throw error
-    }
+  // StaffManagement now calls the API directly, so this is a no-op
+  // but kept for interface compatibility
+  const handleAddStaff = async (staffData: any): Promise<{ email: string; password: string; vin_id: string } | void> => {
+    // The StaffManagement component handles the API call directly
+    // This function exists only for the interface contract
+    console.log('ℹ️ handleAddStaff called (API handled by StaffManagement directly)')
+    return
   }
 
   // Handle updating a staff member
@@ -98,6 +79,7 @@ export default function StaffPage() {
 
       if (error) throw error
 
+      toast.success('Staff updated successfully!')
       await fetchStaff()
     } catch (error: any) {
       console.error('Error updating staff:', error)
@@ -109,7 +91,6 @@ export default function StaffPage() {
   // Handle deleting a staff member
   const handleDeleteStaff = async (staffMember: Staff): Promise<void> => {
     try {
-      // Delete from auth.users via API (if you have one) or admin SDK
       const { error: profileError } = await supabase
         .from('profiles')
         .delete()
@@ -117,6 +98,7 @@ export default function StaffPage() {
 
       if (profileError) throw profileError
 
+      toast.success('Staff deleted successfully!')
       await fetchStaff()
     } catch (error: any) {
       console.error('Error deleting staff:', error)

@@ -1,5 +1,6 @@
+
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/help/page.tsx - REMOVED HAMBURGER, FIXED CHAT POSITION
+// app/student/help/page.tsx - SECURE: No Self-Service Password Reset, Contact Support Only
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
@@ -13,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils'
 import {
   Loader2, HelpCircle, MessageCircle, Phone, Mail, MapPin,
   ChevronRight, Home, ArrowLeft, Send, FileText,
-  BookOpen, Award, Search, User,
+  BookOpen, Award, Search, User, Shield,
   Bot, X, Minimize2, Maximize2, Sparkles, Clock, ThumbsUp, ThumbsDown
 } from 'lucide-react'
 import Link from 'next/link'
@@ -87,7 +87,12 @@ const faqData = [
   {
     category: 'account',
     question: 'How do I change my password?',
-    answer: 'You can change your password in Settings → Account. You\'ll need your current password to set a new one. If you forgot your password, use the "Forgot Password" link on the login page.'
+    answer: 'You can change your password in Settings → Account if you know your current password. If you\'ve forgotten your password, please submit a support ticket or contact the ICT Support Center for assistance.'
+  },
+  {
+    category: 'account',
+    question: 'I forgot my password. What should I do?',
+    answer: 'For security reasons, password resets are handled by our support team. Please submit a support ticket with the category "Account Issue" or contact the ICT Support Center directly. You\'ll need to verify your identity.'
   },
   {
     category: 'account',
@@ -143,8 +148,10 @@ const chatResponses: Record<string, string> = {
   'assignment': 'Assignments are available on the "Assignments" page. You can view details, download files, and submit your work before the due date.',
   'submit assignment': 'Go to Assignments, find the assignment, click "Submit", and upload your file (PDF, DOC, DOCX, or images). Max size: 10MB.',
   'assignment deadline': 'Assignment deadlines are shown on each assignment card. Submit before the due date to avoid penalties.',
-  'password': 'You can change your password in Settings → Account. You\'ll need your current password to set a new one.',
-  'forgot password': 'On the login page, click "Forgot Password". Enter your email and we\'ll send you a reset link.',
+  'password': 'To change your password, go to Settings → Account. You\'ll need your current password. If you\'ve forgotten your password, please contact support.',
+  'forgot password': 'For security reasons, password resets are handled by our support team. Please submit a support ticket with category "Account Issue" or contact the ICT Support Center.',
+  'reset password': 'Password resets must be done through our support team for security verification. Contact support@vincollins.edu.ng or visit the ICT Support Center.',
+  'change password': 'You can change your password in Settings → Account if you know your current one. For forgotten passwords, contact support.',
   'profile photo': 'Go to your Profile page and click the camera icon on your avatar to upload a new photo (JPG, PNG, GIF - max 5MB).',
   'update profile': 'You can update your profile information on the Profile page. Click "Edit Profile" to make changes.',
   'not loading': 'Try: 1) Refresh the page 2) Clear browser cache 3) Try Chrome browser 4) Check internet connection.',
@@ -152,9 +159,11 @@ const chatResponses: Record<string, string> = {
   'mobile': 'Yes! The portal works on smartphones and tablets. You can take exams and access all features from your mobile device.',
   'internet': 'A stable internet connection is required, especially during exams. Your answers are auto-saved if connection drops.',
   'contact teacher': 'You can find teacher contact information in the "Courses" section. Click on a subject to see the teacher\'s details.',
-  'support': 'You can reach support at support@vincollins.edu.ng or call +234 800 123 4567 during business hours (8am-4pm).',
-  'help': 'I\'m here to help! Ask me about exams, results, assignments, or technical issues. You can also submit a support ticket for complex problems.',
-  'default': 'I\'m not sure about that. You can:\n• Search the FAQ above\n• Contact support at support@vincollins.edu.ng\n• Submit a support ticket\n• Call +234 800 123 4567'
+  'support': 'You can reach support at support@vincollins.edu.ng or call +234 800 123 4567 during business hours (Mon-Fri, 8am-4pm).',
+  'help': 'I\'m here to help! Ask me about exams, results, assignments, or technical issues. For password resets and account issues, please submit a support ticket.',
+  'account locked': 'If your account is locked, please contact the ICT Support Center or submit a support ticket for assistance.',
+  'vin id': 'Your VIN ID is your unique student identifier. If you\'ve forgotten it, check your admission letter or contact support.',
+  'default': 'I\'m not sure about that. You can:\n• Search the FAQ above\n• Contact support at support@vincollins.edu.ng\n• Submit a support ticket\n• Call +234 800 123 4567\n• Visit the ICT Support Center'
 }
 
 const quickReplies = [
@@ -183,13 +192,12 @@ export default function StudentHelpPage() {
   const [submitting, setSubmitting] = useState(false)
   const [selectedGuide, setSelectedGuide] = useState<number | null>(null)
   
-  // Chat Bot States
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([
     {
       id: '1',
-      text: '👋 Hello! I\'m the Vincollins Assistant. I can help you with questions about exams, assignments, results, account issues, and more. What would you like to know?',
+      text: '👋 Hello! I\'m the Vincollins Assistant. I can help you with questions about exams, assignments, results, and more. For password resets and account issues, please contact our support team. What would you like to know?',
       sender: 'bot',
       timestamp: new Date()
     }
@@ -292,11 +300,11 @@ export default function StudentHelpPage() {
 
       if (error) throw error
 
-      toast.success('Support ticket submitted successfully!')
+      toast.success('Support ticket submitted successfully! We\'ll get back to you soon.')
       setTicketForm({ subject: '', category: '', message: '', priority: 'normal' })
     } catch (error) {
       console.error('Error submitting ticket:', error)
-      toast.error('Failed to submit ticket')
+      toast.error('Failed to submit ticket. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -310,7 +318,6 @@ export default function StudentHelpPage() {
     return matchesCategory && matchesSearch
   })
 
-  // Chat Bot Functions
   const getBotResponse = (message: string): string => {
     const lowerMessage = message.toLowerCase().trim()
     
@@ -368,33 +375,30 @@ export default function StudentHelpPage() {
   }
 
   const handleQuickReply = (reply: string) => {
-    setChatInput(reply)
+    const userMessage: ChatMessage = {
+      id: Date.now().toString(),
+      text: reply,
+      sender: 'user',
+      timestamp: new Date()
+    }
+    
+    setChatMessages(prev => [...prev, userMessage])
+    setIsTyping(true)
+    
     setTimeout(() => {
-      const userMessage: ChatMessage = {
-        id: Date.now().toString(),
-        text: reply,
-        sender: 'user',
+      const botResponse: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        text: getBotResponse(reply),
+        sender: 'bot',
         timestamp: new Date()
       }
       
-      setChatMessages(prev => [...prev, userMessage])
-      setIsTyping(true)
-      
-      setTimeout(() => {
-        const botResponse: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          text: getBotResponse(reply),
-          sender: 'bot',
-          timestamp: new Date()
-        }
-        
-        setChatMessages(prev => [...prev, botResponse])
-        setIsTyping(false)
-      }, 1000)
-    }, 100)
+      setChatMessages(prev => [...prev, botResponse])
+      setIsTyping(false)
+    }, 1000)
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
@@ -427,7 +431,10 @@ export default function StudentHelpPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
+            <p className="mt-4 text-slate-600 text-sm">Loading help center...</p>
+          </div>
         </div>
       </div>
     )
@@ -438,7 +445,6 @@ export default function StudentHelpPage() {
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
       <div className="flex flex-1">
-        {/* Desktop Sidebar */}
         <div className="hidden lg:block">
           <StudentSidebar 
             profile={profile}
@@ -454,25 +460,25 @@ export default function StudentHelpPage() {
           "flex-1 transition-all duration-300 w-full",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-16 lg:pt-20 pb-20 sm:pb-12 px-3 sm:px-4 md:px-6 lg:px-8">
+          <main className="pt-20 sm:pt-24 lg:pt-28 pb-20 sm:pb-12 px-3 sm:px-4 md:px-6 lg:px-8">
             <div className="container mx-auto max-w-6xl">
               
               {/* Breadcrumb */}
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-4 md:mb-6 flex items-center justify-between"
+                className="mb-4 md:mb-6 flex items-center justify-between flex-wrap gap-2"
               >
                 <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Link href="/student" className="hover:text-primary flex items-center gap-1">
                     <Home className="h-3.5 w-3.5" />
-                    Dashboard
+                    <span className="hidden xs:inline">Dashboard</span>
                   </Link>
-                  <ChevronRight className="h-3.5 w-3.5" />
+                  <ChevronRight className="h-3.5 w-3.5 hidden xs:block" />
                   <span className="text-foreground font-medium">Help & Support</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
-                  <ArrowLeft className="mr-2 h-4 w-4" />
+                <Button variant="outline" size="sm" onClick={() => router.push('/student')} className="h-8 text-xs">
+                  <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                   Back
                 </Button>
               </motion.div>
@@ -484,7 +490,7 @@ export default function StudentHelpPage() {
                 className="mb-6 md:mb-8"
               >
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Help & Support Center</h1>
-                <p className="text-muted-foreground mt-2 text-xs sm:text-sm md:text-base">Find answers to common questions or contact our support team</p>
+                <p className="text-muted-foreground mt-1.5 sm:mt-2 text-xs sm:text-sm md:text-base">Find answers to common questions or contact our support team</p>
               </motion.div>
 
               {/* Search Bar */}
@@ -540,6 +546,7 @@ export default function StudentHelpPage() {
                         <div className="text-center py-8 sm:py-12">
                           <HelpCircle className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
                           <p className="text-slate-500 text-sm sm:text-base">No FAQs found matching your search.</p>
+                          <p className="text-xs text-slate-400 mt-1">Try different keywords or browse all categories.</p>
                         </div>
                       ) : (
                         <div className="space-y-2 sm:space-y-3">
@@ -551,7 +558,7 @@ export default function StudentHelpPage() {
                                   <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90 shrink-0" />
                                 </summary>
                                 <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t border-slate-200 bg-slate-50">
-                                  <p className="text-slate-600 text-xs sm:text-sm">{faq.answer}</p>
+                                  <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">{faq.answer}</p>
                                 </div>
                               </details>
                             </div>
@@ -608,7 +615,7 @@ export default function StudentHelpPage() {
                             <div>
                               <p className="font-medium text-sm sm:text-base">Email Support</p>
                               <p className="text-xs sm:text-sm text-slate-600 break-all">support@vincollins.edu.ng</p>
-                              <p className="text-[10px] sm:text-xs text-slate-500">24/7 response within 24h</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500">Response within 24h</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-2 sm:gap-3">
@@ -617,6 +624,17 @@ export default function StudentHelpPage() {
                               <p className="font-medium text-sm sm:text-base">Visit Us</p>
                               <p className="text-xs sm:text-sm text-slate-600">ICT Support Center</p>
                               <p className="text-[10px] sm:text-xs text-slate-500">Main Campus Building</p>
+                            </div>
+                          </div>
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                            <div className="flex items-start gap-2">
+                              <Shield className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                              <div>
+                                <p className="text-xs font-medium text-amber-800">Password Resets</p>
+                                <p className="text-[10px] sm:text-xs text-amber-700 mt-0.5">
+                                  Password resets require identity verification. Visit the ICT Support Center or submit a ticket.
+                                </p>
+                              </div>
                             </div>
                           </div>
                         </CardContent>
@@ -652,6 +670,7 @@ export default function StudentHelpPage() {
                                   <SelectItem value="exam">Exam Related</SelectItem>
                                   <SelectItem value="assignment">Assignment Help</SelectItem>
                                   <SelectItem value="account">Account Issue</SelectItem>
+                                  <SelectItem value="password">Password Reset</SelectItem>
                                   <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>
                               </Select>
@@ -685,7 +704,7 @@ export default function StudentHelpPage() {
                           <Button 
                             onClick={handleSubmitTicket} 
                             disabled={submitting}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm sm:text-base"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm sm:text-base h-10 sm:h-11"
                           >
                             {submitting ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -705,9 +724,8 @@ export default function StudentHelpPage() {
         </div>
       </div>
 
-      {/* Chat Bot Widget - FIXED POSITION WITH TOP SPACING */}
+      {/* Chat Bot Widget */}
       <>
-        {/* Chat Window */}
         <AnimatePresence>
           {isChatOpen && !isMinimized && (
             <motion.div
@@ -716,19 +734,13 @@ export default function StudentHelpPage() {
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               className={cn(
                 "fixed z-50 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden",
-                // Position with more top spacing
-                "top-20 sm:top-24",
-                // Right position
-                "right-4 sm:right-6",
-                // Width responsive
-                "w-[calc(100vw-2rem)] sm:w-[380px]",
-                // Max width
+                "top-20 sm:top-24 md:top-28",
+                "right-3 sm:right-4 md:right-6",
+                "w-[calc(100vw-1.5rem)] sm:w-[380px]",
                 "max-w-[380px]",
-                // Max height to prevent overflow
-                "max-h-[calc(100vh-120px)]"
+                "max-h-[calc(100vh-120px)] sm:max-h-[calc(100vh-140px)]"
               )}
             >
-              {/* Chat Header */}
               <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 sm:p-4 text-white">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 sm:gap-3">
@@ -736,7 +748,7 @@ export default function StudentHelpPage() {
                       <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-white/20 flex items-center justify-center">
                         <Bot className="h-5 w-5 sm:h-6 sm:w-6" />
                       </div>
-                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-400 rounded-full border-2 border-white"></span>
+                      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-400 rounded-full border-2 border-white" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm sm:text-base flex items-center gap-1 sm:gap-2">
@@ -747,24 +759,17 @@ export default function StudentHelpPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
-                      onClick={toggleMinimize}
-                      className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                    >
+                    <button onClick={toggleMinimize} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
                       <Minimize2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
-                    <button
-                      onClick={toggleChat}
-                      className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
-                    >
+                    <button onClick={toggleChat} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
                       <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </button>
                   </div>
                 </div>
               </div>
 
-              {/* Chat Messages */}
-              <ScrollArea className="h-[350px] sm:h-[400px] max-h-[calc(100vh-320px)] p-3 sm:p-4 bg-slate-50">
+              <div className="h-[300px] sm:h-[350px] md:h-[400px] max-h-[calc(100vh-320px)] overflow-y-auto p-3 sm:p-4 bg-slate-50">
                 <div className="space-y-3 sm:space-y-4">
                   {chatMessages.map((message) => (
                     <div key={message.id}>
@@ -794,19 +799,13 @@ export default function StudentHelpPage() {
                         <div className="flex items-center gap-2 ml-9 sm:ml-10 mt-1">
                           <button
                             onClick={() => handleChatFeedback(message.id, 'up')}
-                            className={cn(
-                              "p-1 rounded hover:bg-slate-200 transition-colors",
-                              feedbackGiven[message.id] === 'up' && "text-green-600"
-                            )}
+                            className={cn("p-1 rounded hover:bg-slate-200 transition-colors", feedbackGiven[message.id] === 'up' && "text-green-600")}
                           >
                             <ThumbsUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </button>
                           <button
                             onClick={() => handleChatFeedback(message.id, 'down')}
-                            className={cn(
-                              "p-1 rounded hover:bg-slate-200 transition-colors",
-                              feedbackGiven[message.id] === 'down' && "text-red-600"
-                            )}
+                            className={cn("p-1 rounded hover:bg-slate-200 transition-colors", feedbackGiven[message.id] === 'down' && "text-red-600")}
                           >
                             <ThumbsDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </button>
@@ -822,9 +821,9 @@ export default function StudentHelpPage() {
                       </div>
                       <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
                         <div className="flex gap-1">
-                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></span>
-                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></span>
-                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></span>
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
                     </div>
@@ -832,11 +831,9 @@ export default function StudentHelpPage() {
                   
                   <div ref={chatEndRef} />
                 </div>
-              </ScrollArea>
+              </div>
 
-              {/* Quick Replies */}
               <div className="p-2 sm:p-3 border-t border-slate-200 bg-white">
-                <p className="text-[10px] sm:text-xs text-slate-500 mb-1.5 sm:mb-2">Quick replies:</p>
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {quickReplies.slice(0, 4).map((reply) => (
                     <Badge
@@ -851,15 +848,14 @@ export default function StudentHelpPage() {
                 </div>
               </div>
 
-              {/* Chat Input */}
               <div className="p-3 sm:p-4 border-t border-slate-200 bg-white">
                 <div className="flex items-center gap-2">
                   <Input
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
-                    onKeyPress={handleKeyPress}
+                    onKeyDown={handleKeyDown}
                     placeholder="Type your message..."
-                    className="flex-1 bg-slate-50 border-slate-200 text-sm"
+                    className="flex-1 bg-slate-50 border-slate-200 text-sm h-9 sm:h-10"
                   />
                   <Button
                     onClick={handleSendMessage}
@@ -870,9 +866,6 @@ export default function StudentHelpPage() {
                     <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </div>
-                <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1.5 sm:mt-2 text-center">
-                  Powered by Vincollins AI Assistant
-                </p>
               </div>
             </motion.div>
           )}
@@ -885,7 +878,7 @@ export default function StudentHelpPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="fixed z-50 top-20 sm:top-24 right-4 sm:right-6 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full shadow-lg py-2 px-4 cursor-pointer"
+              className="fixed z-50 top-20 sm:top-24 right-3 sm:right-4 md:right-6 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full shadow-lg py-2 px-4 cursor-pointer"
               onClick={toggleMinimize}
             >
               <div className="flex items-center gap-2 sm:gap-3 text-white">

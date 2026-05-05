@@ -61,9 +61,7 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
                       <p className="font-medium text-[11px] sm:text-sm truncate line-clamp-1">
                         {displayName}
                       </p>
-                      <p className="text-[9px] sm:text-xs text-slate-500 truncate line-clamp-1">
-                        {classmate.email}
-                      </p>
+                      {/* ✅ REMOVED: Email display - security issue */}
                     </div>
                   </div>
                 )

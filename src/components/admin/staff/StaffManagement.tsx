@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/staff/StaffManagement.tsx - COMPLETE FIXED VERSION
+// components/admin/staff/StaffManagement.tsx - FULLY FIXED
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,15 +24,14 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   UserPlus, MoreVertical, Edit, Trash2, KeyRound, Copy, CheckCircle,
-  Shield, RefreshCw, Loader2, Users, Search, X, Eye, Circle, CircleDot,
-  Wifi, WifiOff, Clock, AlertCircle, Phone, Mail, MapPin
+  Shield, RefreshCw, Loader2, Users, Search, X, Eye, Circle,
+  WifiOff, AlertCircle, Phone, Mail
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
-// FIXED: Staff interface - only includes fields that exist in profiles table
 interface Staff {
   id: string
   vin_id: string
@@ -71,60 +70,6 @@ const generateJoinYears = (): number[] => {
 
 const joinYears = generateJoinYears()
 
-const formatFullName = (firstName: string, lastName: string): string => {
-  if (!firstName || !lastName) return 'Staff Member'
-  const first = firstName.trim()
-  const last = lastName.trim()
-  const formattedFirst = first.charAt(0).toUpperCase() + first.slice(1).toLowerCase()
-  const formattedLast = last.charAt(0).toUpperCase() + last.slice(1).toLowerCase()
-  return `${formattedFirst} ${formattedLast}`
-}
-
-const formatLastSeen = (timestamp?: string) => {
-  if (!timestamp) return 'Never'
-  const lastSeen = new Date(timestamp)
-  const now = new Date()
-  const diffMs = now.getTime() - lastSeen.getTime()
-  const diffMins = Math.floor(diffMs / 60000)
-  const diffHours = Math.floor(diffMs / 3600000)
-  const diffDays = Math.floor(diffMs / 86400000)
-
-  if (diffMins < 1) return 'Just now'
-  if (diffMins < 60) return `${diffMins} min ago`
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
-  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
-  return lastSeen.toLocaleDateString()
-}
-
-const generateStaffEmail = (firstName: string, lastName: string): string => {
-  const cleanFirst = firstName.toLowerCase().trim().replace(/[^a-z0-9]/g, '').slice(0, 15) || 'staff'
-  const cleanLast = lastName.toLowerCase().trim().replace(/[^a-z0-9]/g, '').slice(0, 15) || 'member'
-  return `${cleanFirst}.${cleanLast}@vincollins.edu.ng`
-}
-
-const generateRandomFourDigits = (): string => String(Math.floor(Math.random() * 9000) + 1000)
-
-const generateStaffVIN = async (year: number): Promise<string> => {
-  let isUnique = false
-  let vinId = ''
-  let attempts = 0
-  const maxAttempts = 20
-
-  while (!isUnique && attempts < maxAttempts) {
-    const randomDigits = generateRandomFourDigits()
-    vinId = `VIN-STF-${year}-${randomDigits}`
-    const { data } = await supabase.from('users').select('vin_id').eq('vin_id', vinId).maybeSingle()
-    if (!data) isUnique = true
-    attempts++
-  }
-
-  if (!isUnique) {
-    const timestamp = Date.now().toString().slice(-4)
-    vinId = `VIN-STF-${year}-${timestamp}`
-  }
-  return vinId
-}
-
 const copyToClipboard = (text: string, label: string) => {
   navigator.clipboard.writeText(text)
   toast.success(`${label} copied to clipboard!`)
@@ -143,11 +88,6 @@ export function StaffManagement({
   const [searchQuery, setSearchQuery] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   
-  const [onlineStaff, setOnlineStaff] = useState<Set<string>>(new Set())
-  const [awayStaff, setAwayStaff] = useState<Set<string>>(new Set())
-  const [staffLastSeen, setStaffLastSeen] = useState<Map<string, string>>(new Map())
-  
-  // FIXED: Removed position, qualification, hire_date from form state
   const [newStaff, setNewStaff] = useState({
     first_name: '',
     last_name: '',
@@ -156,38 +96,6 @@ export function StaffManagement({
     address: '',
     join_year: currentYear,
   })
-
-  useEffect(() => {
-    console.log(`StaffManagement: Received ${staff.length} staff members`)
-  }, [staff])
-
-  useEffect(() => {
-    if (!staff.length) return
-    const presenceChannel = supabase.channel('online-users', {
-      config: { presence: { key: 'admin-staff-tracker' } },
-    })
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState()
-        const online = new Set<string>()
-        const away = new Set<string>()
-        const lastSeenMap = new Map<string, string>()
-        Object.values(state).forEach((presences: any) => {
-          presences.forEach((presence: any) => {
-            if (presence.user_id && (presence.role === 'staff' || presence.role === 'teacher')) {
-              if (presence.status === 'online') online.add(presence.user_id)
-              else if (presence.status === 'away') away.add(presence.user_id)
-              if (presence.last_seen) lastSeenMap.set(presence.user_id, presence.last_seen)
-            }
-          })
-        })
-        setOnlineStaff(online)
-        setAwayStaff(away)
-        setStaffLastSeen(prev => new Map([...prev, ...lastSeenMap]))
-      })
-      .subscribe()
-    return () => { presenceChannel.unsubscribe() }
-  }, [staff.length])
 
   const sortedStaff = useMemo(() => {
     return [...staff].sort((a, b) => {
@@ -208,31 +116,21 @@ export function StaffManagement({
     )
   }, [sortedStaff, searchQuery])
 
-  const getStaffStatus = useCallback((staffId: string): 'online' | 'away' | 'offline' => {
-    if (onlineStaff.has(staffId)) return 'online'
-    if (awayStaff.has(staffId)) return 'away'
-    return 'offline'
-  }, [onlineStaff, awayStaff])
-
-  const getStatusIcon = useCallback((staffId: string) => {
-    const status = getStaffStatus(staffId)
-    switch (status) {
-      case 'online': return <Wifi className="h-3 w-3 text-emerald-500" />
-      case 'away': return <CircleDot className="h-3 w-3 text-amber-500" />
-      default: return <WifiOff className="h-3 w-3 text-slate-400" />
+  const getStatusDisplay = (staffMember: Staff) => {
+    if (!staffMember.is_active) {
+      return {
+        icon: <Circle className="h-3 w-3 text-red-400" />,
+        text: 'Inactive',
+        className: 'text-red-500'
+      }
     }
-  }, [getStaffStatus])
-
-  const getStatusText = useCallback((staffId: string) => {
-    const status = getStaffStatus(staffId)
-    switch (status) {
-      case 'online': return 'Online'
-      case 'away': return 'Away'
-      default: return 'Offline'
+    return {
+      icon: <WifiOff className="h-3 w-3 text-slate-400" />,
+      text: 'Offline',
+      className: 'text-slate-500'
     }
-  }, [getStaffStatus])
+  }
 
-  // FIXED: Only send fields that exist in profiles table
   const handleAddStaffClick = async () => {
     if (!newStaff.first_name || !newStaff.last_name || !newStaff.department) {
       toast.error('Please fill in all required fields')
@@ -241,48 +139,71 @@ export function StaffManagement({
 
     setIsSubmitting(true)
     try {
-      const fullName = formatFullName(newStaff.first_name, newStaff.last_name)
-      const email = generateStaffEmail(newStaff.first_name, newStaff.last_name)
       const year = newStaff.join_year || currentYear
-      const vinId = await generateStaffVIN(year)
       
-      // FIXED: Only send fields that exist in profiles table
-      const staffData = {
-        first_name: newStaff.first_name.trim(),
-        last_name: newStaff.last_name.trim(),
-        department: newStaff.department,
-        phone: newStaff.phone || null,
-        address: newStaff.address || null,
-        join_year: year,
-        // DO NOT send: position, qualification, hire_date, full_name, email, vin_id
-      }
+      console.log('📤 Adding staff...')
       
-      console.log('Creating staff:', { fullName, email, vinId, year })
-      
-      const result = await onAddStaff(staffData)
-      
-      if (result) {
-        setNewCredentials({
-          email: result.email,
-          password: result.password,
-          vin_id: result.vin_id,
+      const response = await fetch('/api/admin/users/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: newStaff.first_name.trim(),
+          middle_name: '',
+          last_name: newStaff.last_name.trim(),
+          role: 'staff',
+          department: newStaff.department,
+          join_year: year,
+          phone: newStaff.phone || '',
+          address: newStaff.address || ''
         })
-      } else {
-        setNewCredentials({ email, password: vinId, vin_id: vinId })
-      }
-      
-      setShowAddDialog(false)
-      setShowCredentialsDialog(true)
-      
-      setNewStaff({
-        first_name: '', last_name: '', department: '',
-        phone: '', address: '', join_year: currentYear,
       })
       
-      if (onRefresh) onRefresh()
-      toast.success(`${fullName} added successfully!`)
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create staff member')
+      }
+      
+      const result = await response.json()
+      console.log('✅ Staff created:', result.user.full_name)
+      
+      // Store credentials for display
+      setNewCredentials({
+        email: result.credentials.email,
+        password: result.credentials.password,
+        vin_id: result.credentials.vin_id
+      })
+      
+      // Reset form
+      setNewStaff({
+        first_name: '',
+        last_name: '',
+        department: '',
+        phone: '',
+        address: '',
+        join_year: currentYear,
+      })
+      
+      // Close add dialog
+      setShowAddDialog(false)
+      
+      // ✅ REFRESH NOW - before showing credentials
+      toast.success(`${result.user.full_name} added!`)
+      
+      // Small delay then refresh
+      setTimeout(() => {
+        if (onRefresh) {
+          console.log('🔄 Calling onRefresh...')
+          onRefresh()
+        }
+      }, 200)
+      
+      // Show credentials dialog after refresh
+      setTimeout(() => {
+        setShowCredentialsDialog(true)
+      }, 600)
+      
     } catch (error: any) {
-      console.error('Error adding staff:', error)
+      console.error('❌ Error adding staff:', error)
       toast.error(error.message || 'Failed to add staff member')
     } finally {
       setIsSubmitting(false)
@@ -293,7 +214,6 @@ export function StaffManagement({
     if (!selectedStaff) return
     setIsSubmitting(true)
     try {
-      // FIXED: Only send fields that exist in profiles
       await onUpdateStaff(selectedStaff)
       setShowEditDialog(false)
       setSelectedStaff(null)
@@ -334,11 +254,6 @@ export function StaffManagement({
     }
   }
 
-  const handleRefresh = () => {
-    if (onRefresh) onRefresh()
-    else window.location.reload()
-  }
-
   return (
     <div className="space-y-6">
       <motion.div 
@@ -353,12 +268,6 @@ export function StaffManagement({
           <p className="text-muted-foreground mt-1 flex items-center gap-2">
             <Users className="h-4 w-4" />
             Total {staff.length} staff member{staff.length !== 1 ? 's' : ''}
-            {onlineStaff.size > 0 && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                <Wifi className="h-3 w-3 mr-1 text-emerald-500" />
-                {onlineStaff.size} online
-              </Badge>
-            )}
           </p>
         </div>
         
@@ -384,7 +293,11 @@ export function StaffManagement({
               
               <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
                 <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Mail className="h-3 w-3" /> Auto-generated Email</p>
-                <p className="font-mono text-sm">{newStaff.first_name && newStaff.last_name ? generateStaffEmail(newStaff.first_name, newStaff.last_name) : 'first.last@vincollins.edu.ng'}</p>
+                <p className="font-mono text-sm">
+                  {newStaff.first_name && newStaff.last_name 
+                    ? `${newStaff.first_name.toLowerCase().replace(/[^a-z]/g, '')}.${newStaff.last_name.toLowerCase().replace(/[^a-z]/g, '')}@vincollins.edu.ng`
+                    : 'first.last@vincollins.edu.ng'}
+                </p>
               </div>
               
               <div>
@@ -403,7 +316,7 @@ export function StaffManagement({
               <div><Label>Address</Label><Input value={newStaff.address} onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })} placeholder="Staff address" className="mt-1" /></div>
               
               <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
-                <p className="text-xs text-primary/80 flex items-center gap-2"><Shield className="h-3 w-3" /><strong>Auto-generated credentials:</strong> VIN ID will be created as VIN-STF-{newStaff.join_year || currentYear}-XXXX</p>
+                <p className="text-xs flex items-center gap-2"><Shield className="h-3 w-3" /><strong>Credentials auto-generated</strong></p>
               </div>
             </div>
             
@@ -421,7 +334,7 @@ export function StaffManagement({
           <Input placeholder="Search by name, email, VIN ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-8" />
           {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>}
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
+        <Button variant="outline" size="sm" onClick={() => onRefresh?.()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
       </div>
 
       <Card className="border-0 shadow-lg overflow-hidden">
@@ -442,45 +355,70 @@ export function StaffManagement({
                 <TableRow><TableCell colSpan={6} className="text-center py-16"><div className="flex flex-col items-center gap-3"><Users className="h-8 w-8 text-muted-foreground/40" /><p className="text-muted-foreground font-medium">No staff members found</p></div></TableCell></TableRow>
               ) : (
                 filteredStaff.map((member, index) => {
-                  const status = getStaffStatus(member.id)
+                  const status = getStatusDisplay(member)
                   return (
-                    <motion.tr key={member.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.02 }} className="border-b hover:bg-muted/30 transition-colors">
+                    <motion.tr
+                      key={member.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: index * 0.02 }}
+                      className="border-b hover:bg-muted/30 transition-colors"
+                    >
                       <TableCell className="py-4 px-4">
                         <div className="flex items-center gap-3 min-w-[200px]">
-                          <div className="relative flex-shrink-0">
-                            <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-                              <AvatarImage src={member.photo_url} />
-                              <AvatarFallback className="bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-600 font-medium">
-                                {member.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'S'}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="absolute -bottom-0.5 -right-0.5">{getStatusIcon(member.id)}</div>
-                          </div>
+                          <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
+                            <AvatarImage src={member.photo_url} />
+                            <AvatarFallback className="bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-600 font-medium">
+                              {member.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'S'}
+                            </AvatarFallback>
+                          </Avatar>
                           <div className="min-w-0 flex-1">
                             <p className="font-medium truncate">{member.full_name}</p>
                             <p className="text-xs text-muted-foreground truncate">{member.email}</p>
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="py-4 px-4"><code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">{member.vin_id}</code></TableCell>
-                      <TableCell className="py-4 px-4"><Badge variant="outline" className="font-normal whitespace-nowrap">{member.department || '-'}</Badge></TableCell>
-                      <TableCell className="py-4 px-4 hidden md:table-cell"><div className="flex items-center gap-1 whitespace-nowrap"><Phone className="h-4 w-4 text-muted-foreground" /><span className="text-sm">{member.phone || '-'}</span></div></TableCell>
+                      <TableCell className="py-4 px-4">
+                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">{member.vin_id}</code>
+                      </TableCell>
+                      <TableCell className="py-4 px-4">
+                        <Badge variant="outline" className="font-normal whitespace-nowrap">{member.department || '-'}</Badge>
+                      </TableCell>
+                      <TableCell className="py-4 px-4 hidden md:table-cell">
+                        <div className="flex items-center gap-1 whitespace-nowrap">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{member.phone || '-'}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="py-4 px-4">
                         <div className="flex items-center gap-1.5">
-                          {member.is_active ? <><span className={cn("text-sm font-medium", status === 'online' && "text-emerald-600", status === 'away' && "text-amber-600", status === 'offline' && "text-slate-500")}>{getStatusText(member.id)}</span></> : <><Circle className="h-3 w-3 text-red-400" /><span className="text-sm text-red-500">Inactive</span></>}
+                          {status.icon}
+                          <span className={cn("text-sm", status.className)}>{status.text}</span>
                         </div>
                       </TableCell>
                       <TableCell className="py-4 px-4 text-center">
                         <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowViewDetailsDialog(true) }}><Eye className="mr-2 h-4 w-4" /> View Details</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowEditDialog(true) }}><Edit className="mr-2 h-4 w-4" /> Edit Profile</DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleResetPasswordClick(member)}><KeyRound className="mr-2 h-4 w-4" /> Reset Password</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowViewDetailsDialog(true) }}>
+                              <Eye className="mr-2 h-4 w-4" /> View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowEditDialog(true) }}>
+                              <Edit className="mr-2 h-4 w-4" /> Edit Profile
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleResetPasswordClick(member)}>
+                              <KeyRound className="mr-2 h-4 w-4" /> Reset Password
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }} className="text-red-600"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }} className="text-red-600">
+                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -496,12 +434,30 @@ export function StaffManagement({
       {/* Credentials Dialog */}
       <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
         <DialogContent className="sm:max-w-md">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><CheckCircle className="h-5 w-5 text-emerald-500" />Staff Account Created!</DialogTitle><DialogDescription>Save these credentials.</DialogDescription></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-emerald-500" />
+              Staff Account Created!
+            </DialogTitle>
+            <DialogDescription>Save these credentials for the staff member.</DialogDescription>
+          </DialogHeader>
           {newCredentials && (
             <div className="space-y-4 py-4">
               <div className="bg-muted rounded-lg p-4 space-y-3">
-                <div className="flex justify-between items-center"><div><p className="text-xs text-muted-foreground">Email</p><p className="font-mono text-sm">{newCredentials.email}</p></div><Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.email, 'Email')}><Copy className="h-3 w-3" /></Button></div>
-                <div className="flex justify-between items-center"><div><p className="text-xs text-muted-foreground">Password</p><p className="font-mono text-sm font-bold text-primary">{newCredentials.password}</p></div><Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.password, 'Password')}><Copy className="h-3 w-3" /></Button></div>
+                <div className="flex justify-between items-center">
+                  <div><p className="text-xs text-muted-foreground">Email</p><p className="font-mono text-sm">{newCredentials.email}</p></div>
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.email, 'Email')}><Copy className="h-3 w-3" /></Button>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div><p className="text-xs text-muted-foreground">Password (VIN ID)</p><p className="font-mono text-sm font-bold text-primary">{newCredentials.password}</p></div>
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.password, 'Password')}><Copy className="h-3 w-3" /></Button>
+                </div>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200">
+                <p className="text-xs text-amber-800 flex items-center gap-2">
+                  <Shield className="h-3 w-3" />
+                  <strong>Note:</strong> Password = VIN ID. Staff will be prompted to change it on first login.
+                </p>
               </div>
             </div>
           )}
@@ -509,7 +465,7 @@ export function StaffManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog - Simplified */}
+      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader><DialogTitle>Edit Staff Member</DialogTitle></DialogHeader>
@@ -534,9 +490,20 @@ export function StaffManagement({
 
       {/* Delete Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent><DialogHeader><DialogTitle className="text-red-600">Confirm Deletion</DialogTitle></DialogHeader>
-        {selectedStaff && <div className="py-4"><p>Delete {selectedStaff.full_name}?</p></div>}
-        <DialogFooter><Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button><Button variant="destructive" onClick={handleDeleteStaffClick}>Delete</Button></DialogFooter>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="text-red-600 flex items-center gap-2"><AlertCircle className="h-5 w-5" />Confirm Deletion</DialogTitle></DialogHeader>
+          {selectedStaff && (
+            <div className="py-4">
+              <p className="text-lg font-medium">Delete {selectedStaff.full_name}?</p>
+              <p className="text-sm text-muted-foreground mt-1">This action cannot be undone.</p>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteStaffClick} disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Delete
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -547,14 +514,26 @@ export function StaffManagement({
           {selectedStaff && (
             <div className="space-y-4">
               <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16"><AvatarFallback>{selectedStaff.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}</AvatarFallback></Avatar>
-                <div><p className="text-xl font-bold">{selectedStaff.full_name}</p><p className="text-sm text-muted-foreground">{selectedStaff.email}</p></div>
+                <Avatar className="h-16 w-16">
+                  <AvatarFallback className="text-xl">
+                    {selectedStaff.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-xl font-bold">{selectedStaff.full_name}</p>
+                  <p className="text-sm text-muted-foreground">{selectedStaff.email}</p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3 bg-muted rounded-lg p-4">
                 <div><p className="text-xs text-muted-foreground">VIN ID</p><p className="font-mono font-medium">{selectedStaff.vin_id}</p></div>
                 <div><p className="text-xs text-muted-foreground">Department</p><p className="font-medium">{selectedStaff.department || '-'}</p></div>
                 <div><p className="text-xs text-muted-foreground">Phone</p><p className="font-medium">{selectedStaff.phone || '-'}</p></div>
-                <div><p className="text-xs text-muted-foreground">Status</p><Badge className={selectedStaff.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}>{selectedStaff.is_active ? 'Active' : 'Inactive'}</Badge></div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Status</p>
+                  <p className={cn("text-sm font-medium", selectedStaff.is_active ? 'text-emerald-600' : 'text-red-500')}>
+                    {selectedStaff.is_active ? 'Active' : 'Inactive'}
+                  </p>
+                </div>
               </div>
             </div>
           )}
