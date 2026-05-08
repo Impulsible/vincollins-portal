@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/assignments/page.tsx - FULLY RESPONSIVE WITH PROPER BOTTOM SPACING
+// app/student/assignments/page.tsx - FULLY RESPONSIVE WITH CLASS DELIVERY FIX
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -14,7 +14,6 @@ import { Input } from '@/components/ui/input'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -25,7 +24,7 @@ import {
   AlertCircle, Upload, Paperclip, Filter, X, Award, Inbox
 } from 'lucide-react'
 import Link from 'next/link'
-import { format, isPast, isFuture, differenceInDays } from 'date-fns'
+import { format, isPast, differenceInDays } from 'date-fns'
 
 interface StudentProfile {
   id: string
@@ -42,13 +41,18 @@ interface Assignment {
   title: string
   subject: string
   class: string
+  classes?: string[]
   description: string
   instructions?: string
   due_date: string
   total_marks: number
   file_url?: string
   file_name?: string
+  files?: string[]
+  file_count?: number
   teacher_name?: string
+  created_by?: string
+  created_by_name?: string
   status: string
   created_at: string
   submission?: {
@@ -66,7 +70,7 @@ export default function StudentAssignmentsPage() {
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeTab, setActiveTab] = useState('pending')
+  const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
   
@@ -170,12 +174,15 @@ export default function StudentAssignmentsPage() {
       }
 
       setProfile(studentProfile)
+      console.log('📚 Loading assignments for class:', studentProfile.class)
 
+      // ✅ FIXED: Get assignments for this student's class
+      // Supports both classes[] array and single class column
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select('*')
-        .eq('class', studentProfile.class)
         .eq('status', 'published')
+        .or(`classes.cs.{${studentProfile.class}},class.eq.${studentProfile.class}`)
         .order('due_date', { ascending: true })
 
       if (assignmentsError) {
@@ -184,17 +191,25 @@ export default function StudentAssignmentsPage() {
         return
       }
 
-      const { data: submissionsData } = await supabase
-        .from('assignment_submissions')
-        .select('*')
-        .eq('student_id', studentProfile.id)
-        .in('assignment_id', (assignmentsData || []).map(a => a.id))
+      console.log('📚 Found', assignmentsData?.length || 0, 'assignments for class', studentProfile.class)
 
-      const submissionsMap: Record<string, any> = {}
-      submissionsData?.forEach(sub => {
-        submissionsMap[sub.assignment_id] = sub
-      })
+      // Get submissions for this student
+      const assignmentIds = (assignmentsData || []).map(a => a.id)
+      let submissionsMap: Record<string, any> = {}
+      
+      if (assignmentIds.length > 0) {
+        const { data: submissionsData } = await supabase
+          .from('assignment_submissions')
+          .select('*')
+          .eq('student_id', studentProfile.id)
+          .in('assignment_id', assignmentIds)
 
+        submissionsData?.forEach(sub => {
+          submissionsMap[sub.assignment_id] = sub
+        })
+      }
+
+      // Get teacher names
       const teacherIds = [...new Set((assignmentsData || []).map(a => a.created_by).filter(Boolean))]
       const teacherMap: Record<string, string> = {}
       
@@ -209,7 +224,7 @@ export default function StudentAssignmentsPage() {
 
       const processedAssignments: Assignment[] = (assignmentsData || []).map(a => ({
         ...a,
-        teacher_name: teacherMap[a.created_by] || 'Teacher',
+        teacher_name: a.created_by_name || teacherMap[a.created_by] || 'Teacher',
         submission: submissionsMap[a.id]
       }))
 
@@ -242,7 +257,6 @@ export default function StudentAssignmentsPage() {
   useEffect(() => {
     let filtered = [...assignments]
 
-    const now = new Date()
     switch (activeTab) {
       case 'pending':
         filtered = filtered.filter(a => !a.submission && !isPast(new Date(a.due_date)))
@@ -297,17 +311,18 @@ export default function StudentAssignmentsPage() {
     setSubmitting(true)
     try {
       const fileExt = selectedFile.name.split('.').pop()
-      const fileName = `assignment-${selectedAssignment.id}-${Date.now()}.${fileExt}`
-      const filePath = `assignments/${fileName}`
+      const fileName = `submission-${selectedAssignment.id}-${Date.now()}.${fileExt}`
+      const filePath = `assignment-submissions/${fileName}`
 
+      // Use assignment-files bucket instead
       const { error: uploadError } = await supabase.storage
-        .from('student-photos')
+        .from('assignment-files')
         .upload(filePath, selectedFile)
 
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
-        .from('student-photos')
+        .from('assignment-files')
         .getPublicUrl(filePath)
 
       const { error: submitError } = await supabase
@@ -316,6 +331,7 @@ export default function StudentAssignmentsPage() {
           assignment_id: selectedAssignment.id,
           student_id: profile.id,
           student_name: profile.full_name,
+          student_class: profile.class,
           file_url: publicUrl,
           file_name: selectedFile.name,
           submitted_at: new Date().toISOString(),
@@ -330,9 +346,9 @@ export default function StudentAssignmentsPage() {
       setSelectedAssignment(null)
       loadData()
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting assignment:', error)
-      toast.error('Failed to submit assignment')
+      toast.error(error.message || 'Failed to submit assignment')
     } finally {
       setSubmitting(false)
     }
@@ -343,7 +359,10 @@ export default function StudentAssignmentsPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <div className="text-center">
+            <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
+            <p className="mt-4 text-slate-600 text-sm">Loading assignments...</p>
+          </div>
         </div>
       </div>
     )
@@ -367,7 +386,7 @@ export default function StudentAssignmentsPage() {
           "flex-1 transition-all duration-300 overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="min-h-[calc(100vh-64px)] pt-20 lg:pt-24 pb-12">
+          <main className="min-h-[calc(100vh-64px)] pt-20 lg:pt-24 pb-24 sm:pb-12">
             <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 max-w-7xl mx-auto">
               
               {/* Breadcrumb */}
@@ -386,7 +405,7 @@ export default function StudentAssignmentsPage() {
                 </div>
               </motion.div>
 
-              {/* Stats Cards - Responsive Grid */}
+              {/* Stats Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mb-4 sm:mb-6">
                 <Card className="border-0 shadow-sm bg-white">
                   <CardContent className="p-2.5 sm:p-3 md:p-4">
@@ -445,16 +464,16 @@ export default function StudentAssignmentsPage() {
                 </Card>
               </div>
 
-              {/* Filters - Responsive */}
+              {/* Filters */}
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
                 <div className="overflow-x-auto pb-2 sm:pb-0">
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                     <TabsList className="bg-white p-1 rounded-xl shadow-sm border flex flex-nowrap">
-                      <TabsTrigger value="pending" className="rounded-lg text-xs sm:text-sm px-2 sm:px-3">Pending</TabsTrigger>
-                      <TabsTrigger value="submitted" className="rounded-lg text-xs sm:text-sm px-2 sm:px-3">Submitted</TabsTrigger>
-                      <TabsTrigger value="graded" className="rounded-lg text-xs sm:text-sm px-2 sm:px-3">Graded</TabsTrigger>
-                      <TabsTrigger value="overdue" className="rounded-lg text-xs sm:text-sm px-2 sm:px-3">Overdue</TabsTrigger>
-                      <TabsTrigger value="all" className="rounded-lg text-xs sm:text-sm px-2 sm:px-3">All</TabsTrigger>
+                      <TabsTrigger value="all" className="rounded-lg text-[10px] sm:text-xs px-2 sm:px-3">All</TabsTrigger>
+                      <TabsTrigger value="pending" className="rounded-lg text-[10px] sm:text-xs px-2 sm:px-3">Pending</TabsTrigger>
+                      <TabsTrigger value="submitted" className="rounded-lg text-[10px] sm:text-xs px-2 sm:px-3">Submitted</TabsTrigger>
+                      <TabsTrigger value="graded" className="rounded-lg text-[10px] sm:text-xs px-2 sm:px-3">Graded</TabsTrigger>
+                      <TabsTrigger value="overdue" className="rounded-lg text-[10px] sm:text-xs px-2 sm:px-3">Overdue</TabsTrigger>
                     </TabsList>
                   </Tabs>
                 </div>
@@ -485,7 +504,7 @@ export default function StudentAssignmentsPage() {
                 </div>
               </div>
 
-              {/* Assignments List - Responsive with proper bottom spacing */}
+              {/* Assignments List */}
               <div className="space-y-3 pb-8">
                 {filteredAssignments.length === 0 ? (
                   <Card className="border-0 shadow-lg bg-white">
@@ -493,21 +512,14 @@ export default function StudentAssignmentsPage() {
                       <div className="w-20 h-20 sm:w-24 sm:h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Inbox className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400" />
                       </div>
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
-                        No assignments found
-                      </h3>
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2">No assignments found</h3>
                       <p className="text-sm text-muted-foreground max-w-md mx-auto px-4">
                         {activeTab === 'all' 
                           ? 'No assignments have been created for your class yet. Check back later for new assignments.'
                           : `No ${activeTab} assignments available at the moment.`}
                       </p>
                       {activeTab !== 'all' && stats.total > 0 && (
-                        <Button 
-                          variant="link" 
-                          size="sm" 
-                          onClick={() => setActiveTab('all')}
-                          className="mt-4 text-emerald-600"
-                        >
+                        <Button variant="link" size="sm" onClick={() => setActiveTab('all')} className="mt-4 text-emerald-600">
                           View all assignments
                         </Button>
                       )}
@@ -529,18 +541,8 @@ export default function StudentAssignmentsPage() {
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start gap-2 sm:gap-3">
-                                <div className={cn(
-                                  "h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-xl flex items-center justify-center shrink-0",
-                                  assignment.subject.includes('Math') ? "bg-blue-100" :
-                                  assignment.subject.includes('English') ? "bg-emerald-100" :
-                                  "bg-purple-100"
-                                )}>
-                                  <BookOpen className={cn(
-                                    "h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6",
-                                    assignment.subject.includes('Math') ? "text-blue-600" :
-                                    assignment.subject.includes('English') ? "text-emerald-600" :
-                                    "text-purple-600"
-                                  )} />
+                                <div className="h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-xl flex items-center justify-center shrink-0 bg-purple-100">
+                                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-purple-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">{assignment.title}</h3>
@@ -562,10 +564,7 @@ export default function StudentAssignmentsPage() {
                             <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 sm:gap-4">
                               <div className="text-left sm:text-right">
                                 <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                                  <span className={cn(
-                                    "text-[11px] sm:text-sm font-medium",
-                                    getDaysRemainingColor(assignment.due_date)
-                                  )}>
+                                  <span className={cn("text-[11px] sm:text-sm font-medium", getDaysRemainingColor(assignment.due_date))}>
                                     {getDaysRemaining(assignment.due_date)}
                                   </span>
                                   {getStatusBadge(assignment)}
@@ -582,36 +581,21 @@ export default function StudentAssignmentsPage() {
                               
                               <div className="flex gap-1.5 sm:gap-2">
                                 <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedAssignment(assignment)
-                                    setShowDetailsDialog(true)
-                                  }}
+                                  variant="outline" size="sm"
+                                  onClick={() => { setSelectedAssignment(assignment); setShowDetailsDialog(true) }}
                                   className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                                >
-                                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                                </Button>
+                                ><Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></Button>
                                 {!assignment.submission && (
-                                  <Button
-                                    size="sm"
-                                    className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
-                                    onClick={() => {
-                                      setSelectedAssignment(assignment)
-                                      setShowSubmitDialog(true)
-                                    }}
-                                  >
+                                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
+                                    onClick={() => { setSelectedAssignment(assignment); setShowSubmitDialog(true) }}>
                                     <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                                     <span className="hidden xs:inline">Submit</span>
                                   </Button>
                                 )}
-                                {assignment.file_url && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => window.open(assignment.file_url, '_blank')}
-                                    className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                                  >
+                                {assignment.files && assignment.files.length > 0 && (
+                                  <Button variant="ghost" size="sm"
+                                    onClick={() => window.open(assignment.files![0], '_blank')}
+                                    className="h-8 w-8 sm:h-9 sm:w-9 p-0">
                                     <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                   </Button>
                                 )}
@@ -637,24 +621,44 @@ export default function StudentAssignmentsPage() {
               <DialogHeader className="pb-2">
                 <DialogTitle className="text-base sm:text-lg md:text-xl">{selectedAssignment.title}</DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
-                  {selectedAssignment.subject} • {selectedAssignment.total_marks} marks • Due: {format(new Date(selectedAssignment.due_date), 'MMM dd, yyyy')}
+                  {selectedAssignment.subject} • {selectedAssignment.total_marks} marks • Due: {format(new Date(selectedAssignment.due_date), 'MMM dd, yyyy')} • Teacher: {selectedAssignment.teacher_name}
                 </DialogDescription>
               </DialogHeader>
               
               <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
-                <div>
-                  <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Description</h4>
-                  <p className="text-xs sm:text-sm text-slate-600 bg-slate-50 p-3 sm:p-4 rounded-lg">
-                    {selectedAssignment.description || 'No description provided.'}
-                  </p>
-                </div>
+                {selectedAssignment.description && (
+                  <div>
+                    <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Description</h4>
+                    <p className="text-xs sm:text-sm text-slate-600 bg-slate-50 p-3 sm:p-4 rounded-lg">{selectedAssignment.description}</p>
+                  </div>
+                )}
                 
                 {selectedAssignment.instructions && (
                   <div>
                     <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Instructions</h4>
-                    <p className="text-xs sm:text-sm text-slate-600 bg-slate-50 p-3 sm:p-4 rounded-lg">
-                      {selectedAssignment.instructions}
-                    </p>
+                    <p className="text-xs sm:text-sm text-slate-600 bg-slate-50 p-3 sm:p-4 rounded-lg whitespace-pre-wrap">{selectedAssignment.instructions}</p>
+                  </div>
+                )}
+
+                {/* Attachments */}
+                {selectedAssignment.files && selectedAssignment.files.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Attachments ({selectedAssignment.file_count || selectedAssignment.files.length})</h4>
+                    <div className="space-y-2">
+                      {selectedAssignment.files.map((fileUrl: string, i: number) => (
+                        <Button
+                          key={i}
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start h-9 text-xs"
+                          onClick={() => window.open(fileUrl, '_blank')}
+                        >
+                          <Paperclip className="h-3.5 w-3.5 mr-2" />
+                          Attachment {i + 1}
+                          <Download className="h-3 w-3 ml-auto" />
+                        </Button>
+                      ))}
+                    </div>
                   </div>
                 )}
                 
@@ -662,15 +666,11 @@ export default function StudentAssignmentsPage() {
                   <div>
                     <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Your Submission</h4>
                     <div className="bg-slate-50 p-3 sm:p-4 rounded-lg">
-                      <p className="text-xs sm:text-sm">
-                        Submitted: {format(new Date(selectedAssignment.submission.submitted_at), 'MMM dd, yyyy hh:mm a')}
-                      </p>
+                      <p className="text-xs sm:text-sm">Submitted: {format(new Date(selectedAssignment.submission.submitted_at), 'MMM dd, yyyy hh:mm a')}</p>
                       {selectedAssignment.submission.score !== undefined && (
                         <div className="mt-2 sm:mt-3">
                           <p className="text-xs sm:text-sm font-medium">Score</p>
-                          <p className="text-xl sm:text-2xl font-bold text-green-600">
-                            {selectedAssignment.submission.score}/{selectedAssignment.total_marks}
-                          </p>
+                          <p className="text-xl sm:text-2xl font-bold text-green-600">{selectedAssignment.submission.score}/{selectedAssignment.total_marks}</p>
                           {selectedAssignment.submission.feedback && (
                             <div className="mt-2">
                               <p className="text-xs sm:text-sm font-medium">Feedback</p>
@@ -679,33 +679,7 @@ export default function StudentAssignmentsPage() {
                           )}
                         </div>
                       )}
-                      {selectedAssignment.submission.file_url && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="mt-2 sm:mt-3 h-8 sm:h-9 text-xs"
-                          onClick={() => window.open(selectedAssignment.submission!.file_url, '_blank')}
-                        >
-                          <Download className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                          View Submission
-                        </Button>
-                      )}
                     </div>
-                  </div>
-                )}
-                
-                {selectedAssignment.file_url && !selectedAssignment.submission && (
-                  <div>
-                    <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Attachment</h4>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="h-8 sm:h-9 text-xs"
-                      onClick={() => window.open(selectedAssignment.file_url, '_blank')}
-                    >
-                      <Paperclip className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      {selectedAssignment.file_name || 'Download Attachment'}
-                    </Button>
                   </div>
                 )}
               </div>
@@ -720,26 +694,24 @@ export default function StudentAssignmentsPage() {
           <DialogHeader>
             <DialogTitle className="text-base sm:text-lg">Submit Assignment</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              {selectedAssignment?.title} • {selectedAssignment?.subject}
+              {selectedAssignment?.title} • {selectedAssignment?.subject} • {selectedAssignment?.total_marks} marks
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-3 sm:space-y-4 py-2 sm:py-4">
-            <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 sm:p-6 text-center">
+            <div className="border-2 border-dashed border-slate-200 rounded-lg p-4 sm:p-6 text-center hover:border-emerald-400 transition-colors">
               <input
-                type="file"
-                onChange={handleFileSelect}
-                className="hidden"
-                id="file-upload"
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                type="file" onChange={handleFileSelect}
+                className="hidden" id="submission-file"
+                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.ppt,.pptx"
               />
-              <label htmlFor="file-upload" className="cursor-pointer">
+              <label htmlFor="submission-file" className="cursor-pointer">
                 <Upload className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 mx-auto mb-2 sm:mb-3" />
                 <p className="text-xs sm:text-sm font-medium text-emerald-600 break-all">
                   {selectedFile ? selectedFile.name : 'Click to select a file'}
                 </p>
                 <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
-                  PDF, DOC, DOCX, TXT, JPG, PNG (Max 10MB)
+                  PDF, DOC, DOCX, TXT, JPG, PNG, PPT (Max 10MB)
                 </p>
               </label>
             </div>
@@ -750,12 +722,7 @@ export default function StudentAssignmentsPage() {
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 shrink-0" />
                   <span className="text-[11px] sm:text-sm truncate">{selectedFile.name}</span>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSelectedFile(null)}
-                  className="h-7 w-7 p-0"
-                >
+                <Button variant="ghost" size="sm" onClick={() => setSelectedFile(null)} className="h-7 w-7 p-0">
                   <X className="h-3.5 w-3.5" />
                 </Button>
               </div>
@@ -763,19 +730,9 @@ export default function StudentAssignmentsPage() {
           </div>
           
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
-            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="text-sm">
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleSubmitAssignment}
-              disabled={!selectedFile || submitting}
-              className="bg-emerald-600 text-sm"
-            >
-              {submitting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-              ) : (
-                <Upload className="h-3.5 w-3.5 mr-1.5" />
-              )}
+            <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="text-sm">Cancel</Button>
+            <Button onClick={handleSubmitAssignment} disabled={!selectedFile || submitting} className="bg-emerald-600 text-sm">
+              {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Upload className="h-3.5 w-3.5 mr-1.5" />}
               Submit Assignment
             </Button>
           </div>

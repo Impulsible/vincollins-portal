@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx - COMPLETE BROAD SHEET WITH REPORT CARD GENERATION
+// app/admin/broad-sheet/page.tsx - COMPLETE UPDATED BROAD SHEET WITH REPORT CARD GENERATION
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -14,9 +14,14 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { 
   Loader2, RefreshCw, Printer, Search, X, FileSpreadsheet,
-  Users, FileDown, Sparkles, FileText, ExternalLink
+  Users, FileDown, Sparkles, FileText, ExternalLink, CheckCircle2,
+  Clock, AlertCircle, Send, History, Eye
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle
+} from '@/components/ui/dialog'
 
 // ─── Types ────────────────────────────────────────────
 interface SubjectScore {
@@ -27,6 +32,8 @@ interface SubjectScore {
   exam_theory: number
   total: number
   grade: string
+  status: string
+  teacher_name: string
 }
 
 interface StudentRecord {
@@ -40,6 +47,15 @@ interface StudentRecord {
   completedSubjects: number
   totalSubjects: number
   hasAllSubjects: boolean
+  allSubmitted: boolean
+}
+
+interface SubmissionStatus {
+  subject: string
+  teacher_name: string
+  status: string
+  submitted_at: string
+  graded_students: number
 }
 
 // ─── Constants ────────────────────────────────────────
@@ -120,7 +136,6 @@ const getSubjectRemark = (grade: string): string => {
   return r[grade] || ''
 }
 
-// Also update the teacher comment to match:
 const generateTeacherComment = (name: string, avg: number): string => {
   if (avg >= 80) return `Excellent performance! ${name} has demonstrated outstanding academic ability. Keep up the excellent work!`
   if (avg >= 70) return `Very good performance. ${name} has shown great dedication and consistency. Continue to work hard.`
@@ -129,7 +144,6 @@ const generateTeacherComment = (name: string, avg: number): string => {
   return `${name} needs to work harder and pay more attention in class. Improvement is possible with dedication.`
 }
 
-// And principal comment:
 const generatePrincipalComment = (avg: number): string => {
   if (avg >= 80) return 'An excellent performance. Maintain this high standard.'
   if (avg >= 70) return 'A very good performance. Keep striving for excellence.'
@@ -172,7 +186,9 @@ export default function BroadSheetPage() {
   const [isMounted, setIsMounted] = useState(false)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [approving, setApproving] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
+  const [submissionStatuses, setSubmissionStatuses] = useState<SubmissionStatus[]>([])
   const [expectedSubjects, setExpectedSubjects] = useState<string[]>(SS_SUBJECTS_SCIENCE)
   const [classes, setClasses] = useState<string[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
@@ -181,6 +197,9 @@ export default function BroadSheetPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [profile, setProfile] = useState<any>(null)
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
+  const [activeTab, setActiveTab] = useState('broadsheet')
+  const [showApproveDialog, setShowApproveDialog] = useState(false)
+  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null)
 
   useEffect(() => { setIsMounted(true) }, [])
 
@@ -214,64 +233,186 @@ export default function BroadSheetPage() {
 
   useEffect(() => {
     if (selectedClass) setExpectedSubjects(getExpectedSubjects(selectedClass))
-    if (isMounted && selectedClass && selectedTerm && selectedYear) loadBroadSheet()
+    if (isMounted && selectedClass && selectedTerm && selectedYear) {
+      loadBroadSheet()
+      loadSubmissionStatuses()
+    }
   }, [selectedClass, selectedTerm, selectedYear, isMounted])
+
+  // ─── Load Submission Statuses ───────────────────────
+  const loadSubmissionStatuses = async () => {
+    if (!selectedClass || !selectedTerm || !selectedYear) return
+
+    const { data: submissions } = await supabase
+      .from('ca_submissions')
+      .select('*')
+      .eq('class', selectedClass)
+      .eq('term', selectedTerm)
+      .eq('academic_year', selectedYear)
+      .order('created_at', { ascending: false })
+
+    if (submissions) {
+      const statuses: SubmissionStatus[] = submissions.map((s: any) => ({
+        subject: s.subject,
+        teacher_name: s.teacher_name || 'Unknown',
+        status: s.status || 'pending_review',
+        submitted_at: s.submitted_at,
+        graded_students: s.graded_students || 0
+      }))
+      setSubmissionStatuses(statuses)
+    }
+  }
 
   // ─── Load Broad Sheet ──────────────────────────────
   const loadBroadSheet = async () => {
     setLoading(true)
     try {
+      // Get students in the selected class
       const { data: classStudents, error: studentError } = await supabase
-        .from('profiles').select('id, full_name, class, vin_id')
-        .eq('role', 'student').filter('class', 'eq', selectedClass).order('full_name').limit(500)
+        .from('profiles')
+        .select('id, full_name, class, vin_id')
+        .eq('role', 'student')
+        .filter('class', 'eq', selectedClass)
+        .order('full_name')
+        .limit(500)
 
       if (studentError) throw studentError
-      if (!classStudents || classStudents.length === 0) { setStudents([]); setLoading(false); return }
+      if (!classStudents || classStudents.length === 0) {
+        setStudents([])
+        setLoading(false)
+        return
+      }
 
       const studentIds = classStudents.map(s => s.id)
 
+      // Get ALL CA scores for these students (from submitted/approved scores)
       const { data: allScores, error: scoresError } = await supabase
-        .from('ca_scores').select('*')
-        .filter('class', 'eq', selectedClass).eq('term', selectedTerm)
-        .eq('academic_year', selectedYear).in('student_id', studentIds).limit(5000)
+        .from('ca_scores')
+        .select('*')
+        .in('student_id', studentIds)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .in('status', ['submitted', 'approved'])
+        .limit(5000)
 
       if (scoresError) throw scoresError
 
       const subjectsForClass = getExpectedSubjects(selectedClass)
       const totalExpected = subjectsForClass.length
 
+      // Build student records
       const studentRecords: StudentRecord[] = classStudents.map(student => {
         const studentScores = (allScores || []).filter(s => s.student_id === student.id)
         const subjectMap: Record<string, SubjectScore> = {}
+
         studentScores.forEach(s => {
           subjectMap[s.subject] = {
-            subject: s.subject, ca1: s.ca1_score || 0, ca2: s.ca2_score || 0,
-            exam_obj: s.exam_objective_score || 0, exam_theory: s.exam_theory_score || 0,
-            total: s.total_score || 0, grade: s.grade || '—'
+            subject: s.subject,
+            ca1: s.ca1_score || 0,
+            ca2: s.ca2_score || 0,
+            exam_obj: s.exam_objective_score || 0,
+            exam_theory: s.exam_theory_score || 0,
+            total: s.total_score || 0,
+            grade: s.grade || '—',
+            status: s.status || 'draft',
+            teacher_name: s.teacher_name || ''
           }
         })
+
         const scoredSubjects = Object.keys(subjectMap).length
         const totalScore = Object.values(subjectMap).reduce((sum, s) => sum + s.total, 0)
         const averageScore = scoredSubjects > 0 ? Math.round(totalScore / scoredSubjects) : 0
         const grade = scoredSubjects > 0 ? getWAECGrade(averageScore) : '—'
+
+        // Check if all subjects have been submitted
+        const allSubmitted = subjectsForClass.every(subject => {
+          const score = subjectMap[subject]
+          return score && (score.status === 'submitted' || score.status === 'approved')
+        })
+
         return {
-          id: student.id, name: student.full_name, vin_id: student.vin_id || '—',
-          subjectMap, totalScore, averageScore, grade,
-          completedSubjects: scoredSubjects, totalSubjects: totalExpected,
-          hasAllSubjects: scoredSubjects >= totalExpected
+          id: student.id,
+          name: student.full_name,
+          vin_id: student.vin_id || '—',
+          subjectMap,
+          totalScore,
+          averageScore,
+          grade,
+          completedSubjects: scoredSubjects,
+          totalSubjects: totalExpected,
+          hasAllSubjects: scoredSubjects >= totalExpected,
+          allSubmitted
         }
       })
 
       studentRecords.sort((a, b) => a.name.localeCompare(b.name))
       setStudents(studentRecords)
-    } catch (error) { console.error('Error:', error); toast.error('Failed to load broad sheet') }
-    finally { setLoading(false) }
+    } catch (error) {
+      console.error('Error:', error)
+      toast.error('Failed to load broad sheet')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // ─── Approve All Submissions ────────────────────────
+  const handleApproveAllSubmissions = async () => {
+    if (!selectedClass || !selectedTerm || !selectedYear) {
+      toast.error('Select class, term, and year first')
+      return
+    }
+
+    setApproving(true)
+    try {
+      // Update all submitted scores to approved
+      const { error } = await supabase
+        .from('ca_scores')
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: profile?.id
+        })
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .in('student_id', students.map(s => s.id))
+        .eq('status', 'submitted')
+
+      if (error) throw error
+
+      // Update submissions table
+      await supabase
+        .from('ca_submissions')
+        .update({
+          status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: profile?.id
+        })
+        .eq('class', selectedClass)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .eq('status', 'pending_review')
+
+      toast.success('✅ All submitted scores approved!')
+      setShowApproveDialog(false)
+      await loadBroadSheet()
+      await loadSubmissionStatuses()
+    } catch (error) {
+      console.error('Approval error:', error)
+      toast.error('Failed to approve scores')
+    } finally {
+      setApproving(false)
+    }
   }
 
   // ─── Generate All Report Cards ─────────────────────
   const handleGenerateReportCards = async () => {
-    const completeStudents = students.filter(s => s.hasAllSubjects)
-    if (completeStudents.length === 0) { toast.warning('No students have all subjects completed'); return }
+    // Only generate for students with approved scores
+    const completeStudents = students.filter(s => s.allSubmitted)
+    
+    if (completeStudents.length === 0) {
+      toast.warning('No students have all subjects approved. Please approve submissions first.')
+      return
+    }
 
     setGenerating(true)
     setGenProgress({ current: 0, total: completeStudents.length })
@@ -285,9 +426,15 @@ export default function BroadSheetPage() {
           const ca = Math.round(score.ca1 + score.ca2)
           const exam = Math.round(score.exam_obj + score.exam_theory)
           return {
-            name: subject, ca1: score.ca1, ca2: score.ca2,
-            examObj: score.exam_obj, examTheory: score.exam_theory,
-            ca, exam, total: score.total, grade: score.grade,
+            name: subject,
+            ca1: score.ca1,
+            ca2: score.ca2,
+            examObj: score.exam_obj,
+            examTheory: score.exam_theory,
+            ca,
+            exam,
+            total: score.total,
+            grade: score.grade,
             remark: getSubjectRemark(score.grade)
           }
         }).filter(Boolean)
@@ -295,10 +442,10 @@ export default function BroadSheetPage() {
         const avgScore = student.averageScore
         const grade = getWAECGrade(avgScore)
 
-        await supabase.from('report_cards').upsert({
+        const { error } = await supabase.from('report_cards').upsert({
           student_id: student.id,
           student_name: student.name,
-          student_vin: student.vin_id,                       // ✅ ADMISSION NUMBER
+          student_vin: student.vin_id,
           class: selectedClass,
           term: selectedTerm,
           academic_year: selectedYear,
@@ -312,15 +459,30 @@ export default function BroadSheetPage() {
           skill_ratings: generateSkillRatings(avgScore),
           remarks: getOverallRemark(avgScore),
           assessment_data: {
-            daysPresent: 100, daysAbsent: 0,
-            handwriting: 4, sports: 3, creativity: 4, technical: 3,
-            punctuality: 4, neatness: 4, politeness: 4, cooperation: 3, leadership: 3
+            daysPresent: 100,
+            daysAbsent: 0,
+            handwriting: 4,
+            sports: 3,
+            creativity: 4,
+            technical: 3,
+            punctuality: 4,
+            neatness: 4,
+            politeness: 4,
+            cooperation: 3,
+            leadership: 3
           },
           total_subjects: student.completedSubjects,
+          status: 'generated',
           generated_by: profile?.id,
           generated_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }, { onConflict: 'student_id,term,academic_year' })
+        }, {
+          onConflict: 'student_id,term,academic_year'
+        })
+
+        if (error) {
+          console.error(`Error generating report card for ${student.name}:`, error)
+        }
 
         count++
         setGenProgress({ current: count, total: completeStudents.length })
@@ -336,12 +498,20 @@ export default function BroadSheetPage() {
     }
   }
 
+  // ─── View Student Report Card ──────────────────────
+  const handleViewReportCard = (student: StudentRecord) => {
+    router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
+  }
+
   // ─── Filtered Students ──────────────────────────────
   const displayedStudents = useMemo(() => {
     let filtered = students
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
-      filtered = filtered.filter(s => s.name.toLowerCase().includes(q) || s.vin_id.toLowerCase().includes(q))
+      filtered = filtered.filter(s =>
+        s.name.toLowerCase().includes(q) ||
+        s.vin_id.toLowerCase().includes(q)
+      )
     }
     return filtered
   }, [students, searchQuery])
@@ -349,42 +519,74 @@ export default function BroadSheetPage() {
   // ─── Stats ──────────────────────────────────────────
   const stats = useMemo(() => {
     const complete = students.filter(s => s.hasAllSubjects)
+    const approved = students.filter(s => s.allSubmitted)
     const classAvg = complete.length > 0
-      ? Math.round(complete.reduce((sum, s) => sum + s.averageScore, 0) / complete.length) : 0
-    const topScore = complete.length > 0 ? Math.max(...complete.map(s => s.totalScore)) : 0
-    return { total: students.length, complete: complete.length, incomplete: students.length - complete.length, classAvg, topScore }
-  }, [students])
+      ? Math.round(complete.reduce((sum, s) => sum + s.averageScore, 0) / complete.length)
+      : 0
+    const topScore = complete.length > 0
+      ? Math.max(...complete.map(s => s.totalScore))
+      : 0
+
+    const pendingSubmissions = submissionStatuses.filter(s => s.status === 'pending_review').length
+    const approvedSubmissions = submissionStatuses.filter(s => s.status === 'approved').length
+
+    return {
+      total: students.length,
+      complete: complete.length,
+      approved: approved.length,
+      incomplete: students.length - complete.length,
+      classAvg,
+      topScore,
+      pendingSubmissions,
+      approvedSubmissions
+    }
+  }, [students, submissionStatuses])
 
   // ─── Export CSV ─────────────────────────────────────
   const handleExportCSV = () => {
-    if (displayedStudents.length === 0) { toast.error('No data'); return }
+    if (displayedStudents.length === 0) {
+      toast.error('No data to export')
+      return
+    }
+
     const headers = ['Student Name', 'Admission No', ...expectedSubjects, 'Total', 'Average', 'Grade']
     const rows = displayedStudents.map(s => {
-      const subjects = expectedSubjects.map(sub => { const sc = s.subjectMap[sub]; return sc ? `${sc.total} (${sc.grade})` : '—' })
+      const subjects = expectedSubjects.map(sub => {
+        const sc = s.subjectMap[sub]
+        return sc ? `${sc.total} (${sc.grade})` : '—'
+      })
       return [s.name, s.vin_id, ...subjects, s.totalScore, `${s.averageScore}%`, s.grade]
     })
+
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
-    a.href = url; a.download = `BroadSheet_${selectedClass}_${selectedTerm}_${selectedYear.replace('/', '_')}.csv`; a.click()
+    a.href = url
+    a.download = `BroadSheet_${selectedClass}_${selectedTerm}_${selectedYear.replace('/', '_')}.csv`
+    a.click()
     URL.revokeObjectURL(url)
-    toast.success('Exported!')
+    toast.success('Broad sheet exported!')
   }
 
-  const handlePrint = () => { if (isMounted) window.print() }
+  const handlePrint = () => {
+    if (isMounted) window.print()
+  }
 
   const displayClass = isMounted ? selectedClass : ''
   const displayTermLabel = isMounted ? getTermLabel(selectedTerm) : 'Third Term'
   const displayYear = isMounted ? selectedYear : '2025/2026'
-  const displaySubjectCount = isMounted ? expectedSubjects.length : 10
 
   // ─── Loading ────────────────────────────────────────
   if (!isMounted || (loading && students.length === 0)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="mx-auto mb-6">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="mx-auto mb-6"
+          >
             <FileSpreadsheet className="h-14 w-14 text-emerald-500" />
           </motion.div>
           <p className="text-slate-500 font-medium">Loading broad sheet...</p>
@@ -398,14 +600,19 @@ export default function BroadSheetPage() {
     <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-6 print:space-y-1">
       {/* Header */}
       <div className="no-print">
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+        >
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Broad Sheet</h2>
-            <p className="text-sm text-slate-500">{displayClass} • {displayTermLabel} • {displayYear} • {displaySubjectCount} subjects</p>
+            <h2 className="text-lg font-bold text-slate-800">📊 Broad Sheet & Report Cards</h2>
+            <p className="text-sm text-slate-500">
+              {displayClass} • {displayTermLabel} • {displayYear}
+            </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={loadBroadSheet} disabled={loading} className="h-8 text-xs">
+            <Button variant="outline" size="sm" onClick={() => { loadBroadSheet(); loadSubmissionStatuses() }} disabled={loading} className="h-8 text-xs">
               <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} /> Refresh
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 text-xs">
@@ -414,30 +621,86 @@ export default function BroadSheetPage() {
             <Button size="sm" onClick={handlePrint} className="h-8 text-xs bg-slate-600 hover:bg-slate-700">
               <Printer className="h-3.5 w-3.5 mr-1.5" /> Print
             </Button>
-            {/* ✅ GENERATE REPORT CARDS BUTTON */}
-            <Button
-              size="sm"
-              onClick={handleGenerateReportCards}
-              disabled={generating || stats.complete === 0}
-              className="h-8 text-xs bg-purple-600 hover:bg-purple-700"
-            >
-              {generating ? (
-                <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> {genProgress.current}/{genProgress.total}</>
-              ) : (
-                <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate All Report Cards</>
-              )}
-            </Button>
-            {/* ✅ LINK TO REPORT CARD APPROVAL */}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => router.push('/admin/report-cards')}
-              className="h-8 text-xs"
-            >
-              <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Report Cards
-            </Button>
           </div>
         </motion.div>
+      </div>
+
+      {/* Submission Status Overview */}
+      <div className="no-print">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+              <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                <Send className="h-4 w-4 text-blue-500" />
+                Submission Status
+              </h3>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-amber-100 text-amber-700 text-xs">
+                  <Clock className="h-3 w-3 mr-1" />
+                  {stats.pendingSubmissions} pending
+                </Badge>
+                <Badge className="bg-green-100 text-green-700 text-xs">
+                  <CheckCircle2 className="h-3 w-3 mr-1" />
+                  {stats.approvedSubmissions} approved
+                </Badge>
+              </div>
+            </div>
+
+            {submissionStatuses.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">No submissions yet. Teachers need to submit scores first.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {expectedSubjects.map(subject => {
+                  const submission = submissionStatuses.find(s => s.subject === subject)
+                  return (
+                    <div
+                      key={subject}
+                      className={cn(
+                        "rounded-lg p-2.5 border text-center",
+                        submission?.status === 'approved'
+                          ? "bg-green-50 border-green-200"
+                          : submission?.status === 'pending_review'
+                          ? "bg-amber-50 border-amber-200"
+                          : "bg-slate-50 border-slate-200"
+                      )}
+                    >
+                      <p className="text-[10px] font-medium text-slate-700 truncate">{subject}</p>
+                      {submission ? (
+                        <div className="mt-1">
+                          <Badge className={cn(
+                            "text-[9px]",
+                            submission.status === 'approved'
+                              ? "bg-green-100 text-green-700"
+                              : "bg-amber-100 text-amber-700"
+                          )}>
+                            {submission.status === 'approved' ? '✓ Approved' : '⏳ Pending'}
+                          </Badge>
+                          <p className="text-[9px] text-slate-400 mt-0.5">{submission.teacher_name}</p>
+                        </div>
+                      ) : (
+                        <Badge className="text-[9px] bg-red-100 text-red-700 mt-1">✗ Not Submitted</Badge>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Approve All Button */}
+            {stats.pendingSubmissions > 0 && (
+              <div className="mt-3 pt-3 border-t flex justify-end">
+                <Button
+                  size="sm"
+                  onClick={() => setShowApproveDialog(true)}
+                  className="h-8 text-xs bg-green-600 hover:bg-green-700"
+                >
+                  <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                  Approve All Pending Submissions
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Filters + Stats */}
@@ -449,48 +712,77 @@ export default function BroadSheetPage() {
                 <Label className="text-[10px] text-slate-400 mb-1 block">Class</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {classes.map(c => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-[10px] text-slate-400 mb-1 block">Term</Label>
                 <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {TERMS.map(t => (
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-[10px] text-slate-400 mb-1 block">Year</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                  <SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    {YEARS.map(y => (
+                      <SelectItem key={y} value={y}>{y}</SelectItem>
+                    ))}
+                  </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label className="text-[10px] text-slate-400 mb-1 block">Search</Label>
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input placeholder="Name or VIN..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-7 h-8 text-xs" />
-                  {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2"><X className="h-3.5 w-3.5 text-slate-400" /></button>}
+                  <Input
+                    placeholder="Name or VIN..."
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    className="pl-7 h-8 text-xs"
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <X className="h-3.5 w-3.5 text-slate-400" />
+                    </button>
+                  )}
                 </div>
               </div>
-              <div className="flex items-end">
-                <div className="bg-emerald-50 rounded-lg p-2 text-center w-full border border-emerald-100">
-                  <p className="text-[9px] text-emerald-500 uppercase">Ready</p>
-                  <p className="text-sm font-bold text-emerald-700">{stats.complete}</p>
-                </div>
+              <div className="flex items-end gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleGenerateReportCards}
+                  disabled={generating || stats.approved === 0}
+                  className="h-8 text-xs bg-purple-600 hover:bg-purple-700 w-full"
+                >
+                  {generating ? (
+                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> {genProgress.current}/{genProgress.total}</>
+                  ) : (
+                    <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate Report Cards</>
+                  )}
+                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-5 gap-2">
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
           {[
-            { label: 'Total', value: stats.total, color: 'text-slate-700' },
-            { label: 'Complete', value: stats.complete, color: 'text-emerald-600' },
-            { label: 'Incomplete', value: stats.incomplete, color: 'text-amber-600' },
-            { label: 'Avg', value: `${stats.classAvg}%`, color: 'text-blue-600' },
-            { label: 'Top', value: stats.topScore, color: 'text-purple-600' },
+            { label: 'Total', value: stats.total, color: 'text-slate-700', icon: Users },
+            { label: 'Approved', value: stats.approved, color: 'text-green-600', icon: CheckCircle2 },
+            { label: 'Complete', value: stats.complete, color: 'text-emerald-600', icon: FileText },
+            { label: 'Avg', value: `${stats.classAvg}%`, color: 'text-blue-600', icon: Sparkles },
+            { label: 'Top', value: stats.topScore, color: 'text-purple-600', icon: Sparkles },
           ].map((stat, i) => (
             <div key={i} className="bg-white rounded-lg p-2 text-center shadow-sm border">
               <p className="text-[9px] text-slate-400 uppercase">{stat.label}</p>
@@ -533,32 +825,54 @@ export default function BroadSheetPage() {
                     Student
                   </th>
                   {expectedSubjects.map(subject => (
-                    <th key={subject} className="border-b-2 border-slate-200 px-1.5 sm:px-2 py-2 text-center font-bold text-slate-600 text-[9px] sm:text-[10px] whitespace-nowrap min-w-[70px] sm:min-w-[80px]">
-                      {subject.split(' ').map((w, i) => (<span key={i} className="block leading-tight">{w}</span>))}
+                    <th
+                      key={subject}
+                      className="border-b-2 border-slate-200 px-1.5 sm:px-2 py-2 text-center font-bold text-slate-600 text-[9px] sm:text-[10px] whitespace-nowrap min-w-[70px] sm:min-w-[80px]"
+                    >
+                      {subject.split(' ').map((w, i) => (
+                        <span key={i} className="block leading-tight">{w}</span>
+                      ))}
                     </th>
                   ))}
                   <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Total</th>
                   <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Avg</th>
                   <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Grade</th>
+                  <th className="no-print border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Report</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={expectedSubjects.length + 4} className="text-center py-12">
+                    <td colSpan={expectedSubjects.length + 5} className="text-center py-12">
                       <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                       <p className="text-slate-500 text-sm">No students found</p>
+                      <p className="text-xs text-slate-400 mt-1">Ensure all subjects have been submitted by teachers</p>
                     </td>
                   </tr>
                 ) : (
                   displayedStudents.map(student => (
-                    <tr key={student.id} className={cn("border-b border-slate-100 hover:bg-slate-50/50 transition-colors", !student.hasAllSubjects && "bg-amber-50/20")}>
+                    <tr
+                      key={student.id}
+                      className={cn(
+                        "border-b border-slate-100 hover:bg-slate-50/50 transition-colors",
+                        !student.hasAllSubjects && "bg-amber-50/20",
+                        student.allSubmitted && "bg-green-50/10"
+                      )}
+                    >
                       <td className="sticky left-0 z-10 bg-white print:bg-white border-r border-slate-100 px-2 sm:px-3 py-1.5">
                         <div>
                           <p className="font-semibold text-[11px] sm:text-xs">{student.name}</p>
                           <p className="text-[9px] text-slate-400 font-mono">{student.vin_id}</p>
-                          {!student.hasAllSubjects && (
-                            <span className="text-[9px] text-amber-600">{student.completedSubjects}/{student.totalSubjects}</span>
+                          {!student.allSubmitted && (
+                            <span className="text-[9px] text-amber-600">
+                              {student.completedSubjects}/{student.totalSubjects} submitted
+                            </span>
+                          )}
+                          {student.allSubmitted && (
+                            <Badge className="text-[8px] bg-green-100 text-green-700 mt-0.5">
+                              <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                              Ready
+                            </Badge>
                           )}
                         </div>
                       </td>
@@ -569,7 +883,9 @@ export default function BroadSheetPage() {
                             {score ? (
                               <div className="flex flex-col items-center gap-0.5">
                                 <span className="font-semibold text-[11px] sm:text-xs">{score.total}</span>
-                                <Badge className={cn("text-[8px] leading-none px-1 py-0 border", getGradeColor(score.grade))}>{score.grade}</Badge>
+                                <Badge className={cn("text-[8px] leading-none px-1 py-0 border", getGradeColor(score.grade))}>
+                                  {score.grade}
+                                </Badge>
                               </div>
                             ) : (
                               <span className="text-slate-300 text-xs">—</span>
@@ -577,10 +893,28 @@ export default function BroadSheetPage() {
                           </td>
                         )
                       })}
-                      <td className="px-2 py-1.5 text-center font-bold text-[11px] sm:text-xs text-slate-700 border-r border-slate-50">{student.totalScore}</td>
-                      <td className="px-2 py-1.5 text-center font-semibold text-[11px] sm:text-xs text-slate-600 border-r border-slate-50">{student.averageScore}%</td>
+                      <td className="px-2 py-1.5 text-center font-bold text-[11px] sm:text-xs text-slate-700 border-r border-slate-50">
+                        {student.totalScore}
+                      </td>
+                      <td className="px-2 py-1.5 text-center font-semibold text-[11px] sm:text-xs text-slate-600 border-r border-slate-50">
+                        {student.averageScore}%
+                      </td>
                       <td className="px-2 py-1.5 text-center">
-                        <Badge className={cn("text-[9px] sm:text-[10px] font-bold border", getGradeColor(student.grade))}>{student.grade}</Badge>
+                        <Badge className={cn("text-[9px] sm:text-[10px] font-bold border", getGradeColor(student.grade))}>
+                          {student.grade}
+                        </Badge>
+                      </td>
+                      <td className="no-print px-2 py-1.5 text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleViewReportCard(student)}
+                          className="h-7 text-[10px] text-blue-600 hover:text-blue-700"
+                          disabled={!student.allSubmitted}
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
                       </td>
                     </tr>
                   ))
@@ -594,6 +928,62 @@ export default function BroadSheetPage() {
           </div>
         </Card>
       </motion.div>
+
+      {/* Approve All Dialog */}
+      <Dialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              Approve All Submissions
+            </DialogTitle>
+            <DialogDescription>
+              This will approve all pending score submissions for {displayClass} - {displayTermLabel} - {displayYear}
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-3 py-2">
+            <div className="bg-amber-50 rounded-lg p-3">
+              <p className="text-sm text-amber-800 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                <span>After approval, teachers won&apos;t be able to edit these scores. You can then generate report cards.</span>
+              </p>
+            </div>
+            
+            <div className="bg-blue-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-blue-800 mb-2">Pending submissions:</p>
+              <ul className="space-y-1 text-sm text-blue-700">
+                {submissionStatuses
+                  .filter(s => s.status === 'pending_review')
+                  .map(s => (
+                    <li key={s.subject} className="flex justify-between">
+                      <span>{s.subject}</span>
+                      <span className="text-xs">{s.teacher_name}</span>
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowApproveDialog(false)} className="w-full sm:w-auto" size="sm">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleApproveAllSubmissions}
+              disabled={approving}
+              className="w-full sm:w-auto bg-green-600 hover:bg-green-700"
+              size="sm"
+            >
+              {approving ? (
+                <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Approving...</>
+              ) : (
+                <><CheckCircle2 className="h-4 w-4 mr-2" /> Confirm Approval</>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <style jsx global>{`
         @media print {

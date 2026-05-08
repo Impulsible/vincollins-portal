@@ -43,6 +43,7 @@ interface StudentProfile {
   vin_id?: string | null
   department?: string | null
   admission_year?: number | null
+  admission_number?: string | null
 }
 
 interface StudentSidebarProps {
@@ -146,7 +147,11 @@ const secondaryNavigation: NavigationItem[] = [
   },
 ]
 
-// Get first name from profile
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
+// ✅ Get first name for welcome message
 const getFirstName = (profile?: StudentProfile | null): string => {
   if (profile?.first_name) {
     const firstName = profile.first_name.trim()
@@ -162,34 +167,38 @@ const getFirstName = (profile?: StudentProfile | null): string => {
   return 'Student'
 }
 
-// Get display name - PREFERS display_name from database
+// ✅ FIXED: Get display name - properly uses display_name from database
 const getDisplayName = (profile?: StudentProfile | null): string => {
-  if (profile?.display_name) {
-    return profile.display_name
+  // Priority 1: Use display_name from database (set by admin when editing)
+  if (profile?.display_name && profile.display_name.trim() !== '') {
+    return profile.display_name.trim()
   }
   
+  // Priority 2: Use full_name from database
+  if (profile?.full_name && profile.full_name.trim() !== '') {
+    return profile.full_name.trim()
+  }
+  
+  // Priority 3: Construct from first/middle/last name
   if (profile?.first_name && profile?.last_name) {
-    const lastName = profile.last_name.trim()
-    const firstName = profile.first_name.trim()
+    const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1).toLowerCase()
+    const firstName = capitalize(profile.first_name.trim())
     const middleName = profile.middle_name?.trim()
+    const lastName = capitalize(profile.last_name.trim())
     
-    const parts = [lastName, firstName]
-    if (middleName) parts.push(middleName)
-    
-    return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
-  }
-  
-  if (profile?.full_name) {
-    return profile.full_name
+    if (middleName) {
+      return `${firstName} ${capitalize(middleName)} ${lastName}`
+    }
+    return `${firstName} ${lastName}`
   }
   
   return 'Student Name'
 }
 
-// Get initials for avatar
+// ✅ Get initials for avatar
 const getInitials = (profile?: StudentProfile | null): string => {
-  const displayName = profile?.display_name || profile?.full_name || 'Student'
-  const names = displayName.split(' ')
+  const displayName = getDisplayName(profile)
+  const names = displayName.split(' ').filter(n => n.length > 0)
   
   if (names.length >= 2) {
     return (names[0][0] + names[names.length - 1][0]).toUpperCase()
@@ -197,11 +206,9 @@ const getInitials = (profile?: StudentProfile | null): string => {
   return displayName.slice(0, 2).toUpperCase()
 }
 
-// Format VIN ID for display
+// ✅ Format VIN ID for display
 const formatVinId = (vinId?: string | null): string => {
   if (!vinId) return 'VIN-XXXXXX'
-  if (vinId.startsWith('VIN-')) return vinId
-  if (vinId.length <= 6) return `VIN-${vinId.padStart(6, '0')}`
   return vinId
 }
 
@@ -219,52 +226,127 @@ export function StudentSidebar({
   const [isOnline, setIsOnline] = useState(true)
   const [lastSeen, setLastSeen] = useState<Date | null>(null)
   
-  // Local state for profile
-  const [localProfile, setLocalProfile] = useState<StudentProfile | null>(profile)
+  // ✅ Local state for profile with ALL fields
+  const [localProfile, setLocalProfile] = useState<StudentProfile | null>(null)
+  const [profileLoading, setProfileLoading] = useState(true)
 
-  // Fetch profile if data is missing
+  // ✅ Fetch COMPLETE profile data when component mounts
   useEffect(() => {
     const fetchProfile = async () => {
       try {
+        setProfileLoading(true)
         const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
+        if (!user) {
+          setProfileLoading(false)
+          return
+        }
 
-        const { data: profileData } = await supabase
+        console.log('🔍 Fetching student profile for sidebar...')
+        
+        // ✅ Fetch ALL profile fields including name parts
+        const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('id, first_name, middle_name, last_name, full_name, display_name, email, class, vin_id, photo_url, department, admission_year')
+          .select(`
+            id,
+            first_name,
+            middle_name,
+            last_name,
+            full_name,
+            display_name,
+            email,
+            class,
+            vin_id,
+            photo_url,
+            avatar_url,
+            department,
+            admission_year,
+            admission_number
+          `)
           .eq('id', user.id)
           .single()
 
+        if (error) {
+          console.error('❌ Error fetching profile:', error)
+          setProfileLoading(false)
+          return
+        }
+
         if (profileData) {
+          console.log('✅ Profile loaded:', {
+            full_name: profileData.full_name,
+            display_name: profileData.display_name,
+            first_name: profileData.first_name,
+            middle_name: profileData.middle_name,
+            last_name: profileData.last_name,
+          })
+
           setLocalProfile({
             id: profileData.id,
             first_name: profileData.first_name,
             middle_name: profileData.middle_name,
             last_name: profileData.last_name,
-            full_name: profileData.full_name || `${profileData.first_name || ''} ${profileData.last_name || ''}`.trim(),
+            full_name: profileData.full_name || `${profileData.first_name || ''} ${profileData.middle_name ? profileData.middle_name + ' ' : ''}${profileData.last_name || ''}`.trim(),
             display_name: profileData.display_name,
             email: profileData.email,
             class: profileData.class,
             vin_id: profileData.vin_id,
-            photo_url: profileData.photo_url,
+            photo_url: profileData.photo_url || profileData.avatar_url,
             department: profileData.department,
-            admission_year: profileData.admission_year
+            admission_year: profileData.admission_year,
+            admission_number: profileData.admission_number,
           })
         }
       } catch (error) {
-        console.error('Error fetching profile:', error)
+        console.error('❌ Error in fetchProfile:', error)
+      } finally {
+        setProfileLoading(false)
       }
     }
 
-    // Check if we have complete profile data
-    const hasCompleteProfile = profile?.vin_id && profile?.admission_year
-    
-    if (!hasCompleteProfile) {
-      fetchProfile()
-    } else {
-      setLocalProfile(profile)
+    // ✅ Always fetch fresh profile data
+    fetchProfile()
+
+    // ✅ Set up real-time subscription for profile changes
+    const setupSubscription = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const channel = supabase
+        .channel('profile-updates')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            console.log('🔄 Profile updated in real-time:', payload.new)
+            const newData = payload.new as any
+            setLocalProfile(prev => ({
+              ...prev,
+              ...newData,
+              full_name: newData.full_name || prev?.full_name,
+              display_name: newData.display_name || prev?.display_name,
+              first_name: newData.first_name || prev?.first_name,
+              middle_name: newData.middle_name || prev?.middle_name,
+              last_name: newData.last_name || prev?.last_name,
+            }))
+          }
+        )
+        .subscribe()
+
+      return () => {
+        channel.unsubscribe()
+      }
     }
-  }, [profile])
+
+    const cleanup = setupSubscription()
+    return () => {
+      cleanup.then(fn => fn?.())
+    }
+  }, [profile?.id])
 
   // Track online/offline status
   useEffect(() => {
@@ -448,6 +530,26 @@ export function StudentSidebar({
   const statusDisplay = getStatusDisplay()
   const StatusIcon = statusDisplay.icon
 
+  // ✅ Loading skeleton for profile
+  if (profileLoading) {
+    return (
+      <aside className={cn(
+        "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800",
+        collapsed ? "w-20" : "w-72"
+      )}>
+        <div className="p-5 space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="h-12 w-12 rounded-full bg-muted animate-pulse" />
+            <div className="space-y-2 flex-1">
+              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
+              <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+            </div>
+          </div>
+        </div>
+      </aside>
+    )
+  }
+
   const sidebarContent = (
     <>
       <div className="pt-6" />
@@ -478,7 +580,7 @@ export function StudentSidebar({
         </div>
       </div>
 
-      {/* Profile Section */}
+      {/* ✅ PROFILE SECTION - FIXED DISPLAY */}
       <div className={cn(
         "relative px-5 py-5 border-b border-slate-200 dark:border-slate-800",
         "bg-gradient-to-b from-emerald-50/50 via-white to-transparent dark:from-emerald-950/20 dark:via-slate-900 dark:to-transparent",
@@ -550,16 +652,18 @@ export function StudentSidebar({
                     {statusDisplay.text}
                   </Badge>
                 </div>
+                {/* ✅ WELCOME MESSAGE - Uses first name */}
                 <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">
-                  {localProfile?.first_name || firstName}!
+                  {firstName}!
                 </h3>
               </div>
             </div>
 
             <div className="space-y-2">
+              {/* ✅ FULL DISPLAY NAME */}
               <div>
                 <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
-                  {localProfile?.display_name || displayName}
+                  {displayName}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                   {localProfile?.email || 'student@vincollins.edu.ng'}
@@ -567,10 +671,16 @@ export function StudentSidebar({
               </div>
 
               <div className="flex flex-wrap gap-1.5">
-                {/* ✅ Proper VIN ID display */}
+                {/* ✅ VIN ID */}
                 <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] shadow-sm">
                   {vinId}
                 </Badge>
+                {/* ✅ Admission Number */}
+                {localProfile?.admission_number && (
+                  <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-700">
+                    {localProfile.admission_number}
+                  </Badge>
+                )}
                 {localProfile?.department && (
                   <Badge variant="outline" className="text-[10px]">
                     {localProfile.department}
