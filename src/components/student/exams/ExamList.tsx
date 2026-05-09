@@ -27,10 +27,10 @@ export function ExamList({
   return (
     <div
       className={cn(
-        "pb-8 sm:pb-12 lg:pb-16", // Add bottom padding
+        "pb-8 sm:pb-12 lg:pb-16",
         viewMode === 'grid'
-          ? "grid gap-4 sm:gap-5 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          : "flex flex-col gap-3 sm:gap-4"
+          ? "grid gap-4 sm:gap-5 lg:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 max-w-7xl mx-auto"
+          : "flex flex-col gap-3 sm:gap-4 max-w-4xl mx-auto"
       )}
     >
       {exams.map((exam) => {

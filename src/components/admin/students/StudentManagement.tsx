@@ -81,10 +81,9 @@ export function StudentManagement({
       console.log('✅ Edit saved successfully')
       setShowEdit(false)
       setSelectedStudent(null)
-      // Force refresh parent data
-      onRefresh()
+      // ❌ Removed onRefresh() to prevent skeleton loading
     }
-  }, [selectedStudent, actions, onRefresh])
+  }, [selectedStudent, actions]) // ✅ Removed onRefresh from dependencies
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedStudent) return

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/student/StudentWelcomeBanner.tsx - HYDRATION SAFE + PERSONALIZED
+// components/student/StudentWelcomeBanner.tsx - HYDRATION SAFE + PERSONALIZED + PERSISTENT SESSION
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -14,6 +14,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
+import { supabase } from '@/lib/supabase'
 
 interface StudentProfile {
   id?: string
@@ -102,16 +103,21 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const [isOnline, setIsOnline] = useState(true)
   const [avatarError, setAvatarError] = useState(false)
 
+  // ✅ Restore/create session timer - PERSISTS on reload
   useEffect(() => {
     setMounted(true)
     setCurrentTime(new Date())
 
-    // Session timer
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
-      setSessionStart(new Date(stored))
+      // ✅ Restore existing session
+      const storedTime = new Date(stored)
+      console.log('⏱️ Session restored:', storedTime.toLocaleTimeString())
+      setSessionStart(storedTime)
     } else {
+      // ✅ Create new session only if none exists
       const start = new Date()
+      console.log('⏱️ New session started:', start.toLocaleTimeString())
       localStorage.setItem(STORAGE_KEY, start.toISOString())
       setSessionStart(start)
     }
@@ -120,20 +126,42 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
     return () => clearInterval(timer)
   }, [])
 
-  // Clear session on logout
+  // ✅ Clear session ONLY on explicit logout (NOT on reload)
   useEffect(() => {
-    const handleClear = () => localStorage.removeItem(STORAGE_KEY)
-    window.addEventListener('beforeunload', handleClear)
-    return () => window.removeEventListener('beforeunload', handleClear)
+    const handleLogout = () => {
+      console.log('🔴 Logout: Clearing session timer')
+      localStorage.removeItem(STORAGE_KEY)
+      setSessionStart(null)
+    }
+    
+    window.addEventListener('student-logout', handleLogout)
+    return () => window.removeEventListener('student-logout', handleLogout)
   }, [])
 
+  // ✅ Check actual auth state for online status
   useEffect(() => {
+    const checkAuthStatus = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setIsOnline(!!session)
+    }
+    
+    checkAuthStatus()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT') {
+        setIsOnline(false)
+      } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        setIsOnline(!!session)
+      }
+    })
+
     const handleOnline = () => setIsOnline(true)
     const handleOffline = () => setIsOnline(false)
-    setIsOnline(navigator.onLine)
     window.addEventListener('online', handleOnline)
     window.addEventListener('offline', handleOffline)
+
     return () => {
+      subscription.unsubscribe()
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
@@ -230,12 +258,12 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             <span className="text-xs sm:text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">
               {formattedDate}
             </span>
-            {/* ✅ Live Clock */}
+            {/* Live Clock */}
             <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-cyan-400/10 px-3 py-1 rounded-full text-cyan-200 border border-cyan-400/20">
               <Clock className="h-3.5 w-3.5" />
               {formattedTime}
             </span>
-            {/* ✅ Session Timer */}
+            {/* ✅ Session Timer - PERSISTS on reload */}
             <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/10 px-3 py-1 rounded-full text-blue-200">
               <Timer className="h-3.5 w-3.5" />
               {onlineDuration}
@@ -272,7 +300,7 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
             {greeting.message}
           </p>
 
-          {/* ✅ Personalized Quote */}
+          {/* Personalized Quote */}
           {quote.text && (
             <div className="flex items-start gap-2 mb-3 max-w-xl">
               <Quote className="h-4 w-4 text-amber-400/60 shrink-0 mt-0.5" />

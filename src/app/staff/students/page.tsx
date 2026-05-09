@@ -1,4 +1,4 @@
-// app/staff/students/page.tsx - PROFESSIONAL STUDENT ROSTER (WITH AVATAR PHOTOS)
+// app/staff/students/page.tsx - PROFESSIONAL STUDENT ROSTER (WITH DISPLAY NAMES)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -18,6 +18,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
+
+// ✅ Helper to get best display name
+function getDisplayName(student: any): string {
+  return student.display_name || student.full_name || 'Student'
+}
 
 export default function StudentsPage() {
   const router = useRouter()
@@ -44,12 +49,16 @@ export default function StudentsPage() {
         return
       }
 
-      // Fetch students with photo_url and avatar_url
+      // ✅ Fetch students with display_name and all name fields
       const { data, error } = await supabase
         .from('profiles')
         .select(`
           id,
+          first_name,
+          middle_name,
+          last_name,
           full_name,
+          display_name,
           email,
           vin_id,
           class,
@@ -61,7 +70,7 @@ export default function StudentsPage() {
           created_at
         `)
         .eq('role', 'student')
-        .order('full_name')
+        .order('display_name')
 
       if (error) throw error
 
@@ -78,7 +87,6 @@ export default function StudentsPage() {
         classes: uniqueClasses.length
       })
 
-      // Reset avatar errors
       setAvatarErrors({})
 
       if (showToast) {
@@ -103,6 +111,8 @@ export default function StudentsPage() {
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(s =>
+        // ✅ Search by display_name too
+        (s.display_name || '').toLowerCase().includes(query) ||
         s.full_name?.toLowerCase().includes(query) ||
         s.email?.toLowerCase().includes(query) ||
         s.vin_id?.toLowerCase().includes(query)
@@ -114,9 +124,10 @@ export default function StudentsPage() {
 
   const handleExport = () => {
     const csv = [
-      ['Full Name', 'Class', 'Email', 'VIN ID', 'Status'],
+      ['Full Name', 'Display Name', 'Class', 'Email', 'VIN ID', 'Status'],
       ...filteredStudents.map(s => [
         s.full_name || 'N/A',
+        getDisplayName(s),
         s.class || 'N/A',
         s.email || 'N/A',
         s.vin_id || 'N/A',
@@ -134,13 +145,13 @@ export default function StudentsPage() {
     toast.success('Roster exported successfully')
   }
 
-  const getInitials = (name: string) => {
+  // ✅ Get initials from display name (Surname + Last part)
+  const getInitials = (student: any) => {
+    const name = getDisplayName(student)
     if (!name) return 'ST'
     const names = name.trim().split(/\s+/)
-    if (names.length >= 2) {
-      return (names[0][0] + names[names.length - 1][0]).toUpperCase()
-    }
-    return names[0].slice(0, 2).toUpperCase()
+    if (names.length === 1) return names[0].charAt(0).toUpperCase()
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase()
   }
 
   const getPhotoUrl = (student: any) => {
@@ -298,17 +309,17 @@ export default function StudentsPage() {
                       {groupedStudents[cls].map(student => {
                         const photoUrl = getPhotoUrl(student)
                         const hasAvatarError = avatarErrors[student.id]
+                        const displayName = getDisplayName(student)
                         
                         return (
                           <TableRow key={student.id} className="hover:bg-slate-50/50">
                             <TableCell>
                               <div className="flex items-center gap-2.5">
                                 <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-slate-100">
-                                  {/* Show photo if available and no error */}
                                   {photoUrl && !hasAvatarError ? (
                                     <AvatarImage 
                                       src={photoUrl} 
-                                      alt={student.full_name}
+                                      alt={displayName}
                                       onError={() => handleAvatarError(student.id)}
                                       className="object-cover"
                                     />
@@ -317,12 +328,13 @@ export default function StudentsPage() {
                                     "text-[10px] sm:text-xs font-medium",
                                     "bg-gradient-to-br from-blue-500 to-indigo-600 text-white"
                                   )}>
-                                    {getInitials(student.full_name)}
+                                    {getInitials(student)}
                                   </AvatarFallback>
                                 </Avatar>
                                 <div className="min-w-0">
-                                  <p className="text-xs sm:text-sm font-medium truncate max-w-[120px] sm:max-w-[180px]">
-                                    {student.full_name}
+                                  {/* ✅ Show display_name */}
+                                  <p className="text-xs sm:text-sm font-medium truncate max-w-[150px] sm:max-w-[200px]">
+                                    {displayName}
                                   </p>
                                   <p className="text-[10px] text-slate-400 sm:hidden">
                                     {student.email}

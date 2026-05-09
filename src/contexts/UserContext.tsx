@@ -1,10 +1,9 @@
-// src/contexts/UserContext.tsx - FINAL FIXED
+// src/contexts/UserContext.tsx - OPTIMIZED
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// ─── TYPES ───────────────────────────────────────────
 interface UserProfile {
   id: string
   full_name?: string
@@ -25,14 +24,12 @@ interface UserContextType {
   loading: boolean
   error: string | null
   refreshUser: () => Promise<void>
-  signOut: () => Promise<void>
+  signOut: () => void
   isAuthenticated: boolean
 }
 
-// ─── CONSTANTS ───────────────────────────────────────
-const AUTH_TIMEOUT = 15000
-
-// ─── CONTEXT ─────────────────────────────────────────
+const AUTH_TIMEOUT = 8000 // ✅ Reduced from 15000
+const ADMIN_USER_ID = 'a799693c-97c7-4f8d-baca-82242a98a00c'
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
@@ -44,8 +41,46 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const isMountedRef = useRef(true)
   const authTimeoutRef = useRef<NodeJS.Timeout>()
   const initialLoadDoneRef = useRef(false)
+  const heartbeatRef = useRef<NodeJS.Timeout>()
+  const userRef = useRef<UserProfile | null>(null)
 
-  // ─── Fetch User Profile ────────────────────────────
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
+
+  const setOnlineStatus = useCallback((userId: string, online: boolean) => {
+    if (userId === ADMIN_USER_ID) return
+    
+    const now = new Date().toISOString()
+    supabase
+      .from('user_online_status')
+      .upsert({
+        user_id: userId,
+        is_online: online,
+        last_seen: now,
+        updated_at: now,
+      }, { onConflict: 'user_id' })
+      .then(() => console.log(online ? '🟢 Online:' : '🔴 Offline:', userId), () => {}) // Silently ignore errors
+  }, [])
+
+  // ─── Heartbeat ──────────────────────────────────
+  const startHeartbeat = useCallback((userId: string) => {
+    if (userId === ADMIN_USER_ID) return
+    
+    if (heartbeatRef.current) clearInterval(heartbeatRef.current)
+    heartbeatRef.current = setInterval(() => {
+      setOnlineStatus(userId, true)
+    }, 30000)
+  }, [setOnlineStatus])
+
+  const stopHeartbeat = useCallback(() => {
+    if (heartbeatRef.current) {
+      clearInterval(heartbeatRef.current)
+      heartbeatRef.current = undefined
+    }
+  }, [])
+
+  // ─── Fetch Profile ────────────────────────────
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
@@ -53,82 +88,53 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         .select('*')
         .eq('id', userId)
         .single()
-
       if (error) {
-        if (error.code === 'PGRST116') {
-          console.log('No profile found')
-          return null
-        }
+        if (error.code === 'PGRST116') return null
         throw error
       }
       return data as UserProfile
     } catch (err) {
-      console.error('Error fetching profile:', err)
       return null
     }
   }, [])
 
-  // ─── Load User ──────────────────────────────────────
+  // ─── Load User ────────────────────────────────
   const loadUser = useCallback(async () => {
-    if (fetchPromiseRef.current) {
-      return fetchPromiseRef.current
-    }
+    if (fetchPromiseRef.current) return fetchPromiseRef.current
 
     const fetchPromise = (async () => {
       try {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-
         if (sessionError) throw sessionError
 
         if (!session?.user) {
-          if (isMountedRef.current) {
-            setUser(null)
-            setLoading(false)
-          }
+          if (isMountedRef.current) { setUser(null); setLoading(false) }
           return null
         }
 
-        const profilePromise = fetchUserProfile(session.user.id)
-        const timeoutPromise = new Promise<null>((_, reject) => {
-          authTimeoutRef.current = setTimeout(() => {
-            reject(new Error('Profile fetch timeout'))
-          }, AUTH_TIMEOUT)
-        })
+        const profile = await fetchUserProfile(session.user.id)
+        const userId = profile?.id || session.user.id
 
-        const profile = await Promise.race([profilePromise, timeoutPromise])
+        setOnlineStatus(userId, true)
+        startHeartbeat(userId)
 
-        if (authTimeoutRef.current) {
-          clearTimeout(authTimeoutRef.current)
-        }
+        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
 
         if (!profile) {
           const basicProfile: UserProfile = {
             id: session.user.id,
-            full_name: session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'User',
+            full_name: session.user.user_metadata?.full_name || 'User',
             email: session.user.email,
             role: session.user.user_metadata?.role || 'student',
           }
-          
-          if (isMountedRef.current) {
-            setUser(basicProfile)
-            setError(null)
-            setLoading(false)
-          }
+          if (isMountedRef.current) { setUser(basicProfile); setError(null); setLoading(false) }
           return basicProfile
         }
 
-        if (isMountedRef.current) {
-          setUser(profile)
-          setError(null)
-          setLoading(false)
-        }
-
+        if (isMountedRef.current) { setUser(profile); setError(null); setLoading(false) }
         return profile
       } catch (err: any) {
-        console.error('Error loading user:', err.message)
-        if (isMountedRef.current) {
-          setLoading(false)
-        }
+        if (isMountedRef.current) setLoading(false)
         return null
       } finally {
         fetchPromiseRef.current = null
@@ -137,39 +143,47 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     fetchPromiseRef.current = fetchPromise
     return fetchPromise
-  }, [fetchUserProfile])
+  }, [fetchUserProfile, setOnlineStatus, startHeartbeat])
 
-  // ─── Refresh User ───────────────────────────────────
+  // ─── Refresh ──────────────────────────────────
   const refreshUser = useCallback(async () => {
     setLoading(true)
     fetchPromiseRef.current = null
     await loadUser()
   }, [loadUser])
 
-  // ─── Sign Out (IMMEDIATE REDIRECT) ──────────────────
-  const signOut = useCallback(async () => {
-    try {
-      // Clear state immediately
-      setUser(null)
-      setError(null)
-      setLoading(false)
-      
-      // Sign out from Supabase (fire and forget)
-      supabase.auth.signOut().catch(console.error)
-      
-      // Immediate hard redirect - don't wait for anything
-      window.location.href = '/portal'
-      
-    } catch (err: any) {
-      console.error('Sign out error:', err)
-      window.location.href = '/portal'
+  // ─── Sign Out - INSTANT ───────────────────────
+  const signOut = useCallback(() => {
+    // ✅ IMMEDIATE redirect - user sees portal instantly
+    window.location.href = '/portal'
+    
+    // ✅ Cleanup in background (fire and forget)
+    const currentUser = userRef.current
+    if (currentUser?.id) {
+      setOnlineStatus(currentUser.id, false)
     }
-  }, [])
+    stopHeartbeat()
+    window.dispatchEvent(new Event('student-logout'))
+    supabase.auth.signOut().catch(() => {})
+    
+    // Clear state
+    setUser(null)
+    setError(null)
+    setLoading(false)
+  }, [setOnlineStatus, stopHeartbeat])
 
-  // ─── Auth State Listener ────────────────────────────
+  // ─── Auth State Listener ──────────────────────
   useEffect(() => {
     isMountedRef.current = true
     
+    // ✅ Add loading timeout - never stuck more than 8 seconds
+    const loadingTimeout = setTimeout(() => {
+      if (loading && isMountedRef.current) {
+        console.warn('⚠️ Initial load timed out, showing app')
+        setLoading(false)
+      }
+    }, 8000)
+
     if (!initialLoadDoneRef.current) {
       initialLoadDoneRef.current = true
       loadUser()
@@ -181,24 +195,34 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
         switch (event) {
           case 'SIGNED_IN':
+            if (session?.user) {
+              const profile = await fetchUserProfile(session.user.id)
+              const userId = profile?.id || session.user.id
+              setOnlineStatus(userId, true)
+              startHeartbeat(userId)
+            }
             await loadUser()
             break
 
           case 'SIGNED_OUT':
+            stopHeartbeat()
+            const currentUser = userRef.current
+            if (currentUser?.id) setOnlineStatus(currentUser.id, false)
             setUser(null)
             setLoading(false)
             window.location.href = '/portal'
             break
 
           case 'TOKEN_REFRESHED':
+            if (session?.user) {
+              const profile = await fetchUserProfile(session.user.id)
+              const userId = profile?.id || session.user.id
+              setOnlineStatus(userId, true)
+            }
             break
 
           case 'USER_UPDATED':
             await loadUser()
-            break
-
-          case 'PASSWORD_RECOVERY':
-            window.location.href = '/reset-password'
             break
         }
       }
@@ -206,20 +230,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       isMountedRef.current = false
-      if (authTimeoutRef.current) {
-        clearTimeout(authTimeoutRef.current)
-      }
+      clearTimeout(loadingTimeout)
+      stopHeartbeat()
+      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
       subscription.unsubscribe()
     }
-  }, [loadUser])
+  }, [loadUser, setOnlineStatus, startHeartbeat, stopHeartbeat, fetchUserProfile, loading])
 
-  // ─── Value ──────────────────────────────────────────
   const value: UserContextType = {
-    user,
-    loading,
-    error,
-    refreshUser,
-    signOut,
+    user, loading, error, refreshUser, signOut,
     isAuthenticated: !!user,
   }
 
@@ -230,12 +249,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
-// ─── Hook ────────────────────────────────────────────
 export function useUser() {
   const context = useContext(UserContext)
-  if (context === undefined) {
-    throw new Error('useUser must be used within a UserProvider')
-  }
+  if (context === undefined) throw new Error('useUser must be used within a UserProvider')
   return context
 }
 

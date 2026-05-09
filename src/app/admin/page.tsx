@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
-// app/admin/page.tsx - USES ADMIN LAYOUT (NO DUPLICATE HEADER/SIDEBAR)
+// app/admin/page.tsx - OPTIMIZED ADMIN DASHBOARD
 'use client'
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
@@ -19,7 +19,8 @@ import { cn } from '@/lib/utils'
 import { 
   Loader2, Shield, ArrowRight, LayoutDashboard, MonitorPlay,
   Users, Briefcase, Menu, FileCheck, School,
-  MessageSquare, CheckCircle2, XCircle, Clock, Bell, BookOpen
+  MessageSquare, CheckCircle2, XCircle, Clock, Bell, BookOpen,
+  RefreshCw
 } from 'lucide-react'
 
 // ========== LAZY LOAD HEAVY COMPONENTS ==========
@@ -69,17 +70,9 @@ interface AdminProfile {
   id: string; full_name: string; email: string; role: string; photo_url?: string
 }
 
-// ========== PROFILE CACHE ==========
-let profileCache: { data: AdminProfile; timestamp: number } | null = null
-const CACHE_DURATION = 60000 // 1 minute
-
-// ========== HELPERS ==========
-function formatFullName(name: string): string {
-  if (!name) return ''
-  return name.split(/[\s._-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
-}
-
-// Map routes to tab IDs for syncing
+// ========== CONSTANTS ==========
+const LOAD_TIMEOUT = 8000 // 8 second max loading
+const CACHE_DURATION = 60000 // 1 minute profile cache
 const routeToTabMap: Record<string, string> = {
   '/admin': 'overview',
   '/admin/broad-sheet': 'broad-sheet',
@@ -90,16 +83,17 @@ const routeToTabMap: Record<string, string> = {
   '/admin/inquiries': 'inquiries',
   '/admin/monitor': 'cbt-monitor',
 }
-
 const tabToRouteMap: Record<string, string> = {
-  'overview': '/admin',
-  'broad-sheet': '/admin/broad-sheet',
-  'students': '/admin/students',
-  'staff': '/admin/staff',
-  'exams': '/admin/exams',
-  'report-cards': '/admin/report-cards',
-  'inquiries': '/admin/inquiries',
-  'cbt-monitor': '/admin/monitor',
+  'overview': '/admin', 'broad-sheet': '/admin/broad-sheet',
+  'students': '/admin/students', 'staff': '/admin/staff',
+  'exams': '/admin/exams', 'report-cards': '/admin/report-cards',
+  'inquiries': '/admin/inquiries', 'cbt-monitor': '/admin/monitor',
+}
+
+// ========== HELPERS ==========
+function formatFullName(name: string): string {
+  if (!name) return ''
+  return name.split(/[\s._-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 }
 
 const getTabFromPathname = (pathname: string): string => {
@@ -109,6 +103,9 @@ const getTabFromPathname = (pathname: string): string => {
   }
   return 'overview'
 }
+
+// ========== PROFILE CACHE ==========
+let profileCache: { data: AdminProfile; timestamp: number } | null = null
 
 // ========== MAIN COMPONENT ==========
 function AdminDashboardContent() {
@@ -127,29 +124,35 @@ function AdminDashboardContent() {
   const [inquiries, setInquiries] = useState<any[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
   
   const [pendingExamsCount, setPendingExamsCount] = useState(0)
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingInquiries, setPendingInquiries] = useState(0)
   
   const [stats, setStats] = useState({
-    totalStudents: 0, totalStaff: 0, activeExams: 0,
-    pendingSubmissions: 0,
+    totalStudents: 0, totalStaff: 0, activeExams: 0, pendingSubmissions: 0,
   })
 
   // ========== SYNC TAB WITH ROUTE ==========
   useEffect(() => {
     const tabForCurrentRoute = getTabFromPathname(pathname)
-    if (tabForCurrentRoute !== activeTab) {
-      setActiveTab(tabForCurrentRoute)
-    }
+    if (tabForCurrentRoute !== activeTab) setActiveTab(tabForCurrentRoute)
   }, [pathname])
 
-  // ========== AUTH CHECK (WITH CACHE) ==========
+  // ========== AUTH CHECK (WITH CACHE + TIMEOUT) ==========
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // ✅ Timeout for auth check
+        const timeout = setTimeout(() => {
+          setAuthChecking(false)
+          setLoadError(true)
+        }, LOAD_TIMEOUT)
+
         const { data: { session } } = await supabase.auth.getSession()
+        clearTimeout(timeout)
+
         if (!session?.user) { router.push('/portal'); return }
 
         // Return cached profile if valid
@@ -166,7 +169,6 @@ function AdminDashboardContent() {
           .single()
 
         if (!profileData || !['admin', 'staff'].includes(profileData.role?.toLowerCase())) {
-          toast.error('Access denied')
           router.push('/portal')
           return
         }
@@ -182,86 +184,74 @@ function AdminDashboardContent() {
         profileCache = { data: adminProfile, timestamp: Date.now() }
         setProfile(adminProfile)
         setAuthChecking(false)
-      } catch (err) {
-        router.push('/portal')
+      } catch {
+        setAuthChecking(false)
+        setLoadError(true)
       }
     }
     checkAuth()
   }, [router])
 
-  // ========== LOAD ALL DATA (PARALLEL + OPTIMIZED) ==========
+  // ========== LOAD ALL DATA (PARALLEL + TIMEOUT) ==========
   const loadAllData = useCallback(async () => {
+    setLoadError(false)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
 
-      const [
-        profilesResult,
-        examsResult,
-        inquiriesResult,
-        reportsResult
-      ] = await Promise.allSettled([
-        supabase.from('profiles')
-          .select('id, role, full_name, email, photo_url')
-          .limit(1000),
-        
-        supabase.from('exams')
-          .select('id, title, subject, class, status, duration, total_questions, total_marks, has_theory, questions, theory_questions, instructions, passing_percentage, pass_mark, teacher_name, department, created_at, created_by')
-          .order('created_at', { ascending: false })
-          .limit(100),
-        
-        supabase.from('inquiries')
-          .select('*')
-          .order('created_at', { ascending: false })
-          .limit(100),
-        
-        supabase.from('report_cards')
-          .select('id, status')
-          .eq('status', 'pending')
-          .limit(100)
+      // ✅ Race all fetches against a timeout
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), LOAD_TIMEOUT)
+      )
+
+      const fetchPromise = Promise.allSettled([
+        supabase.from('profiles').select('id, role, full_name, email, photo_url').limit(1000),
+        supabase.from('exams').select('id, title, subject, class, status, duration, total_questions, total_marks, has_theory, questions, theory_questions, instructions, passing_percentage, pass_mark, teacher_name, department, created_at, created_by').order('created_at', { ascending: false }).limit(100),
+        supabase.from('inquiries').select('*').order('created_at', { ascending: false }).limit(100),
+        supabase.from('report_cards').select('id, status').eq('status', 'pending').limit(100)
       ])
+
+      const results = await Promise.race([fetchPromise, timeoutPromise.then(() => null)])
+
+      if (!results) {
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
+
+      const [profilesResult, examsResult, inquiriesResult, reportsResult] = results as any
 
       // Process profiles
       if (profilesResult.status === 'fulfilled' && profilesResult.value.data) {
         const profiles = profilesResult.value.data
-        const studentsList = profiles.filter((p: any) => p.role === 'student')
-        const staffList = profiles.filter((p: any) => p.role === 'staff')
-        setStudents(studentsList)
-        setStaff(staffList)
-        setStats(prev => ({ 
-          ...prev, 
-          totalStudents: studentsList.length, 
-          totalStaff: staffList.length 
-        }))
+        setStudents(profiles.filter((p: any) => p.role === 'student'))
+        setStaff(profiles.filter((p: any) => p.role === 'staff'))
+        setStats(prev => ({ ...prev, totalStudents: profiles.filter((p: any) => p.role === 'student').length, totalStaff: profiles.filter((p: any) => p.role === 'staff').length }))
       }
 
       // Process exams
       if (examsResult.status === 'fulfilled' && examsResult.value.data) {
         const examsData = examsResult.value.data
-        const pendingList: PendingExam[] = examsData
-          .filter((e: any) => e.status === 'pending')
-          .map((e: any) => ({
-            id: e.id, title: e.title, subject: e.subject, class: e.class,
-            duration: e.duration || 60, total_questions: e.total_questions || 0,
-            total_marks: e.total_marks || 0, has_theory: e.has_theory || false,
-            questions: e.questions || [], theory_questions: e.theory_questions || [],
-            instructions: e.instructions || '', passing_percentage: e.passing_percentage || e.pass_mark || 50,
-            teacher_name: e.teacher_name || 'Unknown', department: e.department || 'General',
-            created_at: e.created_at, created_by: e.created_by
-          }))
-        const publishedList = examsData.filter((e: any) => e.status === 'published')
-        
+        const pendingList: PendingExam[] = examsData.filter((e: any) => e.status === 'pending').map((e: any) => ({
+          id: e.id, title: e.title, subject: e.subject, class: e.class,
+          duration: e.duration || 60, total_questions: e.total_questions || 0,
+          total_marks: e.total_marks || 0, has_theory: e.has_theory || false,
+          questions: e.questions || [], theory_questions: e.theory_questions || [],
+          instructions: e.instructions || '', passing_percentage: e.passing_percentage || e.pass_mark || 50,
+          teacher_name: e.teacher_name || 'Unknown', department: e.department || 'General',
+          created_at: e.created_at, created_by: e.created_by
+        }))
         setPendingExams(pendingList)
         setPendingExamsCount(pendingList.length)
-        setPublishedExams(publishedList)
-        setStats(prev => ({ ...prev, activeExams: publishedList.length }))
+        setPublishedExams(examsData.filter((e: any) => e.status === 'published'))
+        setStats(prev => ({ ...prev, activeExams: examsData.filter((e: any) => e.status === 'published').length }))
       }
 
       // Process inquiries
       if (inquiriesResult.status === 'fulfilled' && inquiriesResult.value.data) {
-        const inquiriesData = inquiriesResult.value.data
-        setInquiries(inquiriesData)
-        setPendingInquiries(inquiriesData.filter((i: any) => i.status === 'pending').length)
+        const data = inquiriesResult.value.data
+        setInquiries(data)
+        setPendingInquiries(data.filter((i: any) => i.status === 'pending').length)
       }
 
       // Process reports
@@ -269,8 +259,8 @@ function AdminDashboardContent() {
         setPendingReports(reportsResult.value.data.length)
       }
 
-    } catch (error) {
-      console.error('Load error:', error)
+    } catch {
+      setLoadError(true)
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -281,7 +271,7 @@ function AdminDashboardContent() {
     if (!authChecking) loadAllData()
   }, [authChecking, loadAllData])
 
-  // Real-time updates (only for exams)
+  // Real-time updates (lightweight)
   useEffect(() => {
     const channel = supabase.channel('admin-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => loadAllData())
@@ -300,9 +290,7 @@ function AdminDashboardContent() {
     setActiveTab(tab)
     setMobileMenuOpen(false)
     const targetRoute = tabToRouteMap[tab]
-    if (targetRoute && pathname !== targetRoute) {
-      router.replace(targetRoute)
-    }
+    if (targetRoute && pathname !== targetRoute) router.replace(targetRoute)
   }
 
   const handleApproveExam = async (exam: PendingExam) => {
@@ -313,7 +301,7 @@ function AdminDashboardContent() {
         status: 'published', published_at: new Date().toISOString() 
       }).eq('id', exam.id)
       if (error) throw error
-      toast.success('✅ Exam approved! Notifications sent.')
+      toast.success('✅ Exam approved!')
       await loadAllData()
     } catch (err: any) {
       toast.error(err.message)
@@ -337,8 +325,8 @@ function AdminDashboardContent() {
     }
   }
 
-  // ========== LOADING STATE ==========
-  if (authChecking || loading) {
+  // ========== LOADING STATE (WITH TIMEOUT) ==========
+  if (authChecking || (loading && !loadError)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
@@ -346,19 +334,27 @@ function AdminDashboardContent() {
             <Shield className="h-16 w-16 text-purple-600 mx-auto" />
           </motion.div>
           <p className="mt-4 text-slate-600 dark:text-slate-300 text-lg font-medium">Loading Admin Dashboard...</p>
-          <div className="flex justify-center gap-1 mt-4">
-            {[0, 1, 2].map((i) => (
-              <motion.div key={i} className="h-2 w-2 rounded-full bg-purple-400"
-                animate={{ y: [0, -8, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.1 }}
-              />
-            ))}
-          </div>
         </div>
       </div>
     )
   }
 
-  // ========== RENDER (Header + Sidebar provided by AdminLayout) ==========
+  // ========== ERROR STATE ==========
+  if (loadError && !profile) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <Shield className="h-16 w-16 text-slate-400 mx-auto" />
+          <p className="mt-4 text-slate-600 text-lg font-medium">Failed to load dashboard</p>
+          <Button onClick={() => { setLoadError(false); setLoading(true); loadAllData() }} className="mt-4">
+            <RefreshCw className="mr-2 h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  // ========== RENDER ==========
   return (
     <>
       {/* Mobile Nav */}
@@ -488,7 +484,6 @@ function AdminDashboardContent() {
               </Button>
             </div>
 
-            {/* Pending */}
             <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
               <CardHeader><CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5 text-amber-600" />Pending Approval ({pendingExamsCount})</CardTitle></CardHeader>
               <CardContent>
@@ -530,7 +525,6 @@ function AdminDashboardContent() {
               </CardContent>
             </Card>
 
-            {/* Published */}
             {publishedExams.length > 0 && (
               <Card className="border-0 shadow-sm bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
                 <CardHeader><CardTitle className="flex items-center gap-2"><CheckCircle2 className="h-5 w-5 text-emerald-600" />Published ({publishedExams.length})</CardTitle></CardHeader>
@@ -576,7 +570,6 @@ function AdminDashboardContent() {
   )
 }
 
-// Quick Action Card Component
 function QuickActionCard({ icon: Icon, label, desc, onClick, alert }: { icon: any; label: string; desc: string; onClick: () => void; alert?: boolean }) {
   return (
     <div onClick={onClick} className={cn("p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 bg-white", alert ? "border-amber-300 bg-amber-50/30" : "border-slate-100")}>

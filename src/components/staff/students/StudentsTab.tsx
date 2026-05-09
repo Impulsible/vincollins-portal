@@ -21,6 +21,8 @@ export function StudentsTab({ students }: StudentsTabProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
   const filteredStudents = students.filter(s => 
+    // ✅ Search by display_name, full_name, class, and vin_id
+    (s.display_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     s.class?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     s.vin_id?.toLowerCase().includes(searchQuery.toLowerCase())

@@ -78,58 +78,71 @@ export function useStudentActions(onRefresh: () => void): UseStudentActionsRetur
   }, [onRefresh])
 
   // ============================================
-  // UPDATE STUDENT - COMPLETE FIXED VERSION
+  // UPDATE STUDENT - FIXED (No refresh)
   // ============================================
   const updateStudent = useCallback(async (student: Student): Promise<boolean> => {
+    if (!student || !student.id) {
+      console.error('❌ No student or student ID provided')
+      toast.error('Invalid student data')
+      return false
+    }
+
     setIsSubmitting(true)
     try {
-      console.log('🔄 Updating student:', student.id)
+      console.log('🔄 Updating student via API:', student.id)
 
-      // ✅ Build complete update payload with ALL name parts
-      const updatePayload = {
-        // Name fields
+      // ✅ Build update payload
+      const updatePayload: Record<string, any> = {
+        id: student.id,
         first_name: student.first_name || '',
-        middle_name: student.middle_name || null,
         last_name: student.last_name || '',
-        full_name: student.full_name,
-        display_name: student.display_name || student.full_name,
+        full_name: student.full_name || `${student.first_name} ${student.last_name}`,
+        display_name: student.display_name || student.full_name || '',
 
-        // Academic fields
-        class: student.class,
+        class: student.class || null,
         department: student.department || 'General',
-        is_active: student.is_active,
-        admission_year: student.admission_year,
+        is_active: student.is_active ?? true,
+        admission_year: student.admission_year || null,
         admission_number: student.admission_number || null,
 
-        // Contact fields
         phone: student.phone || null,
         address: student.address || null,
 
-        // Personal fields (Portal & Report only)
         gender: student.gender || null,
         date_of_birth: student.date_of_birth || null,
         next_term_begins: student.next_term_begins || null,
-
-        // Timestamp
-        updated_at: new Date().toISOString(),
       }
 
-      console.log('📋 Update payload:', updatePayload)
-
-      // ✅ Update profiles table
-      const { error } = await supabase
-        .from('profiles')
-        .update(updatePayload)
-        .eq('id', student.id)
-
-      if (error) {
-        console.error('❌ Profile update error:', error)
-        throw error
+      // Handle middle_name
+      if (student.middle_name && student.middle_name.trim()) {
+        updatePayload.middle_name = student.middle_name.trim()
+      } else {
+        updatePayload.middle_name = null
       }
 
-      console.log('✅ Profile updated successfully')
-      toast.success('Student updated successfully')
-      onRefresh()
+      console.log('📤 Sending to API:', updatePayload)
+
+      // ✅ Use API endpoint instead of direct Supabase
+      const response = await fetch('/api/admin/users/update', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatePayload),
+      })
+
+      const result = await response.json()
+      
+      console.log('📥 API response:', result)
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to update student')
+      }
+
+      console.log('✅ Update successful:', result.user)
+      toast.success(`${student.full_name || student.first_name} updated successfully!`)
+      
+      // ✅ Only refresh if needed (remove if causing issues)
+      // onRefresh()
+      
       return true
     } catch (error: any) {
       console.error('❌ Update student error:', error)
@@ -138,26 +151,37 @@ export function useStudentActions(onRefresh: () => void): UseStudentActionsRetur
     } finally {
       setIsSubmitting(false)
     }
-  }, [onRefresh])
+  }, []) // ✅ Remove onRefresh dependency
 
   // ============================================
   // DELETE STUDENT
   // ============================================
   const deleteStudent = useCallback(async (student: Student): Promise<boolean> => {
+    if (!student || !student.id) {
+      console.error('❌ No student or student ID provided')
+      toast.error('Invalid student data')
+      return false
+    }
+
     setIsSubmitting(true)
     try {
       console.log('🗑️ Deleting student:', student.id)
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
         .delete()
         .eq('id', student.id)
+        .select()
+
+      console.log('📥 Delete response:', { data, error })
 
       if (error) {
         console.error('❌ Profile delete error:', error)
-        throw error
+        toast.error(`Database error: ${error.message}`)
+        return false
       }
 
+      console.log('✅ Student deleted successfully')
       toast.success('Student deleted successfully')
       onRefresh()
       return true
@@ -227,7 +251,6 @@ export function useStudentActions(onRefresh: () => void): UseStudentActionsRetur
             error: error.message,
           })
         }
-        // Small delay between requests
         await new Promise(resolve => setTimeout(resolve, 300))
       }
 

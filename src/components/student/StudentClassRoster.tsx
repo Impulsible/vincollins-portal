@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 interface Classmate {
   id: string
   first_name?: string | null
+  middle_name?: string | null
   last_name?: string | null
   full_name: string
   display_name?: string | null
@@ -39,12 +40,19 @@ interface StudentClassRosterProps {
   onClassmateClick?: (classmate: Classmate) => void
 }
 
-// Helper function to get best display name
+// ✅ Helper function to get best display name (Surname First Other)
 function getBestDisplayName(classmate: Classmate): string {
+  // Use display_name if available (already in "Surname First Other" format)
   if (classmate.display_name) return classmate.display_name
-  if (classmate.first_name && classmate.last_name) {
-    return `${classmate.last_name} ${classmate.first_name}`
+  
+  // Build from parts: "Last First Middle"
+  if (classmate.last_name && classmate.first_name) {
+    const parts = [classmate.last_name, classmate.first_name]
+    if (classmate.middle_name) parts.push(classmate.middle_name)
+    return parts.join(' ')
   }
+  
+  // Fallback to full_name
   return classmate.full_name || 'Student'
 }
 
@@ -69,13 +77,13 @@ export function StudentClassRoster({
       }
 
       try {
-        // Fetch all students in the same class with all name fields
+        // ✅ Fetch all students in the same class with ALL name fields
         const { data, error } = await supabase
           .from('profiles')
           .select('id, first_name, middle_name, last_name, full_name, display_name, email, class, photo_url, vin_id, department, admission_year')
           .eq('class', studentClass)
           .eq('role', 'student')
-          .order('full_name')
+          .order('display_name')
 
         if (error) {
           console.error('Error fetching classmates:', error)
@@ -91,6 +99,7 @@ export function StudentClassRoster({
           setClassmates(filteredData.map((student: any) => ({
             id: student.id,
             first_name: student.first_name,
+            middle_name: student.middle_name,
             last_name: student.last_name,
             full_name: student.full_name || `${student.first_name || ''} ${student.last_name || ''}`.trim(),
             display_name: student.display_name,
@@ -144,15 +153,14 @@ export function StudentClassRoster({
     })
   }, [classmates, searchQuery])
 
-  // Get initials for avatar
+  // ✅ Get initials for avatar (using display name format)
   const getInitials = (classmate: Classmate): string => {
     const displayName = getBestDisplayName(classmate)
     if (!displayName) return 'S'
     const parts = displayName.split(' ')
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    }
-    return displayName.slice(0, 2).toUpperCase()
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    // First letter of first part + first letter of last part
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
   }
 
   // Get avatar color based on name

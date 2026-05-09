@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx - COMPLETE UPDATED BROAD SHEET WITH REPORT CARD GENERATION
+// app/admin/broad-sheet/page.tsx - COMPLETE UPDATED WITH DISPLAY NAMES, ADMISSION NUMBERS & VIEWABLE REPORTS
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -14,8 +14,8 @@ import { motion } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import { 
   Loader2, RefreshCw, Printer, Search, X, FileSpreadsheet,
-  Users, FileDown, Sparkles, FileText, ExternalLink, CheckCircle2,
-  Clock, AlertCircle, Send, History, Eye
+  Users, FileDown, Sparkles, FileText, CheckCircle2,
+  Clock, AlertCircle, Send, Eye, Shield
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -39,6 +39,7 @@ interface SubjectScore {
 interface StudentRecord {
   id: string
   name: string
+  admission_number: string
   vin_id: string
   subjectMap: Record<string, SubjectScore>
   totalScore: number
@@ -58,7 +59,8 @@ interface SubmissionStatus {
   graded_students: number
 }
 
-// ─── Constants ────────────────────────────────────────
+const LOAD_TIMEOUT = 10000
+
 const TERMS = [
   { value: 'first', label: 'First Term' },
   { value: 'second', label: 'Second Term' },
@@ -126,7 +128,6 @@ const getTermLabel = (term: string): string => {
   return found?.label || 'Third Term'
 }
 
-// ─── AI REPORT CARD HELPERS ──────────────────────────
 const getSubjectRemark = (grade: string): string => {
   const r: Record<string, string> = {
     'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
@@ -137,11 +138,12 @@ const getSubjectRemark = (grade: string): string => {
 }
 
 const generateTeacherComment = (name: string, avg: number): string => {
-  if (avg >= 80) return `Excellent performance! ${name} has demonstrated outstanding academic ability. Keep up the excellent work!`
-  if (avg >= 70) return `Very good performance. ${name} has shown great dedication and consistency. Continue to work hard.`
-  if (avg >= 60) return `Good performance this term. ${name} has potential to do even better with more focus and effort.`
-  if (avg >= 50) return `A satisfactory performance. ${name} can improve with more dedication to studies.`
-  return `${name} needs to work harder and pay more attention in class. Improvement is possible with dedication.`
+  const firstName = name.split(' ')[0] || name
+  if (avg >= 80) return `Excellent performance! ${firstName} has demonstrated outstanding academic ability. Keep up the excellent work!`
+  if (avg >= 70) return `Very good performance. ${firstName} has shown great dedication and consistency. Continue to work hard.`
+  if (avg >= 60) return `Good performance this term. ${firstName} has potential to do even better with more focus and effort.`
+  if (avg >= 50) return `A satisfactory performance. ${firstName} can improve with more dedication to studies.`
+  return `${firstName} needs to work harder and pay more attention in class. Improvement is possible with dedication.`
 }
 
 const generatePrincipalComment = (avg: number): string => {
@@ -185,6 +187,7 @@ export default function BroadSheetPage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [approving, setApproving] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
@@ -197,9 +200,7 @@ export default function BroadSheetPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [profile, setProfile] = useState<any>(null)
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
-  const [activeTab, setActiveTab] = useState('broadsheet')
   const [showApproveDialog, setShowApproveDialog] = useState(false)
-  const [selectedStudent, setSelectedStudent] = useState<StudentRecord | null>(null)
 
   useEffect(() => { setIsMounted(true) }, [])
 
@@ -207,7 +208,14 @@ export default function BroadSheetPage() {
   useEffect(() => {
     const init = async () => {
       try {
+        const timeout = setTimeout(() => {
+          setLoading(false)
+          setLoadError(true)
+        }, LOAD_TIMEOUT)
+
         const { data: { session } } = await supabase.auth.getSession()
+        clearTimeout(timeout)
+
         if (!session) return
 
         const { data: profileData } = await supabase
@@ -226,7 +234,11 @@ export default function BroadSheetPage() {
             setExpectedSubjects(getExpectedSubjects(sorted[0]))
           }
         }
-      } catch (error) { console.error('Init error:', error) }
+        setLoading(false)
+      } catch {
+        setLoading(false)
+        setLoadError(true)
+      }
     }
     init()
   }, [])
@@ -266,14 +278,15 @@ export default function BroadSheetPage() {
   // ─── Load Broad Sheet ──────────────────────────────
   const loadBroadSheet = async () => {
     setLoading(true)
+    setLoadError(false)
     try {
-      // Get students in the selected class
+      // ✅ Fetch students with display_name and admission_number
       const { data: classStudents, error: studentError } = await supabase
         .from('profiles')
-        .select('id, full_name, class, vin_id')
+        .select('id, full_name, display_name, admission_number, vin_id, class')
         .eq('role', 'student')
         .filter('class', 'eq', selectedClass)
-        .order('full_name')
+        .order('display_name')
         .limit(500)
 
       if (studentError) throw studentError
@@ -285,7 +298,6 @@ export default function BroadSheetPage() {
 
       const studentIds = classStudents.map(s => s.id)
 
-      // Get ALL CA scores for these students (from submitted/approved scores)
       const { data: allScores, error: scoresError } = await supabase
         .from('ca_scores')
         .select('*')
@@ -300,7 +312,6 @@ export default function BroadSheetPage() {
       const subjectsForClass = getExpectedSubjects(selectedClass)
       const totalExpected = subjectsForClass.length
 
-      // Build student records
       const studentRecords: StudentRecord[] = classStudents.map(student => {
         const studentScores = (allScores || []).filter(s => s.student_id === student.id)
         const subjectMap: Record<string, SubjectScore> = {}
@@ -324,7 +335,6 @@ export default function BroadSheetPage() {
         const averageScore = scoredSubjects > 0 ? Math.round(totalScore / scoredSubjects) : 0
         const grade = scoredSubjects > 0 ? getWAECGrade(averageScore) : '—'
 
-        // Check if all subjects have been submitted
         const allSubmitted = subjectsForClass.every(subject => {
           const score = subjectMap[subject]
           return score && (score.status === 'submitted' || score.status === 'approved')
@@ -332,7 +342,8 @@ export default function BroadSheetPage() {
 
         return {
           id: student.id,
-          name: student.full_name,
+          name: student.display_name || student.full_name || 'Student',
+          admission_number: student.admission_number || '—',
           vin_id: student.vin_id || '—',
           subjectMap,
           totalScore,
@@ -345,11 +356,11 @@ export default function BroadSheetPage() {
         }
       })
 
-      studentRecords.sort((a, b) => a.name.localeCompare(b.name))
       setStudents(studentRecords)
     } catch (error) {
       console.error('Error:', error)
       toast.error('Failed to load broad sheet')
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -364,7 +375,6 @@ export default function BroadSheetPage() {
 
     setApproving(true)
     try {
-      // Update all submitted scores to approved
       const { error } = await supabase
         .from('ca_scores')
         .update({
@@ -379,7 +389,6 @@ export default function BroadSheetPage() {
 
       if (error) throw error
 
-      // Update submissions table
       await supabase
         .from('ca_submissions')
         .update({
@@ -406,7 +415,6 @@ export default function BroadSheetPage() {
 
   // ─── Generate All Report Cards ─────────────────────
   const handleGenerateReportCards = async () => {
-    // Only generate for students with approved scores
     const completeStudents = students.filter(s => s.allSubmitted)
     
     if (completeStudents.length === 0) {
@@ -446,6 +454,7 @@ export default function BroadSheetPage() {
           student_id: student.id,
           student_name: student.name,
           student_vin: student.vin_id,
+          student_admission_number: student.admission_number,
           class: selectedClass,
           term: selectedTerm,
           academic_year: selectedYear,
@@ -510,6 +519,7 @@ export default function BroadSheetPage() {
       const q = searchQuery.toLowerCase()
       filtered = filtered.filter(s =>
         s.name.toLowerCase().includes(q) ||
+        s.admission_number.toLowerCase().includes(q) ||
         s.vin_id.toLowerCase().includes(q)
       )
     }
@@ -549,13 +559,13 @@ export default function BroadSheetPage() {
       return
     }
 
-    const headers = ['Student Name', 'Admission No', ...expectedSubjects, 'Total', 'Average', 'Grade']
+    const headers = ['Student Name', 'Admission No', 'VIN ID', ...expectedSubjects, 'Total', 'Average', 'Grade']
     const rows = displayedStudents.map(s => {
       const subjects = expectedSubjects.map(sub => {
         const sc = s.subjectMap[sub]
         return sc ? `${sc.total} (${sc.grade})` : '—'
       })
-      return [s.name, s.vin_id, ...subjects, s.totalScore, `${s.averageScore}%`, s.grade]
+      return [s.name, s.admission_number, s.vin_id, ...subjects, s.totalScore, `${s.averageScore}%`, s.grade]
     })
 
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
@@ -573,23 +583,40 @@ export default function BroadSheetPage() {
     if (isMounted) window.print()
   }
 
+  const handleRetry = () => {
+    setLoadError(false)
+    setLoading(true)
+    loadBroadSheet()
+    loadSubmissionStatuses()
+  }
+
   const displayClass = isMounted ? selectedClass : ''
   const displayTermLabel = isMounted ? getTermLabel(selectedTerm) : 'Third Term'
   const displayYear = isMounted ? selectedYear : '2025/2026'
 
-  // ─── Loading ────────────────────────────────────────
-  if (!isMounted || (loading && students.length === 0)) {
+  // ─── Loading / Error States ────────────────────────
+  if (!isMounted || (loading && students.length === 0 && !loadError)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="mx-auto mb-6"
-          >
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }} className="mx-auto mb-6">
             <FileSpreadsheet className="h-14 w-14 text-emerald-500" />
           </motion.div>
           <p className="text-slate-500 font-medium">Loading broad sheet...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadError && students.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-[50vh]">
+        <div className="text-center">
+          <Shield className="h-14 w-14 text-slate-400 mx-auto mb-4" />
+          <p className="text-slate-600 font-medium">Failed to load broad sheet</p>
+          <Button onClick={handleRetry} className="mt-4">
+            <RefreshCw className="h-4 w-4 mr-2" /> Retry
+          </Button>
         </div>
       </div>
     )
@@ -612,7 +639,7 @@ export default function BroadSheetPage() {
             </p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <Button variant="outline" size="sm" onClick={() => { loadBroadSheet(); loadSubmissionStatuses() }} disabled={loading} className="h-8 text-xs">
+            <Button variant="outline" size="sm" onClick={handleRetry} disabled={loading} className="h-8 text-xs">
               <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} /> Refresh
             </Button>
             <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 text-xs">
@@ -686,7 +713,6 @@ export default function BroadSheetPage() {
               </div>
             )}
 
-            {/* Approve All Button */}
             {stats.pendingSubmissions > 0 && (
               <div className="mt-3 pt-3 border-t flex justify-end">
                 <Button
@@ -746,7 +772,7 @@ export default function BroadSheetPage() {
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <Input
-                    placeholder="Name or VIN..."
+                    placeholder="Name, Admission No, or VIN..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
                     className="pl-7 h-8 text-xs"
@@ -792,7 +818,7 @@ export default function BroadSheetPage() {
         </div>
       </div>
 
-      {/* Generation Progress Bar */}
+      {/* Generation Progress */}
       {generating && (
         <div className="no-print bg-purple-50 border border-purple-200 rounded-lg p-3">
           <div className="flex items-center justify-between mb-1">
@@ -808,7 +834,7 @@ export default function BroadSheetPage() {
         </div>
       )}
 
-      {/* THE BROAD SHEET TABLE */}
+      {/* BROAD SHEET TABLE */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
         <Card className="border-0 shadow-lg overflow-hidden print:shadow-none print:border">
           <div className="hidden print:block p-4 text-center border-b">
@@ -821,8 +847,11 @@ export default function BroadSheetPage() {
             <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[600px]">
               <thead>
                 <tr className="bg-slate-100 print:bg-gray-100">
-                  <th className="sticky left-0 z-20 bg-slate-100 print:bg-gray-100 border-b-2 border-slate-200 px-2 sm:px-3 py-2 text-left font-bold text-slate-600 text-[10px] sm:text-xs min-w-[130px] sm:min-w-[160px]">
+                  <th className="sticky left-0 z-20 bg-slate-100 print:bg-gray-100 border-b-2 border-slate-200 px-2 sm:px-3 py-2 text-left font-bold text-slate-600 text-[10px] sm:text-xs min-w-[140px] sm:min-w-[180px]">
                     Student
+                  </th>
+                  <th className="border-b-2 border-slate-200 px-1.5 py-2 text-center font-bold text-slate-600 text-[9px] sm:text-[10px] min-w-[70px]">
+                    Admission No
                   </th>
                   {expectedSubjects.map(subject => (
                     <th
@@ -837,13 +866,13 @@ export default function BroadSheetPage() {
                   <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Total</th>
                   <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Avg</th>
                   <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Grade</th>
-                  <th className="no-print border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Report</th>
+                  <th className="no-print border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Report</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={expectedSubjects.length + 5} className="text-center py-12">
+                    <td colSpan={expectedSubjects.length + 6} className="text-center py-12">
                       <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
                       <p className="text-slate-500 text-sm">No students found</p>
                       <p className="text-xs text-slate-400 mt-1">Ensure all subjects have been submitted by teachers</p>
@@ -875,6 +904,9 @@ export default function BroadSheetPage() {
                             </Badge>
                           )}
                         </div>
+                      </td>
+                      <td className="px-1.5 py-1.5 text-center text-[10px] sm:text-xs text-slate-600 border-r border-slate-50 font-mono">
+                        {student.admission_number}
                       </td>
                       {expectedSubjects.map(subject => {
                         const score = student.subjectMap[subject]
@@ -910,7 +942,6 @@ export default function BroadSheetPage() {
                           size="sm"
                           onClick={() => handleViewReportCard(student)}
                           className="h-7 text-[10px] text-blue-600 hover:text-blue-700"
-                          disabled={!student.allSubmitted}
                         >
                           <Eye className="h-3 w-3 mr-1" />
                           View

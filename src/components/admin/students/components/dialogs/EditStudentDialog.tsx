@@ -78,30 +78,33 @@ export function EditStudentDialog({
   const handleFirstNameChange = (value: string) => {
     setFirstName(value)
     const fullName = buildFullName(value, middleName, lastName)
+    const displayName = buildDisplayName(value, middleName, lastName)
     update({
       first_name: value,
       full_name: fullName,
-      display_name: fullName,
+      display_name: displayName,
     })
   }
 
   const handleMiddleNameChange = (value: string) => {
     setMiddleName(value)
     const fullName = buildFullName(firstName, value, lastName)
+    const displayName = buildDisplayName(firstName, value, lastName)
     update({
       middle_name: value || '',
       full_name: fullName,
-      display_name: fullName,
+      display_name: displayName,
     })
   }
 
   const handleLastNameChange = (value: string) => {
     setLastName(value)
     const fullName = buildFullName(firstName, middleName, value)
+    const displayName = buildDisplayName(firstName, middleName, value)
     update({
       last_name: value,
       full_name: fullName,
-      display_name: fullName,
+      display_name: displayName,
     })
   }
 
@@ -138,6 +141,15 @@ export function EditStudentDialog({
             </h4>
             <div className="grid grid-cols-3 gap-3">
               <div>
+                <Label>Surname</Label>
+                <Input
+                  value={lastName}
+                  onChange={e => handleLastNameChange(e.target.value)}
+                  placeholder="Surname"
+                  className="mt-1"
+                />
+              </div>
+              <div>
                 <Label>First Name</Label>
                 <Input
                   value={firstName}
@@ -147,7 +159,7 @@ export function EditStudentDialog({
                 />
               </div>
               <div>
-                <Label>Middle Name</Label>
+                <Label>Other Name(s)</Label>
                 <Input
                   value={middleName}
                   onChange={e => handleMiddleNameChange(e.target.value)}
@@ -155,20 +167,17 @@ export function EditStudentDialog({
                   className="mt-1"
                 />
               </div>
-              <div>
-                <Label>Last Name</Label>
-                <Input
-                  value={lastName}
-                  onChange={e => handleLastNameChange(e.target.value)}
-                  placeholder="Last name"
-                  className="mt-1"
-                />
-              </div>
             </div>
-            {/* ✅ Show computed full name */}
-            <div className="mt-2 bg-muted rounded p-2">
-              <p className="text-xs text-muted-foreground">Full Name:</p>
-              <p className="font-medium">{student.full_name}</p>
+            {/* ✅ Show computed names */}
+            <div className="mt-2 space-y-1">
+              <div className="bg-muted rounded p-2">
+                <p className="text-xs text-muted-foreground">Full Name (First Middle Last):</p>
+                <p className="font-medium">{student.full_name}</p>
+              </div>
+              <div className="bg-muted rounded p-2">
+                <p className="text-xs text-muted-foreground">Display Name (Surname First Other):</p>
+                <p className="font-medium">{student.display_name}</p>
+              </div>
             </div>
           </div>
 
@@ -408,8 +417,26 @@ function buildFullName(firstName: string, middleName: string, lastName: string):
   const middle = middleName.trim()
   const last = lastName.trim()
 
+  if (!first || !last) return ''
+
   if (middle) {
     return `${first} ${middle} ${last}`
   }
   return `${first} ${last}`
+}
+
+// ============================================
+// HELPER: Build display name (Surname First Other)
+// ============================================
+function buildDisplayName(firstName: string, middleName: string, lastName: string): string {
+  const first = firstName.trim()
+  const middle = middleName.trim()
+  const last = lastName.trim()
+
+  if (!first || !last) return ''
+
+  if (middle) {
+    return `${last} ${first} ${middle}` // "Yusuf Laila Zainab"
+  }
+  return `${last} ${first}` // "Yusuf Laila"
 }

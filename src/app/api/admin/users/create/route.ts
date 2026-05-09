@@ -4,7 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
-  console.log('📦 API called')
+  console.log('📦 API called: Create User')
   
   try {
     const supabaseAdmin = createClient(
@@ -25,15 +25,27 @@ export async function POST(req: NextRequest) {
       phone, 
       address,
       admission_year,
+      admission_number,
+      gender,
+      date_of_birth,
+      next_term_begins,
       join_year 
     } = body
     
     // Validate
     if (!first_name || !last_name || !role) {
-      console.error('❌ Missing fields:', { first_name, last_name, role })
+      console.error('❌ Missing required fields:', { first_name, last_name, role })
       return NextResponse.json({ 
         error: 'First name, last name, and role are required' 
       }, { status: 400 })
+    }
+    
+    // ✅ Helper function to capitalize words
+    const capitalizeWords = (str: string): string => {
+      return str
+        .split(' ')
+        .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+        .join(' ')
     }
     
     // Generate credentials
@@ -52,12 +64,29 @@ export async function POST(req: NextRequest) {
     const prefix = prefixes[role] || 'VIN-STD'
     const vin_id = `${prefix}-${year}-${randomNum}`
     
-    const fullName = `${first_name} ${last_name}`
-      .split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ')
+    // ✅ Build full name: First [Middle] Last (e.g., "Laila Zainab Yusuf")
+    let fullName = first_name.trim()
+    if (middle_name && middle_name.trim()) {
+      fullName += ' ' + middle_name.trim()
+    }
+    fullName += ' ' + last_name.trim()
+    fullName = capitalizeWords(fullName)
     
-    console.log('📧 Creating user:', { email, vin_id, fullName, role })
+    // ✅ Build display name: Last First [Middle] (e.g., "Yusuf Laila Zainab")
+    let displayName = last_name.trim() + ' ' + first_name.trim()
+    if (middle_name && middle_name.trim()) {
+      displayName += ' ' + middle_name.trim()
+    }
+    displayName = capitalizeWords(displayName)
+    
+    console.log('📧 Creating user:', { email, vin_id, fullName, displayName, role })
+    console.log('📋 Additional fields:', { 
+      gender, 
+      date_of_birth, 
+      next_term_begins, 
+      admission_number,
+      middle_name 
+    })
     
     // Step 1: Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -66,8 +95,10 @@ export async function POST(req: NextRequest) {
       email_confirm: true,
       user_metadata: {
         full_name: fullName,
-        first_name: first_name.trim(),
-        last_name: last_name.trim(),
+        display_name: displayName,
+        first_name: capitalizeWords(first_name.trim()),
+        middle_name: middle_name?.trim() ? capitalizeWords(middle_name.trim()) : '',
+        last_name: capitalizeWords(last_name.trim()),
         role: role,
         vin_id: vin_id
       }
@@ -81,13 +112,14 @@ export async function POST(req: NextRequest) {
     const userId = authData.user.id
     console.log('✅ Auth user created:', userId)
     
-    // Step 2: Insert into profiles
+    // Step 2: Insert into profiles with ALL fields
     const profileInsert: any = {
       id: userId,
       vin_id: vin_id,
       full_name: fullName,
-      first_name: first_name.trim(),
-      last_name: last_name.trim(),
+      display_name: displayName,  // ✅ NOW: "Yusuf Laila Zainab" format
+      first_name: capitalizeWords(first_name.trim()),
+      last_name: capitalizeWords(last_name.trim()),
       email: email,
       role: role,
       department: department || 'General',
@@ -99,15 +131,41 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    // Only add these optional fields if they have values
-    if (middle_name?.trim()) profileInsert.middle_name = middle_name.trim()
-    if (role === 'student' && studentClass) profileInsert.class = studentClass
-    if (admission_year) profileInsert.admission_year = admission_year
-    if (join_year) profileInsert.join_year = join_year
+    // ✅ Optional fields - only add if they have values
+    if (middle_name?.trim()) {
+      profileInsert.middle_name = capitalizeWords(middle_name.trim())
+    }
+    if (role === 'student' && studentClass) {
+      profileInsert.class = studentClass
+    }
+    if (admission_year) {
+      profileInsert.admission_year = admission_year
+    }
+    if (join_year) {
+      profileInsert.join_year = join_year
+    }
+    
+    // ✅ NEW FIELDS
+    if (admission_number?.trim()) {
+      profileInsert.admission_number = admission_number.trim()
+    }
+    if (gender) {
+      profileInsert.gender = gender
+    }
+    if (date_of_birth) {
+      profileInsert.date_of_birth = date_of_birth
+    }
+    if (next_term_begins) {
+      profileInsert.next_term_begins = next_term_begins
+    }
 
-    const { error: profileError } = await supabaseAdmin
+    console.log('💾 Profile insert data:', JSON.stringify(profileInsert, null, 2))
+
+    const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert(profileInsert)
+      .select()
+      .single()
     
     if (profileError) {
       console.error('❌ Profile insert failed:', profileError)
@@ -123,7 +181,7 @@ export async function POST(req: NextRequest) {
       }, { status: 500 })
     }
     
-    console.log('✅ Profile created')
+    console.log('✅ Profile created:', profile?.id, profile?.full_name, profile?.display_name)
     
     // Step 3: Insert into users table (optional)
     try {
@@ -135,6 +193,7 @@ export async function POST(req: NextRequest) {
           vin_id: vin_id,
           email: email,
           role: role,
+          admission_number: admission_number?.trim() || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -150,13 +209,19 @@ export async function POST(req: NextRequest) {
         id: userId, 
         email: email, 
         full_name: fullName,
+        display_name: displayName,
         vin_id: vin_id,
-        role: role
+        role: role,
+        admission_number: admission_number?.trim() || '',
+        gender: gender || null,
+        class: studentClass || null,
+        department: department || 'General',
       },
       credentials: {
         email: email,
         password: vin_id,
-        vin_id: vin_id
+        vin_id: vin_id,
+        admission_number: admission_number?.trim() || '',
       }
     })
     

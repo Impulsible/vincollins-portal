@@ -1,10 +1,11 @@
-// components/admin/students/hooks/useStudentPresence.ts
-
+// components/admin/students/hooks/useStudentPresence.ts - OPTIMIZED
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { PresenceEvent, PresenceStatus, Student } from '../types'
+import { Student } from '../types'
+
+type PresenceStatus = 'online' | 'away' | 'offline'
 
 interface UseStudentPresenceReturn {
   onlineStudents: Set<string>
@@ -19,50 +20,74 @@ interface UseStudentPresenceReturn {
 export function useStudentPresence(students: Student[]): UseStudentPresenceReturn {
   const [onlineStudents, setOnlineStudents] = useState<Set<string>>(new Set())
   const [awayStudents, setAwayStudents] = useState<Set<string>>(new Set())
-  const [studentLastSeen, setStudentLastSeen] = useState<Map<string, string>>(new Map())
+  const [lastSeenMap, setLastSeenMap] = useState<Map<string, string>>(new Map())
   const [isConnected, setIsConnected] = useState(false)
+  const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true
+    
     if (!students.length) return
 
-    const presenceChannel = supabase.channel('online-users', {
-      config: { presence: { key: 'admin-student-tracker' } },
-    })
+    const validStudentIds = new Set(students.map(s => s.id))
 
-    presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState()
+    const fetchStatus = async () => {
+      try {
+        // ✅ Add timeout to fetch
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000)
+
+        const { data, error } = await supabase
+          .from('user_online_status')
+          .select('*')
+          .abortSignal(controller.signal)
+
+        clearTimeout(timeout)
+
+        if (!mountedRef.current) return
+
+        if (error) {
+          // Silently ignore fetch errors
+          return
+        }
+
         const online = new Set<string>()
         const away = new Set<string>()
-        const lastSeenMap = new Map<string, string>()
+        const lastSeen = new Map<string, string>()
 
-        Object.values(state).forEach((presences: any) => {
-          presences.forEach((presence: PresenceEvent) => {
-            if (presence.user_id && presence.role === 'student') {
-              if (presence.status === 'online') {
-                online.add(presence.user_id)
-              } else if (presence.status === 'away') {
-                away.add(presence.user_id)
-              }
-              if (presence.last_seen) {
-                lastSeenMap.set(presence.user_id, presence.last_seen)
-              }
+        data?.forEach((record: any) => {
+          if (record.user_id && validStudentIds.has(record.user_id)) {
+            if (record.is_online) {
+              online.add(record.user_id)
+            } else {
+              away.add(record.user_id)
             }
-          })
+            if (record.last_seen) {
+              lastSeen.set(record.user_id, record.last_seen)
+            }
+          }
         })
 
         setOnlineStudents(online)
         setAwayStudents(away)
-        setStudentLastSeen(prev => new Map([...prev, ...lastSeenMap]))
+        setLastSeenMap(lastSeen)
         setIsConnected(true)
-      })
-      .subscribe()
+      } catch {
+        // Silently ignore errors - component might be unmounted
+      }
+    }
+
+    // Fetch immediately
+    fetchStatus()
+
+    // ✅ Poll every 30 seconds instead of 10 (reduces load)
+    const interval = setInterval(fetchStatus, 30000)
 
     return () => {
-      presenceChannel.unsubscribe()
-      setIsConnected(false)
+      mountedRef.current = false
+      clearInterval(interval)
     }
-  }, [students.length])
+  }, [students])
 
   const getStatus = useCallback(
     (studentId: string): PresenceStatus => {
@@ -75,9 +100,9 @@ export function useStudentPresence(students: Student[]): UseStudentPresenceRetur
 
   const getLastSeen = useCallback(
     (studentId: string): string => {
-      return studentLastSeen.get(studentId) || ''
+      return lastSeenMap.get(studentId) || ''
     },
-    [studentLastSeen]
+    [lastSeenMap]
   )
 
   return {

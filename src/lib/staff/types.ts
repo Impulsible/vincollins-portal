@@ -161,6 +161,7 @@ export interface Note {
 // STUDENT TYPES
 // ============================================
 export interface Student {
+  display_name: string
   id: string
   full_name: string
   vin_id: string

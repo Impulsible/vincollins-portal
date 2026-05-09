@@ -32,6 +32,7 @@ export default function StudentClassmatesPage() {
         return
       }
 
+      // ✅ Fetch all name fields including display_name
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -55,7 +56,8 @@ export default function StudentClassmatesPage() {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: profile.full_name,
+      // ✅ Use display_name for header
+      name: profile.display_name || profile.full_name,
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
