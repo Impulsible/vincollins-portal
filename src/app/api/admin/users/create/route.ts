@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         .join(' ')
     }
     
-    // Generate credentials
+    // ✅ Generate credentials - Email stays as firstname.lastname
     const sanitizedFirst = first_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15) || 'user'
     const sanitizedLast = last_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15) || 'account'
     const email = `${sanitizedFirst}.${sanitizedLast}@vincollins.edu.ng`
@@ -64,20 +64,15 @@ export async function POST(req: NextRequest) {
     const prefix = prefixes[role] || 'VIN-STD'
     const vin_id = `${prefix}-${year}-${randomNum}`
     
-    // ✅ Build full name: First [Middle] Last (e.g., "Laila Zainab Yusuf")
-    let fullName = first_name.trim()
+    // ✅ Build both full_name and display_name: "Last First Middle" (e.g., "Yusuf Laila Zainab")
+    let fullName = last_name.trim() + ' ' + first_name.trim()
     if (middle_name && middle_name.trim()) {
       fullName += ' ' + middle_name.trim()
     }
-    fullName += ' ' + last_name.trim()
     fullName = capitalizeWords(fullName)
     
-    // ✅ Build display name: Last First [Middle] (e.g., "Yusuf Laila Zainab")
-    let displayName = last_name.trim() + ' ' + first_name.trim()
-    if (middle_name && middle_name.trim()) {
-      displayName += ' ' + middle_name.trim()
-    }
-    displayName = capitalizeWords(displayName)
+    // ✅ display_name is the same as full_name (Surname First Other)
+    const displayName = fullName
     
     console.log('📧 Creating user:', { email, vin_id, fullName, displayName, role })
     console.log('📋 Additional fields:', { 
@@ -116,8 +111,8 @@ export async function POST(req: NextRequest) {
     const profileInsert: any = {
       id: userId,
       vin_id: vin_id,
-      full_name: fullName,
-      display_name: displayName,  // ✅ NOW: "Yusuf Laila Zainab" format
+      full_name: fullName,          // ✅ "Soga Esther Olamide" (Surname First Other)
+      display_name: displayName,    // ✅ "Soga Esther Olamide" (Same format)
       first_name: capitalizeWords(first_name.trim()),
       last_name: capitalizeWords(last_name.trim()),
       email: email,

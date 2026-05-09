@@ -1,6 +1,6 @@
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/profile/page.tsx - WORKING UPLOAD WITH FIXED RESPONSIVENESS
+// app/student/profile/page.tsx - UPDATED WITH DISPLAY NAME + ADMISSION NUMBER
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -20,7 +20,7 @@ import { Separator } from '@/components/ui/separator'
 import {
   User, Mail, Phone, MapPin, Calendar, GraduationCap, Shield,
   Camera, Loader2, Save, ChevronRight, Home, ArrowLeft,
-  CheckCircle2, AlertCircle
+  Hash, Fingerprint
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -30,8 +30,13 @@ import Link from 'next/link'
 interface StudentProfile {
   id: string
   full_name: string
+  display_name?: string
+  first_name?: string
+  middle_name?: string
+  last_name?: string
   email: string
   vin_id: string
+  admission_number?: string
   class: string
   department: string
   phone: string
@@ -117,20 +122,10 @@ export default function StudentProfilePage() {
         return
       }
 
-      const { data: userData } = await supabase
-        .from('users')
-        .select('vin_id')
-        .eq('id', session.user.id)
-        .maybeSingle()
-
       console.log('📸 Current photo_url:', profileData?.photo_url)
 
       if (profileData) {
-        const fullProfile: StudentProfile = {
-          ...profileData,
-          vin_id: userData?.vin_id || profileData.vin_id || 'N/A'
-        }
-        setProfile(fullProfile)
+        setProfile(profileData as StudentProfile)
         setEditForm({
           full_name: profileData.full_name || '',
           phone: profileData.phone || '',
@@ -143,11 +138,13 @@ export default function StudentProfilePage() {
           n.charAt(0).toUpperCase() + n.slice(1)
         ).join(' ')
         
-        const newProfile = {
+        const newProfile: StudentProfile = {
           id: session.user.id,
           full_name: formattedName,
+          display_name: formattedName,
           email: session.user.email || '',
-          vin_id: userData?.vin_id || 'N/A',
+          vin_id: 'N/A',
+          admission_number: '',
           class: 'Not Assigned',
           department: 'General',
           phone: '',
@@ -168,6 +165,7 @@ export default function StudentProfilePage() {
         await supabase.from('profiles').upsert({
           id: session.user.id,
           full_name: formattedName,
+          display_name: formattedName,
           email: session.user.email,
           role: 'student',
           class: 'Not Assigned',
@@ -300,21 +298,25 @@ export default function StudentProfilePage() {
     router.push('/portal')
   }
 
-  const getInitials = () => {
-    if (!profile?.full_name) return 'S'
-    const name = profile.full_name.trim()
-    const parts = name.split(/\s+/)
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    }
-    return name.slice(0, 2).toUpperCase()
+  // ✅ Get display name in "Surname First Other" format
+  const getDisplayName = (): string => {
+    if (!profile) return 'Student'
+    return profile.display_name || profile.full_name || 'Student'
+  }
+
+  // ✅ Get initials from display name
+  const getInitials = (): string => {
+    const name = getDisplayName()
+    const parts = name.trim().split(/\s+/)
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
   }
 
   const formatProfileForHeader = () => {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: profile.full_name,
+      name: getDisplayName(), // ✅ Use display name
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -337,6 +339,8 @@ export default function StudentProfilePage() {
       </>
     )
   }
+
+  const displayName = getDisplayName()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden w-full">
@@ -414,7 +418,7 @@ export default function StudentProfilePage() {
                           <Avatar className="h-24 w-24 sm:h-28 sm:w-28 lg:h-32 lg:w-32 ring-4 ring-white shadow-xl" key={avatarKey}>
                             <AvatarImage 
                               src={profile?.photo_url || undefined} 
-                              alt={profile?.full_name}
+                              alt={displayName}
                             />
                             <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white text-xl sm:text-2xl lg:text-3xl font-bold">
                               {getInitials()}
@@ -451,7 +455,7 @@ export default function StudentProfilePage() {
                       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                         <div className="space-y-1 min-w-0 flex-1">
                           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-900 break-words">
-                            {profile?.full_name}
+                            {displayName}
                           </h1>
                           <p className="text-muted-foreground flex items-center gap-1 text-sm sm:text-base break-all">
                             <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
@@ -463,9 +467,15 @@ export default function StudentProfilePage() {
                               {profile?.class}
                             </Badge>
                             <Badge variant="outline" className="font-mono text-xs sm:text-sm">
-                              <Shield className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                              <Fingerprint className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5" />
                               <span className="truncate">VIN: {profile?.vin_id}</span>
                             </Badge>
+                            {profile?.admission_number && (
+                              <Badge variant="outline" className="font-mono text-xs sm:text-sm bg-amber-50">
+                                <Hash className="mr-1 h-3 w-3 sm:h-3.5 sm:w-3.5 text-amber-600" />
+                                <span className="truncate text-amber-700">{profile.admission_number}</span>
+                              </Badge>
+                            )}
                           </div>
                         </div>
                         
@@ -583,6 +593,24 @@ export default function StudentProfilePage() {
                           
                           <Separator className="my-3 sm:my-4" />
                           
+                          {/* ✅ Admission Number + VIN ID */}
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                            <InfoCard 
+                              icon={Hash} 
+                              label="Admission Number" 
+                              value={profile?.admission_number || 'Not assigned'} 
+                              monospace 
+                            />
+                            <InfoCard 
+                              icon={Fingerprint} 
+                              label="VIN ID (Permanent)" 
+                              value={profile?.vin_id || '-'} 
+                              monospace 
+                            />
+                          </div>
+                          
+                          <Separator className="my-3 sm:my-4" />
+                          
                           <InfoCard icon={MapPin} label="Address" value={profile?.address || 'No address added yet.'} fullWidth />
                           
                           {profile?.bio && (
@@ -595,7 +623,11 @@ export default function StudentProfilePage() {
                           <Separator className="my-3 sm:my-4" />
                           
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                            <InfoCard icon={Shield} label="VIN ID (Permanent)" value={profile?.vin_id || '-'} monospace />
+                            <InfoCard 
+                              icon={GraduationCap} 
+                              label="Class" 
+                              value={profile?.class || '-'} 
+                            />
                             <InfoCard 
                               icon={Calendar} 
                               label="Member Since" 

@@ -1,4 +1,4 @@
-// app/student/page.tsx - OPTIMIZED STUDENT DASHBOARD
+ // app/student/page.tsx - Updated with CA scores integration
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -10,10 +10,7 @@ import { OverviewTab } from '@/components/student/OverviewTab'
 import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { BookOpen, Award, LayoutDashboard, RefreshCw } from 'lucide-react'
-
-const LOAD_TIMEOUT = 8000 // ✅ Max loading time
+import { BookOpen, Award, LayoutDashboard } from 'lucide-react'
 
 function calculateGrade(percentage: number): { grade: string; color: string } {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
@@ -28,161 +25,230 @@ export default function StudentDashboardPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
   const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState(false)
   const [profile, setProfile] = useState<any>(null)
   const [stats, setStats] = useState<any>({
-    availableExams: [], classmates: [], recentAttempts: [], allAssignments: [],
-    recentAssignments: [], allNotes: [], recentNotes: [],
-    passedExams: 0, failedExams: 0, completedExams: 0
+    availableExams: [],
+    classmates: [],
+    recentAttempts: [],
+    allAssignments: [],
+    recentAssignments: [],
+    allNotes: [],
+    recentNotes: [],
+    passedExams: 0,
+    failedExams: 0,
+    completedExams: 0
   })
   const [reportCardStatus, setReportCardStatus] = useState<any>(null)
   const [termProgress, setTermProgress] = useState<any>(null)
 
   const loadProfileAndData = useCallback(async () => {
-    setLoadError(false)
     try {
-      // ✅ Timeout for auth
-      const authTimeout = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Auth timeout')), 5000)
-      )
-
-      const sessionPromise = supabase.auth.getSession()
-      const result = await Promise.race([sessionPromise, authTimeout]) as any
-      let session = result?.data?.session
-
+      let { data: { session } } = await supabase.auth.getSession()
+      
       if (!session) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 2000))
         const retry = await supabase.auth.getSession()
         session = retry.data.session
+        if (!session) { router.push('/portal'); return }
       }
 
-      if (!session) { router.push('/portal'); return }
-
-      // ✅ Race all data fetches against timeout
-      const timeoutPromise = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('Data timeout')), LOAD_TIMEOUT)
-      )
-
-      const dataPromise = Promise.all([
-        supabase.from('profiles').select('*').eq('id', session.user.id).single(),
-        supabase.from('student_term_progress').select('*').eq('student_id', session.user.id).eq('term', 'third').eq('session_year', '2025/2026').maybeSingle(),
-        supabase.from('profiles').select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id').eq('class', '').eq('role', 'student').neq('id', session.user.id).limit(6),
-        supabase.from('exams').select('*').eq('status', 'published').limit(20),
-        supabase.from('exam_attempts').select('*').eq('student_id', session.user.id).order('created_at', { ascending: false }),
-        supabase.from('ca_scores').select('*').eq('student_id', session.user.id),
-        supabase.from('assignments').select('*').order('created_at', { ascending: false }).limit(10),
-        supabase.from('notes').select('*').order('created_at', { ascending: false }).limit(10)
-      ])
-
-      const results = await Promise.race([dataPromise, timeoutPromise.then(() => null)])
-
-      if (!results) {
-        setLoadError(true)
-        setLoading(false)
-        return
-      }
-
-      const [profileResult, progressResult, classmatesResult, examsResult, attemptsResult, caScoresResult, assignmentsResult, notesResult] = results as any
-
-      const profileData = profileResult?.data
-      if (!profileData) {
-        setLoading(false)
-        return
-      }
-
-      setProfile(profileData)
-      if (progressResult?.data) setTermProgress(progressResult.data)
-
-      // Get classmates with the correct class
-      const classmatesData = classmatesResult?.data || []
-      
-      // Re-fetch classmates with correct class
-      const { data: realClassmates } = await supabase
+      const { data: profileData } = await supabase
         .from('profiles')
-        .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
-        .eq('class', profileData.class)
-        .eq('role', 'student')
-        .neq('id', profileData.id)
-        .limit(6)
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
 
-      const exams = examsResult?.data || []
-      const attempts = attemptsResult?.data || []
-      const caScores = caScoresResult?.data || []
+      if (profileData) {
+        setProfile(profileData)
+        
+        // Load term progress
+        const { data: progress } = await supabase
+          .from('student_term_progress')
+          .select('*')
+          .eq('student_id', profileData.id)
+          .eq('term', 'third')
+          .eq('session_year', '2025/2026')
+          .maybeSingle()
+        
+        if (progress) setTermProgress(progress)
 
-      // Process data (same logic as before, just with safety checks)
-      const caScoresMap: Record<string, any> = {}
-      caScores?.forEach((ca: any) => { if (ca.exam_id) caScoresMap[ca.exam_id] = ca })
+        // Load classmates
+        const { data: classmates } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
+          .eq('class', profileData.class)
+          .eq('role', 'student')
+          .neq('id', profileData.id)
+          .limit(6)
 
-      const examIds = [...new Set((attempts || []).map((a: any) => a.exam_id))]
-      let examMap: Record<string, any> = {}
-      
-      if (examIds.length > 0) {
-        const { data: examDetails } = await supabase.from('exams').select('id, title, subject').in('id', examIds)
-        examDetails?.forEach((e: any) => { examMap[e.id] = e })
+        // Load exams
+        const { data: exams } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('status', 'published')
+          .eq('class', profileData.class)
+          .limit(20)
+
+        // Load exam attempts
+        const { data: attempts } = await supabase
+          .from('exam_attempts')
+          .select('*')
+          .eq('student_id', profileData.id)
+          .order('created_at', { ascending: false })
+
+        // Load CA scores for this student
+        const { data: caScores } = await supabase
+          .from('ca_scores')
+          .select('*')
+          .eq('student_id', profileData.id)
+
+        // Create CA scores map by exam_id
+        const caScoresMap: Record<string, any> = {}
+        caScores?.forEach((ca: any) => {
+          if (ca.exam_id) {
+            caScoresMap[ca.exam_id] = ca
+          }
+        })
+
+        // Get exam details for attempts
+        const examIds = [...new Set((attempts || []).map((a: any) => a.exam_id))]
+        let examMap: Record<string, any> = {}
+        
+        if (examIds.length > 0) {
+          const { data: examDetails } = await supabase
+            .from('exams')
+            .select('id, title, subject')
+            .in('id', examIds)
+          examDetails?.forEach((e: any) => { examMap[e.id] = e })
+        }
+
+        // Enrich attempts with exam info and CA scores
+        const enrichedAttempts = (attempts || []).map((a: any) => {
+          const caScore = caScoresMap[a.exam_id]
+          const examScore = Number(a.total_score) || 0
+          const ca1Score = caScore?.ca1_score ? Number(caScore.ca1_score) : 0
+          const ca2Score = caScore?.ca2_score ? Number(caScore.ca2_score) : 0
+          const grandTotal = ca1Score + ca2Score + examScore
+          const grandTotalMax = caScore ? 100 : 60
+          
+          let displayPercentage = a.percentage || 0
+          if (caScore && caScore.total_score) {
+            displayPercentage = Math.round((Number(caScore.total_score) / 100) * 100)
+          }
+          
+          return {
+            ...a,
+            exam_title: examMap[a.exam_id]?.title || 'Exam',
+            exam_subject: examMap[a.exam_id]?.subject || 'Unknown Subject',
+            ca_score: caScore || null,
+            grand_total: grandTotal,
+            grand_total_max: grandTotalMax,
+            display_percentage: displayPercentage,
+            has_ca: !!caScore
+          }
+        })
+
+        // All submitted attempts (for average calculation)
+        const allSubmitted = enrichedAttempts.filter((a: any) => {
+          if (['completed', 'pending_theory', 'graded'].includes(a.status)) return true
+          if (a.is_auto_submitted) {
+            if (a.auto_submit_reason?.toLowerCase().includes('time')) return true
+            const unloadCount = a.unload_count || 0
+            const tabSwitches = a.tab_switches || 0
+            const fullscreenExits = a.fullscreen_exits || 0
+            if (unloadCount >= 3 || tabSwitches >= 3 || fullscreenExits >= 3) return true
+            return false
+          }
+          return false
+        })
+        
+        // Truly completed (for term progress)
+        const trulyCompleted = allSubmitted.filter((a: any) => 
+          ['completed', 'graded'].includes(a.status) || 
+          (a.is_auto_submitted && a.auto_submit_reason?.toLowerCase().includes('time'))
+        )
+        
+        // Pending theory count
+        const pendingTheoryCount = enrichedAttempts.filter((a: any) => 
+          a.status === 'pending_theory'
+        ).length
+        
+        // Pass/Fail with CA scores considered
+        const passedExams = allSubmitted.filter((a: any) => {
+          if (a.has_ca && a.ca_score?.grade) {
+            return !['F9'].includes(a.ca_score.grade)
+          }
+          return a.is_passed === true || (a.percentage && a.percentage >= 50)
+        }).length
+        
+        const failedExams = allSubmitted.filter((a: any) => {
+          if (a.has_ca && a.ca_score?.grade) {
+            return a.ca_score.grade === 'F9'
+          }
+          return a.is_passed === false && a.percentage !== null && a.percentage < 50
+        }).length
+
+        // Average using CA scores when available, otherwise exam scores
+        const displayAvgScore = allSubmitted.length > 0
+          ? Math.round((allSubmitted.reduce((sum: number, a: any) => {
+              if (a.has_ca && a.ca_score?.total_score) {
+                return sum + Number(a.ca_score.total_score)
+              }
+              return sum + (a.percentage || 0)
+            }, 0) / allSubmitted.length) * 100) / 100
+          : 0
+
+        // True average from completed/graded (for term progress)
+        const trueAvgScore = trulyCompleted.length > 0
+          ? Math.round((trulyCompleted.reduce((sum: number, a: any) => {
+              if (a.has_ca && a.ca_score?.total_score) {
+                return sum + Number(a.ca_score.total_score)
+              }
+              return sum + (a.percentage || 0)
+            }, 0) / trulyCompleted.length) * 100) / 100
+          : 0
+
+        // Available exams (not yet submitted)
+        const completedAndGradedIds = allSubmitted.map((a: any) => a.exam_id)
+        const availableExams = (exams || []).filter((e: any) => !completedAndGradedIds.includes(e.id))
+
+        // Load assignments and notes
+        const { data: assignments } = await supabase
+          .from('assignments')
+          .select('*')
+          .eq('class', profileData.class)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        const { data: notes } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('class', profileData.class)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        setStats({
+          availableExams,
+          classmates: classmates || [],
+          recentAttempts: enrichedAttempts.slice(0, 10),
+          allAttempts: enrichedAttempts,
+          allAssignments: assignments || [],
+          recentAssignments: assignments?.slice(0, 5) || [],
+          allNotes: notes || [],
+          recentNotes: notes?.slice(0, 5) || [],
+          passedExams,
+          failedExams,
+          completedExams: allSubmitted.length,
+          trulyCompletedCount: trulyCompleted.length,
+          averageScore: displayAvgScore,
+          trueAverageScore: trueAvgScore,
+          pendingTheoryCount,
+          caScoresCount: caScores?.length || 0,
+          subjectsWithCA: [...new Set(caScores?.map((ca: any) => ca.subject) || [])],
+        })
       }
-
-      const enrichedAttempts = (attempts || []).map((a: any) => {
-        const caScore = caScoresMap[a.exam_id]
-        const examScore = Number(a.total_score) || 0
-        const ca1Score = caScore?.ca1_score ? Number(caScore.ca1_score) : 0
-        const ca2Score = caScore?.ca2_score ? Number(caScore.ca2_score) : 0
-        const grandTotal = ca1Score + ca2Score + examScore
-        
-        let displayPercentage = a.percentage || 0
-        if (caScore && caScore.total_score) {
-          displayPercentage = Math.round((Number(caScore.total_score) / 100) * 100)
-        }
-        
-        return {
-          ...a,
-          exam_title: examMap[a.exam_id]?.title || 'Exam',
-          exam_subject: examMap[a.exam_id]?.subject || 'Unknown Subject',
-          ca_score: caScore || null,
-          grand_total: grandTotal,
-          display_percentage: displayPercentage,
-          has_ca: !!caScore
-        }
-      })
-
-      const allSubmitted = enrichedAttempts.filter((a: any) => 
-        ['completed', 'pending_theory', 'graded'].includes(a.status) ||
-        (a.is_auto_submitted && a.auto_submit_reason?.toLowerCase().includes('time'))
-      )
-
-      const passedExams = allSubmitted.filter((a: any) => 
-        a.has_ca && a.ca_score?.grade ? !['F9'].includes(a.ca_score.grade) : (a.is_passed === true || (a.percentage && a.percentage >= 50))
-      ).length
-
-      const failedExams = allSubmitted.filter((a: any) => 
-        a.has_ca && a.ca_score?.grade ? a.ca_score.grade === 'F9' : (a.is_passed === false && a.percentage !== null && a.percentage < 50)
-      ).length
-
-      const displayAvgScore = allSubmitted.length > 0
-        ? Math.round(allSubmitted.reduce((sum: number, a: any) => 
-            sum + (a.has_ca && a.ca_score?.total_score ? Number(a.ca_score.total_score) : (a.percentage || 0)), 0) / allSubmitted.length)
-        : 0
-
-      const completedAndGradedIds = allSubmitted.map((a: any) => a.exam_id)
-      const availableExams = exams.filter((e: any) => !completedAndGradedIds.includes(e.id))
-
-      setStats({
-        availableExams,
-        classmates: realClassmates || classmatesData,
-        recentAttempts: enrichedAttempts.slice(0, 10),
-        allAttempts: enrichedAttempts,
-        allAssignments: assignmentsResult?.data || [],
-        recentAssignments: (assignmentsResult?.data || []).slice(0, 5),
-        allNotes: notesResult?.data || [],
-        recentNotes: (notesResult?.data || []).slice(0, 5),
-        passedExams, failedExams,
-        completedExams: allSubmitted.length,
-        averageScore: displayAvgScore,
-        pendingTheoryCount: enrichedAttempts.filter((a: any) => a.status === 'pending_theory').length,
-        caScoresCount: caScores?.length || 0,
-        subjectsWithCA: [...new Set(caScores?.map((ca: any) => ca.subject) || [])],
-      })
-    } catch {
-      setLoadError(true)
+    } catch (error) {
+      console.error('Error loading data:', error)
     } finally {
       setLoading(false)
     }
@@ -190,23 +256,23 @@ export default function StudentDashboardPage() {
 
   useEffect(() => { loadProfileAndData() }, [loadProfileAndData])
 
-  // ✅ Only reload on focus if not just loaded
-  const lastLoadRef = useState(0)
   useEffect(() => {
-    const handleFocus = () => {
-      const now = Date.now()
-      if (now - lastLoadRef[0] > 30000) { // Only reload if 30s since last load
-        lastLoadRef[0] = now
-        loadProfileAndData()
-      }
-    }
+    const handleFocus = () => loadProfileAndData()
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [loadProfileAndData, lastLoadRef])
+  }, [loadProfileAndData])
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadProfileAndData()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [loadProfileAndData])
 
   const handleLogout = async () => {
-    window.location.href = '/portal' // ✅ Instant redirect
-    supabase.auth.signOut().catch(() => {})
+    await supabase.auth.signOut()
+    router.push('/portal')
   }
 
   const formatProfileForHeader = () => {
@@ -229,17 +295,25 @@ export default function StudentDashboardPage() {
   const currentGrade = gradeInfo.grade
   const pendingTheoryCount = stats.pendingTheoryCount || 0
 
-  // ✅ Loading with timeout
-  if (loading && !loadError) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
         <Header onLogout={handleLogout} />
         <div className="flex w-full">
           <div className="hidden lg:block">
-            <StudentSidebar profile={null} onLogout={handleLogout} collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab={activeSection} setActiveTab={setActiveSection} />
+            <StudentSidebar
+              profile={null}
+              onLogout={handleLogout}
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+              activeTab={activeSection}
+              setActiveTab={setActiveSection}
+            />
           </div>
-          <div className={cn("flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
+          <div className={cn(
+            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]",
+            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+          )}>
             <div className="text-center px-4">
               <div className="relative mx-auto mb-6 h-16 w-16">
                 <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
@@ -249,24 +323,6 @@ export default function StudentDashboardPage() {
               <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Dashboard</h2>
               <p className="text-sm text-slate-500">Please wait while we load your dashboard...</p>
             </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  // ✅ Error state
-  if (loadError && !profile) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <Header onLogout={handleLogout} />
-        <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center">
-            <LayoutDashboard className="h-16 w-16 text-slate-400 mx-auto" />
-            <p className="mt-4 text-slate-600 text-lg font-medium">Failed to load dashboard</p>
-            <Button onClick={loadProfileAndData} className="mt-4">
-              <RefreshCw className="mr-2 h-4 w-4" /> Retry
-            </Button>
           </div>
         </div>
       </div>
@@ -314,6 +370,24 @@ export default function StudentDashboardPage() {
                   handleTabChange={setActiveSection}
                   router={router}
                 />
+              )}
+              {activeSection === 'exams' && (
+                <Card className="border-0 shadow-sm mt-2">
+                  <CardContent className="py-12 text-center">
+                    <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-semibold mb-2">My Exams</h3>
+                    <p className="text-sm text-slate-500">Go to Exams tab to view your exams</p>
+                  </CardContent>
+                </Card>
+              )}
+              {activeSection === 'results' && (
+                <Card className="border-0 shadow-sm mt-2">
+                  <CardContent className="py-12 text-center">
+                    <Award className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-semibold mb-2">My Results</h3>
+                    <p className="text-sm text-slate-500">Go to Results tab to view your results</p>
+                  </CardContent>
+                </Card>
               )}
               {activeSection === 'classmates' && (
                 <ClassmatesTab profile={profile} stats={stats} handleTabChange={setActiveSection} router={router} />

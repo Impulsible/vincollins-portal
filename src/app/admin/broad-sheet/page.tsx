@@ -73,7 +73,7 @@ const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
   'Agricultural Science', 'Home Economics', 'PHE', 'CRS',
-  'French', 'Yoruba', 'Fine Arts', 'Music', 'Security Education'
+  'French', 'Yoruba', 'CCA', 'Music', 'Security Education'
 ]
 
 const SS_SUBJECTS_SCIENCE = [

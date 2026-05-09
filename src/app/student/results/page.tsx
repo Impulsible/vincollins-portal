@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/results/page.tsx - FULLY SYNCED WITH EXAM SCORES
+// app/student/results/page.tsx - FULLY SYNCED WITH EXAM SCORES (FIXED)
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -58,7 +58,9 @@ interface ExamResult {
   total_score: number
   total_marks: number
   objective_score?: number
+  objective_total?: number
   theory_score?: number
+  theory_total?: number
   is_passed: boolean
   started_at: string
   completed_at?: string
@@ -116,6 +118,67 @@ const getGradeFromPercentage = (percentage: number): string => {
 const formatDate = (dateString?: string) => {
   if (!dateString) return 'N/A'
   return format(new Date(dateString), 'MMM dd, yyyy • hh:mm a')
+}
+
+// ============================================
+// SCORE NORMALIZATION HELPER
+// ============================================
+const normalizeScores = (attempt: any, exam: any) => {
+  const attemptTotalMarks = Number(attempt.total_marks) || 0
+  const examTotalMarks = Number(exam?.total_marks) || 0
+  const rawScore = Number(attempt.total_score) || 0
+  const rawObjectiveScore = Number(attempt.objective_score) || 0
+  const rawObjectiveTotal = Number(attempt.objective_total) || 0
+  const rawTheoryTotal = Number(attempt.theory_total) || 0
+
+  let displayScore: number
+  let displayTotalMarks: number
+  let displayObjectiveScore: number
+  let displayObjectiveTotal: number
+  let displayTheoryScore: number
+  let displayTheoryTotal: number
+
+  // Normalize total score
+  if (attemptTotalMarks > 0) {
+    // Attempt already has normalized values (100-based)
+    displayScore = rawScore
+    displayTotalMarks = attemptTotalMarks
+  } else if (examTotalMarks > 0 && examTotalMarks !== 100) {
+    // Normalize from exam scale to 100
+    displayScore = (rawScore / examTotalMarks) * 100
+    displayTotalMarks = 100
+  } else {
+    // Default fallback
+    displayScore = rawScore
+    displayTotalMarks = 100
+  }
+
+  // Normalize objective score
+  if (rawObjectiveTotal > 0 && rawObjectiveTotal !== 100) {
+    displayObjectiveScore = (rawObjectiveScore / rawObjectiveTotal) * 100
+    displayObjectiveTotal = 100
+  } else {
+    displayObjectiveScore = rawObjectiveScore
+    displayObjectiveTotal = rawObjectiveTotal || 100
+  }
+
+  // Normalize theory score
+  if (rawTheoryTotal > 0 && rawTheoryTotal !== 100) {
+    displayTheoryScore = 0 // Theory score comes from theory_answers, not stored directly
+    displayTheoryTotal = 100
+  } else {
+    displayTheoryScore = 0
+    displayTheoryTotal = rawTheoryTotal || 100
+  }
+
+  return {
+    displayScore: Math.round(displayScore * 10) / 10,
+    displayTotalMarks,
+    displayObjectiveScore: Math.round(displayObjectiveScore * 10) / 10,
+    displayObjectiveTotal,
+    displayTheoryScore: Math.round(displayTheoryScore * 10) / 10,
+    displayTheoryTotal,
+  }
 }
 
 // ============================================
@@ -207,7 +270,7 @@ export default function StudentResultsPage() {
   }, [router])
 
   // ============================================
-  // LOAD RESULTS - FIXED SYNC
+  // LOAD RESULTS - FIXED SCORE NORMALIZATION
   // ============================================
   const loadResults = useCallback(async () => {
     if (!profile?.id) return
@@ -269,7 +332,7 @@ export default function StudentResultsPage() {
         })
       }
 
-      // THIRD: Process and combine the data
+      // THIRD: Process and combine the data with score normalization
       const completedResults: ExamResult[] = []
       const subjects: string[] = []
       const subjectScores: Record<string, number[]> = {}
@@ -286,9 +349,13 @@ export default function StudentResultsPage() {
         
         // Include completed, graded, and pending_theory statuses
         if (attempt.status === 'completed' || attempt.status === 'graded' || attempt.status === 'pending_theory') {
-          const percentage = attempt.percentage || 0
+          // Use percentage_score if available, otherwise calculate from percentage
+          const percentage = Number(attempt.percentage_score || attempt.percentage) || 0
           const passingScore = exam?.passing_percentage || 50
           const isPassed = attempt.is_passed || percentage >= passingScore
+          
+          // Normalize scores
+          const normalized = normalizeScores(attempt, exam)
           
           const result: ExamResult = {
             id: attempt.id,
@@ -297,10 +364,12 @@ export default function StudentResultsPage() {
             exam_subject: exam?.subject || 'Unknown Subject',
             status: attempt.status,
             percentage: percentage,
-            total_score: attempt.total_score || 0,
-            total_marks: exam?.total_marks || attempt.total_marks || 100,
-            objective_score: attempt.objective_score,
-            theory_score: attempt.theory_score,
+            total_score: normalized.displayScore,
+            total_marks: normalized.displayTotalMarks,
+            objective_score: normalized.displayObjectiveScore,
+            objective_total: normalized.displayObjectiveTotal,
+            theory_score: normalized.displayTheoryScore,
+            theory_total: normalized.displayTheoryTotal,
             is_passed: isPassed,
             started_at: attempt.started_at || attempt.created_at,
             completed_at: attempt.submitted_at || attempt.completed_at,
@@ -396,7 +465,7 @@ export default function StudentResultsPage() {
       .on(
         'postgres_changes',
         {
-          event: '*', // Listen to INSERT and UPDATE
+          event: '*',
           schema: 'public',
           table: 'exam_attempts',
           filter: `student_id=eq.${profile.id}`
@@ -481,7 +550,7 @@ export default function StudentResultsPage() {
       ...filteredResults.map(r => [
         r.exam_title,
         r.exam_subject,
-        `${r.total_score}/${r.total_marks}`,
+        `${r.total_score.toFixed(1)}/${r.total_marks}`,
         `${r.percentage}%`,
         getGradeFromPercentage(r.percentage),
         r.is_passed ? 'Passed' : 'Failed',
@@ -861,6 +930,17 @@ export default function StudentResultsPage() {
                                         </Badge>
                                       )}
                                     </div>
+                                    {/* Score breakdown */}
+                                    {(result.objective_score !== undefined || result.theory_score !== undefined) && (
+                                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] sm:text-xs text-slate-500">
+                                        {result.objective_score !== undefined && result.objective_total !== undefined && (
+                                          <span>Objective: {result.objective_score.toFixed(1)}/{result.objective_total}</span>
+                                        )}
+                                        {result.theory_score !== undefined && result.theory_total !== undefined && (
+                                          <span>Theory: {result.theory_score.toFixed(1)}/{result.theory_total}</span>
+                                        )}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -884,7 +964,7 @@ export default function StudentResultsPage() {
                                     </Badge>
                                   </div>
                                   <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
-                                    Score: {result.total_score}/{result.total_marks}
+                                    Score: {result.total_score.toFixed(1)}/{result.total_marks}
                                   </p>
                                 </div>
                                 
