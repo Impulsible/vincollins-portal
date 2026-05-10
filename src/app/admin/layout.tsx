@@ -1,4 +1,4 @@
-// app/admin/layout.tsx - SIDEBAR + HEADER FOR ALL ADMIN PAGES
+// app/admin/layout.tsx - FIXED
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -7,12 +7,12 @@ import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
-import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
 interface AdminProfile {
   id: string
   full_name?: string
+  display_name?: string
   name?: string
   email?: string
   photo_url?: string
@@ -29,6 +29,8 @@ const routeToTabMap: Record<string, string> = {
   '/admin/report-cards': 'report-cards',
   '/admin/inquiries': 'inquiries',
   '/admin/monitor': 'cbt-monitor',
+  '/admin/settings': 'settings',
+  '/admin/help': 'help',
 }
 
 const tabToRouteMap: Record<string, string> = {
@@ -40,6 +42,8 @@ const tabToRouteMap: Record<string, string> = {
   'report-cards': '/admin/report-cards',
   'inquiries': '/admin/inquiries',
   'cbt-monitor': '/admin/monitor',
+  'settings': '/admin/settings',
+  'help': '/admin/help',
 }
 
 const getTabFromPathname = (pathname: string): string => {
@@ -54,7 +58,7 @@ function formatProfileForHeader(profile: AdminProfile | null) {
   if (!profile) return undefined
   return {
     id: profile.id,
-    name: profile.full_name || profile.name || 'Administrator',
+    name: profile.display_name || profile.full_name || profile.name || 'Administrator',
     email: profile.email || '',
     role: profile.role === 'staff' ? 'teacher' as const : 'admin' as const,
     avatar: profile.photo_url || profile.avatar_url,
@@ -65,7 +69,7 @@ function formatProfileForHeader(profile: AdminProfile | null) {
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
-  const [activeTab, setActiveTab] = useState('overview')
+  const [activeTab, setActiveTab] = useState(() => getTabFromPathname(pathname || '/admin'))
   const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [notificationCount, setNotificationCount] = useState(0)
@@ -73,10 +77,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingInquiries, setPendingInquiries] = useState(0)
 
-  // Sync active tab with pathname
-  useEffect(() => {
-    setActiveTab(getTabFromPathname(pathname || '/admin'))
-  }, [pathname])
+  // ✅ REMOVED sync effect - was overriding sidebar clicks
 
   // Load profile and counts
   useEffect(() => {
@@ -89,22 +90,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       const { data } = await supabase
         .from('profiles')
-        .select('*')
+        .select('id, full_name, display_name, name, email, photo_url, avatar_url, role')
         .eq('id', session.user.id)
         .single()
       if (data) setProfile(data)
 
-      // Load counts silently
       try {
         const { count: n } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('read', false)
         if (n) setNotificationCount(n)
-
         const { count: e } = await supabase.from('exams').select('*', { count: 'exact', head: true }).eq('status', 'pending')
         if (e) setPendingExamsCount(e)
-
         const { count: r } = await supabase.from('report_cards').select('*', { count: 'exact', head: true }).eq('status', 'pending')
         if (r) setPendingReports(r)
-
         const { count: i } = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', 'pending')
         if (i) setPendingInquiries(i)
       } catch { /* silent */ }
@@ -120,10 +117,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut({ scope: 'local' })
-    toast.success('Logged out successfully')
-    router.push('/portal')
+  const handleLogout = () => {
+    window.location.href = '/portal'
+    supabase.auth.signOut({ scope: 'local' }).catch(() => {})
   }
 
   return (
@@ -131,7 +127,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
 
       <div className="flex overflow-x-hidden">
-        {/* Sidebar - desktop only */}
         <div className="hidden lg:block flex-shrink-0">
           <AdminSidebar
             profile={profile}
@@ -146,7 +141,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           />
         </div>
 
-        {/* Page Content */}
         <main className={cn(
           "flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300 overflow-x-hidden",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
@@ -157,7 +151,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </main>
       </div>
 
-      {/* Mobile Nav */}
       <MobileBottomNav
         role="admin"
         activeTab={activeTab}

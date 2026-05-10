@@ -1,4 +1,4 @@
-// components/admin/AdminSidebar.tsx - FULL FIX: SCROLLS TO TOP, PROPER SPACING
+// components/admin/AdminSidebar.tsx - FULL FIXED (NO SYNC OVERRIDE)
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -54,23 +54,26 @@ export function AdminSidebar({
 
   useEffect(() => { setMounted(true) }, [])
 
-  const getTabFromPathname = (path: string): string => {
-    if (!path) return 'overview'
-    if (path === '/admin') return 'overview'
-    if (path.startsWith('/admin/broad-sheet')) return 'broad-sheet'
-    if (path.startsWith('/admin/students')) return 'students'
-    if (path.startsWith('/admin/staff')) return 'staff'
-    if (path.startsWith('/admin/exams')) return 'exams'
-    if (path.startsWith('/admin/report-cards')) return 'report-cards'
-    if (path.startsWith('/admin/inquiries')) return 'inquiries'
-    if (path.startsWith('/admin/monitor')) return 'cbt-monitor'
-    return 'overview'
-  }
-
+  // ✅ Set initial tab from URL on first load only
   useEffect(() => {
-    const tabForCurrentRoute = getTabFromPathname(pathname)
-    if (tabForCurrentRoute !== activeTab) setActiveTab(tabForCurrentRoute)
-  }, [pathname])
+    const getTabFromPathname = (path: string): string => {
+      if (!path) return 'overview'
+      if (path === '/admin') return 'overview'
+      if (path === '/admin/settings') return 'settings'
+      if (path === '/admin/help') return 'help'
+      if (path.startsWith('/admin/broad-sheet')) return 'broad-sheet'
+      if (path.startsWith('/admin/students')) return 'students'
+      if (path.startsWith('/admin/staff')) return 'staff'
+      if (path.startsWith('/admin/exams')) return 'exams'
+      if (path.startsWith('/admin/report-cards')) return 'report-cards'
+      if (path.startsWith('/admin/inquiries')) return 'inquiries'
+      if (path.startsWith('/admin/monitor')) return 'cbt-monitor'
+      return 'overview'
+    }
+    
+    const tab = getTabFromPathname(pathname || '/admin')
+    setActiveTab(tab)
+  }, []) // ✅ Only runs once on mount
 
   const primaryNavigation: NavigationItem[] = [
     { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', routePatterns: ['/admin'] },
@@ -85,21 +88,26 @@ export function AdminSidebar({
 
   const secondaryNavigation: NavigationItem[] = [
     { id: 'settings', name: 'Settings', icon: Settings, description: 'Preferences', routePatterns: ['/admin/settings'] },
-    { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance' },
+    { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance', routePatterns: ['/admin/help'] },
   ]
 
-  const displayName = profile?.full_name || 'Administrator'
-  const firstName = displayName.split(' ')[0]
+  const displayName = profile?.display_name || profile?.full_name || 'Administrator'
+  const firstName = displayName.split(' ').length >= 2 ? displayName.split(' ')[1] : displayName.split(' ')[0]
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
 
   const handleLogoutClick = () => setShowSignOutConfirm(true)
-  const confirmSignOut = () => { setShowSignOutConfirm(false); onLogout() }
+  const confirmSignOut = () => { 
+    setShowSignOutConfirm(false)
+    window.location.href = '/portal'
+    onLogout()
+  }
 
+  // ✅ Simple navigation - set tab and push route
   const handleNavClick = (tabId: string, routePatterns?: string[]) => {
     setActiveTab(tabId)
     if (routePatterns && routePatterns.length > 0) {
       const targetRoute = routePatterns[0]
-      if (pathname !== targetRoute && !pathname?.startsWith(targetRoute + '/')) {
+      if (pathname !== targetRoute) {
         router.push(targetRoute)
       }
     }
@@ -130,9 +138,7 @@ export function AdminSidebar({
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium block">{item.name}</span>
               {item.badge && item.badge > 0 && (
-                <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 animate-pulse">
-                  {item.badge}
-                </Badge>
+                <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 animate-pulse">{item.badge}</Badge>
               )}
             </div>
             <span className={cn(
@@ -149,9 +155,7 @@ export function AdminSidebar({
         )}
         
         {collapsed && item.badge && item.badge > 0 && (
-          <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">
-            {item.badge}
-          </div>
+          <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">{item.badge}</div>
         )}
       </button>
     )
@@ -165,9 +169,7 @@ export function AdminSidebar({
               <p className="font-medium">{item.name}</p>
               <p className="text-xs text-slate-400">{item.description}</p>
               {item.badge && item.badge > 0 && (
-                <Badge className="mt-1 bg-red-500 text-white text-[9px]">
-                  {item.badge} pending
-                </Badge>
+                <Badge className="mt-1 bg-red-500 text-white text-[9px]">{item.badge} pending</Badge>
               )}
             </div>
           </TooltipContent>
@@ -186,13 +188,11 @@ export function AdminSidebar({
         collapsed ? "w-20" : "w-72"
       )}>
         <TooltipProvider delayDuration={0}>
-          {/* ✅ EVERYTHING scrolls together including profile */}
           <ScrollArea className="h-full">
             {!mounted ? (
               <div className="flex-1" />
             ) : (
               <div className="flex flex-col h-full">
-                {/* Profile Section */}
                 <div className={cn(
                   "shrink-0 border-b border-slate-200 dark:border-slate-800",
                   "bg-gradient-to-b from-purple-50/50 via-white to-transparent dark:from-purple-950/20 dark:via-slate-900",
@@ -203,9 +203,7 @@ export function AdminSidebar({
                       <TooltipTrigger asChild>
                         <Avatar className="h-12 w-12 ring-2 ring-white shadow-xl cursor-pointer">
                           <AvatarImage src={profile?.photo_url} />
-                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">
-                            {initials}
-                          </AvatarFallback>
+                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">{initials}</AvatarFallback>
                         </Avatar>
                       </TooltipTrigger>
                       <TooltipContent side="right">
@@ -218,73 +216,50 @@ export function AdminSidebar({
                       <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 ring-3 ring-white shadow-xl">
                           <AvatarImage src={profile?.photo_url} />
-                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-xl">
-                            {initials}
-                          </AvatarFallback>
+                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-xl">{initials}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wide">
-                            Welcome back,
-                          </p>
-                          <h3 className="font-bold text-slate-900 dark:text-white text-lg truncate">
-                            {firstName}!
-                          </h3>
+                          <p className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wide">Welcome back,</p>
+                          <h3 className="font-bold text-slate-900 dark:text-white text-lg truncate">{firstName}!</h3>
                         </div>
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{profile?.email}</p>
-                        <Badge className="mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-                          Administrator
-                        </Badge>
+                        <Badge className="mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">Administrator</Badge>
                       </div>
                     </div>
                   )}
                 </div>
 
-                {/* Primary Navigation */}
                 <div className="px-3 py-3 space-y-1">
                   {!collapsed && (
-                    <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                      Main
-                    </p>
+                    <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Main</p>
                   )}
                   {primaryNavigation.map(renderNavItem)}
                 </div>
 
                 {!collapsed && <Separator className="mx-3 my-2" />}
 
-                {/* Secondary Navigation */}
                 <div className="px-3 py-3 space-y-1">
                   {!collapsed && (
-                    <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                      Account
-                    </p>
+                    <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Account</p>
                   )}
                   {secondaryNavigation.map(renderNavItem)}
                 </div>
 
-                {/* Sign Out */}
                 <div className="shrink-0 p-3 mt-2 border-t border-slate-200 dark:border-slate-800">
                   {collapsed ? (
                     <Tooltip delayDuration={0}>
                       <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          onClick={handleLogoutClick}
-                          className="w-full justify-center px-2 text-red-600 hover:bg-red-50"
-                        >
+                        <Button variant="ghost" onClick={handleLogoutClick} className="w-full justify-center px-2 text-red-600 hover:bg-red-50">
                           <LogOut className="h-4 w-4 shrink-0" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">Sign Out</TooltipContent>
                     </Tooltip>
                   ) : (
-                    <Button
-                      variant="ghost"
-                      onClick={handleLogoutClick}
-                      className="w-full justify-start text-red-600 hover:bg-red-50"
-                    >
+                    <Button variant="ghost" onClick={handleLogoutClick} className="w-full justify-start text-red-600 hover:bg-red-50">
                       <div className="flex items-center gap-3">
                         <div className="h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center">
                           <LogOut className="h-4 w-4 shrink-0" />
@@ -298,36 +273,26 @@ export function AdminSidebar({
                   )}
                 </div>
 
-                {/* Extra bottom space */}
                 <div className="h-4" />
               </div>
             )}
           </ScrollArea>
         </TooltipProvider>
 
-        {/* Collapse Toggle */}
-        <button 
-          onClick={onToggle} 
-          className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border rounded-full p-1.5 shadow-md hover:shadow-lg transition-all z-50"
-        >
+        <button onClick={onToggle} className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border rounded-full p-1.5 shadow-md hover:shadow-lg transition-all z-50">
           {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>
       </aside>
 
-      {/* Sign Out Dialog */}
       <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Sign Out?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to sign out of your account?
-            </AlertDialogDescription>
+            <AlertDialogDescription>Are you sure you want to sign out of your account?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSignOut} className="bg-red-600 hover:bg-red-700">
-              Sign Out
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmSignOut} className="bg-red-600 hover:bg-red-700">Sign Out</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

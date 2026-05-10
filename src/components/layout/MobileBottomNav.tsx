@@ -1,4 +1,4 @@
-// components/layout/MobileBottomNav.tsx - STATS REMOVED + SIGN OUT DIALOG
+// components/layout/MobileBottomNav.tsx - UPDATED ADMIN NAV
 'use client'
 
 import { useState } from 'react'
@@ -9,26 +9,15 @@ import {
   Calendar, Bell, Settings, HelpCircle, LogOut,
   TrendingUp, FileText, GraduationCap, X,
   LayoutDashboard, Users, MonitorPlay, BarChart3,
-  Shield, KeyRound, CreditCard, School
+  Shield, KeyRound, CreditCard, School, FileSpreadsheet, Activity
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetClose,
-  SheetTrigger,
+  Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose, SheetTrigger,
 } from '@/components/ui/sheet'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -44,6 +33,7 @@ interface MobileBottomNavProps {
   onTabChange: (tab: string) => void
   profile?: {
     full_name?: string
+    display_name?: string
     name?: string
     email?: string
     photo_url?: string | null
@@ -78,17 +68,16 @@ const allNavItems: NavItem[] = [
   { id: 'staff-students', label: 'Students', icon: Users, route: '/staff/students', roles: ['staff'] },
   { id: 'staff-profile', label: 'Profile', icon: User, route: '/staff/profile', roles: ['staff'] },
   
-  // Admin Navigation
+  // ✅ Admin Navigation - UPDATED: Broad Sheet & Monitor instead of Users & Settings
   { id: 'admin-overview', label: 'Home', icon: Home, route: '/admin', roles: ['admin'] },
   { id: 'admin-exams', label: 'Exams', icon: MonitorPlay, route: '/admin/exams', roles: ['admin'] },
-  { id: 'admin-users', label: 'Users', icon: Users, route: '/admin/users', roles: ['admin'] },
-  { id: 'admin-settings', label: 'Settings', icon: Settings, route: '/admin/settings', roles: ['admin'] },
+  { id: 'admin-broad-sheet', label: 'Broad Sheet', icon: FileSpreadsheet, route: '/admin/broad-sheet', roles: ['admin'] },
+  { id: 'admin-monitor', label: 'Monitor', icon: Activity, route: '/admin/monitor', roles: ['admin'] },
 ]
 
 // More menu items with role-based access
-// ✅ ATTENDANCE AND PERFORMANCE REMOVED FOR STUDENTS
 const moreMenuItems: NavItem[] = [
-  // Student More Items (attendance and performance removed)
+  // Student More Items
   { id: 'assignments', label: 'Assignments', icon: FileText, route: '/student/assignments', roles: ['student'] },
   { id: 'courses', label: 'Courses', icon: School, route: '/student/courses', roles: ['student'] },
   { id: 'notifications', label: 'Notifications', icon: Bell, route: '/student/notifications', roles: ['student'] },
@@ -104,13 +93,13 @@ const moreMenuItems: NavItem[] = [
   { id: 'staff-settings', label: 'Settings', icon: Settings, route: '/staff/settings', roles: ['staff'] },
   { id: 'staff-help', label: 'Help', icon: HelpCircle, route: '/staff/help', roles: ['staff'] },
   
-  // Admin More Items
-  { id: 'admin-reports', label: 'Reports', icon: BarChart3, route: '/admin/reports', roles: ['admin'] },
-  { id: 'admin-approvals', label: 'Approvals', icon: Shield, route: '/admin/approvals', roles: ['admin'] },
-  { id: 'admin-report-cards', label: 'Report Cards', icon: Award, route: '/admin/report-cards', roles: ['admin'] },
+  // ✅ Admin More Items - UPDATED
+  { id: 'admin-students', label: 'Students', icon: GraduationCap, route: '/admin/students', roles: ['admin'] },
+  { id: 'admin-staff', label: 'Staff', icon: Users, route: '/admin/staff', roles: ['admin'] },
+  { id: 'admin-reports', label: 'Report Cards', icon: FileText, route: '/admin/report-cards', roles: ['admin'] },
+  { id: 'admin-inquiries', label: 'Inquiries', icon: HelpCircle, route: '/admin/inquiries', roles: ['admin'] },
   { id: 'admin-notifications', label: 'Notifications', icon: Bell, route: '/admin/notifications', roles: ['admin'] },
-  { id: 'admin-billing', label: 'Billing', icon: CreditCard, route: '/admin/billing', roles: ['admin'] },
-  { id: 'admin-help', label: 'Help', icon: HelpCircle, route: '/admin/help', roles: ['admin'] },
+  { id: 'admin-settings', label: 'Settings', icon: Settings, route: '/admin/settings', roles: ['admin'] },
 ]
 
 const formatDisplayName = (name?: string): string => {
@@ -138,19 +127,13 @@ const getRoleDisplayName = (role: UserRole): string => {
 }
 
 export function MobileBottomNav({
-  role,
-  activeTab,
-  onTabChange,
-  profile,
-  onLogout,
-  notificationCount = 0
+  role, activeTab, onTabChange, profile, onLogout, notificationCount = 0
 }: MobileBottomNavProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
-  // Filter nav items based on role
   const mainItems = allNavItems.filter(item => item.roles.includes(role)).slice(0, 4)
   const moreItems = moreMenuItems.filter(item => item.roles.includes(role))
 
@@ -167,22 +150,22 @@ export function MobileBottomNav({
 
   const confirmSignOut = () => {
     setShowSignOutConfirm(false)
+    // ✅ Instant redirect
+    window.location.href = '/portal'
     onLogout?.()
   }
 
   const isActive = (item: NavItem): boolean => {
-    if (item.route === `/${role}`) {
-      return pathname === `/${role}`
-    }
+    if (item.route === `/${role}`) return pathname === `/${role}`
     return pathname?.startsWith(item.route) || activeTab === item.id
   }
 
-  const displayName = profile?.full_name || profile?.name || 'User'
+  // ✅ Use display_name for profile
+  const displayName = profile?.display_name || profile?.full_name || profile?.name || 'User'
   const avatarUrl = profile?.photo_url || profile?.avatar_url || undefined
 
   return (
     <>
-      {/* Bottom Navigation Bar */}
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg">
         <div className="flex items-center justify-around px-2 py-1">
           {mainItems.map((item) => {
@@ -214,33 +197,24 @@ export function MobileBottomNav({
                     transition={{ type: "spring", stiffness: 500, damping: 30 }}
                   />
                 )}
-                <Icon className={cn(
-                  "h-5 w-5 transition-all",
-                  active && "scale-110"
-                )} />
-                <span className={cn(
-                  "text-[10px] font-medium mt-0.5",
-                  active && "font-semibold"
-                )}>
+                <Icon className={cn("h-5 w-5 transition-all", active && "scale-110")} />
+                <span className={cn("text-[10px] font-medium mt-0.5", active && "font-semibold")}>
                   {item.label}
                 </span>
               </button>
             )
           })}
 
-          {/* More Button */}
           <Sheet open={moreMenuOpen} onOpenChange={setMoreMenuOpen}>
             <SheetTrigger asChild>
-              <button
-                className={cn(
-                  "flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all",
-                  moreMenuOpen 
-                    ? role === 'admin' ? "text-purple-600 dark:text-purple-400"
-                      : role === 'staff' ? "text-blue-600 dark:text-blue-400"
-                      : "text-emerald-600 dark:text-emerald-400"
-                    : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300"
-                )}
-              >
+              <button className={cn(
+                "flex flex-col items-center justify-center py-1.5 px-3 rounded-xl transition-all",
+                moreMenuOpen 
+                  ? role === 'admin' ? "text-purple-600 dark:text-purple-400"
+                    : role === 'staff' ? "text-blue-600 dark:text-blue-400"
+                    : "text-emerald-600 dark:text-emerald-400"
+                  : "text-slate-500 dark:text-slate-400"
+              )}>
                 <MoreHorizontal className="h-5 w-5" />
                 <span className="text-[10px] font-medium mt-0.5">More</span>
               </button>
@@ -259,7 +233,6 @@ export function MobileBottomNav({
               </SheetHeader>
               
               <ScrollArea className="h-full pb-20">
-                {/* Profile Section */}
                 <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                   <div className="flex items-center gap-3">
                     <Avatar className={cn(
@@ -279,35 +252,26 @@ export function MobileBottomNav({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 dark:text-white truncate">
-                        {displayName}
-                      </p>
+                      <p className="font-semibold text-gray-900 dark:text-white truncate">{displayName}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                         {profile?.email || `${role}@vincollins.edu.ng`}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <Badge className={cn(
-                          "text-[10px] text-white",
-                          role === 'admin' ? 'bg-purple-500' :
-                          role === 'staff' ? 'bg-blue-500' : 'bg-emerald-500'
+                        <Badge className={cn("text-[10px] text-white",
+                          role === 'admin' ? 'bg-purple-500' : role === 'staff' ? 'bg-blue-500' : 'bg-emerald-500'
                         )}>
                           {getRoleDisplayName(role)}
                         </Badge>
                         {profile?.class && (
-                          <Badge variant="outline" className="text-[10px]">
-                            {profile.class}
-                          </Badge>
+                          <Badge variant="outline" className="text-[10px]">{profile.class}</Badge>
                         )}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Navigation Items */}
                 <div className="p-3">
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 mb-2">
-                    Navigation
-                  </p>
+                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-2 mb-2">Navigation</p>
                   <div className="space-y-1">
                     {moreItems.map((item) => {
                       const Icon = item.icon
@@ -330,10 +294,8 @@ export function MobileBottomNav({
                         >
                           <Icon className="h-5 w-5 shrink-0" />
                           <span className="text-sm font-medium">{item.label}</span>
-                          {(item.id === 'notifications' || item.id === 'staff-notifications' || item.id === 'admin-notifications') && notificationCount > 0 && (
-                            <Badge className="ml-auto bg-red-500 text-white text-[10px]">
-                              {notificationCount}
-                            </Badge>
+                          {notificationCount > 0 && (item.id === 'notifications' || item.id === 'staff-notifications' || item.id === 'admin-notifications') && (
+                            <Badge className="ml-auto bg-red-500 text-white text-[10px]">{notificationCount}</Badge>
                           )}
                         </button>
                       )
@@ -343,10 +305,8 @@ export function MobileBottomNav({
 
                 <Separator className="my-2" />
 
-                {/* Sign Out Button - Opens Dialog */}
                 <div className="p-3">
-                  <button
-                    onClick={handleLogoutClick}
+                  <button onClick={handleLogoutClick}
                     className="w-full flex items-center gap-3 px-3 py-3 rounded-xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50 transition-all"
                   >
                     <LogOut className="h-5 w-5 shrink-0" />
@@ -354,11 +314,8 @@ export function MobileBottomNav({
                   </button>
                 </div>
 
-                {/* Footer */}
                 <div className="p-4 text-center">
-                  <p className="text-[10px] text-slate-400">
-                    Vincollins College • v1.0.0
-                  </p>
+                  <p className="text-[10px] text-slate-400">Vincollins College • v1.0.0</p>
                 </div>
               </ScrollArea>
             </SheetContent>
@@ -366,7 +323,6 @@ export function MobileBottomNav({
         </div>
       </div>
 
-      {/* ✅ SIGN OUT CONFIRMATION DIALOG */}
       <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
         <AlertDialogContent className="rounded-2xl max-w-[90vw] sm:max-w-md">
           <AlertDialogHeader>
@@ -377,17 +333,15 @@ export function MobileBottomNav({
               Sign Out?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-sm text-slate-500">
-              Are you sure you want to sign out of your account? You&apos;ll need to log in again to access your dashboard.
+              Are you sure you want to sign out of your account?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2">
             <AlertDialogCancel className="rounded-xl text-sm">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmSignOut}
+            <AlertDialogAction onClick={confirmSignOut}
               className="rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md shadow-red-500/25 text-sm"
             >
-              <LogOut className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              Sign Out
+              <LogOut className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />Sign Out
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
