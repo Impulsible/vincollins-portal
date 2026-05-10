@@ -36,9 +36,10 @@ interface DashboardStats {
   upcomingExams: number
 }
 
-interface User {
+interface DashboardUser {
   id: string
   name: string
+  firstName: string
   email: string
   role: string
 }
@@ -154,7 +155,7 @@ function SimpleNotificationPanel({
 function DashboardContent() {
   const router = useRouter()
   
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<DashboardUser | null>(null)
   const [stats] = useState<DashboardStats>(mockStats)
   const [notifications, setNotifications] = useState<SimpleNotification[]>(mockNotifications)
   const [loading, setLoading] = useState(true)
@@ -170,6 +171,7 @@ function DashboardContent() {
           setUser({
             id: 'user1',
             name: 'John Doe',
+            firstName: 'John',
             email: 'john@vincollins.edu.ng',
             role: 'student'
           })
@@ -180,9 +182,35 @@ function DashboardContent() {
             .eq('id', session.user.id)
             .single()
           
+          // Build name in LastName FirstName MiddleName order
+          let fullName = ''
+          let firstName = ''
+          
+          if (profile?.first_name) {
+            const parts: string[] = []
+            if (profile?.last_name) parts.push(profile.last_name)
+            parts.push(profile.first_name)
+            if (profile?.middle_name) parts.push(profile.middle_name)
+            fullName = parts.join(' ').trim()
+            firstName = profile.first_name.trim()
+          }
+          if (!fullName && profile?.display_name?.trim()) {
+            fullName = profile.display_name.trim()
+            firstName = fullName.split(' ')[0]
+          }
+          if (!fullName && profile?.full_name?.trim()) {
+            fullName = profile.full_name.trim()
+            firstName = fullName.split(' ')[0]
+          }
+          if (!fullName) {
+            firstName = session.user.email?.split('@')[0] || 'User'
+            fullName = firstName
+          }
+          
           setUser({
             id: session.user.id,
-            name: profile?.full_name || session.user.email?.split('@')[0] || 'User',
+            name: fullName,
+            firstName: firstName,
             email: session.user.email || '',
             role: profile?.role || 'student'
           })
@@ -192,6 +220,7 @@ function DashboardContent() {
         setUser({
           id: 'user1',
           name: 'John Doe',
+          firstName: 'John',
           email: 'john@vincollins.edu.ng',
           role: 'student'
         })
@@ -237,11 +266,15 @@ function DashboardContent() {
     )
   }
 
+  // Get first name for greeting
+  const greetingName = user?.firstName || user?.name?.split(' ')[0] || 'User'
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header user={{
         id: user?.id || '',
         name: user?.name || 'User',
+        firstName: user?.firstName || 'User',  // ✅ ADDED THIS
         email: user?.email || '',
         role: (user?.role === 'teacher' ? 'teacher' : user?.role === 'admin' ? 'admin' : 'student') as 'admin' | 'teacher' | 'student',
         isAuthenticated: true
@@ -251,7 +284,7 @@ function DashboardContent() {
         {/* Welcome Section */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">
-            Welcome back, {user?.name?.split(' ')[0] || 'User'}!
+            Welcome back, {greetingName}!
           </h1>
           <p className="text-gray-600 mt-1">
             Here's what's happening with your academic journey today.
