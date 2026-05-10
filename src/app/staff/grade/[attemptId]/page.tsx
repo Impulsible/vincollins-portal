@@ -204,7 +204,7 @@ export default function GradeTheoryPage() {
   if (loading) {
     return (
       <>
-        <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', role: 'teacher', email: '' }} />
+        <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', firstName: 'Staff', role: 'teacher', email: '' }} />
         <div className="min-h-screen flex items-center justify-center pt-20">
           <Loader2 className="h-8 w-8 animate-spin" />
         </div>
@@ -216,7 +216,7 @@ export default function GradeTheoryPage() {
   if (theoryAnswers.length === 0) {
     return (
       <>
-        <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', role: 'teacher', email: '' }} />
+        <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', firstName: 'Staff', role: 'teacher', email: '' }} />
         <div className="min-h-screen flex items-center justify-center pt-20">
           <Card className="text-center p-8">
             <p className="text-muted-foreground">No theory questions to grade</p>
@@ -230,7 +230,7 @@ export default function GradeTheoryPage() {
 
   return (
     <>
-      <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', role: 'teacher', email: '' }} />
+      <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', firstName: 'Staff', role: 'teacher', email: '' }} />
       
       <main className="min-h-screen bg-gray-50 pt-20">
         <div className="container mx-auto px-4 py-8">
