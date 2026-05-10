@@ -312,11 +312,12 @@ export default function StudentProfilePage() {
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
   }
 
-  const formatProfileForHeader = () => {
+const formatProfileForHeader = () => {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: getDisplayName(), // ✅ Use display name
+      name: getDisplayName(),
+      firstName: profile.first_name || getDisplayName().split(' ')[0] || 'Student',  // ✅ ADD THIS
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,

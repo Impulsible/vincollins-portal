@@ -56,8 +56,8 @@ export default function StudentClassmatesPage() {
     if (!profile) return undefined
     return {
       id: profile.id,
-      // ✅ Use display_name for header
       name: profile.display_name || profile.full_name,
+      firstName: profile.first_name || profile.display_name?.split(' ')[0] || profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,

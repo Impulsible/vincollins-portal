@@ -100,11 +100,12 @@ export default function StudentCoursesPage() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false)
 
   // ========== HELPERS ==========
-  const formatProfileForHeader = (profile: StudentProfile | null) => {
+ const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
       id: profile.id,
       name: profile.full_name,
+      firstName: profile.first_name || profile.display_name?.split(' ')[0] || profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,

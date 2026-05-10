@@ -263,8 +263,15 @@ export default function StudentResultDetailPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 w-full overflow-x-hidden">
-      <Header user={{ id: profile?.id || '', name: profile?.full_name || '', email: profile?.email || '', role: 'student' as const, avatar: profile?.photo_url || undefined, isAuthenticated: true }} onLogout={handleLogout} />
-
+      <Header user={{ 
+  id: profile?.id || '', 
+  name: profile?.full_name || '', 
+  firstName: profile?.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
+  email: profile?.email || '', 
+  role: 'student' as const, 
+  avatar: profile?.photo_url || undefined, 
+  isAuthenticated: true 
+}} onLogout={handleLogout} />
       <div className="flex w-full overflow-x-hidden">
         <StudentSidebar profile={profile} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="results" setActiveTab={() => {}} />
 

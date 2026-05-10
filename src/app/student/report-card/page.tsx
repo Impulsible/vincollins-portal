@@ -51,10 +51,28 @@ export default function StudentReportCardPage() {
 
   const handlePrint = () => window.print()
 
+  // ✅ Helper to build header user with firstName
+  const getHeaderUser = () => {
+    if (!profile) return undefined
+    return {
+      id: profile.id || '',
+      name: profile.full_name || '',
+      firstName: profile.first_name || profile.full_name?.split(' ')[0] || 'Student',
+      email: profile.email || '',
+      role: 'student' as const,
+      isAuthenticated: true
+    }
+  }
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/portal'
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <Header onLogout={async () => { await supabase.auth.signOut(); window.location.href = '/portal' }} />
+        <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center">
             <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
@@ -68,7 +86,7 @@ export default function StudentReportCardPage() {
   if (error || !reportCard) {
     return (
       <div className="min-h-screen bg-slate-50">
-        <Header user={{ id: profile?.id || '', name: profile?.full_name || '', email: profile?.email || '', role: 'student', isAuthenticated: true }} onLogout={async () => { await supabase.auth.signOut(); window.location.href = '/portal' }} />
+        <Header user={getHeaderUser()} onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
           <Card className="max-w-md w-full border-0 shadow-sm">
             <CardContent className="text-center py-10">
@@ -108,7 +126,7 @@ export default function StudentReportCardPage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header user={{ id: profile?.id || '', name: profile?.full_name || '', email: profile?.email || '', role: 'student', isAuthenticated: true }} onLogout={async () => { await supabase.auth.signOut(); window.location.href = '/portal' }} />
+      <Header user={getHeaderUser()} onLogout={handleLogout} />
       <main className="pt-[72px] lg:pt-24 pb-20 px-4">
         <div className="no-print flex justify-between items-center max-w-[210mm] mx-auto mb-4">
           <Button variant="ghost" size="sm" onClick={() => router.push('/student')}><ArrowLeft className="h-4 w-4 mr-1" />Back</Button>

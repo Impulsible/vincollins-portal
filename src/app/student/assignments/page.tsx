@@ -96,11 +96,12 @@ export default function StudentAssignmentsPage() {
     return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase()
   }
 
-  const formatProfileForHeader = (profile: StudentProfile | null) => {
+const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
       id: profile.id,
       name: profile.full_name,
+      firstName: profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,

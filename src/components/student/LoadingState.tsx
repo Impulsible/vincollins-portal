@@ -8,11 +8,12 @@ interface LoadingStateProps {
 }
 
 export function LoadingState({ profile, onLogout }: LoadingStateProps) {
-  const formatProfileForHeader = (profile: any) => {
+ const formatProfileForHeader = (profile: any) => {
     if (!profile) return undefined
     return {
       id: profile.id,
       name: profile.display_name || profile.full_name,
+      firstName: profile.first_name || profile.display_name?.split(' ')[0] || profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,

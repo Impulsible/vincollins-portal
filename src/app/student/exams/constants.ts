@@ -15,7 +15,7 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'Government': { icon: Shield, color: 'text-red-600', bgColor: 'bg-red-50' },
   'Literature in English': { icon: PenTool, color: 'text-pink-600', bgColor: 'bg-pink-50' },
   'Commerce': { icon: BarChart3, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
-  'Computer Science': { icon: MonitorPlay, color: 'text-slate-600', bgColor: 'bg-slate-50' },
+  'Information Technology': { icon: MonitorPlay, color: 'text-slate-600', bgColor: 'bg-slate-50' },
   'Civic Education': { icon: Shield, color: 'text-blue-600', bgColor: 'bg-blue-50' },
   'Christian Religious Studies': { icon: BookOpen, color: 'text-sky-600', bgColor: 'bg-sky-50' },
   'Basic Science': { icon: Zap, color: 'text-cyan-600', bgColor: 'bg-cyan-50' },

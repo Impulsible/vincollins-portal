@@ -40,10 +40,11 @@ interface Notification {
   link?: string
 }
 
-// ✅ FIXED: Header User type
+// ✅ FIXED: Header User type with firstName
 interface HeaderUser {
   id: string
   name: string
+  firstName: string  // ✅ ADD THIS
   email: string
   role: 'admin' | 'student' | 'teacher'
   avatar?: string
@@ -179,12 +180,12 @@ export default function NotificationsPage() {
   const formatProfileForHeader = (profile: Profile | null): HeaderUser | undefined => {
     if (!profile) return undefined
     
-    // Convert role to match Header's expected type
     const headerRole = profile.role === 'staff' ? 'teacher' as const : 'student' as const
     
     return {
       id: profile.id,
       name: profile.full_name || 'Staff',
+      firstName: profile.full_name?.split(' ')[0] || 'User',  // ✅ ADD THIS
       email: profile.email || '',
       role: headerRole,
       avatar: profile.photo_url || undefined,

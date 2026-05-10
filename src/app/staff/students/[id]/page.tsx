@@ -215,12 +215,38 @@ const StarRating = ({ value, onChange, readonly = false }: { value: number; onCh
   )
 }
 
-// Helper function to format profile for Header component
+// ✅ FIXED: Helper function to format profile for Header component with firstName
 const formatProfileForHeader = (profile: any) => {
   if (!profile) return undefined
+  
+  let fullName = ''
+  let firstName = ''
+  
+  if (profile?.first_name) {
+    const parts: string[] = []
+    if (profile?.last_name) parts.push(profile.last_name)
+    parts.push(profile.first_name)
+    if (profile?.middle_name) parts.push(profile.middle_name)
+    fullName = parts.join(' ').trim()
+    firstName = profile.first_name.trim()
+  }
+  if (!fullName && profile?.display_name?.trim()) {
+    fullName = profile.display_name.trim()
+    firstName = fullName.split(' ')[0]
+  }
+  if (!fullName && profile?.full_name?.trim()) {
+    fullName = profile.full_name.trim()
+    firstName = fullName.split(' ')[0]
+  }
+  if (!fullName) {
+    firstName = profile?.email?.split('@')[0] || 'Staff User'
+    fullName = firstName
+  }
+  
   return {
     id: profile.id,
-    name: profile.full_name || profile.email?.split('@')[0] || 'Staff User',
+    name: fullName,
+    firstName: firstName,
     email: profile.email,
     role: profile.role === 'staff' ? 'teacher' : (profile.role || 'teacher'),
     avatar: profile.photo_url || profile.avatar_url,
@@ -329,12 +355,10 @@ export default function StudentDetailsPage() {
     attendance: 94
   })
   
-  // Report Card Status
   const [reportCardStatus, setReportCardStatus] = useState<string | null>(null)
   const [submittingForApproval, setSubmittingForApproval] = useState(false)
   const [showSubmitDialog, setShowSubmitDialog] = useState(false)
   
-  // Dialog states
   const [showCADialog, setShowCADialog] = useState(false)
   const [showAssessmentDialog, setShowAssessmentDialog] = useState(false)
   const [editingCA, setEditingCA] = useState<CAScore | null>(null)
@@ -344,7 +368,6 @@ export default function StudentDetailsPage() {
   const [generatingAI, setGeneratingAI] = useState(false)
   const [fetchingExamScore, setFetchingExamScore] = useState(false)
   
-  // CA Form state
   const [caForm, setCAForm] = useState({
     subject: '',
     ca1_score: 0,
@@ -353,7 +376,6 @@ export default function StudentDetailsPage() {
     exam_theory_score: 0
   })
   
-  // Assessment Form state
   const [assessmentForm, setAssessmentForm] = useState<Partial<Assessment>>({
     handwriting: 3,
     sports_participation: 3,
@@ -370,7 +392,6 @@ export default function StudentDetailsPage() {
     principal_comments: ''
   })
   
-  // Helper functions
   const getInitials = (name?: string): string => {
     if (!name) return 'ST'
     const parts = name.split(' ')
@@ -417,7 +438,6 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // Check report card status
   const checkReportCardStatus = useCallback(async () => {
     if (!studentId) return
     
@@ -440,7 +460,6 @@ export default function StudentDetailsPage() {
     }
   }, [studentId, selectedTerm, selectedYear])
   
-  // Load all data
   const loadData = useCallback(async () => {
     setLoading(true)
     try {
@@ -510,7 +529,6 @@ export default function StudentDetailsPage() {
         vin_id: userData?.vin_id || studentData.vin_id || `VIN-${studentId.slice(0, 8)}`
       })
       
-      // Load exam_scores
       const { data: examScoresData, error: scoresError } = await supabase
         .from('exam_scores')
         .select('*')
@@ -521,7 +539,6 @@ export default function StudentDetailsPage() {
         console.error('Exam scores error:', scoresError)
       }
 
-      // Load exam attempts
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -533,7 +550,6 @@ export default function StudentDetailsPage() {
         console.error('Exam attempts error:', attemptsError)
       }
 
-      // Load exam details
       let examDetailsMap: Record<string, any> = {}
       if (examScoresData && examScoresData.length > 0) {
         const examIds = [...new Set(examScoresData.map(s => s.exam_id).filter(Boolean))]
@@ -552,7 +568,6 @@ export default function StudentDetailsPage() {
         }
       }
 
-      // Merge results
       const mergedResults: ExamResult[] = []
       
       if (examScoresData) {
@@ -625,7 +640,6 @@ export default function StudentDetailsPage() {
       
       setExamResults(mergedResults)
       
-      // Calculate stats
       const completed = mergedResults.filter(r => 
         r.status === 'graded' || r.status === 'completed' || r.status === 'pending_theory'
       )
@@ -659,7 +673,6 @@ export default function StudentDetailsPage() {
         bestSubjectScore: Math.round(bestScore)
       }))
       
-      // Load CA Scores
       const { data: caData, error: caError } = await supabase
         .from('exam_scores')
         .select('*')
@@ -694,7 +707,6 @@ export default function StudentDetailsPage() {
         setCAScores([])
       }
       
-      // Load Assessment
       const { data: assessmentData, error: assessmentError } = await supabase
         .from('student_assessments')
         .select('*')
@@ -721,7 +733,6 @@ export default function StudentDetailsPage() {
         setAssessment(null)
       }
       
-      // Check report card status
       await checkReportCardStatus()
       
     } catch (error) {
@@ -738,13 +749,11 @@ export default function StudentDetailsPage() {
     }
   }, [loadData, studentId])
   
-  // Handle Logout
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/portal')
   }
   
-  // Open CA Dialog for editing
   const handleEditCA = (ca: CAScore) => {
     setEditingCA(ca)
     setCAForm({
@@ -757,7 +766,6 @@ export default function StudentDetailsPage() {
     setShowCADialog(true)
   }
   
-  // Open CA Dialog for new entry
   const handleAddCA = () => {
     setEditingCA(null)
     setCAForm({
@@ -770,7 +778,6 @@ export default function StudentDetailsPage() {
     setShowCADialog(true)
   }
   
-  // Save CA Score
   const handleSaveCAScore = async () => {
     if (!caForm.subject) {
       toast.error('Please select a subject')
@@ -835,7 +842,6 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // Delete CA Score
   const handleDeleteCA = async (caId: string) => {
     if (!confirm('Are you sure you want to delete this CA score?')) return
     
@@ -855,7 +861,6 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // Save Assessment
   const handleSaveAssessment = async () => {
     try {
       const assessmentData = {
@@ -891,7 +896,6 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // Generate AI Comments
   const handleGenerateAIComments = async () => {
     setGeneratingAI(true)
     try {
@@ -929,7 +933,6 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // SUBMIT REPORT CARD FOR APPROVAL
   const handleSubmitForApproval = async () => {
     if (!student || caScores.length === 0) {
       toast.error('Please add CA scores before submitting')
@@ -1004,7 +1007,6 @@ export default function StudentDetailsPage() {
       toast.success('Report card submitted for approval!')
       setShowSubmitDialog(false)
       
-      // Send notification to admin
       await supabase.from('notifications').insert({
         title: 'New Report Card for Approval',
         message: `${student.full_name} (${student.class}) - ${selectedTerm} ${selectedYear}`,
@@ -1021,7 +1023,6 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // Generate Report Card
   const handleGenerateReportCard = async () => {
     setGeneratingReport(true)
     try {
@@ -1108,17 +1109,14 @@ export default function StudentDetailsPage() {
     }
   }
 
-  // Print Report Card
   const handlePrintReportCard = async () => {
     await handleGenerateReportCard()
   }
   
-  // Navigate to grade exam
   const handleGradeExam = (examId: string) => {
     router.push(`/staff/exams/${examId}/grade?studentId=${studentId}`)
   }
   
-  // Fetch exam score from exam_attempts for auto-fill
   const fetchExamScoreForSubject = async (subject: string) => {
     setFetchingExamScore(true)
     try {
@@ -1154,11 +1152,9 @@ export default function StudentDetailsPage() {
     }
   }
   
-  // Calculate total for preview
   const previewTotal = caForm.ca1_score + caForm.ca2_score + caForm.exam_objective_score + caForm.exam_theory_score
   const previewGrade = calculateGradeAndRemark(previewTotal)
   
-  // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -1176,7 +1172,6 @@ export default function StudentDetailsPage() {
     )
   }
   
-  // Student not found state
   if (!student) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950">
@@ -1217,12 +1212,7 @@ export default function StudentDetailsPage() {
         )}>
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
             
-            {/* Header with Back Button */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6"
-            >
+            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <Button variant="outline" onClick={() => router.push('/staff/students')}>
@@ -1253,7 +1243,6 @@ export default function StudentDetailsPage() {
                     Generate Report
                   </Button>
                   
-                  {/* SUBMIT FOR APPROVAL BUTTON */}
                   {reportCardStatus !== 'published' && reportCardStatus !== 'approved' && (
                     <Button 
                       onClick={() => setShowSubmitDialog(true)}
@@ -1267,12 +1256,7 @@ export default function StudentDetailsPage() {
               </div>
             </motion.div>
             
-            {/* Student Profile Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-6"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
               <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500/5 via-white to-indigo-500/5 dark:from-blue-950/20 dark:via-slate-900 dark:to-indigo-950/20 overflow-hidden">
                 <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
                 <CardContent className="p-6">
@@ -1345,7 +1329,6 @@ export default function StudentDetailsPage() {
               </Card>
             </motion.div>
             
-            {/* Term/Year Selector */}
             <div className="flex items-center gap-4 mb-6">
               <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                 <SelectTrigger className="w-40">
@@ -1365,7 +1348,6 @@ export default function StudentDetailsPage() {
               </Select>
             </div>
             
-            {/* Main Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
               <TabsList className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 <TabsTrigger value="overview" className="data-[state=active]:bg-blue-600 data-[state=active]:text-white">
@@ -1382,7 +1364,6 @@ export default function StudentDetailsPage() {
                 </TabsTrigger>
               </TabsList>
               
-              {/* OVERVIEW TAB */}
               <TabsContent value="overview" className="space-y-6">
                 <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
                   <Card>
@@ -1490,7 +1471,6 @@ export default function StudentDetailsPage() {
                 </div>
               </TabsContent>
               
-              {/* CA SCORES TAB */}
               <TabsContent value="ca-scores">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
@@ -1556,7 +1536,6 @@ export default function StudentDetailsPage() {
                 </Card>
               </TabsContent>
               
-              {/* EXAM RESULTS TAB */}
               <TabsContent value="exam-results">
                 <Card>
                   <CardHeader>
@@ -1635,7 +1614,6 @@ export default function StudentDetailsPage() {
                 </Card>
               </TabsContent>
               
-              {/* ASSESSMENT TAB */}
               <TabsContent value="assessment">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between">
@@ -1756,7 +1734,6 @@ export default function StudentDetailsPage() {
         </main>
       </div>
       
-      {/* Submit Confirmation Dialog */}
       <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -1787,7 +1764,6 @@ export default function StudentDetailsPage() {
         </AlertDialogContent>
       </AlertDialog>
       
-      {/* Add/Edit CA Score Dialog */}
       <Dialog open={showCADialog} onOpenChange={setShowCADialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1910,7 +1886,6 @@ export default function StudentDetailsPage() {
         </DialogContent>
       </Dialog>
       
-      {/* Assessment Dialog */}
       <Dialog open={showAssessmentDialog} onOpenChange={setShowAssessmentDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>

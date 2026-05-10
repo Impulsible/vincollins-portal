@@ -28,6 +28,7 @@ export default function StaffLoading({ profile, onLogout }: StaffLoadingProps) {
     return {
       id: profile.id || '',
       name: profile.display_name || profile.full_name || 'Staff',
+      firstName: profile.first_name || profile.display_name?.split(' ')[0] || profile.full_name?.split(' ')[0] || 'Staff',  // ✅ ADD THIS
       email: profile.email || '',
       role: 'teacher' as const,
       avatar: profile.photo_url || undefined,

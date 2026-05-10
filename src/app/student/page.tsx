@@ -275,11 +275,12 @@ export default function StudentDashboardPage() {
     router.push('/portal')
   }
 
-  const formatProfileForHeader = () => {
+ const formatProfileForHeader = () => {
     if (!profile) return undefined
     return {
       id: profile.id,
       name: profile.full_name,
+      firstName: profile.first_name || profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
