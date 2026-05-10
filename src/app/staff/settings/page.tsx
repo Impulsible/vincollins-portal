@@ -14,6 +14,7 @@ import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
+import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
@@ -228,11 +229,13 @@ export default function StaffSettingsPage() {
     }
   }
 
+  // ✅ FIXED: Added firstName
   const formatProfileForHeader = () => {
     if (!profile) return undefined
     return {
       id: profile.id,
       name: profile.full_name,
+      firstName: profile.full_name?.split(' ')[0] || 'Staff',
       email: profile.email,
       role: 'teacher' as const,
       avatar: profile.photo_url || undefined,
@@ -452,6 +455,3 @@ export default function StaffSettingsPage() {
     </div>
   )
 }
-
-// Need Label import
-import { Label } from '@/components/ui/label'

@@ -22,11 +22,16 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface Profile {
   id: string
   full_name?: string
+  first_name?: string
+  last_name?: string
+  middle_name?: string
+  display_name?: string
   email?: string
   role?: string
   class?: string
   department?: string
   photo_url?: string
+  avatar_url?: string
 }
 
 interface Notification {
@@ -40,10 +45,11 @@ interface Notification {
   link?: string
 }
 
-// ✅ FIXED: Header User type
+// ✅ FIXED: Header User type with firstName
 interface HeaderUser {
   id: string
   name: string
+  firstName: string
   email: string
   role: 'admin' | 'student' | 'teacher'
   avatar?: string
@@ -175,19 +181,44 @@ export default function NotificationsPage() {
     }
   }
 
-  // ✅ FIXED: Properly typed header user
+  // ✅ FIXED: Properly typed header user with firstName
   const formatProfileForHeader = (profile: Profile | null): HeaderUser | undefined => {
     if (!profile) return undefined
     
-    // Convert role to match Header's expected type
+    // Build name in LastName FirstName MiddleName order
+    let fullName = ''
+    let firstName = ''
+    
+    if (profile?.first_name) {
+      const parts: string[] = []
+      if (profile?.last_name) parts.push(profile.last_name)
+      parts.push(profile.first_name)
+      if (profile?.middle_name) parts.push(profile.middle_name)
+      fullName = parts.join(' ').trim()
+      firstName = profile.first_name.trim()
+    }
+    if (!fullName && profile?.display_name?.trim()) {
+      fullName = profile.display_name.trim()
+      firstName = fullName.split(' ')[0]
+    }
+    if (!fullName && profile?.full_name?.trim()) {
+      fullName = profile.full_name.trim()
+      firstName = fullName.split(' ')[0]
+    }
+    if (!fullName) {
+      firstName = profile?.email?.split('@')[0] || 'User'
+      fullName = firstName
+    }
+    
     const headerRole = profile.role === 'staff' ? 'teacher' as const : 'student' as const
     
     return {
       id: profile.id,
-      name: profile.full_name || 'Staff',
+      name: fullName,
+      firstName: firstName,
       email: profile.email || '',
       role: headerRole,
-      avatar: profile.photo_url || undefined,
+      avatar: profile.photo_url || profile.avatar_url || undefined,
       isAuthenticated: true
     }
   }
