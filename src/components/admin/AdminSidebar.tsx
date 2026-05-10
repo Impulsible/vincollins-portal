@@ -1,4 +1,4 @@
-// components/admin/AdminSidebar.tsx - FULL FIXED (NO SYNC OVERRIDE)
+// components/admin/AdminSidebar.tsx - FIXED WITH DISPLAY NAME
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -54,7 +54,7 @@ export function AdminSidebar({
 
   useEffect(() => { setMounted(true) }, [])
 
-  // ✅ Set initial tab from URL on first load only
+  // Set initial tab from URL on first load only
   useEffect(() => {
     const getTabFromPathname = (path: string): string => {
       if (!path) return 'overview'
@@ -73,7 +73,7 @@ export function AdminSidebar({
     
     const tab = getTabFromPathname(pathname || '/admin')
     setActiveTab(tab)
-  }, []) // ✅ Only runs once on mount
+  }, []) // Only runs once on mount
 
   const primaryNavigation: NavigationItem[] = [
     { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', routePatterns: ['/admin'] },
@@ -91,8 +91,32 @@ export function AdminSidebar({
     { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance', routePatterns: ['/admin/help'] },
   ]
 
-  const displayName = profile?.display_name || profile?.full_name || 'Administrator'
-  const firstName = displayName.split(' ').length >= 2 ? displayName.split(' ')[1] : displayName.split(' ')[0]
+  // ============================================
+  // NAME RESOLUTION - Same as header
+  // Profile: LastName FirstName MiddleName
+  // Greeting: FirstName only
+  // ============================================
+  const getDisplayName = (): string => {
+    if (profile?.first_name) {
+      const parts: string[] = []
+      if (profile?.last_name) parts.push(profile.last_name)
+      parts.push(profile.first_name)
+      if (profile?.middle_name) parts.push(profile.middle_name)
+      return parts.join(' ').trim()
+    }
+    if (profile?.display_name?.trim()) return profile.display_name.trim()
+    if (profile?.full_name?.trim()) return profile.full_name.trim()
+    return 'Administrator'
+  }
+
+  const getFirstName = (): string => {
+    if (profile?.first_name?.trim()) return profile.first_name.trim()
+    const displayName = getDisplayName()
+    return displayName.split(' ')[0] || 'Admin'
+  }
+
+  const displayName = getDisplayName()
+  const firstName = getFirstName()
   const initials = displayName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
 
   const handleLogoutClick = () => setShowSignOutConfirm(true)
@@ -102,7 +126,7 @@ export function AdminSidebar({
     onLogout()
   }
 
-  // ✅ Simple navigation - set tab and push route
+  // Simple navigation - set tab and push route
   const handleNavClick = (tabId: string, routePatterns?: string[]) => {
     setActiveTab(tabId)
     if (routePatterns && routePatterns.length > 0) {
@@ -202,7 +226,7 @@ export function AdminSidebar({
                     <Tooltip delayDuration={0}>
                       <TooltipTrigger asChild>
                         <Avatar className="h-12 w-12 ring-2 ring-white shadow-xl cursor-pointer">
-                          <AvatarImage src={profile?.photo_url} />
+                          <AvatarImage src={profile?.photo_url || profile?.avatar_url} />
                           <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">{initials}</AvatarFallback>
                         </Avatar>
                       </TooltipTrigger>
@@ -215,7 +239,7 @@ export function AdminSidebar({
                     <div className="space-y-4 w-full">
                       <div className="flex items-center gap-4">
                         <Avatar className="h-16 w-16 ring-3 ring-white shadow-xl">
-                          <AvatarImage src={profile?.photo_url} />
+                          <AvatarImage src={profile?.photo_url || profile?.avatar_url} />
                           <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-xl">{initials}</AvatarFallback>
                         </Avatar>
                         <div className="flex-1 min-w-0">

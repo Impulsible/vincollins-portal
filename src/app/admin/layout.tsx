@@ -1,4 +1,4 @@
-// app/admin/layout.tsx - FIXED
+// app/admin/layout.tsx - FIXED WITH DISPLAY NAME
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,6 +13,9 @@ interface AdminProfile {
   id: string
   full_name?: string
   display_name?: string
+  first_name?: string
+  last_name?: string
+  middle_name?: string
   name?: string
   email?: string
   photo_url?: string
@@ -54,11 +57,43 @@ const getTabFromPathname = (pathname: string): string => {
   return 'overview'
 }
 
+// ✅ FIXED: Format profile with firstName for Header
 function formatProfileForHeader(profile: AdminProfile | null) {
   if (!profile) return undefined
+
+  // Build name in LastName FirstName MiddleName order
+  let fullName = ''
+  let firstName = ''
+
+  if (profile?.first_name) {
+    const parts: string[] = []
+    if (profile?.last_name) parts.push(profile.last_name)
+    parts.push(profile.first_name)
+    if (profile?.middle_name) parts.push(profile.middle_name)
+    fullName = parts.join(' ').trim()
+    firstName = profile.first_name.trim()
+  }
+  if (!fullName && profile?.display_name?.trim()) {
+    fullName = profile.display_name.trim()
+    firstName = fullName.split(' ')[0]
+  }
+  if (!fullName && profile?.full_name?.trim()) {
+    fullName = profile.full_name.trim()
+    firstName = fullName.split(' ')[0]
+  }
+  if (!fullName && profile?.name?.trim()) {
+    fullName = profile.name.trim()
+    firstName = fullName.split(' ')[0]
+  }
+  if (!fullName) {
+    firstName = profile?.email?.split('@')[0] || 'User'
+    fullName = firstName
+  }
+
   return {
     id: profile.id,
-    name: profile.display_name || profile.full_name || profile.name || 'Administrator',
+    name: fullName,
+    firstName: firstName,  // ✅ REQUIRED by User interface
     email: profile.email || '',
     role: profile.role === 'staff' ? 'teacher' as const : 'admin' as const,
     avatar: profile.photo_url || profile.avatar_url,
@@ -77,8 +112,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingInquiries, setPendingInquiries] = useState(0)
 
-  // ✅ REMOVED sync effect - was overriding sidebar clicks
-
   // Load profile and counts
   useEffect(() => {
     const init = async () => {
@@ -90,7 +123,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       const { data } = await supabase
         .from('profiles')
-        .select('id, full_name, display_name, name, email, photo_url, avatar_url, role')
+        .select('id, full_name, display_name, first_name, last_name, middle_name, name, email, photo_url, avatar_url, role')
         .eq('id', session.user.id)
         .single()
       if (data) setProfile(data)
