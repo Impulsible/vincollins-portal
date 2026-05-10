@@ -36,6 +36,7 @@ export interface StudentProfile {
   department?: string
   photo_url?: string | null
   vin_id?: string
+  admission_number?: string
 }
 
 export interface ExamState {
