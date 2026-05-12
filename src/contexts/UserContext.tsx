@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - OPTIMIZED
+// src/contexts/UserContext.tsx - OPTIMIZED + NO REDIRECT CONFLICT
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -28,7 +28,7 @@ interface UserContextType {
   isAuthenticated: boolean
 }
 
-const AUTH_TIMEOUT = 8000 // ✅ Reduced from 15000
+const AUTH_TIMEOUT = 8000
 const ADMIN_USER_ID = 'a799693c-97c7-4f8d-baca-82242a98a00c'
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
@@ -60,10 +60,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         last_seen: now,
         updated_at: now,
       }, { onConflict: 'user_id' })
-      .then(() => console.log(online ? '🟢 Online:' : '🔴 Offline:', userId), () => {}) // Silently ignore errors
+      .then(() => {}, () => {})
   }, [])
 
-  // ─── Heartbeat ──────────────────────────────────
   const startHeartbeat = useCallback((userId: string) => {
     if (userId === ADMIN_USER_ID) return
     
@@ -80,7 +79,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // ─── Fetch Profile ────────────────────────────
   const fetchUserProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     try {
       const { data, error } = await supabase
@@ -98,7 +96,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
-  // ─── Load User ────────────────────────────────
   const loadUser = useCallback(async () => {
     if (fetchPromiseRef.current) return fetchPromiseRef.current
 
@@ -145,19 +142,16 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return fetchPromise
   }, [fetchUserProfile, setOnlineStatus, startHeartbeat])
 
-  // ─── Refresh ──────────────────────────────────
   const refreshUser = useCallback(async () => {
     setLoading(true)
     fetchPromiseRef.current = null
     await loadUser()
   }, [loadUser])
 
-  // ─── Sign Out - INSTANT ───────────────────────
+  // ✅ Instant sign out - redirect first, cleanup later
   const signOut = useCallback(() => {
-    // ✅ IMMEDIATE redirect - user sees portal instantly
-    window.location.href = '/portal'
+    window.location.replace('/portal')
     
-    // ✅ Cleanup in background (fire and forget)
     const currentUser = userRef.current
     if (currentUser?.id) {
       setOnlineStatus(currentUser.id, false)
@@ -166,17 +160,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event('student-logout'))
     supabase.auth.signOut().catch(() => {})
     
-    // Clear state
     setUser(null)
     setError(null)
     setLoading(false)
   }, [setOnlineStatus, stopHeartbeat])
 
-  // ─── Auth State Listener ──────────────────────
   useEffect(() => {
     isMountedRef.current = true
     
-    // ✅ Add loading timeout - never stuck more than 8 seconds
     const loadingTimeout = setTimeout(() => {
       if (loading && isMountedRef.current) {
         console.warn('⚠️ Initial load timed out, showing app')
@@ -204,14 +195,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             await loadUser()
             break
 
-          case 'SIGNED_OUT':
-            stopHeartbeat()
-            const currentUser = userRef.current
-            if (currentUser?.id) setOnlineStatus(currentUser.id, false)
-            setUser(null)
-            setLoading(false)
-            window.location.href = '/portal'
-            break
+         case 'SIGNED_OUT':
+  stopHeartbeat()
+  const currentUser = userRef.current
+  if (currentUser?.id) setOnlineStatus(currentUser.id, false)
+  setUser(null)
+  setLoading(false)
+  // ❌ NO window.location.href here
+  break
 
           case 'TOKEN_REFRESHED':
             if (session?.user) {

@@ -1,9 +1,10 @@
-// app/staff/page.tsx - OPTIMIZED STAFF DASHBOARD
+// app/staff/page.tsx - ALL FUNCTIONALITY PRESERVED + INSTANT LOGOUT
 'use client'
 
 import { useState, useEffect, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { instantLogout } from '@/lib/auth-utils'
 import StaffWelcomeBanner from '@/components/staff/StaffWelcomeBanner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,7 +43,7 @@ interface DashboardStats {
 const TERM_START = new Date('2026-05-04')
 const TERM_END = new Date('2026-08-01')
 const TOTAL_WEEKS = 13
-const LOAD_TIMEOUT = 8000 // ✅ Max loading time
+const LOAD_TIMEOUT = 8000
 
 const DEFAULT_STATS: DashboardStats = {
   totalStudents: 0, activeStudents: 0, activeClasses: 0,
@@ -118,7 +119,6 @@ function StaffDashboardContent() {
   useEffect(() => {
     const init = async () => {
       try {
-        // ✅ Timeout for auth check
         const timeout = setTimeout(() => {
           setLoading(false)
           setLoadError(true)
@@ -152,7 +152,6 @@ function StaffDashboardContent() {
 
   const loadDashboardData = async (userId: string) => {
     try {
-      // ✅ Race all fetches against timeout
       const timeoutPromise = new Promise<null>((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), LOAD_TIMEOUT)
       )
@@ -235,6 +234,9 @@ function StaffDashboardContent() {
     if (!d) return ''
     try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
   }
+
+  // ✅ INSTANT LOGOUT
+  const handleLogout = () => instantLogout()
 
   if (loading && !loadError) return <DashboardSkeleton />
 

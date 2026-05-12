@@ -1,4 +1,4 @@
-// components/layout/header/MobileMenu.tsx
+// components/layout/header/MobileMenu.tsx - CONTEXT-AWARE NAVIGATION
 'use client'
 
 import { memo } from 'react'
@@ -9,7 +9,7 @@ import {
   X, LayoutDashboard, Users, MonitorPlay, FileCheck, GraduationCap, Briefcase, BarChart3,
   LogOut, ArrowRight, Bell, Home, KeyRound, Calendar, BookOpen, Search,
   Mail, MapPin, Phone, Clock, Facebook, Twitter, Instagram, Linkedin, ChevronRight,
-  FileText, MessageSquare, Activity
+  FileText, MessageSquare, Activity, Laptop, PhoneCall
 } from 'lucide-react'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
-import { HeaderUser, SchoolSettings, UserRole } from './types'
+import { HeaderUser, SchoolSettings } from './types'
 
 const socialLinks = [
   { icon: Facebook, href: 'https://facebook.com/vincollins', label: 'Facebook' },
@@ -33,13 +33,23 @@ const contactInfoData = [
   { icon: Clock, text: 'Mon-Fri: 8:00 AM - 4:00 PM' },
 ]
 
-const navMap: Record<string, { name: string; href: string; icon: any }[]> = {
+// Navigation maps
+const publicNavItems = [
+  { name: 'Home', href: '/', icon: Home },
+  { name: 'Admission', href: '/admission', icon: FileText },
+  { name: 'Schools', href: '/schools', icon: BookOpen },
+  { name: 'CBT Platform', href: '#cbt', icon: Laptop },
+  { name: 'Contact', href: '/contact', icon: PhoneCall },
+]
+
+const dashboardNavMap: Record<string, { name: string; href: string; icon: any }[]> = {
   admin: [
     { name: 'Overview', href: '/admin', icon: LayoutDashboard },
     { name: 'Students', href: '/admin/students', icon: GraduationCap },
     { name: 'Staff', href: '/admin/staff', icon: Briefcase },
     { name: 'Exam Approvals', href: '/admin/exams', icon: MonitorPlay },
     { name: 'Reports', href: '/admin/report-cards', icon: FileCheck },
+    { name: 'Live Monitor', href: '/admin/monitor', icon: Activity },
   ],
   teacher: [
     { name: 'Overview', href: '/staff', icon: LayoutDashboard },
@@ -52,6 +62,7 @@ const navMap: Record<string, { name: string; href: string; icon: any }[]> = {
     { name: 'Overview', href: '/student', icon: LayoutDashboard },
     { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
     { name: 'Results', href: '/student/results', icon: GraduationCap },
+    { name: 'Classmates', href: '/student/classmates', icon: Users },
     { name: 'Profile', href: '/student/profile', icon: Users },
   ],
 }
@@ -84,11 +95,33 @@ interface MobileMenuProps {
 export const MobileMenu = memo(function MobileMenu({ open, onClose, user, schoolSettings, onSignOut, pathname }: MobileMenuProps) {
   const router = useRouter()
   const currentYear = new Date().getFullYear()
-  const items = navMap[user?.role || 'student'] || navMap.student
-  const isDashboardPage = pathname?.startsWith('/admin') || pathname?.startsWith('/staff') || pathname?.startsWith('/student')
   const isAuthenticated = user?.isAuthenticated ?? false
+  
+  // ✅ Determine which nav to show based on current page
+  const isDashboardPage = pathname?.startsWith('/admin') || pathname?.startsWith('/staff') || pathname?.startsWith('/student')
+  const isPortalPage = pathname === '/portal'
+  
+  // ✅ Show dashboard nav on dashboard pages, public nav everywhere else
+  const navItems = isDashboardPage && isAuthenticated
+    ? (dashboardNavMap[user?.role || 'student'] || dashboardNavMap.student)
+    : publicNavItems
 
-  const handleNav = (href: string) => { onClose(); router.push(href) }
+  // ✅ Check if a specific href is active
+  const isActive = (href: string): boolean => {
+    if (href === '/') return pathname === '/'
+    if (href === '#cbt') return false
+    if (href === '/admin') return pathname === '/admin'
+    if (href === '/staff') return pathname === '/staff'
+    if (href === '/student') return pathname === '/student'
+    return pathname === href || pathname?.startsWith(href + '/')
+  }
+
+  const handleNav = (href: string) => { 
+    onClose()
+    if (href === '#cbt') return // CBT handled separately
+    router.push(href) 
+  }
+  
   const goToDashboard = () => {
     onClose()
     const urls: Record<string, string> = { admin: '/admin', teacher: '/staff', student: '/student' }
@@ -126,8 +159,8 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
               </button>
             </div>
 
-            {/* User Info */}
-            {isAuthenticated && (
+            {/* User Info - only on dashboard pages */}
+            {isDashboardPage && isAuthenticated && (
               <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12 ring-2 ring-primary/20 flex-shrink-0">
@@ -143,7 +176,8 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                     </Badge>
                   </div>
                 </div>
-                {(pathname === '/' || pathname === '/admission' || pathname === '/schools' || pathname === '/contact') && (
+                {/* Show "Go to Dashboard" on public pages */}
+                {!isDashboardPage && (
                   <button onClick={goToDashboard} className="mt-3 w-full py-2.5 bg-[#F5A623] text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2">
                     <LayoutDashboard className="h-4 w-4" />Go to Dashboard<ArrowRight className="h-4 w-4" />
                   </button>
@@ -153,34 +187,62 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
 
             <ScrollArea className="flex-1">
               <nav className="p-4">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Navigation</p>
+                {/* ✅ Section label changes based on context */}
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                  {isDashboardPage ? 'Dashboard' : 'Navigation'}
+                </p>
+                
+                {/* ✅ Only ONE active item at a time */}
                 <div className="space-y-1">
-                  {items.map((item) => (
-                    <button key={item.name} onClick={() => handleNav(item.href)}
-                      className={cn("flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium",
-                        pathname?.startsWith(item.href) ? 'bg-primary/10 text-primary shadow-sm' : 'text-gray-700 hover:bg-gray-50')}>
-                      <item.icon className={cn("h-5 w-5 flex-shrink-0", pathname?.startsWith(item.href) ? 'text-primary' : 'text-gray-400')} />
-                      <span className="flex-1 text-left">{item.name}</span>
-                    </button>
-                  ))}
+                  {navItems.map((item) => {
+                    const active = isActive(item.href)
+                    return (
+                      <button
+                        key={item.name}
+                        onClick={() => handleNav(item.href)}
+                        className={cn(
+                          "flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium transition-all",
+                          active
+                            ? 'bg-primary/10 text-primary shadow-sm font-semibold'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        )}
+                      >
+                        <item.icon className={cn(
+                          "h-5 w-5 flex-shrink-0",
+                          active ? 'text-primary' : 'text-gray-400'
+                        )} />
+                        <span className="flex-1 text-left">{item.name}</span>
+                        {/* ✅ Active indicator */}
+                        {active && (
+                          <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
 
+                {/* ✅ Quick Links - Portal & Home for dashboard users */}
                 {isDashboardPage && (
                   <>
-                    <div className="my-4 border-t" />
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Navigate To</p>
+                    <div className="my-4 border-t border-gray-100" />
+                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Quick Links</p>
                     <div className="space-y-1">
                       <button onClick={() => handleNav('/')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                        <Home className="h-4 w-4 text-gray-400" />Home Page
+                        <Home className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                        <span>Home Page</span>
                       </button>
-                      <button onClick={() => handleNav('/portal')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                        <KeyRound className="h-4 w-4 text-gray-400" />Portal Login
-                      </button>
+                      {!isPortalPage && (
+                        <button onClick={() => handleNav('/portal')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 bg-amber-50/50">
+                          <KeyRound className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                          <span>Portal Login</span>
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
 
-                <div className="mt-4 pt-4 border-t">
+                {/* ✅ Contact Info + Social + Footer */}
+                <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="space-y-2 mb-4">
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2">Contact Info</p>
                     {contactInfoData.map((info, idx) => (
@@ -205,12 +267,14 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                     <p className="text-[9px] text-gray-300">Geared Towards Excellence</p>
                   </div>
 
-                  {!isAuthenticated && (
-                    <button onClick={() => handleNav('/portal')} className="flex items-center justify-center gap-2 w-full py-3 bg-[#F5A623] text-[#0A2472] rounded-xl font-semibold text-sm mb-3">
+                  {/* ✅ Portal Login for public pages */}
+                  {!isAuthenticated && !isPortalPage && (
+                    <button onClick={() => handleNav('/portal')} className="flex items-center justify-center gap-2 w-full py-3 bg-[#F5A623] text-[#0A2472] rounded-xl font-semibold shadow-md text-sm mb-3">
                       <KeyRound className="h-4 w-4" />Portal Login
                     </button>
                   )}
 
+                  {/* ✅ Sign Out for authenticated users */}
                   {isAuthenticated && (
                     <button onClick={() => { onClose(); onSignOut() }}
                       className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium text-sm">

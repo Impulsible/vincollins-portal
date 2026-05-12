@@ -1,5 +1,4 @@
-// components/admin/students/StudentManagement.tsx
-
+// components/admin/students/StudentManagement.tsx - OPTIMIZED
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -22,16 +21,10 @@ export function StudentManagement({
   onRefresh,
   loading = false,
 }: StudentManagementProps) {
-  // ============================================
-  // CUSTOM HOOKS
-  // ============================================
   const presence = useStudentPresence(students)
   const filters = useStudentFilters(students)
   const actions = useStudentActions(onRefresh)
 
-  // ============================================
-  // DIALOG STATES
-  // ============================================
   const [showCredentials, setShowCredentials] = useState(false)
   const [showResetPassword, setShowResetPassword] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
@@ -40,10 +33,6 @@ export function StudentManagement({
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [credentials, setCredentials] = useState<Credentials | null>(null)
-
-  // ============================================
-  // HANDLERS
-  // ============================================
 
   const handleCredentialsGenerated = useCallback((creds: Credentials) => {
     setCredentials(creds)
@@ -56,7 +45,6 @@ export function StudentManagement({
   }, [])
 
   const handleEdit = useCallback((student: Student) => {
-    // Create a fresh copy to avoid mutation issues
     setSelectedStudent({ ...student })
     setShowEdit(true)
   }, [])
@@ -73,29 +61,19 @@ export function StudentManagement({
 
   const handleSaveEdit = useCallback(async () => {
     if (!selectedStudent) return
-
-    console.log('📝 Saving student edits:', selectedStudent.id)
     const success = await actions.updateStudent(selectedStudent)
-
     if (success) {
-      console.log('✅ Edit saved successfully')
       setShowEdit(false)
       setSelectedStudent(null)
-      // ❌ Removed onRefresh() to prevent skeleton loading
     }
-  }, [selectedStudent, actions]) // ✅ Removed onRefresh from dependencies
+  }, [selectedStudent, actions])
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedStudent) return
-
-    console.log('🗑️ Deleting student:', selectedStudent.id)
     const success = await actions.deleteStudent(selectedStudent)
-
     if (success) {
-      console.log('✅ Student deleted')
       setShowDelete(false)
       setSelectedStudent(null)
-      // Force refresh parent data
       onRefresh()
     }
   }, [selectedStudent, actions, onRefresh])
@@ -122,9 +100,6 @@ export function StudentManagement({
     setSelectedStudent(updatedStudent)
   }, [])
 
-  // ============================================
-  // LOADING STATE
-  // ============================================
   if (loading) {
     return (
       <div className="space-y-6">
@@ -137,22 +112,15 @@ export function StudentManagement({
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
           {[1, 2, 3, 4].map(i => (
-            <div
-              key={i}
-              className="h-40 bg-muted animate-pulse rounded-xl"
-            />
+            <div key={i} className="h-40 bg-muted animate-pulse rounded-xl" />
           ))}
         </div>
       </div>
     )
   }
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <div className="space-y-6">
-      {/* Header */}
       <StudentHeader
         totalStudents={students.length}
         onlineCount={presence.onlineCount}
@@ -167,7 +135,6 @@ export function StudentManagement({
         onClearSelection={handleClearSelection}
       />
 
-      {/* Search & Filter Bar */}
       {(filters.viewMode === 'list' || filters.selectedClass) && (
         <StudentSearchFilter
           searchQuery={filters.searchQuery}
@@ -183,7 +150,6 @@ export function StudentManagement({
         />
       )}
 
-      {/* Class Cards View */}
       {filters.viewMode === 'classes' && !filters.selectedClass && (
         <StudentClassCards
           classGroups={filters.classGroups}
@@ -191,7 +157,6 @@ export function StudentManagement({
         />
       )}
 
-      {/* Student Table View */}
       {(filters.viewMode === 'list' || filters.selectedClass) && (
         <StudentTable
           students={filters.filteredStudents}
@@ -205,46 +170,53 @@ export function StudentManagement({
         />
       )}
 
-      {/* ============================================ */}
-      {/* DIALOGS */}
-      {/* ============================================ */}
+      {/* ✅ Only render dialogs when open - saves memory */}
+      {showCredentials && (
+        <CredentialsDialog
+          open={showCredentials}
+          onOpenChange={setShowCredentials}
+          credentials={credentials}
+        />
+      )}
 
-      <CredentialsDialog
-        open={showCredentials}
-        onOpenChange={setShowCredentials}
-        credentials={credentials}
-      />
+      {showResetPassword && (
+        <ResetPasswordDialog
+          open={showResetPassword}
+          onOpenChange={setShowResetPassword}
+          student={selectedStudent}
+        />
+      )}
 
-      <ResetPasswordDialog
-        open={showResetPassword}
-        onOpenChange={setShowResetPassword}
-        student={selectedStudent}
-      />
+      {showDelete && (
+        <DeleteConfirmDialog
+          open={showDelete}
+          onOpenChange={setShowDelete}
+          student={selectedStudent}
+          onConfirm={handleConfirmDelete}
+          isSubmitting={actions.isSubmitting}
+        />
+      )}
 
-      <DeleteConfirmDialog
-        open={showDelete}
-        onOpenChange={setShowDelete}
-        student={selectedStudent}
-        onConfirm={handleConfirmDelete}
-        isSubmitting={actions.isSubmitting}
-      />
+      {showEdit && (
+        <EditStudentDialog
+          open={showEdit}
+          onOpenChange={setShowEdit}
+          student={selectedStudent}
+          onStudentChange={handleStudentChange}
+          onSave={handleSaveEdit}
+          isSubmitting={actions.isSubmitting}
+        />
+      )}
 
-      <EditStudentDialog
-        open={showEdit}
-        onOpenChange={setShowEdit}
-        student={selectedStudent}
-        onStudentChange={handleStudentChange}
-        onSave={handleSaveEdit}
-        isSubmitting={actions.isSubmitting}
-      />
-
-      <ViewDetailsDialog
-        open={showViewDetails}
-        onOpenChange={setShowViewDetails}
-        student={selectedStudent}
-        status={selectedStudent ? presence.getStatus(selectedStudent.id) : 'offline'}
-        lastSeen={selectedStudent ? presence.getLastSeen(selectedStudent.id) : ''}
-      />
+      {showViewDetails && (
+        <ViewDetailsDialog
+          open={showViewDetails}
+          onOpenChange={setShowViewDetails}
+          student={selectedStudent}
+          status={selectedStudent ? presence.getStatus(selectedStudent.id) : 'offline'}
+          lastSeen={selectedStudent ? presence.getLastSeen(selectedStudent.id) : ''}
+        />
+      )}
     </div>
   )
 }

@@ -1,9 +1,10 @@
-// app/admin/layout.tsx - FULL FIXED
+// app/admin/layout.tsx
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
+import { instantLogout } from '@/lib/auth-utils'
 import { Header } from '@/components/layout/header'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
@@ -60,8 +61,6 @@ function formatProfileForHeader(profile: AdminProfile | null) {
   if (!profile) return undefined
 
   const displayName = profile.display_name || profile.full_name || 'Administrator'
-  
-  // ✅ Get first name from "Surname FirstName Other" format
   const nameParts = displayName.split(' ')
   const firstName = nameParts.length >= 2 ? nameParts[1] : nameParts[0]
 
@@ -75,6 +74,10 @@ function formatProfileForHeader(profile: AdminProfile | null) {
     isAuthenticated: true
   }
 }
+
+// Cache counts for 2 minutes
+let countsCache: { data: any; timestamp: number } | null = null
+const COUNTS_CACHE_DURATION = 120000
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -102,19 +105,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         .single()
       if (data) setProfile(data)
 
+      // Use cached counts if available
+      if (countsCache && Date.now() - countsCache.timestamp < COUNTS_CACHE_DURATION) {
+        const c = countsCache.data
+        setNotificationCount(c.notificationCount)
+        setPendingExamsCount(c.pendingExamsCount)
+        setPendingReports(c.pendingReports)
+        setPendingInquiries(c.pendingInquiries)
+        return
+      }
+
+      // Fetch counts (only when cache expired)
       try {
-        const { count: n } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('read', false)
-        if (n) setNotificationCount(n)
-        const { count: e } = await supabase.from('exams').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-        if (e) setPendingExamsCount(e)
-        const { count: r } = await supabase.from('report_cards').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-        if (r) setPendingReports(r)
-        const { count: i } = await supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', 'pending')
-        if (i) setPendingInquiries(i)
-      } catch { /* silent */ }
+        const { count: n } = await supabase.from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', session.user.id)
+          .eq('read', false)
+        const { count: e } = await supabase.from('exams')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending')
+        const { count: r } = await supabase.from('report_cards')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending')
+        const { count: i } = await supabase.from('inquiries')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'pending')
+
+        const counts = {
+          notificationCount: n || 0,
+          pendingExamsCount: e || 0,
+          pendingReports: r || 0,
+          pendingInquiries: i || 0
+        }
+        countsCache = { data: counts, timestamp: Date.now() }
+
+        setNotificationCount(counts.notificationCount)
+        setPendingExamsCount(counts.pendingExamsCount)
+        setPendingReports(counts.pendingReports)
+        setPendingInquiries(counts.pendingInquiries)
+      } catch {
+        // Silently fail - counts just stay at 0
+      }
     }
     init()
-  }, [router])
+  }, [router, pathname])
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
@@ -124,9 +158,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
+  // Single source of truth for sign out
   const handleLogout = () => {
-    window.location.href = '/portal'
-    supabase.auth.signOut({ scope: 'local' }).catch(() => {})
+    instantLogout()
   }
 
   return (

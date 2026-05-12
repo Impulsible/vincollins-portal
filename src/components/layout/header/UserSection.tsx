@@ -1,4 +1,4 @@
-// components/layout/header/UserSection.tsx - INDEPENDENT DROPDOWNS
+// components/layout/header/UserSection.tsx - INDEPENDENT DROPDOWNS + NO LOGIN ON PORTAL
 'use client'
 
 import { useState, useRef, useEffect, memo, useCallback } from 'react'
@@ -85,12 +85,12 @@ export const UserSection = memo(function UserSection({
   }, [])
 
   const handleProfileToggle = useCallback(() => {
-    setNotificationOpen(false) // Close notifications when opening profile
+    setNotificationOpen(false)
     setProfileOpen(prev => !prev)
   }, [])
 
   const handleNotificationToggle = useCallback((open: boolean) => {
-    setProfileOpen(false) // Close profile when opening notifications
+    setProfileOpen(false)
     setNotificationOpen(open)
   }, [])
 
@@ -101,7 +101,6 @@ export const UserSection = memo(function UserSection({
   }
 
   return (
-    // ✅ No gap, each item manages its own space
     <div className="flex items-center">
       
       {/* Search Button */}
@@ -147,7 +146,7 @@ export const UserSection = memo(function UserSection({
               <ChevronDown className={cn("h-3 w-3 text-white transition-transform", profileOpen && "rotate-180")} />
             </button>
 
-            {/* Profile Dropdown - absolutely positioned relative to its own container */}
+            {/* Profile Dropdown */}
             {profileOpen && (
               <div className="absolute right-0 top-[64px] w-72 sm:w-80 bg-white rounded-xl shadow-2xl border z-[60] overflow-hidden">
                 <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
@@ -197,6 +196,7 @@ export const UserSection = memo(function UserSection({
                       <Home className="h-4 w-4 text-gray-400 shrink-0" />Home Page
                     </Link>
                   )}
+                  {/* ✅ Don't show Portal Page link when already on portal */}
                   {pathname !== '/portal' && (
                     <Link href="/portal" className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
                       onClick={() => setProfileOpen(false)}>
@@ -215,7 +215,8 @@ export const UserSection = memo(function UserSection({
             )}
           </div>
         ) : (
-          isPublicPage && (
+          // ✅ Don't show Portal Login button when already on portal page
+          isPublicPage && !isPortalPage && (
             <Link href="/portal" className="hidden sm:inline-flex items-center px-4 py-2 bg-[#F5A623] text-[#0A2472] rounded-full font-semibold text-sm mx-0.5">
               <KeyRound className="mr-1.5 h-4 w-4" />Portal Login
             </Link>

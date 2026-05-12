@@ -4,6 +4,7 @@
 import { memo } from 'react'
 import { LogOut } from 'lucide-react'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { instantLogout } from '@/lib/auth-utils'
 
 interface SignOutDialogProps {
   open: boolean
@@ -14,8 +15,7 @@ interface SignOutDialogProps {
 export const SignOutDialog = memo(function SignOutDialog({ open, onClose, onLogout }: SignOutDialogProps) {
   const handleSignOut = () => {
     onClose()
-    window.location.href = '/portal'
-    onLogout?.()
+    instantLogout()
   }
 
   return (
@@ -28,7 +28,9 @@ export const SignOutDialog = memo(function SignOutDialog({ open, onClose, onLogo
             </div>
             Sign Out?
           </AlertDialogTitle>
-          <AlertDialogDescription>Are you sure you want to sign out of your account?</AlertDialogDescription>
+          <AlertDialogDescription>
+            Are you sure you want to sign out of your account?
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="gap-2">
           <AlertDialogCancel className="rounded-xl text-sm">Cancel</AlertDialogCancel>
