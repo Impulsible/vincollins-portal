@@ -308,7 +308,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <>
+    <div className="pb-24 lg:pb-0">
       <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white dark:bg-slate-900 border-t shadow-lg">
         <div className="grid grid-cols-5 gap-1 p-2">
           {[
@@ -388,7 +388,7 @@ function AdminDashboardContent() {
         {activeTab === 'inquiries' && <motion.div key="inquiries" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><AdminInquiriesTab inquiries={inquiries} onNavigate={handleTabChange} /></motion.div>}
         {!['overview', 'broad-sheet', 'students', 'staff', 'exams', 'report-cards', 'inquiries'].includes(activeTab) && <motion.div className="flex flex-col items-center justify-center py-20"><School className="h-16 w-16 text-purple-400 mx-auto" /><h2 className="text-2xl font-bold capitalize mt-4">{activeTab.replace('-', ' ')}</h2><p className="text-muted-foreground">Under development</p></motion.div>}
       </AnimatePresence>
-    </>
+    </div>
   )
 }
 
