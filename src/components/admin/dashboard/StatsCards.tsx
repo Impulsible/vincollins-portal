@@ -54,7 +54,7 @@ const StatCard = memo(({
             </span>
           </div>
         )}
-        <div className="absolute inset-0 opacity-[0.02] bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
+        {/* ✅ Removed dot pattern overlay that caused moiré/static lines on mobile */}
         <CardContent className="relative p-5 lg:p-6">
           <div className="flex items-start justify-between gap-3 lg:gap-4">
             <div className="flex-1 space-y-2 lg:space-y-3">
