@@ -85,16 +85,15 @@ function HeaderContent({ onLogout }: { onLogout?: () => void }) {
             
             <Logo schoolSettings={schoolSettings} />
 
-            {isAuthenticated && (
-              <div className="hidden lg:flex flex-1 justify-center">
-                <DesktopNav 
-                  userRole={user?.role} 
-                  pathname={pathname} 
-                  isPublic={isPublicPage || isPortalPage || isHomePage}
-                  onCbtClick={() => setShowCbtInfo(true)} 
-                />
-              </div>
-            )}
+            {/* ✅ ALWAYS SHOW DESKTOP NAV - public links for unauthenticated users */}
+            <div className="hidden lg:flex flex-1 justify-center">
+              <DesktopNav 
+                userRole={user?.role} 
+                pathname={pathname} 
+                isPublic={!isAuthenticated || isPublicPage || isPortalPage || isHomePage}
+                onCbtClick={() => setShowCbtInfo(true)} 
+              />
+            </div>
 
             <UserSection
               user={user}
