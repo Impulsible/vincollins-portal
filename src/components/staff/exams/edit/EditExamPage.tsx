@@ -32,20 +32,20 @@ const TERM_NAMES: Record<string, string> = {
 }
 
 const CLASSES = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
-const AVAILABLE_SESSIONS = ['2024/2025', '2025/2026', '2026/2027']
+const AVAILABLE_SESSIONS = ['2025/2026', '2026/2027']
 
 const JSS_SUBJECTS = [
   'Mathematics', 'English Studies', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Christian Religious Studies',
   'Islamic Religious Studies', 'Business Studies', 'Home Economics',
   'Agricultural Science', 'Physical and Health Education',
-  'Computer Studies', 'Cultural and Creative Arts', 'French'
+  'Information Technology', 'Security Education', 'Yoruba','Cultural and Creative Arts', 'French'
 ]
 
 const SS_SUBJECTS = [
   'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
   'Economics', 'Government', 'Literature in English', 'Geography',
-  'Commerce', 'Financial Accounting', 'Agricultural Science'
+  'Commerce', 'Data Processing', 'Further Mathematics', 'Civic Education', 'CRS','Financial Accounting', 'Agricultural Science'
 ]
 
 interface EditExamPageProps {

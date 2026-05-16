@@ -5,12 +5,9 @@ import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
-import { Providers } from '@/components/providers';
 import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ProgressBar';
-import { GlobalLoadingWrapper } from '@/components/GlobalLoadingWrapper';
-import { UserProvider } from '@/contexts/UserContext';
-import { ConditionalHeader } from '@/components/ConditionalHeader';
+import { ClientLayout } from '@/components/ClientLayout';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -206,16 +203,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <ProgressBar />
-        <UserProvider>
-          <Providers>
-            <ConditionalHeader />
-            <GlobalLoadingWrapper>
-              <div className="relative flex min-h-screen flex-col">
-                {children}
-              </div>
-            </GlobalLoadingWrapper>
-          </Providers>
-        </UserProvider>
+        <ClientLayout>{children}</ClientLayout>
       </body>
     </html>
   );

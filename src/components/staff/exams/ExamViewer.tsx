@@ -1,4 +1,4 @@
-// components/staff/exams/ExamViewer.tsx - COMPLETE WITH AUTO-CALCULATION
+// components/staff/exams/ExamViewer.tsx - UPDATED WITH SUBMISSIONS BUTTON
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -62,6 +62,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
   const [questions, setQuestions] = useState<Question[]>([])
   const [activeTab, setActiveTab] = useState('overview')
   const [submitting, setSubmitting] = useState(false)
+  const [submissionCount, setSubmissionCount] = useState(0) // ✅ NEW
 
   const loadExamDetails = useCallback(async () => {
     if (!examId) return
@@ -92,16 +93,20 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
       
       setExam(examData)
       setQuestions(extractedQuestions)
+
+      // ✅ Get submission count
+      const { count } = await supabase
+        .from('exam_attempts')
+        .select('*', { count: 'exact', head: true })
+        .eq('exam_id', examId)
       
-      // ✅ Auto-calculate totals from JSONB
-      const totalMarks = extractedQuestions.reduce((sum, q) => sum + (q.marks || 0), 0)
-      const totalQCount = extractedQuestions.length
+      setSubmissionCount(count || 0)
       
       console.log('📊 Exam loaded:', { 
         title: examData.title, 
-        totalQuestions: totalQCount, 
-        totalMarks,
-        questionsCount: extractedQuestions.length 
+        totalQuestions: extractedQuestions.length, 
+        totalMarks: extractedQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0),
+        submissions: count
       })
       
     } catch (error) {
@@ -223,6 +228,21 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {/* ✅ VIEW SUBMISSIONS BUTTON - ALWAYS VISIBLE */}
+          {(exam.status === 'published' || exam.status === 'pending') && (
+            <Button 
+              size="sm" 
+              onClick={() => router.push(`/staff/exams/${examId}/submissions`)} 
+              className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-xs"
+            >
+              <Users className="h-3.5 w-3.5 mr-1" />
+              Submissions
+              {submissionCount > 0 && (
+                <Badge className="ml-1.5 bg-white/20 text-white text-[10px]">{submissionCount}</Badge>
+              )}
+            </Button>
+          )}
+          
           {exam.status === 'draft' && (
             <>
               <Button variant="outline" size="sm" onClick={onEdit} className="h-8 sm:h-9 text-xs">
@@ -300,6 +320,14 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
             </span>
           </div>
         )}
+        {/* ✅ Show submission count */}
+        {submissionCount > 0 && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5">
+            <span className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-400">
+              👥 {submissionCount} submission{submissionCount !== 1 ? 's' : ''}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -339,6 +367,14 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
                   <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                   <div><p className="text-[10px] text-muted-foreground">Shuffle Options</p><p className="text-xs">{exam.shuffle_options ? 'Yes' : 'No'}</p></div>
                 </div>
+                {/* ✅ Show submissions count */}
+                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
+                  <Users className="h-3.5 w-3.5 text-blue-600" />
+                  <div>
+                    <p className="text-[10px] text-muted-foreground">Submissions</p>
+                    <p className="text-xs font-medium text-blue-700">{submissionCount}</p>
+                  </div>
+                </div>
               </div>
               
               {exam.instructions && (
@@ -347,13 +383,30 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
                   <p className="text-xs">{exam.instructions}</p>
                 </div>
               )}
+
+              {/* ✅ Quick link to submissions */}
+              {submissionCount > 0 && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-blue-700">{submissionCount} student{submissionCount !== 1 ? 's' : ''} submitted</p>
+                    <p className="text-[10px] text-blue-600">View all scores and grades</p>
+                  </div>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    className="bg-white h-7 text-xs"
+                    onClick={() => router.push(`/staff/exams/${examId}/submissions`)}
+                  >
+                    <Eye className="h-3 w-3 mr-1" /> View
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* Questions Tab */}
         <TabsContent value="questions" className="mt-4 space-y-4">
-          {/* Objective Questions */}
           {objectiveQuestions.length > 0 && (
             <Card>
               <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
@@ -391,7 +444,6 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
             </Card>
           )}
 
-          {/* Theory Questions */}
           {theoryQuestions.length > 0 && (
             <Card>
               <CardHeader className="pb-2 px-3 sm:px-5 pt-3">

@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - OPTIMIZED + NO REDIRECT CONFLICT
+// src/contexts/UserContext.tsx - FULLY FIXED
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -28,12 +28,24 @@ interface UserContextType {
   isAuthenticated: boolean
 }
 
-const AUTH_TIMEOUT = 8000
+const AUTH_TIMEOUT = 5000 // Reduced from 8000
 const ADMIN_USER_ID = 'a799693c-97c7-4f8d-baca-82242a98a00c'
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(null)
+  const [user, setUser] = useState<UserProfile | null>(() => {
+    // ✅ Initialize from sessionStorage to prevent flash
+    if (typeof window !== 'undefined') {
+      const cached = sessionStorage.getItem('userProfile')
+      if (cached) {
+        try {
+          return JSON.parse(cached)
+        } catch {}
+      }
+    }
+    return null
+  })
+  
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
@@ -44,8 +56,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const heartbeatRef = useRef<NodeJS.Timeout>()
   const userRef = useRef<UserProfile | null>(null)
 
+  // ✅ Sync userRef with state
   useEffect(() => {
     userRef.current = user
+    // Cache user in sessionStorage
+    if (user) {
+      sessionStorage.setItem('userProfile', JSON.stringify(user))
+    } else {
+      sessionStorage.removeItem('userProfile')
+    }
   }, [user])
 
   const setOnlineStatus = useCallback((userId: string, online: boolean) => {
@@ -97,6 +116,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const loadUser = useCallback(async () => {
+    // ✅ Return existing promise if already loading
     if (fetchPromiseRef.current) return fetchPromiseRef.current
 
     const fetchPromise = (async () => {
@@ -105,7 +125,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (sessionError) throw sessionError
 
         if (!session?.user) {
-          if (isMountedRef.current) { setUser(null); setLoading(false) }
+          if (isMountedRef.current) { 
+            setUser(null)
+            setLoading(false)
+            sessionStorage.removeItem('userProfile')
+          }
           return null
         }
 
@@ -124,14 +148,26 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             email: session.user.email,
             role: session.user.user_metadata?.role || 'student',
           }
-          if (isMountedRef.current) { setUser(basicProfile); setError(null); setLoading(false) }
+          if (isMountedRef.current) { 
+            setUser(basicProfile)
+            setError(null)
+            setLoading(false)
+          }
           return basicProfile
         }
 
-        if (isMountedRef.current) { setUser(profile); setError(null); setLoading(false) }
+        if (isMountedRef.current) { 
+          setUser(profile)
+          setError(null)
+          setLoading(false)
+        }
         return profile
       } catch (err: any) {
-        if (isMountedRef.current) setLoading(false)
+        console.error('Error loading user:', err)
+        if (isMountedRef.current) {
+          setError(err.message)
+          setLoading(false)
+        }
         return null
       } finally {
         fetchPromiseRef.current = null
@@ -148,32 +184,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     await loadUser()
   }, [loadUser])
 
-  // ✅ Instant sign out - redirect first, cleanup later
   const signOut = useCallback(() => {
-    window.location.replace('/portal')
-    
     const currentUser = userRef.current
     if (currentUser?.id) {
       setOnlineStatus(currentUser.id, false)
     }
     stopHeartbeat()
-    window.dispatchEvent(new Event('student-logout'))
-    supabase.auth.signOut().catch(() => {})
     
+    // ✅ Clear cache
+    sessionStorage.removeItem('userProfile')
+    localStorage.removeItem('auth_user')
+    localStorage.removeItem('auth_role')
+    
+    // ✅ Reset state
     setUser(null)
     setError(null)
     setLoading(false)
+    
+    // ✅ Sign out and redirect
+    supabase.auth.signOut().catch(() => {})
+    window.location.replace('/portal')
   }, [setOnlineStatus, stopHeartbeat])
 
   useEffect(() => {
     isMountedRef.current = true
     
+    // ✅ Faster loading timeout
     const loadingTimeout = setTimeout(() => {
       if (loading && isMountedRef.current) {
-        console.warn('⚠️ Initial load timed out, showing app')
+        console.warn('⚠️ Auth load timed out, forcing ready state')
         setLoading(false)
       }
-    }, 8000)
+    }, AUTH_TIMEOUT)
 
     if (!initialLoadDoneRef.current) {
       initialLoadDoneRef.current = true
@@ -182,6 +224,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        // ✅ Skip INITIAL_SESSION to avoid double loading
         if (event === 'INITIAL_SESSION') return
 
         switch (event) {
@@ -195,14 +238,15 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
             await loadUser()
             break
 
-         case 'SIGNED_OUT':
-  stopHeartbeat()
-  const currentUser = userRef.current
-  if (currentUser?.id) setOnlineStatus(currentUser.id, false)
-  setUser(null)
-  setLoading(false)
-  // ❌ NO window.location.href here
-  break
+          case 'SIGNED_OUT':
+            stopHeartbeat()
+            const currentUser = userRef.current
+            if (currentUser?.id) setOnlineStatus(currentUser.id, false)
+            setUser(null)
+            setLoading(false)
+            sessionStorage.removeItem('userProfile')
+            // ✅ Don't redirect here - let signOut handle it
+            break
 
           case 'TOKEN_REFRESHED':
             if (session?.user) {
@@ -229,7 +273,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [loadUser, setOnlineStatus, startHeartbeat, stopHeartbeat, fetchUserProfile, loading])
 
   const value: UserContextType = {
-    user, loading, error, refreshUser, signOut,
+    user,
+    loading,
+    error,
+    refreshUser,
+    signOut,
     isAuthenticated: !!user,
   }
 

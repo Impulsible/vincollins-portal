@@ -1,9 +1,12 @@
+// next.config.js - FULLY OPTIMIZED
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // FIX: Disable Strict Mode to prevent double auth calls and lock conflicts
+  // ✅ Keep StrictMode OFF to prevent double auth calls in development
+  reactStrictMode: false,
   
   output: 'standalone',
   
+  // ✅ Image optimization
   images: {
     remotePatterns: [
       {
@@ -50,18 +53,32 @@ const nextConfig = {
     dangerouslyAllowSVG: true,
   },
   
+  // ✅ Enable compression
   compress: true,
+  
+  // ✅ Disable source maps in production
   productionBrowserSourceMaps: false,
   
-  // Remove the env section - it's unnecessary and can cause issues
-  // Next.js automatically loads .env.local files
-  
+  // ✅ Experimental optimizations
   experimental: {
     optimizeCss: true,
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons', 'sonner'],
+    optimizePackageImports: [
+      'lucide-react', 
+      '@radix-ui/react-icons', 
+      'sonner',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-slot',
+      'framer-motion',
+      'recharts',
+    ],
+    // ✅ Enable scroll restoration
+    scrollRestoration: true,
   },
   
-  webpack: (config, { isServer }) => {
+  // ✅ Webpack configuration
+  webpack: (config, { isServer, dev }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -73,7 +90,7 @@ const nextConfig = {
       };
     }
     
-    // Fix Watchpack errors on Windows - Add system folders to ignore
+    // ✅ Watch options - ignore system files
     config.watchOptions = {
       ignored: [
         '**/node_modules',
@@ -91,13 +108,13 @@ const nextConfig = {
         'C:/Program Files',
         'C:/Program Files (x86)',
       ],
-      poll: false,
+      poll: dev ? 1000 : false, // Poll in dev, no poll in production
+      aggregateTimeout: 300,
     };
     
-    // Add source map warnings and Watchpack errors to ignore list
+    // ✅ Ignore warnings
     config.ignoreWarnings = [
-      { module: /node_modules\/@radix-ui\/react-slot/ },
-      { module: /node_modules\/@radix-ui\/react-popover/ },
+      { module: /node_modules\/@radix-ui/ },
       { message: /Failed to parse source map/ },
       { message: /Source map error/ },
       { file: /LayoutGroupContext\.mjs\.map/ },
@@ -107,9 +124,49 @@ const nextConfig = {
       { message: /System Volume Information/ },
     ];
     
+    // ✅ Production optimizations
+    if (!dev && !isServer) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            // Separate vendor chunks
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name(module) {
+                const packageName = module.context.match(
+                  /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                )[1];
+                return `vendor.${packageName.replace('@', '')}`;
+              },
+              priority: 10,
+              minChunks: 1,
+            },
+            // Common chunks
+            common: {
+              name: 'common',
+              minChunks: 2,
+              priority: 5,
+              reuseExistingChunk: true,
+            },
+            // Supabase chunk
+            supabase: {
+              test: /[\\/]node_modules[\\/]@supabase[\\/]/,
+              name: 'vendor.supabase',
+              priority: 20,
+            },
+          },
+        },
+        // Minimize CSS
+        minimize: true,
+      };
+    }
+    
     return config;
   },
   
+  // ✅ URL rewrites
   async rewrites() {
     return [
       {
@@ -131,8 +188,10 @@ const nextConfig = {
     ];
   },
   
+  // ✅ Security headers + Caching
   async headers() {
     return [
+      // Global security headers
       {
         source: '/(.*)',
         headers: [
@@ -158,6 +217,7 @@ const nextConfig = {
           },
         ],
       },
+      // Admin pages - no cache
       {
         source: '/admin/:path*',
         headers: [
@@ -167,15 +227,37 @@ const nextConfig = {
           },
         ],
       },
+      // Staff pages - short cache
+      {
+        source: '/staff/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'private, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      // Student pages - short cache
+      {
+        source: '/student/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'private, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      // Static images - long cache
       {
         source: '/images/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'public, max-age=86400, must-revalidate',
+            value: 'public, max-age=86400, stale-while-revalidate=604800',
           },
         ],
       },
+      // Fonts - immutable cache
       {
         source: '/fonts/:path*',
         headers: [
@@ -185,6 +267,7 @@ const nextConfig = {
           },
         ],
       },
+      // Next.js static assets - immutable
       {
         source: '/_next/static/:path*',
         headers: [
@@ -194,17 +277,37 @@ const nextConfig = {
           },
         ],
       },
+      // API routes - no cache
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
+          },
+        ],
+      },
     ];
   },
   
+  // ✅ Development optimizations
   onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
+    maxInactiveAge: 60 * 1000, // 60 seconds
+    pagesBufferLength: 5,
   },
   
+  // ✅ Remove X-Powered-By header
   poweredByHeader: false,
-  transpilePackages: ['lucide-react', 'sonner'],
   
+  // ✅ Transpile packages for better tree-shaking
+  transpilePackages: [
+    'lucide-react', 
+    'sonner',
+    '@radix-ui/react-dialog',
+    '@radix-ui/react-dropdown-menu',
+  ],
+  
+  // ✅ TypeScript and ESLint
   typescript: {
     ignoreBuildErrors: false,
   },

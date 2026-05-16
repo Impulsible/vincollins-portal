@@ -1118,3 +1118,62 @@ img, video, iframe {
 .animate-bounce {
   animation: bounce 0.6s ease-in-out infinite;
 }
+
+/* globals.css - Add at the end */
+
+/* Prevent header flash */
+body {
+  --header-height: 64px;
+}
+
+@media (min-width: 640px) {
+  body {
+    --header-height: 72px;
+  }
+}
+
+/* Header loading state */
+.header-loading {
+  min-height: var(--header-height);
+  background: linear-gradient(to right, #0A2472, #1e3a8a);
+}
+
+/* Smooth header appearance */
+header {
+  animation: headerFadeIn 0.3s ease-out;
+}
+
+@keyframes headerFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Prevent double active states */
+a.active,
+button.active {
+  position: relative;
+}
+
+a.active::after,
+button.active::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+/* Ensure only one active indicator */
+a.active + a.active::after,
+button.active + button.active::after {
+  display: none;
+}

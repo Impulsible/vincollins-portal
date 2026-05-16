@@ -1,4 +1,4 @@
-// components/layout/header.tsx - REFACTORED NON-BLOCKING HEADER
+// components/layout/header.tsx - FIXED
 'use client'
 
 import { useState, useEffect, Suspense, lazy, memo } from 'react'
@@ -29,7 +29,6 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
-// ✅ Static shell for initial SSR - renders immediately
 const HeaderShell = memo(() => (
   <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-2 sm:py-3">
     <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
@@ -44,7 +43,7 @@ const HeaderShell = memo(() => (
 ))
 HeaderShell.displayName = 'HeaderShell'
 
-function HeaderContent({ onLogout }: { onLogout?: () => void }) {
+function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -52,10 +51,51 @@ function HeaderContent({ onLogout }: { onLogout?: () => void }) {
   const [showCbtInfo, setShowCbtInfo] = useState(false)
   const [showSignOut, setShowSignOut] = useState(false)
   const [scrolled, setScrolled] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
 
-  // ✅ Non-blocking - all data loads in background
-  const { user, schoolSettings, notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useHeaderData()
-  const isAuthenticated = user?.isAuthenticated ?? false
+  const { 
+    user: fetchedUser, 
+    schoolSettings, 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    deleteNotification,
+    isLoading,
+    isAuthenticated 
+  } = useHeaderData()
+
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  // ✅ Use prop user if provided (from ConditionalHeader), otherwise fetched user
+  const user = propUser || fetchedUser
+
+  // ✅ Determine page type for navigation
+  const isHomePage = pathname === '/'
+  const isPortalPage = pathname === '/portal'
+  
+  // ✅ PUBLIC PAGES: Home, Admission, Schools, Contact, Portal
+  const publicPages = ['/', '/admission', '/schools', '/contact']
+  const isPublicPage = publicPages.includes(pathname || '') || pathname?.startsWith('/admission') || pathname?.startsWith('/schools')
+  
+  // ✅ DASHBOARD PAGES: Student, Staff, Admin dashboards
+  const isStudentPage = pathname?.startsWith('/student')
+  const isStaffPage = pathname?.startsWith('/staff')
+  const isAdminPage = pathname?.startsWith('/admin')
+
+  // ✅ CRITICAL LOGIC:
+  // Show public nav IF:
+  // 1. User is NOT authenticated (guest) - always show public nav
+  // 2. User IS authenticated BUT visiting a public page (home, admission, etc.) - show public nav
+  // Show dashboard nav IF:
+  // 3. User IS authenticated AND on their dashboard pages - show role-specific nav
+  const showPublicNav = !isHydrated || isLoading 
+    ? false // Don't show anything during loading
+    : !isAuthenticated 
+      ? true // Guest user - always public nav
+      : (isPublicPage || isHomePage) && !isStudentPage && !isStaffPage && !isAdminPage // Authenticated but on public page
 
   // Scroll detection
   useEffect(() => {
@@ -70,10 +110,6 @@ function HeaderContent({ onLogout }: { onLogout?: () => void }) {
     return () => { document.body.style.overflow = 'unset' }
   }, [mobileMenuOpen])
 
-  const isPortalPage = pathname === '/portal'
-  const isHomePage = pathname === '/'
-  const isPublicPage = pathname === '/' || pathname === '/admission' || pathname === '/schools' || pathname === '/contact'
-
   return (
     <>
       <header className={cn(
@@ -85,12 +121,12 @@ function HeaderContent({ onLogout }: { onLogout?: () => void }) {
             
             <Logo schoolSettings={schoolSettings} />
 
-            {/* ✅ ALWAYS SHOW DESKTOP NAV - public links for unauthenticated users */}
+            {/* ✅ Desktop Nav */}
             <div className="hidden lg:flex flex-1 justify-center">
               <DesktopNav 
-                userRole={user?.role} 
+                userRole={isHydrated && !isLoading ? user?.role : undefined}
                 pathname={pathname} 
-                isPublic={!isAuthenticated || isPublicPage || isPortalPage || isHomePage}
+                isPublic={showPublicNav}
                 onCbtClick={() => setShowCbtInfo(true)} 
               />
             </div>
@@ -134,14 +170,12 @@ function HeaderContent({ onLogout }: { onLogout?: () => void }) {
   )
 }
 
-// ✅ Main export - same import path for all pages
 export const Header = memo(function Header(props: HeaderProps) {
   return (
     <Suspense fallback={<HeaderShell />}>
-      <HeaderContent onLogout={props.onLogout} />
+      <HeaderContent {...props} />
     </Suspense>
   )
 })
 
-// ✅ Default export for existing imports
 export default Header

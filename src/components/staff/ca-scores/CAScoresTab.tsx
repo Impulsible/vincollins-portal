@@ -76,13 +76,14 @@ const SENIOR_SUBJECTS = [
   'English Language', 'Mathematics', 'Civic Education',
   'Physics', 'Chemistry', 'Biology', 'Agricultural Science',
   'Economics', 'Geography', 'Government', 'Literature in English',
-  'CRS', 'Yoruba', 'French', 'Computer Science', 'Commerce', 'Financial Accounting'
+  'CRS', 'Yoruba', 'Commerce', 'Financial Accounting',
+  'Data Processing', 'Further Mathematics' 
 ]
 
 const JUNIOR_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Agricultural Science', 'Business Studies',
-  'Home Economics', 'CRS', 'Yoruba', 'French', 'Computer Science',
+  'Home Economics', 'CRS', 'Yoruba', 'French', 'Information Technology',
   'Creative Arts', 'Physical Education', 'History', 'Security Education'
 ]
 
