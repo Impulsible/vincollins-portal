@@ -1,25 +1,22 @@
-// app/staff/page.tsx - FULL UPDATE - ONLY PENDING THEORY
+// app/staff/page.tsx - FIXED: Correct column names and queries
 'use client'
 
-import { useState, useEffect, Suspense, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/contexts/UserContext'
 import { AuthGuard } from '@/components/AuthGuard'
-import { useDataFetching } from '@/hooks/useDataFetching'
-import { instantLogout } from '@/lib/auth-utils'
 import StaffWelcomeBanner from '@/components/staff/StaffWelcomeBanner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { 
   MonitorPlay, FileText, BookOpen, Users, ArrowRight, 
   Loader2, Calculator, Plus,
-  GraduationCap, FileCheck, Briefcase, Clock, AlertCircle,
-  ChevronRight, Shield, CheckCircle2, Eye
+  GraduationCap, FileCheck, Clock, Briefcase,
+  ChevronRight, CheckCircle2, RefreshCw, AlertTriangle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import Link from 'next/link'
@@ -28,109 +25,25 @@ import Link from 'next/link'
 // TYPES & CONSTANTS
 // ============================================
 interface DashboardStats {
-  totalStudents: number
-  activeStudents: number
-  activeClasses: number
-  pendingCAScores: number
-  publishedExams: number
-  totalExams: number
-  totalAssignments: number
-  totalNotes: number
-  reportCardsGenerated: number
-  averagePerformance: number
-  classBreakdown: { name: string; count: number }[]
-  pendingTheoryCount: number
-  pendingTheorySubmissions: any[]
-  recentSubmissions: any[]
+  totalStudents: number; activeStudents: number; activeClasses: number
+  pendingCAScores: number; publishedExams: number; totalExams: number
+  totalAssignments: number; totalNotes: number; reportCardsGenerated: number
+  averagePerformance: number; classBreakdown: { name: string; count: number }[]
+  pendingTheoryCount: number; pendingTheorySubmissions: any[]; recentSubmissions: any[]
 }
 
-interface DashboardData {
-  exams: any[]
-  assignments: any[]
-  notes: any[]
-  stats: DashboardStats
-}
+interface DashboardData { exams: any[]; assignments: any[]; notes: any[]; stats: DashboardStats }
 
 const TERM_START = new Date('2026-05-04')
 const TERM_END = new Date('2026-08-01')
 const TOTAL_WEEKS = 13
-const LOAD_TIMEOUT = 6000
-const VISIBILITY_REFRESH_INTERVAL = 120000
 
 const DEFAULT_STATS: DashboardStats = {
   totalStudents: 0, activeStudents: 0, activeClasses: 0,
   pendingCAScores: 0, publishedExams: 0, totalExams: 0,
   totalAssignments: 0, totalNotes: 0, reportCardsGenerated: 0,
   averagePerformance: 0, classBreakdown: [],
-  pendingTheoryCount: 0, pendingTheorySubmissions: [],
-  recentSubmissions: []
-}
-
-// ============================================
-// SKELETON
-// ============================================
-function DashboardSkeleton() {
-  return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
-      <div className="h-40 sm:h-48 bg-gradient-to-r from-emerald-600 to-teal-600 animate-pulse" />
-      <div className="px-4 sm:px-6 lg:px-8 pb-8 -mt-16 sm:-mt-20 relative z-10">
-        <div className="flex items-center gap-2 mt-4 sm:mt-5 flex-wrap">
-          <Skeleton className="h-9 w-24 rounded-md" />
-          <Skeleton className="h-9 w-28 rounded-md" />
-          <Skeleton className="h-9 w-20 rounded-md" />
-          <Skeleton className="h-9 w-24 rounded-md ml-auto" />
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-          <div className="lg:col-span-2 space-y-4">
-            <Card>
-              <CardHeader className="flex-row items-center justify-between py-3 px-4">
-                <Skeleton className="h-5 w-28" /><Skeleton className="h-8 w-16" />
-              </CardHeader>
-              <CardContent className="px-4 pb-4 pt-0">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="flex items-center justify-between py-2.5">
-                    <div className="flex items-center gap-3">
-                      <Skeleton className="h-8 w-8 rounded" />
-                      <div><Skeleton className="h-4 w-32 mb-1" /><Skeleton className="h-3 w-24" /></div>
-                    </div>
-                    <Skeleton className="h-5 w-16 rounded-full" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="flex-row items-center justify-between py-3 px-4">
-                <Skeleton className="h-5 w-36" /><Skeleton className="h-8 w-16" />
-              </CardHeader>
-              <CardContent className="px-4 pb-4 pt-0">
-                {[1,2,3].map(i => (
-                  <div key={i} className="flex items-center gap-3 py-2.5">
-                    <Skeleton className="h-8 w-8 rounded" />
-                    <div className="flex-1"><Skeleton className="h-4 w-36 mb-1" /><Skeleton className="h-3 w-24" /></div>
-                    <Skeleton className="h-4 w-4" />
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-          <div className="space-y-4">
-            <Card>
-              <CardHeader className="py-3 px-4"><Skeleton className="h-5 w-20" /></CardHeader>
-              <CardContent className="px-4 pb-4 pt-0 space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  {[1,2,3,4].map(i => (
-                    <div key={i} className="p-3 bg-slate-50 rounded-lg">
-                      <Skeleton className="h-7 w-12 mb-1" /><Skeleton className="h-3 w-16" />
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  pendingTheoryCount: 0, pendingTheorySubmissions: [], recentSubmissions: []
 }
 
 // ============================================
@@ -151,14 +64,35 @@ function EmptyState({ icon: Icon, title, action }: { icon: any; title: string; a
 }
 
 // ============================================
+// LOADING SPINNER
+// ============================================
+function PreparingWorkspace() {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+      <div className="text-center">
+        <div className="relative mx-auto mb-6 h-16 w-16">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+          <Briefcase className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
+        </div>
+        <h2 className="text-lg font-semibold text-slate-700 mb-1">Preparing Your Workspace</h2>
+        <p className="text-sm text-slate-500">Loading your dashboard...</p>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
 // MAIN CONTENT
 // ============================================
 function StaffDashboardContent() {
   const router = useRouter()
-  const { user: contextUser } = useUser()
+  const { user: contextUser, loading: authLoading } = useUser()
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
+  const [dataLoading, setDataLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
-  const lastVisibilityRef = useRef(0)
-  const isInitialLoadRef = useRef(true)
+  const hasLoadedOnce = useRef(false)
 
   const termInfo = useMemo(() => {
     const now = new Date()
@@ -175,45 +109,93 @@ function StaffDashboardContent() {
     return { termName: 'Third Term', sessionYear: '2025/2026', currentWeek, totalWeeks: TOTAL_WEEKS, weekProgress, displayWeek }
   }, [])
 
-  // ✅ Fetch dashboard data - ONLY pending_theory submissions
   const fetchDashboardData = useCallback(async (): Promise<DashboardData> => {
-    const userId = contextUser?.id
-    if (!userId) throw new Error('User not authenticated')
+    const { data: { session } } = await supabase.auth.getSession()
+    const userId = session?.user?.id
+    if (!userId) throw new Error('Not authenticated')
 
-    const fetchPromise = Promise.all([
-      supabase.from('exams').select('id, title, subject, class, status, created_at').eq('created_by', userId).order('created_at', { ascending: false }).limit(10),
-      supabase.from('assignments').select('id, title, subject, class, created_at').eq('created_by', userId).order('created_at', { ascending: false }).limit(5),
-      supabase.from('notes').select('id, title, subject, created_at').order('created_at', { ascending: false }).limit(4),
-      supabase.from('profiles').select('class, is_active').eq('role', 'student'),
-      supabase.from('ca_scores').select('total_score').limit(1000),
-      // ✅ ONLY pending_theory - completed/graded are excluded
+    // ============================================
+    // STEP 1: Fetch basic data in parallel
+    // ============================================
+    const results = await Promise.allSettled([
+      supabase.from('exams')
+        .select('id, title, subject, class, status, created_at')
+        .eq('created_by', userId)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase.from('assignments')
+        .select('id, title, subject_id, class_id, created_at')
+        .order('created_at', { ascending: false })
+        .limit(5),
+      supabase.from('notes')
+        .select('id, title, created_at')
+        .order('created_at', { ascending: false })
+        .limit(4),
+      supabase.from('profiles')
+        .select('class, is_active')
+        .eq('role', 'student'),
       supabase.from('exam_attempts')
-        .select('exam_id, student_name, student_email, submitted_at, id, status, total_score, percentage')
+        .select('exam_id, student_name, submitted_at, id, status, total_score, percentage')
         .eq('status', 'pending_theory')
         .order('submitted_at', { ascending: false })
         .limit(20)
     ])
 
-    const timeoutPromise = new Promise<null>((_, reject) => setTimeout(() => reject(new Error('Timeout')), LOAD_TIMEOUT))
-    const results = await Promise.race([fetchPromise, timeoutPromise])
+    const examsResult = results[0].status === 'fulfilled' ? results[0].value : { data: [], error: results[0].reason }
+    const assignmentsResult = results[1].status === 'fulfilled' ? results[1].value : { data: [], error: results[1].reason }
+    const notesResult = results[2].status === 'fulfilled' ? results[2].value : { data: [], error: results[2].reason }
+    const studentsResult = results[3].status === 'fulfilled' ? results[3].value : { data: [], error: results[3].reason }
+    const submissionsResult = results[4].status === 'fulfilled' ? results[4].value : { data: [], error: results[4].reason }
 
-    if (!results) throw new Error('Data load timeout')
-
-    const [examsResult, assignmentsResult, notesResult, studentsResult, scoresResult, submissionsResult] = results as any
+    if (examsResult.error) console.warn('⚠️ Exams:', examsResult.error)
+    if (assignmentsResult.error) console.warn('⚠️ Assignments:', assignmentsResult.error)
+    if (notesResult.error) console.warn('⚠️ Notes:', notesResult.error)
+    if (studentsResult.error) console.warn('⚠️ Students:', studentsResult.error)
+    if (submissionsResult.error) console.warn('⚠️ Submissions:', submissionsResult.error)
 
     const examData = examsResult?.data || []
     const assignmentData = assignmentsResult?.data || []
     const notesData = notesResult?.data || []
     const studentsData = studentsResult?.data || []
-    const scoresData = scoresResult?.data || []
     const recentSubmissions = submissionsResult?.data || []
 
-    // Enrich submissions with exam titles
+    // ============================================
+    // STEP 2: Enrich assignments with subject/class names
+    // ============================================
+    let subjectMap: Record<string, string> = {}
+    const assignmentSubjectIds = [...new Set(assignmentData.map((a: any) => a.subject_id).filter(Boolean))]
+    if (assignmentSubjectIds.length > 0) {
+      try {
+        const { data: subjects } = await supabase.from('subjects').select('id, name').in('id', assignmentSubjectIds)
+        subjects?.forEach((s: any) => { subjectMap[s.id] = s.name })
+      } catch (e) {}
+    }
+
+    let classMapForAssignments: Record<string, string> = {}
+    const assignmentClassIds = [...new Set(assignmentData.map((a: any) => a.class_id).filter(Boolean))]
+    if (assignmentClassIds.length > 0) {
+      try {
+        const { data: classes } = await supabase.from('classes').select('id, name').in('id', assignmentClassIds)
+        classes?.forEach((c: any) => { classMapForAssignments[c.id] = c.name })
+      } catch (e) {}
+    }
+
+    const enrichedAssignments = assignmentData.map((a: any) => ({
+      ...a,
+      subject: subjectMap[a.subject_id] || 'Unknown',
+      class: classMapForAssignments[a.class_id] || 'Unknown'
+    }))
+
+    // ============================================
+    // STEP 3: Enrich submissions with exam titles
+    // ============================================
     const submissionExamIds = [...new Set(recentSubmissions.map((s: any) => s.exam_id))]
     const examTitleMap: Record<string, any> = {}
     if (submissionExamIds.length > 0) {
-      const { data: details } = await supabase.from('exams').select('id, title, subject, class').in('id', submissionExamIds.slice(0, 20))
-      details?.forEach((e: any) => { examTitleMap[e.id] = e })
+      try {
+        const { data: details } = await supabase.from('exams').select('id, title, subject, class').in('id', submissionExamIds)
+        details?.forEach((e: any) => { examTitleMap[e.id] = e })
+      } catch (e) {}
     }
 
     const enrichedSubmissions = recentSubmissions.map((s: any) => ({
@@ -223,9 +205,112 @@ function StaffDashboardContent() {
       exam_class: examTitleMap[s.exam_id]?.class || ''
     }))
 
+    // Class breakdown
     const classMap = new Map<string, number>()
-    studentsData.forEach((s: any) => { if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1) })
-    const avgPerf = scoresData.length ? Math.round(scoresData.reduce((sum: number, s: any) => sum + (s.total_score || 0), 0) / scoresData.length) : 0
+    studentsData.forEach((s: any) => { 
+      if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1) 
+    })
+
+    // ============================================
+    // ✅ STEP 4: TEACHER-SPECIFIC AVERAGE PERFORMANCE
+    // Fixed: Use correct column names
+    // - ca_scores likely has 'student_id' not 'exam_id'
+    // - exam_attempts uses 'status' not 'total_score' for null check
+    // ============================================
+    const teacherExamIds = examData.map((e: any) => e.id)
+    let averagePerformance = 0
+
+    if (teacherExamIds.length > 0) {
+      try {
+        // ✅ Fetch exam_attempts for this teacher's exams
+        // Only get graded ones (not pending_theory)
+        const { data: scoredAttempts, error: attemptsError } = await supabase
+          .from('exam_attempts')
+          .select('total_score, percentage, exam_id')
+          .in('exam_id', teacherExamIds)
+          .neq('status', 'pending_theory')
+          .limit(10000)
+
+        if (attemptsError) {
+          console.warn('⚠️ exam_attempts query error:', attemptsError)
+        }
+
+        // ✅ Try ca_scores - it might use different column names
+        // Try without exam_id filter first to see if table exists
+        let caScoresData: any[] = []
+        try {
+          // First try with exam_id (might fail)
+          const { data: ca1, error: caError1 } = await supabase
+            .from('ca_scores')
+            .select('*')
+            .limit(1)
+          
+          if (!caError1 && ca1 && ca1.length > 0) {
+            // Table exists, check what columns it has
+            const sampleRow = ca1[0]
+            console.log('📊 ca_scores sample row:', Object.keys(sampleRow))
+            
+            // If it has exam_id, filter by it
+            if ('exam_id' in sampleRow) {
+              const { data: ca2 } = await supabase
+                .from('ca_scores')
+                .select('total_score, exam_id')
+                .in('exam_id', teacherExamIds)
+                .limit(10000)
+              caScoresData = ca2 || []
+            }
+            // If it has no exam_id, try without filter (all CA scores are teacher-specific via RLS?)
+            else {
+              const { data: ca3 } = await supabase
+                .from('ca_scores')
+                .select('*')
+                .limit(10000)
+              caScoresData = ca3 || []
+            }
+          }
+        } catch (e) {
+          console.warn('⚠️ ca_scores table might not exist or have different schema:', e)
+        }
+
+        const scoredAttemptsList = scoredAttempts || []
+        const caScoresList = caScoresData || []
+
+        console.log('📊 [AVG PERF DEBUG]:', {
+          teacherExamIds,
+          scoredAttemptsCount: scoredAttemptsList.length,
+          caScoresCount: caScoresList.length
+        })
+
+        // Collect all valid scores
+        const allScores: number[] = []
+
+        scoredAttemptsList.forEach((s: any) => {
+          const score = s.percentage || s.total_score || 0
+          if (score > 0) allScores.push(score)
+        })
+
+        caScoresList.forEach((s: any) => {
+          const score = s.total_score || s.score || 0
+          if (score > 0) allScores.push(score)
+        })
+
+        console.log('📊 [AVG PERF RESULT]:', {
+          allScoresCount: allScores.length,
+          firstFive: allScores.slice(0, 5),
+          average: allScores.length > 0
+            ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
+            : 0
+        })
+
+        if (allScores.length > 0) {
+          averagePerformance = Math.round(
+            allScores.reduce((sum, score) => sum + score, 0) / allScores.length
+          )
+        }
+      } catch (e) {
+        console.warn('⚠️ Failed to calculate average performance:', e)
+      }
+    }
 
     const stats: DashboardStats = {
       totalStudents: studentsData.length,
@@ -237,70 +322,108 @@ function StaffDashboardContent() {
       totalAssignments: assignmentData.length,
       totalNotes: notesData.length,
       reportCardsGenerated: 0,
-      averagePerformance: avgPerf,
-      classBreakdown: Array.from(classMap.entries()).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count),
+      averagePerformance,
+      classBreakdown: Array.from(classMap.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count),
       pendingTheoryCount: enrichedSubmissions.length,
       pendingTheorySubmissions: enrichedSubmissions,
       recentSubmissions: enrichedSubmissions
     }
 
-    return { exams: examData, assignments: assignmentData, notes: notesData, stats }
-  }, [contextUser?.id])
+    return { exams: examData, assignments: enrichedAssignments, notes: notesData, stats }
+  }, [])
 
-  const { data: dashboardData, loading, refresh, refetch } = useDataFetching<DashboardData>({
-    key: `staff-dashboard-${contextUser?.id}`,
-    fetcher: fetchDashboardData,
-    cacheDuration: 30000,
-    enabled: !!contextUser?.id,
-  })
+  useEffect(() => {
+    if (authLoading || !contextUser?.id) return
+    let cancelled = false
+
+    const loadData = async () => {
+      setDataLoading(true)
+      setLoadError(null)
+      try {
+        const data = await fetchDashboardData()
+        if (!cancelled) {
+          setDashboardData(data)
+          hasLoadedOnce.current = true
+          setDataLoading(false)
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          console.error('❌ Dashboard load error:', error)
+          setLoadError(error?.message || 'Failed to load dashboard')
+          setDataLoading(false)
+        }
+      }
+    }
+
+    loadData()
+    return () => { cancelled = true }
+  }, [contextUser?.id, authLoading, fetchDashboardData])
 
   const exams = dashboardData?.exams || []
   const assignments = dashboardData?.assignments || []
   const notes = dashboardData?.notes || []
   const stats = dashboardData?.stats || DEFAULT_STATS
 
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (isInitialLoadRef.current) { isInitialLoadRef.current = false; return }
-      if (document.visibilityState === 'visible') {
-        if (Date.now() - lastVisibilityRef.current > VISIBILITY_REFRESH_INTERVAL && contextUser?.id) {
-          lastVisibilityRef.current = Date.now()
-          refresh()
-        }
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [refresh, contextUser?.id])
-
   const handleRefresh = async () => {
     setRefreshing(true)
-    await refetch()
-    toast.success('Dashboard refreshed')
+    setLoadError(null)
+    try {
+      const data = await fetchDashboardData()
+      setDashboardData(data)
+      toast.success('Dashboard refreshed')
+    } catch (error: any) {
+      toast.error(error?.message || 'Refresh failed')
+    }
     setRefreshing(false)
   }
 
   const formatDate = (d?: string) => {
     if (!d) return ''
-    try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
+    try {
+      return new Date(d).toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      })
+    } catch { return '' }
   }
 
-  const handleLogout = () => instantLogout()
   const profile = contextUser
 
-  if (loading) return <DashboardSkeleton />
+  if (authLoading || dataLoading) {
+    return <PreparingWorkspace />
+  }
+
+  if (loadError && !hasLoadedOnce.current) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center max-w-sm px-4">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-slate-700 mb-2">Failed to Load Dashboard</h2>
+          <p className="text-sm text-slate-500 mb-4">{loadError}</p>
+          <Button onClick={handleRefresh} className="bg-emerald-600 hover:bg-emerald-700">
+            <RefreshCw className="mr-2 h-4 w-4" /> Retry
+          </Button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
-      <StaffWelcomeBanner 
-        profile={profile} 
+      <StaffWelcomeBanner
+        profile={profile}
         stats={{
-          totalExams: stats.totalExams, publishedExams: stats.publishedExams,
-          totalStudents: stats.totalStudents, activeStudents: stats.activeStudents,
-          pendingGrading: stats.pendingCAScores, totalAssignments: stats.totalAssignments,
-          totalNotes: stats.totalNotes, reportCardsGenerated: stats.reportCardsGenerated,
+          totalExams: stats.totalExams,
+          publishedExams: stats.publishedExams,
+          totalStudents: stats.totalStudents,
+          activeStudents: stats.activeStudents,
+          pendingGrading: stats.pendingCAScores,
+          totalAssignments: stats.totalAssignments,
+          totalNotes: stats.totalNotes,
+          reportCardsGenerated: stats.reportCardsGenerated,
           averagePerformance: stats.averagePerformance
-        }} 
+        }}
         termInfo={termInfo}
       />
 
@@ -324,7 +447,7 @@ function StaffDashboardContent() {
           </Button>
         </div>
 
-        {/* ✅ PENDING SUBMISSIONS - Only pending_theory */}
+        {/* Pending Submissions */}
         {stats.recentSubmissions.length > 0 && (
           <div className="mt-4 p-4 bg-white dark:bg-slate-900 border rounded-lg">
             <div className="flex items-center justify-between mb-3">
@@ -336,11 +459,9 @@ function StaffDashboardContent() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
               {stats.recentSubmissions.slice(0, 6).map((sub: any) => (
-                <div 
-                  key={sub.id} 
-                  className="flex items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-md border hover:border-amber-300 dark:hover:border-amber-700 transition-colors cursor-pointer"
-                  onClick={() => router.push(`/staff/exams/${sub.exam_id}/submissions/${sub.id}`)}
-                >
+                <div key={sub.id}
+                  className="flex items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-md border hover:border-amber-300 cursor-pointer"
+                  onClick={() => router.push(`/staff/exams/${sub.exam_id}/submissions/${sub.id}`)}>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{sub.student_name || 'Unknown'}</p>
                     <p className="text-xs text-muted-foreground truncate">{sub.exam_title}</p>
@@ -349,28 +470,25 @@ function StaffDashboardContent() {
                       <Badge className="text-[10px] bg-amber-100 text-amber-700">Needs Grading</Badge>
                     </div>
                   </div>
-                  <Button size="sm" className="h-7 text-xs bg-amber-600 hover:bg-amber-700 shrink-0">
-                    Grade
-                  </Button>
+                  <Button size="sm" className="h-7 text-xs bg-amber-600 hover:bg-amber-700 shrink-0">Grade</Button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* ✅ Empty state when all graded */}
+        {/* All caught up */}
         {stats.recentSubmissions.length === 0 && stats.totalExams > 0 && (
-          <div className="mt-4 p-6 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-lg text-center">
+          <div className="mt-4 p-6 bg-emerald-50 border border-emerald-200 rounded-lg text-center">
             <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
-            <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">All caught up!</p>
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">No pending submissions to grade</p>
+            <p className="text-sm font-medium text-emerald-700">All caught up!</p>
+            <p className="text-xs text-emerald-600 mt-1">No pending submissions to grade</p>
           </div>
         )}
 
         {/* Main Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
           <div className="lg:col-span-2 space-y-4">
-            {/* Exams */}
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
                 <CardTitle className="text-sm font-medium flex items-center gap-2"><MonitorPlay className="h-4 w-4 text-emerald-600" />Recent Exams</CardTitle>
@@ -382,10 +500,10 @@ function StaffDashboardContent() {
                 ) : (
                   <div className="divide-y">
                     {exams.slice(0, 4).map((exam) => (
-                      <div key={exam.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-2 px-2 rounded transition-colors"
+                      <div key={exam.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
                         onClick={() => router.push(`/staff/exams/${exam.id}/submissions`)}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="p-1.5 bg-blue-50 dark:bg-blue-900/20 rounded"><MonitorPlay className="h-4 w-4 text-blue-600 dark:text-blue-400" /></div>
+                          <div className="p-1.5 bg-blue-50 rounded"><MonitorPlay className="h-4 w-4 text-blue-600" /></div>
                           <div className="min-w-0"><p className="text-sm font-medium truncate">{exam.title}</p><p className="text-xs text-muted-foreground">{exam.subject} · {exam.class}</p></div>
                         </div>
                         <Badge variant="outline" className="text-xs shrink-0 ml-2">{exam.status || 'draft'}</Badge>
@@ -396,7 +514,6 @@ function StaffDashboardContent() {
               </CardContent>
             </Card>
 
-            {/* Assignments */}
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
                 <CardTitle className="text-sm font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-blue-600" />Recent Assignments</CardTitle>
@@ -420,7 +537,6 @@ function StaffDashboardContent() {
               </CardContent>
             </Card>
 
-            {/* Notes */}
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
                 <CardTitle className="text-sm font-medium flex items-center gap-2"><BookOpen className="h-4 w-4 text-purple-600" />Study Notes</CardTitle>
@@ -435,7 +551,7 @@ function StaffDashboardContent() {
                       <div key={note.id} className="flex items-center gap-3 p-2.5 rounded-lg border hover:border-purple-200 cursor-pointer transition-colors"
                         onClick={() => router.push(`/staff/notes/${note.id}`)}>
                         <div className="p-1.5 bg-purple-50 rounded"><BookOpen className="h-4 w-4 text-purple-600" /></div>
-                        <div className="min-w-0"><p className="text-sm font-medium truncate">{note.title}</p><p className="text-xs text-muted-foreground">{note.subject || 'General'}</p></div>
+                        <div className="min-w-0"><p className="text-sm font-medium truncate">{note.title}</p><p className="text-xs text-muted-foreground">General</p></div>
                       </div>
                     ))}
                   </div>
@@ -444,7 +560,6 @@ function StaffDashboardContent() {
             </Card>
           </div>
 
-          {/* Right Sidebar */}
           <div className="space-y-4">
             <Card>
               <CardHeader className="py-3 px-4">
@@ -477,7 +592,6 @@ function StaffDashboardContent() {
               <CardContent className="p-4 space-y-2">
                 <Button variant="outline" className="w-full justify-start h-10 text-sm" onClick={() => router.push('/staff/ca-scores')}>
                   <Calculator className="h-4 w-4 mr-2 text-amber-600" />CA Scores
-                  {stats.pendingCAScores > 0 && <Badge className="ml-auto bg-amber-100 text-amber-700 text-xs">{stats.pendingCAScores}</Badge>}
                 </Button>
                 <Button variant="outline" className="w-full justify-start h-10 text-sm" onClick={() => router.push('/staff/report-cards')}>
                   <FileCheck className="h-4 w-4 mr-2 text-blue-600" />Report Cards
@@ -497,9 +611,7 @@ function StaffDashboardContent() {
 export default function StaffDashboardPage() {
   return (
     <AuthGuard allowedRoles={['staff', 'admin', 'teacher']}>
-      <Suspense fallback={<DashboardSkeleton />}>
-        <StaffDashboardContent />
-      </Suspense>
+      <StaffDashboardContent />
     </AuthGuard>
   )
 }

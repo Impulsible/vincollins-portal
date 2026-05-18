@@ -1,4 +1,4 @@
-// app/admin/page.tsx - FULLY OPTIMIZED + AUTH GUARD + NO TAB RELOAD
+// app/admin/page.tsx - FULLY FIXED + NO JITTER
 'use client'
 
 import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo, Component } from 'react'
@@ -31,22 +31,18 @@ const StudentManagement = dynamic(
   () => import('@/components/admin/students/StudentManagement').then(mod => ({ default: mod.StudentManagement })),
   { loading: () => <TabLoader /> }
 )
-
 const StaffManagement = dynamic(
   () => import('@/components/admin/staff/StaffManagement').then(mod => ({ default: mod.StaffManagement })),
   { loading: () => <TabLoader /> }
 )
-
 const ReportCardApproval = dynamic(
   () => import('@/components/admin/report-cards/ReportCardApproval').then(mod => ({ default: mod.ReportCardApproval })),
   { loading: () => <TabLoader /> }
 )
-
 const BroadSheetPage = dynamic(
   () => import('@/app/admin/broad-sheet/page'),
   { loading: () => <TabLoader /> }
 )
-
 const AdminInquiriesTab = dynamic(
   () => import('@/components/admin/inquiries/AdminInquiriesTab').then(mod => ({ default: mod.AdminInquiriesTab })),
   { loading: () => <TabLoader /> }
@@ -84,15 +80,8 @@ class ErrorBoundary extends Component<
     super(props)
     this.state = { hasError: false, error: null }
   }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error }
-  }
-
-  resetError = () => {
-    this.setState({ hasError: false, error: null })
-  }
-
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error } }
+  resetError = () => this.setState({ hasError: false, error: null })
   render() {
     if (this.state.hasError && this.state.error) {
       const { fallback: Fallback } = this.props
@@ -104,81 +93,30 @@ class ErrorBoundary extends Component<
 
 // ========== TYPES ==========
 interface PendingExam {
-  id: string
-  title: string
-  subject: string
-  class: string
-  duration: number
-  total_questions: number
-  total_marks: number
-  has_theory: boolean
-  questions: Record<string, unknown>[]
+  id: string; title: string; subject: string; class: string
+  duration: number; total_questions: number; total_marks: number
+  has_theory: boolean; questions: Record<string, unknown>[]
   theory_questions: Record<string, unknown>[]
-  instructions: string
-  passing_percentage: number
-  teacher_name: string
-  department: string
-  created_at: string
-  created_by: string
+  instructions: string; passing_percentage: number
+  teacher_name: string; department: string; created_at: string; created_by: string
 }
 
 interface Staff {
-  id: string
-  role: string
-  full_name: string
-  email: string
-  photo_url?: string
-  vin_id: string
-  department: string
-  phone: string
-  address: string
-  is_active: boolean
-  password_changed: boolean
-  created_at: string
-  title?: string
-  date_joined?: string
+  id: string; role: string; full_name: string; email: string
+  photo_url?: string; vin_id: string; department: string
+  phone: string; address: string; is_active: boolean
+  password_changed: boolean; created_at: string; title?: string; date_joined?: string
 }
 
-interface Inquiry {
-  id: string
-  status: string
-  [key: string]: unknown
-}
+interface Inquiry { id: string; status: string; [key: string]: unknown }
 
 interface Exam {
-  id: string
-  title: string
-  subject: string
-  class: string
-  teacher_name: string
-  status: string
-  duration?: number
-  total_questions?: number
-  total_marks?: number
-  has_theory?: boolean
-  questions?: Record<string, unknown>[]
-  theory_questions?: Record<string, unknown>[]
-  instructions?: string
-  passing_percentage?: number
-  pass_mark?: number
-  department?: string
-  created_at: string
-  created_by: string
-}
-
-interface AdminData {
-  students: Student[]
-  staff: Staff[]
-  pendingExams: PendingExam[]
-  publishedExams: Exam[]
-  inquiries: Inquiry[]
-  pendingReports: number
-  stats: {
-    totalStudents: number
-    totalStaff: number
-    activeExams: number
-    pendingSubmissions: number
-  }
+  id: string; title: string; subject: string; class: string
+  teacher_name: string; status: string; duration?: number
+  total_questions?: number; total_marks?: number; has_theory?: boolean
+  questions?: Record<string, unknown>[]; theory_questions?: Record<string, unknown>[]
+  instructions?: string; passing_percentage?: number; pass_mark?: number
+  department?: string; created_at: string; created_by: string
 }
 
 // ========== CONSTANTS ==========
@@ -186,28 +124,19 @@ const LOAD_TIMEOUT = 8000
 const VISIBILITY_REFRESH_INTERVAL = 120000
 
 const routeToTabMap: Record<string, string> = {
-  '/admin': 'overview',
-  '/admin/broad-sheet': 'broad-sheet',
-  '/admin/students': 'students',
-  '/admin/staff': 'staff',
-  '/admin/exams': 'exams',
-  '/admin/report-cards': 'report-cards',
-  '/admin/inquiries': 'inquiries',
-  '/admin/monitor': 'cbt-monitor',
+  '/admin': 'overview', '/admin/broad-sheet': 'broad-sheet',
+  '/admin/students': 'students', '/admin/staff': 'staff',
+  '/admin/exams': 'exams', '/admin/report-cards': 'report-cards',
+  '/admin/inquiries': 'inquiries', '/admin/monitor': 'cbt-monitor',
 }
 
 const tabToRouteMap: Record<string, string> = {
-  'overview': '/admin',
-  'broad-sheet': '/admin/broad-sheet',
-  'students': '/admin/students',
-  'staff': '/admin/staff',
-  'exams': '/admin/exams',
-  'report-cards': '/admin/report-cards',
-  'inquiries': '/admin/inquiries',
-  'cbt-monitor': '/admin/monitor',
+  'overview': '/admin', 'broad-sheet': '/admin/broad-sheet',
+  'students': '/admin/students', 'staff': '/admin/staff',
+  'exams': '/admin/exams', 'report-cards': '/admin/report-cards',
+  'inquiries': '/admin/inquiries', 'cbt-monitor': '/admin/monitor',
 }
 
-// ========== UTILITIES ==========
 function formatFullName(name: string): string {
   if (!name) return ''
   return name.split(/[\s._-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
@@ -250,12 +179,14 @@ function mapToStaff(p: Record<string, unknown>): Staff {
 function AdminDashboardContent() {
   const router = useRouter()
   const pathname = usePathname()
-  const { user: contextUser } = useUser()
+  const { user: contextUser, loading: authLoading } = useUser()
   
   const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [activeTab, setActiveTab] = useState(() => getTabFromPathname(pathname))
   const [error, setError] = useState<Error | null>(null)
+  const [loadError, setLoadError] = useState(false)
+  const [dataLoaded, setDataLoaded] = useState(false)
   
   const [students, setStudents] = useState<Student[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
@@ -264,8 +195,6 @@ function AdminDashboardContent() {
   const [inquiries, setInquiries] = useState<Inquiry[]>([])
   const [refreshing, setRefreshing] = useState(false)
   const [approvingId, setApprovingId] = useState<string | null>(null)
-  const [loadError, setLoadError] = useState(false)
-  const [dataLoaded, setDataLoaded] = useState(false)
   
   const [pendingExamsCount, setPendingExamsCount] = useState(0)
   const [pendingReports, setPendingReports] = useState(0)
@@ -281,6 +210,7 @@ function AdminDashboardContent() {
   const lastVisibilityRef = useRef(0)
   const isInitialLoadRef = useRef(true)
   const mountedRef = useRef(true)
+  const hasLoadedOnce = useRef(false)
 
   // ✅ Set profile from UserContext
   useEffect(() => {
@@ -299,7 +229,7 @@ function AdminDashboardContent() {
   useEffect(() => {
     const tabForCurrentRoute = getTabFromPathname(pathname)
     if (tabForCurrentRoute !== activeTab) setActiveTab(tabForCurrentRoute)
-  }, [pathname, activeTab])
+  }, [pathname])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -310,7 +240,7 @@ function AdminDashboardContent() {
     }
   }, [])
 
-  // Load all data
+  // ✅ Load all data - FIXED dependencies
   const loadAllData = useCallback(async () => {
     if (abortControllerRef.current) abortControllerRef.current.abort()
 
@@ -319,6 +249,7 @@ function AdminDashboardContent() {
 
     setLoadError(false)
     setError(null)
+    if (!hasLoadedOnce.current) setLoading(true)
 
     try {
       const fetchPromises = [
@@ -342,11 +273,13 @@ function AdminDashboardContent() {
 
       if (profilesResult.status === 'fulfilled' && !profilesResult.value.error && profilesResult.value.data) {
         const profiles = profilesResult.value.data as Record<string, unknown>[]
-        const studentProfiles: Student[] = profiles.filter(p => p.role === 'student').map(mapToStudent)
-        const staffProfiles: Staff[] = profiles.filter(p => p.role === 'staff').map(mapToStaff)
-        setStudents(studentProfiles)
-        setStaff(staffProfiles)
-        setStats(prev => ({ ...prev, totalStudents: studentProfiles.length, totalStaff: staffProfiles.length }))
+        setStudents(profiles.filter(p => p.role === 'student').map(mapToStudent))
+        setStaff(profiles.filter(p => p.role === 'staff').map(mapToStaff))
+        setStats(prev => ({
+          ...prev,
+          totalStudents: profiles.filter(p => p.role === 'student').length,
+          totalStaff: profiles.filter(p => p.role === 'staff').length
+        }))
       }
 
       if (examsResult.status === 'fulfilled' && !examsResult.value.error && examsResult.value.data) {
@@ -376,7 +309,9 @@ function AdminDashboardContent() {
         setPendingReports(reportsResult.value.data.length)
       }
 
+      hasLoadedOnce.current = true
       setDataLoaded(true)
+      setLoadError(false)
     } catch (err) {
       if (err instanceof Error && err.message === 'Data load timeout') {
         setLoadError(true); setError(err)
@@ -388,24 +323,27 @@ function AdminDashboardContent() {
       }
     } finally {
       if (!controller.signal.aborted && mountedRef.current) {
-        setLoading(false); setRefreshing(false)
+        setLoading(false)
+        setRefreshing(false)
       }
     }
   }, [])
 
   loadAllDataRef.current = loadAllData
 
-  // Initial data load
+  // ✅ Initial data load - FIXED: runs when contextUser is available
   useEffect(() => {
-    if (contextUser?.id && !dataLoaded) loadAllData()
-  }, [contextUser?.id, dataLoaded, loadAllData])
+    if (contextUser?.id && !hasLoadedOnce.current) {
+      loadAllData()
+    }
+  }, [contextUser?.id, loadAllData])
 
-  // ✅ Use visibilitychange instead of focus for tab return refresh
+  // Visibility change refresh
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (isInitialLoadRef.current) { isInitialLoadRef.current = false; return }
       if (document.visibilityState === 'visible') {
-        if (Date.now() - lastVisibilityRef.current > VISIBILITY_REFRESH_INTERVAL && contextUser?.id) {
+        if (Date.now() - lastVisibilityRef.current > VISIBILITY_REFRESH_INTERVAL) {
           lastVisibilityRef.current = Date.now()
           loadAllDataRef.current?.()
         }
@@ -413,12 +351,11 @@ function AdminDashboardContent() {
     }
     document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [contextUser?.id])
+  }, [])
 
   // Real-time subscription
   useEffect(() => {
     if (!profile?.id) return
-
     const channel = supabase
       .channel('admin-updates')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => loadAllDataRef.current?.())
@@ -426,9 +363,7 @@ function AdminDashboardContent() {
       .subscribe((status) => {
         if (status === 'CHANNEL_ERROR') console.error('Failed to subscribe to real-time updates')
       })
-
     supabaseChannelRef.current = channel
-
     return () => { supabase.removeChannel(channel).catch(console.error) }
   }, [profile?.id])
 
@@ -441,7 +376,7 @@ function AdminDashboardContent() {
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab)
     const targetRoute = tabToRouteMap[tab]
-    if (targetRoute && pathname !== targetRoute) router.replace(targetRoute)
+    if (targetRoute && pathname !== targetRoute) router.replace(targetRoute, { scroll: false })
   }, [pathname, router])
 
   const handleApproveExam = useCallback(async (exam: PendingExam) => {
@@ -474,7 +409,7 @@ function AdminDashboardContent() {
     setLoadError(false); setLoading(true); setError(null); loadAllData()
   }, [loadAllData])
 
-  // Memoized tab content
+  // ✅ Memoized tab content - FIXED dependencies
   const tabContent = useMemo(() => {
     if (error) {
       return (
@@ -492,16 +427,16 @@ function AdminDashboardContent() {
     switch (activeTab) {
       case 'overview':
         return (
-          <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-4 sm:space-y-6">
+          <div key="overview" className="space-y-4 sm:space-y-6">
             <WelcomeBanner adminProfile={profile} activeTab={activeTab} />
             {pendingExamsCount > 0 && (
-              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="p-4 bg-amber-50 border-2 border-amber-300 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="p-4 bg-amber-50 border-2 border-amber-300 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Bell className="h-6 w-6 text-amber-600" />
                   <div><p className="font-bold text-amber-800">{pendingExamsCount} exam(s) pending</p><p className="text-sm text-amber-600">Review and publish exams</p></div>
                 </div>
                 <Button onClick={() => handleTabChange('exams')} className="bg-amber-600 hover:bg-amber-700 shrink-0">Review Now <ArrowRight className="ml-2 h-4 w-4" /></Button>
-              </motion.div>
+              </div>
             )}
             <StatsCards stats={{ ...stats, pendingReports }} onStudentClick={() => handleTabChange('students')} onStaffClick={() => handleTabChange('staff')} onExamsClick={() => handleTabChange('exams')} onSubmissionsClick={() => {}} onBroadSheetClick={() => handleTabChange('broad-sheet')} onReportCardsClick={() => handleTabChange('report-cards')} />
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -511,17 +446,17 @@ function AdminDashboardContent() {
               <QuickActionCard icon={MessageSquare} label="Inquiries" desc={`${pendingInquiries} pending`} onClick={() => handleTabChange('inquiries')} alert={pendingInquiries > 0} />
             </div>
             <RecentActivityFeed />
-          </motion.div>
+          </div>
         )
       case 'broad-sheet':
-        return <motion.div key="broad-sheet" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><BroadSheetPage /></motion.div>
+        return <div key="broad-sheet"><BroadSheetPage /></div>
       case 'students':
-        return <motion.div key="students" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><StudentManagement students={students} onRefresh={handleRefresh} loading={refreshing} /></motion.div>
+        return <div key="students"><StudentManagement students={students} onRefresh={handleRefresh} loading={refreshing} /></div>
       case 'staff':
-        return <motion.div key="staff" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><StaffManagement staff={staff} onRefresh={handleRefresh} onAddStaff={async () => {}} onUpdateStaff={async () => {}} onDeleteStaff={async () => {}} onResetPassword={async () => {}} /></motion.div>
+        return <div key="staff"><StaffManagement staff={staff} onRefresh={handleRefresh} onAddStaff={async () => {}} onUpdateStaff={async () => {}} onDeleteStaff={async () => {}} onResetPassword={async () => {}} /></div>
       case 'exams':
         return (
-          <motion.div key="exams" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <div key="exams" className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
               <div><h1 className="text-2xl font-bold">Exam Approvals</h1><p className="text-muted-foreground">{pendingExamsCount} pending • {publishedExams.length} published</p></div>
               <Button onClick={handleRefresh} variant="outline" disabled={refreshing}><Loader2 className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />Refresh</Button>
@@ -579,24 +514,25 @@ function AdminDashboardContent() {
                 </CardContent>
               </Card>
             )}
-          </motion.div>
+          </div>
         )
       case 'report-cards':
-        return <motion.div key="report-cards" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><ReportCardApproval onRefresh={handleRefresh} /></motion.div>
+        return <div key="report-cards"><ReportCardApproval onRefresh={handleRefresh} /></div>
       case 'inquiries':
-        return <motion.div key="inquiries" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}><AdminInquiriesTab inquiries={inquiries} onNavigate={handleTabChange} /></motion.div>
+        return <div key="inquiries"><AdminInquiriesTab inquiries={inquiries} onNavigate={handleTabChange} /></div>
       default:
         return (
-          <motion.div key="not-found" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20">
+          <div key="not-found" className="flex flex-col items-center justify-center py-20">
             <School className="h-16 w-16 text-purple-400 mx-auto" />
             <h2 className="text-2xl font-bold capitalize mt-4">{activeTab.replace('-', ' ')}</h2>
             <p className="text-muted-foreground">Under development</p>
-          </motion.div>
+          </div>
         )
     }
-  }, [activeTab, error, profile, pendingExamsCount, pendingReports, pendingInquiries, stats, students, staff, pendingExams, publishedExams, inquiries, refreshing, approvingId, handleRefresh, handleTabChange, handleApproveExam, handleRejectExam, handleRetry])
+  }, [activeTab, error, profile, pendingExamsCount, pendingReports, pendingInquiries, stats, students, staff, pendingExams, publishedExams, inquiries, refreshing, approvingId])
 
-  if (loading && !loadError && !dataLoaded) {
+  // Loading state
+  if (authLoading || (loading && !loadError && !dataLoaded)) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
@@ -609,6 +545,7 @@ function AdminDashboardContent() {
     )
   }
 
+  // Error state
   if (loadError && !dataLoaded) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
@@ -622,7 +559,7 @@ function AdminDashboardContent() {
     )
   }
 
-  return <AnimatePresence mode="wait">{tabContent}</AnimatePresence>
+  return <div className="w-full overflow-x-hidden">{tabContent}</div>
 }
 
 function QuickActionCard({ icon: Icon, label, desc, onClick, alert }: { icon: React.ElementType; label: string; desc: string; onClick: () => void; alert?: boolean }) {
@@ -637,7 +574,6 @@ function QuickActionCard({ icon: Icon, label, desc, onClick, alert }: { icon: Re
   )
 }
 
-// ✅ Wrap with AuthGuard
 export default function AdminDashboard() {
   return (
     <AuthGuard allowedRoles={['admin']}>
