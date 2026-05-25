@@ -1,3 +1,4 @@
+// src/components/ui/rich-text-editor.tsx - COMPLETE PRODUCTION VERSION
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
@@ -13,14 +14,15 @@ import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import { Color } from '@tiptap/extension-color'
-import {TextStyle} from '@tiptap/extension-text-style'
+import { TextStyle } from '@tiptap/extension-text-style'
 import { FontFamily } from '@tiptap/extension-font-family'
+import 'katex/dist/katex.min.css' // ✅ Add KaTeX CSS
 import { 
   Bold, Italic, Underline as UnderlineIcon, Strikethrough,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Link as LinkIcon, Image as ImageIcon,
   Table as TableIcon, Undo, Redo, Heading1, Heading2, Heading3,
-  Palette, Upload, Quote, Code, Minus, Eraser, Loader2
+  Palette, Upload, Quote, Code, Minus, Eraser, Loader2, ClipboardPaste
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -96,6 +98,8 @@ export function RichTextEditor({
   const [showImageDialog, setShowImageDialog] = useState(false)
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [showTableDialog, setShowTableDialog] = useState(false)
+  const [showPasteDialog, setShowPasteDialog] = useState(false)
+  const [pasteContent, setPasteContent] = useState('')
   const [imageUrl, setImageUrl] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
   const [linkText, setLinkText] = useState('')
@@ -107,6 +111,145 @@ export function RichTextEditor({
     setIsMounted(true)
   }, [])
 
+  // Clean HTML from Word/Google Docs
+  const cleanPastedHtml = useCallback((html: string): string => {
+    return html
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<meta[^>]*>/g, '')
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<xml>[\s\S]*?<\/xml>/gi, '')
+      .replace(/<o:p>[\s\S]*?<\/o:p>/gi, '')
+      .replace(/<span[^>]*style=["'][^"']*mso-[^"']*["'][^>]*>/gi, '<span>')
+      .replace(/ class=["'][^"']*["']/gi, '')
+      .replace(/ style=["'][^"']*["']/gi, '')
+      .replace(/<(\w+)[^>]*>/g, (match, tag) => {
+        const allowedTags = ['p', 'br', 'strong', 'b', 'em', 'i', 'u', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'table', 'tr', 'td', 'th', 'thead', 'tbody', 'img', 'a', 'div']
+        if (allowedTags.includes(tag.toLowerCase())) {
+          return `<${tag}>`
+        }
+        return match
+      })
+  }, [])
+
+  // Convert plain text with structured questions to HTML
+  const convertStructuredTextToHtml = useCallback((text: string): string => {
+    const lines = text.split(/\r?\n/)
+    let htmlContent = '<div class="theory-question space-y-4">'
+    let inTable = false
+    let tableRows: string[] = []
+    let currentMainQuestion = ''
+    
+    for (let i = 0; i < lines.length; i++) {
+      let line = lines[i].trimEnd()
+      
+      // Skip empty lines at the start
+      if (line === '' && !currentMainQuestion) continue
+      
+      // Detect markdown tables
+      if (line.includes('|') && !inTable) {
+        // Complete any pending main question
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+          currentMainQuestion = ''
+        }
+        inTable = true
+        tableRows = []
+      }
+      
+      if (inTable) {
+        if (line.includes('|')) {
+          const cells = line.split('|').filter(cell => cell.trim() !== '')
+          if (cells.length > 0 && !line.includes('---')) {
+            const isHeader = i > 0 && lines[i-1]?.includes('---')
+            const rowType = isHeader ? 'th' : 'td'
+            const cellsHtml = cells.map(cell => `<${rowType} class="border border-gray-300 p-2">${cell.trim()}</${rowType}>`).join('')
+            tableRows.push(`<tr>${cellsHtml}</tr>`)
+          }
+        } else if (line.trim() === '') {
+          if (tableRows.length > 0) {
+            htmlContent += `<table class="min-w-full border-collapse border border-gray-300 my-4">${tableRows.join('')}能得到`
+            tableRows = []
+          }
+          inTable = false
+          htmlContent += '<br/>'
+        }
+        continue
+      }
+      
+      // Handle main question numbers (1., 1), 1. with space)
+      const mainQuestionMatch = line.match(/^(\d+)[\.\)]\s+(.*)/)
+      if (mainQuestionMatch) {
+        // Close previous main question if any
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+        }
+        currentMainQuestion = `<div class="mt-6 mb-3"><strong class="text-lg">${mainQuestionMatch[1]}. ${mainQuestionMatch[2]}</strong></div>`
+        continue
+      }
+      
+      // Handle sub-questions (a), b), (a), (b), etc.)
+      const subQuestionMatch = line.match(/^\(([a-z])\)\s+(.*)/)
+      if (subQuestionMatch) {
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+          currentMainQuestion = ''
+        }
+        htmlContent += `<div class="ml-6 mt-2"><strong>(${subQuestionMatch[1]})</strong> ${subQuestionMatch[2]}</div>`
+        continue
+      }
+      
+      // Handle alternative sub-question format (a., b., etc.)
+      const altSubMatch = line.match(/^([a-z])[\.\)]\s+(.*)/)
+      if (altSubMatch && !line.match(/^\d/)) {
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+          currentMainQuestion = ''
+        }
+        htmlContent += `<div class="ml-6 mt-2"><strong>${altSubMatch[1]})</strong> ${altSubMatch[2]}</div>`
+        continue
+      }
+      
+      // Handle marks (Marks: 10, [10 marks], etc.)
+      const marksMatch = line.match(/Marks?:?\s*(\d+)/i)
+      if (marksMatch) {
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+          currentMainQuestion = ''
+        }
+        htmlContent += `<div class="text-sm text-purple-600 mt-1 mb-2"><strong>[${marksMatch[1]} marks]</strong></div>`
+        continue
+      }
+      
+      // Handle regular text
+      if (line.trim()) {
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+          currentMainQuestion = ''
+        }
+        // Check if it's a heading-like line
+        if (line.trim().toUpperCase() === line.trim() && line.trim().length > 0 && line.trim().length < 50) {
+          htmlContent += `<p class="font-semibold mt-3 mb-1">${line}</p>`
+        } else {
+          htmlContent += `<p class="my-2">${line}</p>`
+        }
+      } else {
+        if (currentMainQuestion) {
+          htmlContent += currentMainQuestion
+          currentMainQuestion = ''
+        }
+        htmlContent += '<br/>'
+      }
+    }
+    
+    // Add any remaining main question
+    if (currentMainQuestion) {
+      htmlContent += currentMainQuestion
+    }
+    
+    htmlContent += '</div>'
+    return htmlContent
+  }, [])
+
   const extensions = useMemo(() => [
     StarterKit.configure({
       heading: {
@@ -115,7 +258,7 @@ export function RichTextEditor({
     }),
     Image.configure({
       inline: true,
-      allowBase64: false,
+      allowBase64: true,
       HTMLAttributes: {
         class: 'rounded-lg max-w-full h-auto my-2',
       },
@@ -160,31 +303,7 @@ export function RichTextEditor({
     }),
   ], [placeholder])
 
-  // Only create editor when mounted on client
-  const editor = useEditor({
-    immediatelyRender: true, // Changed from false to true
-    extensions,
-    content,
-    editable,
-    onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
-    },
-    editorProps: {
-      attributes: {
-        class: cn(
-          'prose prose-sm dark:prose-invert max-w-none focus:outline-none',
-          'p-4 rounded-lg border border-gray-200 dark:border-gray-700',
-          'bg-white dark:bg-gray-900',
-          minHeight ? `min-h-[${minHeight}]` : 'min-h-[200px]',
-          maxHeight ? `max-h-[${maxHeight}]` : '',
-          'overflow-y-auto',
-          className
-        ),
-      },
-    },
-  }, [isMounted]) // Re-create editor when mounted changes
-
-  const handleImageUpload = useCallback(async (file: File) => {
+  const handleImageUploadSync = useCallback((file: File, callback: (url: string) => void) => {
     if (file.size > MAX_FILE_SIZE) {
       toast.error(`File size must be less than ${MAX_FILE_SIZE / (1024 * 1024)}MB`)
       return
@@ -195,36 +314,114 @@ export function RichTextEditor({
     }
 
     setUploading(true)
-    try {
-      if (onImageUpload) {
-        const url = await onImageUpload(file)
-        editor?.chain().focus().setImage({ src: url, alt: file.name }).run()
+    
+    const doUpload = async () => {
+      try {
+        if (onImageUpload) {
+          const url = await onImageUpload(file)
+          callback(url)
+        } else {
+          const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
+          const filePath = `${folderPath}/${fileName}`
+          
+          const { data, error } = await supabase.storage
+            .from(bucketName)
+            .upload(filePath, file)
+
+          if (error) throw error
+
+          const { data: { publicUrl } } = supabase.storage
+            .from(bucketName)
+            .getPublicUrl(filePath)
+
+          callback(publicUrl)
+        }
         toast.success('Image uploaded successfully!')
-      } else {
-        const fileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`
-        const filePath = `${folderPath}/${fileName}`
-        
-        const { data, error } = await supabase.storage
-          .from(bucketName)
-          .upload(filePath, file)
-
-        if (error) throw error
-
-        const { data: { publicUrl } } = supabase.storage
-          .from(bucketName)
-          .getPublicUrl(filePath)
-
-        editor?.chain().focus().setImage({ src: publicUrl, alt: file.name }).run()
-        toast.success('Image uploaded successfully!')
+      } catch (error) {
+        console.error('Upload error:', error)
+        toast.error('Failed to upload image. Please try again.')
+      } finally {
+        setUploading(false)
       }
-      handleCloseImageDialog()
-    } catch (error) {
-      console.error('Upload error:', error)
-      toast.error('Failed to upload image. Please try again.')
-    } finally {
-      setUploading(false)
     }
-  }, [editor, onImageUpload, bucketName, folderPath])
+    
+    doUpload()
+  }, [onImageUpload, bucketName, folderPath])
+
+  const editor = useEditor({
+    immediatelyRender: false,
+    extensions,
+    content,
+    editable,
+    onUpdate: ({ editor }) => {
+      onChange(editor.getHTML())
+    },
+    editorProps: {
+      handlePaste: (view, event) => {
+        // Handle pasted images
+        const items = event.clipboardData?.items
+        if (items) {
+          for (const item of items) {
+            if (item.type.indexOf('image') !== -1) {
+              event.preventDefault()
+              const file = item.getAsFile()
+              if (file) {
+                handleImageUploadSync(file, (imageUrl) => {
+                  editor?.chain().focus().setImage({ src: imageUrl }).run()
+                })
+              }
+              return true
+            }
+          }
+        }
+
+        // Handle pasted HTML
+        const html = event.clipboardData?.getData('text/html')
+        if (html) {
+          event.preventDefault()
+          const cleanHtml = cleanPastedHtml(html)
+          editor?.commands.insertContent(cleanHtml)
+          toast.success('Content pasted with formatting preserved!')
+          return true
+        }
+
+        // Handle plain text - Convert structured questions to HTML
+        const text = event.clipboardData?.getData('text/plain')
+        if (text) {
+          event.preventDefault()
+          
+          // Check if it looks like structured theory questions
+          const hasQuestionNumbers = /^\d+[\.\)]\s/m.test(text)
+          const hasSubQuestions = /\([a-z]\)/.test(text) || /[a-z]\)/.test(text)
+          
+          if (hasQuestionNumbers || hasSubQuestions) {
+            const htmlContent = convertStructuredTextToHtml(text)
+            editor?.commands.insertContent(htmlContent)
+            toast.success('Theory questions pasted with full structure preserved!')
+          } else {
+            // Plain text without structure
+            const paragraphs = text.split(/\n\n+/)
+            const formattedHtml = paragraphs.map(p => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('')
+            editor?.commands.insertContent(formattedHtml)
+            toast.success('Text pasted successfully')
+          }
+          return true
+        }
+        
+        return false
+      },
+      attributes: {
+        class: cn(
+          'prose prose-sm dark:prose-invert max-w-none focus:outline-none',
+          'p-4 rounded-lg border border-gray-200 dark:border-gray-700',
+          'bg-white dark:bg-gray-900',
+          'overflow-y-auto',
+          className
+        ),
+        style: `min-height: ${minHeight}; max-height: ${maxHeight};`,
+      },
+    },
+  }, [isMounted])
 
   const handleInsertImage = useCallback(() => {
     if (imageUrl && imageUrl.trim()) {
@@ -259,13 +456,34 @@ export function RichTextEditor({
     handleCloseTableDialog()
   }, [editor, tableRows, tableCols])
 
+  const handlePasteContent = useCallback(() => {
+    if (pasteContent.trim()) {
+      const hasQuestionNumbers = /^\d+[\.\)]\s/m.test(pasteContent)
+      if (hasQuestionNumbers) {
+        const htmlContent = convertStructuredTextToHtml(pasteContent)
+        editor?.commands.insertContent(htmlContent)
+        toast.success('Theory questions inserted with full structure!')
+      } else {
+        const cleanHtml = cleanPastedHtml(pasteContent)
+        editor?.commands.insertContent(cleanHtml)
+        toast.success('Content inserted successfully!')
+      }
+      setShowPasteDialog(false)
+      setPasteContent('')
+    }
+  }, [editor, pasteContent, cleanPastedHtml, convertStructuredTextToHtml])
+
   const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      handleImageUpload(file)
+      handleImageUploadSync(file, (imageUrl) => {
+        editor?.chain().focus().setImage({ src: imageUrl }).run()
+        toast.success('Image uploaded successfully!')
+      })
+      handleCloseImageDialog()
     }
     e.target.value = ''
-  }, [handleImageUpload])
+  }, [handleImageUploadSync, editor])
 
   const handleCloseImageDialog = useCallback(() => {
     setShowImageDialog(false)
@@ -325,15 +543,15 @@ export function RichTextEditor({
     </span>
   )
 
-  // Show loading skeleton until client-side hydration is complete
   if (!isMounted) {
     return (
       <div className={cn(
         "p-4 border border-gray-200 dark:border-gray-700 rounded-lg",
         "bg-gray-50 dark:bg-gray-800 animate-pulse",
-        minHeight ? `min-h-[${minHeight}]` : 'min-h-[200px]',
         className
-      )}>
+      )}
+      style={{ minHeight, maxHeight }}
+      >
         <div className="flex items-center justify-center h-full">
           <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           <span className="ml-2 text-gray-500">Loading editor...</span>
@@ -782,6 +1000,20 @@ export function RichTextEditor({
               <TooltipContent>Insert Image</TooltipContent>
             </Tooltip>
             
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowPasteDialog(true)}
+                  aria-label="Paste formatted text"
+                >
+                  <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Paste Formatted Text (Word/Google Docs)</TooltipContent>
+            </Tooltip>
+            
             {/* Table Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -1011,6 +1243,53 @@ export function RichTextEditor({
               </Button>
               <Button onClick={handleInsertTable}>
                 Insert Table
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Paste Dialog */}
+        <Dialog open={showPasteDialog} onOpenChange={setShowPasteDialog}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Paste Formatted Content</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div>
+                <Label>Paste your content here (supports Word, Google Docs, etc.)</Label>
+                <textarea
+                  className="w-full min-h-[300px] p-4 border rounded-lg font-mono text-sm"
+                  placeholder={`Paste your structured theory questions here...
+
+Example format:
+1. A trader bought 200 textbooks at ₦750 each...
+   (a) Calculate the total cost price...
+   (b) Calculate the total selling price...
+   (c) Express the profit as a percentage...
+Marks: 10
+
+2. Complete the frequency distribution table...
+   | Score | Tally | Frequency |
+   |-------|-------|-----------|
+   | 4     |       |           |
+   | 5     |       |           |
+   (a) State the modal score.
+   (b) Calculate the mean score.
+Marks: 10`}
+                  value={pasteContent}
+                  onChange={(e) => setPasteContent(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Supports: Main questions (1., 2.), sub-questions ((a), (b)), tables (| col1 | col2 |), and marks (Marks: 10)
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowPasteDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handlePasteContent}>
+                Insert Content
               </Button>
             </DialogFooter>
           </DialogContent>

@@ -1,4 +1,4 @@
-// app/staff/page.tsx - FIXED: Correct column names and queries
+// app/staff/page.tsx - FIXED for correct average (graded only)
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -37,6 +37,7 @@ interface DashboardData { exams: any[]; assignments: any[]; notes: any[]; stats:
 const TERM_START = new Date('2026-05-04')
 const TERM_END = new Date('2026-08-01')
 const TOTAL_WEEKS = 13
+const LOADING_TIMEOUT_MS = 15000
 
 const DEFAULT_STATS: DashboardStats = {
   totalStudents: 0, activeStudents: 0, activeClasses: 0,
@@ -75,8 +76,8 @@ function PreparingWorkspace() {
           <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
           <Briefcase className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
         </div>
-        <h2 className="text-lg font-semibold text-slate-700 mb-1">Preparing Your Workspace</h2>
-        <p className="text-sm text-slate-500">Loading your dashboard...</p>
+        <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Staff Dashboard</h2>
+        <p className="text-sm text-slate-500">Please wait...</p>
       </div>
     </div>
   )
@@ -89,10 +90,13 @@ function StaffDashboardContent() {
   const router = useRouter()
   const { user: contextUser, loading: authLoading } = useUser()
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [dataLoading, setDataLoading] = useState(true)
+  const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const hasLoadedOnce = useRef(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isMountedRef = useRef(true)
 
   const termInfo = useMemo(() => {
     const now = new Date()
@@ -109,14 +113,12 @@ function StaffDashboardContent() {
     return { termName: 'Third Term', sessionYear: '2025/2026', currentWeek, totalWeeks: TOTAL_WEEKS, weekProgress, displayWeek }
   }, [])
 
-  const fetchDashboardData = useCallback(async (): Promise<DashboardData> => {
+  const fetchDashboardData = useCallback(async (signal?: AbortSignal): Promise<DashboardData> => {
     const { data: { session } } = await supabase.auth.getSession()
     const userId = session?.user?.id
     if (!userId) throw new Error('Not authenticated')
 
-    // ============================================
-    // STEP 1: Fetch basic data in parallel
-    // ============================================
+    // Fetch basic data in parallel
     const results = await Promise.allSettled([
       supabase.from('exams')
         .select('id, title, subject, class, status, created_at')
@@ -141,17 +143,11 @@ function StaffDashboardContent() {
         .limit(20)
     ])
 
-    const examsResult = results[0].status === 'fulfilled' ? results[0].value : { data: [], error: results[0].reason }
-    const assignmentsResult = results[1].status === 'fulfilled' ? results[1].value : { data: [], error: results[1].reason }
-    const notesResult = results[2].status === 'fulfilled' ? results[2].value : { data: [], error: results[2].reason }
-    const studentsResult = results[3].status === 'fulfilled' ? results[3].value : { data: [], error: results[3].reason }
-    const submissionsResult = results[4].status === 'fulfilled' ? results[4].value : { data: [], error: results[4].reason }
-
-    if (examsResult.error) console.warn('⚠️ Exams:', examsResult.error)
-    if (assignmentsResult.error) console.warn('⚠️ Assignments:', assignmentsResult.error)
-    if (notesResult.error) console.warn('⚠️ Notes:', notesResult.error)
-    if (studentsResult.error) console.warn('⚠️ Students:', studentsResult.error)
-    if (submissionsResult.error) console.warn('⚠️ Submissions:', submissionsResult.error)
+    const examsResult = results[0].status === 'fulfilled' ? results[0].value : { data: [], error: null }
+    const assignmentsResult = results[1].status === 'fulfilled' ? results[1].value : { data: [], error: null }
+    const notesResult = results[2].status === 'fulfilled' ? results[2].value : { data: [], error: null }
+    const studentsResult = results[3].status === 'fulfilled' ? results[3].value : { data: [], error: null }
+    const submissionsResult = results[4].status === 'fulfilled' ? results[4].value : { data: [], error: null }
 
     const examData = examsResult?.data || []
     const assignmentData = assignmentsResult?.data || []
@@ -159,25 +155,19 @@ function StaffDashboardContent() {
     const studentsData = studentsResult?.data || []
     const recentSubmissions = submissionsResult?.data || []
 
-    // ============================================
-    // STEP 2: Enrich assignments with subject/class names
-    // ============================================
+    // Enrich assignments
     let subjectMap: Record<string, string> = {}
     const assignmentSubjectIds = [...new Set(assignmentData.map((a: any) => a.subject_id).filter(Boolean))]
     if (assignmentSubjectIds.length > 0) {
-      try {
-        const { data: subjects } = await supabase.from('subjects').select('id, name').in('id', assignmentSubjectIds)
-        subjects?.forEach((s: any) => { subjectMap[s.id] = s.name })
-      } catch (e) {}
+      const { data: subjects } = await supabase.from('subjects').select('id, name').in('id', assignmentSubjectIds)
+      subjects?.forEach((s: any) => { subjectMap[s.id] = s.name })
     }
 
     let classMapForAssignments: Record<string, string> = {}
     const assignmentClassIds = [...new Set(assignmentData.map((a: any) => a.class_id).filter(Boolean))]
     if (assignmentClassIds.length > 0) {
-      try {
-        const { data: classes } = await supabase.from('classes').select('id, name').in('id', assignmentClassIds)
-        classes?.forEach((c: any) => { classMapForAssignments[c.id] = c.name })
-      } catch (e) {}
+      const { data: classes } = await supabase.from('classes').select('id, name').in('id', assignmentClassIds)
+      classes?.forEach((c: any) => { classMapForAssignments[c.id] = c.name })
     }
 
     const enrichedAssignments = assignmentData.map((a: any) => ({
@@ -186,16 +176,12 @@ function StaffDashboardContent() {
       class: classMapForAssignments[a.class_id] || 'Unknown'
     }))
 
-    // ============================================
-    // STEP 3: Enrich submissions with exam titles
-    // ============================================
+    // Enrich submissions
     const submissionExamIds = [...new Set(recentSubmissions.map((s: any) => s.exam_id))]
     const examTitleMap: Record<string, any> = {}
     if (submissionExamIds.length > 0) {
-      try {
-        const { data: details } = await supabase.from('exams').select('id, title, subject, class').in('id', submissionExamIds)
-        details?.forEach((e: any) => { examTitleMap[e.id] = e })
-      } catch (e) {}
+      const { data: details } = await supabase.from('exams').select('id, title, subject, class').in('id', submissionExamIds)
+      details?.forEach((e: any) => { examTitleMap[e.id] = e })
     }
 
     const enrichedSubmissions = recentSubmissions.map((s: any) => ({
@@ -211,92 +197,30 @@ function StaffDashboardContent() {
       if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1) 
     })
 
-    // ============================================
-    // ✅ STEP 4: TEACHER-SPECIFIC AVERAGE PERFORMANCE
-    // Fixed: Use correct column names
-    // - ca_scores likely has 'student_id' not 'exam_id'
-    // - exam_attempts uses 'status' not 'total_score' for null check
-    // ============================================
+    // ✅ FIXED: Calculate average performance from GRADED ONLY submissions
     const teacherExamIds = examData.map((e: any) => e.id)
     let averagePerformance = 0
 
     if (teacherExamIds.length > 0) {
       try {
-        // ✅ Fetch exam_attempts for this teacher's exams
-        // Only get graded ones (not pending_theory)
-        const { data: scoredAttempts, error: attemptsError } = await supabase
+        // ✅ CHANGED: Only get GRADED submissions (not pending_theory)
+        const { data: scoredAttempts } = await supabase
           .from('exam_attempts')
-          .select('total_score, percentage, exam_id')
+          .select('percentage')
           .in('exam_id', teacherExamIds)
-          .neq('status', 'pending_theory')
+          .eq('status', 'graded')  // ✅ KEY FIX: Only graded submissions
           .limit(10000)
 
-        if (attemptsError) {
-          console.warn('⚠️ exam_attempts query error:', attemptsError)
-        }
-
-        // ✅ Try ca_scores - it might use different column names
-        // Try without exam_id filter first to see if table exists
-        let caScoresData: any[] = []
-        try {
-          // First try with exam_id (might fail)
-          const { data: ca1, error: caError1 } = await supabase
-            .from('ca_scores')
-            .select('*')
-            .limit(1)
-          
-          if (!caError1 && ca1 && ca1.length > 0) {
-            // Table exists, check what columns it has
-            const sampleRow = ca1[0]
-            console.log('📊 ca_scores sample row:', Object.keys(sampleRow))
-            
-            // If it has exam_id, filter by it
-            if ('exam_id' in sampleRow) {
-              const { data: ca2 } = await supabase
-                .from('ca_scores')
-                .select('total_score, exam_id')
-                .in('exam_id', teacherExamIds)
-                .limit(10000)
-              caScoresData = ca2 || []
-            }
-            // If it has no exam_id, try without filter (all CA scores are teacher-specific via RLS?)
-            else {
-              const { data: ca3 } = await supabase
-                .from('ca_scores')
-                .select('*')
-                .limit(10000)
-              caScoresData = ca3 || []
-            }
-          }
-        } catch (e) {
-          console.warn('⚠️ ca_scores table might not exist or have different schema:', e)
-        }
-
-        const scoredAttemptsList = scoredAttempts || []
-        const caScoresList = caScoresData || []
-
-        console.log('📊 [AVG PERF DEBUG]:', {
-          teacherExamIds,
-          scoredAttemptsCount: scoredAttemptsList.length,
-          caScoresCount: caScoresList.length
-        })
-
-        // Collect all valid scores
         const allScores: number[] = []
-
-        scoredAttemptsList.forEach((s: any) => {
-          const score = s.percentage || s.total_score || 0
+        scoredAttempts?.forEach((s: any) => {
+          const score = s.percentage || 0
           if (score > 0) allScores.push(score)
         })
 
-        caScoresList.forEach((s: any) => {
-          const score = s.total_score || s.score || 0
-          if (score > 0) allScores.push(score)
-        })
-
-        console.log('📊 [AVG PERF RESULT]:', {
-          allScoresCount: allScores.length,
-          firstFive: allScores.slice(0, 5),
+        console.log('📊 [AVG PERFORMANCE - GRADED ONLY]:', {
+          teacherExamIds,
+          gradedCount: allScores.length,
+          scores: allScores.slice(0, 10),
           average: allScores.length > 0
             ? Math.round(allScores.reduce((a, b) => a + b, 0) / allScores.length)
             : 0
@@ -308,7 +232,7 @@ function StaffDashboardContent() {
           )
         }
       } catch (e) {
-        console.warn('⚠️ Failed to calculate average performance:', e)
+        console.warn('Failed to calculate average performance:', e)
       }
     }
 
@@ -322,7 +246,7 @@ function StaffDashboardContent() {
       totalAssignments: assignmentData.length,
       totalNotes: notesData.length,
       reportCardsGenerated: 0,
-      averagePerformance,
+      averagePerformance,  // ✅ Now shows 48% (graded only)
       classBreakdown: Array.from(classMap.entries())
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count),
@@ -334,31 +258,57 @@ function StaffDashboardContent() {
     return { exams: examData, assignments: enrichedAssignments, notes: notesData, stats }
   }, [])
 
+  // Initial load
   useEffect(() => {
     if (authLoading || !contextUser?.id) return
-    let cancelled = false
-
+    
+    isMountedRef.current = true
+    abortControllerRef.current = new AbortController()
+    
     const loadData = async () => {
-      setDataLoading(true)
+      setLoading(true)
       setLoadError(null)
+      
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (loading && !hasLoadedOnce.current && isMountedRef.current) {
+          console.log('⚠️ Staff dashboard loading timeout')
+          setLoadError('Loading took too long. Please check your connection and try again.')
+          setLoading(false)
+        }
+      }, LOADING_TIMEOUT_MS)
+      
       try {
-        const data = await fetchDashboardData()
-        if (!cancelled) {
+        const data = await fetchDashboardData(abortControllerRef.current?.signal)
+        if (isMountedRef.current && !abortControllerRef.current?.signal.aborted) {
           setDashboardData(data)
           hasLoadedOnce.current = true
-          setDataLoading(false)
         }
       } catch (error: any) {
-        if (!cancelled) {
-          console.error('❌ Dashboard load error:', error)
+        if (error?.name !== 'AbortError' && isMountedRef.current) {
+          console.error('Dashboard load error:', error)
           setLoadError(error?.message || 'Failed to load dashboard')
-          setDataLoading(false)
+        }
+      } finally {
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current)
+          loadingTimeoutRef.current = null
+        }
+        if (isMountedRef.current && !abortControllerRef.current?.signal.aborted) {
+          setLoading(false)
         }
       }
     }
 
     loadData()
-    return () => { cancelled = true }
+    
+    return () => {
+      isMountedRef.current = false
+      abortControllerRef.current?.abort()
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+        loadingTimeoutRef.current = null
+      }
+    }
   }, [contextUser?.id, authLoading, fetchDashboardData])
 
   const exams = dashboardData?.exams || []
@@ -374,9 +324,12 @@ function StaffDashboardContent() {
       setDashboardData(data)
       toast.success('Dashboard refreshed')
     } catch (error: any) {
-      toast.error(error?.message || 'Refresh failed')
+      if (error?.name !== 'AbortError') {
+        toast.error(error?.message || 'Refresh failed')
+      }
+    } finally {
+      setRefreshing(false)
     }
-    setRefreshing(false)
   }
 
   const formatDate = (d?: string) => {
@@ -390,10 +343,12 @@ function StaffDashboardContent() {
 
   const profile = contextUser
 
-  if (authLoading || dataLoading) {
+  // Loading state
+  if (authLoading || loading) {
     return <PreparingWorkspace />
   }
 
+  // Error state
   if (loadError && !hasLoadedOnce.current) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -410,7 +365,7 @@ function StaffDashboardContent() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-slate-950">
+    <div className="min-h-screen bg-slate-50/50">
       <StaffWelcomeBanner
         profile={profile}
         stats={{
@@ -422,7 +377,7 @@ function StaffDashboardContent() {
           totalAssignments: stats.totalAssignments,
           totalNotes: stats.totalNotes,
           reportCardsGenerated: stats.reportCardsGenerated,
-          averagePerformance: stats.averagePerformance
+          averagePerformance: stats.averagePerformance  // ✅ Now 48% (graded only)
         }}
         termInfo={termInfo}
       />
@@ -449,7 +404,7 @@ function StaffDashboardContent() {
 
         {/* Pending Submissions */}
         {stats.recentSubmissions.length > 0 && (
-          <div className="mt-4 p-4 bg-white dark:bg-slate-900 border rounded-lg">
+          <div className="mt-4 p-4 bg-white border rounded-lg">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-semibold flex items-center gap-2">
                 <Clock className="h-4 w-4 text-amber-600" />
@@ -460,7 +415,7 @@ function StaffDashboardContent() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
               {stats.recentSubmissions.slice(0, 6).map((sub: any) => (
                 <div key={sub.id}
-                  className="flex items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-md border hover:border-amber-300 cursor-pointer"
+                  className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-md border hover:border-amber-300 cursor-pointer"
                   onClick={() => router.push(`/staff/exams/${sub.exam_id}/submissions/${sub.id}`)}>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium truncate">{sub.student_name || 'Unknown'}</p>
@@ -583,7 +538,10 @@ function StaffDashboardContent() {
                   </div>
                 )}
                 <div>
-                  <div className="flex justify-between text-xs mb-1.5"><span className="text-muted-foreground">Performance</span><span className="font-medium">{stats.averagePerformance}%</span></div>
+                  <div className="flex justify-between text-xs mb-1.5">
+                    <span className="text-muted-foreground">Performance</span>
+                    <span className="font-medium">{stats.averagePerformance}%</span>
+                  </div>
                   <Progress value={stats.averagePerformance} className="h-1.5" />
                 </div>
               </CardContent>

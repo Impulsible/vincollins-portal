@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - FULLY FIXED
+// src/contexts/UserContext.tsx - FULLY CORRECTED VERSION
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -28,42 +28,27 @@ interface UserContextType {
   isAuthenticated: boolean
 }
 
-const AUTH_TIMEOUT = 5000 // Reduced from 8000
 const ADMIN_USER_ID = 'a799693c-97c7-4f8d-baca-82242a98a00c'
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<UserProfile | null>(() => {
-    // ✅ Initialize from sessionStorage to prevent flash
-    if (typeof window !== 'undefined') {
-      const cached = sessionStorage.getItem('userProfile')
-      if (cached) {
-        try {
-          return JSON.parse(cached)
-        } catch {}
-      }
-    }
-    return null
-  })
-  
+  const [user, setUser] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
   const fetchPromiseRef = useRef<Promise<any> | null>(null)
   const isMountedRef = useRef(true)
-  const authTimeoutRef = useRef<NodeJS.Timeout>()
-  const initialLoadDoneRef = useRef(false)
   const heartbeatRef = useRef<NodeJS.Timeout>()
   const userRef = useRef<UserProfile | null>(null)
+  const lastRefreshTimeRef = useRef(0)
+  const refreshTimeoutRef = useRef<NodeJS.Timeout>()
 
-  // ✅ Sync userRef with state
   useEffect(() => {
     userRef.current = user
-    // Cache user in sessionStorage
-    if (user) {
-      sessionStorage.setItem('userProfile', JSON.stringify(user))
-    } else {
-      sessionStorage.removeItem('userProfile')
+    if (user && isMountedRef.current) {
+      localStorage.setItem('auth_user', JSON.stringify({ id: user.id, role: user.role }))
+    } else if (!user && isMountedRef.current) {
+      localStorage.removeItem('auth_user')
     }
   }, [user])
 
@@ -71,7 +56,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (userId === ADMIN_USER_ID) return
     
     const now = new Date().toISOString()
-    supabase
+    // ✅ Fixed: No .match(), use void to ignore promise
+    void supabase
       .from('user_online_status')
       .upsert({
         user_id: userId,
@@ -79,7 +65,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         last_seen: now,
         updated_at: now,
       }, { onConflict: 'user_id' })
-      .then(() => {}, () => {})
   }, [])
 
   const startHeartbeat = useCallback((userId: string) => {
@@ -88,7 +73,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     if (heartbeatRef.current) clearInterval(heartbeatRef.current)
     heartbeatRef.current = setInterval(() => {
       setOnlineStatus(userId, true)
-    }, 30000)
+    }, 60000)
   }, [setOnlineStatus])
 
   const stopHeartbeat = useCallback(() => {
@@ -104,31 +89,43 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
+      
       if (error) {
-        if (error.code === 'PGRST116') return null
-        throw error
+        console.error('Profile fetch error:', error)
+        return null
       }
       return data as UserProfile
     } catch (err) {
+      console.error('Profile fetch exception:', err)
       return null
     }
   }, [])
 
   const loadUser = useCallback(async () => {
-    // ✅ Return existing promise if already loading
+    // Prevent multiple simultaneous loads
     if (fetchPromiseRef.current) return fetchPromiseRef.current
 
     const fetchPromise = (async () => {
       try {
+        setLoading(true)
+        
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) throw sessionError
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError)
+          if (isMountedRef.current) { 
+            setUser(null)
+            setLoading(false)
+          }
+          return null
+        }
 
         if (!session?.user) {
           if (isMountedRef.current) { 
             setUser(null)
             setLoading(false)
-            sessionStorage.removeItem('userProfile')
+            localStorage.removeItem('auth_user')
           }
           return null
         }
@@ -136,10 +133,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const profile = await fetchUserProfile(session.user.id)
         const userId = profile?.id || session.user.id
 
-        setOnlineStatus(userId, true)
-        startHeartbeat(userId)
-
-        if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
+        // Only update online status if not admin
+        if (userId !== ADMIN_USER_ID) {
+          setOnlineStatus(userId, true)
+          startHeartbeat(userId)
+        }
 
         if (!profile) {
           const basicProfile: UserProfile = {
@@ -179,98 +177,96 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUserProfile, setOnlineStatus, startHeartbeat])
 
   const refreshUser = useCallback(async () => {
-    setLoading(true)
+    // Rate limiting: minimum 5 seconds between refreshes
+    const now = Date.now()
+    const timeSinceLastRefresh = now - lastRefreshTimeRef.current
+    
+    if (timeSinceLastRefresh < 5000) {
+      console.log('Rate limiting refresh, skipping...')
+      return
+    }
+    
+    lastRefreshTimeRef.current = now
     fetchPromiseRef.current = null
     await loadUser()
   }, [loadUser])
 
   const signOut = useCallback(() => {
     const currentUser = userRef.current
-    if (currentUser?.id) {
+    
+    // Clear all timeouts
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current)
+    }
+    
+    if (currentUser?.id && currentUser.id !== ADMIN_USER_ID) {
       setOnlineStatus(currentUser.id, false)
     }
     stopHeartbeat()
     
-    // ✅ Clear cache
-    sessionStorage.removeItem('userProfile')
-    localStorage.removeItem('auth_user')
-    localStorage.removeItem('auth_role')
+    localStorage.clear()
+    sessionStorage.clear()
     
-    // ✅ Reset state
     setUser(null)
     setError(null)
     setLoading(false)
     
-    // ✅ Sign out and redirect
-    supabase.auth.signOut().catch(() => {})
+    // Sign out from Supabase without waiting
+    void supabase.auth.signOut().catch(() => {})
+    
+    // Hard redirect
     window.location.replace('/portal')
   }, [setOnlineStatus, stopHeartbeat])
 
   useEffect(() => {
     isMountedRef.current = true
     
-    // ✅ Faster loading timeout
-    const loadingTimeout = setTimeout(() => {
-      if (loading && isMountedRef.current) {
-        console.warn('⚠️ Auth load timed out, forcing ready state')
-        setLoading(false)
-      }
-    }, AUTH_TIMEOUT)
-
-    if (!initialLoadDoneRef.current) {
-      initialLoadDoneRef.current = true
+    // Load user with a small delay to prevent race conditions
+    const timer = setTimeout(() => {
       loadUser()
-    }
+    }, 100)
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        // ✅ Skip INITIAL_SESSION to avoid double loading
-        if (event === 'INITIAL_SESSION') return
-
-        switch (event) {
-          case 'SIGNED_IN':
-            if (session?.user) {
-              const profile = await fetchUserProfile(session.user.id)
-              const userId = profile?.id || session.user.id
-              setOnlineStatus(userId, true)
-              startHeartbeat(userId)
-            }
+        console.log('🔄 Auth event:', event)
+        
+        // Ignore TOKEN_REFRESHED events completely
+        if (event === 'TOKEN_REFRESHED') {
+          console.log('🔑 Token refreshed (ignoring to prevent rate limits)')
+          return
+        }
+        
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('✅ User signed in, loading profile...')
+          await loadUser()
+        } else if (event === 'SIGNED_OUT') {
+          console.log('👋 User signed out')
+          stopHeartbeat()
+          setUser(null)
+          setLoading(false)
+          localStorage.removeItem('auth_user')
+        } else if (event === 'USER_UPDATED') {
+          await refreshUser()
+        } else if (event === 'INITIAL_SESSION') {
+          console.log('📦 Initial session loaded')
+          // Only load if we don't have a user yet
+          if (!userRef.current) {
             await loadUser()
-            break
-
-          case 'SIGNED_OUT':
-            stopHeartbeat()
-            const currentUser = userRef.current
-            if (currentUser?.id) setOnlineStatus(currentUser.id, false)
-            setUser(null)
-            setLoading(false)
-            sessionStorage.removeItem('userProfile')
-            // ✅ Don't redirect here - let signOut handle it
-            break
-
-          case 'TOKEN_REFRESHED':
-            if (session?.user) {
-              const profile = await fetchUserProfile(session.user.id)
-              const userId = profile?.id || session.user.id
-              setOnlineStatus(userId, true)
-            }
-            break
-
-          case 'USER_UPDATED':
-            await loadUser()
-            break
+          }
         }
       }
     )
 
     return () => {
+      clearTimeout(timer)
       isMountedRef.current = false
-      clearTimeout(loadingTimeout)
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current)
+      }
       stopHeartbeat()
-      if (authTimeoutRef.current) clearTimeout(authTimeoutRef.current)
       subscription.unsubscribe()
     }
-  }, [loadUser, setOnlineStatus, startHeartbeat, stopHeartbeat, fetchUserProfile, loading])
+  }, [loadUser, refreshUser, stopHeartbeat])
 
   const value: UserContextType = {
     user,

@@ -1,7 +1,7 @@
-// app/student/page.tsx - UPDATED + NO TAB RELOAD
+// app/student/page.tsx - FULLY UPDATED with timeout fallback
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/contexts/UserContext'
@@ -14,8 +14,10 @@ import { OverviewTab } from '@/components/student/OverviewTab'
 import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
-import { BookOpen, Award, LayoutDashboard } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { BookOpen, Award, LayoutDashboard, Loader2, RefreshCw, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // ============================================
 // TYPES & CONSTANTS
@@ -46,7 +48,8 @@ interface DashboardData {
   reportCardStatus: any
 }
 
-const VISIBILITY_REFRESH_INTERVAL = 120000 // ✅ 2 minutes
+const CACHE_DURATION = 30000 // 30 seconds
+const LOADING_TIMEOUT_MS = 15000 // 15 seconds
 
 function calculateGrade(percentage: number): { grade: string; color: string } {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
@@ -76,23 +79,74 @@ const DEFAULT_STATS: DashboardStats = {
   subjectsWithCA: [],
 }
 
+// ============================================
+// LOADING COMPONENT - Simple spinner (no skeleton)
+// ============================================
+function DashboardLoading() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center">
+      <div className="text-center">
+        <div className="relative mx-auto mb-4 h-12 w-12">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+          <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
+          <LayoutDashboard className="absolute inset-0 m-auto h-5 w-5 text-emerald-500" />
+        </div>
+        <p className="text-sm text-slate-500">Loading your dashboard...</p>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// TIMEOUT ERROR COMPONENT
+// ============================================
+function LoadingTimeoutError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center">
+      <div className="text-center px-4">
+        <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-slate-700 mb-2">Still Loading?</h3>
+        <p className="text-sm text-slate-500 mb-4">The dashboard is taking longer than expected.</p>
+        <Button onClick={onRetry} className="bg-emerald-600 hover:bg-emerald-700">
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Retry
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
 function StudentDashboardContent() {
   const router = useRouter()
   const { user: contextUser } = useUser()
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
-  const lastVisibilityRef = useRef(0)
-  const isInitialLoadRef = useRef(true)
+  const [isMobile, setIsMobile] = useState(false)
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
+  const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  // ✅ ALL data fetching in one function
+  // Detect mobile screen
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
+  // Fetch dashboard data
   const fetchDashboardData = useCallback(async (): Promise<DashboardData> => {
     const userId = contextUser?.id
     const userClass = contextUser?.class
     
     if (!userId || !userClass) throw new Error('User data not available')
 
-    // ALL 7 parallel queries
+    // Parallel queries with error handling
     const [
       progressResult,
       classmatesResult,
@@ -101,7 +155,7 @@ function StudentDashboardContent() {
       caScoresResult,
       assignmentsResult,
       notesResult
-    ] = await Promise.all([
+    ] = await Promise.allSettled([
       supabase.from('student_term_progress').select('*').eq('student_id', userId).eq('term', 'third').eq('session_year', '2025/2026').maybeSingle(),
       supabase.from('profiles').select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id').eq('class', userClass).eq('role', 'student').neq('id', userId).limit(6),
       supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
@@ -111,22 +165,32 @@ function StudentDashboardContent() {
       supabase.from('notes').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
     ])
 
-    // CA Scores processing
-    const caScores = caScoresResult.data || []
+    // Safely extract data with fallbacks
+    const progress = progressResult.status === 'fulfilled' ? progressResult.value.data : null
+    const classmates = classmatesResult.status === 'fulfilled' && !classmatesResult.value.error ? classmatesResult.value.data || [] : []
+    const exams = examsResult.status === 'fulfilled' && !examsResult.value.error ? examsResult.value.data || [] : []
+    const attempts = attemptsResult.status === 'fulfilled' && !attemptsResult.value.error ? attemptsResult.value.data || [] : []
+    const caScores = caScoresResult.status === 'fulfilled' && !caScoresResult.value.error ? caScoresResult.value.data || [] : []
+    const assignments = assignmentsResult.status === 'fulfilled' && !assignmentsResult.value.error ? assignmentsResult.value.data || [] : []
+    const notes = notesResult.status === 'fulfilled' && !notesResult.value.error ? notesResult.value.data || [] : []
+
+    // CA Scores mapping
     const caScoresMap: Record<string, any> = {}
     caScores.forEach((ca: any) => { if (ca.exam_id) caScoresMap[ca.exam_id] = ca })
 
-    // Exam attempts enrichment
-    const attempts = attemptsResult.data || []
+    // Get exam details for attempts
     const examIds = [...new Set(attempts.map((a: any) => a.exam_id))]
     let examMap: Record<string, any> = {}
     
     if (examIds.length > 0) {
-      const { data: examDetails } = await supabase.from('exams').select('id, title, subject').in('id', examIds.slice(0, 50))
+      const { data: examDetails } = await supabase
+        .from('exams')
+        .select('id, title, subject')
+        .in('id', examIds.slice(0, 50))
       examDetails?.forEach((e: any) => { examMap[e.id] = e })
     }
 
-    // Enriched attempts
+    // Enrich attempts
     const enrichedAttempts = attempts.map((a: any) => {
       const caScore = caScoresMap[a.exam_id]
       const examScore = Number(a.total_score) || 0
@@ -152,7 +216,7 @@ function StudentDashboardContent() {
       }
     })
 
-    // All submitted filter
+    // Calculate statistics
     const allSubmitted = enrichedAttempts.filter((a: any) => {
       if (['completed', 'pending_theory', 'graded'].includes(a.status)) return true
       if (a.is_auto_submitted) {
@@ -166,16 +230,13 @@ function StudentDashboardContent() {
       return false
     })
     
-    // Truly completed
     const trulyCompleted = allSubmitted.filter((a: any) => 
       ['completed', 'graded'].includes(a.status) || 
       (a.is_auto_submitted && a.auto_submit_reason?.toLowerCase().includes('time'))
     )
     
-    // Pending theory
     const pendingTheoryCount = enrichedAttempts.filter((a: any) => a.status === 'pending_theory').length
     
-    // Pass/Fail calculation
     const passedExams = allSubmitted.filter((a: any) => {
       if (a.has_ca && a.ca_score?.grade) return !['F9'].includes(a.ca_score.grade)
       return a.is_passed === true || (a.percentage && a.percentage >= 50)
@@ -186,7 +247,6 @@ function StudentDashboardContent() {
       return a.is_passed === false && a.percentage !== null && a.percentage < 50
     }).length
 
-    // Average score
     const displayAvgScore = allSubmitted.length > 0
       ? Math.round((allSubmitted.reduce((sum: number, a: any) => {
           if (a.has_ca && a.ca_score?.total_score) return sum + Number(a.ca_score.total_score)
@@ -201,20 +261,19 @@ function StudentDashboardContent() {
         }, 0) / trulyCompleted.length) * 100) / 100
       : 0
 
-    // Available exams
     const completedAndGradedIds = allSubmitted.map((a: any) => a.exam_id)
-    const availableExams = (examsResult.data || []).filter((e: any) => !completedAndGradedIds.includes(e.id))
+    const availableExams = exams.filter((e: any) => !completedAndGradedIds.includes(e.id))
 
     return {
       stats: {
         availableExams,
-        classmates: classmatesResult.data || [],
+        classmates,
         recentAttempts: enrichedAttempts.slice(0, 10),
         allAttempts: enrichedAttempts,
-        allAssignments: assignmentsResult.data || [],
-        recentAssignments: (assignmentsResult.data || []).slice(0, 5),
-        allNotes: notesResult.data || [],
-        recentNotes: (notesResult.data || []).slice(0, 5),
+        allAssignments: assignments,
+        recentAssignments: assignments.slice(0, 5),
+        allNotes: notes,
+        recentNotes: notes.slice(0, 5),
         passedExams,
         failedExams,
         completedExams: allSubmitted.length,
@@ -225,16 +284,16 @@ function StudentDashboardContent() {
         caScoresCount: caScores.length,
         subjectsWithCA: [...new Set(caScores.map((ca: any) => ca.subject))],
       },
-      termProgress: progressResult.data,
+      termProgress: progress,
       reportCardStatus: null,
     }
   }, [contextUser?.id, contextUser?.class])
 
-  // ✅ Use caching hook - refresh() uses cache, refetch() forces fresh
+  // Data fetching hook
   const { data: dashboardData, loading, refresh, refetch } = useDataFetching<DashboardData>({
     key: `student-dashboard-${contextUser?.id}`,
     fetcher: fetchDashboardData,
-    cacheDuration: 30000,
+    cacheDuration: CACHE_DURATION,
     enabled: !!contextUser?.id,
   })
 
@@ -242,30 +301,29 @@ function StudentDashboardContent() {
   const termProgress = dashboardData?.termProgress
   const reportCardStatus = dashboardData?.reportCardStatus
 
-  // ✅ Use visibilitychange instead of focus + skip initial load + longer throttle
+  // ✅ Timeout fallback - prevents infinite loading spinner
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      // Skip if document just became visible on initial page load
-      if (isInitialLoadRef.current) {
-        isInitialLoadRef.current = false
-        return
-      }
-
-      if (document.visibilityState === 'visible') {
-        // Only refresh if it's been more than 2 minutes
-        if (Date.now() - lastVisibilityRef.current > VISIBILITY_REFRESH_INTERVAL && contextUser?.id) {
-          lastVisibilityRef.current = Date.now()
-          // ✅ Use refresh() instead of refetch() to use cache if available
-          refresh()
+    if (loading) {
+      loadingTimeoutRef.current = setTimeout(() => {
+        console.log('⚠️ Student dashboard loading timeout')
+        setLoadingTimeout(true)
+      }, LOADING_TIMEOUT_MS)
+      return () => {
+        if (loadingTimeoutRef.current) {
+          clearTimeout(loadingTimeoutRef.current)
+          loadingTimeoutRef.current = null
         }
       }
+    } else {
+      setLoadingTimeout(false)
+      if (loadingTimeoutRef.current) {
+        clearTimeout(loadingTimeoutRef.current)
+        loadingTimeoutRef.current = null
+      }
     }
+  }, [loading])
 
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [refresh, contextUser?.id])
-
-  // ✅ Format profile for header
+  // Format profile for header
   const formatProfileForHeader = useCallback(() => {
     if (!contextUser) return undefined
     return {
@@ -279,112 +337,144 @@ function StudentDashboardContent() {
     }
   }, [contextUser])
 
-  const profile = contextUser
   const handleLogout = () => instantLogout()
 
-  // All calculations
-  const completedExams = stats.completedExams || 0
-  const totalExams = termProgress?.total_subjects || (stats.availableExams?.length + completedExams) || 0
-  const availableExams = stats.availableExams?.length || 0
-  const avgScore = stats.averageScore ?? 0
-  const gradeInfo = calculateGrade(avgScore)
+  const handleRetry = () => {
+    setLoadingTimeout(false)
+    window.location.reload()
+  }
 
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50">
-        <Header onLogout={handleLogout} />
-        <div className="flex w-full">
-          <div className="hidden lg:block">
-            <StudentSidebar
-              profile={null}
-              onLogout={handleLogout}
-              collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-              activeTab={activeSection}
-              setActiveTab={setActiveSection}
-            />
-          </div>
-          <div className={cn(
-            "flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]",
-            sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-          )}>
-            <div className="text-center px-4">
-              <div className="relative mx-auto mb-6 h-16 w-16">
-                <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
-                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
-                <LayoutDashboard className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
-              </div>
-              <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Dashboard</h2>
-              <p className="text-sm text-slate-500">Please wait while we load your dashboard...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    )
+  // Memoized calculations
+  const dashboardMetrics = useMemo(() => {
+    const completedExams = stats.completedExams || 0
+    const totalExams = termProgress?.total_subjects || (stats.availableExams?.length + completedExams) || 0
+    const availableExams = stats.availableExams?.length || 0
+    const avgScore = stats.averageScore ?? 0
+    const gradeInfo = calculateGrade(avgScore)
+
+    return {
+      completedExams,
+      totalExams,
+      availableExams,
+      avgScore,
+      gradeInfo
+    }
+  }, [stats.completedExams, stats.availableExams, stats.averageScore, termProgress?.total_subjects])
+
+  // ✅ Loading state with timeout fallback
+  if (loading && !loadingTimeout) {
+    return <DashboardLoading />
+  }
+
+  if (loading && loadingTimeout) {
+    return <LoadingTimeoutError onRetry={handleRetry} />
   }
 
   // Main render
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
       <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
       <div className="flex w-full overflow-x-hidden">
         <StudentSidebar 
-          profile={profile} onLogout={handleLogout}
-          collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab={activeSection} setActiveTab={setActiveSection}
+          profile={contextUser} 
+          onLogout={handleLogout}
+          collapsed={sidebarCollapsed} 
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+          activeTab={activeSection} 
+          setActiveTab={setActiveSection}
         />
 
-        <div className={cn("flex-1 transition-all duration-300 w-full overflow-x-hidden", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
-          <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
-            <div className="max-w-7xl mx-auto">
-              {activeSection === 'overview' && (
-                <OverviewTab 
-                  profile={profile} stats={stats}
-                  bannerStats={{
-                    availableExams, totalExams, completedExams,
-                    averageScore: avgScore, currentGrade: gradeInfo.grade, gradeColor: gradeInfo.color,
-                    passedExams: stats.passedExams || 0, failedExams: stats.failedExams || 0,
-                    pendingTheoryCount: stats.pendingTheoryCount || 0,
-                    caScoresCount: stats.caScoresCount || 0,
-                    subjectsWithCA: stats.subjectsWithCA || [],
-                  }}
-                  reportCardStatus={reportCardStatus}
-                  welcomeBannerProfile={profile}
-                  handleTabChange={setActiveSection}
-                  router={router}
-                />
-              )}
-              {activeSection === 'exams' && (
-                <Card className="border-0 shadow-sm mt-2">
-                  <CardContent className="py-12 text-center">
-                    <BookOpen className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                    <h3 className="text-lg font-semibold mb-2">My Exams</h3>
-                    <p className="text-sm text-slate-500">Go to Exams tab to view your exams</p>
-                  </CardContent>
-                </Card>
-              )}
-              {activeSection === 'results' && (
-                <Card className="border-0 shadow-sm mt-2">
-                  <CardContent className="py-12 text-center">
-                    <Award className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                    <h3 className="text-lg font-semibold mb-2">My Results</h3>
-                    <p className="text-sm text-slate-500">Go to Results tab to view your results</p>
-                  </CardContent>
-                </Card>
-              )}
-              {activeSection === 'classmates' && (
-                <ClassmatesTab profile={profile} stats={stats} handleTabChange={setActiveSection} router={router} />
-              )}
+        <div className={cn(
+          "flex-1 transition-all duration-300 w-full overflow-x-hidden",
+          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
+        )}>
+          <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-24 pb-12 px-3 sm:px-4 lg:px-8 w-full overflow-x-hidden">
+            <div className="w-full max-w-7xl mx-auto">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={activeSection}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ duration: 0.3 }}
+                >
+                  {activeSection === 'overview' && (
+                    <OverviewTab 
+                      profile={contextUser} 
+                      stats={stats}
+                      bannerStats={{
+                        availableExams: dashboardMetrics.availableExams,
+                        totalExams: dashboardMetrics.totalExams,
+                        completedExams: dashboardMetrics.completedExams,
+                        averageScore: dashboardMetrics.avgScore,
+                        currentGrade: dashboardMetrics.gradeInfo.grade,
+                        gradeColor: dashboardMetrics.gradeInfo.color,
+                        passedExams: stats.passedExams || 0,
+                        failedExams: stats.failedExams || 0,
+                        pendingTheoryCount: stats.pendingTheoryCount || 0,
+                        caScoresCount: stats.caScoresCount || 0,
+                        subjectsWithCA: stats.subjectsWithCA || [],
+                      }}
+                      reportCardStatus={reportCardStatus}
+                      welcomeBannerProfile={contextUser}
+                      handleTabChange={setActiveSection}
+                      router={router}
+                    />
+                  )}
+                  
+                  {activeSection === 'exams' && (
+                    <Card className="border-0 shadow-sm mt-2">
+                      <CardContent className="py-12 sm:py-20 text-center">
+                        <div className="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
+                          <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-slate-800 mb-2">My Exams</h3>
+                        <p className="text-sm text-slate-500 max-w-md mx-auto">
+                          Your exams will appear here. Check back when exams are published.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {activeSection === 'results' && (
+                    <Card className="border-0 shadow-sm mt-2">
+                      <CardContent className="py-12 sm:py-20 text-center">
+                        <div className="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-purple-50 flex items-center justify-center mb-4">
+                          <Award className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-semibold text-slate-800 mb-2">My Results</h3>
+                        <p className="text-sm text-slate-500 max-w-md mx-auto">
+                          Your exam results will be displayed here once grading is complete.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {activeSection === 'classmates' && (
+                    <ClassmatesTab 
+                      profile={contextUser} 
+                      stats={stats} 
+                      handleTabChange={setActiveSection} 
+                      router={router} 
+                    />
+                  )}
+                </motion.div>
+              </AnimatePresence>
             </div>
           </main>
         </div>
       </div>
+
+      {/* Mobile bottom padding for better scrolling */}
+      <div className="lg:hidden h-16" />
     </div>
   )
 }
 
+// ============================================
+// EXPORT WITH AUTH GUARD
+// ============================================
 export default function StudentDashboardPage() {
   return (
     <AuthGuard allowedRoles={['student']}>

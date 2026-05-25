@@ -1,4 +1,3 @@
-// components/layout/header/Logo.tsx
 'use client'
 
 import { memo } from 'react'
@@ -22,8 +21,15 @@ export const Logo = memo(function Logo({ schoolSettings }: { schoolSettings: Sch
             />
           </div>
         ) : (
-          <div className="h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] rounded-xl flex items-center justify-center shadow-lg">
-            <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 lg:h-7 lg:w-7 text-white" />
+          // ✅ ADD YOUR LOCAL LOGO HERE AS FALLBACK
+          <div className="relative h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12">
+            <Image 
+              src="/images/logo.png" 
+              alt="Vincollins College Logo" 
+              width={48} height={48} 
+              className="object-contain" 
+              priority 
+            />
           </div>
         )}
       </div>

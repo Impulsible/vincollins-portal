@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/student/StudentSidebar.tsx - FULLY FIXED - SINGLE EFFECT
+// components/student/StudentSidebar.tsx - COMPLETELY FIXED
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -144,47 +144,72 @@ export function StudentSidebar({
   
   const isMountedRef = useRef(true)
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const subscriptionAttemptedRef = useRef(false)
 
   // ✅ Cleanup on unmount
   useEffect(() => {
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current).catch(() => {})
-        channelRef.current = null
+      // Clean up channel subscription properly
+      const cleanupChannel = async () => {
+        if (channelRef.current) {
+          try {
+            await supabase.removeChannel(channelRef.current)
+          } catch (error) {
+            console.error('Error removing channel:', error)
+          }
+          channelRef.current = null
+        }
       }
+      cleanupChannel()
     }
   }, [])
 
   // ✅ SINGLE EFFECT: Fetch profile THEN set up subscription
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel> | null = null
-
-    const fetchProfileAndSubscribe = async () => {
+    // Reset subscription flag when component mounts
+    subscriptionAttemptedRef.current = false
+    
+    const setupProfileAndSubscription = async () => {
       try {
         setProfileLoading(true)
-        const { data: { user } } = await supabase.auth.getUser()
         
-        if (!user || !isMountedRef.current) {
-          setProfileLoading(false)
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+        
+        if (userError || !user) {
+          console.error('No user found:', userError)
+          if (isMountedRef.current) setProfileLoading(false)
           return
         }
 
         console.log('🔍 Fetching student profile for sidebar...')
         
-        const { data: profileData, error } = await supabase
+        // Fetch profile data
+        const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select(`
-            id, first_name, middle_name, last_name, full_name, display_name,
-            email, class, vin_id, photo_url, avatar_url, department,
-            admission_year, admission_number
+            id, 
+            first_name, 
+            middle_name, 
+            last_name, 
+            full_name, 
+            display_name,
+            email, 
+            class, 
+            vin_id, 
+            photo_url, 
+            avatar_url, 
+            department,
+            admission_year, 
+            admission_number
           `)
           .eq('id', user.id)
           .single()
 
-        if (error) {
-          console.error('❌ Error fetching profile:', error)
+        if (profileError) {
+          console.error('❌ Error fetching profile:', profileError)
           if (isMountedRef.current) setProfileLoading(false)
           return
         }
@@ -196,6 +221,7 @@ export function StudentSidebar({
             first_name: profileData.first_name,
           })
 
+          // Set local profile state
           setLocalProfile({
             id: profileData.id,
             first_name: profileData.first_name,
@@ -214,66 +240,99 @@ export function StudentSidebar({
           setProfileLoading(false)
         }
 
-        // ✅ NOW set up subscription - AFTER profile is fetched
-        // Clean up any previous channel
+        // ✅ CRITICAL FIX: Clean up previous channel before creating new one
         if (channelRef.current) {
-          await supabase.removeChannel(channelRef.current).catch(() => {})
+          try {
+            await supabase.removeChannel(channelRef.current)
+          } catch (err) {
+            console.warn('Error removing previous channel:', err)
+          }
           channelRef.current = null
         }
 
-        // ✅ Create channel and add ALL listeners BEFORE subscribing
-        channel = supabase
-          .channel(`profile-updates-${user.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'profiles',
-              filter: `id=eq.${user.id}`,
-            },
-            (payload) => {
-              console.log('🔄 Profile updated in real-time:', payload.new)
-              if (!isMountedRef.current) return
-              const newData = payload.new as any
-              setLocalProfile(prev => prev ? {
+        // ✅ Create unique channel ID with timestamp to prevent conflicts
+        const channelId = `profile-updates-${user.id}-${Date.now()}`
+        
+        // ✅ Create channel and add listeners BEFORE subscribing
+        const newChannel = supabase.channel(channelId)
+        
+        // ✅ Add the postgres_changes listener
+        newChannel.on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'profiles',
+            filter: `id=eq.${user.id}`,
+          },
+          (payload) => {
+            if (!isMountedRef.current) return
+            
+            console.log('🔄 Profile updated in real-time:', payload.new)
+            const newData = payload.new as any
+            
+            setLocalProfile(prev => {
+              if (!prev) return null
+              return {
                 ...prev,
-                ...newData,
+                id: newData.id || prev.id,
                 full_name: newData.full_name || prev.full_name,
                 display_name: newData.display_name || prev.display_name,
                 first_name: newData.first_name || prev.first_name,
                 middle_name: newData.middle_name || prev.middle_name,
                 last_name: newData.last_name || prev.last_name,
-              } : null)
-            }
-          )
-          // ✅ Subscribe AFTER adding all listeners
-          .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-              console.log('✅ Subscribed to profile updates')
-            }
-            if (status === 'CHANNEL_ERROR') {
-              console.error('❌ Failed to subscribe to profile updates')
-            }
-          })
-
-        channelRef.current = channel
+                email: newData.email || prev.email,
+                class: newData.class || prev.class,
+                vin_id: newData.vin_id || prev.vin_id,
+                photo_url: newData.photo_url || newData.avatar_url || prev.photo_url,
+                department: newData.department || prev.department,
+                admission_year: newData.admission_year || prev.admission_year,
+                admission_number: newData.admission_number || prev.admission_number,
+              }
+            })
+          }
+        )
+        
+        // ✅ NOW subscribe (AFTER adding all listeners)
+        const subscription = newChannel.subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            console.log('✅ Successfully subscribed to profile updates for channel:', channelId)
+            subscriptionAttemptedRef.current = true
+          } else if (status === 'CHANNEL_ERROR') {
+            console.error('❌ Failed to subscribe to profile updates')
+          } else if (status === 'TIMED_OUT') {
+            console.error('❌ Subscription timed out')
+          } else if (status === 'CLOSED') {
+            console.log('Channel closed')
+          }
+        })
+        
+        // Store channel reference
+        channelRef.current = newChannel
 
       } catch (error) {
-        console.error('❌ Error in fetchProfileAndSubscribe:', error)
+        console.error('❌ Error in setupProfileAndSubscription:', error)
         if (isMountedRef.current) setProfileLoading(false)
       }
     }
 
-    fetchProfileAndSubscribe()
+    setupProfileAndSubscription()
 
-    // ✅ Cleanup
+    // ✅ Cleanup function for this effect
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel).catch(() => {})
+      const cleanup = async () => {
+        if (channelRef.current) {
+          try {
+            await supabase.removeChannel(channelRef.current)
+          } catch (error) {
+            console.error('Error cleaning up channel:', error)
+          }
+          channelRef.current = null
+        }
       }
+      cleanup()
     }
-  }, []) // Empty dependency = run once on mount
+  }, []) // Empty dependency array - run once on mount
 
   // Track online/offline status
   useEffect(() => {

@@ -1,4 +1,38 @@
 // src/components/staff/exams/edit/types.ts
+export interface Question {
+  id: string
+  question_text: string
+  type: 'objective' | 'theory'
+  options: string[]
+  correct_answer: string
+  points: number
+  order_number: number
+  exam_id?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TheorySubQuestion {
+  id: string
+  text: string
+  points: number
+  keywords?: string[]
+  model_answer?: string
+}
+
+export interface TheoryQuestion {
+  id: string
+  question_text: string
+  points: number
+  sub_questions?: TheorySubQuestion[]
+  keywords?: string[]
+  model_answer?: string
+  order_number: number
+  exam_id?: string
+  created_at?: string
+  updated_at?: string
+}
+
 export interface Exam {
   id: string
   title: string
@@ -20,23 +54,6 @@ export interface Exam {
   created_at: string
   published_at: string | null
   created_by: string
-}
-
-export interface Question {
-  id: string
-  question_text: string
-  type: string
-  options: string[]
-  correct_answer: string
-  points: number
-  order_number: number
-}
-
-export interface TheoryQuestion {
-  id: string
-  question_text: string
-  points: number
-  order_number: number
 }
 
 export interface StaffProfile {

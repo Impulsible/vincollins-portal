@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ClientLayout } from '@/components/ClientLayout';
 
+
 const inter = Inter({ 
   subsets: ['latin'],
   variable: '--font-inter',

@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - FULL CORRECTED LOGIN PAGE
+// app/portal/page.tsx - COMPLETE WORKING VERSION
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -32,7 +32,7 @@ interface SchoolSettings {
 
 export default function LoginPage() {
   const router = useRouter()
-  const { user, loading: userLoading, refreshUser } = useUser()
+  const { user, loading: userLoading, refreshUser, isAuthenticated } = useUser()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -53,65 +53,11 @@ export default function LoginPage() {
     role: 'student' | 'teacher' | 'admin'
     redirectPath: string
   } | null>(null)
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   
   const loginInProgress = useRef(false)
-  const hasRedirected = useRef(false)
-  const authCheckedOnce = useRef(false)
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // ============================================
-  // CHECK EXISTING AUTH - FIXED
-  // ============================================
-  useEffect(() => {
-    if (authCheckedOnce.current) return
-    if (loginInProgress.current) {
-      setIsCheckingAuth(false)
-      return
-    }
-
-    const checkAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        
-        if (session?.user && !hasRedirected.current) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .maybeSingle()
-          
-          const role = profile?.role || 'student'
-          const mappedRole = role === 'staff' ? 'teacher' : role
-          
-          const redirectMap: Record<string, string> = {
-            admin: '/admin',
-            teacher: '/staff',
-            student: '/student',
-          }
-          
-          const redirectPath = redirectMap[mappedRole] || '/student'
-          
-          if (redirectPath && !hasRedirected.current) {
-            hasRedirected.current = true
-            authCheckedOnce.current = true
-            router.replace(redirectPath)
-            return
-          }
-        }
-      } catch (error) {
-        console.error('Auth check error:', error)
-      }
-      
-      authCheckedOnce.current = true
-      setIsCheckingAuth(false)
-    }
-
-    checkAuth()
-  }, [router])
-
-  // ============================================
-  // LOAD SCHOOL SETTINGS
-  // ============================================
+  // Load school settings
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
@@ -137,13 +83,45 @@ export default function LoginPage() {
     loadSchoolSettings()
   }, [])
 
-  // ============================================
-  // LOGIN HANDLER - FIXED
-  // ============================================
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current)
+      }
+    }
+  }, [])
+
+  // Auto-redirect after 3 seconds
+  useEffect(() => {
+    if (showSuccessModal && loginSuccessData) {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current)
+      }
+      
+      redirectTimerRef.current = setTimeout(() => {
+        setShowSuccessModal(false)
+        setLoginSuccessData(null)
+        setLoading(false)
+        loginInProgress.current = false
+        router.push(loginSuccessData.redirectPath)
+      }, 3000)
+      
+      return () => {
+        if (redirectTimerRef.current) {
+          clearTimeout(redirectTimerRef.current)
+        }
+      }
+    }
+  }, [showSuccessModal, loginSuccessData, router])
+
+  // ✅ LOGIN HANDLER - Modal shows every time
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     
-    if (loginInProgress.current) return
+    if (loginInProgress.current || loading) {
+      return
+    }
     
     loginInProgress.current = true
     setLoading(true)
@@ -151,7 +129,7 @@ export default function LoginPage() {
     setSuccessMessage('')
 
     try {
-      const cleanEmail = email.trim().toLowerCase().replace(/\s+/g, '')
+      const cleanEmail = email.trim().toLowerCase()
       const cleanPassword = password.trim()
 
       if (!cleanEmail || !cleanPassword) {
@@ -182,25 +160,18 @@ export default function LoginPage() {
       }
 
       if (!signInData?.user) {
-        setError('Login failed. No user data received. Please try again.')
+        setError('Login failed. No user data received.')
         loginInProgress.current = false
         setLoading(false)
         return
       }
 
-      // Small delay for session establishment
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      // Get profile
-      const { data: profile, error: profileError } = await supabase
+      // Fetch profile
+      const { data: profile } = await supabase
         .from('profiles')
         .select('role, full_name, first_name, last_name')
         .eq('id', signInData.user.id)
         .maybeSingle()
-
-      if (profileError) {
-        console.error('Profile fetch error:', profileError)
-      }
 
       const userRole = profile?.role?.toLowerCase() || 
                        signInData.user.user_metadata?.role?.toLowerCase() || 
@@ -245,11 +216,11 @@ export default function LoginPage() {
       
       const redirectPath = redirectMap[mappedRole] || '/student'
 
-      // Mark as redirected
-      hasRedirected.current = true
-      authCheckedOnce.current = true
+      // Store auth info
+      localStorage.setItem('auth_user', JSON.stringify({ id: signInData.user.id, role: mappedRole }))
+      localStorage.setItem('auth_role', mappedRole)
 
-      // Show success modal
+      // ✅ SHOW SUCCESS MODAL
       setLoginSuccessData({
         userName: formattedName,
         role: mappedRole as 'student' | 'teacher' | 'admin',
@@ -257,14 +228,15 @@ export default function LoginPage() {
       })
       setShowSuccessModal(true)
       setSuccessMessage('Login successful! Redirecting...')
-
-      // Refresh user context
-      if (refreshUser) {
-        await refreshUser()
-      }
+      setLoading(false)
+      
+      // Reset login progress after modal shows
+      setTimeout(() => {
+        loginInProgress.current = false
+      }, 500)
 
     } catch (err: any) {
-      console.error('Unexpected login error:', err)
+      console.error('Login error:', err)
       setError('An unexpected error occurred. Please try again later.')
       loginInProgress.current = false
       setLoading(false)
@@ -293,9 +265,7 @@ export default function LoginPage() {
     }
   }
 
-  // ============================================
-  // SUCCESS MODAL - FIXED
-  // ============================================
+  // ✅ SUCCESS MODAL COMPONENT
   const SuccessModal = () => {
     if (!loginSuccessData) return null
     
@@ -308,7 +278,6 @@ export default function LoginPage() {
         color: '#9333EA',
         bgColor: '#F3E8FF',
         borderColor: '#D8B4FE',
-        lightBg: 'from-purple-50 to-fuchsia-50',
         greeting: 'Welcome back, Administrator',
         message: 'Accessing admin control panel...',
       },
@@ -318,7 +287,6 @@ export default function LoginPage() {
         color: '#2563EB',
         bgColor: '#EFF6FF',
         borderColor: '#BFDBFE',
-        lightBg: 'from-blue-50 to-cyan-50',
         greeting: 'Welcome back, Teacher',
         message: 'Loading your teaching dashboard...',
       },
@@ -328,7 +296,6 @@ export default function LoginPage() {
         color: '#059669',
         bgColor: '#ECFDF5',
         borderColor: '#A7F3D0',
-        lightBg: 'from-emerald-50 to-teal-50',
         greeting: 'Welcome back, Student',
         message: 'Preparing your learning space...',
       }
@@ -338,10 +305,15 @@ export default function LoginPage() {
     const firstName = userName.split(' ')[0]
 
     const goToDashboard = () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current)
+        redirectTimerRef.current = null
+      }
       setShowSuccessModal(false)
+      setLoginSuccessData(null)
       setLoading(false)
       loginInProgress.current = false
-      window.location.href = redirectPath
+      router.push(redirectPath)
     }
 
     return (
@@ -353,7 +325,7 @@ export default function LoginPage() {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={() => goToDashboard()}
+            onClick={goToDashboard}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0, y: 20 }}
@@ -363,22 +335,12 @@ export default function LoginPage() {
               className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Top gradient bar */}
               <div 
                 className="absolute top-0 left-0 right-0 h-1.5"
                 style={{ background: `linear-gradient(90deg, ${config.color}, ${config.color}88)` }}
               />
               
-              {/* Background pattern */}
-              <div className="absolute inset-0 opacity-[0.02] pointer-events-none">
-                <div className="absolute inset-0" style={{ 
-                  backgroundImage: 'radial-gradient(circle at 25px 25px, #333 2%, transparent 0%), radial-gradient(circle at 75px 75px, #333 2%, transparent 0%)',
-                  backgroundSize: '100px 100px'
-                }} />
-              </div>
-
               <div className="relative p-8">
-                {/* Close button */}
                 <button
                   onClick={goToDashboard}
                   className="absolute top-4 right-4 h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
@@ -389,7 +351,6 @@ export default function LoginPage() {
                 </button>
 
                 <div className="flex flex-col items-center text-center">
-                  {/* Success icon */}
                   <motion.div
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
@@ -418,7 +379,6 @@ export default function LoginPage() {
                     </div>
                   </motion.div>
                   
-                  {/* Welcome text */}
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -442,7 +402,6 @@ export default function LoginPage() {
                     </p>
                   </motion.div>
                   
-                  {/* Action buttons */}
                   <motion.div
                     initial={{ y: 20, opacity: 0 }}
                     animate={{ y: 0, opacity: 1 }}
@@ -473,38 +432,19 @@ export default function LoginPage() {
     )
   }
 
-  // Auto-redirect after 3 seconds
-  useEffect(() => {
-    if (showSuccessModal && loginSuccessData) {
-      const timer = setTimeout(() => {
-        setShowSuccessModal(false)
-        window.location.href = loginSuccessData.redirectPath
-      }, 3000)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [showSuccessModal, loginSuccessData])
-
-  // ============================================
-  // LOADING STATE
-  // ============================================
-  if (isCheckingAuth || userLoading) {
+  // Loading state
+  if (userLoading && !showSuccessModal) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        >
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
           <Loader2 className="h-10 w-10 text-primary" />
         </motion.div>
-        <p className="mt-4 text-sm text-gray-500">Checking authentication...</p>
+        <p className="mt-4 text-sm text-gray-500">Preparing secure login...</p>
       </div>
     )
   }
 
-  // ============================================
-  // RENDER
-  // ============================================
+  // Main render
   return (
     <>
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -512,7 +452,7 @@ export default function LoginPage() {
         
         <div className="flex-1 flex items-stretch pt-16 sm:pt-20">
           <div className="flex w-full">
-            {/* LEFT SIDE - IMAGE WITH MINIMAL TEXT */}
+            {/* LEFT SIDE - IMAGE */}
             <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative overflow-hidden">
               <Image
                 src="/images/portal.jpg"
@@ -526,11 +466,7 @@ export default function LoginPage() {
                   target.style.display = 'none';
                 }}
               />
-
               <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
-              <div className="absolute top-20 left-10 w-64 h-64 bg-[#F5A623]/5 rounded-full blur-3xl" />
-              <div className="absolute bottom-20 right-10 w-80 h-80 bg-white/5 rounded-full blur-3xl" />
-
               <div className="relative flex flex-col justify-center px-12 xl:px-16 py-12 w-full">
                 <motion.div
                   initial={{ opacity: 0, y: 30 }}
@@ -698,7 +634,7 @@ export default function LoginPage() {
 
                   {/* Success Message */}
                   <AnimatePresence>
-                    {successMessage && (
+                    {successMessage && !showSuccessModal && (
                       <motion.div 
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
