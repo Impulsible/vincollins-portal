@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/student/StudentWelcomeBanner.tsx - COMPLETE WITH PERSONALIZED QUOTES
+// components/student/StudentWelcomeBanner.tsx - WITH REAL-TIME UPDATES
+
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -7,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen,
-  Wifi, WifiOff, AlertCircle, Timer, Quote, Sparkles
+  Wifi, WifiOff, AlertCircle, Timer, Quote, Sparkles, RefreshCw
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -40,6 +41,7 @@ interface StudentStats {
 interface StudentWelcomeBannerProps {
   profile: StudentProfile | null
   stats: StudentStats | null
+  onRefresh?: () => void
 }
 
 const STORAGE_KEY = 'student_session_start'
@@ -118,12 +120,77 @@ const getSubjectCountForClass = (className: string): number => {
   return 17
 }
 
-export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerProps) {
+export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelcomeBannerProps) {
   const [mounted, setMounted] = useState(false)
   const [currentTime, setCurrentTime] = useState<Date | null>(null)
   const [sessionStart, setSessionStart] = useState<Date | null>(null)
   const [isOnline, setIsOnline] = useState(true)
   const [avatarError, setAvatarError] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [liveStats, setLiveStats] = useState<StudentStats | null>(stats)
+
+  // Update live stats when parent stats change
+  useEffect(() => {
+    setLiveStats(stats)
+  }, [stats])
+
+  // ─── Real-time Subscriptions for Stats ─────────────────
+  useEffect(() => {
+    if (!profile?.id) return
+
+    console.log('📡 Setting up real-time subscriptions for student stats...')
+
+    // Subscribe to exam_attempts changes
+    const attemptsChannel = supabase
+      .channel(`student-stats-attempts-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'exam_attempts',
+          filter: `student_id=eq.${profile.id}`
+        },
+        (payload) => {
+          console.log('🔄 Exam attempt changed, refreshing stats...', payload.eventType)
+          if (onRefresh) onRefresh()
+        }
+      )
+      .subscribe()
+
+    // Subscribe to ca_scores changes
+    const caScoresChannel = supabase
+      .channel(`student-stats-ca-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ca_scores',
+          filter: `student_id=eq.${profile.id}`
+        },
+        (payload) => {
+          console.log('🔄 CA scores changed, refreshing stats...', payload.eventType)
+          if (onRefresh) onRefresh()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      console.log('📡 Cleaning up stats subscriptions')
+      attemptsChannel.unsubscribe()
+      caScoresChannel.unsubscribe()
+    }
+  }, [profile?.id, onRefresh])
+
+  // Manual refresh handler
+  const handleRefresh = () => {
+    if (onRefresh && !refreshing) {
+      setRefreshing(true)
+      onRefresh()
+      setTimeout(() => setRefreshing(false), 1000)
+    }
+  }
 
   useEffect(() => {
     setMounted(true)
@@ -213,14 +280,14 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
   const firstName = getFirstName(profile?.full_name || 'Student')
   const studentClass = profile?.class || 'Not Assigned'
   const studentDepartment = profile?.department || 'General'
-  const totalSubjects = stats?.totalSubjects || getSubjectCountForClass(studentClass)
-  const completedExams = stats?.completedExams ?? 0
-  const averageScore = stats?.averageScore ?? 0
-  const availableExams = stats?.availableExams ?? 0
-  const pendingTheoryCount = stats?.pendingTheoryCount ?? 0
+  const totalSubjects = liveStats?.totalSubjects || getSubjectCountForClass(studentClass)
+  const completedExams = liveStats?.completedExams ?? 0
+  const averageScore = liveStats?.averageScore ?? 0
+  const availableExams = liveStats?.availableExams ?? 0
+  const pendingTheoryCount = liveStats?.pendingTheoryCount ?? 0
 
-  const gradeInfo = stats?.currentGrade && stats?.gradeColor 
-    ? { grade: stats.currentGrade, color: stats.gradeColor, description: '' }
+  const gradeInfo = liveStats?.currentGrade && liveStats?.gradeColor 
+    ? { grade: liveStats.currentGrade, color: liveStats.gradeColor, description: '' }
     : calculateGrade(averageScore)
   
   const showGrade = completedExams > 0
@@ -250,6 +317,16 @@ export function StudentWelcomeBanner({ profile, stats }: StudentWelcomeBannerPro
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 text-white shadow-2xl mb-8"
       suppressHydrationWarning
     >
+      {/* Refresh button */}
+      <button
+        onClick={handleRefresh}
+        disabled={refreshing}
+        className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+        title="Refresh stats"
+      >
+        <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+      </button>
+
       <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
       

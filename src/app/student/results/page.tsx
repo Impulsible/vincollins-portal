@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/results/page.tsx - FULLY SYNCED WITH EXAM SCORES (FIXED)
+// app/student/results/page.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -61,6 +62,9 @@ interface ExamResult {
   objective_total?: number
   theory_score?: number
   theory_total?: number
+  ca1_score?: number
+  ca2_score?: number
+  has_ca?: boolean
   is_passed: boolean
   started_at: string
   completed_at?: string
@@ -85,7 +89,7 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
   return {
     id: profile.id,
     name: profile.full_name,
-    firstName: profile.first_name || profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
+    firstName: profile.first_name || profile.full_name?.split(' ')[0] || 'Student',
     email: profile.email,
     role: 'student' as const,
     avatar: profile.photo_url || undefined,
@@ -103,8 +107,8 @@ const getInitials = (name: string): string => {
 const calculateGrade = (percentage: number): { grade: string; color: string } => {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
   if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
-  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
-  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-cyan-600' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-amber-600' }
   return { grade: 'F', color: 'text-red-600' }
 }
 
@@ -122,72 +126,12 @@ const formatDate = (dateString?: string) => {
 }
 
 // ============================================
-// SCORE NORMALIZATION HELPER
-// ============================================
-const normalizeScores = (attempt: any, exam: any) => {
-  const attemptTotalMarks = Number(attempt.total_marks) || 0
-  const examTotalMarks = Number(exam?.total_marks) || 0
-  const rawScore = Number(attempt.total_score) || 0
-  const rawObjectiveScore = Number(attempt.objective_score) || 0
-  const rawObjectiveTotal = Number(attempt.objective_total) || 0
-  const rawTheoryTotal = Number(attempt.theory_total) || 0
-
-  let displayScore: number
-  let displayTotalMarks: number
-  let displayObjectiveScore: number
-  let displayObjectiveTotal: number
-  let displayTheoryScore: number
-  let displayTheoryTotal: number
-
-  // Normalize total score
-  if (attemptTotalMarks > 0) {
-    // Attempt already has normalized values (100-based)
-    displayScore = rawScore
-    displayTotalMarks = attemptTotalMarks
-  } else if (examTotalMarks > 0 && examTotalMarks !== 100) {
-    // Normalize from exam scale to 100
-    displayScore = (rawScore / examTotalMarks) * 100
-    displayTotalMarks = 100
-  } else {
-    // Default fallback
-    displayScore = rawScore
-    displayTotalMarks = 100
-  }
-
-  // Normalize objective score
-  if (rawObjectiveTotal > 0 && rawObjectiveTotal !== 100) {
-    displayObjectiveScore = (rawObjectiveScore / rawObjectiveTotal) * 100
-    displayObjectiveTotal = 100
-  } else {
-    displayObjectiveScore = rawObjectiveScore
-    displayObjectiveTotal = rawObjectiveTotal || 100
-  }
-
-  // Normalize theory score
-  if (rawTheoryTotal > 0 && rawTheoryTotal !== 100) {
-    displayTheoryScore = 0 // Theory score comes from theory_answers, not stored directly
-    displayTheoryTotal = 100
-  } else {
-    displayTheoryScore = 0
-    displayTheoryTotal = rawTheoryTotal || 100
-  }
-
-  return {
-    displayScore: Math.round(displayScore * 10) / 10,
-    displayTotalMarks,
-    displayObjectiveScore: Math.round(displayObjectiveScore * 10) / 10,
-    displayObjectiveTotal,
-    displayTheoryScore: Math.round(displayTheoryScore * 10) / 10,
-    displayTheoryTotal,
-  }
-}
-
-// ============================================
 // MAIN COMPONENT
 // ============================================
 export default function StudentResultsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
   const [profile, setProfile] = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -239,13 +183,6 @@ export default function StudentResultsPage() {
           return
         }
 
-        // Also get VIN from users table
-        const { data: userData } = await supabase
-          .from('users')
-          .select('vin_id')
-          .eq('id', session.user.id)
-          .maybeSingle()
-
         if (isMounted) {
           setProfile({
             id: session.user.id,
@@ -255,7 +192,7 @@ export default function StudentResultsPage() {
             email: profileData.email || session.user.email || '',
             class: profileData.class || 'Not Assigned',
             department: profileData.department || 'General',
-            vin_id: userData?.vin_id || profileData.vin_id,
+            vin_id: profileData.vin_id,
             photo_url: profileData.photo_url
           })
           setAuthChecking(false)
@@ -271,16 +208,18 @@ export default function StudentResultsPage() {
   }, [router])
 
   // ============================================
-  // LOAD RESULTS - FIXED SCORE NORMALIZATION
+  // LOAD RESULTS - SEPARATE QUERIES (NO FOREIGN KEY)
   // ============================================
-  const loadResults = useCallback(async () => {
+  const loadResults = useCallback(async (showToast = false) => {
     if (!profile?.id) return
     
-    setLoading(true)
+    if (showToast) setRefreshing(true)
+    else setLoading(true)
+    
     try {
       console.log('📊 Loading results for student:', profile.id)
 
-      // FIRST: Get all exam attempts for this student
+      // Query 1: Get exam attempts
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -291,14 +230,15 @@ export default function StudentResultsPage() {
         console.error('Error loading attempts:', attemptsError)
         toast.error('Failed to load results')
         setLoading(false)
+        setRefreshing(false)
         return
       }
-
-      console.log('📊 Found', attemptsData?.length || 0, 'exam attempts')
 
       if (!attemptsData || attemptsData.length === 0) {
         setResults([])
         setFilteredResults([])
+        setSubjectPerformance([])
+        setAvailableSubjects([])
         setStats({
           totalExams: 0,
           passedExams: 0,
@@ -309,23 +249,19 @@ export default function StudentResultsPage() {
           pendingResults: 0
         })
         setLoading(false)
+        setRefreshing(false)
         return
       }
 
-      // SECOND: Get all exam details for these attempts
-      const examIds = [...new Set(attemptsData.map(a => a.exam_id).filter(Boolean))]
-      console.log('📊 Exam IDs:', examIds)
+      console.log('📊 Found attempts:', attemptsData.length)
 
-      const { data: examsData, error: examsError } = await supabase
+      // Query 2: Get exam details separately
+      const examIds = [...new Set(attemptsData.map(a => a.exam_id))]
+      const { data: examsData } = await supabase
         .from('exams')
         .select('id, title, subject, total_marks, passing_percentage')
         .in('id', examIds)
 
-      if (examsError) {
-        console.error('Error loading exams:', examsError)
-      }
-
-      // Create exam map for quick lookup
       const examMap: Record<string, any> = {}
       if (examsData) {
         examsData.forEach(exam => {
@@ -333,30 +269,42 @@ export default function StudentResultsPage() {
         })
       }
 
-      // THIRD: Process and combine the data with score normalization
+      // Query 3: Get CA scores
+      const { data: caScoresData } = await supabase
+        .from('ca_scores')
+        .select('exam_id, ca1_score, ca2_score')
+        .eq('student_id', profile.id)
+
+      const caScoresMap: Record<string, any> = {}
+      if (caScoresData) {
+        caScoresData.forEach(ca => {
+          caScoresMap[ca.exam_id] = ca
+        })
+      }
+
+      // Process results
       const completedResults: ExamResult[] = []
-      const subjects: string[] = []
       const subjectScores: Record<string, number[]> = {}
       
-      let totalScore = 0
+      let totalPercentage = 0
       let passedCount = 0
       let failedCount = 0
       let highestScore = 0
       let lowestScore = 100
       let pendingCount = 0
 
-      attemptsData.forEach((attempt: any) => {
+      for (const attempt of attemptsData) {
         const exam = examMap[attempt.exam_id]
+        const ca = caScoresMap[attempt.exam_id]
         
-        // Include completed, graded, and pending_theory statuses
-        if (attempt.status === 'completed' || attempt.status === 'graded' || attempt.status === 'pending_theory') {
-          // Use percentage_score if available, otherwise calculate from percentage
-          const percentage = Number(attempt.percentage_score || attempt.percentage) || 0
+        // Include completed, graded exams
+        if (attempt.status === 'completed' || attempt.status === 'graded') {
+          // Use percentage from database (calculated by trigger)
+          const percentage = attempt.percentage || 0
           const passingScore = exam?.passing_percentage || 50
-          const isPassed = attempt.is_passed || percentage >= passingScore
+          const isPassed = percentage >= passingScore
           
-          // Normalize scores
-          const normalized = normalizeScores(attempt, exam)
+          console.log(`📊 ${exam?.subject || 'Unknown'}: ${percentage}% (from DB), Passed: ${isPassed}`)
           
           const result: ExamResult = {
             id: attempt.id,
@@ -365,42 +313,41 @@ export default function StudentResultsPage() {
             exam_subject: exam?.subject || 'Unknown Subject',
             status: attempt.status,
             percentage: percentage,
-            total_score: normalized.displayScore,
-            total_marks: normalized.displayTotalMarks,
-            objective_score: normalized.displayObjectiveScore,
-            objective_total: normalized.displayObjectiveTotal,
-            theory_score: normalized.displayTheoryScore,
-            theory_total: normalized.displayTheoryTotal,
+            total_score: attempt.total_score || 0,
+            total_marks: attempt.total_marks || 100,
+            objective_score: attempt.objective_score,
+            objective_total: attempt.objective_total || 20,
+            theory_score: attempt.theory_score,
+            theory_total: attempt.theory_total || 40,
+            ca1_score: ca?.ca1_score,
+            ca2_score: ca?.ca2_score,
+            has_ca: !!(ca?.ca1_score || ca?.ca2_score),
             is_passed: isPassed,
             started_at: attempt.started_at || attempt.created_at,
-            completed_at: attempt.submitted_at || attempt.completed_at,
+            completed_at: attempt.submitted_at,
             attempt_number: attempt.attempt_number || 1,
             passing_percentage: passingScore
           }
           
           completedResults.push(result)
           
-          // Track subjects for performance
+          // Track subject performance
           const subject = exam?.subject || 'Unknown'
-          subjects.push(subject)
           if (!subjectScores[subject]) {
             subjectScores[subject] = []
           }
           subjectScores[subject].push(percentage)
           
           // Update stats
-          totalScore += percentage
+          totalPercentage += percentage
           if (isPassed) passedCount++ 
           else failedCount++
           if (percentage > highestScore) highestScore = percentage
           if (percentage < lowestScore) lowestScore = percentage
-          
         } else if (attempt.status === 'submitted') {
           pendingCount++
         }
-      })
-
-      console.log('📊 Processed', completedResults.length, 'completed results')
+      }
 
       // Calculate subject performance
       const performance: SubjectPerformance[] = []
@@ -421,26 +368,43 @@ export default function StudentResultsPage() {
 
       performance.sort((a, b) => b.averageScore - a.averageScore)
 
+      const avgScore = completedResults.length > 0 ? Math.round(totalPercentage / completedResults.length) : 0
+
+      console.log('📊 Final Stats:', {
+        totalExams: completedResults.length,
+        passedExams: passedCount,
+        failedExams: failedCount,
+        averageScore: avgScore,
+        highestScore: highestScore,
+        lowestScore: lowestScore,
+        pendingResults: pendingCount
+      })
+
       setResults(completedResults)
       setFilteredResults(completedResults)
-      setAvailableSubjects([...new Set(subjects)].sort())
+      setAvailableSubjects([...new Set(Object.keys(subjectScores))].sort())
       setSubjectPerformance(performance)
       
       setStats({
         totalExams: completedResults.length,
         passedExams: passedCount,
         failedExams: failedCount,
-        averageScore: completedResults.length > 0 ? Math.round(totalScore / completedResults.length) : 0,
-        highestScore: completedResults.length > 0 ? highestScore : 0,
-        lowestScore: completedResults.length > 0 ? lowestScore : 0,
+        averageScore: avgScore,
+        highestScore: highestScore,
+        lowestScore: lowestScore,
         pendingResults: pendingCount
       })
+
+      if (showToast) {
+        toast.success('Results refreshed!')
+      }
 
     } catch (error) {
       console.error('Error loading results:', error)
       toast.error('Failed to load results')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }, [profile?.id])
 
@@ -454,15 +418,15 @@ export default function StudentResultsPage() {
   }, [authChecking, profile, loadResults])
 
   // ============================================
-  // REAL-TIME SYNC - Listen for new exam attempts
+  // REAL-TIME SYNC
   // ============================================
   useEffect(() => {
     if (!profile?.id) return
 
-    console.log('📡 Setting up real-time subscription for results...')
+    console.log('📡 Setting up real-time subscriptions for results...')
 
-    const channel = supabase
-      .channel('results-sync')
+    const attemptsChannel = supabase
+      .channel('results-attempts-sync')
       .on(
         'postgres_changes',
         {
@@ -473,16 +437,32 @@ export default function StudentResultsPage() {
         },
         (payload) => {
           console.log('🔄 Exam attempt changed, refreshing results...', payload.eventType)
-          loadResults()
+          loadResults(true)
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Results subscription status:', status)
-      })
+      .subscribe()
+
+    const caScoresChannel = supabase
+      .channel('results-ca-sync')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'ca_scores',
+          filter: `student_id=eq.${profile.id}`
+        },
+        (payload) => {
+          console.log('🔄 CA scores changed, refreshing results...', payload.eventType)
+          loadResults(true)
+        }
+      )
+      .subscribe()
 
     return () => {
-      console.log('📡 Cleaning up results subscription')
-      channel.unsubscribe()
+      console.log('📡 Cleaning up results subscriptions')
+      attemptsChannel.unsubscribe()
+      caScoresChannel.unsubscribe()
     }
   }, [profile?.id, loadResults])
 
@@ -537,8 +517,8 @@ export default function StudentResultsPage() {
     window.location.replace('/portal')
   }
 
-  const handleViewDetails = (resultId: string) => {
-    router.push(`/student/results/${resultId}`)
+  const handleViewDetails = (examId: string) => {
+    router.push(`/student/results/${examId}`)
   }
 
   const handlePrint = () => {
@@ -546,12 +526,17 @@ export default function StudentResultsPage() {
   }
 
   const handleExport = () => {
+    if (filteredResults.length === 0) {
+      toast.error('No data to export')
+      return
+    }
+    
     const csv = [
       ['Exam Title', 'Subject', 'Score', 'Percentage', 'Grade', 'Status', 'Date'],
       ...filteredResults.map(r => [
         r.exam_title,
         r.exam_subject,
-        `${r.total_score.toFixed(1)}/${r.total_marks}`,
+        `${r.total_score}/${r.total_marks}`,
         `${r.percentage}%`,
         getGradeFromPercentage(r.percentage),
         r.is_passed ? 'Passed' : 'Failed',
@@ -567,6 +552,10 @@ export default function StudentResultsPage() {
     a.click()
     window.URL.revokeObjectURL(url)
     toast.success('Results exported successfully!')
+  }
+
+  const handleRefresh = () => {
+    loadResults(true)
   }
 
   // ============================================
@@ -588,9 +577,6 @@ export default function StudentResultsPage() {
 
   const gradeInfo = calculateGrade(stats.averageScore)
 
-  // ============================================
-  // RENDER
-  // ============================================
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
@@ -611,6 +597,14 @@ export default function StudentResultsPage() {
         )}>
           <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-7xl">
             
+            {/* Refresh indicator */}
+            {refreshing && (
+              <div className="fixed top-20 right-4 z-50 flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-lg shadow-lg text-xs">
+                <RefreshCw className="h-3 w-3 animate-spin" />
+                Updating results...
+              </div>
+            )}
+
             {/* Breadcrumb */}
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
@@ -625,10 +619,16 @@ export default function StudentResultsPage() {
                 <ChevronRight className="h-3.5 w-3.5" />
                 <span className="text-foreground font-medium">My Results</span>
               </div>
-              <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Back to Dashboard
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleRefresh} className="h-8">
+                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
+                  Refresh
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back
+                </Button>
+              </div>
             </motion.div>
             
             {/* Header */}
@@ -663,10 +663,6 @@ export default function StudentResultsPage() {
                   <Button variant="outline" size="sm" onClick={handleExport} className="h-8 sm:h-9">
                     <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
                     <span className="hidden sm:inline">Export</span>
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={loadResults} className="h-8 sm:h-9">
-                    <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-2" />
-                    <span className="hidden sm:inline">Refresh</span>
                   </Button>
                 </div>
               </div>
@@ -761,13 +757,13 @@ export default function StudentResultsPage() {
                   <CardContent className="px-3 sm:px-6 pb-4 sm:pb-6">
                     <div className="grid gap-2 sm:gap-3 lg:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                       {subjectPerformance.slice(0, 6).map((perf) => {
-                        const gradeInfo = calculateGrade(perf.averageScore)
+                        const perfGrade = calculateGrade(perf.averageScore)
                         return (
                           <div key={perf.subject} className="p-3 sm:p-4 bg-slate-50 rounded-xl">
                             <div className="flex items-center justify-between mb-2">
                               <p className="font-medium text-sm sm:text-base truncate">{perf.subject}</p>
-                              <Badge className={cn("text-[10px] sm:text-xs", gradeInfo.color.replace('text', 'bg').replace('600', '100'))}>
-                                <span className={gradeInfo.color}>{perf.grade}</span>
+                              <Badge className={cn("text-[10px] sm:text-xs", perfGrade.color.replace('text', 'bg').replace('600', '100'), perfGrade.color)}>
+                                {perf.grade}
                               </Badge>
                             </div>
                             <div className="flex items-center justify-between mb-1">
@@ -813,7 +809,7 @@ export default function StudentResultsPage() {
                 <div className="relative flex-1 min-w-[140px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
                   <Input
-                    placeholder="Search..."
+                    placeholder="Search exams..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="pl-9 pr-4 h-9 text-sm bg-white w-full"
@@ -841,8 +837,8 @@ export default function StudentResultsPage() {
                   <SelectContent>
                     <SelectItem value="newest">Newest</SelectItem>
                     <SelectItem value="oldest">Oldest</SelectItem>
-                    <SelectItem value="highest">Highest</SelectItem>
-                    <SelectItem value="lowest">Lowest</SelectItem>
+                    <SelectItem value="highest">Highest Score</SelectItem>
+                    <SelectItem value="lowest">Lowest Score</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -888,6 +884,7 @@ export default function StudentResultsPage() {
                 >
                   {filteredResults.map((result, index) => {
                     const gradeInfo = calculateGrade(result.percentage)
+                    const hasCA = result.has_ca || (result.ca1_score && result.ca1_score > 0) || (result.ca2_score && result.ca2_score > 0)
                     
                     return (
                       <motion.div
@@ -897,9 +894,10 @@ export default function StudentResultsPage() {
                         transition={{ delay: index * 0.05 }}
                       >
                         <Card className={cn(
-                          "border-0 shadow-sm bg-white hover:shadow-md transition-shadow",
+                          "border-0 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer",
                           result.is_passed ? "border-l-4 border-l-green-500" : "border-l-4 border-l-red-500"
-                        )}>
+                        )}
+                        onClick={() => handleViewDetails(result.exam_id)}>
                           <CardContent className="p-3 sm:p-4 lg:p-5">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                               <div className="flex-1">
@@ -921,6 +919,11 @@ export default function StudentResultsPage() {
                                       <Badge variant="outline" className="text-[10px] sm:text-xs">
                                         {result.exam_subject}
                                       </Badge>
+                                      {hasCA && (
+                                        <Badge className="bg-blue-100 text-blue-700 text-[10px] sm:text-xs">
+                                          CA: {result.ca1_score || 0}/{result.ca2_score || 0}
+                                        </Badge>
+                                      )}
                                       <span className="text-[10px] sm:text-xs text-slate-500 flex items-center gap-1">
                                         <Calendar className="h-3 w-3" />
                                         {formatDate(result.completed_at)}
@@ -931,17 +934,17 @@ export default function StudentResultsPage() {
                                         </Badge>
                                       )}
                                     </div>
-                                    {/* Score breakdown */}
-                                    {(result.objective_score !== undefined || result.theory_score !== undefined) && (
-                                      <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] sm:text-xs text-slate-500">
-                                        {result.objective_score !== undefined && result.objective_total !== undefined && (
-                                          <span>Objective: {result.objective_score.toFixed(1)}/{result.objective_total}</span>
-                                        )}
-                                        {result.theory_score !== undefined && result.theory_total !== undefined && (
-                                          <span>Theory: {result.theory_score.toFixed(1)}/{result.theory_total}</span>
-                                        )}
-                                      </div>
-                                    )}
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2 text-[10px] sm:text-xs text-slate-500">
+                                      {result.objective_score !== undefined && (
+                                        <span>Objective: {result.objective_score?.toFixed(1) || 0}/{result.objective_total}</span>
+                                      )}
+                                      {result.theory_score !== undefined && result.theory_score > 0 && (
+                                        <span>Theory: {result.theory_score?.toFixed(1) || 0}/{result.theory_total}</span>
+                                      )}
+                                      {hasCA && (
+                                        <span>Total: {result.total_score?.toFixed(1) || 0}/{result.total_marks}</span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -964,19 +967,14 @@ export default function StudentResultsPage() {
                                       {result.is_passed ? 'Passed' : 'Failed'}
                                     </Badge>
                                   </div>
-                                  <p className="text-[10px] sm:text-xs text-slate-500 mt-1">
-                                    Score: {result.total_score.toFixed(1)}/{result.total_marks}
-                                  </p>
                                 </div>
                                 
                                 <Button 
-                                  variant="outline" 
+                                  variant="ghost" 
                                   size="sm"
-                                  onClick={() => handleViewDetails(result.id)}
-                                  className="shrink-0 h-8 sm:h-9 px-2 sm:px-3"
+                                  className="shrink-0 h-8 w-8 p-0 rounded-full"
                                 >
-                                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4 sm:mr-1" />
-                                  <span className="hidden sm:inline">View</span>
+                                  <ChevronRight className="h-4 w-4 text-slate-400" />
                                 </Button>
                               </div>
                             </div>
