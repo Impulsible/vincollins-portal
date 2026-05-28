@@ -1,10 +1,10 @@
-// components/admin/dashboard/AdminOverview.tsx
+// components/admin/dashboard/AdminOverview.tsx - WITHOUT RecentActivityFeed
+
 'use client'
 
 import { WelcomeBanner } from '@/components/admin/dashboard/WelcomeBanner'
 import { StatsCards } from '@/components/admin/dashboard/StatsCards'
 import { QuickActions } from '@/components/admin/dashboard/QuickActions'
-import { RecentActivityFeed } from '@/components/admin/dashboard/RecentActivityFeed'
 import { Button } from '@/components/ui/button'
 import { Bell, ArrowRight } from 'lucide-react'
 import { motion } from 'framer-motion'
@@ -81,10 +81,6 @@ export function AdminOverview({ profile, stats, students, pendingExamsCount, onN
           onStaffClick={() => onNavigate('staff')}
           onExamsClick={() => onNavigate('exams')}
         />
-      </motion.div>
-
-      <motion.div variants={itemVariants}>
-        <RecentActivityFeed />
       </motion.div>
     </motion.div>
   )
