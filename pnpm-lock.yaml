@@ -66,7 +66,7 @@ importers:
         specifier: ^0.10.0
         version: 0.10.2(@supabase/supabase-js@2.103.2)
       '@supabase/supabase-js':
-        specifier: ^2.101.1
+        specifier: ^2.103.2
         version: 2.103.2
       '@tanstack/react-query':
         specifier: ^5.96.0
@@ -152,6 +152,9 @@ importers:
       geist:
         specifier: ^1.7.0
         version: 1.7.0(next@14.2.15(@babel/core@7.29.0)(react-dom@18.3.1(react@18.3.1))(react@18.3.1))
+      html2canvas:
+        specifier: ^1.4.1
+        version: 1.4.1
       jspdf:
         specifier: ^4.2.1
         version: 4.2.1
@@ -7442,8 +7445,7 @@ snapshots:
 
   balanced-match@4.0.4: {}
 
-  base64-arraybuffer@1.0.2:
-    optional: true
+  base64-arraybuffer@1.0.2: {}
 
   base64-js@1.5.1: {}
 
@@ -7673,7 +7675,6 @@ snapshots:
   css-line-break@2.1.0:
     dependencies:
       utrie: 1.0.2
-    optional: true
 
   css-select@5.2.2:
     dependencies:
@@ -8589,7 +8590,6 @@ snapshots:
     dependencies:
       css-line-break: 2.1.0
       text-segmentation: 1.0.3
-    optional: true
 
   htmlparser2@8.0.2:
     dependencies:
@@ -10296,7 +10296,6 @@ snapshots:
   text-segmentation@1.0.3:
     dependencies:
       utrie: 1.0.2
-    optional: true
 
   text-table@0.2.0: {}
 
@@ -10489,7 +10488,6 @@ snapshots:
   utrie@1.0.2:
     dependencies:
       base64-arraybuffer: 1.0.2
-    optional: true
 
   validate-npm-package-name@7.0.2: {}
 

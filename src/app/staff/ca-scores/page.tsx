@@ -1,7 +1,7 @@
-// app/staff/ca-scores/page.tsx - UPDATED TO USE FULL CAScoresTab
+// app/staff/ca-scores/page.tsx - FIXED with useState import
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'  // ✅ Add useState here
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/contexts/UserContext'

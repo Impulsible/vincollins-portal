@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/staff/StaffSidebar.tsx - NO LOADING STATE, OPENS IMMEDIATELY
+// components/staff/StaffSidebar.tsx - NO ATTENDANCE, OPENS IMMEDIATELY
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +10,7 @@ import {
   LayoutDashboard, BookOpen, FileText, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, User, CalendarDays,
-  Bell, HelpCircle, ClipboardList, Notebook
+  Bell, HelpCircle, Notebook
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -65,12 +65,12 @@ interface SidebarStats {
   examCount: number
 }
 
+// ✅ Removed attendance from primary navigation
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
   { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory', route: '/staff/exams' },
   { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks', route: '/staff/assignments' },
   { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
-  { id: 'attendance', name: 'Attendance', icon: ClipboardList, description: 'Track Records', route: '/staff/attendance' },
   { id: 'students', name: 'Students', icon: User, description: 'Class Roster', route: '/staff/students' },
   { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class Schedule', route: '/staff/schedule' },
 ]
@@ -147,7 +147,6 @@ export function StaffSidebar({
   const pathname = usePathname()
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   
-  // Use the profile directly from props - no loading state
   const firstName = getFirstName(profile)
   const displayName = getDisplayName(profile)
   const initials = getInitials(profile)
@@ -156,22 +155,19 @@ export function StaffSidebar({
   const userRole = profile?.role
   const department = profile?.department
 
-  // Stats - initialize with empty values, they'll update when data loads
   const [stats, setStats] = useState<SidebarStats>({ studentCount: 0, examCount: 0 })
 
-  // Fetch stats in background (doesn't block sidebar rendering)
+  // Fetch stats in background
   useEffect(() => {
     const fetchStats = async () => {
       if (!profile?.id) return
       
       try {
-        // Get student count
         const { count: studentsCount } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .eq('role', 'student')
 
-        // Get exam count for this teacher
         const { count: examsCount } = await supabase
           .from('exams')
           .select('*', { count: 'exact', head: true })
@@ -199,8 +195,6 @@ export function StaffSidebar({
       setActiveTab('assignments')
     } else if (pathname?.startsWith('/staff/notes')) {
       setActiveTab('notes')
-    } else if (pathname?.startsWith('/staff/attendance')) {
-      setActiveTab('attendance')
     } else if (pathname?.startsWith('/staff/students')) {
       setActiveTab('students')
     } else if (pathname?.startsWith('/staff/schedule')) {
@@ -388,7 +382,7 @@ export function StaffSidebar({
                 )}
               </div>
 
-              {/* Stats - updates in background */}
+              {/* Stats */}
               <div className="grid grid-cols-2 gap-2 pt-2">
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Students</p>

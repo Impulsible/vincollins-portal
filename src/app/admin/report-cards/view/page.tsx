@@ -1,50 +1,150 @@
-// app/admin/report-cards/view/page.tsx
+// app/admin/report-cards/view/page.tsx - UPDATED TO READ FROM REPORT_CARDS TABLE
+
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { motion, AnimatePresence } from 'framer-motion'
-import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import {
-  GraduationCap, Calendar, User, Hash, Mail, Phone, MapPin,
-  Award, Star, TrendingUp, BookOpen, Heart, Clock,
-  MessageSquare, PenTool, CheckCircle2, Download,
-  Printer, Shield, Sparkles, ChevronLeft, Target,
-  Loader2, FileText, Users, CheckCheck, AlertTriangle,
-  School, BadgeCheck, Clock4, ArrowUpRight, ArrowLeft,
-  Home, Send, XCircle, Camera, ImageIcon, RefreshCw,
-  Eye, EyeOff, Maximize2, Minimize2, MoreVertical,
-  Share2, Copy, FileDown, ZoomIn, ZoomOut
+  ArrowLeft,
+  Printer,
+  RefreshCw,
+  Loader2,
+  Sparkles,
 } from 'lucide-react'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 
-// ─── Types ────────────────────────────────────────────
+// ============================================
+// WAEC GRADING SYSTEM
+// ============================================
+const getWAECGrade = (score: number): string => {
+  if (score >= 75) return 'A1'
+  if (score >= 70) return 'B2'
+  if (score >= 65) return 'B3'
+  if (score >= 60) return 'C4'
+  if (score >= 55) return 'C5'
+  if (score >= 50) return 'C6'
+  if (score >= 45) return 'D7'
+  if (score >= 40) return 'E8'
+  return 'F9'
+}
+
+const getOverallGrade = (score: number): string => {
+  if (score >= 80) return 'A'
+  if (score >= 70) return 'B'
+  if (score >= 60) return 'C'
+  if (score >= 50) return 'P'
+  return 'F'
+}
+
+const getGradeRemark = (grade: string): string => {
+  const remarks: Record<string, string> = {
+    'A1': 'Excellent',
+    'B2': 'Very Good',
+    'B3': 'Good',
+    'C4': 'Credit',
+    'C5': 'Credit',
+    'C6': 'Credit',
+    'D7': 'Pass',
+    'E8': 'Pass',
+    'F9': 'Fail',
+  }
+  return remarks[grade] || ''
+}
+
+const getGradeStyle = (grade: string): string => {
+  switch (grade) {
+    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'B2':
+    case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'C4':
+    case 'C5':
+    case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'D7':
+    case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px]'
+    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px]'
+  }
+}
+
+const getOverallGradeColor = (grade: string): string => {
+  switch (grade) {
+    case 'A': return 'text-emerald-700 font-bold'
+    case 'B': return 'text-blue-700 font-bold'
+    case 'C': return 'text-cyan-700 font-bold'
+    case 'P': return 'text-amber-700 font-bold'
+    case 'F': return 'text-red-700 font-bold'
+    default: return 'text-gray-700'
+  }
+}
+
+// ============================================
+// AI COMMENT GENERATION (for regeneration only)
+// ============================================
+const generateAIComments = async (firstName: string, averageScore: number, subjects: any[], className: string, gender: string) => {
+  try {
+    const response = await fetch('/api/generate-comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        studentName: firstName,
+        averageScore: averageScore,
+        subjects: subjects.map(s => ({ name: s.name, score: s.total })),
+        className: className,
+        gender: gender
+      })
+    })
+
+    if (response.ok) {
+      return await response.json()
+    }
+  } catch (error) {
+    console.error('API error:', error)
+  }
+  return null
+}
+
+// Fallback comments
+const getFallbackTeacherComment = (firstName: string, avg: number, bestSubject: string, bestScore: number, worstSubject: string, worstScore: number, gender: string): string => {
+  const pronoun = gender === 'female' ? 'She' : 'He'
+  const possessive = gender === 'female' ? 'her' : 'his'
+  
+  if (avg >= 90) return `Absolutely outstanding, ${firstName}! Scoring ${bestScore}% in ${bestSubject} is remarkable. ${pronoun} has set a very high standard. Keep this exceptional work!`
+  if (avg >= 85) return `Excellent performance, ${firstName}! ${possessive} ${bestScore}% in ${bestSubject} is impressive. Keep striving for excellence!`
+  if (avg >= 80) return `Excellent work, ${firstName}! ${possessive} performance in ${bestSubject} shows strong understanding and dedication.`
+  if (avg >= 75) return `Very good work, ${firstName}! ${pronoun} excelled in ${bestSubject} (${bestScore}%). Focus more on ${worstSubject} (${worstScore}%) to reach even greater heights.`
+  if (avg >= 70) return `Good effort, ${firstName}! ${possessive} performance in ${bestSubject} (${bestScore}%) was solid. Keep pushing forward!`
+  if (avg >= 65) return `Fair performance, ${firstName}. ${pronoun} did well in ${bestSubject} (${bestScore}%). With more effort in ${worstSubject} (${worstScore}%), improvement is certain.`
+  if (avg >= 60) return `Credit level achieved, ${firstName}. ${bestSubject} (${bestScore}%) was ${possessive} strongest subject.`
+  if (avg >= 55) return `${firstName}, ${pronoun} narrowly passed. ${bestSubject} (${bestScore}%) was okay, but more effort is needed overall.`
+  if (avg >= 50) return `${firstName}, this was a close one. ${possessive} performance in ${bestSubject} (${bestScore}%) helped ${possessive} pass.`
+  if (avg >= 40) return `${firstName}, unfortunately ${pronoun} struggled this term. Please see your class teacher for support.`
+  return `${firstName}, this is a serious concern. Parent-teacher meeting is required urgently.`
+}
+
+const getFallbackPrincipalComment = (avg: number, firstName: string, gender: string): string => {
+  const pronoun = gender === 'female' ? 'She' : 'He'
+  
+  if (avg >= 90) return `Outstanding academic performance. ${pronoun} is promoted with distinction.`
+  if (avg >= 85) return `Excellent performance. ${pronoun} is promoted with high honors.`
+  if (avg >= 80) return `Excellent performance. ${pronoun} is promoted with honors.`
+  if (avg >= 75) return `Very good performance. ${pronoun} is promoted to the next class.`
+  if (avg >= 70) return `Good performance. Consistent effort will take ${pronoun} further. Promoted.`
+  if (avg >= 65) return `Satisfactory performance. There is room for improvement. Promoted.`
+  if (avg >= 60) return `Fair performance. More dedication needed. Promoted.`
+  if (avg >= 55) return `Credit performance. ${pronoun} passed but can do better. Promoted.`
+  if (avg >= 50) return `${pronoun} passed. Work harder next term. Promoted conditionally.`
+  if (avg >= 45) return `A pass. Significant improvement required. Promoted conditionally.`
+  if (avg >= 40) return `Poor performance. ${pronoun} must improve significantly next term.`
+  return `Failed. ${pronoun} needs to repeat the class or work much harder next term.`
+}
+
+// ============================================
+// TYPES
+// ============================================
 interface SubjectData {
   name: string
-  ca1?: number
-  ca2?: number
-  examObj?: number
-  examTheory?: number
   ca: number
   exam: number
   total: number
@@ -52,28 +152,14 @@ interface SubjectData {
   remark: string
 }
 
-interface BehaviorRating {
-  name: string
-  rating: number
-}
-
-interface SkillRating {
-  name: string
-  rating: number
-}
-
-interface AssessmentData {
-  daysPresent?: number
-  daysAbsent?: number
-  totalDays?: number
-}
-
 interface ReportCardData {
   id: string
   student_id: string
   student_name: string
+  student_first_name: string
   student_vin: string
   student_admission_number?: string
+  student_photo_url?: string
   class: string
   term: string
   academic_year: string
@@ -83,18 +169,11 @@ interface ReportCardData {
   grade: string
   teacher_comments: string
   principal_comments: string
-  behavior_ratings?: BehaviorRating[]
-  skill_ratings?: SkillRating[]
-  assessment_data?: AssessmentData
-  remarks?: string
+  behavior_ratings?: { name: string; rating: number }[]
+  skill_ratings?: { name: string; rating: number }[]
   status: string
   generated_at?: string
   next_term_begins?: string
-  approved_at?: string
-  published_at?: string
-  student_photo_url?: string
-  class_teacher?: string
-  principal_name?: string
 }
 
 interface SchoolSettings {
@@ -102,1170 +181,538 @@ interface SchoolSettings {
   address: string
   phone: string
   email: string
-  website: string
   logo_url?: string
   motto?: string
 }
 
-// ─── Constants ────────────────────────────────────────
-const GRADE_SCALE = [
-  { grade: 'A1', min: 75, max: 100, color: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Excellent' },
-  { grade: 'B2', min: 70, max: 74, color: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Very Good' },
-  { grade: 'B3', min: 65, max: 69, color: 'bg-indigo-50 text-indigo-700 border-indigo-200', label: 'Good' },
-  { grade: 'C4', min: 60, max: 64, color: 'bg-cyan-50 text-cyan-700 border-cyan-200', label: 'Credit' },
-  { grade: 'C5', min: 55, max: 59, color: 'bg-teal-50 text-teal-700 border-teal-200', label: 'Credit' },
-  { grade: 'C6', min: 50, max: 54, color: 'bg-sky-50 text-sky-700 border-sky-200', label: 'Credit' },
-  { grade: 'D7', min: 45, max: 49, color: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Pass' },
-  { grade: 'E8', min: 40, max: 44, color: 'bg-orange-50 text-orange-700 border-orange-200', label: 'Pass' },
-  { grade: 'F9', min: 0, max: 39, color: 'bg-red-50 text-red-700 border-red-200', label: 'Fail' },
-]
+const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <div className="border border-gray-300 mb-2">
+    <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 uppercase">{title}</div>
+    <div className="p-2 text-[10px]">{children}</div>
+  </div>
+)
 
-const RATING_KEYS = [
-  { value: 5, label: 'Very Good', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { value: 4, label: 'Good', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { value: 3, label: 'Average', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  { value: 2, label: 'Below Average', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { value: 1, label: 'Poor', color: 'bg-red-100 text-red-700 border-red-200' },
-]
-
-const TERM_LABELS: Record<string, string> = {
-  first: 'First Term',
-  second: 'Second Term',
-  third: 'Third Term',
+const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
+  name: 'VINCOLLINS COLLEGE',
+  address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
+  phone: '+234 912 1155 554',
+  email: 'vincollinscollege@gmail.com',
+  motto: 'Geared Towards Excellence',
 }
 
-const DEFAULT_SCHOOL: SchoolSettings = {
-  name: 'Demo International School Abuja',
-  address: '1234 Unity Avenue, Wuse, Abuja, FCT, Nigeria',
-  phone: '08033174228',
-  email: 'info@demo.inlaps.cloud',
-  website: 'demo.intalps.cloud',
-  motto: 'Excellence in Education',
-}
-
-// ─── Helpers ──────────────────────────────────────────
-const getGradeColor = (grade: string): string => {
-  const scale = GRADE_SCALE.find(g => g.grade === grade)
-  return scale?.color || 'bg-slate-50 text-slate-600 border-slate-200'
-}
-
-const getGradeLabel = (grade: string): string => {
-  const scale = GRADE_SCALE.find(g => g.grade === grade)
-  return scale?.label || ''
-}
-
-const getRatingColor = (rating: number): string => {
-  const key = RATING_KEYS.find(k => k.value === rating)
-  return key?.color || 'bg-slate-100 text-slate-600 border-slate-200'
-}
-
-const getRatingLabel = (rating: number): string => {
-  const key = RATING_KEYS.find(k => k.value === rating)
-  return key?.label || ''
-}
-
-const getRatingStars = (rating: number) => {
-  return Array.from({ length: 5 }, (_, i) => (
-    <Star
-      key={i}
-      className={cn(
-        'h-3.5 w-3.5 transition-all duration-300',
-        i < rating 
-          ? 'text-amber-400 fill-amber-400 drop-shadow-sm' 
-          : 'text-slate-200 fill-slate-100'
-      )}
-    />
-  ))
-}
-
-const getOverallGrade = (avg: number): string => {
-  if (avg >= 75) return 'A1'
-  if (avg >= 70) return 'B2'
-  if (avg >= 65) return 'B3'
-  if (avg >= 60) return 'C4'
-  if (avg >= 55) return 'C5'
-  if (avg >= 50) return 'C6'
-  if (avg >= 45) return 'D7'
-  if (avg >= 40) return 'E8'
-  return 'F9'
-}
-
-const getStatusBadge = (status: string) => {
-  switch (status) {
-    case 'published':
-      return <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200"><Send className="h-3 w-3 mr-1" /> Published</Badge>
-    case 'approved':
-      return <Badge className="bg-blue-100 text-blue-700 border-blue-200"><CheckCircle2 className="h-3 w-3 mr-1" /> Approved</Badge>
-    case 'generated':
-      return <Badge className="bg-purple-100 text-purple-700 border-purple-200"><FileText className="h-3 w-3 mr-1" /> Generated</Badge>
-    case 'pending':
-      return <Badge className="bg-amber-100 text-amber-700 border-amber-200"><Clock className="h-3 w-3 mr-1" /> Pending</Badge>
-    case 'rejected':
-      return <Badge className="bg-red-100 text-red-700 border-red-200"><XCircle className="h-3 w-3 mr-1" /> Rejected</Badge>
-    default:
-      return <Badge variant="outline">{status}</Badge>
-  }
-}
-
-const getInitials = (name: string): string => {
-  return name
-    .split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2)
-}
-
-// ─── Main Component ───────────────────────────────────
+// ============================================
+// MAIN COMPONENT
+// ============================================
 export default function ViewReportCardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+
   const studentId = searchParams.get('student')
   const term = searchParams.get('term') || 'third'
   const year = searchParams.get('year') || '2025/2026'
 
   const [loading, setLoading] = useState(true)
+  const [regenerating, setRegenerating] = useState(false)
+  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(DEFAULT_SCHOOL_SETTINGS)
   const [reportCard, setReportCard] = useState<ReportCardData | null>(null)
-  const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(DEFAULT_SCHOOL)
-  const [profile, setProfile] = useState<any>(null)
-  const [zoomLevel, setZoomLevel] = useState(1)
-  const [showWatermark, setShowWatermark] = useState(true)
-  const [isFullscreen, setIsFullscreen] = useState(false)
-  const [liveStatus, setLiveStatus] = useState<'connecting' | 'connected' | 'disconnected'>('connecting')
-  const containerRef = useRef<HTMLDivElement>(null)
-  const subscriptionRef = useRef<any>(null)
+  const [nextTermDate, setNextTermDate] = useState<string>('')
+  const [studentGender, setStudentGender] = useState<string>('male')
 
-  // ─── Init ───────────────────────────────────────────
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.user) {
-          router.push('/login')
-          return
-        }
+  const loadNextTermDate = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'next_term_date')
+        .maybeSingle()
 
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single()
-        
-        if (profileData) setProfile(profileData)
-
-        // Load school settings
-        const { data: schoolData } = await supabase
-          .from('school_settings')
-          .select('*')
-          .single()
-        
-        if (schoolData) {
-          setSchoolSettings({
-            name: schoolData.name || DEFAULT_SCHOOL.name,
-            address: schoolData.address || DEFAULT_SCHOOL.address,
-            phone: schoolData.phone || DEFAULT_SCHOOL.phone,
-            email: schoolData.email || DEFAULT_SCHOOL.email,
-            website: schoolData.website || DEFAULT_SCHOOL.website,
-            logo_url: schoolData.logo_url,
-            motto: schoolData.motto || DEFAULT_SCHOOL.motto,
-          })
-        }
-
-        if (studentId) {
-          await loadReportCard()
-        }
-      } catch (error) {
-        console.error('Init error:', error)
-        toast.error('Failed to initialize')
-      } finally {
-        setLoading(false)
+      if (data?.value) {
+        setNextTermDate(data.value)
       }
+    } catch (error) {
+      console.error('Error loading next term date:', error)
     }
-    init()
-  }, [studentId, term, year])
+  }, [])
 
-  // ─── Real-time Subscription ─────────────────────────
   useEffect(() => {
-    if (!studentId) return
-
-    // Subscribe to real-time updates for this student's report card
-    const channel = supabase
-      .channel(`report-card-${studentId}-${term}-${year}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'report_cards',
-          filter: `student_id=eq.${studentId}`,
-        },
-        (payload) => {
-          console.log('Real-time update:', payload)
-          const updatedCard = payload.new as ReportCardData
-          if (updatedCard.term === term && updatedCard.academic_year === year) {
-            setReportCard(prev => ({
-              ...prev,
-              ...updatedCard,
-            }))
-            toast.success('Report card updated in real-time!', {
-              icon: <RefreshCw className="h-4 w-4" />,
-              duration: 2000,
-            })
-          }
-        }
-      )
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') {
-          setLiveStatus('connected')
-        } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
-          setLiveStatus('disconnected')
-        } else {
-          setLiveStatus('connecting')
-        }
-      })
-
-    subscriptionRef.current = channel
-
-    return () => {
-      supabase.removeChannel(channel)
+    const handleDateUpdate = (event: CustomEvent) => {
+      setNextTermDate(event.detail.date)
+      toast.info('Next term date has been updated', { duration: 3000 })
+      loadReportCard()
     }
-  }, [studentId, term, year])
 
-  // ─── Load Report Card ──────────────────────────────
+    window.addEventListener('next-term-date-updated', handleDateUpdate as EventListener)
+    return () => window.removeEventListener('next-term-date-updated', handleDateUpdate as EventListener)
+  }, [])
+
+  const generateRatings = (averageScore: number) => {
+    const getRating = (base: number): number => {
+      if (averageScore >= 90) return Math.min(5, base + 1)
+      if (averageScore >= 80) return base
+      if (averageScore >= 70) return Math.max(3, base)
+      if (averageScore >= 60) return Math.max(2, base - 1)
+      return Math.max(1, base - 2)
+    }
+
+    return {
+      behaviorRatings: [
+        { name: 'Honesty', rating: getRating(4) },
+        { name: 'Neatness', rating: getRating(4) },
+        { name: 'Obedience', rating: getRating(4) },
+        { name: 'Orderliness', rating: getRating(3) },
+        { name: 'Diligence', rating: getRating(4) },
+        { name: 'Punctuality', rating: getRating(4) },
+        { name: 'Leadership', rating: getRating(3) },
+        { name: 'Politeness', rating: getRating(4) },
+      ],
+      skillRatings: [
+        { name: 'Handwriting', rating: getRating(4) },
+        { name: 'Verbal Fluency', rating: getRating(4) },
+        { name: 'Sports', rating: getRating(3) },
+        { name: 'Handling Tools', rating: getRating(3) },
+        { name: 'Club Activities', rating: getRating(4) },
+      ]
+    }
+  }
+
+  // ✅ FIXED: Load report card from report_cards table, NOT from ca_scores
   const loadReportCard = useCallback(async () => {
     setLoading(true)
+
     try {
-      // Load report card
+      // Get student profile first
+      const { data: studentData, error: studentError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', studentId)
+        .single()
+
+      if (studentError) throw studentError
+
+      const gender = studentData?.gender || 'male'
+      setStudentGender(gender)
+
+      const fullName = studentData?.display_name || studentData?.full_name || 'Student'
+      const firstName = fullName.split(' ')[0] || fullName
+
+      // ✅ Load from report_cards table
       const { data: reportCardData, error: reportCardError } = await supabase
         .from('report_cards')
         .select('*')
         .eq('student_id', studentId)
         .eq('term', term)
         .eq('academic_year', year)
-        .single()
+        .maybeSingle()
 
-      if (reportCardError) {
-        if (reportCardError.code === 'PGRST116') {
-          // No report card found, create empty template
-          const { data: studentData } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', studentId)
-            .single()
-
-          if (studentData) {
-            setReportCard({
-              id: '',
-              student_id: studentId!,
-              student_name: studentData.display_name || studentData.full_name || 'Student',
-              student_vin: studentData.vin_id || '—',
-              student_admission_number: studentData.admission_number || '—',
-              class: studentData.class || '—',
-              term: term,
-              academic_year: year,
-              subjects_data: [],
-              average_score: 0,
-              total_score: 0,
-              grade: '—',
-              teacher_comments: '',
-              principal_comments: '',
-              behavior_ratings: [],
-              skill_ratings: [],
-              remarks: '',
-              status: 'pending',
-              student_photo_url: studentData.photo_url || null,
-            })
-          }
-        } else {
-          throw reportCardError
-        }
-      } else if (reportCardData) {
-        // Load student photo if available
-        const { data: studentData } = await supabase
-          .from('profiles')
-          .select('photo_url, display_name, full_name, admission_number')
-          .eq('id', studentId)
-          .single()
-
-        setReportCard({
-          ...reportCardData,
-          student_photo_url: studentData?.photo_url || null,
-          student_name: studentData?.display_name || studentData?.full_name || reportCardData.student_name,
-          student_admission_number: studentData?.admission_number || reportCardData.student_admission_number,
-        })
+      if (reportCardError || !reportCardData) {
+        toast.error('No report card found for this student')
+        router.back()
+        return
       }
+
+      // Format subjects data for display (ensure ca and exam are proper numbers)
+      const formattedSubjects = (reportCardData.subjects_data || []).map((subject: any) => ({
+        name: subject.name,
+        ca: subject.ca || subject.ca1 + subject.ca2 || 0,
+        exam: subject.exam || subject.examObj + subject.examTheory || 0,
+        total: subject.total || 0,
+        grade: subject.grade || getWAECGrade(subject.total || 0),
+        remark: subject.remark || getGradeRemark(subject.grade || getWAECGrade(subject.total || 0))
+      }))
+
+      const termLabels: Record<string, string> = {
+        first: 'First Term',
+        second: 'Second Term',
+        third: 'Third Term',
+      }
+
+      setReportCard({
+        id: reportCardData.id,
+        student_id: studentId!,
+        student_name: fullName,
+        student_first_name: firstName,
+        student_vin: studentData?.vin_id || '—',
+        student_admission_number: studentData?.admission_number || '—',
+        student_photo_url: studentData?.photo_url || null,
+        class: reportCardData.class || studentData?.class || '—',
+        term: termLabels[term] || term,
+        academic_year: year,
+        subjects_data: formattedSubjects,
+        average_score: reportCardData.average_score || 0,
+        total_score: reportCardData.total_score || 0,
+        grade: reportCardData.grade || getOverallGrade(reportCardData.average_score || 0),
+        teacher_comments: reportCardData.teacher_comments || 'No comment available.',
+        principal_comments: reportCardData.principal_comments || 'No comment available.',
+        behavior_ratings: generateRatings(reportCardData.average_score || 0).behaviorRatings,
+        skill_ratings: generateRatings(reportCardData.average_score || 0).skillRatings,
+        status: reportCardData.status,
+        next_term_begins: nextTermDate,
+      })
     } catch (error) {
-      console.error('Error loading report card:', error)
+      console.error(error)
       toast.error('Failed to load report card')
     } finally {
       setLoading(false)
     }
-  }, [studentId, term, year])
+  }, [studentId, term, year, nextTermDate, router])
 
-  // ─── Actions ────────────────────────────────────────
-  const handlePrint = () => {
-    window.print()
-  }
+  // Regenerate just the comments and update the database
+  const handleRegenerateComments = async () => {
+    if (!reportCard) return
+    
+    setRegenerating(true)
+    try {
+      const aiComments = await generateAIComments(
+        reportCard.student_first_name,
+        reportCard.average_score,
+        reportCard.subjects_data,
+        reportCard.class,
+        studentGender
+      )
+      
+      if (aiComments) {
+        // Update the report card in the database
+        const { error } = await supabase
+          .from('report_cards')
+          .update({
+            teacher_comments: aiComments.teacher_comment,
+            principal_comments: aiComments.principal_comment
+          })
+          .eq('id', reportCard.id)
 
-  const handleDownloadPDF = () => {
-    // Trigger PDF download - you can integrate jsPDF or react-pdf here
-    toast.info('PDF download feature coming soon!')
-  }
+        if (error) throw error
 
-  const handleRefresh = async () => {
-    await loadReportCard()
-    toast.success('Report card refreshed')
-  }
-
-  const handleToggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen()
-      setIsFullscreen(true)
-    } else {
-      document.exitFullscreen()
-      setIsFullscreen(false)
+        // Update local state
+        setReportCard({
+          ...reportCard,
+          teacher_comments: aiComments.teacher_comment,
+          principal_comments: aiComments.principal_comment
+        })
+        toast.success('Comments regenerated and saved successfully!')
+      } else {
+        toast.error('Failed to regenerate comments')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to regenerate comments')
+    } finally {
+      setRegenerating(false)
     }
   }
 
-  const handleCopyLink = () => {
-    const url = window.location.href
-    navigator.clipboard.writeText(url)
-    toast.success('Link copied to clipboard!')
-  }
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) {
+        router.push('/portal')
+        return
+      }
 
-  // ─── Get Class Subjects (Empty Template) ────────────
-  const getEmptySubjects = (className: string): SubjectData[] => {
-    const subjects = className?.toUpperCase().startsWith('JSS') 
-      ? [
-          'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
-          'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
-          'Agricultural Science', 'Home Economics', 'PHE', 'CRS', 'French', 'Yoruba', 'CCA', 'Music', 'Security Education'
-        ]
-      : [
-          'English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics',
-          'Further Mathematics', 'Agricultural Science', 'Data Processing', 'Civic Education', 'Economics',
-          'Literature in English', 'Government', 'CRS', 'Commerce', 'Financial Accounting', 'Geography'
-        ]
+      const { data: schoolData } = await supabase
+        .from('school_settings')
+        .select('*')
+        .maybeSingle()
 
-    return subjects.map(name => ({
-      name,
-      ca: 0,
-      exam: 0,
-      total: 0,
-      grade: '—',
-      remark: '',
-    }))
-  }
+      if (schoolData) {
+        setSchoolSettings({
+          name: schoolData.school_name || DEFAULT_SCHOOL_SETTINGS.name,
+          address: schoolData.address || DEFAULT_SCHOOL_SETTINGS.address,
+          phone: schoolData.school_phone || DEFAULT_SCHOOL_SETTINGS.phone,
+          email: schoolData.school_email || DEFAULT_SCHOOL_SETTINGS.email,
+          logo_url: schoolData.logo_path,
+          motto: schoolData.school_motto || DEFAULT_SCHOOL_SETTINGS.motto,
+        })
+      }
 
-  const getEmptyBehaviors = (): BehaviorRating[] => {
-    return [
-      { name: 'Honesty', rating: 0 },
-      { name: 'Neatness', rating: 0 },
-      { name: 'Obedience', rating: 0 },
-      { name: 'Orderliness', rating: 0 },
-      { name: 'Diligence', rating: 0 },
-      { name: 'Empathy', rating: 0 },
-      { name: 'Punctuality', rating: 0 },
-      { name: 'Leadership', rating: 0 },
-      { name: 'Politeness', rating: 0 },
-    ]
-  }
+      await loadNextTermDate()
+      
+      if (studentId) {
+        await loadReportCard()
+      }
+    }
 
-  const getEmptySkills = (): SkillRating[] => {
-    return [
-      { name: 'Handwriting', rating: 0 },
-      { name: 'Verbal Fluency', rating: 0 },
-      { name: 'Sports', rating: 0 },
-      { name: 'Handling Tools', rating: 0 },
-      { name: 'Club Activities', rating: 0 },
-    ]
-  }
+    init()
+  }, [studentId, term, year])
 
-  // ─── Prepare Display Data ───────────────────────────
-  const displaySubjects = reportCard?.subjects_data?.length 
-    ? reportCard.subjects_data 
-    : reportCard?.class ? getEmptySubjects(reportCard.class) : []
-
-  const displayBehaviors = reportCard?.behavior_ratings?.length 
-    ? reportCard.behavior_ratings 
-    : getEmptyBehaviors()
-
-  const displaySkills = reportCard?.skill_ratings?.length 
-    ? reportCard.skill_ratings 
-    : getEmptySkills()
-
-  const hasScores = displaySubjects.some(s => s.total > 0)
-  const isGenerated = reportCard?.status === 'generated' || reportCard?.status === 'approved' || reportCard?.status === 'published'
-  const canApprove = reportCard?.status === 'generated'
-  const canPublish = reportCard?.status === 'approved'
-
-  // ─── Loading State ──────────────────────────────────
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          className="mb-6"
-        >
-          <GraduationCap className="h-16 w-16 text-blue-500" />
-        </motion.div>
-        <h2 className="text-xl font-semibold text-slate-700 mb-2">Loading Report Card</h2>
-        <p className="text-sm text-slate-500">Please wait while we fetch the student's data...</p>
-        <div className="flex gap-1 mt-4">
-          {[0, 1, 2].map(i => (
-            <motion.div
-              key={i}
-              className="h-2 w-2 rounded-full bg-blue-400"
-              animate={{ y: [0, -8, 0] }}
-              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-            />
-          ))}
-        </div>
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     )
   }
 
-  // ─── Render ─────────────────────────────────────────
+  const displaySubjects = reportCard?.subjects_data || []
+  const termDisplay = reportCard?.term || term
+  const formattedNextTermDate = reportCard?.next_term_begins 
+    ? new Date(reportCard.next_term_begins).toLocaleDateString('en-NG', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      })
+    : 'To be announced'
+
   return (
-    <TooltipProvider>
-      <div 
-        ref={containerRef}
-        className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 print:bg-white"
-        style={{ transform: `scale(${zoomLevel})`, transformOrigin: 'top center' }}
-      >
-        {/* Top Navigation Bar */}
-        <div className="no-print sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 py-2">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.back()}
-                  className="text-slate-600 hover:text-slate-900"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-1" />
-                  Back
-                </Button>
-                <Separator orientation="vertical" className="h-6" />
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-slate-700">
-                    {reportCard?.student_name || 'Student Report'}
-                  </span>
-                  {reportCard && getStatusBadge(reportCard.status)}
-                </div>
-              </div>
+    <div className="bg-gray-100 min-h-screen py-4">
 
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2">
-                {/* Live Status Indicator */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-slate-100">
-                      <div className={cn(
-                        "h-2 w-2 rounded-full",
-                        liveStatus === 'connected' ? 'bg-emerald-500 animate-pulse' :
-                        liveStatus === 'connecting' ? 'bg-amber-500' : 'bg-red-500'
-                      )} />
-                      <span className="text-[10px] text-slate-500">
-                        {liveStatus === 'connected' ? 'Live' : liveStatus === 'connecting' ? 'Connecting...' : 'Offline'}
-                      </span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs">Real-time updates {liveStatus}</p>
-                  </TooltipContent>
-                </Tooltip>
+      {/* TOPBAR */}
+      <div className="no-print max-w-[210mm] mx-auto mb-3 flex items-center justify-between">
+        <Button variant="outline" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back
+        </Button>
 
-                {/* Zoom Controls */}
-                <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-0.5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))}
-                    disabled={zoomLevel <= 0.5}
-                  >
-                    <ZoomOut className="h-3.5 w-3.5" />
-                  </Button>
-                  <span className="text-xs font-medium text-slate-600 min-w-[40px] text-center">
-                    {Math.round(zoomLevel * 100)}%
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7"
-                    onClick={() => setZoomLevel(prev => Math.min(2, prev + 0.1))}
-                    disabled={zoomLevel >= 2}
-                  >
-                    <ZoomIn className="h-3.5 w-3.5" />
-                  </Button>
-                </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={loadReportCard}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          </Button>
+          <Button 
+            variant="outline" 
+            onClick={handleRegenerateComments}
+            disabled={regenerating}
+          >
+            {regenerating ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Sparkles className="h-4 w-4 mr-2" />
+            )}
+            Regenerate Comments
+          </Button>
+          <Button onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-2" /> Print
+          </Button>
+        </div>
+      </div>
 
-                {/* Watermark Toggle */}
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8"
-                      onClick={() => setShowWatermark(!showWatermark)}
-                    >
-                      {showWatermark ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="text-xs">{showWatermark ? 'Hide' : 'Show'} Watermark</p>
-                  </TooltipContent>
-                </Tooltip>
+      {/* REPORT CARD */}
+      <div className="bg-white w-[210mm] min-h-[297mm] mx-auto text-[11px] text-black border border-gray-300 p-3 print:p-0 print:border-none">
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  className="h-8 text-xs"
-                >
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" />
-                  Refresh
-                </Button>
+        {/* HEADER */}
+        <div className="border-b border-gray-300 pb-2 print:pb-1">
+          <div className="flex items-start justify-between">
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handlePrint}
-                  className="h-8 text-xs"
-                >
-                  <Printer className="h-3.5 w-3.5 mr-1" />
-                  Print
-                </Button>
+            {/* LOGO */}
+            <div className="w-16 print:w-12">
+              {schoolSettings.logo_url && (
+                <img src={schoolSettings.logo_url} alt="logo" className="w-14 h-14 object-contain print:w-10 print:h-10" />
+              )}
+            </div>
 
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-8 text-xs">
-                      <MoreVertical className="h-3.5 w-3.5 mr-1" />
-                      More
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
-                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleDownloadPDF}>
-                      <FileDown className="h-4 w-4 mr-2" />
-                      Download PDF
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleCopyLink}>
-                      <Copy className="h-4 w-4 mr-2" />
-                      Copy Link
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={handleToggleFullscreen}>
-                      {isFullscreen ? (
-                        <><Minimize2 className="h-4 w-4 mr-2" /> Exit Fullscreen</>
-                      ) : (
-                        <><Maximize2 className="h-4 w-4 mr-2" /> Fullscreen</>
-                      )}
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setShowWatermark(!showWatermark)}>
-                      {showWatermark ? (
-                        <><EyeOff className="h-4 w-4 mr-2" /> Hide Watermark</>
-                      ) : (
-                        <><Eye className="h-4 w-4 mr-2" /> Show Watermark</>
-                      )}
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
+            {/* SCHOOL INFO */}
+            <div className="flex-1 text-center">
+              <h1 className="text-[18px] font-bold uppercase text-blue-900 print:text-[14px]">
+                {schoolSettings.name}
+              </h1>
+              <p className="text-[10px] print:text-[8px]">{schoolSettings.address}</p>
+              <p className="text-[10px] print:text-[8px]">Tel: {schoolSettings.phone}</p>
+              <p className="text-[10px] print:text-[8px]">Email: {schoolSettings.email}</p>
+              <p className="text-[9px] italic text-amber-600 mt-1 print:text-[7px]">"{schoolSettings.motto}"</p>
+              <h2 className="font-bold mt-2 text-[14px] print:text-[11px]">
+                {termDisplay} Student&apos;s Performance Report
+              </h2>
+            </div>
+
+            {/* PHOTO */}
+            <div className="w-20 h-24 border border-gray-300 print:w-16 print:h-20">
+              {reportCard?.student_photo_url ? (
+                <img src={reportCard.student_photo_url} alt="student" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-gray-100" />
+              )}
             </div>
           </div>
         </div>
 
-        {/* Main Report Card Content */}
-        <div className="max-w-5xl mx-auto px-4 py-6 print:py-0 print:px-2">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={reportCard?.id || 'empty'}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className="relative"
-            >
-              {/* Watermark */}
-              {showWatermark && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                  <div className="relative">
-                    {schoolSettings.logo_url ? (
-                      <img
-                        src={schoolSettings.logo_url}
-                        alt="Watermark"
-                        className="w-96 h-96 object-contain opacity-[0.03]"
-                      />
-                    ) : (
-                      <GraduationCap className="w-96 h-96 text-slate-200 opacity-[0.04]" />
-                    )}
-                    <p className="text-6xl font-bold text-slate-200/10 text-center mt-4 select-none">
-                      {schoolSettings.name}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Report Card Content */}
-              <div className="relative z-10 space-y-4 sm:space-y-6">
-                {/* School Header */}
-                <motion.div
-                  initial={{ opacity: 0, y: -20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.1 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-950 via-blue-900 to-indigo-950 p-5 sm:p-8 text-white print:rounded-none print:bg-white print:text-black print:border-b print:border-black"
-                >
-                  {/* Background Decorations */}
-                  <div className="absolute inset-0 print:hidden">
-                    <div className="absolute -top-32 -right-32 h-80 w-80 rounded-full bg-white/5 blur-3xl" />
-                    <div className="absolute -bottom-32 -left-32 h-80 w-80 rounded-full bg-blue-400/10 blur-3xl" />
-                  </div>
-
-                  {/* Top Line */}
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-white to-amber-400 opacity-60 print:hidden" />
-
-                  <div className="relative">
-                    {/* School Info & Student Photo */}
-                    <div className="flex flex-col sm:flex-row items-center gap-4 mb-5">
-                      {/* School Logo */}
-                      <div className="flex-shrink-0">
-                        {schoolSettings.logo_url ? (
-                          <img
-                            src={schoolSettings.logo_url}
-                            alt="School Logo"
-                            className="h-16 w-16 sm:h-20 sm:w-20 object-contain rounded-xl bg-white/10 backdrop-blur-sm border border-white/20 p-2"
-                          />
-                        ) : (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                            className="flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm border border-white/20 shadow-lg"
-                          >
-                            <School className="h-8 w-8 sm:h-10 sm:w-10 text-amber-300" />
-                          </motion.div>
-                        )}
-                      </div>
-
-                      {/* School Name */}
-                      <div className="flex-1 text-center sm:text-left">
-                        <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight print:text-black">
-                          {schoolSettings.name}
-                        </h1>
-                        <p className="text-blue-200/70 text-xs mt-1 print:text-gray-600">
-                          {schoolSettings.address}
-                        </p>
-                        <div className="flex flex-wrap justify-center sm:justify-start gap-3 mt-1 text-xs text-blue-200/60 print:text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" /> {schoolSettings.phone}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" /> {schoolSettings.email}
-                          </span>
-                          {schoolSettings.motto && (
-                            <span className="italic font-medium text-amber-300/80 print:text-gray-700">
-                              "{schoolSettings.motto}"
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Student Photo */}
-                      <div className="flex-shrink-0">
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{ delay: 0.3 }}
-                          className="relative"
-                        >
-                          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 border-2 border-white/30 shadow-lg">
-                            <AvatarImage src={reportCard?.student_photo_url || ''} />
-                            <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white text-xl sm:text-2xl font-bold">
-                              {reportCard?.student_name ? getInitials(reportCard.student_name) : <User className="h-8 w-8" />}
-                            </AvatarFallback>
-                          </Avatar>
-                          {!reportCard?.student_photo_url && (
-                            <div className="absolute inset-0 flex items-center justify-center">
-                              <div className="bg-black/30 rounded-full p-1">
-                                <Camera className="h-4 w-4 text-white/70" />
-                              </div>
-                            </div>
-                          )}
-                        </motion.div>
-                      </div>
-                    </div>
-
-                    <div className="h-px bg-gradient-to-r from-transparent via-white/30 to-transparent mb-5 print:bg-black print:h-0.5" />
-
-                    {/* Report Title */}
-                    <div className="text-center">
-                      <motion.div
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.3 }}
-                      >
-                        <Badge className="mb-3 bg-amber-500/20 text-amber-200 border border-amber-400/30 px-4 py-1 text-xs font-medium tracking-wider uppercase print:hidden">
-                          <Award className="h-3 w-3 mr-1.5" />
-                          Student Progress Report
-                        </Badge>
-                        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight print:text-black">
-                          Academic Performance Report
-                        </h2>
-                      </motion.div>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Student Information */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.4 }}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:shadow-none print:border print:border-black"
-                >
-                  <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3 border-b border-slate-100 print:bg-gray-100">
-                    <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <BadgeCheck className="h-4 w-4 text-blue-500" />
-                      Student Information
-                    </h3>
-                  </div>
-                  <div className="p-5">
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                      {[
-                        { label: 'Student Name', value: reportCard?.student_name || '—', icon: User },
-                        { label: 'Admission No', value: reportCard?.student_admission_number || reportCard?.student_vin || '—', icon: Hash },
-                        { label: 'Class', value: reportCard?.class || '—', icon: BookOpen },
-                        { label: 'Term', value: `${TERM_LABELS[reportCard?.term || term] || term} ${reportCard?.academic_year || year}`, icon: Calendar },
-                        { label: 'Days Present', value: `${reportCard?.assessment_data?.daysPresent || 0}/${reportCard?.assessment_data?.totalDays || (reportCard?.assessment_data?.daysPresent || 0) + (reportCard?.assessment_data?.daysAbsent || 0)}`, icon: CheckCircle2 },
-                        { label: 'Next Term Begins', value: reportCard?.next_term_begins || 'TBD', icon: Clock },
-                        { label: 'Class Teacher', value: reportCard?.class_teacher || '—', icon: User },
-                        { label: 'Principal', value: reportCard?.principal_name || schoolSettings.name, icon: School },
-                      ].map((item, i) => (
-                        <motion.div
-                          key={item.label}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.45 + i * 0.05 }}
-                          className="flex items-start gap-3"
-                        >
-                          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                            <item.icon className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-[10px] font-medium uppercase tracking-wider text-slate-400">
-                              {item.label}
-                            </p>
-                            <p className="text-sm font-semibold text-slate-800 truncate">
-                              {item.value}
-                            </p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Score Summary */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="grid grid-cols-1 sm:grid-cols-3 gap-3"
-                >
-                  {[
-                    {
-                      label: 'Average Score',
-                      value: hasScores ? `${(reportCard?.average_score || 0).toFixed(1)}%` : '—',
-                      icon: TrendingUp,
-                      bgColor: 'bg-violet-50',
-                      textColor: 'text-violet-700',
-                      borderColor: 'border-violet-200',
-                    },
-                    {
-                      label: 'Total Score',
-                      value: hasScores ? (reportCard?.total_score?.toString() || '0') : '—',
-                      icon: Target,
-                      bgColor: 'bg-blue-50',
-                      textColor: 'text-blue-700',
-                      borderColor: 'border-blue-200',
-                    },
-                    {
-                      label: 'Overall Grade',
-                      value: hasScores ? getOverallGrade(reportCard?.average_score || 0) : '—',
-                      icon: Award,
-                      bgColor: 'bg-emerald-50',
-                      textColor: 'text-emerald-700',
-                      borderColor: 'border-emerald-200',
-                      isGrade: true,
-                    },
-                  ].map((item, i) => (
-                    <motion.div
-                      key={item.label}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: 0.55 + i * 0.08 }}
-                      className={cn(
-                        "relative overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-sm hover:shadow-md transition-all duration-200",
-                        item.borderColor
-                      )}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className={cn('flex h-10 w-10 items-center justify-center rounded-xl', item.bgColor)}>
-                          <item.icon className={cn('h-5 w-5', item.textColor)} />
-                        </div>
-                        {item.isGrade && hasScores && (
-                          <Badge className={cn('text-xs font-bold px-3 py-1 border', getGradeColor(item.value))}>
-                            {item.value}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="mt-3">
-                        <p className="text-xs font-medium text-slate-500">{item.label}</p>
-                        <p className={cn('text-2xl sm:text-3xl font-bold mt-0.5', item.isGrade ? item.textColor : 'text-slate-800')}>
-                          {item.value}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))}
-                </motion.div>
-
-                {/* Academic Performance Table */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:shadow-none print:border print:border-black"
-                >
-                  <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3 border-b border-slate-100 print:bg-gray-100">
-                    <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                      <BookOpen className="h-4 w-4 text-blue-500" />
-                      Academic Performance
-                      {!hasScores && (
-                        <Badge className="text-[10px] bg-amber-100 text-amber-700 ml-2">
-                          Awaiting Scores
-                        </Badge>
-                      )}
-                    </h3>
-                  </div>
-
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="border-b-2 border-slate-200 bg-slate-50/80 print:bg-gray-200">
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                            Subjects
-                          </th>
-                          <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-600 w-16">
-                            CA <span className="text-[9px] text-slate-400 font-normal">(40)</span>
-                          </th>
-                          <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-600 w-16">
-                            Exam <span className="text-[9px] text-slate-400 font-normal">(60)</span>
-                          </th>
-                          <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-600 w-20">
-                            Total <span className="text-[9px] text-slate-400 font-normal">(100)</span>
-                          </th>
-                          <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-600 w-16">
-                            Grade
-                          </th>
-                          <th className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-600">
-                            Remarks
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {displaySubjects.length === 0 ? (
-                          <tr>
-                            <td colSpan={6} className="text-center py-16">
-                              <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                              <p className="text-sm text-slate-500 font-medium">No subjects available</p>
-                              <p className="text-xs text-slate-400 mt-1">Subject scores will appear here once submitted by teachers</p>
-                            </td>
-                          </tr>
-                        ) : (
-                          displaySubjects.map((subject, idx) => (
-                            <motion.tr
-                              key={subject.name}
-                              initial={{ opacity: 0, x: -10 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              transition={{ delay: 0.65 + idx * 0.02 }}
-                              className={cn(
-                                'group border-b border-slate-100 transition-all duration-200 hover:bg-blue-50/30',
-                                idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/30',
-                                subject.total > 0 && 'hover:shadow-sm'
-                              )}
-                            >
-                              <td className="px-4 py-2.5">
-                                <span className="text-xs font-medium text-slate-700 group-hover:text-slate-900 transition-colors">
-                                  {subject.name}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {subject.total > 0 ? (
-                                  <span className="text-xs font-medium text-slate-600">{subject.ca}</span>
-                                ) : (
-                                  <span className="text-xs text-slate-300">—</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {subject.total > 0 ? (
-                                  <span className="text-xs font-medium text-slate-600">{subject.exam}</span>
-                                ) : (
-                                  <span className="text-xs text-slate-300">—</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {subject.total > 0 ? (
-                                  <span className="text-xs font-bold text-slate-800">{subject.total}</span>
-                                ) : (
-                                  <span className="text-xs text-slate-300">—</span>
-                                )}
-                              </td>
-                              <td className="px-3 py-2.5 text-center">
-                                {subject.total > 0 ? (
-                                  <Badge className={cn('text-[10px] font-bold px-2 py-0.5 border', getGradeColor(subject.grade))}>
-                                    {subject.grade}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-xs text-slate-300">—</span>
-                                )}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                {subject.total > 0 ? (
-                                  <span className="text-xs text-slate-500 group-hover:text-slate-700 transition-colors">
-                                    {subject.remark || getGradeLabel(subject.grade)}
-                                  </span>
-                                ) : (
-                                  <span className="text-xs text-slate-300 italic">Awaiting submission</span>
-                                )}
-                              </td>
-                            </motion.tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Grade Scale */}
-                  <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-3 print:bg-gray-100">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-2">
-                      Grade Scale
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {GRADE_SCALE.map((g) => (
-                        <Badge
-                          key={g.grade}
-                          variant="outline"
-                          className={cn(
-                            'text-[9px] font-medium border',
-                            g.color
-                          )}
-                        >
-                          {g.grade}: {g.min}-{g.max} ({g.label})
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Behaviour & Skills */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-                >
-                  {/* Behaviour / Character Development */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:shadow-none print:border print:border-black">
-                    <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3 border-b border-slate-100 print:bg-gray-100">
-                      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <Heart className="h-4 w-4 text-rose-500" />
-                        Character Development
-                      </h3>
-                    </div>
-                    <div className="p-5">
-                      <div className="space-y-2">
-                        {displayBehaviors.map((item, idx) => (
-                          <motion.div
-                            key={item.name}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.75 + idx * 0.03 }}
-                            className="flex items-center justify-between rounded-xl bg-slate-50/80 px-3 py-2 hover:bg-blue-50/50 transition-colors"
-                          >
-                            <span className="text-xs font-medium text-slate-700">{item.name}</span>
-                            <div className="flex items-center gap-2">
-                              {item.rating > 0 ? (
-                                <>
-                                  <Badge className={cn('text-[10px] font-medium border', getRatingColor(item.rating))}>
-                                    {item.rating}/5
-                                  </Badge>
-                                  <div className="flex">{getRatingStars(item.rating)}</div>
-                                </>
-                              ) : (
-                                <span className="text-xs text-slate-300 italic">Pending</span>
-                              )}
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Skills & Abilities */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:shadow-none print:border print:border-black">
-                    <div className="bg-gradient-to-r from-slate-50 to-blue-50/50 px-5 py-3 border-b border-slate-100 print:bg-gray-100">
-                      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <Star className="h-4 w-4 text-amber-500" />
-                        Skills & Abilities
-                      </h3>
-                    </div>
-                    <div className="p-5">
-                      <div className="space-y-2">
-                        {displaySkills.map((item, idx) => (
-                          <motion.div
-                            key={item.name}
-                            initial={{ opacity: 0, x: -10 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.85 + idx * 0.03 }}
-                            className="flex items-center justify-between rounded-xl bg-slate-50/80 px-3 py-2 hover:bg-blue-50/50 transition-colors"
-                          >
-                            <span className="text-xs font-medium text-slate-700">{item.name}</span>
-                            <div className="flex items-center gap-2">
-                              {item.rating > 0 ? (
-                                <>
-                                  <Badge className={cn('text-[10px] font-medium border', getRatingColor(item.rating))}>
-                                    {item.rating}/5
-                                  </Badge>
-                                  <div className="flex">{getRatingStars(item.rating)}</div>
-                                </>
-                              ) : (
-                                <span className="text-xs text-slate-300 italic">Pending</span>
-                              )}
-                            </div>
-                          </motion.div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Rating Key */}
-                  <div className="sm:col-span-2 pt-3">
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {RATING_KEYS.map((key) => (
-                        <Badge
-                          key={key.value}
-                          variant="outline"
-                          className={cn('text-[9px] font-medium border', key.color)}
-                        >
-                          {key.value} - {key.label}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Comments Section */}
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.8 }}
-                  className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-                >
-                  {/* Teacher's Comment */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:shadow-none print:border print:border-black">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50/50 px-5 py-3 border-b border-slate-100 print:bg-gray-100">
-                      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <PenTool className="h-4 w-4 text-blue-500" />
-                        Teacher's Comment
-                      </h3>
-                    </div>
-                    <div className="p-5">
-                      <div className="relative rounded-xl bg-gradient-to-br from-blue-50/50 to-indigo-50/30 p-4 border border-blue-100">
-                        <MessageSquare className="absolute top-3 right-3 h-4 w-4 text-blue-300" />
-                        <p className="text-sm text-slate-700 leading-relaxed">
-                          {reportCard?.teacher_comments || (
-                            <span className="text-slate-400 italic">No comments yet. Teacher will provide feedback here.</span>
-                          )}
-                        </p>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-2 text-right">
-                        — {reportCard?.class_teacher || 'Class Teacher'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Principal's Comment */}
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm print:rounded-none print:shadow-none print:border print:border-black">
-                    <div className="bg-gradient-to-r from-emerald-50 to-teal-50/50 px-5 py-3 border-b border-slate-100 print:bg-gray-100">
-                      <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <Award className="h-4 w-4 text-emerald-500" />
-                        Principal's Comment
-                      </h3>
-                    </div>
-                    <div className="p-5">
-                      <div className="relative rounded-xl bg-gradient-to-br from-emerald-50/50 to-teal-50/30 p-4 border border-emerald-100">
-                        <Star className="absolute top-3 right-3 h-4 w-4 text-emerald-300" />
-                        <p className="text-sm text-slate-700 leading-relaxed">
-                          {reportCard?.principal_comments || (
-                            <span className="text-slate-400 italic">Pending principal's review and comments.</span>
-                          )}
-                        </p>
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-2 text-right">
-                        — Principal
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-
-                {/* Footer */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.9 }}
-                  className="text-center pt-4 pb-8"
-                >
-                  <div className="inline-flex items-center gap-2 rounded-full bg-amber-50 border border-amber-200 px-4 py-2 print:border print:border-black">
-                    <Clock className="h-3.5 w-3.5 text-amber-500" />
-                    <p className="text-xs font-medium text-amber-700">
-                      Next Term Begins: <span className="font-bold">{reportCard?.next_term_begins || 'TBD'}</span>
-                    </p>
-                  </div>
-                  <div className="mt-3 space-y-1">
-                    <p className="text-[10px] text-slate-400">
-                      Generated: {reportCard?.generated_at ? new Date(reportCard.generated_at).toLocaleString() : 'Not yet generated'}
-                    </p>
-                    <p className="text-[9px] text-slate-300 print:hidden">
-                      Status: {reportCard?.status || 'N/A'} • Real-time updates: {liveStatus}
-                    </p>
-                  </div>
-                </motion.div>
-              </div>
-            </motion.div>
-          </AnimatePresence>
+        {/* STUDENT INFO */}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] mt-2 mb-3 print:mt-1 print:mb-2 print:text-[9px]">
+          <div className="flex"><span className="font-bold w-32">Name:</span><span>{reportCard?.student_name}</span></div>
+          <div className="flex"><span className="font-bold w-32">Admission No:</span><span>{reportCard?.student_admission_number}</span></div>
+          <div className="flex"><span className="font-bold w-32">Class:</span><span>{reportCard?.class}</span></div>
+          <div className="flex"><span className="font-bold w-32">Term:</span><span>{termDisplay}</span></div>
+          <div className="flex"><span className="font-bold w-32">Session:</span><span>{reportCard?.academic_year}</span></div>
+          <div className="flex"><span className="font-bold w-32">Next Term:</span><span>{formattedNextTermDate}</span></div>
         </div>
 
-        {/* Print Styles */}
-        <style jsx global>{`
-          @media print {
-            .no-print { display: none !important; }
-            body { 
-              background: white !important;
-              -webkit-print-color-adjust: exact;
-              print-color-adjust: exact;
-            }
-            @page { 
-              size: A4;
-              margin: 1cm;
-            }
-          }
-        `}</style>
+        {/* MAIN CONTENT */}
+        <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-3">
+
+          {/* LEFT COLUMN - ACADEMIC RESULTS */}
+          <div>
+
+            {/* SUBJECT TABLE */}
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse border border-gray-300 text-[10px] print:text-[8px] min-w-[500px]">
+                <thead className="bg-blue-600 text-white">
+                  <tr>
+                    <th className="border px-2 py-1 text-left">Subjects</th>
+                    <th className="border px-2 py-1 text-center w-16">CA</th>
+                    <th className="border px-2 py-1 text-center w-16">Exam</th>
+                    <th className="border px-2 py-1 text-center w-16">Total</th>
+                    <th className="border px-2 py-1 text-center w-14">Grade</th>
+                    <th className="border px-2 py-1 text-left">Remarks</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displaySubjects.map((subject) => (
+                    <tr key={subject.name} className="hover:bg-gray-50">
+                      <td className="border px-2 py-1">{subject.name}</td>
+                      <td className="border text-center font-mono">{subject.ca}</td>
+                      <td className="border text-center font-mono">{subject.exam}</td>
+                      <td className="border text-center font-bold font-mono">{subject.total}</td>
+                      <td className="border text-center">
+                        <span className={getGradeStyle(subject.grade)}>{subject.grade}</span>
+                      </td>
+                      <td className="border px-2 py-1">{subject.remark}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-gray-100 font-bold">
+                  <tr>
+                    <td colSpan={3} className="border px-2 py-1 text-right">TOTAL / AVERAGE:</td>
+                    <td className="border text-center">{reportCard?.total_score}</td>
+                    <td className="border text-center">
+                      <span className={getOverallGradeColor(reportCard?.grade || '—')}>{reportCard?.grade || '—'}</span>
+                    </td>
+                    <td className="border text-center">{reportCard?.average_score}%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* CLASS TEACHER'S REMARK */}
+            <div className="mt-3 border border-gray-300">
+              <div className="bg-purple-600 text-white px-2 py-1 text-[10px] font-bold flex items-center gap-1">
+                <Sparkles className="h-3 w-3" />
+                CLASS TEACHER'S REMARK (AI-Generated)
+              </div>
+              <div className="p-2 text-[10px] italic leading-relaxed bg-purple-50">
+                {reportCard?.teacher_comments || 'No comment available.'}
+              </div>
+            </div>
+
+            {/* PRINCIPAL'S REMARK */}
+            <div className="mt-2 border border-gray-300">
+              <div className="bg-blue-600 text-white px-2 py-1 text-[10px] font-bold">
+                PRINCIPAL'S REMARK
+              </div>
+              <div className="p-2 text-[10px] italic leading-relaxed">
+                {reportCard?.principal_comments || 'No comment available.'}
+              </div>
+            </div>
+
+            {/* GRADE SCALE */}
+            <div className="mt-3">
+              <div className="bg-blue-600 text-white text-[10px] px-2 py-1 font-bold">Grade Scale (WAEC)</div>
+              <div className="border border-gray-300 p-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[9px]">
+                  <div><span className={getGradeStyle('A1')}>A1</span> 75-100</div>
+                  <div><span className={getGradeStyle('B2')}>B2</span> 70-74</div>
+                  <div><span className={getGradeStyle('B3')}>B3</span> 65-69</div>
+                  <div><span className={getGradeStyle('C4')}>C4</span> 60-64</div>
+                  <div><span className={getGradeStyle('C5')}>C5</span> 55-59</div>
+                  <div><span className={getGradeStyle('C6')}>C6</span> 50-54</div>
+                  <div><span className={getGradeStyle('D7')}>D7</span> 45-49</div>
+                  <div><span className={getGradeStyle('E8')}>E8</span> 40-44</div>
+                  <div><span className={getGradeStyle('F9')}>F9</span> 0-39</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN - PSYCHOMOTOR & SKILLS */}
+          <div>
+
+            {/* PERFORMANCE SUMMARY */}
+            <Panel title="Performance Summary">
+              <div className="space-y-1">
+                <div className="flex justify-between"><span>Total Score</span><span className="font-bold">{reportCard?.total_score}</span></div>
+                <div className="flex justify-between"><span>Average</span><span className="font-bold">{reportCard?.average_score}%</span></div>
+                <div className="flex justify-between">
+                  <span>Grade</span>
+                  <span className={getOverallGradeColor(reportCard?.grade || '—')}>{reportCard?.grade || '—'}</span>
+                </div>
+              </div>
+            </Panel>
+
+            {/* AFFECTIVE DOMAIN */}
+            <Panel title="Affective Domain">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300 text-[10px]">
+                  <tbody>
+                    {reportCard?.behavior_ratings?.map((item) => (
+                      <tr key={item.name}>
+                        <td className="border px-1 py-1">{item.name}</td>
+                        <td className="border text-center w-12 font-bold">{item.rating}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+
+            {/* PSYCHOMOTOR SKILLS */}
+            <Panel title="Psychomotor Skills">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300 text-[10px]">
+                  <tbody>
+                    {reportCard?.skill_ratings?.map((item) => (
+                      <tr key={item.name}>
+                        <td className="border px-1 py-1">{item.name}</td>
+                        <td className="border text-center w-12 font-bold">{item.rating}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>
+
+            {/* RATING KEY */}
+            <Panel title="Key To Ratings">
+              <div className="space-y-1 text-[9px]">
+                <div>5 - Excellent</div>
+                <div>4 - Very Good</div>
+                <div>3 - Good</div>
+                <div>2 - Fair</div>
+                <div>1 - Poor</div>
+              </div>
+            </Panel>
+
+          </div>
+        </div>
+
+        {/* FOOTER */}
+        <div className="border-t border-gray-300 mt-4 pt-2 text-center text-[9px] text-gray-500 print:mt-2 print:pt-1 print:text-[7px]">
+          Powered by Vincollins Portal | {schoolSettings.motto}
+        </div>
+
       </div>
-    </TooltipProvider>
+
+      {/* PRINT CSS */}
+      <style jsx global>{`
+        @media print {
+          body { 
+            background: white; 
+            margin: 0; 
+            padding: 0; 
+            -webkit-print-color-adjust: exact; 
+            print-color-adjust: exact; 
+          }
+          .no-print { 
+            display: none !important; 
+          }
+          @page { 
+            size: A4 portrait; 
+            margin: 0.5cm;
+          }
+          .bg-blue-600, .bg-purple-600 {
+            background-color: #1e40af !important;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .border {
+            border-color: #000 !important;
+          }
+        }
+      `}</style>
+    </div>
   )
 }

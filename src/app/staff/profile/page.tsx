@@ -15,29 +15,26 @@ import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { 
-  User, Mail, Phone, MapPin, BookOpen, Award, Calendar, 
-  Camera, Save, X, Building, Clock, Shield, Key, Eye, EyeOff,
-  CheckCircle, AlertCircle, ArrowLeft, Loader2, ChevronRight, Home,
-  Hash, Lock
+  User, Mail, Phone, MapPin, BookOpen, Award, 
+  Camera, Save, X, Building, Clock, Shield, Key,
+  CheckCircle, Loader2, Hash, Lock
 } from 'lucide-react'
-import Link from 'next/link'
 
 // ============================================
 // TYPES
 // ============================================
 interface StaffProfile {
   id: string
-  full_name: string
-  email: string
+  full_name: string | null
+  email: string | null
   phone?: string | null
   address?: string | null
-  department: string
-  position: string
+  department?: string | null
+  position?: string | null
   qualification?: string | null
   experience?: string | null
   bio?: string | null
@@ -45,16 +42,20 @@ interface StaffProfile {
   photo_url?: string | null
   avatar_url?: string | null
   vin_id?: string | null
-  class?: string
-  role?: string
-  created_at?: string
-  updated_at?: string
+  role?: string | null
+  created_at?: string | null
+  updated_at?: string | null
 }
 
 // ============================================
 // HELPER COMPONENTS
 // ============================================
-function InfoCard({ icon: Icon, label, value, className }: { icon: React.ElementType; label: string; value: string; className?: string }) {
+function InfoCard({ icon: Icon, label, value, className }: { 
+  icon: React.ElementType
+  label: string
+  value: string
+  className?: string 
+}) {
   return (
     <div className={cn("flex items-start gap-2 sm:gap-3 p-2.5 sm:p-3 bg-slate-50 rounded-xl", className)}>
       <div className="p-1.5 sm:p-2 bg-white rounded-lg shrink-0 shadow-sm">
@@ -62,7 +63,7 @@ function InfoCard({ icon: Icon, label, value, className }: { icon: React.Element
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">{label}</p>
-        <p className="font-medium text-slate-900 text-xs sm:text-sm break-words">{value}</p>
+        <p className="font-medium text-slate-900 text-xs sm:text-sm break-words">{value || 'Not provided'}</p>
       </div>
     </div>
   )
@@ -114,25 +115,84 @@ export default function StaffProfilePage() {
   })
 
   // ============================================
-  // LOAD PROFILE
+  // LOAD PROFILE FROM DATABASE
   // ============================================
   const loadProfile = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
+      setLoading(true)
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError)
+        toast.error('Authentication error. Please login again.')
+        router.push('/portal')
+        return
+      }
+      
       if (!session) {
+        toast.error('Please login to view your profile')
         router.push('/portal')
         return
       }
 
-      const { data: profileData, error } = await supabase
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', session.user.id)
-        .maybeSingle()
+        .single()
 
-      if (error) {
-        console.error('Error fetching profile:', error)
-        toast.error('Failed to load profile')
+      if (profileError) {
+        if (profileError.code === 'PGRST116') {
+          const vinId = `VIN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`
+          
+          const newProfile = {
+            id: session.user.id,
+            email: session.user.email || '',
+            full_name: session.user.user_metadata?.full_name || '',
+            department: session.user.user_metadata?.department || '',
+            position: session.user.user_metadata?.position || 'Teacher',
+            role: 'staff',
+            vin_id: vinId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+          
+          const { data: insertedData, error: insertError } = await supabase
+            .from('profiles')
+            .insert([newProfile])
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error('Error creating profile:', insertError)
+            toast.error('Failed to create profile')
+            setLoading(false)
+            return
+          }
+
+          setProfile(insertedData as StaffProfile)
+          setFormData({
+            full_name: insertedData.full_name || '',
+            email: insertedData.email || session.user.email || '',
+            phone: insertedData.phone || '',
+            address: insertedData.address || '',
+            department: insertedData.department || '',
+            position: insertedData.position || '',
+            qualification: insertedData.qualification || '',
+            experience: insertedData.experience || '',
+            bio: insertedData.bio || '',
+            subjects: insertedData.subjects || '',
+            photo_url: insertedData.photo_url || insertedData.avatar_url || '',
+            vin_id: insertedData.vin_id || vinId,
+          })
+          
+          toast.success('Profile created successfully!')
+        } else {
+          console.error('Error fetching profile:', profileError)
+          toast.error('Failed to load profile data')
+        }
+        setLoading(false)
         return
       }
 
@@ -152,63 +212,10 @@ export default function StaffProfilePage() {
           photo_url: profileData.photo_url || profileData.avatar_url || '',
           vin_id: profileData.vin_id || '',
         })
-      } else {
-        const emailName = session.user.email?.split('@')[0] || 'Teacher'
-        const formattedName = emailName
-          .split(/[._-]/)
-          .map((part: string) => part.charAt(0).toUpperCase() + part.slice(1))
-          .join(' ')
-        
-        // Generate VIN ID if not exists
-        const vinId = `VIN-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 5).toUpperCase()}`
-        
-        const basicProfile: StaffProfile = {
-          id: session.user.id,
-          full_name: formattedName,
-          email: session.user.email || '',
-          department: 'General',
-          position: 'Teacher',
-          role: 'staff',
-          vin_id: vinId,
-        }
-        
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: session.user.id,
-            full_name: basicProfile.full_name,
-            email: basicProfile.email,
-            department: basicProfile.department,
-            position: basicProfile.position,
-            role: 'staff',
-            vin_id: vinId,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          })
-
-        if (insertError) {
-          console.error('Error creating profile:', insertError)
-        }
-
-        setProfile(basicProfile)
-        setFormData({
-          full_name: basicProfile.full_name,
-          email: basicProfile.email,
-          phone: '',
-          address: '',
-          department: basicProfile.department,
-          position: basicProfile.position,
-          qualification: '',
-          experience: '',
-          bio: '',
-          subjects: '',
-          photo_url: '',
-          vin_id: vinId,
-        })
       }
     } catch (error) {
       console.error('Error loading profile:', error)
-      toast.error('Failed to load profile')
+      toast.error('An unexpected error occurred while loading your profile')
     } finally {
       setLoading(false)
     }
@@ -235,14 +242,15 @@ export default function StaffProfilePage() {
   }
 
   // ============================================
-  // PHOTO UPLOAD WITH PERSISTENCE
+  // PHOTO UPLOAD
   // ============================================
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file (JPEG, PNG, GIF, WebP)')
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload an image file (JPEG, PNG, GIF, or WebP)')
       return
     }
 
@@ -256,16 +264,21 @@ export default function StaffProfilePage() {
     
     try {
       if (profile?.photo_url) {
-        const oldPath = profile.photo_url.split('/').pop()
-        if (oldPath) {
-          await supabase.storage
-            .from('student-photos')
-            .remove([oldPath])
+        try {
+          const urlParts = profile.photo_url.split('/')
+          const oldPath = urlParts[urlParts.length - 1]
+          if (oldPath) {
+            await supabase.storage
+              .from('student-photos')
+              .remove([oldPath])
+          }
+        } catch (deleteError) {
+          console.warn('Could not delete old photo:', deleteError)
         }
       }
 
       const fileExt = file.name.split('.').pop() || 'jpg'
-      const fileName = `staff-${profile?.id}-${Date.now()}.${fileExt}`
+      const fileName = `staff-${profile?.id || 'unknown'}-${Date.now()}.${fileExt}`
       
       const { error: uploadError } = await supabase.storage
         .from('student-photos')
@@ -298,6 +311,7 @@ export default function StaffProfilePage() {
         setProfile(prev => prev ? { ...prev, photo_url: publicUrl, avatar_url: publicUrl } : null)
       }
       setAvatarKey(Date.now())
+      setAvatarError(false)
       
       toast.success('Profile photo updated successfully!')
       
@@ -314,10 +328,10 @@ export default function StaffProfilePage() {
   }
 
   // ============================================
-  // SAVE PROFILE
+  // SAVE PROFILE - FIXED upsert
   // ============================================
   const handleSave = async () => {
-    if (!formData.full_name.trim()) {
+    if (!formData.full_name?.trim()) {
       toast.error('Full name is required')
       return
     }
@@ -327,6 +341,7 @@ export default function StaffProfilePage() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
+        toast.error('Session expired. Please login again.')
         router.push('/portal')
         return
       }
@@ -334,38 +349,49 @@ export default function StaffProfilePage() {
       const updateData = {
         id: session.user.id,
         full_name: formData.full_name.trim(),
-        phone: formData.phone.trim() || null,
-        address: formData.address.trim() || null,
-        department: formData.department.trim() || 'General',
-        position: formData.position.trim() || 'Teacher',
-        qualification: formData.qualification.trim() || null,
-        experience: formData.experience.trim() || null,
-        bio: formData.bio.trim() || null,
-        subjects: formData.subjects.trim() || null,
+        email: formData.email.trim(),
+        phone: formData.phone?.trim() || null,
+        address: formData.address?.trim() || null,
+        department: formData.department?.trim() || 'General',
+        position: formData.position?.trim() || 'Teacher',
+        qualification: formData.qualification?.trim() || null,
+        experience: formData.experience?.trim() || null,
+        bio: formData.bio?.trim() || null,
+        subjects: formData.subjects?.trim() || null,
         photo_url: formData.photo_url || null,
         avatar_url: formData.photo_url || null,
+        role: profile?.role || 'staff',
         updated_at: new Date().toISOString(),
       }
 
+      // FIXED: Removed 'returning' option
       const { error } = await supabase
         .from('profiles')
         .upsert(updateData, { onConflict: 'id' })
 
-      if (error) throw error
+      if (error) {
+        console.error('Database error:', error)
+        throw new Error(error.message || 'Failed to save profile')
+      }
 
-      setProfile(prev => {
-        if (!prev) return null
-        return {
-          ...prev,
-          ...updateData,
-        }
-      })
+      // Refetch to get updated data
+      const { data: refreshedData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single()
+
+      if (refreshedData) {
+        setProfile(refreshedData as StaffProfile)
+      } else {
+        setProfile(prev => prev ? { ...prev, ...updateData } : null)
+      }
 
       toast.success('Profile updated successfully!')
       setIsEditing(false)
     } catch (error: any) {
       console.error('Error updating profile:', error)
-      toast.error(error.message || 'Failed to update profile')
+      toast.error(error.message || 'Failed to update profile. Please try again.')
     } finally {
       setSaving(false)
     }
@@ -387,7 +413,7 @@ export default function StaffProfilePage() {
         experience: profile.experience || '',
         bio: profile.bio || '',
         subjects: profile.subjects || '',
-        photo_url: profile.photo_url || '',
+        photo_url: profile.photo_url || profile.avatar_url || '',
         vin_id: profile.vin_id || '',
       })
     }
@@ -400,7 +426,7 @@ export default function StaffProfilePage() {
   // ============================================
   if (loading) {
     return (
-      <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-4 md:px-5 lg:px-6 py-6 sm:py-8 md:py-10 lg:py-12">
+      <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6">
         <ProfileSkeleton />
       </div>
     )
@@ -410,52 +436,24 @@ export default function StaffProfilePage() {
   // RENDER
   // ============================================
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-4 md:px-5 lg:px-6 py-6 sm:py-8 md:py-10 lg:py-12">
+    <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6">
       
-      {/* Breadcrumb & Back Button */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-3 sm:mb-4 md:mb-6 flex flex-wrap items-center justify-between gap-2 sm:gap-3"
+        className="space-y-4 sm:space-y-5 md:space-y-6"
       >
-        <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-muted-foreground flex-wrap">
-          <Link href="/staff" className="hover:text-primary flex items-center gap-1 transition-colors">
-            <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-            <span className="hidden xs:inline">Dashboard</span>
-          </Link>
-          <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-          <span className="text-foreground font-medium truncate">My Profile</span>
+        {/* Page Title - Tight to header */}
+        <div className="mb-3 sm:mb-4">
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900">
+            {isEditing ? 'Edit Profile' : 'My Profile'}
+          </h1>
+          <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5">
+            {isEditing ? 'Update your personal and professional information' : 'View and manage your profile information'}
+          </p>
         </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={() => router.push('/staff')} 
-          className="h-7 sm:h-8 md:h-9 text-[11px] sm:text-xs md:text-sm flex-shrink-0"
-        >
-          <ArrowLeft className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-3.5 sm:w-3.5" />
-          <span className="hidden xs:inline">Back to Dashboard</span>
-          <span className="xs:hidden">Back</span>
-        </Button>
-      </motion.div>
 
-      {/* Page Title */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="mb-3 sm:mb-4 md:mb-6"
-      >
-        <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900">My Profile</h1>
-        <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5 sm:mt-1">
-          Manage your personal information and account settings
-        </p>
-      </motion.div>
-
-      {/* Profile Content */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
+        {/* Profile Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-4 md:space-y-6">
           <TabsList className="grid w-full max-w-[240px] sm:max-w-[280px] md:max-w-md grid-cols-2 bg-slate-100 p-1 rounded-xl">
             <TabsTrigger value="profile" className="data-[state=active]:bg-white rounded-lg text-[11px] sm:text-xs md:text-sm py-1.5 sm:py-2">
@@ -468,9 +466,7 @@ export default function StaffProfilePage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* ============================================ */}
           {/* PROFILE TAB */}
-          {/* ============================================ */}
           <TabsContent value="profile" className="space-y-3 sm:space-y-4 md:space-y-6">
             {/* Profile Card with Avatar */}
             <Card className="border-0 shadow-lg overflow-hidden">
@@ -500,6 +496,7 @@ export default function StaffProfilePage() {
                       >
                         <AvatarImage 
                           src={formData.photo_url || undefined} 
+                          alt={formData.full_name}
                           onError={() => setAvatarError(true)}
                         />
                         <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold">
@@ -511,7 +508,7 @@ export default function StaffProfilePage() {
                         <button
                           onClick={() => fileInputRef.current?.click()}
                           disabled={isUploading}
-                          className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 p-1.5 sm:p-2 md:p-2.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+                          className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 p-1.5 sm:p-2 md:p-2.5 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           title="Upload photo"
                         >
                           {isUploading ? (
@@ -529,14 +526,17 @@ export default function StaffProfilePage() {
                       accept="image/jpeg,image/png,image/gif,image/webp"
                       onChange={handleImageUpload}
                       className="hidden"
+                      aria-label="Upload profile photo"
                     />
                     
                     {isUploading && (
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 sm:mt-2 text-center">Uploading...</p>
+                      <p className="text-[10px] sm:text-xs text-muted-foreground mt-1 sm:mt-2 text-center">
+                        Uploading...
+                      </p>
                     )}
                     {isEditing && !isUploading && (
                       <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-1 text-center max-w-[80px] sm:max-w-[100px]">
-                        Click camera to upload photo
+                        Click to upload photo
                       </p>
                     )}
                   </div>
@@ -546,7 +546,9 @@ export default function StaffProfilePage() {
                     {isEditing ? (
                       <div className="space-y-2 sm:space-y-3">
                         <div>
-                          <Label htmlFor="full_name" className="text-[11px] sm:text-xs md:text-sm">Full Name *</Label>
+                          <Label htmlFor="full_name" className="text-[11px] sm:text-xs md:text-sm">
+                            Full Name <span className="text-red-500">*</span>
+                          </Label>
                           <Input
                             id="full_name"
                             value={formData.full_name}
@@ -589,27 +591,29 @@ export default function StaffProfilePage() {
                     ) : (
                       <div className="min-w-0">
                         <h2 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 truncate">
-                          {formData.full_name || 'Teacher Name'}
+                          {formData.full_name || 'Not set'}
                         </h2>
                         <div className="flex flex-wrap justify-center sm:justify-start gap-1 sm:gap-1.5 md:gap-2 mt-1 sm:mt-1.5 md:mt-2">
                           <Badge className="bg-blue-100 text-blue-700 text-[10px] sm:text-xs">
-                            {formData.position || 'Teacher'}
+                            {formData.position || 'Position not set'}
                           </Badge>
                           <Badge variant="outline" className="text-[10px] sm:text-xs">
-                            {formData.department || 'Department'}
+                            {formData.department || 'Department not set'}
                           </Badge>
                           {formData.qualification && (
-                            <Badge variant="secondary" className="text-[10px] sm:text-xs">{formData.qualification}</Badge>
+                            <Badge variant="secondary" className="text-[10px] sm:text-xs">
+                              {formData.qualification}
+                            </Badge>
                           )}
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1 sm:mt-1.5 md:mt-2 text-[11px] sm:text-xs md:text-sm text-slate-500">
                           <div className="flex items-center justify-center sm:justify-start gap-1">
                             <Mail className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-                            <span className="truncate">{formData.email}</span>
+                            <span className="truncate">{formData.email || 'No email'}</span>
                           </div>
                           {formData.vin_id && (
                             <>
-                              <span className="hidden sm:inline text-slate-300">•</span>
+                              <span className="hidden sm:inline text-slate-300">-</span>
                               <div className="flex items-center justify-center sm:justify-start gap-1">
                                 <Hash className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 flex-shrink-0" />
                                 <span className="font-mono text-[10px] sm:text-xs">{formData.vin_id}</span>
@@ -630,11 +634,16 @@ export default function StaffProfilePage() {
                       </Button>
                       <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-[11px] sm:text-xs">
                         {saving ? (
-                          <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin mr-1 sm:mr-1.5" />
+                          <>
+                            <Loader2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 animate-spin mr-1 sm:mr-1.5" />
+                            Saving...
+                          </>
                         ) : (
-                          <Save className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
+                          <>
+                            <Save className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 sm:mr-1.5" />
+                            Save Changes
+                          </>
                         )}
-                        {saving ? 'Saving...' : 'Save'}
                       </Button>
                     </div>
                   )}
@@ -649,11 +658,16 @@ export default function StaffProfilePage() {
                     </Button>
                     <Button size="sm" onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 h-8 text-[11px]">
                       {saving ? (
-                        <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                        <>
+                          <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                          Saving...
+                        </>
                       ) : (
-                        <Save className="h-3 w-3 mr-1" />
+                        <>
+                          <Save className="h-3 w-3 mr-1" />
+                          Save
+                        </>
                       )}
-                      {saving ? 'Saving...' : 'Save'}
                     </Button>
                   </div>
                 )}
@@ -666,7 +680,9 @@ export default function StaffProfilePage() {
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
                   <CardTitle className="text-sm sm:text-base md:text-lg">Personal Information</CardTitle>
-                  <CardDescription className="text-[10px] sm:text-xs md:text-sm">Your personal contact details</CardDescription>
+                  <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+                    Your personal contact details
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3 md:space-y-4 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
                   {isEditing ? (
@@ -706,14 +722,9 @@ export default function StaffProfilePage() {
                     </>
                   ) : (
                     <div className="space-y-2 sm:space-y-3">
-                      <InfoCard icon={Phone} label="Phone" value={formData.phone || 'Not provided'} />
-                      <InfoCard icon={MapPin} label="Address" value={formData.address || 'Not provided'} />
-                      {formData.bio && <InfoCard icon={User} label="Bio" value={formData.bio} />}
-                      {!formData.bio && !formData.phone && !formData.address && (
-                        <p className="text-center text-[11px] sm:text-xs text-muted-foreground py-4">
-                          No personal information added yet. Click Edit Profile to add.
-                        </p>
-                      )}
+                      <InfoCard icon={Phone} label="Phone" value={formData.phone || ''} />
+                      <InfoCard icon={MapPin} label="Address" value={formData.address || ''} />
+                      <InfoCard icon={User} label="Bio" value={formData.bio || ''} />
                     </div>
                   )}
                 </CardContent>
@@ -723,7 +734,9 @@ export default function StaffProfilePage() {
               <Card className="border-0 shadow-lg">
                 <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
                   <CardTitle className="text-sm sm:text-base md:text-lg">Professional Information</CardTitle>
-                  <CardDescription className="text-[10px] sm:text-xs md:text-sm">Your teaching qualifications and experience</CardDescription>
+                  <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+                    Your teaching qualifications and experience
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2 sm:space-y-3 md:space-y-4 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
                   {isEditing ? (
@@ -761,10 +774,10 @@ export default function StaffProfilePage() {
                     </>
                   ) : (
                     <div className="space-y-2 sm:space-y-3">
-                      <InfoCard icon={Award} label="Qualification" value={formData.qualification || 'Not provided'} />
-                      <InfoCard icon={Clock} label="Experience" value={formData.experience || 'Not provided'} />
-                      <InfoCard icon={BookOpen} label="Subjects" value={formData.subjects || 'Not provided'} />
-                      <InfoCard icon={Building} label="Department" value={formData.department || 'Not assigned'} />
+                      <InfoCard icon={Award} label="Qualification" value={formData.qualification || ''} />
+                      <InfoCard icon={Clock} label="Experience" value={formData.experience || ''} />
+                      <InfoCard icon={BookOpen} label="Subjects" value={formData.subjects || ''} />
+                      <InfoCard icon={Building} label="Department" value={formData.department || ''} />
                     </div>
                   )}
                 </CardContent>
@@ -772,34 +785,36 @@ export default function StaffProfilePage() {
             </div>
 
             {/* VIN ID Card */}
-            <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-50 to-blue-50">
-              <CardContent className="p-3 sm:p-4 md:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
-                  <div className="p-2 sm:p-3 bg-blue-100 rounded-xl shrink-0">
-                    <Hash className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+            {formData.vin_id && (
+              <Card className="border-0 shadow-lg bg-gradient-to-r from-slate-50 to-blue-50">
+                <CardContent className="p-3 sm:p-4 md:p-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
+                    <div className="p-2 sm:p-3 bg-blue-100 rounded-xl shrink-0">
+                      <Hash className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] sm:text-xs md:text-sm text-slate-500">Staff VIN ID</p>
+                      <p className="text-sm sm:text-base md:text-lg font-mono font-bold text-slate-900 break-all">
+                        {formData.vin_id}
+                      </p>
+                      <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
+                        This is your unique staff identification number
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] sm:text-xs md:text-sm text-slate-500">Staff VIN ID</p>
-                    <p className="text-sm sm:text-base md:text-lg font-mono font-bold text-slate-900 break-all">
-                      {formData.vin_id || 'Not assigned'}
-                    </p>
-                    <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5">
-                      This is your unique staff identification number
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </TabsContent>
 
-          {/* ============================================ */}
           {/* SECURITY TAB */}
-          {/* ============================================ */}
           <TabsContent value="security" className="space-y-3 sm:space-y-4 md:space-y-6">
             <Card className="border-0 shadow-lg">
               <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
                 <CardTitle className="text-sm sm:text-base md:text-lg">Account Security</CardTitle>
-                <CardDescription className="text-[10px] sm:text-xs md:text-sm">View your account details and security information</CardDescription>
+                <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+                  View your account details and security information
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 sm:space-y-4 md:space-y-6 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
                 {/* Email Info */}
@@ -816,27 +831,48 @@ export default function StaffProfilePage() {
                 </div>
 
                 {/* VIN ID Section */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200">
-                  <Hash className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[11px] sm:text-xs md:text-sm text-blue-600">Staff VIN ID</p>
-                    <p className="font-mono font-bold text-sm sm:text-base text-blue-900 break-all">
-                      {formData.vin_id || 'Not assigned'}
-                    </p>
-                    <p className="text-[9px] sm:text-[10px] text-blue-500 mt-0.5">
-                      Your unique identification number cannot be changed
-                    </p>
+                {formData.vin_id && (
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-blue-50 rounded-xl border border-blue-200">
+                    <Hash className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[11px] sm:text-xs md:text-sm text-blue-600">Staff VIN ID</p>
+                      <p className="font-mono font-bold text-sm sm:text-base text-blue-900 break-all">
+                        {formData.vin_id}
+                      </p>
+                      <p className="text-[9px] sm:text-[10px] text-blue-500 mt-0.5">
+                        Your unique identification number cannot be changed
+                      </p>
+                    </div>
+                    <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 shrink-0" />
                   </div>
-                  <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-blue-400 shrink-0" />
-                </div>
+                )}
 
-                {/* Password Section - Read Only */}
+                {/* Account Created Date */}
+                {profile?.created_at && (
+                  <div className="flex items-center gap-2 sm:gap-3 p-3 sm:p-4 bg-slate-50 rounded-xl">
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-slate-600 shrink-0" />
+                    <div>
+                      <p className="text-[11px] sm:text-xs md:text-sm text-slate-500">Account Created</p>
+                      <p className="font-medium text-sm sm:text-base text-slate-900">
+                        {new Date(profile.created_at).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Password Section */}
                 <div className="p-3 sm:p-4 bg-amber-50 rounded-xl border border-amber-200">
                   <div className="flex items-center gap-2 sm:gap-3 mb-2">
                     <Lock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 shrink-0" />
                     <div>
                       <p className="font-medium text-amber-800 text-sm sm:text-base">Password</p>
-                      <p className="text-[10px] sm:text-xs md:text-sm text-amber-600">Password changes are managed by the system administrator</p>
+                      <p className="text-[10px] sm:text-xs md:text-sm text-amber-600">
+                        Password changes are managed by the system administrator
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-2 sm:p-3 bg-amber-100/50 rounded-lg">
@@ -852,7 +888,9 @@ export default function StaffProfilePage() {
                   <Shield className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 shrink-0" />
                   <div>
                     <p className="font-medium text-green-800 text-sm sm:text-base">Account Status</p>
-                    <p className="text-[10px] sm:text-xs md:text-sm text-green-600">Your account is active and secure</p>
+                    <p className="text-[10px] sm:text-xs md:text-sm text-green-600">
+                      Your account is active and secure
+                    </p>
                   </div>
                 </div>
               </CardContent>

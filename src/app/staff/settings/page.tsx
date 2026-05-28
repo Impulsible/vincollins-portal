@@ -1,26 +1,22 @@
-// app/staff/settings/page.tsx - STAFF SETTINGS PAGE (NO PASSWORD CHANGE)
+// app/staff/settings/page.tsx - STAFF SETTINGS PAGE (FIXED COLUMN NAMES)
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Header } from '@/components/layout/header'
-import { StaffSidebar } from '@/components/staff/StaffSidebar'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
-import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import { 
-  Settings, Bell, Moon, Sun, Monitor, Palette, Volume2, Mail, 
-  Loader2, Save, ArrowLeft, ChevronRight, Home, CheckCircle
+  Settings, Bell, Mail, Loader2, Save, ArrowLeft, 
+  ChevronRight, Home, CheckCircle, BookOpen, GraduationCap,
+  Clock, AlertTriangle, Megaphone, FileText, Users, Calendar
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -29,10 +25,13 @@ import Link from 'next/link'
 // ============================================
 interface StaffProfile {
   id: string
-  full_name: string
-  email: string
-  role?: string
-  photo_url?: string
+  full_name: string | null
+  email: string | null
+  role?: string | null
+  photo_url?: string | null
+  department?: string | null
+  vin_id?: string | null
+  created_at?: string | null
 }
 
 interface SettingsState {
@@ -41,8 +40,9 @@ interface SettingsState {
   gradingAlerts: boolean
   studentActivity: boolean
   soundEnabled: boolean
-  theme: 'light' | 'dark' | 'system'
-  fontSize: 'small' | 'medium' | 'large'
+  systemAnnouncements: boolean
+  timetableUpdates: boolean
+  reportGeneration: boolean
 }
 
 const DEFAULT_SETTINGS: SettingsState = {
@@ -51,8 +51,9 @@ const DEFAULT_SETTINGS: SettingsState = {
   gradingAlerts: true,
   studentActivity: false,
   soundEnabled: true,
-  theme: 'light',
-  fontSize: 'medium',
+  systemAnnouncements: true,
+  timetableUpdates: true,
+  reportGeneration: true,
 }
 
 // ============================================
@@ -60,67 +61,42 @@ const DEFAULT_SETTINGS: SettingsState = {
 // ============================================
 function SettingsSkeleton() {
   return (
-    <div className="space-y-4 sm:space-y-6">
-      <Skeleton className="h-10 w-48 rounded-lg" />
-      <Skeleton className="h-80 rounded-2xl" />
+    <div className="space-y-3 sm:space-y-4">
+      <Skeleton className="h-8 w-40 rounded-lg" />
+      <Skeleton className="h-72 rounded-2xl" />
     </div>
   )
 }
 
 function SettingToggle({ 
-  icon: Icon, title, description, checked, onToggle 
+  icon: Icon, title, description, notificationExample, checked, onToggle 
 }: { 
   icon: React.ElementType
   title: string
   description: string
+  notificationExample: string
   checked: boolean
   onToggle: () => void 
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 sm:gap-4 py-2">
-      <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+    <div className="flex items-start justify-between gap-3 sm:gap-4 py-3">
+      <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
         <div className="p-1.5 sm:p-2 bg-slate-100 rounded-lg shrink-0">
           <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-xs sm:text-sm font-medium text-slate-900">{title}</p>
           <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{description}</p>
+          <div className="mt-1.5 p-2 bg-slate-50 rounded-lg border border-slate-100">
+            <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium mb-0.5">YOU WILL RECEIVE:</p>
+            <p className="text-[10px] sm:text-xs text-slate-600 italic">
+              &ldquo;{notificationExample}&rdquo;
+            </p>
+          </div>
         </div>
       </div>
-      <Switch checked={checked} onCheckedChange={onToggle} className="shrink-0" />
+      <Switch checked={checked} onCheckedChange={onToggle} className="shrink-0 mt-1" />
     </div>
-  )
-}
-
-function ThemeOption({ 
-  icon: Icon, title, active, onClick 
-}: { 
-  icon: React.ElementType
-  title: string
-  active: boolean
-  onClick: () => void 
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "flex flex-col items-center gap-1.5 sm:gap-2 p-3 sm:p-4 rounded-xl border-2 transition-all",
-        active 
-          ? "border-blue-500 bg-blue-50 shadow-sm" 
-          : "border-slate-200 hover:border-slate-300 bg-white"
-      )}
-    >
-      <Icon className={cn(
-        "h-5 w-5 sm:h-6 sm:w-6",
-        active ? "text-blue-600" : "text-slate-400"
-      )} />
-      <span className={cn(
-        "text-[10px] sm:text-xs font-medium",
-        active ? "text-blue-700" : "text-slate-600"
-      )}>
-        {title}
-      </span>
-    </button>
   )
 }
 
@@ -133,27 +109,40 @@ export default function StaffSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<StaffProfile | null>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS)
 
   // ============================================
-  // LOAD PROFILE & SETTINGS
+  // LOAD PROFILE & SETTINGS FROM DATABASE
   // ============================================
   const loadData = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
+      setLoading(true)
+      
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session) {
+        toast.error('Please login to access settings')
         router.push('/portal')
         return
       }
 
-      const { data: profileData } = await supabase
+      // Fetch only columns that exist in your profiles table
+      const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, email, role, photo_url')
+        .select('id, full_name, email, role, photo_url, department, vin_id, created_at')
         .eq('id', session.user.id)
         .single()
 
-      if (profileData) {
+      if (profileError) {
+        // Check if it's because the profile doesn't exist
+        if (profileError.code === 'PGRST116') {
+          console.log('Profile not found for settings page')
+          toast.error('Profile not found. Please contact administrator.')
+        } else {
+          console.error('Error fetching profile:', profileError)
+          toast.error('Failed to load profile data')
+        }
+      } else if (profileData) {
         setProfile(profileData as StaffProfile)
       }
 
@@ -169,6 +158,7 @@ export default function StaffSettingsPage() {
       }
     } catch (error) {
       console.error('Error loading data:', error)
+      toast.error('Failed to load settings')
     } finally {
       setLoading(false)
     }
@@ -181,11 +171,6 @@ export default function StaffSettingsPage() {
   // ============================================
   // HANDLERS
   // ============================================
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/portal')
-  }
-
   const handleToggle = (key: keyof SettingsState) => {
     setSettings(prev => ({
       ...prev,
@@ -193,33 +178,11 @@ export default function StaffSettingsPage() {
     }))
   }
 
-  const handleSelectChange = (key: keyof SettingsState, value: string) => {
-    setSettings(prev => ({
-      ...prev,
-      [key]: value
-    }))
-  }
-
   const handleSaveSettings = async () => {
     setSaving(true)
     
     try {
-      // Save to localStorage
       localStorage.setItem('staff-settings', JSON.stringify(settings))
-      
-      // Apply theme
-      if (settings.theme === 'dark') {
-        document.documentElement.classList.add('dark')
-      } else if (settings.theme === 'light') {
-        document.documentElement.classList.remove('dark')
-      }
-      // 'system' relies on OS preference
-      
-      // Apply font size
-      document.documentElement.style.fontSize = 
-        settings.fontSize === 'small' ? '14px' : 
-        settings.fontSize === 'large' ? '18px' : '16px'
-      
       toast.success('Settings saved successfully!')
     } catch (error) {
       console.error('Error saving settings:', error)
@@ -229,37 +192,13 @@ export default function StaffSettingsPage() {
     }
   }
 
-  // ✅ FIXED: Added firstName
-  const formatProfileForHeader = () => {
-    if (!profile) return undefined
-    return {
-      id: profile.id,
-      name: profile.full_name,
-      firstName: profile.full_name?.split(' ')[0] || 'Staff',
-      email: profile.email,
-      role: 'teacher' as const,
-      avatar: profile.photo_url || undefined,
-      isAuthenticated: true
-    }
-  }
-
   // ============================================
   // LOADING STATE
   // ============================================
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col">
-        <Header onLogout={handleLogout} />
-        <div className="flex flex-1">
-          <div className="hidden lg:block w-72 shrink-0" />
-          <div className="flex-1">
-            <main className="pt-16 sm:pt-20 lg:pt-24 pb-8 sm:pb-12">
-              <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-4 md:px-5 lg:px-6">
-                <SettingsSkeleton />
-              </div>
-            </main>
-          </div>
-        </div>
+      <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6">
+        <SettingsSkeleton />
       </div>
     )
   }
@@ -268,190 +207,248 @@ export default function StaffSettingsPage() {
   // RENDER
   // ============================================
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden">
-      <Header user={formatProfileForHeader()} onLogout={handleLogout} />
+    <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6">
       
-      <div className="flex flex-1">
-        <StaffSidebar 
-          profile={profile}
-          onLogout={handleLogout}
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab="settings"
-          setActiveTab={() => {}}
-        />
-
-        <div className={cn(
-          "flex-1 transition-all duration-300 overflow-x-hidden min-w-0",
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-        )}>
-          <main className="pt-16 sm:pt-20 lg:pt-24 pb-8 sm:pb-12">
-            <div className="w-full max-w-screen-xl mx-auto px-3 sm:px-4 md:px-5 lg:px-6">
-              
-              {/* Breadcrumb */}
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-3 sm:mb-4 md:mb-6 flex flex-wrap items-center justify-between gap-2 sm:gap-3"
-              >
-                <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-muted-foreground flex-wrap">
-                  <Link href="/staff" className="hover:text-primary flex items-center gap-1 transition-colors">
-                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                    <span className="hidden xs:inline">Dashboard</span>
-                  </Link>
-                  <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-                  <span className="text-foreground font-medium truncate">Settings</span>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => router.push('/staff')} 
-                  className="h-7 sm:h-8 md:h-9 text-[11px] sm:text-xs md:text-sm flex-shrink-0"
-                >
-                  <ArrowLeft className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  Back
-                </Button>
-              </motion.div>
-
-              {/* Page Title */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-3 sm:mb-4 md:mb-6"
-              >
-                <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 flex items-center gap-2">
-                  <Settings className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-slate-600" />
-                  Settings
-                </h1>
-                <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5 sm:mt-1">
-                  Customize your experience and manage preferences
-                </p>
-              </motion.div>
-
-              {/* Settings Content */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-                className="space-y-3 sm:space-y-4 md:space-y-6"
-              >
-                {/* Account Info Card */}
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
-                    <CardTitle className="text-sm sm:text-base md:text-lg">Account Information</CardTitle>
-                    <CardDescription className="text-[10px] sm:text-xs md:text-sm">
-                      Your basic account details
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                        <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Full Name</p>
-                        <p className="font-medium text-sm sm:text-base text-slate-900">{profile?.full_name || '—'}</p>
-                      </div>
-                      <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                        <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Email Address</p>
-                        <p className="font-medium text-sm sm:text-base text-slate-900 break-all">{profile?.email || '—'}</p>
-                      </div>
-                      <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                        <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Role</p>
-                        <Badge className="text-[10px] sm:text-xs bg-blue-100 text-blue-700">
-                          {profile?.role || 'Staff'}
-                        </Badge>
-                      </div>
-                      <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                        <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Staff ID</p>
-                        <p className="font-medium text-sm sm:text-base text-slate-900 font-mono">{profile?.id?.slice(0, 8) || '—'}...</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Notifications */}
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
-                    <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                      <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
-                      Notification Preferences
-                    </CardTitle>
-                    <CardDescription className="text-[10px] sm:text-xs md:text-sm">
-                      Choose what notifications you want to receive
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-1 sm:space-y-2 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
-                    <SettingToggle icon={Mail} title="Email Notifications" description="Receive important updates via email" checked={settings.emailNotifications} onToggle={() => handleToggle('emailNotifications')} />
-                    <Separator />
-                    <SettingToggle icon={Bell} title="Exam Reminders" description="Get notified about upcoming exams" checked={settings.examReminders} onToggle={() => handleToggle('examReminders')} />
-                    <Separator />
-                    <SettingToggle icon={CheckCircle} title="Grading Alerts" description="Alerts when students submit exams for grading" checked={settings.gradingAlerts} onToggle={() => handleToggle('gradingAlerts')} />
-                    <Separator />
-                    <SettingToggle icon={Monitor} title="Student Activity" description="Track student login and exam activity" checked={settings.studentActivity} onToggle={() => handleToggle('studentActivity')} />
-                    <Separator />
-                    <SettingToggle icon={Volume2} title="Sound Effects" description="Play sounds for notifications" checked={settings.soundEnabled} onToggle={() => handleToggle('soundEnabled')} />
-                  </CardContent>
-                </Card>
-
-                {/* Appearance */}
-                <Card className="border-0 shadow-lg">
-                  <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
-                    <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                      <Palette className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
-                      Appearance
-                    </CardTitle>
-                    <CardDescription className="text-[10px] sm:text-xs md:text-sm">
-                      Customize how the dashboard looks
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 sm:space-y-6 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
-                    {/* Theme */}
-                    <div>
-                      <Label className="text-[11px] sm:text-xs md:text-sm font-medium mb-2 sm:mb-3 block">Theme</Label>
-                      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                        <ThemeOption icon={Sun} title="Light" active={settings.theme === 'light'} onClick={() => handleSelectChange('theme', 'light')} />
-                        <ThemeOption icon={Moon} title="Dark" active={settings.theme === 'dark'} onClick={() => handleSelectChange('theme', 'dark')} />
-                        <ThemeOption icon={Monitor} title="System" active={settings.theme === 'system'} onClick={() => handleSelectChange('theme', 'system')} />
-                      </div>
-                    </div>
-
-                    <Separator />
-
-                    {/* Font Size */}
-                    <div>
-                      <Label className="text-[11px] sm:text-xs md:text-sm font-medium mb-2 sm:mb-3 block">Font Size</Label>
-                      <Select value={settings.fontSize} onValueChange={(value) => handleSelectChange('fontSize', value)}>
-                        <SelectTrigger className="h-8 sm:h-9 md:h-10 text-xs sm:text-sm max-w-[250px]">
-                          <SelectValue placeholder="Select font size" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="small">Small</SelectItem>
-                          <SelectItem value="medium">Medium (Default)</SelectItem>
-                          <SelectItem value="large">Large</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Save Button */}
-                <div className="flex justify-end">
-                  <Button 
-                    onClick={handleSaveSettings} 
-                    disabled={saving}
-                    className="bg-blue-600 hover:bg-blue-700 h-9 sm:h-10 text-xs sm:text-sm"
-                  >
-                    {saving ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Save All Settings
-                  </Button>
-                </div>
-              </motion.div>
-            </div>
-          </main>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="space-y-4 sm:space-y-5 md:space-y-6"
+      >
+        {/* Breadcrumb & Back Button */}
+        <div className="mb-1 sm:mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-muted-foreground">
+            <Link href="/staff" className="hover:text-primary flex items-center gap-1 transition-colors">
+              <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span className="hidden xs:inline">Dashboard</span>
+            </Link>
+            <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
+            <span className="text-foreground font-medium">Settings</span>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => router.push('/staff')} 
+            className="h-7 sm:h-8 text-[11px] sm:text-xs flex-shrink-0"
+          >
+            <ArrowLeft className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            Back
+          </Button>
         </div>
-      </div>
+
+        {/* Page Title */}
+        <div className="mb-3 sm:mb-4">
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 flex items-center gap-2">
+            <Settings className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-slate-600" />
+            Settings
+          </h1>
+          <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5">
+            Manage your notification preferences and account information
+          </p>
+        </div>
+
+        {/* Settings Content */}
+        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+          
+          {/* Account Info Card */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg">Account Information</CardTitle>
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+                Your account details
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Full Name</p>
+                  <p className="font-medium text-sm sm:text-base text-slate-900">
+                    {profile?.full_name || 'Not set'}
+                  </p>
+                </div>
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Email Address</p>
+                  <p className="font-medium text-sm sm:text-base text-slate-900 break-all">
+                    {profile?.email || 'Not set'}
+                  </p>
+                </div>
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Role</p>
+                  <Badge className="text-[10px] sm:text-xs bg-blue-100 text-blue-700">
+                    {profile?.role || 'Staff'}
+                  </Badge>
+                </div>
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Staff ID</p>
+                  <p className="font-medium text-sm sm:text-base text-slate-900 font-mono">
+                    {profile?.vin_id || profile?.id?.slice(0, 8) || 'N/A'}
+                  </p>
+                </div>
+                {profile?.department && (
+                  <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Department</p>
+                    <p className="font-medium text-sm sm:text-base text-slate-900">
+                      {profile.department}
+                    </p>
+                  </div>
+                )}
+              </div>
+              {profile?.created_at && (
+                <p className="text-[10px] sm:text-xs text-slate-400 mt-3">
+                  Member since: {new Date(profile.created_at).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notification Preferences */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+                Choose what notifications you want to receive
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-1 sm:space-y-2 px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
+              <SettingToggle 
+                icon={Mail} 
+                title="Email Notifications" 
+                description="Receive important updates via email" 
+                notificationExample="Your exam schedule has been updated for next week. Please review the changes."
+                checked={settings.emailNotifications} 
+                onToggle={() => handleToggle('emailNotifications')} 
+              />
+              <Separator />
+              <SettingToggle 
+                icon={Clock} 
+                title="Exam Reminders" 
+                description="Get notified about upcoming exams and deadlines" 
+                notificationExample="Reminder: Mathematics final exam starts in 2 days. 45 students are registered."
+                checked={settings.examReminders} 
+                onToggle={() => handleToggle('examReminders')} 
+              />
+              <Separator />
+              <SettingToggle 
+                icon={CheckCircle} 
+                title="Grading Alerts" 
+                description="Alerts when students submit exams that need grading" 
+                notificationExample="15 new exam submissions are waiting for your review in Physics 101."
+                checked={settings.gradingAlerts} 
+                onToggle={() => handleToggle('gradingAlerts')} 
+              />
+              <Separator />
+              <SettingToggle 
+                icon={Users} 
+                title="Student Activity" 
+                description="Track student login and exam participation" 
+                notificationExample="John Doe just logged in and started the Chemistry practical exam."
+                checked={settings.studentActivity} 
+                onToggle={() => handleToggle('studentActivity')} 
+              />
+              <Separator />
+              <SettingToggle 
+                icon={Megaphone} 
+                title="System Announcements" 
+                description="Important announcements from administration" 
+                notificationExample="Staff meeting scheduled for Friday at 2:00 PM in the conference hall."
+                checked={settings.systemAnnouncements} 
+                onToggle={() => handleToggle('systemAnnouncements')} 
+              />
+              <Separator />
+              <SettingToggle 
+                icon={Calendar} 
+                title="Timetable Updates" 
+                description="Get notified when your class schedule changes" 
+                notificationExample="Your Monday 9AM class has been moved to Room 204 starting next week."
+                checked={settings.timetableUpdates} 
+                onToggle={() => handleToggle('timetableUpdates')} 
+              />
+              <Separator />
+              <SettingToggle 
+                icon={FileText} 
+                title="Report Generation" 
+                description="Notify when student reports are ready for review" 
+                notificationExample="End of term reports for SS2 students have been generated and ready for approval."
+                checked={settings.reportGeneration} 
+                onToggle={() => handleToggle('reportGeneration')} 
+              />
+            </CardContent>
+          </Card>
+
+          {/* Teaching Preferences */}
+          <Card className="border-0 shadow-lg">
+            <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+                Teaching Preferences
+              </CardTitle>
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+                Configure your teaching and grading defaults
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
+              <div className="space-y-3">
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <GraduationCap className="h-4 w-4 text-emerald-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-900">Default Grade View</p>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-slate-500">
+                    Current: <span className="font-medium text-slate-700">Percentage & Letter Grade</span>
+                  </p>
+                </div>
+                
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="h-4 w-4 text-blue-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-900">Auto-Save Interval</p>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-slate-500">
+                    Current: <span className="font-medium text-slate-700">Every 5 minutes</span>
+                  </p>
+                </div>
+                
+                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-900">Low Attendance Alert</p>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-slate-500">
+                    Current: <span className="font-medium text-slate-700">Below 75% attendance</span>
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Save Button */}
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleSaveSettings} 
+              disabled={saving}
+              className="bg-blue-600 hover:bg-blue-700 h-9 sm:h-10 text-xs sm:text-sm"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Save All Settings
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   )
 }

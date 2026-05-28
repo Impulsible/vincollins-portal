@@ -1,4 +1,5 @@
-// app/admin/report-cards/page.tsx - AUTO-DETECT TERM + LOADING TEXT
+// app/admin/report-cards/page.tsx - WITH STORED AI-GENERATED COMMENTS
+
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -29,10 +30,33 @@ import {
   Users, Search, RefreshCw,
   Download, Send, Clock, CheckCheck,
   GraduationCap, ChevronDown, ChevronUp,
-  CheckCircle2, User, FileSpreadsheet
+  CheckCircle2, User, FileSpreadsheet, Sparkles
 } from 'lucide-react'
 
-// ─── Types ────────────────────────────────────────────
+// ============================================
+// WAEC GRADING COLORS
+// ============================================
+const getGradeColor = (grade: string) => {
+  if (grade === 'A1') return 'bg-emerald-100 text-emerald-700'
+  if (grade === 'B2' || grade === 'B3') return 'bg-blue-100 text-blue-700'
+  if (grade === 'C4' || grade === 'C5' || grade === 'C6') return 'bg-cyan-100 text-cyan-700'
+  if (grade === 'D7' || grade === 'E8') return 'bg-amber-100 text-amber-700'
+  if (grade === 'F9') return 'bg-red-100 text-red-700'
+  return 'bg-slate-100 text-slate-600'
+}
+
+// ============================================
+// TYPES
+// ============================================
+interface SubjectScore {
+  name: string
+  ca: number
+  exam: number
+  total: number
+  grade: string
+  remark: string
+}
+
 interface ReportCard {
   id: string
   student_id: string
@@ -41,92 +65,70 @@ interface ReportCard {
   class: string
   term: string
   academic_year: string
-  subjects_data: any[]
+  subjects_data: SubjectScore[]
   assessment_data: any
   teacher_comments: string
   principal_comments: string
   class_teacher: string
   total_score: number
   average_score: number
-  status: 'pending' | 'approved' | 'published' | 'rejected'
-  submitted_at: string
+  status: 'generated' | 'approved' | 'published' | 'rejected'
   rejected_reason?: string
+  generated_at?: string
 }
 
 interface ClassStats {
   className: string
   total: number
-  pending: number
+  generated: number
   approved: number
   published: number
   rejected: number
 }
 
-// ─── Auto-Detect Current Term & Session ───────────────
-const getCurrentTermAndSession = () => {
-  const now = new Date()
-  const month = now.getMonth() // 0=January, 11=December
-  const year = now.getFullYear()
+// ============================================
+// CONSTANTS
+// ============================================
+const TERMS = [
+  { value: 'first', label: 'First Term' },
+  { value: 'second', label: 'Second Term' },
+  { value: 'third', label: 'Third Term' },
+]
 
-  // Nigerian Secondary School Terms:
-  // First Term:  September (8) - December (11)
-  // Second Term: January (0) - April (3)
-  // Third Term:  May (4) - July/August (6/7)
-
-  if (month >= 8) {
-    // September - December = First Term of new session
-    return { term: 'First Term', session: `${year}/${year + 1}` }
-  } else if (month >= 4) {
-    // May - August = Third Term of current session
-    return { term: 'Third Term', session: `${year - 1}/${year}` }
-  } else {
-    // January - April = Second Term of current session
-    return { term: 'Second Term', session: `${year - 1}/${year}` }
-  }
-}
-
-// ─── Constants ────────────────────────────────────────
-const TERMS = ['First Term', 'Second Term', 'Third Term']
-const YEARS = ['2023/2024', '2024/2025', '2025/2026', '2026/2027', '2027/2028']
+const YEARS = ['2024/2025', '2025/2026', '2026/2027']
 const CLASSES = ['all', 'JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
 
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'published': return <Badge className="bg-emerald-100 text-emerald-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
     case 'approved': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>
-    case 'pending': return <Badge className="bg-amber-100 text-amber-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+    case 'generated': return <Badge className="bg-purple-100 text-purple-700"><FileText className="h-3 w-3 mr-1" />Generated</Badge>
     case 'rejected': return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>
     default: return <Badge variant="outline">{status}</Badge>
   }
 }
 
-const getGradeColor = (grade: string) => {
-  if (grade?.startsWith('A')) return 'bg-emerald-100 text-emerald-700'
-  if (grade?.startsWith('B')) return 'bg-blue-100 text-blue-700'
-  if (grade?.startsWith('C')) return 'bg-yellow-100 text-yellow-700'
-  return 'bg-slate-100 text-slate-600'
+const getTermLabel = (term: string): string => {
+  const found = TERMS.find(t => t.value === term)
+  return found?.label || 'Third Term'
 }
 
-// ─── Detect current term/session on load ──────────────
-const { term: autoTerm, session: autoSession } = getCurrentTermAndSession()
-
-// ─── Main Component ───────────────────────────────────
+// ============================================
+// MAIN COMPONENT
+// ============================================
 export default function AdminReportCardsPage() {
   const [loading, setLoading] = useState(true)
-  const [loadingText, setLoadingText] = useState('Loading report cards...')
   const [profile, setProfile] = useState<any>(null)
   const [reportCards, setReportCards] = useState<ReportCard[]>([])
   const [classStats, setClassStats] = useState<ClassStats[]>([])
   const [expandedClass, setExpandedClass] = useState<string | null>(null)
   
-  // Filters - initialized with auto-detected values
   const [selectedClass, setSelectedClass] = useState('all')
-  const [selectedTerm, setSelectedTerm] = useState<string>(autoTerm)
-  const [selectedYear, setSelectedYear] = useState<string>(autoSession)
+  const [selectedTerm, setSelectedTerm] = useState('third')
+  const [selectedYear, setSelectedYear] = useState('2025/2026')
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   
-  // Dialogs
   const [selectedCard, setSelectedCard] = useState<ReportCard | null>(null)
   const [showReviewDialog, setShowReviewDialog] = useState(false)
   const [showRejectDialog, setShowRejectDialog] = useState(false)
@@ -136,12 +138,11 @@ export default function AdminReportCardsPage() {
   const [processing, setProcessing] = useState(false)
   const [bulkClass, setBulkClass] = useState('')
   
-  const [stats, setStats] = useState({ total: 0, pending: 0, approved: 0, published: 0, rejected: 0 })
+  const [stats, setStats] = useState({ total: 0, generated: 0, approved: 0, published: 0, rejected: 0 })
 
   // ─── Init ───────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
-      setLoadingText('Verifying your account...')
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.user) return
       const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
@@ -153,55 +154,80 @@ export default function AdminReportCardsPage() {
   // ─── Load Report Cards ──────────────────────────────
   const loadReportCards = useCallback(async () => {
     setLoading(true)
-    setLoadingText(`Loading ${selectedClass === 'all' ? 'all' : selectedClass} report cards...`)
     try {
       let query = supabase
         .from('report_cards')
         .select('*')
-        .filter('term', 'eq', selectedTerm)
-        .filter('academic_year', 'eq', selectedYear)
-        .order('submitted_at', { ascending: false })
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .order('generated_at', { ascending: false })
         .limit(500)
 
-      if (selectedClass !== 'all') query = query.filter('class', 'eq', selectedClass)
-      if (selectedStatus !== 'all') query = query.filter('status', 'eq', selectedStatus)
+      if (selectedClass !== 'all') query = query.eq('class', selectedClass)
+      if (selectedStatus !== 'all') query = query.eq('status', selectedStatus)
 
-      setLoadingText('Fetching report cards from database...')
       const { data, error } = await query
       if (error) throw error
 
-      setLoadingText('Processing report card data...')
-      const cards: ReportCard[] = (data || []).map((rc: any) => ({
-        id: rc.id, student_id: rc.student_id,
-        student_name: rc.student_name || 'Unknown', student_vin: rc.student_vin || 'N/A',
-        class: rc.class, term: rc.term, academic_year: rc.academic_year,
-        subjects_data: rc.subjects_data || [], assessment_data: rc.assessment_data || {},
-        teacher_comments: rc.teacher_comments || '', principal_comments: rc.principal_comments || '',
-        class_teacher: rc.class_teacher || 'Unknown',
-        total_score: rc.total_score || 0, average_score: rc.average_score || 0,
-        status: rc.status || 'pending', submitted_at: rc.submitted_at || rc.created_at,
-        rejected_reason: rc.rejected_reason
-      }))
+      // Get student profiles for names if needed
+      const studentIds = [...new Set((data || []).map((rc: any) => rc.student_id))]
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, full_name, vin_id')
+        .in('id', studentIds)
+
+      const profileMap = new Map()
+      profiles?.forEach(profile => {
+        profileMap.set(profile.id, {
+          name: profile.display_name || profile.full_name || 'Student',
+          vin: profile.vin_id
+        })
+      })
+
+      const cards: ReportCard[] = (data || []).map((rc: any) => {
+        const profile = profileMap.get(rc.student_id)
+        return {
+          id: rc.id,
+          student_id: rc.student_id,
+          student_name: rc.student_name || profile?.name || 'Unknown',
+          student_vin: rc.student_vin || profile?.vin || 'N/A',
+          class: rc.class,
+          term: rc.term,
+          academic_year: rc.academic_year,
+          subjects_data: rc.subjects_data || [],
+          assessment_data: rc.assessment_data || {},
+          teacher_comments: rc.teacher_comments || 'No comment available.',
+          principal_comments: rc.principal_comments || 'No comment available.',
+          class_teacher: rc.class_teacher || 'Unknown',
+          total_score: rc.total_score || 0,
+          average_score: rc.average_score || 0,
+          status: rc.status || 'generated',
+          rejected_reason: rc.rejected_reason,
+          generated_at: rc.generated_at
+        }
+      })
 
       setReportCards(cards)
       
-      // Stats
       setStats({
         total: cards.length,
-        pending: cards.filter(c => c.status === 'pending').length,
+        generated: cards.filter(c => c.status === 'generated').length,
         approved: cards.filter(c => c.status === 'approved').length,
         published: cards.filter(c => c.status === 'published').length,
         rejected: cards.filter(c => c.status === 'rejected').length,
       })
 
-      // Class stats
       if (selectedClass === 'all') {
         const map: Record<string, ClassStats> = {}
         cards.forEach(c => {
-          if (!map[c.class]) map[c.class] = { className: c.class, total: 0, pending: 0, approved: 0, published: 0, rejected: 0 }
+          if (!map[c.class]) {
+            map[c.class] = { className: c.class, total: 0, generated: 0, approved: 0, published: 0, rejected: 0 }
+          }
           map[c.class].total++
-          const st = c.status as keyof Pick<ClassStats, 'pending' | 'approved' | 'published' | 'rejected'>
-          if (st in map[c.class]) map[c.class][st]++
+          if (c.status === 'generated') map[c.class].generated++
+          if (c.status === 'approved') map[c.class].approved++
+          if (c.status === 'published') map[c.class].published++
+          if (c.status === 'rejected') map[c.class].rejected++
         })
         setClassStats(Object.values(map).sort((a, b) => a.className.localeCompare(b.className)))
       }
@@ -223,7 +249,7 @@ export default function AdminReportCardsPage() {
   // ─── Actions ────────────────────────────────────────
   const handleViewCard = (card: ReportCard) => {
     setSelectedCard(card)
-    setPrincipalComment(card.principal_comments || '')
+    setPrincipalComment(card.principal_comments || '')  // Show existing principal comment
     setShowReviewDialog(true)
   }
 
@@ -231,10 +257,18 @@ export default function AdminReportCardsPage() {
     if (!selectedCard || !profile) return
     setProcessing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({
-        status: 'approved', principal_comments: principalComment,
-        approved_by: profile.id, approved_at: new Date().toISOString()
-      }).eq('id', selectedCard.id)
+      // Keep the existing principal_comments if not changed, otherwise use edited version
+      const finalPrincipalComment = principalComment || selectedCard.principal_comments
+      
+      const { error } = await supabase
+        .from('report_cards')
+        .update({
+          status: 'approved',
+          principal_comments: finalPrincipalComment,
+          approved_by: profile.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('id', selectedCard.id)
       if (error) throw error
       toast.success('✅ Report card approved!')
       setShowReviewDialog(false)
@@ -247,10 +281,17 @@ export default function AdminReportCardsPage() {
     if (!selectedCard || !profile) return
     setProcessing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({
-        status: 'published', principal_comments: principalComment,
-        published_by: profile.id, published_at: new Date().toISOString()
-      }).eq('id', selectedCard.id)
+      const finalPrincipalComment = principalComment || selectedCard.principal_comments
+      
+      const { error } = await supabase
+        .from('report_cards')
+        .update({
+          status: 'published',
+          principal_comments: finalPrincipalComment,
+          published_by: profile.id,
+          published_at: new Date().toISOString()
+        })
+        .eq('id', selectedCard.id)
       if (error) throw error
       toast.success('📢 Report card published to student!')
       setShowReviewDialog(false)
@@ -263,10 +304,15 @@ export default function AdminReportCardsPage() {
     if (!selectedCard || !rejectReason.trim()) { toast.error('Provide a reason'); return }
     setProcessing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({
-        status: 'rejected', rejected_reason: rejectReason,
-        rejected_by: profile?.id, rejected_at: new Date().toISOString()
-      }).eq('id', selectedCard.id)
+      const { error } = await supabase
+        .from('report_cards')
+        .update({
+          status: 'rejected',
+          rejected_reason: rejectReason,
+          rejected_by: profile?.id,
+          rejected_at: new Date().toISOString()
+        })
+        .eq('id', selectedCard.id)
       if (error) throw error
       toast.success('Report card rejected')
       setShowRejectDialog(false)
@@ -281,12 +327,22 @@ export default function AdminReportCardsPage() {
     if (!bulkClass) return
     setProcessing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({
-        status: 'approved', approved_by: profile?.id, approved_at: new Date().toISOString()
-      }).filter('class', 'eq', bulkClass).eq('status', 'pending').filter('term', 'eq', selectedTerm).filter('academic_year', 'eq', selectedYear)
+      const { error } = await supabase
+        .from('report_cards')
+        .update({
+          status: 'approved',
+          approved_by: profile?.id,
+          approved_at: new Date().toISOString()
+        })
+        .eq('class', bulkClass)
+        .eq('status', 'generated')
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
       if (error) throw error
-      toast.success(`✅ All pending in ${bulkClass} approved!`)
-      setShowBulkDialog(false); setBulkClass(''); loadReportCards()
+      toast.success(`✅ All generated in ${bulkClass} approved!`)
+      setShowBulkDialog(false)
+      setBulkClass('')
+      loadReportCards()
     } catch (err) { toast.error('Failed') }
     finally { setProcessing(false) }
   }
@@ -295,12 +351,22 @@ export default function AdminReportCardsPage() {
     if (!bulkClass) return
     setProcessing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({
-        status: 'published', published_by: profile?.id, published_at: new Date().toISOString()
-      }).filter('class', 'eq', bulkClass).eq('status', 'approved').filter('term', 'eq', selectedTerm).filter('academic_year', 'eq', selectedYear)
+      const { error } = await supabase
+        .from('report_cards')
+        .update({
+          status: 'published',
+          published_by: profile?.id,
+          published_at: new Date().toISOString()
+        })
+        .eq('class', bulkClass)
+        .eq('status', 'approved')
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
       if (error) throw error
       toast.success(`📢 All approved in ${bulkClass} published!`)
-      setShowBulkDialog(false); setBulkClass(''); loadReportCards()
+      setShowBulkDialog(false)
+      setBulkClass('')
+      loadReportCards()
     } catch (err) { toast.error('Failed') }
     finally { setProcessing(false) }
   }
@@ -308,40 +374,39 @@ export default function AdminReportCardsPage() {
   const handleExport = (className: string) => {
     const cards = className === 'all' ? reportCards : reportCards.filter(c => c.class === className)
     if (!cards.length) { toast.info('No data'); return }
-    const csv = [['Name','VIN','Avg','Grade','Status'].join(','), ...cards.map(c => [c.student_name, c.student_vin, `${c.average_score}%`, c.average_score>=75?'A1':c.average_score>=65?'B2':c.average_score>=50?'C4':'F9', c.status].join(','))].join('\n')
+    const headers = ['Name', 'VIN', 'Total', 'Average', 'Grade', 'Status', 'Teacher Comment', 'Principal Comment']
+    const rows = cards.map(c => [
+      c.student_name,
+      c.student_vin,
+      c.total_score,
+      `${c.average_score}%`,
+      c.average_score >= 75 ? 'A1' : c.average_score >= 70 ? 'B2' : c.average_score >= 65 ? 'B3' : c.average_score >= 60 ? 'C4' : c.average_score >= 55 ? 'C5' : c.average_score >= 50 ? 'C6' : c.average_score >= 45 ? 'D7' : c.average_score >= 40 ? 'E8' : 'F9',
+      c.status,
+      c.teacher_comments,
+      c.principal_comments
+    ])
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a'); a.href = url; a.download = `ReportCards_${className}_${selectedTerm}_${selectedYear.replace('/', '_')}.csv`; a.click()
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ReportCards_${className}_${getTermLabel(selectedTerm)}_${selectedYear.replace('/', '_')}.csv`
+    a.click()
     URL.revokeObjectURL(url)
     toast.success('Exported!')
   }
 
-  // ─── Loading State ──────────────────────────────────
   if (loading && !reportCards.length) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-        >
+        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }}>
           <FileSpreadsheet className="h-12 w-12 text-blue-500" />
         </motion.div>
-        <p className="text-slate-600 font-medium text-sm">{loadingText}</p>
-        <div className="flex gap-1">
-          {[0, 1, 2].map(i => (
-            <motion.div
-              key={i}
-              className="h-1.5 w-1.5 rounded-full bg-blue-400"
-              animate={{ y: [0, -6, 0] }}
-              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
-            />
-          ))}
-        </div>
+        <p className="text-slate-600 font-medium text-sm">Loading report cards...</p>
       </div>
     )
   }
 
-  // ─── Render ─────────────────────────────────────────
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -349,7 +414,7 @@ export default function AdminReportCardsPage() {
         <div>
           <h2 className="text-lg font-bold text-slate-800">Report Card Approval</h2>
           <p className="text-sm text-slate-500">
-            {selectedTerm} {selectedYear} • {stats.pending} pending • {stats.published} published
+            {getTermLabel(selectedTerm)} {selectedYear} • {stats.generated} generated • {stats.published} published
           </p>
         </div>
         <div className="flex gap-2">
@@ -365,11 +430,11 @@ export default function AdminReportCardsPage() {
       {/* Stats */}
       <div className="grid grid-cols-5 gap-2">
         {[
-          { label: 'Total', value: stats.total, color: 'text-slate-600 bg-slate-50' },
-          { label: 'Pending', value: stats.pending, color: 'text-amber-600 bg-amber-50' },
-          { label: 'Approved', value: stats.approved, color: 'text-blue-600 bg-blue-50' },
-          { label: 'Published', value: stats.published, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Rejected', value: stats.rejected, color: 'text-red-600 bg-red-50' },
+          { label: 'Total', value: stats.total, color: 'bg-slate-100 text-slate-700' },
+          { label: 'Generated', value: stats.generated, color: 'bg-purple-100 text-purple-700' },
+          { label: 'Approved', value: stats.approved, color: 'bg-blue-100 text-blue-700' },
+          { label: 'Published', value: stats.published, color: 'bg-emerald-100 text-emerald-700' },
+          { label: 'Rejected', value: stats.rejected, color: 'bg-red-100 text-red-700' },
         ].map((s, i) => (
           <div key={i} className={cn("rounded-lg p-2.5 text-center border", s.color)}>
             <p className="text-[9px] uppercase opacity-70">{s.label}</p>
@@ -383,8 +448,14 @@ export default function AdminReportCardsPage() {
         <CardContent className="p-3">
           <div className="flex flex-wrap gap-2">
             <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-              <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>
-              <SelectContent>{TERMS.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="h-8 text-xs w-[130px]">
+                <SelectValue placeholder="Term" />
+              </SelectTrigger>
+              <SelectContent>
+                {TERMS.map(t => (
+                  <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                ))}
+              </SelectContent>
             </Select>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue /></SelectTrigger>
@@ -392,13 +463,15 @@ export default function AdminReportCardsPage() {
             </Select>
             <Select value={selectedClass} onValueChange={setSelectedClass}>
               <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Class" /></SelectTrigger>
-              <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c === 'all' ? 'All Classes' : c}</SelectItem>)}</SelectContent>
+              <SelectContent>
+                {CLASSES.map(c => <SelectItem key={c} value={c}>{c === 'all' ? 'All Classes' : c}</SelectItem>)}
+              </SelectContent>
             </Select>
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="generated">Generated</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
                 <SelectItem value="published">Published</SelectItem>
                 <SelectItem value="rejected">Rejected</SelectItem>
@@ -412,7 +485,7 @@ export default function AdminReportCardsPage() {
         </CardContent>
       </Card>
 
-      {/* Content */}
+      {/* Content - All Classes View */}
       {selectedClass === 'all' ? (
         <div className="space-y-3">
           {classStats.length === 0 ? (
@@ -420,7 +493,7 @@ export default function AdminReportCardsPage() {
               <CardContent className="text-center py-16">
                 <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
                 <h3 className="text-base font-semibold text-slate-700 mb-1">No report cards found</h3>
-                <p className="text-sm text-slate-500">No report cards for {selectedTerm} {selectedYear}</p>
+                <p className="text-sm text-slate-500">No report cards for {getTermLabel(selectedTerm)} {selectedYear}</p>
               </CardContent>
             </Card>
           ) : classStats.map(cs => {
@@ -440,7 +513,7 @@ export default function AdminReportCardsPage() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-xs">
-                    <span className="text-amber-600 font-medium">{cs.pending} pending</span>
+                    <span className="text-purple-600 font-medium">{cs.generated} generated</span>
                     <span className="text-emerald-600 font-medium">{cs.published} published</span>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => { e.stopPropagation(); handleExport(cs.className) }}>
                       <Download className="h-3.5 w-3.5" />
@@ -456,6 +529,7 @@ export default function AdminReportCardsPage() {
                             <TableHead className="text-xs">Student</TableHead>
                             <TableHead className="text-xs">VIN</TableHead>
                             <TableHead className="text-center text-xs">Avg</TableHead>
+                            <TableHead className="text-xs">Grade</TableHead>
                             <TableHead className="text-xs">Status</TableHead>
                             <TableHead className="text-right text-xs">Action</TableHead>
                           </TableRow>
@@ -463,16 +537,20 @@ export default function AdminReportCardsPage() {
                         <TableBody>
                           {classCards.map(c => (
                             <TableRow key={c.id} className="hover:bg-slate-50/50">
-                              <TableCell className="text-xs font-medium">
-                                <div className="flex items-center gap-2">
-                                  <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center">
-                                    <User className="h-3.5 w-3.5 text-slate-500" />
-                                  </div>
-                                  {c.student_name}
-                                </div>
-                              </TableCell>
+                              <TableCell className="text-xs font-medium">{c.student_name}</TableCell>
                               <TableCell className="text-xs font-mono">{c.student_vin}</TableCell>
                               <TableCell className="text-center text-xs font-bold">{c.average_score}%</TableCell>
+                              <TableCell className="text-center">
+                                <Badge className={cn("text-[9px] font-bold", getGradeColor(
+                                  c.average_score >= 75 ? 'A1' : c.average_score >= 70 ? 'B2' : c.average_score >= 65 ? 'B3' : 
+                                  c.average_score >= 60 ? 'C4' : c.average_score >= 55 ? 'C5' : c.average_score >= 50 ? 'C6' :
+                                  c.average_score >= 45 ? 'D7' : c.average_score >= 40 ? 'E8' : 'F9'
+                                ))}>
+                                  {c.average_score >= 75 ? 'A1' : c.average_score >= 70 ? 'B2' : c.average_score >= 65 ? 'B3' : 
+                                   c.average_score >= 60 ? 'C4' : c.average_score >= 55 ? 'C5' : c.average_score >= 50 ? 'C6' :
+                                   c.average_score >= 45 ? 'D7' : c.average_score >= 40 ? 'E8' : 'F9'}
+                                </Badge>
+                              </TableCell>
                               <TableCell>{getStatusBadge(c.status)}</TableCell>
                               <TableCell className="text-right">
                                 <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => handleViewCard(c)}>
@@ -491,6 +569,7 @@ export default function AdminReportCardsPage() {
           })}
         </div>
       ) : (
+        // Single Class View
         <Card className="border-0 shadow-sm">
           <CardContent className="p-0">
             {filteredCards.length === 0 ? (
@@ -506,6 +585,7 @@ export default function AdminReportCardsPage() {
                     <TableHead className="text-xs">Student</TableHead>
                     <TableHead className="text-xs">VIN</TableHead>
                     <TableHead className="text-center text-xs">Avg</TableHead>
+                    <TableHead className="text-xs">Grade</TableHead>
                     <TableHead className="text-xs">Status</TableHead>
                     <TableHead className="text-xs">Teacher</TableHead>
                     <TableHead className="text-right text-xs">Action</TableHead>
@@ -517,6 +597,17 @@ export default function AdminReportCardsPage() {
                       <TableCell className="text-xs font-medium">{c.student_name}</TableCell>
                       <TableCell className="text-xs font-mono">{c.student_vin}</TableCell>
                       <TableCell className="text-center text-xs font-bold">{c.average_score}%</TableCell>
+                      <TableCell className="text-center">
+                        <Badge className={cn("text-[9px] font-bold", getGradeColor(
+                          c.average_score >= 75 ? 'A1' : c.average_score >= 70 ? 'B2' : c.average_score >= 65 ? 'B3' : 
+                          c.average_score >= 60 ? 'C4' : c.average_score >= 55 ? 'C5' : c.average_score >= 50 ? 'C6' :
+                          c.average_score >= 45 ? 'D7' : c.average_score >= 40 ? 'E8' : 'F9'
+                        ))}>
+                          {c.average_score >= 75 ? 'A1' : c.average_score >= 70 ? 'B2' : c.average_score >= 65 ? 'B3' : 
+                           c.average_score >= 60 ? 'C4' : c.average_score >= 55 ? 'C5' : c.average_score >= 50 ? 'C6' :
+                           c.average_score >= 45 ? 'D7' : c.average_score >= 40 ? 'E8' : 'F9'}
+                        </Badge>
+                      </TableCell>
                       <TableCell>{getStatusBadge(c.status)}</TableCell>
                       <TableCell className="text-xs text-slate-500">{c.class_teacher}</TableCell>
                       <TableCell className="text-right">
@@ -533,7 +624,7 @@ export default function AdminReportCardsPage() {
         </Card>
       )}
 
-      {/* Review Dialog */}
+      {/* Review Dialog - DISPLAYS STORED AI-GENERATED COMMENTS */}
       <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           {selectedCard && (
@@ -544,78 +635,115 @@ export default function AdminReportCardsPage() {
                   {selectedCard.student_name}
                 </DialogTitle>
                 <DialogDescription>
-                  {selectedCard.class} • VIN: {selectedCard.student_vin} • {selectedCard.term} {selectedCard.academic_year}
+                  {selectedCard.class} • VIN: {selectedCard.student_vin} • {getTermLabel(selectedCard.term)} {selectedCard.academic_year}
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">{getStatusBadge(selectedCard.status)}</div>
+                
+                {/* Summary Stats */}
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="bg-blue-50 rounded-lg p-2">
-                    <p className="text-[10px] text-blue-500 uppercase">Average</p>
-                    <p className="text-lg font-bold text-blue-700">{selectedCard.average_score}%</p>
+                  <div className="bg-purple-50 rounded-lg p-2">
+                    <p className="text-[10px] text-purple-500 uppercase">Average</p>
+                    <p className="text-lg font-bold text-purple-700">{selectedCard.average_score}%</p>
                   </div>
                   <div className="bg-emerald-50 rounded-lg p-2">
                     <p className="text-[10px] text-emerald-500 uppercase">Total</p>
                     <p className="text-lg font-bold text-emerald-700">{selectedCard.total_score}</p>
                   </div>
-                  <div className="bg-purple-50 rounded-lg p-2">
-                    <p className="text-[10px] text-purple-500 uppercase">Class</p>
-                    <p className="text-lg font-bold text-purple-700">{selectedCard.class}</p>
+                  <div className="bg-blue-50 rounded-lg p-2">
+                    <p className="text-[10px] text-blue-500 uppercase">Grade</p>
+                    <Badge className={cn("text-sm font-bold", getGradeColor(
+                      selectedCard.average_score >= 75 ? 'A1' : selectedCard.average_score >= 70 ? 'B2' : selectedCard.average_score >= 65 ? 'B3' :
+                      selectedCard.average_score >= 60 ? 'C4' : selectedCard.average_score >= 55 ? 'C5' : selectedCard.average_score >= 50 ? 'C6' :
+                      selectedCard.average_score >= 45 ? 'D7' : selectedCard.average_score >= 40 ? 'E8' : 'F9'
+                    ))}>
+                      {selectedCard.average_score >= 75 ? 'A1' : selectedCard.average_score >= 70 ? 'B2' : selectedCard.average_score >= 65 ? 'B3' :
+                       selectedCard.average_score >= 60 ? 'C4' : selectedCard.average_score >= 55 ? 'C5' : selectedCard.average_score >= 50 ? 'C6' :
+                       selectedCard.average_score >= 45 ? 'D7' : selectedCard.average_score >= 40 ? 'E8' : 'F9'}
+                    </Badge>
                   </div>
                 </div>
+                
+                {/* Subject Scores Table */}
                 <div>
                   <p className="text-xs font-semibold mb-1">Subject Scores</p>
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-slate-50">
-                        <TableHead className="text-xs">Subject</TableHead>
-                        <TableHead className="text-center text-xs">CA</TableHead>
-                        <TableHead className="text-center text-xs">Exam</TableHead>
-                        <TableHead className="text-center text-xs">Total</TableHead>
-                        <TableHead className="text-center text-xs">Grade</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedCard.subjects_data?.map((s: any, i: number) => (
-                        <TableRow key={i}>
-                          <TableCell className="text-xs font-medium">{s.name}</TableCell>
-                          <TableCell className="text-center text-xs">{s.ca || '-'}</TableCell>
-                          <TableCell className="text-center text-xs">{s.exam || '-'}</TableCell>
-                          <TableCell className="text-center text-xs font-bold">{s.total}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge className={cn("text-[10px]", getGradeColor(s.grade))}>{s.grade}</Badge>
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-slate-50">
+                          <TableHead className="text-xs">Subject</TableHead>
+                          <TableHead className="text-center text-xs">CA</TableHead>
+                          <TableHead className="text-center text-xs">Exam</TableHead>
+                          <TableHead className="text-center text-xs">Total</TableHead>
+                          <TableHead className="text-center text-xs">Grade</TableHead>
+                          <TableHead className="text-left text-xs">Remark</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {selectedCard.subjects_data?.map((s: SubjectScore, i: number) => (
+                          <TableRow key={i}>
+                            <TableCell className="text-xs font-medium">{s.name}</TableCell>
+                            <TableCell className="text-center text-xs">{s.ca || '-'}</TableCell>
+                            <TableCell className="text-center text-xs">{s.exam || '-'}</TableCell>
+                            <TableCell className="text-center text-xs font-bold">{s.total}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={cn("text-[9px]", getGradeColor(s.grade))}>{s.grade}</Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">{s.remark || '-'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold mb-1">Teacher's Comments</p>
-                  <p className="text-xs bg-slate-50 p-2 rounded-lg">{selectedCard.teacher_comments || 'No comments provided.'}</p>
+                
+                {/* AI-GENERATED TEACHER'S COMMENT (from stored data) */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-purple-600 text-white px-3 py-2 text-xs font-bold flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    CLASS TEACHER'S REMARK
+                  </div>
+                  <div className="p-3 text-xs bg-purple-50 leading-relaxed">
+                    {selectedCard.teacher_comments || 'No comment available.'}
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-semibold mb-1">Principal's Comments</p>
-                  <Textarea
-                    value={principalComment}
-                    onChange={e => setPrincipalComment(e.target.value)}
-                    rows={2}
-                    className="text-xs"
-                    placeholder="Enter principal's comments..."
-                    disabled={selectedCard.status === 'published'}
-                  />
+                
+                {/* PRINCIPAL'S COMMENT (from stored data - editable) */}
+                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                  <div className="bg-blue-600 text-white px-3 py-2 text-xs font-bold flex items-center gap-2">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    PRINCIPAL'S REMARK
+                  </div>
+                  <div className="p-3 bg-blue-50">
+                    <Textarea
+                      value={principalComment}
+                      onChange={e => setPrincipalComment(e.target.value)}
+                      rows={3}
+                      className="text-xs bg-white border-blue-300"
+                      placeholder="Edit principal's comment here..."
+                      disabled={selectedCard.status === 'published'}
+                    />
+                    <p className="text-[10px] text-slate-500 mt-2">
+                      You can edit this comment before approving or publishing.
+                    </p>
+                  </div>
                 </div>
+                
+                {/* Rejection Reason if rejected */}
                 {selectedCard.status === 'rejected' && selectedCard.rejected_reason && (
-                  <div className="p-2 bg-red-50 rounded-lg">
+                  <div className="p-3 bg-red-50 rounded-lg border border-red-200">
                     <p className="text-xs font-medium text-red-700">Rejection Reason:</p>
-                    <p className="text-xs text-red-600">{selectedCard.rejected_reason}</p>
+                    <p className="text-xs text-red-600 mt-1">{selectedCard.rejected_reason}</p>
                   </div>
                 )}
               </div>
-              <DialogFooter className="flex items-center justify-between">
+              
+              {/* Dialog Footer Buttons */}
+              <DialogFooter className="flex items-center justify-between gap-2 flex-wrap">
                 <div>
-                  {selectedCard.status === 'pending' && (
-                    <Button variant="outline" size="sm" className="text-red-600"
+                  {selectedCard.status === 'generated' && (
+                    <Button variant="outline" size="sm" className="text-red-600 border-red-200 hover:bg-red-50"
                       onClick={() => { setShowReviewDialog(false); setShowRejectDialog(true) }}>
                       <XCircle className="h-3.5 w-3.5 mr-1" />Reject
                     </Button>
@@ -623,13 +751,13 @@ export default function AdminReportCardsPage() {
                 </div>
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={() => setShowReviewDialog(false)}>Close</Button>
-                  {selectedCard.status === 'pending' && (
-                    <Button size="sm" className="bg-blue-600" onClick={handleApproveCard} disabled={processing}>
+                  {selectedCard.status === 'generated' && (
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700" onClick={handleApproveCard} disabled={processing}>
                       {processing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <CheckCircle className="h-3.5 w-3.5 mr-1" />}Approve
                     </Button>
                   )}
                   {selectedCard.status === 'approved' && (
-                    <Button size="sm" className="bg-emerald-600" onClick={handlePublishCard} disabled={processing}>
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={handlePublishCard} disabled={processing}>
                       {processing ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}Publish to Student
                     </Button>
                   )}
@@ -684,11 +812,11 @@ export default function AdminReportCardsPage() {
               <SelectTrigger><SelectValue placeholder="Choose a class" /></SelectTrigger>
               <SelectContent>
                 {CLASSES.filter(c => c !== 'all').map(c => {
-                  const pending = reportCards.filter(rc => rc.class === c && rc.status === 'pending').length
+                  const generated = reportCards.filter(rc => rc.class === c && rc.status === 'generated').length
                   const approved = reportCards.filter(rc => rc.class === c && rc.status === 'approved').length
                   return (
                     <SelectItem key={c} value={c}>
-                      {c} ({pending} pending, {approved} approved)
+                      {c} ({generated} generated, {approved} approved)
                     </SelectItem>
                   )
                 })}
@@ -697,7 +825,7 @@ export default function AdminReportCardsPage() {
           </div>
           <div className="flex gap-2 mt-3">
             <Button className="flex-1 bg-blue-600 hover:bg-blue-700" size="sm" onClick={handleBulkApprove} disabled={!bulkClass || processing}>
-              <CheckCircle className="h-4 w-4 mr-1" />Approve All Pending
+              <CheckCircle className="h-4 w-4 mr-1" />Approve All Generated
             </Button>
             <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700" size="sm" onClick={handleBulkPublish} disabled={!bulkClass || processing}>
               <Send className="h-4 w-4 mr-1" />Publish All Approved

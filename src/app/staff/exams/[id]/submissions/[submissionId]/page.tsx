@@ -1,4 +1,3 @@
-// app/staff/exams/[id]/submissions/[submissionId]/page.tsx - FULLY FIXED
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -62,21 +61,27 @@ export default function GradeSubmissionPage() {
       // Load exam
       const { data: examData } = await supabase
         .from('exams')
-        .select('id, title, subject, theory_questions, theory_total, has_theory, total_marks, questions, term, session_year')
+        .select('*')
         .eq('id', att.exam_id)
         .single()
 
       setExam(examData)
       setExamTitle(examData?.title || 'Untitled Exam')
       setSubjectName(examData?.subject || '')
-      setHasTheory(examData?.has_theory || false)
+      
+      // Check if exam has theory (from column or from theory_questions)
+      const examHasTheory = examData?.has_theory || 
+                           (examData?.theory_questions && 
+                            Array.isArray(examData.theory_questions) && 
+                            examData.theory_questions.length > 0)
+      setHasTheory(examHasTheory)
 
       // Dynamic theory max
       const examTheoryMax = examData?.theory_total || Number(att.theory_total) || 40
       setTheoryMax(examTheoryMax)
 
       // Dynamic objective total
-      setObjTotal(Number(att.objective_total) || 30)
+      setObjTotal(Number(att.objective_total) || examData?.total_marks || 30)
 
       // Process theory questions
       if (examData?.theory_questions) {
@@ -103,24 +108,32 @@ export default function GradeSubmissionPage() {
       // Load student profile
       const { data: student } = await supabase
         .from('profiles')
-        .select('photo_url, class')
+        .select('photo_url, class, full_name, email')
         .eq('id', att.student_id)
         .single()
 
-      // Get existing theory score
+      // Get existing theory score from various possible locations
       let existingScore = ''
       if (att.theory_feedback?.total?.score !== undefined) {
         existingScore = String(att.theory_feedback.total.score)
+      } else if (att.theory_score !== undefined && att.theory_score > 0) {
+        existingScore = String(att.theory_score)
+      } else if (att.theory_feedback?.score !== undefined) {
+        existingScore = String(att.theory_feedback.score)
       }
 
       // Get existing feedback
       let existingFeedback = ''
       if (att.theory_feedback?.total?.feedback) {
         existingFeedback = att.theory_feedback.total.feedback
+      } else if (att.feedback) {
+        existingFeedback = att.feedback
       }
 
       setAttempt({
         ...att,
+        student_name: student?.full_name || att.student_name || 'Unknown',
+        student_email: student?.email || att.student_email || '',
         photo_url: student?.photo_url || null,
         student_class: student?.class || att.student_class || '—'
       })
@@ -208,7 +221,15 @@ export default function GradeSubmissionPage() {
   }
 
   const handleSave = async () => {
-    if (!attempt) return
+    if (!attempt) {
+      toast.error('No submission data')
+      return
+    }
+
+    console.log('=== STARTING SAVE ===')
+    console.log('Current attempt status:', attempt.status)
+    console.log('Submission ID:', submissionId)
+    console.log('Has theory:', hasTheory)
 
     // Only validate theory score if exam has theory
     let tScore = 0
@@ -223,8 +244,7 @@ export default function GradeSubmissionPage() {
 
     setSaving(true)
 
-    const objScore = Number(attempt.objective_score) || 0
-    // ✅ FIX: When no theory, totalMarks = objTotal only
+    const objScore = Math.round(Number(attempt.objective_score) || 0)
     const theoryTotal = hasTheory ? theoryMax : 0
     const totalScore = objScore + tScore
     const totalMarks = hasTheory ? (objTotal + theoryTotal) : objTotal
@@ -232,24 +252,47 @@ export default function GradeSubmissionPage() {
     const isPassed = percentage >= 50
     const grade = getWAECGrade(percentage)
 
-    const term = exam?.term || attempt.term || 'third'
-    const sessionYear = exam?.session_year || attempt.session_year || '2025/2026'
+    console.log('Calculated values:', {
+      objScore,
+      tScore,
+      totalScore,
+      totalMarks,
+      percentage,
+      grade
+    })
 
     try {
-      // Build update object
+      // Build update data dynamically based on what columns exist
       const updateData: any = {
+        status: 'graded',
         total_score: totalScore,
         total_marks: totalMarks,
-        percentage,
+        percentage: percentage,
         is_passed: isPassed,
-        status: hasTheory ? 'graded' : 'completed',
-        term,
-        session_year: sessionYear,
         updated_at: new Date().toISOString()
       }
 
-      // Only add theory_feedback if exam has theory
+      // Add grade if column exists (check first)
+      try {
+        const { data: columnCheck } = await supabase
+          .from('exam_attempts')
+          .select('grade')
+          .limit(1)
+        if (columnCheck !== undefined) {
+          updateData.grade = grade
+        }
+      } catch {
+        // Column doesn't exist, skip
+      }
+
+      // Add objective fields
+      updateData.objective_score = objScore
+      updateData.objective_total = objTotal
+
+      // Add theory data if has theory
       if (hasTheory) {
+        updateData.theory_score = tScore
+        updateData.theory_total = theoryTotal
         updateData.theory_feedback = {
           total: {
             score: tScore,
@@ -259,42 +302,127 @@ export default function GradeSubmissionPage() {
         }
       }
 
-      const { error } = await supabase
+      // Try to add feedback if column exists (check by attempting to insert)
+      if (feedback) {
+        try {
+          const { error: testError } = await supabase
+            .from('exam_attempts')
+            .select('feedback')
+            .limit(1)
+          if (!testError) {
+            updateData.feedback = feedback
+          } else {
+            console.log('Feedback column not found, skipping...')
+          }
+        } catch {
+          console.log('Feedback column not found, skipping...')
+        }
+      }
+
+      console.log('Updating with data:', updateData)
+
+      // Perform the update
+      const { error: updateError } = await supabase
         .from('exam_attempts')
         .update(updateData)
         .eq('id', submissionId)
 
-      if (error) throw error
-
-      // Update CA scores if they exist
-      const { data: existingCA } = await supabase
-        .from('ca_scores')
-        .select('*')
-        .eq('student_id', attempt.student_id)
-        .eq('exam_id', attempt.exam_id)
-        .maybeSingle()
-
-      if (existingCA) {
-        await supabase
-          .from('ca_scores')
-          .update({
-            exam_score: totalScore,
-            total_score: (existingCA.ca1_score || 0) + (existingCA.ca2_score || 0) + totalScore,
-            grade: grade,
+      if (updateError) {
+        console.error('Update error:', updateError)
+        
+        // If error is about missing column, try without that column
+        if (updateError.message.includes('column')) {
+          console.log('Retrying without problematic columns...')
+          const cleanData: any = {
+            status: 'graded',
+            total_score: totalScore,
+            total_marks: totalMarks,
+            percentage: percentage,
+            is_passed: isPassed,
+            objective_score: objScore,
+            objective_total: objTotal,
             updated_at: new Date().toISOString()
-          })
-          .eq('id', existingCA.id)
+          }
+          
+          if (hasTheory) {
+            cleanData.theory_score = tScore
+            cleanData.theory_total = theoryTotal
+            cleanData.theory_feedback = {
+              total: {
+                score: tScore,
+                max: theoryTotal,
+                feedback: feedback || `Theory: ${tScore}/${theoryTotal}`
+              }
+            }
+          }
+          
+          const { error: retryError } = await supabase
+            .from('exam_attempts')
+            .update(cleanData)
+            .eq('id', submissionId)
+            
+          if (retryError) throw retryError
+        } else {
+          throw updateError
+        }
+      }
+
+      console.log('✅ Update completed successfully')
+
+      // Wait a moment for triggers to execute
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      // Verify the update
+      const { data: verifiedAttempt, error: verifyError } = await supabase
+        .from('exam_attempts')
+        .select('status, total_score, percentage')
+        .eq('id', submissionId)
+        .single()
+
+      if (!verifyError && verifiedAttempt) {
+        console.log('Verified after update:', verifiedAttempt)
+        
+        if (verifiedAttempt.status === 'graded') {
+          toast.success(`✅ Grade saved! Status: GRADED | Score: ${totalScore}/${totalMarks} (${percentage}%) | Grade: ${grade}`)
+        } else {
+          toast.warning(`Scores saved but status is ${verifiedAttempt.status}`)
+        }
+      } else {
+        toast.success(`✅ Grade saved! Score: ${totalScore}/${totalMarks} (${percentage}%) - Grade: ${grade}`)
+      }
+
+      // Try to update CA scores if table exists
+      try {
+        const { data: existingCA } = await supabase
+          .from('ca_scores')
+          .select('*')
+          .eq('student_id', attempt.student_id)
+          .eq('exam_id', attempt.exam_id)
+          .maybeSingle()
+
+        if (existingCA) {
+          await supabase
+            .from('ca_scores')
+            .update({
+              exam_score: totalScore,
+              total_score: (existingCA.ca1_score || 0) + (existingCA.ca2_score || 0) + totalScore,
+              grade: grade,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingCA.id)
+        }
+      } catch (caError) {
+        console.log('CA scores table not found or error updating:', caError)
       }
 
       // Update term progress
       await updateTermProgress(attempt.student_id, attempt.student_class)
 
-      toast.success(`✅ Saved! ${objScore}${hasTheory ? `(Obj) + ${tScore}(Theory)` : '(Obj)'} = ${totalScore}/${totalMarks} (${percentage}%) - Grade: ${grade}`)
-
-      // Navigate back
+      // Navigate back after delay
       setTimeout(() => {
         router.push(`/staff/exams/${examId}/submissions`)
-      }, 500)
+        router.refresh()
+      }, 2000)
 
     } catch (error: any) {
       console.error('Save error:', error)
@@ -349,7 +477,6 @@ export default function GradeSubmissionPage() {
     )
   }
 
-  // ✅ FIX: Calculate scores correctly based on hasTheory
   const objScore = Math.round(Number(attempt.objective_score) || 0)
   const tScore = hasTheory ? Math.round(parseFloat(theoryScore) || 0) : 0
   const total = objScore + tScore
@@ -508,19 +635,21 @@ export default function GradeSubmissionPage() {
             </div>
           )}
 
-          {/* Feedback */}
-          <div>
-            <Label className="text-sm font-medium">Feedback (optional)</Label>
-            <Textarea
-              value={feedback}
-              onChange={(e) => setFeedback(e.target.value)}
-              placeholder="Overall feedback for the student..."
-              className="mt-1.5"
-              rows={3}
-            />
-          </div>
+          {/* Feedback - Only show if exam has theory */}
+          {hasTheory && (
+            <div>
+              <Label className="text-sm font-medium">Feedback (optional)</Label>
+              <Textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Overall feedback for the student..."
+                className="mt-1.5"
+                rows={3}
+              />
+            </div>
+          )}
 
-          {/* ✅ FIXED: Final Score - Correctly shows obj only when no theory */}
+          {/* Final Score */}
           <div className="bg-emerald-50 rounded-xl p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-lg bg-emerald-500 flex items-center justify-center">
@@ -561,7 +690,7 @@ export default function GradeSubmissionPage() {
         )}
         {saving
           ? 'Saving...'
-          : `Save — ${total}/${totalMax} (${pct}%) — Grade: ${grade}`
+          : `Save Grade — ${total}/${totalMax} (${pct}%) — ${grade}`
         }
       </Button>
     </div>

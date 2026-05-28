@@ -7,9 +7,10 @@ export async function PUT(req: NextRequest) {
   console.log('📦 API called: Update User')
   
   try {
+    // ✅ Use the exact same variable name as in .env.local
     const supabaseAdmin = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY!  // ✅ Matches your .env.local
     )
     
     const body = await req.json()
@@ -22,7 +23,6 @@ export async function PUT(req: NextRequest) {
     console.log('🔄 Updating user:', id)
     console.log('📋 Update data:', updateData)
     
-    // Update profiles table using admin client (bypasses RLS)
     const { data, error } = await supabaseAdmin
       .from('profiles')
       .update({

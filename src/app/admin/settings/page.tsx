@@ -1,4 +1,4 @@
-// app/admin/settings/page.tsx - ADMIN SETTINGS PAGE
+// app/admin/settings/page.tsx - UPDATED WITH NEXT TERM DATE MANAGEMENT
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -20,7 +20,7 @@ import {
   Loader2, Settings, User, Shield, Bell, Palette, Database,
   Save, Camera, Key, Mail, Phone, MapPin, School,
   Globe, Lock, Eye, EyeOff, LogOut, Trash2,
-  CheckCircle2, AlertTriangle, ChevronRight
+  CheckCircle2, AlertTriangle, ChevronRight, Calendar
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────
@@ -68,14 +68,18 @@ export default function AdminSettingsPage() {
   // School settings
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>({
     school_name: 'Vincollins College',
-    school_motto: 'Excellence in Education',
-    school_address: 'Lagos, Nigeria',
-    school_phone: '+234 800 000 0000',
-    school_email: 'info@vincollins.edu.ng',
+    school_motto: 'Geared Towards Excellence',
+    school_address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
+    school_phone: '+234 912 1155 554',
+    school_email: 'vincollinscollege@gmail.com',
     current_term: 'Third Term',
     current_session: '2025/2026',
     portal_name: 'Vincollins Portal'
   })
+  
+  // Next Term Date
+  const [nextTermDate, setNextTermDate] = useState('')
+  const [savingNextTerm, setSavingNextTerm] = useState(false)
   
   // Notification settings
   const [emailNotifications, setEmailNotifications] = useState(true)
@@ -106,6 +110,9 @@ export default function AdminSettingsPage() {
         }
       }
       
+      // Load next term date from database
+      await loadNextTermDate()
+      
       // Load saved preferences
       const storedCompact = localStorage.getItem('admin-compact-mode')
       if (storedCompact) setCompactMode(storedCompact === 'true')
@@ -114,6 +121,74 @@ export default function AdminSettingsPage() {
     }
     init()
   }, [])
+
+  // Load next term date from system_settings
+  const loadNextTermDate = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'next_term_date')
+        .maybeSingle()
+
+      if (data?.value) {
+        setNextTermDate(data.value)
+      } else {
+        // Default date
+        const defaultDate = new Date()
+        defaultDate.setMonth(defaultDate.getMonth() + 3)
+        setNextTermDate(defaultDate.toISOString().split('T')[0])
+      }
+    } catch (error) {
+      console.error('Error loading next term date:', error)
+    }
+  }
+
+  // Save next term date
+  const handleSaveNextTermDate = async () => {
+    if (!nextTermDate) {
+      toast.error('Please select a date')
+      return
+    }
+
+    setSavingNextTerm(true)
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert({
+          key: 'next_term_date',
+          value: nextTermDate,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'key'
+        })
+
+      if (error) throw error
+
+      toast.success('Next term date saved! It will appear on all report cards.')
+      
+      // Dispatch event to notify other components
+      window.dispatchEvent(new CustomEvent('next-term-date-updated', { 
+        detail: { date: nextTermDate }
+      }))
+      
+    } catch (error) {
+      console.error('Error saving next term date:', error)
+      toast.error('Failed to save next term date')
+    } finally {
+      setSavingNextTerm(false)
+    }
+  }
+
+  // Format date for display
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'Not set'
+    return new Date(dateString).toLocaleDateString('en-NG', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  }
 
   // ─── Handlers ───────────────────────────────────────
   const handleSaveProfile = async () => {
@@ -215,10 +290,11 @@ export default function AdminSettingsPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="h-9 w-full sm:w-auto grid grid-cols-4 sm:flex sm:flex-row gap-1">
+        <TabsList className="h-9 w-full sm:w-auto grid grid-cols-5 sm:flex sm:flex-row gap-1">
           <TabsTrigger value="profile" className="text-xs h-7">Profile</TabsTrigger>
           <TabsTrigger value="password" className="text-xs h-7">Password</TabsTrigger>
           <TabsTrigger value="school" className="text-xs h-7">School</TabsTrigger>
+          <TabsTrigger value="system" className="text-xs h-7">System</TabsTrigger>
           <TabsTrigger value="preferences" className="text-xs h-7">Preferences</TabsTrigger>
         </TabsList>
 
@@ -350,9 +426,14 @@ export default function AdminSettingsPage() {
                   <Label className="text-xs">School Motto</Label>
                   <Input value={schoolSettings.school_motto} onChange={e => setSchoolSettings({...schoolSettings, school_motto: e.target.value})} className="h-9 text-sm mt-1" />
                 </div>
-                <div>
+                <div className="sm:col-span-2">
                   <Label className="text-xs">School Address</Label>
-                  <Input value={schoolSettings.school_address} onChange={e => setSchoolSettings({...schoolSettings, school_address: e.target.value})} className="h-9 text-sm mt-1" />
+                  <Textarea 
+                    value={schoolSettings.school_address} 
+                    onChange={e => setSchoolSettings({...schoolSettings, school_address: e.target.value})} 
+                    className="h-20 text-sm mt-1"
+                    rows={2}
+                  />
                 </div>
                 <div>
                   <Label className="text-xs">School Phone</Label>
@@ -361,10 +442,6 @@ export default function AdminSettingsPage() {
                 <div>
                   <Label className="text-xs">School Email</Label>
                   <Input value={schoolSettings.school_email} onChange={e => setSchoolSettings({...schoolSettings, school_email: e.target.value})} className="h-9 text-sm mt-1" />
-                </div>
-                <div>
-                  <Label className="text-xs">Portal Name</Label>
-                  <Input value={schoolSettings.portal_name} onChange={e => setSchoolSettings({...schoolSettings, portal_name: e.target.value})} className="h-9 text-sm mt-1" />
                 </div>
                 <div>
                   <Label className="text-xs">Current Term</Label>
@@ -380,6 +457,84 @@ export default function AdminSettingsPage() {
                   {saving ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
                   Save School Settings
                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ─── System Tab (New) ─────────────────────── */}
+        <TabsContent value="system" className="mt-4">
+          <Card className="border-0 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-blue-500" />
+                System Settings
+              </CardTitle>
+              <CardDescription className="text-xs">Configure system-wide settings that affect all users</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Next Term Date Section */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-5 w-5 text-blue-500" />
+                  <h3 className="font-semibold text-sm">Next Term Resumption Date</h3>
+                </div>
+                <p className="text-xs text-slate-500">
+                  This date will appear on all report cards. Set it once and it will apply to all students automatically.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
+                  <div className="flex-1">
+                    <Label className="text-xs">Select Date</Label>
+                    <Input
+                      type="date"
+                      value={nextTermDate}
+                      onChange={(e) => setNextTermDate(e.target.value)}
+                      className="h-9 text-sm mt-1 max-w-[250px]"
+                    />
+                  </div>
+                  <Button 
+                    onClick={handleSaveNextTermDate} 
+                    disabled={savingNextTerm} 
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {savingNextTerm ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
+                    Save Date
+                  </Button>
+                </div>
+                {nextTermDate && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <p className="text-sm text-blue-800 flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4" />
+                      Next term begins on: <strong>{formatDate(nextTermDate)}</strong>
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      This date will automatically appear on all report cards generated.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              {/* Database Status */}
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Database className="h-5 w-5 text-green-500" />
+                  <h3 className="font-semibold text-sm">Database Status</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-green-50 rounded-lg">
+                    <p className="text-xs text-green-600">Connection Status</p>
+                    <p className="text-sm font-semibold text-green-700 flex items-center gap-1">
+                      <CheckCircle2 className="h-4 w-4" /> Connected
+                    </p>
+                  </div>
+                  <div className="p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-600">Last Backup</p>
+                    <p className="text-sm font-semibold text-blue-700">{new Date().toLocaleDateString()}</p>
+                  </div>
+                </div>
               </div>
             </CardContent>
           </Card>

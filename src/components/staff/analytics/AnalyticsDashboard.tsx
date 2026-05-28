@@ -1,4 +1,4 @@
-// src/components/staff/analytics/AnalyticsDashboard.tsx - FINAL FIX
+// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED SUBJECT MAPPING
 // @ts-nocheck
 'use client'
 
@@ -16,13 +16,8 @@ import { SubjectPerformance } from './SubjectPerformance'
 import { GradeDistribution } from './GradeDistribution'
 import { TopStudents } from './TopStudents'
 
-// ✅ Nigerian Grading System
-// A1=75-100, B2=70-74, B3=65-69, C4=60-64, C5=55-59, C6=50-54, D7=45-49, E8=40-44, F9=0-39
-// Pass = A1 to E8 (40+), Fail = F9 (below 40)
-
 function isPassing(grade: string | null | undefined): boolean {
   if (!grade) return false
-  // A1 through E8 are passing grades
   const passingGrades = ['A1', 'B2', 'B3', 'C4', 'C5', 'C6', 'D7', 'E8']
   return passingGrades.includes(grade)
 }
@@ -65,10 +60,16 @@ export function AnalyticsDashboard() {
         .select('id, title, subject, class, status')
         .eq('created_by', userId)
 
+      // ✅ BUILD EXAM MAP for subject lookup
+      const examMap: Record<string, any> = {}
+      ;(teacherExams || []).forEach(exam => {
+        examMap[exam.id] = exam
+      })
+
       const examIds = (teacherExams || []).map(e => e.id)
       const publishedExams = (teacherExams || []).filter(e => e.status === 'published').length
 
-      console.log('📊 [ANALYTICS] Teacher exams:', { examCount: examIds.length, examIds })
+      console.log('📊 [ANALYTICS] Teacher exams:', teacherExams?.map(e => ({ id: e.id, subject: e.subject, class: e.class })))
 
       // ✅ Step 2: Get students
       const { data: students } = await supabase
@@ -82,18 +83,16 @@ export function AnalyticsDashboard() {
       const studentMap: Record<string, any> = {}
       students?.forEach(s => { studentMap[s.id] = s })
 
-      // ✅ Step 3: Get scores from BOTH tables (same as banner)
+      // ✅ Step 3: Get scores from BOTH tables
       const allScores: any[] = []
 
       if (examIds.length > 0) {
         const [attemptsResult, caResult] = await Promise.all([
-          // Get exam_attempts that are NOT pending_theory (scored ones)
           supabase.from('exam_attempts')
             .select('*')
             .in('exam_id', examIds)
             .neq('status', 'pending_theory')
             .order('submitted_at', { ascending: false }),
-          // Get ca_scores for this teacher's exams
           supabase.from('ca_scores')
             .select('*')
             .in('exam_id', examIds)
@@ -106,19 +105,25 @@ export function AnalyticsDashboard() {
 
         console.log('📊 [ANALYTICS] Raw data:', {
           attemptsCount: attempts.length,
-          caScoresCount: caScores.length
+          caScoresCount: caScores.length,
+          sampleAttempt: attempts[0] // Log first attempt to see structure
         })
 
-        // Enrich exam_attempts
+        // Enrich exam_attempts - FIXED: Get subject from examMap
         attempts.forEach((a: any) => {
-          const score = a.percentage || a.total_score || 0
+          const exam = examMap[a.exam_id]
+          const score = a.percentage || a.total_score || a.score || 0
           const grade = a.grade || a.letter_grade || getGradeFromScore(score)
+          
+          // ✅ Get subject from exam table first, then fallback to attempt fields
+          const subject = exam?.subject || a.subject || a.exam_subject || 'Unknown Subject'
+          const studentClass = studentMap[a.student_id]?.class || a.class || exam?.class || 'Unknown Class'
           
           allScores.push({
             student_id: a.student_id,
-            student_name: a.student_name || studentMap[a.student_id]?.full_name || 'Unknown',
-            student_class: studentMap[a.student_id]?.class || a.class || '—',
-            subject: a.subject || a.exam_subject || '—',
+            student_name: a.student_name || studentMap[a.student_id]?.full_name || 'Unknown Student',
+            student_class: studentClass,
+            subject: subject,
             total_score: score,
             percentage: a.percentage,
             grade: grade,
@@ -127,18 +132,23 @@ export function AnalyticsDashboard() {
           })
         })
 
-        // Enrich ca_scores
+        // Enrich ca_scores - FIXED: Get subject from examMap
         caScores.forEach((c: any) => {
-          const score = c.total_score || 0
+          const exam = examMap[c.exam_id]
+          const score = c.total_score || c.score || 0
           const grade = c.grade || getGradeFromScore(score)
+          
+          // ✅ Get subject from exam table first
+          const subject = exam?.subject || c.subject || 'Unknown Subject'
+          const studentClass = studentMap[c.student_id]?.class || c.class || exam?.class || 'Unknown Class'
           
           allScores.push({
             student_id: c.student_id,
-            student_name: c.student_name || studentMap[c.student_id]?.full_name || 'Unknown',
-            student_class: studentMap[c.student_id]?.class || c.class || '—',
-            subject: c.subject || '—',
+            student_name: c.student_name || studentMap[c.student_id]?.full_name || 'Unknown Student',
+            student_class: studentClass,
+            subject: subject,
             total_score: score,
-            percentage: score, // CA scores are already out of 100
+            percentage: score,
             grade: grade,
             exam_id: c.exam_id,
             type: 'ca'
@@ -146,105 +156,47 @@ export function AnalyticsDashboard() {
         })
       }
 
-      // ✅ Step 4: Filter by class (same logic as banner - all classes = all scores)
+      // ✅ Log unique subjects for debugging
+      const uniqueSubjects = [...new Set(allScores.map(s => s.subject))]
+      console.log('📊 [ANALYTICS] Unique subjects found:', uniqueSubjects)
+
+      // ✅ Step 4: Filter by class
       const filtered = selectedClass !== 'all'
         ? allScores.filter(s => s.student_class === selectedClass)
         : allScores
 
-      console.log('📊 [ANALYTICS] Filtered scores:', {
-        allScoresCount: allScores.length,
-        filteredCount: filtered.length,
-        selectedClass
+      // ✅ Filter out "Unknown Subject" entries
+      const validScores = filtered.filter(s => s.subject !== 'Unknown Subject' && s.subject !== '—')
+
+      console.log('📊 [ANALYTICS] Score counts:', {
+        allScores: allScores.length,
+        filtered: filtered.length,
+        validScores: validScores.length
       })
 
-      // ✅ Step 5: Calculate overview (MATCHES BANNER CALCULATION)
-      // Average performance - same formula as banner
-      const avgScore = filtered.length > 0
-        ? Math.round(filtered.reduce((sum, s) => sum + (s.total_score || 0), 0) / filtered.length)
+      // ✅ Step 5: Calculate overview using valid scores
+      const avgScore = validScores.length > 0
+        ? Math.round(validScores.reduce((sum, s) => sum + (s.total_score || 0), 0) / validScores.length)
         : 0
 
-      // ✅ Pass rate - Nigerian grading: A1-E8 = pass, F9 = fail
-      const passingScores = filtered.filter(s => isPassing(s.grade))
-      const passRate = filtered.length > 0
-        ? Math.round((passingScores.length / filtered.length) * 100)
+      const passingScores = validScores.filter(s => isPassing(s.grade))
+      const passRate = validScores.length > 0
+        ? Math.round((passingScores.length / validScores.length) * 100)
         : 0
-
-      const pendingCount = allScores.filter(s => s.status === 'pending_theory').length
 
       const overview = {
         totalStudents: studentCount,
         totalExams: publishedExams,
-        avgScore,           // ← Same as banner averagePerformance
-        passRate,            // ← Proper Nigerian pass rate
-        pendingGrading: pendingCount,
+        avgScore,
+        passRate,
+        pendingGrading: allScores.filter(s => s.status === 'pending_theory').length,
         activeClasses: classList.length
       }
 
-      console.log('📊 [ANALYTICS] Overview:', overview)
-
-      // ✅ Step 6: Class Stats
-      const classMap: Record<string, any> = {}
-      filtered.forEach(s => {
-        const cls = s.student_class || 'Unknown'
-        if (!classMap[cls]) {
-          classMap[cls] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
-        }
-        const score = s.total_score || 0
-        classMap[cls].total += score
-        classMap[cls].count++
-        if (score > classMap[cls].high) classMap[cls].high = score
-        if (score < classMap[cls].low) classMap[cls].low = score
-        if (isPassing(s.grade)) classMap[cls].pass++
-      })
-
-      const classStudentCount: Record<string, number> = {}
-      students?.forEach(s => {
-        const c = s.class || 'Unknown'
-        classStudentCount[c] = (classStudentCount[c] || 0) + 1
-      })
-
-      const classStats = Object.entries(classMap).map(([name, d]: any) => ({
-        name,
-        students: d.count,
-        totalInClass: classStudentCount[name] || 0,
-        avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
-        passRate: d.count > 0 ? Math.round((d.pass / d.count) * 100) : 0,
-        highest: d.high,
-        lowest: d.low
-      })).sort((a: any, b: any) => b.avgScore - a.avgScore)
-
-      // ✅ Step 7: Top Students
-      const studentScores: Record<string, any> = {}
-      filtered.forEach(s => {
-        const key = s.student_id || s.student_name || 'unknown'
-        if (!studentScores[key]) {
-          studentScores[key] = {
-            id: s.student_id,
-            name: s.student_name || 'Unknown',
-            class: s.student_class || '—',
-            total: 0,
-            count: 0
-          }
-        }
-        studentScores[key].total += (s.total_score || 0)
-        studentScores[key].count++
-      })
-
-      const topStudents = Object.entries(studentScores)
-        .map(([key, d]: any) => ({
-          id: d.id || key,
-          name: d.name,
-          class: d.class,
-          avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
-          subjects: d.count
-        }))
-        .sort((a, b) => b.avgScore - a.avgScore)
-        .slice(0, 20)
-
-      // ✅ Step 8: Subject Stats
+      // ✅ Step 6: Subject Stats - Use valid scores only
       const subjMap: Record<string, any> = {}
-      filtered.forEach(s => {
-        const subj = s.subject || 'Unknown'
+      validScores.forEach(s => {
+        const subj = s.subject
         if (!subjMap[subj]) {
           subjMap[subj] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
         }
@@ -265,19 +217,73 @@ export function AnalyticsDashboard() {
         lowest: d.low
       })).sort((a: any, b: any) => b.avgScore - a.avgScore)
 
-      // ✅ Step 9: Grade Distribution (Nigerian system)
+      console.log('📊 [ANALYTICS] Final subject stats:', subjectStats.map(s => `${s.name}: ${s.students} students, ${s.avgScore}%`))
+
+      // ✅ Step 7: Class Stats
+      const classMap: Record<string, any> = {}
+      validScores.forEach(s => {
+        const cls = s.student_class || 'Unknown Class'
+        if (!classMap[cls]) {
+          classMap[cls] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
+        }
+        const score = s.total_score || 0
+        classMap[cls].total += score
+        classMap[cls].count++
+        if (score > classMap[cls].high) classMap[cls].high = score
+        if (score < classMap[cls].low) classMap[cls].low = score
+        if (isPassing(s.grade)) classMap[cls].pass++
+      })
+
+      const classStats = Object.entries(classMap).map(([name, d]: any) => ({
+        name,
+        students: d.count,
+        avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
+        passRate: d.count > 0 ? Math.round((d.pass / d.count) * 100) : 0,
+        highest: d.high,
+        lowest: d.low
+      })).sort((a: any, b: any) => b.avgScore - a.avgScore)
+
+      // ✅ Step 8: Top Students
+      const studentScores: Record<string, any> = {}
+      validScores.forEach(s => {
+        const key = s.student_id || s.student_name || 'unknown'
+        if (!studentScores[key]) {
+          studentScores[key] = {
+            id: s.student_id,
+            name: s.student_name || 'Unknown',
+            class: s.student_class || 'Unknown',
+            total: 0,
+            count: 0
+          }
+        }
+        studentScores[key].total += (s.total_score || 0)
+        studentScores[key].count++
+      })
+
+      const topStudents = Object.entries(studentScores)
+        .map(([key, d]: any) => ({
+          id: d.id || key,
+          name: d.name,
+          class: d.class,
+          avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
+          subjects: d.count
+        }))
+        .sort((a, b) => b.avgScore - a.avgScore)
+        .slice(0, 20)
+
+      // ✅ Step 9: Grade Distribution
       const allGrades = ['A1', 'B2', 'B3', 'C4', 'C5', 'C6', 'D7', 'E8', 'F9']
       const gradeCounts: Record<string, number> = {}
       allGrades.forEach(g => { gradeCounts[g] = 0 })
       
-      filtered.forEach(s => {
+      validScores.forEach(s => {
         const grade = s.grade || getGradeFromScore(s.total_score || 0)
         if (gradeCounts[grade] !== undefined) {
           gradeCounts[grade]++
         }
       })
 
-      const total = filtered.length || 1
+      const total = validScores.length || 1
       const gradeDist = allGrades.map(g => ({
         grade: g,
         count: gradeCounts[g] || 0,
@@ -334,7 +340,6 @@ export function AnalyticsDashboard() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full">
-      {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500">
         <Link href="/staff" className="hover:text-emerald-600 transition-colors flex items-center gap-1">
           <Home className="h-3.5 w-3.5" />
@@ -344,7 +349,6 @@ export function AnalyticsDashboard() {
         <span className="text-slate-800 font-medium">My Analytics</span>
       </nav>
 
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
@@ -385,10 +389,8 @@ export function AnalyticsDashboard() {
         </div>
       </div>
 
-      {/* Overview Cards */}
       <AnalyticsOverview overview={data.overview} />
 
-      {/* Tabs */}
       <Tabs defaultValue="classes">
         <TabsList className="bg-white border rounded-lg p-1 h-auto w-full sm:w-auto overflow-x-auto flex-nowrap shadow-sm">
           <TabsTrigger value="classes" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">By Class</TabsTrigger>

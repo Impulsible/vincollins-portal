@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - FULLY CORRECTED VERSION
+// src/contexts/UserContext.tsx - SIMPLIFIED WORKING VERSION
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -42,6 +42,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const userRef = useRef<UserProfile | null>(null)
   const lastRefreshTimeRef = useRef(0)
   const refreshTimeoutRef = useRef<NodeJS.Timeout>()
+  const isBackgroundRef = useRef(false)
 
   useEffect(() => {
     userRef.current = user
@@ -52,12 +53,36 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user])
 
+  // Track when app goes to background - NO AUTO ACTIONS
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const isHidden = document.hidden
+      isBackgroundRef.current = isHidden
+      
+      if (isHidden) {
+        // App went to background - stop heartbeat only
+        if (heartbeatRef.current) {
+          clearInterval(heartbeatRef.current)
+          heartbeatRef.current = undefined
+        }
+      } else {
+        // App returned to foreground - DO NOTHING
+        console.log('App returned to foreground - no auto refresh performed')
+      }
+    }
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [])
+
   const setOnlineStatus = useCallback((userId: string, online: boolean) => {
     if (userId === ADMIN_USER_ID) return
+    // Don't update status if app is in background
+    if (isBackgroundRef.current && !online) return
     
     const now = new Date().toISOString()
-    // ✅ Fixed: No .match(), use void to ignore promise
-    void supabase
+    // ✅ Fire and forget - no need to handle promise
+    supabase
       .from('user_online_status')
       .upsert({
         user_id: userId,
@@ -65,15 +90,22 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         last_seen: now,
         updated_at: now,
       }, { onConflict: 'user_id' })
+      // Ignore result - just execute
   }, [])
 
   const startHeartbeat = useCallback((userId: string) => {
     if (userId === ADMIN_USER_ID) return
     
+    // Don't start heartbeat if app is in background
+    if (isBackgroundRef.current) return
+    
     if (heartbeatRef.current) clearInterval(heartbeatRef.current)
     heartbeatRef.current = setInterval(() => {
-      setOnlineStatus(userId, true)
-    }, 60000)
+      // Only update if app is not in background
+      if (!isBackgroundRef.current && userRef.current?.id === userId) {
+        setOnlineStatus(userId, true)
+      }
+    }, 120000) // 2 minutes
   }, [setOnlineStatus])
 
   const stopHeartbeat = useCallback(() => {
@@ -92,12 +124,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle()
       
       if (error) {
-        console.error('Profile fetch error:', error)
+        if (error.code !== 'PGRST116') {
+          console.error('Profile fetch error:', error)
+        }
         return null
       }
       return data as UserProfile
     } catch (err) {
-      console.error('Profile fetch exception:', err)
       return null
     }
   }, [])
@@ -113,7 +146,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const { data: { session }, error: sessionError } = await supabase.auth.getSession()
         
         if (sessionError) {
-          console.error('Session error:', sessionError)
           if (isMountedRef.current) { 
             setUser(null)
             setLoading(false)
@@ -133,8 +165,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const profile = await fetchUserProfile(session.user.id)
         const userId = profile?.id || session.user.id
 
-        // Only update online status if not admin
-        if (userId !== ADMIN_USER_ID) {
+        // Only update online status if not admin and app is not in background
+        if (userId !== ADMIN_USER_ID && !isBackgroundRef.current) {
           setOnlineStatus(userId, true)
           startHeartbeat(userId)
         }
@@ -161,7 +193,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
         return profile
       } catch (err: any) {
-        console.error('Error loading user:', err)
+        if (!err?.message?.includes('lock') && !err?.message?.includes('Lock')) {
+          console.error('Error loading user:', err)
+        }
         if (isMountedRef.current) {
           setError(err.message)
           setLoading(false)
@@ -177,11 +211,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   }, [fetchUserProfile, setOnlineStatus, startHeartbeat])
 
   const refreshUser = useCallback(async () => {
-    // Rate limiting: minimum 5 seconds between refreshes
+    // Rate limiting: minimum 10 seconds between refreshes
     const now = Date.now()
     const timeSinceLastRefresh = now - lastRefreshTimeRef.current
     
-    if (timeSinceLastRefresh < 5000) {
+    // Don't refresh if app is in background
+    if (isBackgroundRef.current) {
+      console.log('App in background, skipping refresh')
+      return
+    }
+    
+    if (timeSinceLastRefresh < 10000) {
       console.log('Rate limiting refresh, skipping...')
       return
     }
@@ -194,7 +234,6 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(() => {
     const currentUser = userRef.current
     
-    // Clear all timeouts
     if (refreshTimeoutRef.current) {
       clearTimeout(refreshTimeoutRef.current)
     }
@@ -211,34 +250,33 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setError(null)
     setLoading(false)
     
-    // Sign out from Supabase without waiting
-    void supabase.auth.signOut().catch(() => {})
+    // Sign out without waiting
+    supabase.auth.signOut()
     
-    // Hard redirect
     window.location.replace('/portal')
   }, [setOnlineStatus, stopHeartbeat])
 
+  // Initialize ONLY ONCE on mount
   useEffect(() => {
+    if (fetchPromiseRef.current) return
+    
     isMountedRef.current = true
     
-    // Load user with a small delay to prevent race conditions
     const timer = setTimeout(() => {
       loadUser()
     }, 100)
 
+    // Auth listener - NO AUTO ACTIONS on TOKEN_REFRESHED
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('🔄 Auth event:', event)
-        
-        // Ignore TOKEN_REFRESHED events completely
+        // Completely ignore TOKEN_REFRESHED events
         if (event === 'TOKEN_REFRESHED') {
-          console.log('🔑 Token refreshed (ignoring to prevent rate limits)')
           return
         }
         
-        if (event === 'SIGNED_IN' && session?.user) {
-          console.log('✅ User signed in, loading profile...')
-          await loadUser()
+        // Only log, don't auto-refresh for these events
+        if (event === 'SIGNED_IN') {
+          console.log('✅ User signed in - manual refresh required')
         } else if (event === 'SIGNED_OUT') {
           console.log('👋 User signed out')
           stopHeartbeat()
@@ -246,11 +284,9 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setLoading(false)
           localStorage.removeItem('auth_user')
         } else if (event === 'USER_UPDATED') {
-          await refreshUser()
+          console.log('📝 User updated - manual refresh required')
         } else if (event === 'INITIAL_SESSION') {
-          console.log('📦 Initial session loaded')
-          // Only load if we don't have a user yet
-          if (!userRef.current) {
+          if (!userRef.current && session?.user) {
             await loadUser()
           }
         }
@@ -266,7 +302,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       stopHeartbeat()
       subscription.unsubscribe()
     }
-  }, [loadUser, refreshUser, stopHeartbeat])
+  }, [loadUser, stopHeartbeat])
 
   const value: UserContextType = {
     user,
