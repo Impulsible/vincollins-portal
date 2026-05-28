@@ -1,11 +1,21 @@
-// components/admin/students/hooks/useStudentPresence.ts - OPTIMIZED
+// src/components/admin/students/hooks/useStudentPresence.ts
+
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Student } from '../types'
 
 type PresenceStatus = 'online' | 'away' | 'offline'
+
+interface PresencePayload {
+  user_id?: string
+  status?: string
+  last_seen?: string
+  online_at?: string
+  away_at?: string
+  last_heartbeat?: string
+  [key: string]: any
+}
 
 interface UseStudentPresenceReturn {
   onlineStudents: Set<string>
@@ -17,75 +27,143 @@ interface UseStudentPresenceReturn {
   getLastSeen: (studentId: string) => string
 }
 
-export function useStudentPresence(students: Student[]): UseStudentPresenceReturn {
+export function useStudentPresence(students: any[]): UseStudentPresenceReturn {
   const [onlineStudents, setOnlineStudents] = useState<Set<string>>(new Set())
   const [awayStudents, setAwayStudents] = useState<Set<string>>(new Set())
   const [lastSeenMap, setLastSeenMap] = useState<Map<string, string>>(new Map())
   const [isConnected, setIsConnected] = useState(false)
-  const mountedRef = useRef(true)
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
-    mountedRef.current = true
-    
     if (!students.length) return
 
+    let mounted = true
     const validStudentIds = new Set(students.map(s => s.id))
+    
+    // Create channel for listening
+    const channel = supabase.channel('online-students')
+    channelRef.current = channel
 
-    const fetchStatus = async () => {
-      try {
-        // ✅ Add timeout to fetch
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), 5000)
-
-        const { data, error } = await supabase
-          .from('user_online_status')
-          .select('*')
-          .abortSignal(controller.signal)
-
-        clearTimeout(timeout)
-
-        if (!mountedRef.current) return
-
-        if (error) {
-          // Silently ignore fetch errors
-          return
-        }
-
-        const online = new Set<string>()
-        const away = new Set<string>()
-        const lastSeen = new Map<string, string>()
-
-        data?.forEach((record: any) => {
-          if (record.user_id && validStudentIds.has(record.user_id)) {
-            if (record.is_online) {
-              online.add(record.user_id)
-            } else {
-              away.add(record.user_id)
-            }
-            if (record.last_seen) {
-              lastSeen.set(record.user_id, record.last_seen)
-            }
+    // Listen for presence sync - this gets all current presence data
+    channel.on('presence', { event: 'sync' }, () => {
+      if (!mounted) return
+      
+      const presenceState = channel.presenceState()
+      console.log('📡 Presence state received:', presenceState)
+      
+      const online = new Set<string>()
+      const away = new Set<string>()
+      const lastSeen = new Map<string, string>()
+      
+      // Parse presence data
+      Object.entries(presenceState).forEach(([key, presences]) => {
+        const presence = presences?.[0] as PresencePayload
+        if (!presence) return
+        
+        const userId = presence.user_id || key
+        console.log(`👤 User ${userId} status: ${presence.status}`)
+        
+        if (userId && validStudentIds.has(userId)) {
+          if (presence.status === 'online') {
+            online.add(userId)
+          } else if (presence.status === 'away') {
+            away.add(userId)
           }
-        })
+          
+          const lastSeenTime = presence.last_seen || presence.online_at || presence.away_at
+          if (lastSeenTime) {
+            lastSeen.set(userId, lastSeenTime)
+          }
+        }
+      })
+      
+      setOnlineStudents(online)
+      setAwayStudents(away)
+      setLastSeenMap(lastSeen)
+      setIsConnected(true)
+      console.log(`📊 Online: ${online.size}, Away: ${away.size}`)
+    })
 
-        setOnlineStudents(online)
-        setAwayStudents(away)
-        setLastSeenMap(lastSeen)
-        setIsConnected(true)
-      } catch {
-        // Silently ignore errors - component might be unmounted
+    // Listen for join events - when a user comes online
+    channel.on('presence', { event: 'join' }, ({ newPresences }: any) => {
+      if (!mounted) return
+      
+      console.log('🎉 New presence join:', newPresences)
+      newPresences?.forEach((presence: PresencePayload) => {
+        const userId = presence.user_id
+        if (userId && validStudentIds.has(userId)) {
+          if (presence.status === 'online') {
+            setOnlineStudents(prev => new Set([...prev, userId]))
+            setAwayStudents(prev => {
+              const newSet = new Set(prev)
+              newSet.delete(userId)
+              return newSet
+            })
+            console.log(`✅ Student ${userId} came online`)
+          } else if (presence.status === 'away') {
+            setAwayStudents(prev => new Set([...prev, userId]))
+            setOnlineStudents(prev => {
+              const newSet = new Set(prev)
+              newSet.delete(userId)
+              return newSet
+            })
+          }
+          
+          const lastSeenTime = presence.last_seen || presence.online_at || presence.away_at
+          if (lastSeenTime) {
+            setLastSeenMap(prev => {
+              const newMap = new Map(prev)
+              newMap.set(userId, lastSeenTime)
+              return newMap
+            })
+          }
+        }
+      })
+    })
+
+    // Listen for leave events - when a user goes offline
+    channel.on('presence', { event: 'leave' }, ({ leftPresences }: any) => {
+      if (!mounted) return
+      
+      console.log('👋 Presence leave:', leftPresences)
+      leftPresences?.forEach((presence: PresencePayload) => {
+        const userId = presence.user_id
+        if (userId && validStudentIds.has(userId)) {
+          setOnlineStudents(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(userId)
+            return newSet
+          })
+          setAwayStudents(prev => {
+            const newSet = new Set(prev)
+            newSet.delete(userId)
+            return newSet
+          })
+          setLastSeenMap(prev => {
+            const newMap = new Map(prev)
+            newMap.set(userId, new Date().toISOString())
+            return newMap
+          })
+          console.log(`❌ Student ${userId} went offline`)
+        }
+      })
+    })
+
+    // Subscribe to the channel
+    channel.subscribe((status: string) => {
+      if (status === 'SUBSCRIBED') {
+        console.log('🔌 Presence channel subscribed successfully')
+      } else if (status === 'CHANNEL_ERROR') {
+        console.error('❌ Channel error')
       }
-    }
-
-    // Fetch immediately
-    fetchStatus()
-
-    // ✅ Poll every 30 seconds instead of 10 (reduces load)
-    const interval = setInterval(fetchStatus, 30000)
+    })
 
     return () => {
-      mountedRef.current = false
-      clearInterval(interval)
+      mounted = false
+      if (channelRef.current) {
+        channelRef.current.unsubscribe()
+        console.log('🔌 Presence channel unsubscribed')
+      }
     }
   }, [students])
 
@@ -115,3 +193,5 @@ export function useStudentPresence(students: Student[]): UseStudentPresenceRetur
     getLastSeen,
   }
 }
+
+export default useStudentPresence

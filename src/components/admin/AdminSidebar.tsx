@@ -1,4 +1,5 @@
-// components/admin/AdminSidebar.tsx - FULL FIXED
+// components/admin/AdminSidebar.tsx - WITH ANNOUNCEMENTS
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -9,7 +10,7 @@ import {
   LayoutDashboard, Users, MonitorPlay, FileCheck, Activity,
   LogOut, ChevronLeft, ChevronRight, Shield, Sparkles,
   Settings, HelpCircle, GraduationCap, Briefcase,
-  MessageSquare, BookOpen
+  MessageSquare, BookOpen, Megaphone
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -60,6 +61,7 @@ export function AdminSidebar({
     if (path === '/admin') return 'overview'
     if (path === '/admin/settings') return 'settings'
     if (path === '/admin/help') return 'help'
+    if (path.startsWith('/admin/announcements')) return 'announcements'
     if (path.startsWith('/admin/broad-sheet')) return 'broad-sheet'
     if (path.startsWith('/admin/students')) return 'students'
     if (path.startsWith('/admin/staff')) return 'staff'
@@ -78,6 +80,7 @@ export function AdminSidebar({
 
   const primaryNavigation: NavigationItem[] = [
     { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', routePatterns: ['/admin'] },
+    { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'Send Updates', routePatterns: ['/admin/announcements'] },
     { id: 'broad-sheet', name: 'Broad Sheet', icon: BookOpen, description: 'Generate Report Cards', routePatterns: ['/admin/broad-sheet'] },
     { id: 'students', name: 'Students', icon: GraduationCap, description: 'Manage Students', routePatterns: ['/admin/students'] },
     { id: 'staff', name: 'Staff', icon: Briefcase, description: 'Manage Teachers', routePatterns: ['/admin/staff'] },
@@ -98,7 +101,6 @@ export function AdminSidebar({
 
   const handleLogoutClick = () => setShowSignOutConfirm(true)
 
-  // Single source of truth for sign out
   const confirmSignOut = () => {
     setShowSignOutConfirm(false)
     instantLogout()

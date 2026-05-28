@@ -1,4 +1,5 @@
-// components/layout/MobileBottomNav.tsx - FIXED INSTANT LOGOUT
+// components/layout/MobileBottomNav.tsx - ANNOUNCEMENTS IN MORE MENU
+
 'use client'
 
 import { useState } from 'react'
@@ -10,7 +11,8 @@ import {
   Bell, Settings, HelpCircle, LogOut,
   FileText, GraduationCap, X,
   LayoutDashboard, Users, MonitorPlay,
-  FileSpreadsheet, Activity, MessageSquare
+  FileSpreadsheet, Activity, MessageSquare,
+  Megaphone
 } from 'lucide-react'
 import { motion } from 'framer-motion'
 import {
@@ -52,37 +54,47 @@ interface NavItem {
   roles: UserRole[]
 }
 
-// ✅ Only existing routes - no 404s
-const allNavItems: NavItem[] = [
+// ✅ Main Navigation Items (4 items max)
+const mainNavItems: NavItem[] = [
+  // Student Main Items
   { id: 'overview', label: 'Home', icon: Home, route: '/student', roles: ['student'] },
   { id: 'exams', label: 'Exams', icon: BookOpen, route: '/student/exams', roles: ['student'] },
   { id: 'results', label: 'Results', icon: Award, route: '/student/results', roles: ['student'] },
   { id: 'profile', label: 'Profile', icon: User, route: '/student/profile', roles: ['student'] },
   
+  // Staff Main Items
   { id: 'staff-overview', label: 'Home', icon: Home, route: '/staff', roles: ['staff'] },
   { id: 'staff-exams', label: 'Exams', icon: MonitorPlay, route: '/staff/exams', roles: ['staff'] },
   { id: 'staff-students', label: 'Students', icon: Users, route: '/staff/students', roles: ['staff'] },
   { id: 'staff-profile', label: 'Profile', icon: User, route: '/staff/profile', roles: ['staff'] },
   
+  // Admin Main Items
   { id: 'admin-overview', label: 'Home', icon: Home, route: '/admin', roles: ['admin'] },
   { id: 'admin-exams', label: 'Exams', icon: MonitorPlay, route: '/admin/exams', roles: ['admin'] },
   { id: 'admin-broad-sheet', label: 'Broad Sheet', icon: FileSpreadsheet, route: '/admin/broad-sheet', roles: ['admin'] },
   { id: 'admin-monitor', label: 'Monitor', icon: Activity, route: '/admin/monitor', roles: ['admin'] },
 ]
 
+// ✅ More Menu Items (includes Announcements)
 const moreMenuItems: NavItem[] = [
+  // Student More Items
+  { id: 'announcements', label: 'Announcements', icon: Megaphone, route: '/student/announcements', roles: ['student'] },
   { id: 'assignments', label: 'Assignments', icon: FileText, route: '/student/assignments', roles: ['student'] },
   { id: 'notifications', label: 'Notifications', icon: Bell, route: '/student/notifications', roles: ['student'] },
   { id: 'report-card', label: 'Report Card', icon: Award, route: '/student/report-card', roles: ['student'] },
   { id: 'settings', label: 'Settings', icon: Settings, route: '/student/settings', roles: ['student'] },
   { id: 'help', label: 'Help', icon: HelpCircle, route: '/student/help', roles: ['student'] },
   
+  // Staff More Items
+  { id: 'staff-announcements', label: 'Announcements', icon: Megaphone, route: '/staff/announcements', roles: ['staff'] },
   { id: 'staff-assignments', label: 'Assignments', icon: FileText, route: '/staff/assignments', roles: ['staff'] },
   { id: 'staff-notifications', label: 'Notifications', icon: Bell, route: '/staff/notifications', roles: ['staff'] },
   { id: 'staff-report-cards', label: 'Report Cards', icon: Award, route: '/staff/report-cards', roles: ['staff'] },
   { id: 'staff-settings', label: 'Settings', icon: Settings, route: '/staff/settings', roles: ['staff'] },
   { id: 'staff-help', label: 'Help', icon: HelpCircle, route: '/staff/help', roles: ['staff'] },
   
+  // Admin More Items
+  { id: 'admin-announcements', label: 'Announcements', icon: Megaphone, route: '/admin/announcements', roles: ['admin'] },
   { id: 'admin-students', label: 'Students', icon: GraduationCap, route: '/admin/students', roles: ['admin'] },
   { id: 'admin-staff', label: 'Staff', icon: Users, route: '/admin/staff', roles: ['admin'] },
   { id: 'admin-report-cards', label: 'Report Cards', icon: FileText, route: '/admin/report-cards', roles: ['admin'] },
@@ -123,7 +135,7 @@ export function MobileBottomNav({
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
 
-  const mainItems = allNavItems.filter(item => item.roles.includes(role)).slice(0, 4)
+  const mainItems = mainNavItems.filter(item => item.roles.includes(role)).slice(0, 4)
   const moreItems = moreMenuItems.filter(item => item.roles.includes(role))
 
   const handleNavigation = (route: string, tabId: string) => {
@@ -137,11 +149,10 @@ export function MobileBottomNav({
     setShowSignOutConfirm(true)
   }
 
-  // ✅ INSTANT LOGOUT
- const confirmSignOut = () => {
-  setShowSignOutConfirm(false)
-  instantLogout()
-}
+  const confirmSignOut = () => {
+    setShowSignOutConfirm(false)
+    instantLogout()
+  }
 
   const isActive = (item: NavItem): boolean => {
     if (item.route === `/${role}`) return pathname === `/${role}`

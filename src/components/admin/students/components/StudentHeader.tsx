@@ -2,22 +2,22 @@
 
 'use client'
 
-import { motion } from 'framer-motion'
-import { Users, Wifi, WifiOff, CircleDot } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
-import { ViewModeToggle } from './ViewModeToggle'           // ✅ Same folder
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Users, LayoutGrid, List, Filter } from 'lucide-react'
 import { AddStudentDialog } from './dialogs/AddStudentDialog'
 import { BulkUploadDialog } from './dialogs/BulkUploadDialog'
-import type { StudentFormData, Credentials, BulkUploadResult } from '../types'  
+import { cn } from '@/lib/utils'
+
 interface StudentHeaderProps {
   totalStudents: number
   onlineCount: number
   awayCount: number
   isPresenceConnected: boolean
   isSubmitting: boolean
-  onCreateStudent: (data: StudentFormData) => Promise<Credentials | null>
-  onCredentialsGenerated: (credentials: Credentials) => void
-  onBulkUpload: (file: File) => Promise<BulkUploadResult | null>
+  onCreateStudent: (formData: any) => Promise<any>
+  onCredentialsGenerated: (credentials: any) => void
+  onBulkUpload: (file: File) => Promise<any>  // This is the prop name
   viewMode: 'classes' | 'list'
   setViewMode: (mode: 'classes' | 'list') => void
   onClearSelection: () => void
@@ -37,66 +37,97 @@ export function StudentHeader({
   onClearSelection,
 }: StudentHeaderProps) {
   return (
-    <motion.div
-      className="flex flex-wrap justify-between items-start lg:items-center gap-4"
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-    >
-      {/* Title & Stats */}
-      <div>
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-          Student Management
-        </h1>
+    <div className="space-y-4">
+      {/* Header Title and Stats */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-800">Student Management</h1>
+          <p className="text-sm text-slate-500 mt-1">
+            {totalStudents} student{totalStudents !== 1 ? 's' : ''} enrolled
+          </p>
+        </div>
         
-        {/* ✅ FIXED: Changed from <p> to <div> to avoid nesting <div> inside <p> */}
-        <div className="text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
-          <Users className="h-4 w-4" />
-          <span>Total {totalStudents} student{totalStudents !== 1 ? 's' : ''} enrolled</span>
-
-          {isPresenceConnected && (
-            <>
-              {onlineCount > 0 && (
-                <Badge className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">
-                  <Wifi className="h-3 w-3 mr-1" />
-                  {onlineCount} online
-                </Badge>
-              )}
-              {awayCount > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  <CircleDot className="h-3 w-3 mr-1" />
-                  {awayCount} away
-                </Badge>
-              )}
-            </>
-          )}
-          {!isPresenceConnected && (
-            <Badge variant="outline" className="text-xs">
-              <WifiOff className="h-3 w-3 mr-1" />
-              Offline
-            </Badge>
-          )}
+        {/* Action Buttons */}
+        <div className="flex gap-3">
+          <AddStudentDialog
+            onCreateStudent={onCreateStudent}
+            onCredentialsGenerated={onCredentialsGenerated}
+            isSubmitting={isSubmitting}
+          />
+          <BulkUploadDialog
+            onBulkUpload={onBulkUpload}  // Use onBulkUpload (not onUpload)
+            isSubmitting={isSubmitting}
+          />
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <ViewModeToggle
-          viewMode={viewMode}
-          setViewMode={setViewMode}
-          onClearSelection={onClearSelection}
-        />
-
-        <BulkUploadDialog
-          onBulkUpload={onBulkUpload}
-          isSubmitting={isSubmitting}
-        />
-
-        <AddStudentDialog
-          onCreateStudent={onCreateStudent}
-          onCredentialsGenerated={onCredentialsGenerated}
-          isSubmitting={isSubmitting}
-        />
-      </div>
-    </motion.div>
+      {/* View Toggle Card */}
+      <Card className="border shadow-sm">
+        <CardContent className="p-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Button
+                variant={viewMode === 'classes' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('classes')}
+                className={cn(
+                  "h-9 px-4",
+                  viewMode === 'classes' && "bg-emerald-600 hover:bg-emerald-700"
+                )}
+              >
+                <LayoutGrid className="h-4 w-4 mr-2" />
+                Class View
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "h-9 px-4",
+                  viewMode === 'list' && "bg-emerald-600 hover:bg-emerald-700"
+                )}
+              >
+                <List className="h-4 w-4 mr-2" />
+                List View
+              </Button>
+              {viewMode === 'list' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClearSelection}
+                  className="h-9 px-3 text-slate-500"
+                >
+                  <Filter className="h-4 w-4 mr-1" />
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+            
+            {/* Stats Summary */}
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <Users className="h-4 w-4 text-slate-400" />
+                <span className="font-medium text-slate-700">{totalStudents}</span>
+                <span className="text-slate-500">total</span>
+              </div>
+              {isPresenceConnected && (
+                <>
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 bg-green-500 rounded-full animate-pulse" />
+                    <span className="font-medium text-green-600">{onlineCount}</span>
+                    <span className="text-slate-500">online</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <div className="h-2 w-2 bg-amber-500 rounded-full" />
+                    <span className="font-medium text-amber-600">{awayCount}</span>
+                    <span className="text-slate-500">away</span>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

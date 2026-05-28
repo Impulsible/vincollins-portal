@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/staff/StaffManagement.tsx - FULLY FIXED
+// components/admin/staff/StaffManagement.tsx - PROFESSIONALLY STYLED
+
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -15,7 +16,7 @@ import {
 } from '@/components/ui/table'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, 
-  DialogHeader, DialogTitle, DialogTrigger,
+  DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
@@ -24,8 +25,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   UserPlus, MoreVertical, Edit, Trash2, KeyRound, Copy, CheckCircle,
-  Shield, RefreshCw, Loader2, Users, Search, X, Eye, Circle,
-  WifiOff, AlertCircle, Phone, Mail
+  Shield, RefreshCw, Loader2, Users, Search, X, Eye,
+  Phone, Mail, Calendar, MapPin, Building, AlertCircle, Circle
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
@@ -116,21 +117,6 @@ export function StaffManagement({
     )
   }, [sortedStaff, searchQuery])
 
-  const getStatusDisplay = (staffMember: Staff) => {
-    if (!staffMember.is_active) {
-      return {
-        icon: <Circle className="h-3 w-3 text-red-400" />,
-        text: 'Inactive',
-        className: 'text-red-500'
-      }
-    }
-    return {
-      icon: <WifiOff className="h-3 w-3 text-slate-400" />,
-      text: 'Offline',
-      className: 'text-slate-500'
-    }
-  }
-
   const handleAddStaffClick = async () => {
     if (!newStaff.first_name || !newStaff.last_name || !newStaff.department) {
       toast.error('Please fill in all required fields')
@@ -140,8 +126,6 @@ export function StaffManagement({
     setIsSubmitting(true)
     try {
       const year = newStaff.join_year || currentYear
-      
-      console.log('📤 Adding staff...')
       
       const response = await fetch('/api/admin/users/create', {
         method: 'POST',
@@ -164,16 +148,13 @@ export function StaffManagement({
       }
       
       const result = await response.json()
-      console.log('✅ Staff created:', result.user.full_name)
       
-      // Store credentials for display
       setNewCredentials({
         email: result.credentials.email,
         password: result.credentials.password,
         vin_id: result.credentials.vin_id
       })
       
-      // Reset form
       setNewStaff({
         first_name: '',
         last_name: '',
@@ -183,27 +164,19 @@ export function StaffManagement({
         join_year: currentYear,
       })
       
-      // Close add dialog
       setShowAddDialog(false)
+      toast.success(`${result.user.full_name} added successfully!`)
       
-      // ✅ REFRESH NOW - before showing credentials
-      toast.success(`${result.user.full_name} added!`)
-      
-      // Small delay then refresh
       setTimeout(() => {
-        if (onRefresh) {
-          console.log('🔄 Calling onRefresh...')
-          onRefresh()
-        }
+        if (onRefresh) onRefresh()
       }, 200)
       
-      // Show credentials dialog after refresh
       setTimeout(() => {
         setShowCredentialsDialog(true)
       }, 600)
       
     } catch (error: any) {
-      console.error('❌ Error adding staff:', error)
+      console.error('Error adding staff:', error)
       toast.error(error.message || 'Failed to add staff member')
     } finally {
       setIsSubmitting(false)
@@ -254,177 +227,341 @@ export function StaffManagement({
     }
   }
 
+  // Stats for summary cards
+  const activeCount = staff.filter(s => s.is_active).length
+  const inactiveCount = staff.filter(s => !s.is_active).length
+  const departmentCount = new Set(staff.map(s => s.department).filter(Boolean)).size
+
   return (
     <div className="space-y-6">
+      {/* Header Section */}
       <motion.div 
-        className="flex flex-wrap justify-between items-start lg:items-center gap-4"
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
       >
         <div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 flex items-center gap-2">
+            <Users className="h-7 w-7 text-emerald-600" />
             Staff Management
           </h1>
-          <p className="text-muted-foreground mt-1 flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Total {staff.length} staff member{staff.length !== 1 ? 's' : ''}
-          </p>
+          <p className="text-slate-500 mt-1">Manage staff profiles, credentials, and department assignments</p>
         </div>
         
-        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-primary to-secondary shadow-lg hover:shadow-xl transition-shadow">
-              <UserPlus className="mr-2 h-4 w-4" /> Add Staff
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Staff Member</DialogTitle>
-              <DialogDescription>
-                Enter staff details. Email and VIN ID will be auto-generated.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="space-y-4 py-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>First Name *</Label><Input value={newStaff.first_name} onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })} placeholder="John" className="mt-1" /></div>
-                <div><Label>Last Name *</Label><Input value={newStaff.last_name} onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })} placeholder="Doe" className="mt-1" /></div>
+        <Button 
+          onClick={() => setShowAddDialog(true)}
+          className="bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all h-10"
+        >
+          <UserPlus className="mr-2 h-4 w-4" /> Add Staff
+        </Button>
+      </motion.div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Total Staff</p>
+                <p className="text-2xl font-bold text-slate-800">{staff.length}</p>
               </div>
-              
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-3">
-                <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1"><Mail className="h-3 w-3" /> Auto-generated Email</p>
-                <p className="font-mono text-sm">
+              <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-emerald-600" />
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Active</p>
+                <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+              </div>
+              <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
+                <Shield className="h-5 w-5 text-green-600" />
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="border-l-4 border-l-slate-500 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Inactive</p>
+                <p className="text-2xl font-bold text-slate-600">{inactiveCount}</p>
+              </div>
+              <div className="h-10 w-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                <Circle className="h-5 w-5 text-slate-500" />
+              </div>
+            </div>
+          </div>
+        </Card>
+        
+        <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-500 font-medium">Departments</p>
+                <p className="text-2xl font-bold text-purple-600">{departmentCount}</p>
+              </div>
+              <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Building className="h-5 w-5 text-purple-600" />
+              </div>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Search Bar */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Input 
+            placeholder="Search by name, email, VIN ID, or department..." 
+            value={searchQuery} 
+            onChange={(e) => setSearchQuery(e.target.value)} 
+            className="pl-9 pr-8 h-10"
+          />
+          {searchQuery && (
+            <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
+              <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+            </button>
+          )}
+        </div>
+        <Button variant="outline" size="sm" onClick={() => onRefresh?.()} className="h-10">
+          <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+        </Button>
+      </div>
+
+      {/* Add Staff Dialog */}
+      <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+        <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto p-0">
+          <div className="sticky top-0 bg-white dark:bg-slate-950 z-10 border-b px-6 py-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-xl">
+                <UserPlus className="h-5 w-5 text-emerald-600" />
+                Add New Staff Member
+              </DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-slate-500 mt-1">Email and VIN ID will be auto-generated</p>
+          </div>
+          
+          <div className="space-y-5 px-6 py-5">
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-emerald-600" />
+                <h3 className="text-sm font-semibold text-slate-700">Personal Information</h3>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs text-slate-500">First Name *</Label>
+                  <Input 
+                    value={newStaff.first_name} 
+                    onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })} 
+                    placeholder="First name"
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Last Name *</Label>
+                  <Input 
+                    value={newStaff.last_name} 
+                    onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })} 
+                    placeholder="Last name"
+                    className="mt-1 h-9"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Building className="h-4 w-4 text-blue-600" />
+                <h3 className="text-sm font-semibold text-slate-700">Employment Details</h3>
+              </div>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-slate-500">Department *</Label>
+                  <Select value={newStaff.department} onValueChange={(v) => setNewStaff({ ...newStaff, department: v })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Join Year</Label>
+                  <Select value={newStaff.join_year?.toString()} onValueChange={(v) => setNewStaff({ ...newStaff, join_year: parseInt(v) })}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select join year" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[200px]">
+                      {joinYears.map(year => <SelectItem key={year} value={year.toString()}>{year}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Mail className="h-4 w-4 text-purple-600" />
+                <h3 className="text-sm font-semibold text-slate-700">Auto-generated Email</h3>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
+                <p className="font-mono text-sm text-emerald-600">
                   {newStaff.first_name && newStaff.last_name 
                     ? `${newStaff.first_name.toLowerCase().replace(/[^a-z]/g, '')}.${newStaff.last_name.toLowerCase().replace(/[^a-z]/g, '')}@vincollins.edu.ng`
                     : 'first.last@vincollins.edu.ng'}
                 </p>
               </div>
-              
-              <div>
-                <Label>Department *</Label>
-                <Select value={newStaff.department} onValueChange={(v) => setNewStaff({ ...newStaff, department: v })}>
-                  <SelectTrigger className="mt-1"><SelectValue placeholder="Select department" /></SelectTrigger>
-                  <SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent>
-                </Select>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Phone className="h-4 w-4 text-slate-500" />
+                <h3 className="text-sm font-semibold text-slate-700">Contact Information</h3>
+                <Badge variant="outline" className="text-[10px]">Optional</Badge>
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div><Label>Phone</Label><Input value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} placeholder="+234 XXX XXX XXXX" className="mt-1" /></div>
-                <div><Label>Join Year</Label><Select value={newStaff.join_year?.toString()} onValueChange={(v) => setNewStaff({ ...newStaff, join_year: parseInt(v) })}><SelectTrigger className="mt-1"><SelectValue placeholder="Select join year" /></SelectTrigger><SelectContent className="max-h-[200px]">{joinYears.map(year => <SelectItem key={year} value={year.toString()}>{year}</SelectItem>)}</SelectContent></Select></div>
-              </div>
-              
-              <div><Label>Address</Label><Input value={newStaff.address} onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })} placeholder="Staff address" className="mt-1" /></div>
-              
-              <div className="bg-primary/5 rounded-lg p-3 border border-primary/10">
-                <p className="text-xs flex items-center gap-2"><Shield className="h-3 w-3" /><strong>Credentials auto-generated</strong></p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs text-slate-500">Phone Number</Label>
+                  <Input 
+                    value={newStaff.phone} 
+                    onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} 
+                    placeholder="+234 XXX XXX XXXX"
+                    className="mt-1 h-9"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-slate-500">Address</Label>
+                  <Input 
+                    value={newStaff.address} 
+                    onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })} 
+                    placeholder="Staff address"
+                    className="mt-1 h-9"
+                  />
+                </div>
               </div>
             </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setShowAddDialog(false)}>Cancel</Button>
-              <Button onClick={handleAddStaffClick} disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Add Staff</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </motion.div>
+          </div>
+          
+          <DialogFooter className="sticky bottom-0 bg-white dark:bg-slate-950 border-t px-6 py-4 gap-2">
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="h-9">
+              Cancel
+            </Button>
+            <Button onClick={handleAddStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 h-9">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
+              {isSubmitting ? 'Creating...' : 'Add Staff'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search by name, email, VIN ID..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9 pr-8" />
-          {searchQuery && <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2"><X className="h-4 w-4 text-muted-foreground hover:text-foreground" /></button>}
-        </div>
-        <Button variant="outline" size="sm" onClick={() => onRefresh?.()}><RefreshCw className="mr-2 h-4 w-4" />Refresh</Button>
-      </div>
-
-      <Card className="border-0 shadow-lg overflow-hidden">
+      {/* Staff Table */}
+      <Card className="border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-muted/50">
+            <TableHeader className="bg-slate-50">
               <TableRow>
-                <TableHead className="font-semibold py-4 px-4">Staff Member</TableHead>
-                <TableHead className="font-semibold py-4 px-4">VIN ID</TableHead>
-                <TableHead className="font-semibold py-4 px-4">Department</TableHead>
-                <TableHead className="font-semibold py-4 px-4 hidden md:table-cell">Phone</TableHead>
-                <TableHead className="font-semibold py-4 px-4">Status</TableHead>
-                <TableHead className="font-semibold py-4 px-4 text-center">Actions</TableHead>
+                <TableHead className="font-semibold py-3 px-4">Staff Member</TableHead>
+                <TableHead className="font-semibold py-3 px-4">VIN ID</TableHead>
+                <TableHead className="font-semibold py-3 px-4">Department</TableHead>
+                <TableHead className="font-semibold py-3 px-4 hidden md:table-cell">Phone</TableHead>
+                <TableHead className="font-semibold py-3 px-4">Status</TableHead>
+                <TableHead className="font-semibold py-3 px-4 text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredStaff.length === 0 ? (
-                <TableRow><TableCell colSpan={6} className="text-center py-16"><div className="flex flex-col items-center gap-3"><Users className="h-8 w-8 text-muted-foreground/40" /><p className="text-muted-foreground font-medium">No staff members found</p></div></TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-12">
+                    <div className="flex flex-col items-center gap-3">
+                      <Users className="h-10 w-10 text-slate-300" />
+                      <p className="text-slate-500 font-medium">No staff members found</p>
+                    </div>
+                  </TableCell>
+                </TableRow>
               ) : (
-                filteredStaff.map((member, index) => {
-                  const status = getStatusDisplay(member)
-                  return (
-                    <motion.tr
-                      key={member.id}
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="border-b hover:bg-muted/30 transition-colors"
-                    >
-                      <TableCell className="py-4 px-4">
-                        <div className="flex items-center gap-3 min-w-[200px]">
-                          <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-                            <AvatarImage src={member.photo_url} />
-                            <AvatarFallback className="bg-gradient-to-br from-blue-500/20 to-blue-500/10 text-blue-600 font-medium">
-                              {member.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'S'}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium truncate">{member.full_name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{member.email}</p>
-                          </div>
+                filteredStaff.map((member, index) => (
+                  <motion.tr
+                    key={member.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.02 }}
+                    className="border-b hover:bg-slate-50/50 transition-colors"
+                  >
+                    <TableCell className="py-3 px-4">
+                      <div className="flex items-center gap-3 min-w-[200px]">
+                        <Avatar className="h-10 w-10 ring-1 ring-slate-200">
+                          <AvatarImage src={member.photo_url} />
+                          <AvatarFallback className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 text-emerald-700 font-semibold text-sm">
+                            {member.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'ST'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-slate-800 truncate">{member.full_name}</p>
+                          <p className="text-xs text-slate-500 truncate">{member.email}</p>
                         </div>
-                      </TableCell>
-                      <TableCell className="py-4 px-4">
-                        <code className="text-xs bg-muted px-2 py-1 rounded font-mono whitespace-nowrap">{member.vin_id}</code>
-                      </TableCell>
-                      <TableCell className="py-4 px-4">
-                        <Badge variant="outline" className="font-normal whitespace-nowrap">{member.department || '-'}</Badge>
-                      </TableCell>
-                      <TableCell className="py-4 px-4 hidden md:table-cell">
-                        <div className="flex items-center gap-1 whitespace-nowrap">
-                          <Phone className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{member.phone || '-'}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4 px-4">
-                        <div className="flex items-center gap-1.5">
-                          {status.icon}
-                          <span className={cn("text-sm", status.className)}>{status.text}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4 px-4 text-center">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowViewDetailsDialog(true) }}>
-                              <Eye className="mr-2 h-4 w-4" /> View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowEditDialog(true) }}>
-                              <Edit className="mr-2 h-4 w-4" /> Edit Profile
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleResetPasswordClick(member)}>
-                              <KeyRound className="mr-2 h-4 w-4" /> Reset Password
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }} className="text-red-600">
-                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </motion.tr>
-                  )
-                })
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3 px-4">
+                      <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">{member.vin_id}</code>
+                    </TableCell>
+                    <TableCell className="py-3 px-4">
+                      <Badge variant="outline" className="font-normal bg-slate-50">
+                        {member.department || '-'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 px-4 hidden md:table-cell">
+                      <div className="flex items-center gap-1.5">
+                        <Phone className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="text-sm text-slate-600">{member.phone || '-'}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="py-3 px-4">
+                      <Badge className={cn(
+                        "text-xs font-medium px-2 py-0.5",
+                        member.is_active 
+                          ? "bg-emerald-100 text-emerald-700" 
+                          : "bg-slate-100 text-slate-600"
+                      )}>
+                        {member.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="py-3 px-4 text-center">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowViewDetailsDialog(true) }}>
+                            <Eye className="mr-2 h-4 w-4" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowEditDialog(true) }}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit Profile
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleResetPasswordClick(member)}>
+                            <KeyRound className="mr-2 h-4 w-4" /> Reset Password
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }} className="text-red-600">
+                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </motion.tr>
+                ))
               )}
             </TableBody>
           </Table>
@@ -435,73 +572,140 @@ export function StaffManagement({
       <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-lg">
               <CheckCircle className="h-5 w-5 text-emerald-500" />
-              Staff Account Created!
+              Staff Account Created
             </DialogTitle>
-            <DialogDescription>Save these credentials for the staff member.</DialogDescription>
+            <DialogDescription>
+              Save these credentials for the staff member. Password = VIN ID
+            </DialogDescription>
           </DialogHeader>
           {newCredentials && (
-            <div className="space-y-4 py-4">
-              <div className="bg-muted rounded-lg p-4 space-y-3">
+            <div className="space-y-4 py-2">
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-center">
-                  <div><p className="text-xs text-muted-foreground">Email</p><p className="font-mono text-sm">{newCredentials.email}</p></div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.email, 'Email')}><Copy className="h-3 w-3" /></Button>
+                  <div>
+                    <p className="text-xs text-slate-500">Email Address</p>
+                    <p className="font-mono text-sm font-medium">{newCredentials.email}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.email, 'Email')} className="h-8">
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
-                <div className="flex justify-between items-center">
-                  <div><p className="text-xs text-muted-foreground">Password (VIN ID)</p><p className="font-mono text-sm font-bold text-primary">{newCredentials.password}</p></div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.password, 'Password')}><Copy className="h-3 w-3" /></Button>
+                <div className="flex justify-between items-center pt-2 border-t">
+                  <div>
+                    <p className="text-xs text-slate-500">Password / VIN ID</p>
+                    <p className="font-mono text-sm font-bold text-emerald-600">{newCredentials.password}</p>
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.password, 'Password')} className="h-8">
+                    <Copy className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               </div>
               <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200">
-                <p className="text-xs text-amber-800 flex items-center gap-2">
-                  <Shield className="h-3 w-3" />
-                  <strong>Note:</strong> Password = VIN ID. Staff will be prompted to change it on first login.
+                <p className="text-xs text-amber-700 flex items-center gap-2">
+                  <Shield className="h-3.5 w-3.5" />
+                  <span>Staff will be prompted to change password on first login</span>
                 </p>
               </div>
             </div>
           )}
-          <DialogFooter><Button onClick={() => setShowCredentialsDialog(false)}>Close</Button></DialogFooter>
+          <DialogFooter>
+            <Button onClick={() => setShowCredentialsDialog(false)} className="h-9">Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader><DialogTitle>Edit Staff Member</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Edit Staff Member</DialogTitle>
+          </DialogHeader>
           {selectedStaff && (
-            <div className="space-y-4 py-4">
-              <div><Label>Full Name</Label><Input value={selectedStaff.full_name} onChange={(e) => setSelectedStaff({ ...selectedStaff, full_name: e.target.value })} /></div>
-              <div><Label>Department</Label><Select value={selectedStaff.department} onValueChange={(v) => setSelectedStaff({ ...selectedStaff, department: v })}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}</SelectContent></Select></div>
-              <div><Label>Phone</Label><Input value={selectedStaff.phone || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, phone: e.target.value })} /></div>
-              <div><Label>Address</Label><Input value={selectedStaff.address || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, address: e.target.value })} /></div>
-              <div className="flex items-center gap-3">
+            <div className="space-y-4 py-2">
+              <div>
+                <Label className="text-sm">Full Name</Label>
+                <Input 
+                  value={selectedStaff.full_name} 
+                  onChange={(e) => setSelectedStaff({ ...selectedStaff, full_name: e.target.value })} 
+                  className="mt-1 h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Department</Label>
+                <Select value={selectedStaff.department} onValueChange={(v) => setSelectedStaff({ ...selectedStaff, department: v })}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm">Phone</Label>
+                <Input 
+                  value={selectedStaff.phone || ''} 
+                  onChange={(e) => setSelectedStaff({ ...selectedStaff, phone: e.target.value })} 
+                  className="mt-1 h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-sm">Address</Label>
+                <Input 
+                  value={selectedStaff.address || ''} 
+                  onChange={(e) => setSelectedStaff({ ...selectedStaff, address: e.target.value })} 
+                  className="mt-1 h-9"
+                />
+              </div>
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-sm text-slate-600">Account Status</span>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" checked={selectedStaff.is_active} onChange={(e) => setSelectedStaff({ ...selectedStaff, is_active: e.target.checked })} className="sr-only peer" />
-                  <div className="w-9 h-5 bg-muted rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
-                  <span className="ml-3 text-sm font-medium">Active Account</span>
+                  <input
+                    type="checkbox"
+                    checked={selectedStaff.is_active}
+                    onChange={(e) => setSelectedStaff({ ...selectedStaff, is_active: e.target.checked })}
+                    className="sr-only peer"
+                  />
+                  <div className="w-10 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600" />
+                  <span className="ml-3 text-sm font-medium">
+                    {selectedStaff.is_active ? 'Active' : 'Inactive'}
+                  </span>
                 </label>
               </div>
             </div>
           )}
-          <DialogFooter><Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button><Button onClick={handleUpdateStaffClick} disabled={isSubmitting}>{isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Save</Button></DialogFooter>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="h-9">Cancel</Button>
+            <Button onClick={handleUpdateStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 h-9">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Save Changes
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Delete Dialog */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent>
-          <DialogHeader><DialogTitle className="text-red-600 flex items-center gap-2"><AlertCircle className="h-5 w-5" />Confirm Deletion</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="h-5 w-5" />
+              Confirm Deletion
+            </DialogTitle>
+          </DialogHeader>
           {selectedStaff && (
             <div className="py-4">
-              <p className="text-lg font-medium">Delete {selectedStaff.full_name}?</p>
-              <p className="text-sm text-muted-foreground mt-1">This action cannot be undone.</p>
+              <p className="text-base font-medium">Delete {selectedStaff.full_name}?</p>
+              <p className="text-sm text-slate-500 mt-1">This action cannot be undone.</p>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteStaffClick} disabled={isSubmitting}>
-              {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}Delete
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="h-9">Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteStaffClick} disabled={isSubmitting} className="h-9">
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -509,35 +713,59 @@ export function StaffManagement({
 
       {/* View Details Dialog */}
       <Dialog open={showViewDetailsDialog} onOpenChange={setShowViewDetailsDialog}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Staff Details</DialogTitle></DialogHeader>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Staff Details</DialogTitle>
+          </DialogHeader>
           {selectedStaff && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback className="text-xl">
+            <div className="space-y-4 py-2">
+              <div className="flex items-center gap-4 pb-2 border-b">
+                <Avatar className="h-14 w-14">
+                  <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-lg font-semibold">
                     {selectedStaff.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-xl font-bold">{selectedStaff.full_name}</p>
-                  <p className="text-sm text-muted-foreground">{selectedStaff.email}</p>
+                  <p className="text-lg font-bold text-slate-800">{selectedStaff.full_name}</p>
+                  <p className="text-sm text-slate-500">{selectedStaff.email}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 bg-muted rounded-lg p-4">
-                <div><p className="text-xs text-muted-foreground">VIN ID</p><p className="font-mono font-medium">{selectedStaff.vin_id}</p></div>
-                <div><p className="text-xs text-muted-foreground">Department</p><p className="font-medium">{selectedStaff.department || '-'}</p></div>
-                <div><p className="text-xs text-muted-foreground">Phone</p><p className="font-medium">{selectedStaff.phone || '-'}</p></div>
+              
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-lg p-4">
                 <div>
-                  <p className="text-xs text-muted-foreground">Status</p>
-                  <p className={cn("text-sm font-medium", selectedStaff.is_active ? 'text-emerald-600' : 'text-red-500')}>
+                  <p className="text-xs text-slate-500">VIN ID</p>
+                  <p className="font-mono text-sm font-medium">{selectedStaff.vin_id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Department</p>
+                  <p className="font-medium text-sm">{selectedStaff.department || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Phone</p>
+                  <p className="font-medium text-sm">{selectedStaff.phone || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Status</p>
+                  <Badge className={cn(
+                    "text-xs",
+                    selectedStaff.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                  )}>
                     {selectedStaff.is_active ? 'Active' : 'Inactive'}
-                  </p>
+                  </Badge>
                 </div>
               </div>
+              
+              {selectedStaff.address && (
+                <div>
+                  <p className="text-xs text-slate-500">Address</p>
+                  <p className="text-sm bg-slate-50 rounded-lg p-3">{selectedStaff.address}</p>
+                </div>
+              )}
             </div>
           )}
-          <DialogFooter><Button onClick={() => setShowViewDetailsDialog(false)}>Close</Button></DialogFooter>
+          <DialogFooter>
+            <Button onClick={() => setShowViewDetailsDialog(false)} className="h-9">Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

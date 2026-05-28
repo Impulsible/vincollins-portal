@@ -1,4 +1,5 @@
-// app/admin/page.tsx - FULLY UPDATED (Loading Admin Dashboard text)
+// app/admin/page.tsx - WITH AdminLoading COMPONENT
+
 'use client'
 
 import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -9,7 +10,6 @@ import { useUser } from '@/contexts/UserContext'
 import { AuthGuard } from '@/components/AuthGuard'
 import { WelcomeBanner } from '@/components/admin/dashboard/WelcomeBanner'
 import { StatsCards } from '@/components/admin/dashboard/StatsCards'
-import { RecentActivityFeed } from '@/components/admin/dashboard/RecentActivityFeed'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -20,8 +20,9 @@ import {
   Loader2, Shield, ArrowRight, MonitorPlay,
   Users, FileCheck, School, MessageSquare, 
   CheckCircle2, XCircle, Clock, Bell, BookOpen,
-  RefreshCw, AlertTriangle, X
+  RefreshCw, AlertTriangle, X, Megaphone
 } from 'lucide-react'
+import AdminLoading from '@/components/admin/AdminLoading'
 import type { Student } from '@/components/admin/students/types'
 
 // ========== LAZY LOAD HEAVY COMPONENTS ==========
@@ -43,6 +44,10 @@ const BroadSheetPage = dynamic(
 )
 const AdminInquiriesTab = dynamic(
   () => import('@/components/admin/inquiries/AdminInquiriesTab').then(mod => ({ default: mod.AdminInquiriesTab })),
+  { ssr: false }
+)
+const AnnouncementsManager = dynamic(
+  () => import('@/components/admin/announcements/AnnouncementsManager').then(mod => ({ default: mod.AnnouncementsManager })),
   { ssr: false }
 )
 
@@ -75,20 +80,30 @@ interface Exam {
 }
 
 // ========== CONSTANTS ==========
-const CACHE_DURATION = 60000 // 1 minute cache
+const CACHE_DURATION = 60000
 
 const routeToTabMap: Record<string, string> = {
-  '/admin': 'overview', '/admin/broad-sheet': 'broad-sheet',
-  '/admin/students': 'students', '/admin/staff': 'staff',
-  '/admin/exams': 'exams', '/admin/report-cards': 'report-cards',
-  '/admin/inquiries': 'inquiries', '/admin/monitor': 'cbt-monitor',
+  '/admin': 'overview',
+  '/admin/broad-sheet': 'broad-sheet',
+  '/admin/students': 'students',
+  '/admin/staff': 'staff',
+  '/admin/exams': 'exams',
+  '/admin/report-cards': 'report-cards',
+  '/admin/inquiries': 'inquiries',
+  '/admin/monitor': 'cbt-monitor',
+  '/admin/announcements': 'announcements',
 }
 
 const tabToRouteMap: Record<string, string> = {
-  'overview': '/admin', 'broad-sheet': '/admin/broad-sheet',
-  'students': '/admin/students', 'staff': '/admin/staff',
-  'exams': '/admin/exams', 'report-cards': '/admin/report-cards',
-  'inquiries': '/admin/inquiries', 'cbt-monitor': '/admin/monitor',
+  'overview': '/admin',
+  'broad-sheet': '/admin/broad-sheet',
+  'students': '/admin/students',
+  'staff': '/admin/staff',
+  'exams': '/admin/exams',
+  'report-cards': '/admin/report-cards',
+  'inquiries': '/admin/inquiries',
+  'cbt-monitor': '/admin/monitor',
+  'announcements': '/admin/announcements',
 }
 
 const getTabFromPathname = (pathname: string | null): string => {
@@ -122,6 +137,53 @@ function mapToStaff(p: Record<string, unknown>): Staff {
     password_changed: (p.password_changed as boolean) ?? false,
     created_at: (p.created_at as string) || new Date().toISOString(),
   }
+}
+
+// ========== QUICK ACTION CARD ==========
+function QuickActionCard({ 
+  icon: Icon, 
+  label, 
+  desc, 
+  onClick, 
+  alert 
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  desc: string; 
+  onClick: () => void; 
+  alert?: boolean;
+}) {
+  return (
+    <div 
+      onClick={onClick} 
+      role="button" 
+      tabIndex={0} 
+      onKeyDown={(e) => { 
+        if (e.key === 'Enter' || e.key === ' ') { 
+          e.preventDefault(); 
+          onClick(); 
+        } 
+      }} 
+      className={cn(
+        "p-2 sm:p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500",
+        alert ? "border-amber-300 bg-amber-50/30" : "border-slate-100"
+      )}
+      aria-label={`${label}: ${desc}`}
+    >
+      <div className="flex items-center gap-2 sm:gap-3">
+        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
+          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs sm:text-sm font-semibold truncate">{label}</p>
+          <p className="text-[10px] sm:text-xs text-slate-400 truncate">{desc}</p>
+        </div>
+        {alert && (
+          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-500 animate-pulse shrink-0" aria-label="Alert" />
+        )}
+      </div>
+    </div>
+  )
 }
 
 // ========== MAIN COMPONENT ==========
@@ -176,7 +238,7 @@ function AdminDashboardContent() {
     }
   }, [contextUser])
 
-  // Sync tab with pathname - NO AUTO RELOAD
+  // Sync tab with pathname
   useEffect(() => {
     const tabForCurrentRoute = getTabFromPathname(pathname)
     if (tabForCurrentRoute !== activeTab) {
@@ -192,9 +254,8 @@ function AdminDashboardContent() {
     }
   }, [])
 
-  // Load data with caching
+  // Load all data
   const loadAllData = useCallback(async (forceRefresh = false) => {
-    // Check cache
     const now = Date.now()
     if (!forceRefresh && lastLoadTimeRef.current && (now - lastLoadTimeRef.current) < CACHE_DURATION) {
       const cached = cacheRef.current.get('dashboardData')
@@ -216,7 +277,6 @@ function AdminDashboardContent() {
     }
 
     try {
-      // Fetch all data in parallel
       const [profilesRes, examsRes, inquiriesRes, reportsRes] = await Promise.allSettled([
         supabase.from('profiles').select('id, role, full_name, email, photo_url, vin_id, class, department, is_active, phone, address, password_changed, created_at').limit(1000),
         supabase.from('exams').select('*').order('created_at', { ascending: false }).limit(500),
@@ -298,7 +358,7 @@ function AdminDashboardContent() {
     }
   }, [students, staff, pendingExams, publishedExams, inquiries, pendingExamsCount, pendingReports, pendingInquiries, stats])
 
-  // Initial load - ONLY ONCE
+  // Initial load
   useEffect(() => {
     if (contextUser?.id && !initialLoadDoneRef.current && !dataLoaded) {
       initialLoadDoneRef.current = true
@@ -445,7 +505,7 @@ function AdminDashboardContent() {
               onReportCardsClick={() => handleTabChange('report-cards')} 
             />
             
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 sm:gap-3">
               <QuickActionCard 
                 icon={BookOpen} 
                 label="Broad Sheet" 
@@ -473,10 +533,21 @@ function AdminDashboardContent() {
                 onClick={() => handleTabChange('inquiries')} 
                 alert={pendingInquiries > 0} 
               />
+              <QuickActionCard 
+                icon={Megaphone} 
+                label="Announcements" 
+                desc="Send updates" 
+                onClick={() => handleTabChange('announcements')} 
+              />
             </div>
-            
-            <RecentActivityFeed />
           </motion.div>
+        )
+      
+      case 'announcements':
+        return (
+          <Suspense fallback={<div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>}>
+            <AnnouncementsManager profile={profile} />
+          </Suspense>
         )
       
       case 'broad-sheet':
@@ -675,73 +746,14 @@ function AdminDashboardContent() {
     }
   }, [activeTab, error, profile, pendingExamsCount, pendingReports, pendingInquiries, stats, students, staff, pendingExams, publishedExams, inquiries, refreshing, approvingId, dismissedBanner, handleTabChange, handleRefresh, handleApproveExam, handleRejectExam, handleRetry])
 
-  // ✅ LOADING STATE - UPDATED with "Loading Admin Dashboard..."
+  // LOADING STATE - USING AdminLoading COMPONENT
   if (authLoading || (loading && !dataLoaded && !error)) {
-    return (
-      <div className="flex items-center justify-center min-h-[50vh] px-4">
-        <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-          >
-            <Shield className="h-12 w-12 sm:h-16 sm:w-16 text-purple-600 mx-auto" />
-          </motion.div>
-          <p className="mt-4 text-slate-600 text-base sm:text-lg font-medium">Loading Admin Dashboard...</p>
-        </div>
-      </div>
-    )
+    return <AdminLoading profile={profile} onLogout={() => {}} />
   }
 
   return (
     <div className="w-full overflow-x-hidden">
       {tabContent}
-    </div>
-  )
-}
-
-// Mobile-optimized Quick Action Card
-function QuickActionCard({ 
-  icon: Icon, 
-  label, 
-  desc, 
-  onClick, 
-  alert 
-}: { 
-  icon: React.ElementType; 
-  label: string; 
-  desc: string; 
-  onClick: () => void; 
-  alert?: boolean;
-}) {
-  return (
-    <div 
-      onClick={onClick} 
-      role="button" 
-      tabIndex={0} 
-      onKeyDown={(e) => { 
-        if (e.key === 'Enter' || e.key === ' ') { 
-          e.preventDefault(); 
-          onClick(); 
-        } 
-      }} 
-      className={cn(
-        "p-2 sm:p-4 rounded-xl border-2 cursor-pointer transition-all hover:shadow-md hover:border-purple-300 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500",
-        alert ? "border-amber-300 bg-amber-50/30" : "border-slate-100"
-      )}
-      aria-label={`${label}: ${desc}`}
-    >
-      <div className="flex items-center gap-2 sm:gap-3">
-        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-lg sm:rounded-xl bg-purple-50 flex items-center justify-center shrink-0">
-          <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs sm:text-sm font-semibold truncate">{label}</p>
-          <p className="text-[10px] sm:text-xs text-slate-400 truncate">{desc}</p>
-        </div>
-        {alert && (
-          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 rounded-full bg-amber-500 animate-pulse shrink-0" aria-label="Alert" />
-        )}
-      </div>
     </div>
   )
 }

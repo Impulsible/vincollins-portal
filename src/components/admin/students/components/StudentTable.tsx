@@ -37,27 +37,24 @@ export function StudentTable({
   onDelete,
 }: StudentTableProps) {
   return (
-    <Card className="border-0 shadow-lg overflow-hidden">
+    <Card className="border shadow-sm rounded-xl overflow-hidden">
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="bg-muted/50">
-            <TableRow>
-              <TableHead className="font-semibold py-4 px-4">Student</TableHead>
-              <TableHead className="font-semibold py-4 px-4">VIN ID</TableHead>
-              <TableHead className="font-semibold py-4 px-4">Admission No.</TableHead>
-              <TableHead className="font-semibold py-4 px-4">Class</TableHead>
-              <TableHead className="font-semibold py-4 px-4 hidden lg:table-cell">Gender</TableHead>
-              <TableHead className="font-semibold py-4 px-4 hidden lg:table-cell">Year</TableHead>
-              <TableHead className="font-semibold py-4 px-4 hidden md:table-cell">Dept</TableHead>
-              <TableHead className="font-semibold py-4 px-4">Status</TableHead>
-              <TableHead className="font-semibold py-4 px-4 hidden sm:table-cell">Last Seen</TableHead>
-              <TableHead className="font-semibold py-4 px-4 text-center">Actions</TableHead>
+          <TableHeader className="bg-slate-50">
+            <TableRow className="border-b border-slate-200">
+              <TableHead className="font-semibold text-slate-700 py-4 px-4">Student</TableHead>
+              <TableHead className="font-semibold text-slate-700 py-4 px-4">VIN ID</TableHead>
+              <TableHead className="font-semibold text-slate-700 py-4 px-4">Admission No.</TableHead>
+              <TableHead className="font-semibold text-slate-700 py-4 px-4">Class</TableHead>
+              <TableHead className="font-semibold text-slate-700 py-4 px-4 hidden lg:table-cell">Dept</TableHead>
+              <TableHead className="font-semibold text-slate-700 py-4 px-4">Status</TableHead>
+              <TableHead className="font-semibold text-slate-700 py-4 px-4 text-center w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {students.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} className="text-center">
+                <TableCell colSpan={7} className="text-center py-12">
                   <EmptyState searchQuery={searchQuery} />
                 </TableCell>
               </TableRow>
@@ -82,3 +79,6 @@ export function StudentTable({
     </Card>
   )
 }
+
+// Add default export
+export default StudentTable

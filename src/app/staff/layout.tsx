@@ -1,4 +1,5 @@
-// app/staff/layout.tsx - FIXED - NO type=eq.theory ERROR
+// app/staff/layout.tsx - WITH ANNOUNCEMENTS
+
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react'
@@ -11,7 +12,7 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Briefcase, LogOut, User, ChevronDown, GraduationCap, Settings,
-  Bell
+  Bell, Megaphone
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -99,6 +100,7 @@ function DesktopTopBar({ profile, activeTab, handleLogout }: { profile: StaffPro
       'overview': 'Dashboard Overview', 'exams': 'Exams Management', 'assignments': 'Assignments',
       'notes': 'Lesson Notes', 'students': 'Students', 'report-cards': 'Report Cards',
       'ca-scores': 'CA Scores', 'results': 'Results', 'notifications': 'Notifications',
+      'announcements': 'Announcements',
     }
     return titles[tab] || tab.charAt(0).toUpperCase() + tab.slice(1).replace('-', ' ')
   }
@@ -147,6 +149,9 @@ function DesktopTopBar({ profile, activeTab, handleLogout }: { profile: StaffPro
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => router.push('/staff/announcements')} className="cursor-pointer">
+                <Megaphone className="mr-2 h-4 w-4" />Announcements
+              </DropdownMenuItem>
               <DropdownMenuItem onClick={() => router.push('/staff/notifications')} className="cursor-pointer">
                 <Bell className="mr-2 h-4 w-4" />Notifications
               </DropdownMenuItem>
@@ -173,6 +178,7 @@ function MobileTopBar({ profile, activeTab }: { profile: StaffProfile | null; ac
       'overview': 'Dashboard', 'exams': 'Exams', 'assignments': 'Assignments',
       'notes': 'Notes', 'students': 'Students', 'report-cards': 'Reports',
       'ca-scores': 'CA Scores', 'results': 'Results', 'notifications': 'Notifications',
+      'announcements': 'Announcements',
     }
     return titles[tab] || tab.charAt(0).toUpperCase() + tab.slice(1)
   }
@@ -216,7 +222,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
   }, [sidebarCollapsed, isHydrated])
 
   useEffect(() => {
-    const paths = ['exams', 'assignments', 'notes', 'students', 'report-cards', 'ca-scores', 'results', 'notifications']
+    const paths = ['exams', 'assignments', 'notes', 'students', 'report-cards', 'ca-scores', 'results', 'notifications', 'announcements']
     let matched = false
     for (const path of paths) {
       if (pathname?.startsWith(`/staff/${path}`)) { setActiveTab(path); matched = true; break }
@@ -256,7 +262,6 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
       let pendingGradingCount = 0
       try { const { count } = await supabase.from('ca_scores').select('*', { count: 'exact', head: true }).eq('teacher_id', session.user.id); pendingGradingCount = count || 0 } catch {}
 
-      // FIXED: Count pending theory from exam_attempts, NOT exams
       let pendingTheoryCount = 0
       try { 
         const { count } = await supabase.from('exam_attempts').select('*', { count: 'exact', head: true })
@@ -341,7 +346,7 @@ export default function StaffLayout({ children }: { children: React.ReactNode })
                 'overview': '/staff', 'exams': '/staff/exams', 'assignments': '/staff/assignments',
                 'notes': '/staff/notes', 'students': '/staff/students',
                 'ca-scores': '/staff/ca-scores', 'report-cards': '/staff/report-cards',
-                'notifications': '/staff/notifications',
+                'notifications': '/staff/notifications', 'announcements': '/staff/announcements',
               }
               const path = pathMap[tab]
               if (path) router.push(path)

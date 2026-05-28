@@ -1,4 +1,5 @@
-// app/admin/layout.tsx
+// app/admin/layout.tsx - WITH LOADING STATE
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -8,6 +9,7 @@ import { instantLogout } from '@/lib/auth-utils'
 import { Header } from '@/components/layout/header'
 import { AdminSidebar } from '@/components/admin/AdminSidebar'
 import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
+import AdminLoading from '@/components/admin/AdminLoading'
 import { cn } from '@/lib/utils'
 
 interface AdminProfile {
@@ -32,6 +34,7 @@ const routeToTabMap: Record<string, string> = {
   '/admin/report-cards': 'report-cards',
   '/admin/inquiries': 'inquiries',
   '/admin/monitor': 'cbt-monitor',
+  '/admin/announcements': 'announcements',
   '/admin/settings': 'settings',
   '/admin/help': 'help',
 }
@@ -45,6 +48,7 @@ const tabToRouteMap: Record<string, string> = {
   'report-cards': '/admin/report-cards',
   'inquiries': '/admin/inquiries',
   'cbt-monitor': '/admin/monitor',
+  'announcements': '/admin/announcements',
   'settings': '/admin/settings',
   'help': '/admin/help',
 }
@@ -89,66 +93,83 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [pendingExamsCount, setPendingExamsCount] = useState(0)
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingInquiries, setPendingInquiries] = useState(0)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.user) {
-        router.push('/portal')
-        return
-      }
-
-      const { data } = await supabase
-        .from('profiles')
-        .select('id, full_name, display_name, first_name, last_name, middle_name, email, photo_url, avatar_url, role')
-        .eq('id', session.user.id)
-        .single()
-      if (data) setProfile(data)
-
-      // Use cached counts if available
-      if (countsCache && Date.now() - countsCache.timestamp < COUNTS_CACHE_DURATION) {
-        const c = countsCache.data
-        setNotificationCount(c.notificationCount)
-        setPendingExamsCount(c.pendingExamsCount)
-        setPendingReports(c.pendingReports)
-        setPendingInquiries(c.pendingInquiries)
-        return
-      }
-
-      // Fetch counts (only when cache expired)
+      setLoading(true)
       try {
-        const { count: n } = await supabase.from('notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', session.user.id)
-          .eq('read', false)
-        const { count: e } = await supabase.from('exams')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-        const { count: r } = await supabase.from('report_cards')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-        const { count: i } = await supabase.from('inquiries')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'pending')
-
-        const counts = {
-          notificationCount: n || 0,
-          pendingExamsCount: e || 0,
-          pendingReports: r || 0,
-          pendingInquiries: i || 0
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) {
+          router.push('/portal')
+          return
         }
-        countsCache = { data: counts, timestamp: Date.now() }
 
-        setNotificationCount(counts.notificationCount)
-        setPendingExamsCount(counts.pendingExamsCount)
-        setPendingReports(counts.pendingReports)
-        setPendingInquiries(counts.pendingInquiries)
-      } catch {
-        // Silently fail - counts just stay at 0
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, display_name, first_name, last_name, middle_name, email, photo_url, avatar_url, role')
+          .eq('id', session.user.id)
+          .single()
+        if (data) setProfile(data)
+
+        // Use cached counts if available
+        if (countsCache && Date.now() - countsCache.timestamp < COUNTS_CACHE_DURATION) {
+          const c = countsCache.data
+          setNotificationCount(c.notificationCount)
+          setPendingExamsCount(c.pendingExamsCount)
+          setPendingReports(c.pendingReports)
+          setPendingInquiries(c.pendingInquiries)
+          setLoading(false)
+          return
+        }
+
+        // Fetch counts (only when cache expired)
+        try {
+          const [notificationsRes, examsRes, reportsRes, inquiriesRes] = await Promise.allSettled([
+            supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('read', false),
+            supabase.from('exams').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+            supabase.from('report_cards').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+            supabase.from('inquiries').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+          ])
+
+          const n = notificationsRes.status === 'fulfilled' ? notificationsRes.value.count || 0 : 0
+          const e = examsRes.status === 'fulfilled' ? examsRes.value.count || 0 : 0
+          const r = reportsRes.status === 'fulfilled' ? reportsRes.value.count || 0 : 0
+          const i = inquiriesRes.status === 'fulfilled' ? inquiriesRes.value.count || 0 : 0
+
+          const counts = {
+            notificationCount: n,
+            pendingExamsCount: e,
+            pendingReports: r,
+            pendingInquiries: i
+          }
+          countsCache = { data: counts, timestamp: Date.now() }
+
+          setNotificationCount(counts.notificationCount)
+          setPendingExamsCount(counts.pendingExamsCount)
+          setPendingReports(counts.pendingReports)
+          setPendingInquiries(counts.pendingInquiries)
+        } catch {
+          // Silently fail - counts just stay at 0
+        }
+      } catch (error) {
+        console.error('Error initializing admin layout:', error)
+      } finally {
+        setLoading(false)
       }
     }
     init()
-  }, [router, pathname])
+  }, [router])
+
+  // Sync active tab with pathname
+  useEffect(() => {
+    if (pathname) {
+      const tab = getTabFromPathname(pathname)
+      if (tab !== activeTab) {
+        setActiveTab(tab)
+      }
+    }
+  }, [pathname, activeTab])
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab)
@@ -161,6 +182,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Single source of truth for sign out
   const handleLogout = () => {
     instantLogout()
+  }
+
+  // Show loading state
+  if (loading) {
+    return <AdminLoading profile={profile} onLogout={handleLogout} />
   }
 
   return (

@@ -1,4 +1,4 @@
-// components/layout/header/UserSection.tsx - INDEPENDENT DROPDOWNS + NO LOGIN ON PORTAL
+// components/layout/header/UserSection.tsx - INDEPENDENT DROPDOWNS + PORTAL PAGE REDIRECT
 'use client'
 
 import { useState, useRef, useEffect, memo, useCallback } from 'react'
@@ -100,6 +100,13 @@ export const UserSection = memo(function UserSection({
     router.push(urls[user?.role || 'student'] || '/student')
   }
 
+  // ✅ Handle portal page click - ALWAYS go to /portal (whether authenticated or not)
+  const handlePortalClick = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    setProfileOpen(false)
+    router.push('/portal')
+  }, [router])
+
   return (
     <div className="flex items-center">
       
@@ -196,12 +203,15 @@ export const UserSection = memo(function UserSection({
                       <Home className="h-4 w-4 text-gray-400 shrink-0" />Home Page
                     </Link>
                   )}
-                  {/* ✅ Don't show Portal Page link when already on portal */}
+                  {/* ✅ FIXED: Portal Page - ALWAYS takes user to /portal */}
                   {pathname !== '/portal' && (
-                    <Link href="/portal" className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-                      onClick={() => setProfileOpen(false)}>
-                      <KeyRound className="h-4 w-4 text-gray-400 shrink-0" />Portal Page
-                    </Link>
+                    <button 
+                      onClick={handlePortalClick}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <KeyRound className="h-4 w-4 text-gray-400 shrink-0" />
+                      Portal Page
+                    </button>
                   )}
                 </div>
                 
@@ -215,8 +225,8 @@ export const UserSection = memo(function UserSection({
             )}
           </div>
         ) : (
-          // ✅ Don't show Portal Login button when already on portal page
-          isPublicPage && !isPortalPage && (
+          // Don't show Portal Login button when already on portal page
+          !isPortalPage && (
             <Link href="/portal" className="hidden sm:inline-flex items-center px-4 py-2 bg-[#F5A623] text-[#0A2472] rounded-full font-semibold text-sm mx-0.5">
               <KeyRound className="mr-1.5 h-4 w-4" />Portal Login
             </Link>

@@ -1,16 +1,37 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // app/api/admin/users/create/route.ts
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   console.log('📦 API called: Create User')
+  console.log('🔑 Environment check:', {
+    hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY, // ✅ Changed from NEXT_SUPABASE_SERVICE_ROLE_KEY
+    url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 20) + '...',
+  })
   
   try {
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_SUPABASE_SERVICE_ROLE_KEY!
-    )
+    // Validate environment variables
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY // ✅ Changed from NEXT_SUPABASE_SERVICE_ROLE_KEY
+    
+    if (!supabaseUrl) {
+      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is missing')
+      return NextResponse.json({ 
+        error: 'Server configuration error: Missing Supabase URL' 
+      }, { status: 500 })
+    }
+    
+    if (!supabaseServiceKey) {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is missing')
+      return NextResponse.json({ 
+        error: 'Server configuration error: Missing Service Role Key' 
+      }, { status: 500 })
+    }
+    
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
     
     const body = await req.json()
     console.log('📦 Received body:', JSON.stringify(body, null, 2))
@@ -40,15 +61,16 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
     
-    // ✅ Helper function to capitalize words
+    // Helper function to capitalize words
     const capitalizeWords = (str: string): string => {
+      if (!str) return ''
       return str
         .split(' ')
         .map((w: string) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
         .join(' ')
     }
     
-    // ✅ Generate credentials - Email stays as firstname.lastname
+    // Generate credentials
     const sanitizedFirst = first_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15) || 'user'
     const sanitizedLast = last_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15) || 'account'
     const email = `${sanitizedFirst}.${sanitizedLast}@vincollins.edu.ng`
@@ -64,24 +86,15 @@ export async function POST(req: NextRequest) {
     const prefix = prefixes[role] || 'VIN-STD'
     const vin_id = `${prefix}-${year}-${randomNum}`
     
-    // ✅ Build both full_name and display_name: "Last First Middle" (e.g., "Yusuf Laila Zainab")
+    // Build full name
     let fullName = last_name.trim() + ' ' + first_name.trim()
     if (middle_name && middle_name.trim()) {
       fullName += ' ' + middle_name.trim()
     }
     fullName = capitalizeWords(fullName)
-    
-    // ✅ display_name is the same as full_name (Surname First Other)
     const displayName = fullName
     
     console.log('📧 Creating user:', { email, vin_id, fullName, displayName, role })
-    console.log('📋 Additional fields:', { 
-      gender, 
-      date_of_birth, 
-      next_term_begins, 
-      admission_number,
-      middle_name 
-    })
     
     // Step 1: Create auth user
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -107,12 +120,12 @@ export async function POST(req: NextRequest) {
     const userId = authData.user.id
     console.log('✅ Auth user created:', userId)
     
-    // Step 2: Insert into profiles with ALL fields
+    // Step 2: Insert into profiles
     const profileInsert: any = {
       id: userId,
       vin_id: vin_id,
-      full_name: fullName,          // ✅ "Soga Esther Olamide" (Surname First Other)
-      display_name: displayName,    // ✅ "Soga Esther Olamide" (Same format)
+      full_name: fullName,
+      display_name: displayName,
       first_name: capitalizeWords(first_name.trim()),
       last_name: capitalizeWords(last_name.trim()),
       email: email,
@@ -126,7 +139,6 @@ export async function POST(req: NextRequest) {
       updated_at: new Date().toISOString()
     }
 
-    // ✅ Optional fields - only add if they have values
     if (middle_name?.trim()) {
       profileInsert.middle_name = capitalizeWords(middle_name.trim())
     }
@@ -139,8 +151,6 @@ export async function POST(req: NextRequest) {
     if (join_year) {
       profileInsert.join_year = join_year
     }
-    
-    // ✅ NEW FIELDS
     if (admission_number?.trim()) {
       profileInsert.admission_number = admission_number.trim()
     }
@@ -164,38 +174,14 @@ export async function POST(req: NextRequest) {
     
     if (profileError) {
       console.error('❌ Profile insert failed:', profileError)
-      console.error('Error details:', profileError.message, profileError.details, profileError.hint)
-      
-      // ✅ ROLLBACK: Delete the auth user since profile creation failed
       await supabaseAdmin.auth.admin.deleteUser(userId)
       console.log('🔄 Rolled back auth user')
-      
       return NextResponse.json({ 
-        error: `Failed to create profile: ${profileError.message}`,
-        details: profileError.details 
+        error: `Failed to create profile: ${profileError.message}`
       }, { status: 500 })
     }
     
-    console.log('✅ Profile created:', profile?.id, profile?.full_name, profile?.display_name)
-    
-    // Step 3: Insert into users table (optional)
-    try {
-      await supabaseAdmin
-        .from('users')
-        .insert({
-          id: userId,
-          auth_id: userId,
-          vin_id: vin_id,
-          email: email,
-          role: role,
-          admission_number: admission_number?.trim() || null,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-      console.log('✅ Users table updated')
-    } catch (e: any) {
-      console.log('⚠️ Users table (skipped):', e.message)
-    }
+    console.log('✅ Profile created:', profile?.id)
     
     // Success!
     return NextResponse.json({ 
@@ -222,7 +208,6 @@ export async function POST(req: NextRequest) {
     
   } catch (error: any) {
     console.error('❌ API FATAL ERROR:', error)
-    console.error('Stack:', error.stack)
     return NextResponse.json({ 
       error: error.message || 'Internal server error' 
     }, { status: 500 })

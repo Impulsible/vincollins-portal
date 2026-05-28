@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx - WITH WAEC/NECO SUBJECT ORDERING
+// app/admin/broad-sheet/page.tsx - COMPLETE FIXED VERSION
 
 'use client'
 
@@ -16,8 +16,8 @@ import { useRouter } from 'next/navigation'
 import { 
   Loader2, RefreshCw, Printer, Search, X, FileSpreadsheet,
   Users, FileDown, Sparkles, FileText, CheckCircle2,
-  Clock, AlertCircle, Eye, Shield, Bell, Zap,
-  TrendingUp, Award, GraduationCap
+  AlertCircle, Eye, Shield, Bell, Zap,
+  TrendingUp, Award, GraduationCap, ChevronLeft
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -31,51 +31,15 @@ const SS_MIN_SUBJECTS = 9
 // WAEC/NECO STANDARD SUBJECT ORDERING
 // ============================================
 const SUBJECT_ORDER: Record<string, number> = {
-  // Core/Compulsory (1-2)
-  'English Language': 1,
-  'English Studies': 1,
-  'Mathematics': 2,
-  
-  // Physical Sciences (3-6)
-  'Physics': 3,
-  'Chemistry': 4,
-  'Further Mathematics': 5,
-  'Basic Science': 6,
-  
-  // Life Sciences (7-9)
-  'Biology': 7,
-  'Agricultural Science': 8,
-  'Basic Technology': 9,
-  
-  // Social Sciences (10-15)
-  'Economics': 10,
-  'Geography': 11,
-  'Social Studies': 12,
-  'Civic Education': 13,
-  'Government': 14,
-  'History': 15,
-  
-  // Commercial Subjects (16-18)
-  'Commerce': 16,
-  'Financial Accounting': 17,
-  'Business Studies': 18,
-  
-  // Arts/Humanities (19-23)
-  'Literature in English': 19,
-  'CRS': 20,
-  'CCA': 21,
-  'Creative Arts': 21,
-  'Music': 22,
-  'Yoruba': 23,
-  'French': 23,
-  
-  // Vocational/Trade (24-27)
-  'Data Processing': 24,
-  'Information Technology': 25,
-  'Home Economics': 26,
-  'PHE': 27,
-  'Physical Education': 27,
-  'Security Education': 28
+  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
+  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
+  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
+  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
+  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
+  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
+  'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
+  'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
+  'PHE': 27, 'Physical Education': 27, 'Security Education': 28
 }
 
 // ============================================
@@ -105,7 +69,7 @@ const SS_SUBJECTS_COMMERCIAL = [
 ]
 
 // Sort subjects according to WAEC/NECO order
-const sortSubjectsByWAECOrder = (subjects: string[]): string[] => {
+const sortSubjectsByOrder = (subjects: string[]): string[] => {
   return [...subjects].sort((a, b) => {
     const orderA = SUBJECT_ORDER[a] || 999
     const orderB = SUBJECT_ORDER[b] || 999
@@ -114,7 +78,7 @@ const sortSubjectsByWAECOrder = (subjects: string[]): string[] => {
 }
 
 const getSubjectsForStudent = (className: string, department?: string | null): string[] => {
-  if (!className) return sortSubjectsByWAECOrder(SS_SUBJECTS_SCIENCE)
+  if (!className) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
   const upperClass = className.toUpperCase()
   
   let subjects: string[] = []
@@ -136,12 +100,11 @@ const getSubjectsForStudent = (className: string, department?: string | null): s
     subjects = [...SS_SUBJECTS_SCIENCE]
   }
   
-  // Sort by WAEC/NECO order
-  return sortSubjectsByWAECOrder(subjects)
+  return sortSubjectsByOrder(subjects)
 }
 
 const getAllSubjectsForClass = (className: string): string[] => {
-  if (!className) return sortSubjectsByWAECOrder(SS_SUBJECTS_SCIENCE)
+  if (!className) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
   const upperClass = className.toUpperCase()
   
   let allSubjects: string[] = []
@@ -159,7 +122,7 @@ const getAllSubjectsForClass = (className: string): string[] => {
     allSubjects = [...SS_SUBJECTS_SCIENCE]
   }
   
-  return sortSubjectsByWAECOrder(allSubjects)
+  return sortSubjectsByOrder(allSubjects)
 }
 
 const meetsMinimumSubjects = (className: string, completedSubjects: number): boolean => {
@@ -172,7 +135,7 @@ const meetsMinimumSubjects = (className: string, completedSubjects: number): boo
 // ============================================
 // WAEC GRADING SYSTEM
 // ============================================
-const getWAECGrade = (score: number): string => {
+const getGrade = (score: number): string => {
   if (score >= 75) return 'A1'
   if (score >= 70) return 'B2'
   if (score >= 65) return 'B3'
@@ -185,12 +148,18 @@ const getWAECGrade = (score: number): string => {
 }
 
 const getGradeColor = (grade: string): string => {
-  if (grade === 'A1') return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-  if (grade === 'B2' || grade === 'B3') return 'bg-blue-100 text-blue-700 border-blue-200'
-  if (grade === 'C4' || grade === 'C5' || grade === 'C6') return 'bg-cyan-100 text-cyan-700 border-cyan-200'
-  if (grade === 'D7' || grade === 'E8') return 'bg-amber-100 text-amber-700 border-amber-200'
-  if (grade === 'F9') return 'bg-red-100 text-red-700 border-red-200'
-  return 'bg-slate-100 text-slate-600'
+  const colors: Record<string, string> = {
+    'A1': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    'B2': 'bg-blue-100 text-blue-700 border-blue-200',
+    'B3': 'bg-blue-100 text-blue-700 border-blue-200',
+    'C4': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+    'C5': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+    'C6': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+    'D7': 'bg-amber-100 text-amber-700 border-amber-200',
+    'E8': 'bg-amber-100 text-amber-700 border-amber-200',
+    'F9': 'bg-red-100 text-red-700 border-red-200'
+  }
+  return colors[grade] || 'bg-slate-100 text-slate-600'
 }
 
 const getGradeRemark = (grade: string): string => {
@@ -227,34 +196,32 @@ const getFallbackTeacherComment = (firstName: string, avg: number, bestSubject: 
   const pronoun = gender === 'female' ? 'She' : 'He'
   const possessive = gender === 'female' ? 'her' : 'his'
   
-  if (avg >= 90) return `Absolutely outstanding, ${firstName}! Scoring ${bestScore}% in ${bestSubject} is remarkable. ${pronoun} has set a very high standard. Keep this exceptional work!`
-  if (avg >= 85) return `Excellent performance, ${firstName}! ${possessive} ${bestScore}% in ${bestSubject} is impressive. Keep striving for excellence!`
-  if (avg >= 80) return `Excellent work, ${firstName}! ${possessive} performance in ${bestSubject} shows strong understanding and dedication.`
-  if (avg >= 75) return `Very good work, ${firstName}! ${pronoun} excelled in ${bestSubject} (${bestScore}%). Focus more on ${worstSubject} (${worstScore}%) to reach even greater heights.`
-  if (avg >= 70) return `Good effort, ${firstName}! ${possessive} performance in ${bestSubject} (${bestScore}%) was solid. Keep pushing forward!`
-  if (avg >= 65) return `Fair performance, ${firstName}. ${pronoun} did well in ${bestSubject} (${bestScore}%). With more effort in ${worstSubject} (${worstScore}%), improvement is certain.`
-  if (avg >= 60) return `Credit level achieved, ${firstName}. ${bestSubject} (${bestScore}%) was ${possessive} strongest subject.`
-  if (avg >= 55) return `${firstName}, ${pronoun} narrowly passed. ${bestSubject} (${bestScore}%) was okay, but more effort is needed overall.`
-  if (avg >= 50) return `${firstName}, this was a close one. ${possessive} performance in ${bestSubject} (${bestScore}%) helped ${possessive} pass.`
-  if (avg >= 40) return `${firstName}, unfortunately ${pronoun} struggled this term. Please see your class teacher for support.`
-  return `${firstName}, this is a serious concern. Parent-teacher meeting is required urgently.`
+  if (avg >= 90) return `Outstanding performance, ${firstName}! Scoring ${bestScore}% in ${bestSubject} is remarkable.`
+  if (avg >= 85) return `Excellent performance, ${firstName}! ${possessive} ${bestScore}% in ${bestSubject} is impressive.`
+  if (avg >= 80) return `Excellent work, ${firstName}! ${possessive} performance in ${bestSubject} shows strong understanding.`
+  if (avg >= 75) return `Very good work, ${firstName}! ${pronoun} excelled in ${bestSubject} (${bestScore}%).`
+  if (avg >= 70) return `Good effort, ${firstName}! ${possessive} performance in ${bestSubject} (${bestScore}%) was solid.`
+  if (avg >= 65) return `Fair performance, ${firstName}. ${pronoun} did well in ${bestSubject} (${bestScore}%).`
+  if (avg >= 60) return `Credit level achieved, ${firstName}. ${bestSubject} (${bestScore}%) was strongest.`
+  if (avg >= 55) return `${firstName}, ${pronoun} narrowly passed. More effort is needed.`
+  if (avg >= 50) return `${firstName}, this was a close one. ${possessive} performance in ${bestSubject} helped.`
+  return `${firstName}, unfortunately ${pronoun} struggled this term. Please see your teacher.`
 }
 
 const getFallbackPrincipalComment = (avg: number, firstName: string, gender: string): string => {
   const pronoun = gender === 'female' ? 'She' : 'He'
-  
-  if (avg >= 90) return `Outstanding academic performance. ${pronoun} is promoted with distinction.`
+  if (avg >= 90) return `Outstanding performance. ${pronoun} is promoted with distinction.`
   if (avg >= 85) return `Excellent performance. ${pronoun} is promoted with high honors.`
   if (avg >= 80) return `Excellent performance. ${pronoun} is promoted with honors.`
-  if (avg >= 75) return `Very good performance. ${pronoun} is promoted to the next class.`
-  if (avg >= 70) return `Good performance. Consistent effort will take ${pronoun} further. Promoted.`
-  if (avg >= 65) return `Satisfactory performance. There is room for improvement. Promoted.`
-  if (avg >= 60) return `Fair performance. More dedication needed. Promoted.`
-  if (avg >= 55) return `Credit performance. ${pronoun} passed but can do better. Promoted.`
-  if (avg >= 50) return `${pronoun} passed. Work harder next term. Promoted conditionally.`
-  if (avg >= 45) return `A pass. Significant improvement required. Promoted conditionally.`
-  if (avg >= 40) return `Poor performance. ${pronoun} must improve significantly next term.`
-  return `Failed. ${pronoun} needs to repeat the class or work much harder next term.`
+  if (avg >= 75) return `Very good performance. ${pronoun} is promoted.`
+  if (avg >= 70) return `Good performance. Promoted to next class.`
+  if (avg >= 65) return `Satisfactory performance. Promoted.`
+  if (avg >= 60) return `Fair performance. Promoted.`
+  if (avg >= 55) return `Credit performance. Promoted.`
+  if (avg >= 50) return `Passed. Work harder next term. Promoted conditionally.`
+  if (avg >= 45) return `Pass. Significant improvement required.`
+  if (avg >= 40) return `Poor performance. Must improve significantly.`
+  return `Failed. Needs to repeat class.`
 }
 
 // ============================================
@@ -292,7 +259,7 @@ interface StudentRecord {
 }
 
 // ============================================
-// CONSTANTS & HELPERS
+// CONSTANTS
 // ============================================
 const LOAD_TIMEOUT = 10000
 const AUTO_REFRESH_INTERVAL = 30000
@@ -306,10 +273,10 @@ const TERMS = [
 const YEARS = ['2024/2025', '2025/2026', '2026/2027']
 
 const DEPARTMENTS = [
-  { value: 'all', label: 'All Departments' },
-  { value: 'Science', label: '🔬 Science' },
-  { value: 'Arts', label: '🎭 Arts' },
-  { value: 'Commercial', label: '💼 Commercial' },
+  { value: 'all', label: 'All Departments', icon: '📊' },
+  { value: 'Science', label: 'Science', icon: '🔬' },
+  { value: 'Arts', label: 'Arts', icon: '🎭' },
+  { value: 'Commercial', label: 'Commercial', icon: '💼' },
 ]
 
 const getTermLabel = (term: string): string => {
@@ -327,7 +294,7 @@ export default function BroadSheetPage() {
   const [loadError, setLoadError] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
-  const [expectedSubjects, setExpectedSubjects] = useState<string[]>(sortSubjectsByWAECOrder(SS_SUBJECTS_SCIENCE))
+  const [expectedSubjects, setExpectedSubjects] = useState<string[]>(sortSubjectsByOrder(SS_SUBJECTS_SCIENCE))
   const [classes, setClasses] = useState<string[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [selectedTerm, setSelectedTerm] = useState('third')
@@ -344,9 +311,7 @@ export default function BroadSheetPage() {
 
   useEffect(() => { setIsMounted(true) }, [])
 
-  // ============================================
-  // INITIALIZATION
-  // ============================================
+  // Initialization
   useEffect(() => {
     const init = async () => {
       try {
@@ -395,9 +360,7 @@ export default function BroadSheetPage() {
     }
   }, [selectedClass, selectedTerm, selectedYear, isMounted])
 
-  // ============================================
-  // AUTO-REFRESH TIMER
-  // ============================================
+  // Auto-refresh timer
   useEffect(() => {
     if (!autoRefreshEnabled || loading || students.length === 0) return
     
@@ -425,9 +388,7 @@ export default function BroadSheetPage() {
     }
   }, [autoRefreshEnabled, selectedClass, selectedTerm, selectedYear, loading, students.length])
 
-  // ============================================
-  // REAL-TIME SUBSCRIPTION FOR NEW SCORES
-  // ============================================
+  // Real-time subscription
   useEffect(() => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
 
@@ -465,9 +426,7 @@ export default function BroadSheetPage() {
     }
   }, [newScoreAlert])
 
-  // ============================================
-  // LOAD BROADSHEET DATA
-  // ============================================
+  // Load broadsheet data
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
     
@@ -522,7 +481,7 @@ export default function BroadSheetPage() {
             exam_obj: s.exam_objective_score || 0,
             exam_theory: s.exam_theory_score || 0,
             total: totalScore,
-            grade: getWAECGrade(percentage),
+            grade: getGrade(percentage),
             status: s.status || 'approved',
             teacher_name: s.teacher_name || ''
           }
@@ -531,11 +490,10 @@ export default function BroadSheetPage() {
         const scoredSubjects = Object.keys(subjectMap).length
         const totalScore = Object.values(subjectMap).reduce((sum, s) => sum + s.total, 0)
         const averageScore = scoredSubjects > 0 ? Math.round(totalScore / scoredSubjects) : 0
-        const grade = scoredSubjects > 0 ? getWAECGrade(averageScore) : '—'
+        const grade = scoredSubjects > 0 ? getGrade(averageScore) : '—'
 
         const meetsMinimum = meetsMinimumSubjects(selectedClass, scoredSubjects)
-        const allApproved = true
-        const allSubmitted = meetsMinimum && allApproved
+        const allSubmitted = meetsMinimum
 
         return {
           id: student.id,
@@ -572,16 +530,14 @@ export default function BroadSheetPage() {
     }
   }, [selectedClass, selectedTerm, selectedYear, selectedDepartment])
 
-  // ============================================
-  // GENERATE REPORT CARDS WITH AI COMMENTS
-  // ============================================
+  // Generate report cards with AI comments
   const handleGenerateReportCards = async () => {
     const completeStudents = students.filter(s => s.meetsMinimum && s.allSubmitted)
     
     if (completeStudents.length === 0) {
       const isJSS = selectedClass?.toUpperCase().startsWith('JSS')
       const requiredMin = isJSS ? JSS_MIN_SUBJECTS : SS_MIN_SUBJECTS
-      toast.warning(`No students meet the minimum requirement of ${requiredMin} subjects with approved scores.`)
+      toast.warning(`No students meet the minimum requirement of ${requiredMin} subjects.`)
       return
     }
 
@@ -714,9 +670,6 @@ export default function BroadSheetPage() {
     }
   }
 
-  // ============================================
-  // VIEW STUDENT REPORT CARD - ALWAYS ENABLED
-  // ============================================
   const handleViewReportCard = (student: StudentRecord) => {
     router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
   }
@@ -727,14 +680,14 @@ export default function BroadSheetPage() {
       return
     }
 
-    const headers = ['Student Name', 'Department', 'Admission No', 'VIN ID', ...expectedSubjects, 'Total', 'Average', 'Grade', 'Status']
+    const headers = ['Student Name', 'Department', 'Admission No', ...expectedSubjects, 'Total', 'Average', 'Grade', 'Status']
     const rows = students.map(s => {
       const subjects = expectedSubjects.map(sub => {
         const sc = s.subjectMap[sub]
         return sc ? `${sc.total} (${sc.grade})` : '—'
       })
-      const status = s.meetsMinimum ? (s.allSubmitted ? '✅ Ready' : '⚠️ Pending') : `${s.completedSubjects}/${s.totalSubjects} subjects`
-      return [s.name, s.department || '—', s.admission_number, s.vin_id, ...subjects, s.totalScore, `${s.averageScore}%`, s.grade, status]
+      const status = s.meetsMinimum ? (s.allSubmitted ? 'Ready' : 'Pending') : `${s.completedSubjects}/${s.totalSubjects} subjects`
+      return [s.name, s.department || '—', s.admission_number, ...subjects, s.totalScore, `${s.averageScore}%`, s.grade, status]
     })
 
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
@@ -758,9 +711,10 @@ export default function BroadSheetPage() {
     loadBroadSheet()
   }
 
+  // ✅ FIXED STATS CALCULATION
   const stats = useMemo(() => {
-    const complete = students.filter(s => s.hasAllSubjects)
     const readyForReport = students.filter(s => s.meetsMinimum && s.allSubmitted)
+    const complete = students.filter(s => s.hasAllSubjects)
     const classAvg = readyForReport.length > 0
       ? Math.round(readyForReport.reduce((sum, s) => sum + s.averageScore, 0) / readyForReport.length)
       : 0
@@ -810,10 +764,10 @@ export default function BroadSheetPage() {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }} className="mx-auto mb-6">
-            <FileSpreadsheet className="h-14 w-14 text-emerald-500" />
+          <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity }} className="mx-auto mb-4">
+            <FileSpreadsheet className="h-12 w-12 text-emerald-500" />
           </motion.div>
-          <p className="text-slate-500 font-medium">Loading broad sheet...</p>
+          <p className="text-slate-500">Loading broad sheet...</p>
         </div>
       </div>
     )
@@ -823,9 +777,9 @@ export default function BroadSheetPage() {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-center">
-          <Shield className="h-14 w-14 text-slate-400 mx-auto mb-4" />
-          <p className="text-slate-600 font-medium">Failed to load broad sheet</p>
-          <Button onClick={handleRetry} className="mt-4">
+          <AlertCircle className="h-12 w-12 text-slate-400 mx-auto mb-3" />
+          <p className="text-slate-600 mb-4">Failed to load broad sheet</p>
+          <Button onClick={handleRetry} className="bg-emerald-600 hover:bg-emerald-700">
             <RefreshCw className="h-4 w-4 mr-2" /> Retry
           </Button>
         </div>
@@ -834,19 +788,31 @@ export default function BroadSheetPage() {
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-6 print:space-y-1">
-      {/* New Score Alert Banner */}
+    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-6 print:space-y-2 px-3 sm:px-4 md:px-6">
+      {/* Back Button */}
+      <div className="no-print">
+        <Button
+          variant="ghost"
+          onClick={() => router.back()}
+          className="mb-2 -ml-2 text-slate-600 hover:text-slate-900"
+        >
+          <ChevronLeft className="h-4 w-4 mr-1" />
+          Back
+        </Button>
+      </div>
+
+      {/* Alert Banner */}
       <AnimatePresence>
         {newScoreAlert && (
           <motion.div
-            initial={{ opacity: 0, y: -50 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
-            className="bg-green-50 border-l-4 border-green-500 rounded-lg p-3 flex items-center justify-between"
+            exit={{ opacity: 0, y: -20 }}
+            className="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
           >
             <div className="flex items-center gap-2">
-              <Bell className="h-4 w-4 text-green-600" />
-              <span className="text-sm text-green-700">{newScoreAlert}</span>
+              <Bell className="h-4 w-4 text-emerald-600" />
+              <span className="text-sm text-emerald-700">{newScoreAlert}</span>
             </div>
             <Button
               size="sm"
@@ -855,9 +821,9 @@ export default function BroadSheetPage() {
                 setNewScoreAlert(null)
                 loadBroadSheet()
               }}
-              className="h-7 text-xs text-green-600"
+              className="h-8 text-xs text-emerald-600 hover:text-emerald-700 w-full sm:w-auto"
             >
-              View
+              View Updates
             </Button>
           </motion.div>
         )}
@@ -865,136 +831,188 @@ export default function BroadSheetPage() {
 
       {/* Header */}
       <div className="no-print">
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
-        >
+        <div className="flex flex-col gap-3">
           <div>
-            <h2 className="text-lg font-bold text-slate-800">📊 Broad Sheet & Report Cards</h2>
-            <p className="text-sm text-slate-500">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800">📊 Broad Sheet</h1>
+            <p className="text-sm text-slate-500 mt-1">
+              Class performance overview and report card generation
+            </p>
+            <p className="text-xs text-slate-400">
               {displayClass} • {displayTermLabel} • {displayYear} • Minimum {minRequired} subjects required
             </p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          
+          {/* Action Buttons Row */}
+          <div className="flex flex-wrap items-center gap-2">
             <Button 
               variant={autoRefreshEnabled ? "default" : "outline"} 
               size="sm" 
               onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-              className={cn("h-8 text-xs", autoRefreshEnabled && "bg-emerald-600")}
+              className={cn("h-9 text-sm", autoRefreshEnabled && "bg-emerald-600 hover:bg-emerald-700")}
             >
               <Zap className="h-3.5 w-3.5 mr-1.5" />
-              {autoRefreshEnabled ? 'Auto-refresh ON' : 'Auto-refresh OFF'}
+              {autoRefreshEnabled ? 'Auto ON' : 'Auto OFF'}
             </Button>
-            <Button variant="outline" size="sm" onClick={handleRetry} disabled={loading} className="h-8 text-xs">
+            <Button variant="outline" size="sm" onClick={handleRetry} disabled={loading} className="h-9 text-sm">
               <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} /> Refresh
             </Button>
-            <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-8 text-xs">
-              <FileDown className="h-3.5 w-3.5 mr-1.5" /> Export
+            <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-9 text-sm">
+              <FileDown className="h-3.5 w-3.5 mr-1.5" /> Export CSV
             </Button>
-            <Button size="sm" onClick={handlePrint} className="h-8 text-xs bg-slate-600 hover:bg-slate-700">
+            <Button variant="outline" size="sm" onClick={handlePrint} className="h-9 text-sm">
               <Printer className="h-3.5 w-3.5 mr-1.5" /> Print
             </Button>
           </div>
-        </motion.div>
+        </div>
       </div>
 
-      {/* Filters + Stats */}
+      {/* Filters Section */}
       <div className="no-print space-y-3">
-        <Card className="border-0 shadow-sm">
-          <CardContent className="p-3">
-            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+        <Card className="border shadow-sm">
+          <CardContent className="p-3 sm:p-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <div>
-                <Label className="text-[10px] text-slate-400 mb-1 block">Class</Label>
+                <Label className="text-xs font-medium text-slate-500 mb-1 block">Class</Label>
                 <Select value={selectedClass} onValueChange={setSelectedClass}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Select class" />
+                  </SelectTrigger>
                   <SelectContent>
                     {classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
-                <Label className="text-[10px] text-slate-400 mb-1 block">Term</Label>
+                <Label className="text-xs font-medium text-slate-500 mb-1 block">Term</Label>
                 <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
-                <Label className="text-[10px] text-slate-400 mb-1 block">Year</Label>
+                <Label className="text-xs font-medium text-slate-500 mb-1 block">Session</Label>
                 <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
-                <Label className="text-[10px] text-slate-400 mb-1 block">Department</Label>
+                <Label className="text-xs font-medium text-slate-500 mb-1 block">Department</Label>
                 <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
-                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
-                    {DEPARTMENTS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                    {DEPARTMENTS.map(d => (
+                      <SelectItem key={d.value} value={d.value}>
+                        <span className="flex items-center gap-2">
+                          <span>{d.icon}</span> {d.label}
+                        </span>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
+              
               <div>
-                <Label className="text-[10px] text-slate-400 mb-1 block">Search</Label>
+                <Label className="text-xs font-medium text-slate-500 mb-1 block">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <Input
-                    placeholder="Name, Admission No, or VIN..."
+                    placeholder="Name, Admission No..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-7 h-8 text-xs"
+                    className="pl-9 h-9 text-sm"
                   />
                   {searchQuery && (
-                    <button onClick={() => setSearchQuery('')} className="absolute right-2 top-1/2 -translate-y-1/2">
-                      <X className="h-3.5 w-3.5 text-slate-400" />
+                    <button 
+                      onClick={() => setSearchQuery('')} 
+                      className="absolute right-3 top-1/2 -translate-y-1/2"
+                    >
+                      <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
                     </button>
                   )}
                 </div>
               </div>
-              <div className="flex items-end gap-2">
-                <Button
-                  size="sm"
-                  onClick={handleGenerateReportCards}
-                  disabled={generating || stats.readyForReport === 0}
-                  className="h-8 text-xs bg-purple-600 hover:bg-purple-700 w-full"
-                >
-                  {generating ? (
-                    <><Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> {genProgress.current}/{genProgress.total}</>
-                  ) : (
-                    <><Sparkles className="h-3.5 w-3.5 mr-1.5" /> Generate Report Cards ({stats.readyForReport} ready)</>
-                  )}
-                </Button>
-              </div>
+            </div>
+
+            <div className="mt-4">
+              <Button
+                onClick={handleGenerateReportCards}
+                disabled={generating || stats.readyForReport === 0}
+                className="w-full sm:w-auto bg-purple-600 hover:bg-purple-700 h-10"
+              >
+                {generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Generating... {genProgress.current}/{genProgress.total}
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4 mr-2" />
+                    Generate Report Cards ({stats.readyForReport} ready)
+                  </>
+                )}
+              </Button>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-          {[
-            { label: 'Total', value: stats.total, color: 'text-slate-700' },
-            { label: 'Ready', value: stats.readyForReport, color: 'text-green-600' },
-            { label: `Min ${minRequired}`, value: stats.complete, color: 'text-emerald-600' },
-            { label: 'Avg', value: `${stats.classAvg}%`, color: 'text-blue-600' },
-            { label: 'Top', value: stats.topScore, color: 'text-purple-600' },
-          ].map((stat, i) => (
-            <div key={i} className="bg-white rounded-lg p-2 text-center shadow-sm border">
-              <p className="text-[9px] text-slate-400 uppercase">{stat.label}</p>
-              <p className={cn("text-sm font-bold", stat.color)}>{stat.value}</p>
-            </div>
-          ))}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+          <Card className="border-l-4 border-l-emerald-500 shadow-sm">
+            <CardContent className="p-3">
+              <p className="text-xs text-slate-500">Total Students</p>
+              <p className="text-xl font-bold text-slate-800">{stats.total}</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-l-4 border-l-green-500 shadow-sm">
+            <CardContent className="p-3">
+              <p className="text-xs text-slate-500">Ready for Report</p>
+              <p className="text-xl font-bold text-green-600">{stats.readyForReport}</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-l-4 border-l-blue-500 shadow-sm">
+            <CardContent className="p-3">
+              <p className="text-xs text-slate-500">Complete Subjects</p>
+              <p className="text-xl font-bold text-blue-600">{stats.complete}</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-l-4 border-l-purple-500 shadow-sm">
+            <CardContent className="p-3">
+              <p className="text-xs text-slate-500">Class Average</p>
+              <p className="text-xl font-bold text-purple-600">{stats.classAvg}%</p>
+            </CardContent>
+          </Card>
+          
+          <Card className="border-l-4 border-l-amber-500 shadow-sm col-span-2 sm:col-span-1">
+            <CardContent className="p-3">
+              <p className="text-xs text-slate-500">Top Score</p>
+              <p className="text-xl font-bold text-amber-600">{stats.topScore}</p>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* Department Breakdown */}
         {Object.keys(stats.departmentBreakdown).length > 0 && (
-          <div className="flex flex-wrap gap-2 justify-center">
+          <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
             {Object.entries(stats.departmentBreakdown).map(([dept, count]) => (
-              <Badge key={dept} className="bg-slate-100 text-slate-700">
-                {dept}: {count} students
+              <Badge key={dept} variant="secondary" className="px-3 py-1 text-sm">
+                {dept}: {count} student{count !== 1 ? 's' : ''}
               </Badge>
             ))}
           </div>
@@ -1004,9 +1022,9 @@ export default function BroadSheetPage() {
       {/* Generation Progress */}
       {generating && (
         <div className="no-print bg-purple-50 border border-purple-200 rounded-lg p-3">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-purple-700 font-medium">Generating Report Cards...</span>
-            <span className="text-xs text-purple-600">{genProgress.current}/{genProgress.total}</span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+            <span className="text-sm font-medium text-purple-700">Generating Report Cards...</span>
+            <span className="text-xs text-purple-600">{genProgress.current}/{genProgress.total} completed</span>
           </div>
           <div className="w-full bg-purple-200 rounded-full h-2">
             <div
@@ -1017,135 +1035,125 @@ export default function BroadSheetPage() {
         </div>
       )}
 
-      {/* BROADSHEET TABLE */}
+      {/* Broadsheet Table - VIN ID COLUMN REMOVED */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
-        <Card className="border-0 shadow-lg overflow-hidden print:shadow-none print:border">
+        <Card className="border shadow-lg overflow-hidden print:shadow-none">
+          {/* Print Header */}
           <div className="hidden print:block p-4 text-center border-b">
             <h1 className="text-xl font-bold">VINCOLLINS COLLEGE</h1>
             <p className="text-base font-semibold">Broad Sheet - {selectedClass}</p>
-            <p className="text-xs">{getTermLabel(selectedTerm)} • {selectedYear} • Minimum {minRequired} subjects</p>
+            <p className="text-xs">{getTermLabel(selectedTerm)} • {selectedYear}</p>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-[11px] sm:text-xs min-w-[600px]">
+          <div className="overflow-x-auto -mx-3 sm:mx-0">
+            <table className="w-full border-collapse text-xs min-w-[800px]">
               <thead>
-                <tr className="bg-slate-100 print:bg-gray-100">
-                  <th className="sticky left-0 z-20 bg-slate-100 print:bg-gray-100 border-b-2 border-slate-200 px-2 sm:px-3 py-2 text-left font-bold text-slate-600 text-[10px] sm:text-xs min-w-[140px] sm:min-w-[180px]">
-                    Student / Department
+                <tr className="bg-slate-50 border-b-2 border-slate-200">
+                  <th className="sticky left-0 z-20 bg-slate-50 px-3 py-3 text-left font-semibold text-slate-700 text-xs min-w-[160px]">
+                    Student
                   </th>
-                  <th className="border-b-2 border-slate-200 px-1.5 py-2 text-center font-bold text-slate-600 text-[9px] sm:text-[10px] min-w-[70px]">
+                  <th className="px-2 py-3 text-left font-semibold text-slate-700 text-xs min-w-[100px]">
                     Admission No
                   </th>
                   {expectedSubjects.map(subject => (
                     <th
                       key={subject}
-                      className="border-b-2 border-slate-200 px-1.5 sm:px-2 py-2 text-center font-bold text-slate-600 text-[9px] sm:text-[10px] whitespace-nowrap min-w-[70px] sm:min-w-[80px]"
+                      className="px-2 py-3 text-center font-semibold text-slate-700 text-xs whitespace-nowrap min-w-[70px]"
                     >
-                      {subject.split(' ').map((w, i) => (
-                        <span key={i} className="block leading-tight">{w}</span>
-                      ))}
+                      {subject.split(' ').slice(0, 2).join(' ')}
                     </th>
                   ))}
-                  <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Total</th>
-                  <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[45px]">Avg</th>
-                  <th className="border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Grade</th>
-                  <th className="no-print border-b-2 border-slate-200 px-2 py-2 text-center font-bold text-slate-600 text-[10px] sm:text-xs min-w-[55px]">Report</th>
+                  <th className="px-2 py-3 text-center font-semibold text-slate-700 text-xs min-w-[60px]">Total</th>
+                  <th className="px-2 py-3 text-center font-semibold text-slate-700 text-xs min-w-[60px]">Avg</th>
+                  <th className="px-2 py-3 text-center font-semibold text-slate-700 text-xs min-w-[60px]">Grade</th>
+                  <th className="no-print px-2 py-3 text-center font-semibold text-slate-700 text-xs min-w-[70px]">Report</th>
                 </tr>
               </thead>
               <tbody>
                 {displayedStudents.length === 0 ? (
                   <tr>
                     <td colSpan={expectedSubjects.length + 6} className="text-center py-12">
-                      <Users className="h-8 w-8 text-slate-300 mx-auto mb-2" />
-                      <p className="text-slate-500 text-sm">No students found</p>
+                      <Users className="h-10 w-10 text-slate-300 mx-auto mb-2" />
+                      <p className="text-slate-500">No students found</p>
                     </td>
                   </tr>
                 ) : (
-                  displayedStudents.map(student => {
+                  displayedStudents.map((student, idx) => {
                     const isJSS = student.class?.toUpperCase().startsWith('JSS')
                     const departmentDisplay = student.department ? 
                       (student.department === 'Science' ? '🔬 Science' : 
                        student.department === 'Arts' ? '🎭 Arts' : 
                        student.department === 'Commercial' ? '💼 Commercial' : student.department) : 
-                      (isJSS ? 'Junior Secondary' : 'General')
+                      (isJSS ? 'Junior' : 'General')
                     
                     return (
                       <tr
                         key={student.id}
                         className={cn(
                           "border-b border-slate-100 hover:bg-slate-50/50 transition-colors",
-                          !student.meetsMinimum && "bg-amber-50/20",
-                          student.meetsMinimum && student.allSubmitted && "bg-green-50/10"
+                          idx % 2 === 0 && "bg-white",
+                          !student.meetsMinimum && "bg-amber-50/30"
                         )}
                       >
-                        <td className="sticky left-0 z-10 bg-white print:bg-white border-r border-slate-100 px-2 sm:px-3 py-1.5">
+                        <td className="sticky left-0 z-10 bg-inherit px-3 py-2">
                           <div>
-                            <p className="font-semibold text-[11px] sm:text-xs">{student.name}</p>
-                            <Badge className={cn(
-                              "text-[8px] mt-0.5",
-                              student.department === 'Science' ? "bg-blue-100 text-blue-700" :
-                              student.department === 'Arts' ? "bg-purple-100 text-purple-700" :
-                              student.department === 'Commercial' ? "bg-emerald-100 text-emerald-700" :
-                              "bg-slate-100 text-slate-700"
-                            )}>
-                              {departmentDisplay}
-                            </Badge>
-                            <p className="text-[9px] text-slate-400 font-mono mt-0.5">{student.vin_id}</p>
-                            {!student.meetsMinimum && (
-                              <span className="text-[9px] text-amber-600">
-                                {student.completedSubjects}/{student.totalSubjects} subjects
-                              </span>
-                            )}
-                            {student.meetsMinimum && student.allSubmitted && (
-                              <Badge className="text-[8px] bg-green-100 text-green-700 mt-0.5">
-                                <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
-                                Ready
+                            <p className="font-semibold text-sm">{student.name}</p>
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                                {departmentDisplay}
                               </Badge>
-                            )}
+                              {student.meetsMinimum && student.allSubmitted && (
+                                <Badge className="text-[9px] bg-green-100 text-green-700 px-1.5 py-0">
+                                  <CheckCircle2 className="h-2.5 w-2.5 inline mr-0.5" />
+                                  Ready
+                                </Badge>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-slate-400 font-mono mt-1">{student.vin_id}</p>
                           </div>
                         </td>
-                        <td className="px-1.5 py-1.5 text-center text-[10px] sm:text-xs text-slate-600 border-r border-slate-50 font-mono">
+                        <td className="px-2 py-2 text-left font-mono text-xs">
                           {student.admission_number}
                         </td>
                         {expectedSubjects.map(subject => {
                           const score = student.subjectMap[subject]
                           const isExpected = student.expectedSubjects.includes(subject)
                           return (
-                            <td key={subject} className="px-1.5 sm:px-2 py-1.5 text-center border-r border-slate-50">
+                            <td key={subject} className="px-2 py-2 text-center">
                               {score && isExpected ? (
                                 <div className="flex flex-col items-center gap-0.5">
-                                  <span className="font-semibold text-[11px] sm:text-xs">{score.total}</span>
-                                  <Badge className={cn("text-[8px] leading-none px-1 py-0 border", getGradeColor(score.grade))}>
+                                  <span className="font-semibold text-xs">{score.total}</span>
+                                  <Badge className={cn("text-[8px] px-1 py-0", getGradeColor(score.grade))}>
                                     {score.grade}
                                   </Badge>
                                 </div>
                               ) : isExpected ? (
-                                <span className="text-slate-300 text-xs">—</span>
+                                <span className="text-slate-300">—</span>
                               ) : (
-                                <span className="text-slate-200 text-[8px]">N/A</span>
+                                <span className="text-slate-200 text-[8px]">—</span>
                               )}
                             </td>
                           )
                         })}
-                        <td className="px-2 py-1.5 text-center font-bold text-[11px] sm:text-xs text-slate-700 border-r border-slate-50">
+                        <td className="px-2 py-2 text-center font-bold text-sm text-slate-800">
                           {student.totalScore}
                         </td>
-                        <td className="px-2 py-1.5 text-center font-semibold text-[11px] sm:text-xs text-slate-600 border-r border-slate-50">
+                        <td className="px-2 py-2 text-center font-semibold text-sm text-slate-700">
                           {student.averageScore}%
                         </td>
-                        <td className="px-2 py-1.5 text-center">
-                          <Badge className={cn("text-[9px] sm:text-[10px] font-bold border", getGradeColor(student.grade))}>
+                        <td className="px-2 py-2 text-center">
+                          <Badge className={cn("text-xs font-bold px-2 py-0.5", getGradeColor(student.grade))}>
                             {student.grade}
                           </Badge>
                         </td>
-                        <td className="no-print px-2 py-1.5 text-center">
+                        <td className="no-print px-2 py-2 text-center">
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewReportCard(student)}
-                            className="h-7 text-[10px] text-blue-600 hover:text-blue-700"
+                            className="h-8 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50"
                           >
-                            <Eye className="h-3 w-3 mr-1" />
+                            <Eye className="h-3.5 w-3.5 mr-1" />
                             View
                           </Button>
                         </td>
@@ -1164,6 +1172,8 @@ export default function BroadSheetPage() {
           .no-print { display: none !important; }
           body { background: white !important; }
           @page { size: landscape; margin: 0.5cm; }
+          table { font-size: 9pt !important; }
+          th, td { padding: 4px !important; }
         }
       `}</style>
     </div>

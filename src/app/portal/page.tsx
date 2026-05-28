@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - COMPLETE WORKING VERSION
+// app/portal/page.tsx - FIXED: Modal appears before redirect
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -38,7 +38,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [selectedRole, setSelectedRole] = useState<'student' | 'teacher' | 'admin'>('student')
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>({
     logo_path: '',
@@ -56,6 +55,10 @@ export default function LoginPage() {
   
   const loginInProgress = useRef(false)
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const redirectStartedRef = useRef(false)
+  
+  // ✅ DON'T auto-redirect authenticated users - let them see the modal first
+  // Remove the automatic redirect
 
   // Load school settings
   useEffect(() => {
@@ -92,19 +95,19 @@ export default function LoginPage() {
     }
   }, [])
 
-  // Auto-redirect after 3 seconds
+  // ✅ AUTO-REDIRECT AFTER 3 SECONDS - ONLY when modal is showing
   useEffect(() => {
-    if (showSuccessModal && loginSuccessData) {
+    if (showSuccessModal && loginSuccessData && !redirectStartedRef.current) {
+      console.log('Starting 3-second redirect timer')
+      redirectStartedRef.current = true
+      
       if (redirectTimerRef.current) {
         clearTimeout(redirectTimerRef.current)
       }
       
       redirectTimerRef.current = setTimeout(() => {
-        setShowSuccessModal(false)
-        setLoginSuccessData(null)
-        setLoading(false)
-        loginInProgress.current = false
-        router.push(loginSuccessData.redirectPath)
+        console.log('Redirecting to:', loginSuccessData.redirectPath)
+        window.location.href = loginSuccessData.redirectPath
       }, 3000)
       
       return () => {
@@ -113,9 +116,9 @@ export default function LoginPage() {
         }
       }
     }
-  }, [showSuccessModal, loginSuccessData, router])
+  }, [showSuccessModal, loginSuccessData])
 
-  // ✅ LOGIN HANDLER - Modal shows every time
+  // ✅ LOGIN HANDLER
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     
@@ -126,7 +129,7 @@ export default function LoginPage() {
     loginInProgress.current = true
     setLoading(true)
     setError('')
-    setSuccessMessage('')
+    redirectStartedRef.current = false
 
     try {
       const cleanEmail = email.trim().toLowerCase()
@@ -139,12 +142,15 @@ export default function LoginPage() {
         return
       }
 
+      console.log('Attempting login for:', cleanEmail)
+
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: cleanEmail,
         password: cleanPassword,
       })
 
       if (signInError) {
+        console.error('Sign in error:', signInError)
         if (signInError.message.includes('Invalid login credentials')) {
           setError('Invalid email or password. Please try again.')
         } else if (signInError.message.includes('Email not confirmed')) {
@@ -166,7 +172,8 @@ export default function LoginPage() {
         return
       }
 
-      // Fetch profile
+      console.log('Login successful, fetching profile')
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, full_name, first_name, last_name')
@@ -178,7 +185,6 @@ export default function LoginPage() {
                        'student'
       const mappedRole = userRole === 'staff' ? 'teacher' : (userRole as 'student' | 'teacher' | 'admin')
       
-      // Check role match
       if (mappedRole !== selectedRole) {
         const roleDisplayName = mappedRole === 'teacher' ? 'Teacher/Staff' : 
                                  mappedRole.charAt(0).toUpperCase() + mappedRole.slice(1)
@@ -189,7 +195,6 @@ export default function LoginPage() {
         return
       }
 
-      // Format name
       let userName = 'User'
       if (profile?.first_name && profile?.last_name) {
         userName = `${profile.first_name} ${profile.last_name}`
@@ -207,7 +212,6 @@ export default function LoginPage() {
         .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
         .join(' ')
 
-      // Redirect paths
       const redirectMap: Record<string, string> = {
         admin: '/admin',
         teacher: '/staff',
@@ -216,21 +220,25 @@ export default function LoginPage() {
       
       const redirectPath = redirectMap[mappedRole] || '/student'
 
-      // Store auth info
       localStorage.setItem('auth_user', JSON.stringify({ id: signInData.user.id, role: mappedRole }))
       localStorage.setItem('auth_role', mappedRole)
 
-      // ✅ SHOW SUCCESS MODAL
+      console.log('Setting modal data:', { userName: formattedName, role: mappedRole, redirectPath })
+      
+      // ✅ SHOW MODAL FIRST before any redirect
       setLoginSuccessData({
         userName: formattedName,
         role: mappedRole as 'student' | 'teacher' | 'admin',
         redirectPath: redirectPath
       })
       setShowSuccessModal(true)
-      setSuccessMessage('Login successful! Redirecting...')
       setLoading(false)
       
-      // Reset login progress after modal shows
+      console.log('Modal should be visible now. showSuccessModal:', true)
+      
+      // Refresh user in background
+      refreshUser().catch(console.error)
+      
       setTimeout(() => {
         loginInProgress.current = false
       }, 500)
@@ -246,7 +254,6 @@ export default function LoginPage() {
   const handleRoleChange = (role: 'student' | 'teacher' | 'admin') => {
     setSelectedRole(role)
     setError('')
-    setSuccessMessage('')
   }
 
   const getRoleColor = () => {
@@ -265,9 +272,11 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ SUCCESS MODAL COMPONENT
+  // ✅ SUCCESS MODAL - Direct rendering without AnimatePresence for reliability
   const SuccessModal = () => {
-    if (!loginSuccessData) return null
+    if (!showSuccessModal || !loginSuccessData) {
+      return null
+    }
     
     const { userName, role, redirectPath } = loginSuccessData
     
@@ -305,6 +314,7 @@ export default function LoginPage() {
     const firstName = userName.split(' ')[0]
 
     const goToDashboard = () => {
+      console.log('Manual redirect to dashboard')
       if (redirectTimerRef.current) {
         clearTimeout(redirectTimerRef.current)
         redirectTimerRef.current = null
@@ -313,138 +323,92 @@ export default function LoginPage() {
       setLoginSuccessData(null)
       setLoading(false)
       loginInProgress.current = false
-      router.push(redirectPath)
+      redirectStartedRef.current = false
+      window.location.href = redirectPath
     }
 
     return (
-      <AnimatePresence>
-        {showSuccessModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-            onClick={goToDashboard}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.8, opacity: 0, y: 20 }}
-              transition={{ type: "spring", damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
-              onClick={(e) => e.stopPropagation()}
+      <div 
+        className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+        style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+      >
+        <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+          <div 
+            className="absolute top-0 left-0 right-0 h-1.5"
+            style={{ background: `linear-gradient(90deg, ${config.color}, ${config.color}88)` }}
+          />
+          
+          <div className="relative p-8">
+            <button
+              onClick={goToDashboard}
+              className="absolute top-4 right-4 h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
             >
-              <div 
-                className="absolute top-0 left-0 right-0 h-1.5"
-                style={{ background: `linear-gradient(90deg, ${config.color}, ${config.color}88)` }}
-              />
-              
-              <div className="relative p-8">
-                <button
-                  onClick={goToDashboard}
-                  className="absolute top-4 right-4 h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
-                >
-                  <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+              <svg className="h-4 w-4 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
 
-                <div className="flex flex-col items-center text-center">
-                  <motion.div
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ type: "spring", damping: 15, stiffness: 200, delay: 0.1 }}
-                    className="mb-6"
+            <div className="flex flex-col items-center text-center">
+              <div className="mb-6">
+                <div className="relative">
+                  <div 
+                    className="w-28 h-28 rounded-full flex items-center justify-center text-6xl relative z-10"
+                    style={{ 
+                      background: `linear-gradient(135deg, ${config.bgColor}, white)`,
+                      border: `3px solid ${config.borderColor}`,
+                      boxShadow: `0 0 40px ${config.color}20`
+                    }}
                   >
-                    <div className="relative">
-                      <div 
-                        className="w-28 h-28 rounded-full flex items-center justify-center text-6xl relative z-10"
-                        style={{ 
-                          background: `linear-gradient(135deg, ${config.bgColor}, white)`,
-                          border: `3px solid ${config.borderColor}`,
-                          boxShadow: `0 0 40px ${config.color}20`
-                        }}
-                      >
-                        {config.icon}
-                      </div>
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.5, type: "spring", stiffness: 200 }}
-                        className="absolute -bottom-1 -right-1 h-8 w-8 bg-green-500 rounded-full flex items-center justify-center z-20 shadow-lg"
-                      >
-                        <CheckCircle className="h-5 w-5 text-white" />
-                      </motion.div>
-                    </div>
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.2 }}
-                    className="space-y-3"
-                  >
-                    <h3 className="text-3xl font-bold text-gray-900">
-                      Welcome! {config.emoji}
-                    </h3>
-                    
-                    <p className="text-xl font-semibold" style={{ color: config.color }}>
-                      {firstName}
-                    </p>
-                    
-                    <p className="text-gray-500">
-                      {config.greeting}
-                    </p>
-                    
-                    <p className="text-sm text-gray-400">
-                      {config.message}
-                    </p>
-                  </motion.div>
-                  
-                  <motion.div
-                    initial={{ y: 20, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    transition={{ delay: 0.4 }}
-                    className="flex flex-col gap-3 w-full mt-8"
-                  >
-                    <Button
-                      onClick={goToDashboard}
-                      className="w-full py-6 text-base font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                      style={{ 
-                        background: `linear-gradient(135deg, ${config.color}, ${config.color}dd)`,
-                      }}
-                    >
-                      <span>Go to Dashboard</span>
-                      <ArrowRight className="ml-2 h-5 w-5" />
-                    </Button>
-                    
-                    <p className="text-xs text-gray-400">
-                      Auto-redirecting in 3 seconds...
-                    </p>
-                  </motion.div>
+                    {config.icon}
+                  </div>
+                  <div className="absolute -bottom-1 -right-1 h-8 w-8 bg-green-500 rounded-full flex items-center justify-center z-20 shadow-lg">
+                    <CheckCircle className="h-5 w-5 text-white" />
+                  </div>
                 </div>
               </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    )
-  }
-
-  // Loading state
-  if (userLoading && !showSuccessModal) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-gray-100">
-        <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
-          <Loader2 className="h-10 w-10 text-primary" />
-        </motion.div>
-        <p className="mt-4 text-sm text-gray-500">Preparing secure login...</p>
+              
+              <div className="space-y-3">
+                <h3 className="text-3xl font-bold text-gray-900">
+                  Welcome! {config.emoji}
+                </h3>
+                
+                <p className="text-xl font-semibold" style={{ color: config.color }}>
+                  {firstName}
+                </p>
+                
+                <p className="text-gray-500">
+                  {config.greeting}
+                </p>
+                
+                <p className="text-sm text-gray-400">
+                  {config.message}
+                </p>
+              </div>
+              
+              <div className="flex flex-col gap-3 w-full mt-8">
+                <Button
+                  onClick={goToDashboard}
+                  className="w-full py-6 text-base font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                  style={{ 
+                    background: `linear-gradient(135deg, ${config.color}, ${config.color}dd)`,
+                  }}
+                >
+                  <span>Go to Dashboard Now</span>
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+                
+                <p className="text-xs text-gray-400">
+                  Redirecting in 3 seconds...
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
 
-  // Main render
+  // ✅ Render portal page immediately - NO LOADING SCREEN
   return (
     <>
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -632,22 +596,6 @@ export default function LoginPage() {
                     )}
                   </AnimatePresence>
 
-                  {/* Success Message */}
-                  <AnimatePresence>
-                    {successMessage && !showSuccessModal && (
-                      <motion.div 
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                      >
-                        <Alert className="mb-6 border-green-200 bg-green-50 text-green-800 rounded-xl">
-                          <CheckCircle className="h-4 w-4 text-green-600" />
-                          <AlertDescription className="text-sm ml-2">{successMessage}</AlertDescription>
-                        </Alert>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
                   {/* Login Form */}
                   <form onSubmit={handleLogin} className="space-y-5">
                     <div>
@@ -759,7 +707,7 @@ export default function LoginPage() {
         </div>
       </div>
       
-      {/* Success Modal */}
+      {/* ✅ Success Modal */}
       <SuccessModal />
     </>
   )

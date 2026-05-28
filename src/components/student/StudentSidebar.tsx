@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/student/StudentSidebar.tsx - COMPLETELY FIXED
+// components/student/StudentSidebar.tsx - WITH ANNOUNCEMENTS
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -10,7 +10,8 @@ import {
   LayoutDashboard, BookOpen, FileText, Award, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, MonitorPlay, User,
-  Bell, HelpCircle, Wifi, WifiOff, FileCheck, Users
+  Bell, HelpCircle, Wifi, WifiOff, FileCheck, Users,
+  Megaphone
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -65,6 +66,7 @@ interface NavigationItem {
 
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Stats', route: '/student' },
+  { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'School Updates', route: '/student/announcements' },
   { id: 'exams', name: 'My Exams', icon: MonitorPlay, description: 'Take CBT & Theory', route: '/student/exams' },
   { id: 'results', name: 'Results', icon: Award, description: 'View Performance', route: '/student/results' },
   { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Course Work', route: '/student/assignments' },
@@ -377,6 +379,7 @@ export function StudentSidebar({
   // Sync active tab with pathname
   useEffect(() => {
     if (pathname === '/student') setActiveTab('overview')
+    else if (pathname?.startsWith('/student/announcements')) setActiveTab('announcements')
     else if (pathname?.startsWith('/student/exams')) setActiveTab('exams')
     else if (pathname?.startsWith('/student/results')) setActiveTab('results')
     else if (pathname?.startsWith('/student/assignments')) setActiveTab('assignments')

@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/staff/StaffSidebar.tsx - NO ATTENDANCE, OPENS IMMEDIATELY
+// components/staff/StaffSidebar.tsx - WITH ANNOUNCEMENTS
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +10,7 @@ import {
   LayoutDashboard, BookOpen, FileText, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, User, CalendarDays,
-  Bell, HelpCircle, Notebook
+  Bell, HelpCircle, Notebook, Megaphone
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -65,9 +65,10 @@ interface SidebarStats {
   examCount: number
 }
 
-// ✅ Removed attendance from primary navigation
+// ✅ Primary navigation with Announcements added
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
+  { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'School Updates', route: '/staff/announcements' },
   { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory', route: '/staff/exams' },
   { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks', route: '/staff/assignments' },
   { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
@@ -189,6 +190,8 @@ export function StaffSidebar({
   useEffect(() => {
     if (pathname === '/staff') {
       setActiveTab('overview')
+    } else if (pathname?.startsWith('/staff/announcements')) {
+      setActiveTab('announcements')
     } else if (pathname?.startsWith('/staff/exams')) {
       setActiveTab('exams')
     } else if (pathname?.startsWith('/staff/assignments')) {
