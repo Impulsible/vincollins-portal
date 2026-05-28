@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx - VIEW BUTTON ALWAYS ENABLED
+// app/admin/broad-sheet/page.tsx - WITH WAEC/NECO SUBJECT ORDERING
 
 'use client'
 
@@ -27,6 +27,60 @@ import { cn } from '@/lib/utils'
 const JSS_MIN_SUBJECTS = 16
 const SS_MIN_SUBJECTS = 9
 
+// ============================================
+// WAEC/NECO STANDARD SUBJECT ORDERING
+// ============================================
+const SUBJECT_ORDER: Record<string, number> = {
+  // Core/Compulsory (1-2)
+  'English Language': 1,
+  'English Studies': 1,
+  'Mathematics': 2,
+  
+  // Physical Sciences (3-6)
+  'Physics': 3,
+  'Chemistry': 4,
+  'Further Mathematics': 5,
+  'Basic Science': 6,
+  
+  // Life Sciences (7-9)
+  'Biology': 7,
+  'Agricultural Science': 8,
+  'Basic Technology': 9,
+  
+  // Social Sciences (10-15)
+  'Economics': 10,
+  'Geography': 11,
+  'Social Studies': 12,
+  'Civic Education': 13,
+  'Government': 14,
+  'History': 15,
+  
+  // Commercial Subjects (16-18)
+  'Commerce': 16,
+  'Financial Accounting': 17,
+  'Business Studies': 18,
+  
+  // Arts/Humanities (19-23)
+  'Literature in English': 19,
+  'CRS': 20,
+  'CCA': 21,
+  'Creative Arts': 21,
+  'Music': 22,
+  'Yoruba': 23,
+  'French': 23,
+  
+  // Vocational/Trade (24-27)
+  'Data Processing': 24,
+  'Information Technology': 25,
+  'Home Economics': 26,
+  'PHE': 27,
+  'Physical Education': 27,
+  'Security Education': 28
+}
+
+// ============================================
+// STANDARD SUBJECT LISTS BY DEPARTMENT
+// ============================================
 const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
@@ -50,37 +104,62 @@ const SS_SUBJECTS_COMMERCIAL = [
   'Geography', 'Literature in English'
 ]
 
+// Sort subjects according to WAEC/NECO order
+const sortSubjectsByWAECOrder = (subjects: string[]): string[] => {
+  return [...subjects].sort((a, b) => {
+    const orderA = SUBJECT_ORDER[a] || 999
+    const orderB = SUBJECT_ORDER[b] || 999
+    return orderA - orderB
+  })
+}
+
 const getSubjectsForStudent = (className: string, department?: string | null): string[] => {
-  if (!className) return SS_SUBJECTS_SCIENCE
+  if (!className) return sortSubjectsByWAECOrder(SS_SUBJECTS_SCIENCE)
   const upperClass = className.toUpperCase()
-  if (upperClass.startsWith('JSS')) return JSS_SUBJECTS
-  if (upperClass.startsWith('SS')) {
+  
+  let subjects: string[] = []
+  
+  if (upperClass.startsWith('JSS')) {
+    subjects = [...JSS_SUBJECTS]
+  } else if (upperClass.startsWith('SS')) {
     const dept = department?.toUpperCase() || ''
-    if (dept.includes('SCIENCE') || dept === 'SCIENCE') return SS_SUBJECTS_SCIENCE
-    if (dept.includes('ART') || dept === 'ARTS') return SS_SUBJECTS_ARTS
-    if (dept.includes('COMMERCIAL') || dept === 'COMMERCIAL' || dept === 'COMM') return SS_SUBJECTS_COMMERCIAL
-    return SS_SUBJECTS_SCIENCE
+    if (dept.includes('SCIENCE') || dept === 'SCIENCE') {
+      subjects = [...SS_SUBJECTS_SCIENCE]
+    } else if (dept.includes('ART') || dept === 'ARTS') {
+      subjects = [...SS_SUBJECTS_ARTS]
+    } else if (dept.includes('COMMERCIAL') || dept === 'COMMERCIAL' || dept === 'COMM') {
+      subjects = [...SS_SUBJECTS_COMMERCIAL]
+    } else {
+      subjects = [...SS_SUBJECTS_SCIENCE]
+    }
+  } else {
+    subjects = [...SS_SUBJECTS_SCIENCE]
   }
-  return SS_SUBJECTS_SCIENCE
+  
+  // Sort by WAEC/NECO order
+  return sortSubjectsByWAECOrder(subjects)
 }
 
 const getAllSubjectsForClass = (className: string): string[] => {
-  if (!className) return SS_SUBJECTS_SCIENCE
+  if (!className) return sortSubjectsByWAECOrder(SS_SUBJECTS_SCIENCE)
   const upperClass = className.toUpperCase()
-  if (upperClass.startsWith('JSS')) return JSS_SUBJECTS
-  if (upperClass.startsWith('SS')) {
-    const allSubjects = new Set([
+  
+  let allSubjects: string[] = []
+  
+  if (upperClass.startsWith('JSS')) {
+    allSubjects = [...JSS_SUBJECTS]
+  } else if (upperClass.startsWith('SS')) {
+    const uniqueSubjects = new Set([
       ...SS_SUBJECTS_SCIENCE,
       ...SS_SUBJECTS_ARTS,
       ...SS_SUBJECTS_COMMERCIAL
     ])
-    const subjectsArray = Array.from(allSubjects)
-    const englishFirst = subjectsArray.filter(s => s === 'English Language')
-    const mathsSecond = subjectsArray.filter(s => s === 'Mathematics')
-    const others = subjectsArray.filter(s => s !== 'English Language' && s !== 'Mathematics').sort()
-    return [...englishFirst, ...mathsSecond, ...others]
+    allSubjects = Array.from(uniqueSubjects)
+  } else {
+    allSubjects = [...SS_SUBJECTS_SCIENCE]
   }
-  return SS_SUBJECTS_SCIENCE
+  
+  return sortSubjectsByWAECOrder(allSubjects)
 }
 
 const meetsMinimumSubjects = (className: string, completedSubjects: number): boolean => {
@@ -248,7 +327,7 @@ export default function BroadSheetPage() {
   const [loadError, setLoadError] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
-  const [expectedSubjects, setExpectedSubjects] = useState<string[]>(SS_SUBJECTS_SCIENCE)
+  const [expectedSubjects, setExpectedSubjects] = useState<string[]>(sortSubjectsByWAECOrder(SS_SUBJECTS_SCIENCE))
   const [classes, setClasses] = useState<string[]>([])
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [selectedTerm, setSelectedTerm] = useState('third')
@@ -309,8 +388,7 @@ export default function BroadSheetPage() {
   // Update subjects when class changes
   useEffect(() => {
     if (selectedClass) {
-      const allSubjects = getAllSubjectsForClass(selectedClass)
-      setExpectedSubjects(allSubjects)
+      setExpectedSubjects(getAllSubjectsForClass(selectedClass))
     }
     if (isMounted && selectedClass && selectedTerm && selectedYear) {
       loadBroadSheet()
@@ -581,7 +659,7 @@ export default function BroadSheetPage() {
         const reportCardData = {
           student_id: student.id,
           student_name: student.name,
-            student_vin: student.vin_id,
+          student_vin: student.vin_id,
           term: selectedTerm,
           academic_year: selectedYear,
           class: selectedClass,
