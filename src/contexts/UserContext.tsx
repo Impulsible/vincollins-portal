@@ -1,4 +1,4 @@
-// src/contexts/UserContext.tsx - NO LOADING EXPERIENCE
+// src/contexts/UserContext.tsx - COMPLETE FIXED VERSION WITH NO .catch() ERROR
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react'
@@ -29,11 +29,12 @@ interface UserContextType {
 }
 
 const ADMIN_USER_ID = 'a799693c-97c7-4f8d-baca-82242a98a00c'
+const AUTH_TIMEOUT_MS = 15000
 const UserContext = createContext<UserContextType | undefined>(undefined)
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(false) // ✅ Start with false - NO LOADING SCREEN
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
   const fetchPromiseRef = useRef<Promise<any> | null>(null)
@@ -44,6 +45,8 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const refreshTimeoutRef = useRef<NodeJS.Timeout>()
   const isBackgroundRef = useRef(false)
   const initialLoadDoneRef = useRef(false)
+  const authTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const authStartedRef = useRef(false)
 
   useEffect(() => {
     userRef.current = user
@@ -56,7 +59,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user])
 
-  // Track when app goes to background - NO AUTO ACTIONS
+  // Auth timeout protection
+  useEffect(() => {
+    if (loading && authStartedRef.current) {
+      authTimeoutRef.current = setTimeout(() => {
+        if (loading && isMountedRef.current && !initialLoadDoneRef.current) {
+          console.warn('Auth is taking longer than expected, but continuing to wait...')
+        }
+      }, AUTH_TIMEOUT_MS)
+    }
+
+    return () => {
+      if (authTimeoutRef.current) {
+        clearTimeout(authTimeoutRef.current)
+      }
+    }
+  }, [loading])
+
+  // Track when app goes to background
   useEffect(() => {
     const handleVisibilityChange = () => {
       const isHidden = document.hidden
@@ -76,19 +96,24 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [])
 
-  const setOnlineStatus = useCallback((userId: string, online: boolean) => {
+  // ✅ FIXED: No .catch() - using async/await instead
+  const setOnlineStatus = useCallback(async (userId: string, online: boolean) => {
     if (userId === ADMIN_USER_ID) return
     if (isBackgroundRef.current && !online) return
     
     const now = new Date().toISOString()
-    supabase
-      .from('user_online_status')
-      .upsert({
-        user_id: userId,
-        is_online: online,
-        last_seen: now,
-        updated_at: now,
-      }, { onConflict: 'user_id' })
+    try {
+      await supabase
+        .from('user_online_status')
+        .upsert({
+          user_id: userId,
+          is_online: online,
+          last_seen: now,
+          updated_at: now,
+        }, { onConflict: 'user_id' })
+    } catch (error) {
+      // Silently fail - don't log to avoid console spam
+    }
   }, [])
 
   const startHeartbeat = useCallback((userId: string) => {
@@ -133,18 +158,17 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
   const loadUser = useCallback(async () => {
     if (fetchPromiseRef.current) return fetchPromiseRef.current
 
+    authStartedRef.current = true
+    
     const fetchPromise = (async () => {
       try {
-        // ✅ Don't set loading to true - keep it false to avoid loading screens
-        // setLoading(true) - REMOVED
-        
+        // Show cached profile immediately if available
         const cachedProfile = localStorage.getItem('user_profile')
         if (cachedProfile && !initialLoadDoneRef.current) {
           try {
             const cached = JSON.parse(cachedProfile)
             if (cached && cached.id) {
               setUser(cached)
-              // setLoading(false) - already false
             }
           } catch (e) {
             // Invalid cache, ignore
@@ -156,6 +180,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (sessionError) {
           if (isMountedRef.current) { 
             setUser(null)
+            setLoading(false)
           }
           return null
         }
@@ -163,6 +188,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         if (!session?.user) {
           if (isMountedRef.current) { 
             setUser(null)
+            setLoading(false)
             localStorage.removeItem('auth_user')
             localStorage.removeItem('user_profile')
           }
@@ -173,7 +199,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         const userId = profile?.id || session.user.id
 
         if (userId !== ADMIN_USER_ID && !isBackgroundRef.current) {
-          setOnlineStatus(userId, true)
+          await setOnlineStatus(userId, true)
           startHeartbeat(userId)
         }
 
@@ -193,6 +219,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           setUser(finalProfile)
           setError(null)
           initialLoadDoneRef.current = true
+          setLoading(false)
         }
         return finalProfile
       } catch (err: any) {
@@ -201,10 +228,14 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
         }
         if (isMountedRef.current) {
           setError(err.message)
+          setLoading(false)
         }
         return null
       } finally {
         fetchPromiseRef.current = null
+        if (authTimeoutRef.current) {
+          clearTimeout(authTimeoutRef.current)
+        }
       }
     })()
 
@@ -248,6 +279,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     setUser(null)
     setError(null)
+    setLoading(false)
     
     supabase.auth.signOut()
     
@@ -261,7 +293,7 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     
     isMountedRef.current = true
     
-    // Load user in background - no loading state
+    // Load user
     loadUser()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -279,11 +311,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
           console.log('👋 User signed out')
           stopHeartbeat()
           setUser(null)
+          setLoading(false)
           localStorage.removeItem('auth_user')
           localStorage.removeItem('user_profile')
           initialLoadDoneRef.current = false
         } else if (event === 'USER_UPDATED') {
           console.log('📝 User updated')
+          await refreshUser()
         } else if (event === 'INITIAL_SESSION') {
           if (!userRef.current && session?.user && !initialLoadDoneRef.current) {
             await loadUser()
@@ -297,10 +331,13 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
       if (refreshTimeoutRef.current) {
         clearTimeout(refreshTimeoutRef.current)
       }
+      if (authTimeoutRef.current) {
+        clearTimeout(authTimeoutRef.current)
+      }
       stopHeartbeat()
       subscription.unsubscribe()
     }
-  }, [loadUser, stopHeartbeat])
+  }, [loadUser, stopHeartbeat, refreshUser])
 
   const value: UserContextType = {
     user,

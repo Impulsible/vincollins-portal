@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - FIXED: Modal appears before redirect
+// app/portal/page.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -56,10 +56,8 @@ export default function LoginPage() {
   const loginInProgress = useRef(false)
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null)
   const redirectStartedRef = useRef(false)
+  const [imageError, setImageError] = useState(false)
   
-  // ✅ DON'T auto-redirect authenticated users - let them see the modal first
-  // Remove the automatic redirect
-
   // Load school settings
   useEffect(() => {
     async function loadSchoolSettings() {
@@ -95,10 +93,10 @@ export default function LoginPage() {
     }
   }, [])
 
-  // ✅ AUTO-REDIRECT AFTER 3 SECONDS - ONLY when modal is showing
+  // Auto-redirect after 3 seconds when modal is showing
   useEffect(() => {
     if (showSuccessModal && loginSuccessData && !redirectStartedRef.current) {
-      console.log('Starting 3-second redirect timer')
+      console.log('Starting 3-second redirect timer to:', loginSuccessData.redirectPath)
       redirectStartedRef.current = true
       
       if (redirectTimerRef.current) {
@@ -106,8 +104,8 @@ export default function LoginPage() {
       }
       
       redirectTimerRef.current = setTimeout(() => {
-        console.log('Redirecting to:', loginSuccessData.redirectPath)
-        window.location.href = loginSuccessData.redirectPath
+        console.log('Redirecting to dashboard:', loginSuccessData.redirectPath)
+        router.push(loginSuccessData.redirectPath)
       }, 3000)
       
       return () => {
@@ -116,9 +114,9 @@ export default function LoginPage() {
         }
       }
     }
-  }, [showSuccessModal, loginSuccessData])
+  }, [showSuccessModal, loginSuccessData, router])
 
-  // ✅ LOGIN HANDLER
+  // Login handler
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault()
     
@@ -220,12 +218,20 @@ export default function LoginPage() {
       
       const redirectPath = redirectMap[mappedRole] || '/student'
 
+      // Save to localStorage for instant header update
       localStorage.setItem('auth_user', JSON.stringify({ id: signInData.user.id, role: mappedRole }))
       localStorage.setItem('auth_role', mappedRole)
+      localStorage.setItem('user_profile', JSON.stringify({
+        id: signInData.user.id,
+        full_name: formattedName,
+        first_name: formattedName.split(' ')[0],
+        email: cleanEmail,
+        role: mappedRole,
+      }))
 
       console.log('Setting modal data:', { userName: formattedName, role: mappedRole, redirectPath })
       
-      // ✅ SHOW MODAL FIRST before any redirect
+      // Show modal first
       setLoginSuccessData({
         userName: formattedName,
         role: mappedRole as 'student' | 'teacher' | 'admin',
@@ -234,10 +240,8 @@ export default function LoginPage() {
       setShowSuccessModal(true)
       setLoading(false)
       
-      console.log('Modal should be visible now. showSuccessModal:', true)
-      
       // Refresh user in background
-      refreshUser().catch(console.error)
+      await refreshUser()
       
       setTimeout(() => {
         loginInProgress.current = false
@@ -272,7 +276,7 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ SUCCESS MODAL - Direct rendering without AnimatePresence for reliability
+  // Success Modal Component
   const SuccessModal = () => {
     if (!showSuccessModal || !loginSuccessData) {
       return null
@@ -324,7 +328,7 @@ export default function LoginPage() {
       setLoading(false)
       loginInProgress.current = false
       redirectStartedRef.current = false
-      window.location.href = redirectPath
+      router.push(redirectPath)
     }
 
     return (
@@ -408,7 +412,7 @@ export default function LoginPage() {
     )
   }
 
-  // ✅ Render portal page immediately - NO LOADING SCREEN
+  // Render portal page
   return (
     <>
       <div className="min-h-screen flex flex-col bg-gray-50">
@@ -416,20 +420,21 @@ export default function LoginPage() {
         
         <div className="flex-1 flex items-stretch pt-16 sm:pt-20">
           <div className="flex w-full">
-            {/* LEFT SIDE - IMAGE */}
-            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative overflow-hidden">
-              <Image
-                src="/images/portal.jpg"
-                alt="Vincollins College Campus"
-                fill
-                className="object-cover object-center"
-                priority
-                sizes="60vw"
-                onError={(e) => {
-                  const target = e.target as HTMLImageElement;
-                  target.style.display = 'none';
-                }}
-              />
+            {/* LEFT SIDE - IMAGE with fixed height container */}
+            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative min-h-[calc(100vh-80px)]">
+              {!imageError ? (
+                <Image
+                  src="/images/portal.jpg"
+                  alt="Vincollins College Campus"
+                  fill
+                  className="object-cover object-center"
+                  priority
+                  sizes="(max-width: 1024px) 55vw, 60vw"
+                  onError={() => setImageError(true)}
+                />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]" />
+              )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
               <div className="relative flex flex-col justify-center px-12 xl:px-16 py-12 w-full">
                 <motion.div
@@ -707,7 +712,7 @@ export default function LoginPage() {
         </div>
       </div>
       
-      {/* ✅ Success Modal */}
+      {/* Success Modal */}
       <SuccessModal />
     </>
   )

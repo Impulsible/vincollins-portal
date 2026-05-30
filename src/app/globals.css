@@ -1177,3 +1177,27 @@ a.active + a.active::after,
 button.active + button.active::after {
   display: none;
 }
+
+/* styles/globals.css or app/globals.css */
+
+/* Prevent layout shift and flash */
+header {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* Smooth transition for header changes */
+.header-transition {
+  transition: opacity 0.15s ease-in-out;
+}
+
+/* Hide header during auth transitions */
+.header-hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.header-visible {
+  opacity: 1;
+  visibility: visible;
+}

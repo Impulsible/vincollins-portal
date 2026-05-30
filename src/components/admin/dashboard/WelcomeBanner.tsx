@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-// components/admin/dashboard/WelcomeBanner.tsx - CLEAN & SIMPLE
+// components/admin/dashboard/WelcomeBanner.tsx - OPTIMIZED (No loading skeleton)
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -77,15 +77,14 @@ const getPersonalizedQuote = (hour: number, firstName: string): { text: string; 
 }
 
 export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: WelcomeBannerProps) {
-  const [mounted, setMounted] = useState(false)
-  const firstName = adminProfile?.full_name?.split(' ')[0] || 'Admin'
-  const [now, setNow] = useState<Date | null>(null)
+  // ✅ Initialize with current date immediately (no mounted state)
+  const [now, setNow] = useState<Date>(() => new Date())
   const [sessionStart, setSessionStart] = useState<Date | null>(null)
+  
+  const firstName = adminProfile?.full_name?.split(' ')[0] || 'Admin'
 
+  // Initialize session start only once
   useEffect(() => {
-    setMounted(true)
-    setNow(new Date())
-
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       setSessionStart(new Date(stored))
@@ -95,11 +94,12 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
       setSessionStart(start)
     }
 
+    // Update clock every second
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Clear session on logout/page close
+  // Clear session on page close
   useEffect(() => {
     const handleClear = () => localStorage.removeItem(STORAGE_KEY)
     window.addEventListener('beforeunload', handleClear)
@@ -107,7 +107,6 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
   }, [])
 
   const greeting = useMemo(() => {
-    if (!now) return 'Welcome'
     const hour = now.getHours()
     if (hour < 12) return 'Good morning'
     if (hour < 17) return 'Good afternoon'
@@ -116,22 +115,19 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
   }, [now])
 
   const quote = useMemo(() => {
-    if (!now) return { text: '', author: '' }
     return getPersonalizedQuote(now.getHours(), firstName)
   }, [now, firstName])
 
   const formattedDate = useMemo(() => {
-    if (!now) return ''
     return now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   }, [now])
 
   const formattedTime = useMemo(() => {
-    if (!now) return ''
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   }, [now])
 
   const onlineDuration = useMemo(() => {
-    if (!now || !sessionStart) return '00:00:00'
+    if (!sessionStart) return '00:00:00'
     const diffMs = now.getTime() - sessionStart.getTime()
     const totalSeconds = Math.floor(diffMs / 1000)
     const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
@@ -140,25 +136,7 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
     return `${h}:${m}:${s}`
   }, [now, sessionStart])
 
-  if (!mounted || !now || !sessionStart) {
-    return (
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] p-8 shadow-2xl ring-1 ring-white/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_22%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(96,165,250,0.22),transparent_28%)]" />
-        <div className="relative z-10 space-y-3">
-          <div className="flex items-center gap-2">
-            <div className="rounded-lg border border-white/15 bg-white/10 p-1.5">
-              <Sparkles className="h-4 w-4 text-amber-300" />
-            </div>
-            <span className="text-sm text-blue-100/80">Loading...</span>
-          </div>
-          <div className="h-8 w-48 bg-white/10 rounded animate-pulse" />
-          <div className="h-4 w-64 bg-white/10 rounded animate-pulse" />
-        </div>
-      </div>
-    )
-  }
-
+  // ✅ No loading state - render immediately
   return (
     <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] p-6 sm:p-8 shadow-2xl ring-1 ring-white/10" suppressHydrationWarning>
       <div className="absolute inset-0">
@@ -177,37 +155,39 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
               </div>
               <span className="text-sm text-blue-100/80">Welcome Back, Administrator</span>
             </div>
-            <h1 className="text-3xl font-bold text-white sm:text-4xl">{greeting}, {firstName}!</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
+              {greeting}, {firstName}!
+            </h1>
           </div>
 
-          <div className="flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2" suppressHydrationWarning>
-              <Calendar className="h-4 w-4 text-blue-100/80" />
-              <span className="text-sm text-blue-50/95">{formattedDate}</span>
+          <div className="flex flex-wrap gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/15 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2">
+              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-100/80" />
+              <span className="text-xs sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedDate}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2" suppressHydrationWarning>
-              <Clock className="h-4 w-4 text-blue-100/80" />
-              <span className="font-mono text-sm text-blue-50/95">{formattedTime}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/15 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-blue-100/80" />
+              <span className="font-mono text-xs sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedTime}</span>
             </div>
-            <div className="flex items-center gap-2 rounded-xl border border-cyan-300/20 bg-white/10 px-3 py-2" suppressHydrationWarning>
-              <Timer className="h-4 w-4 text-cyan-300" />
-              <span className="font-mono text-sm text-blue-50/95">{onlineDuration}</span>
+            <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-cyan-300/20 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2">
+              <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-300" />
+              <span className="font-mono text-xs sm:text-sm text-blue-50/95 whitespace-nowrap">{onlineDuration}</span>
             </div>
           </div>
         </div>
 
-        {/* Quote */}
+        {/* Quote - Only show on desktop or if space allows */}
         {quote.text && (
-          <div className="border-t border-white/10 pt-4">
+          <div className="hidden sm:block border-t border-white/10 pt-4">
             <div className="flex items-start gap-3">
               <div className="rounded-lg border border-amber-300/20 bg-amber-400/10 p-1.5 shrink-0 mt-0.5">
-                <Quote className="h-4 w-4 text-amber-300" />
+                <Quote className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300" />
               </div>
-              <div>
-                <p className="text-sm sm:text-base text-blue-50/90 italic leading-relaxed">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-blue-50/90 italic leading-relaxed line-clamp-2">
                   &ldquo;{quote.text}&rdquo;
                 </p>
-                <p className="text-xs text-blue-200/60 mt-1.5 tracking-wide">{quote.author}</p>
+                <p className="text-[10px] sm:text-xs text-blue-200/60 mt-1 tracking-wide">{quote.author}</p>
               </div>
             </div>
           </div>

@@ -1,12 +1,10 @@
-// app/staff/page.tsx - FAST LOADING (No Skeleton, No Multi-Loading)
+// app/staff/page.tsx - COMPLETE INSTANT LOADING VERSION
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/contexts/UserContext'
-import { AuthGuard } from '@/components/AuthGuard'
-import StaffLoading from '@/components/staff/Staffloading'
 import StaffWelcomeBanner from '@/components/staff/StaffWelcomeBanner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -26,19 +24,32 @@ import Link from 'next/link'
 // TYPES & CONSTANTS
 // ============================================
 interface DashboardStats {
-  totalStudents: number; activeStudents: number; activeClasses: number
-  pendingCAScores: number; publishedExams: number; totalExams: number
-  totalAssignments: number; totalNotes: number; reportCardsGenerated: number
-  averagePerformance: number; classBreakdown: { name: string; count: number }[]
-  pendingTheoryCount: number; pendingTheorySubmissions: any[]; recentSubmissions: any[]
+  totalStudents: number
+  activeStudents: number
+  activeClasses: number
+  pendingCAScores: number
+  publishedExams: number
+  totalExams: number
+  totalAssignments: number
+  totalNotes: number
+  reportCardsGenerated: number
+  averagePerformance: number
+  classBreakdown: { name: string; count: number }[]
+  pendingTheoryCount: number
+  pendingTheorySubmissions: any[]
+  recentSubmissions: any[]
 }
 
-interface DashboardData { exams: any[]; assignments: any[]; notes: any[]; stats: DashboardStats }
+interface DashboardData { 
+  exams: any[]
+  assignments: any[]
+  notes: any[]
+  stats: DashboardStats 
+}
 
 const TERM_START = new Date('2026-05-04')
 const TERM_END = new Date('2026-08-01')
 const TOTAL_WEEKS = 13
-const LOADING_TIMEOUT_MS = 10000 // 10 seconds max
 
 const DEFAULT_STATS: DashboardStats = {
   totalStudents: 0, activeStudents: 0, activeClasses: 0,
@@ -85,16 +96,32 @@ function LoadingTimeoutError({ onRetry }: { onRetry: () => void }) {
 }
 
 // ============================================
-// MAIN COMPONENT
+// MAIN COMPONENT - INSTANT RENDER with cached data
 // ============================================
 function StaffDashboardContent() {
   const router = useRouter()
-  const { user: contextUser } = useUser()
+  const { user: contextUser, loading: authLoading, isAuthenticated } = useUser()
   
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(() => {
+    // ✅ INSTANT: Load from cache immediately on first render
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('staff_dashboard_cache')
+      if (cached) {
+        try {
+          return JSON.parse(cached)
+        } catch (e) {
+          return null
+        }
+      }
+    }
+    return null
+  })
+  
+  const [loading, setLoading] = useState(!dashboardData)
   const [loadingTimeout, setLoadingTimeout] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const dataFetchedRef = useRef(false)
+  const redirectCheckedRef = useRef(false)
   const loadingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const termInfo = useMemo(() => {
@@ -112,18 +139,49 @@ function StaffDashboardContent() {
     return { termName: 'Third Term', sessionYear: '2025/2026', currentWeek, totalWeeks: TOTAL_WEEKS, weekProgress, displayWeek }
   }, [])
 
-  // Fetch data directly - NO CACHE, NO EXTRA HOOKS
+  // ✅ Integrated auth check
   useEffect(() => {
-    if (!contextUser?.id) return
+    if (redirectCheckedRef.current) return
+    
+    if (!authLoading) {
+      redirectCheckedRef.current = true
+      
+      if (!isAuthenticated || !contextUser) {
+        router.replace('/portal')
+        return
+      }
+      
+      const userRole = contextUser.role?.toLowerCase()
+      const allowedRoles = ['staff', 'teacher', 'admin']
+      if (!userRole || !allowedRoles.includes(userRole)) {
+        router.replace('/portal')
+        return
+      }
+    }
+  }, [authLoading, isAuthenticated, contextUser, router])
+
+  // ✅ Fetch data in background - doesn't block rendering
+  useEffect(() => {
+    if (authLoading) return
+    if (!isAuthenticated || !contextUser?.id) return
+    
+    const userRole = contextUser.role?.toLowerCase()
+    if (userRole !== 'staff' && userRole !== 'teacher' && userRole !== 'admin') return
+    
+    if (dataFetchedRef.current) return
 
     const fetchData = async () => {
-      setLoading(true)
-      setLoadingTimeout(false)
+      dataFetchedRef.current = true
+      setRefreshing(true)
+      
+      // Set timeout for loading
+      loadingTimeoutRef.current = setTimeout(() => {
+        if (loading) setLoadingTimeout(true)
+      }, 10000)
       
       try {
         const userId = contextUser.id
 
-        // Fast parallel queries
         const results = await Promise.all([
           supabase.from('exams')
             .select('id, title, subject, class, status, created_at')
@@ -154,7 +212,7 @@ function StaffDashboardContent() {
         const studentsData = results[3].error ? [] : results[3].data || []
         const recentSubmissions = results[4].error ? [] : results[4].data || []
 
-        // Enrich assignments with subject and class names
+        // Enrich assignments
         let subjectMap: Record<string, string> = {}
         const assignmentSubjectIds = [...new Set(assignmentData.map((a: any) => a.subject_id).filter(Boolean))]
         if (assignmentSubjectIds.length > 0) {
@@ -175,7 +233,6 @@ function StaffDashboardContent() {
           class: classMapForAssignments[a.class_id] || 'Unknown'
         }))
 
-        // Enrich submissions with exam details
         const submissionExamIds = [...new Set(recentSubmissions.map((s: any) => s.exam_id))]
         const examTitleMap: Record<string, any> = {}
         if (submissionExamIds.length > 0) {
@@ -190,13 +247,11 @@ function StaffDashboardContent() {
           exam_class: examTitleMap[s.exam_id]?.class || ''
         }))
 
-        // Class breakdown
         const classMap = new Map<string, number>()
         studentsData.forEach((s: any) => { 
           if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1) 
         })
 
-        // Calculate average performance from GRADED ONLY submissions
         const teacherExamIds = examData.map((e: any) => e.id)
         let averagePerformance = 0
 
@@ -240,26 +295,26 @@ function StaffDashboardContent() {
           recentSubmissions: enrichedSubmissions
         }
 
-        setDashboardData({ exams: examData, assignments: enrichedAssignments, notes: notesData, stats })
+        const newData = { exams: examData, assignments: enrichedAssignments, notes: notesData, stats }
+        setDashboardData(newData)
+        setLoading(false)
+        
+        // ✅ Cache for instant loading next time
+        localStorage.setItem('staff_dashboard_cache', JSON.stringify(newData))
       } catch (error) {
         console.error('Error fetching dashboard:', error)
       } finally {
-        setLoading(false)
+        setRefreshing(false)
         if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current)
       }
     }
-
-    // Set timeout
-    loadingTimeoutRef.current = setTimeout(() => {
-      if (loading) setLoadingTimeout(true)
-    }, LOADING_TIMEOUT_MS)
 
     fetchData()
 
     return () => {
       if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current)
     }
-  }, [contextUser?.id])
+  }, [contextUser?.id, authLoading, isAuthenticated, contextUser?.role, loading])
 
   const exams = dashboardData?.exams || []
   const assignments = dashboardData?.assignments || []
@@ -267,10 +322,12 @@ function StaffDashboardContent() {
   const stats = dashboardData?.stats || DEFAULT_STATS
 
   const handleRefresh = async () => {
+    if (!isAuthenticated || !contextUser?.id) return
+    
     setRefreshing(true)
+    dataFetchedRef.current = false
     try {
-      const userId = contextUser?.id
-      if (!userId) return
+      const userId = contextUser.id
 
       const results = await Promise.all([
         supabase.from('exams')
@@ -302,7 +359,6 @@ function StaffDashboardContent() {
       const studentsData = results[3].error ? [] : results[3].data || []
       const recentSubmissions = results[4].error ? [] : results[4].data || []
 
-      // Quick enrichment for refresh
       let subjectMap: Record<string, string> = {}
       const assignmentSubjectIds = [...new Set(assignmentData.map((a: any) => a.subject_id).filter(Boolean))]
       if (assignmentSubjectIds.length > 0) {
@@ -385,7 +441,9 @@ function StaffDashboardContent() {
         recentSubmissions: enrichedSubmissions
       }
 
-      setDashboardData({ exams: examData, assignments: enrichedAssignments, notes: notesData, stats })
+      const newData = { exams: examData, assignments: enrichedAssignments, notes: notesData, stats }
+      setDashboardData(newData)
+      localStorage.setItem('staff_dashboard_cache', JSON.stringify(newData))
       toast.success('Dashboard refreshed')
     } catch (error) {
       toast.error('Refresh failed')
@@ -405,16 +463,39 @@ function StaffDashboardContent() {
 
   const profile = contextUser
 
-  // ✅ FAST LOADING - Just the beautiful component, no skeleton, no multi-loading
-  if (loading && !loadingTimeout) {
-    return <StaffLoading profile={contextUser} onLogout={() => {}} />
+  // ✅ Handle auth redirects
+  if (!authLoading && (!isAuthenticated || !contextUser)) {
+    return null
+  }
+
+  const userRole = contextUser?.role?.toLowerCase()
+  if (!authLoading && userRole !== 'staff' && userRole !== 'teacher' && userRole !== 'admin') {
+    return null
+  }
+
+  // ✅ Show loading only on first visit (no cache)
+  if (loading && !dashboardData && !loadingTimeout) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-emerald-200 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Briefcase className="h-7 w-7 text-emerald-600" />
+            </div>
+          </div>
+          <p className="mt-4 text-slate-600 text-lg font-medium">Loading Staff Dashboard...</p>
+          <p className="mt-2 text-slate-500 text-sm">Preparing your teaching workspace 📚</p>
+        </div>
+      </div>
+    )
   }
 
   if (loading && loadingTimeout) {
     return <LoadingTimeoutError onRetry={() => window.location.reload()} />
   }
 
-  // ✅ IMMEDIATE RENDER - No loading states anywhere
+  // ✅ RENDER INSTANTLY - with cached or fresh data
   return (
     <div className="min-h-screen bg-slate-50/50">
       <StaffWelcomeBanner
@@ -434,6 +515,14 @@ function StaffDashboardContent() {
       />
 
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
+        {/* Refreshing indicator - subtle */}
+        {refreshing && (
+          <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg px-3 py-1.5 flex items-center gap-2 text-xs text-slate-500">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Refreshing...
+          </div>
+        )}
+
         {/* Quick Actions */}
         <div className="flex items-center gap-2 mt-4 sm:mt-5 flex-wrap">
           <Button size="sm" onClick={() => router.push('/staff/exams')} className="h-9 text-sm bg-emerald-600 hover:bg-emerald-700">
@@ -497,8 +586,12 @@ function StaffDashboardContent() {
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
-                <CardTitle className="text-sm font-medium flex items-center gap-2"><MonitorPlay className="h-4 w-4 text-emerald-600" />Recent Exams</CardTitle>
-                <Button variant="ghost" size="sm" asChild className="h-8 text-xs"><Link href="/staff/exams">View all <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <MonitorPlay className="h-4 w-4 text-emerald-600" />Recent Exams
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
+                  <Link href="/staff/exams">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                </Button>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-0">
                 {exams.length === 0 ? (
@@ -506,11 +599,15 @@ function StaffDashboardContent() {
                 ) : (
                   <div className="divide-y">
                     {exams.slice(0, 4).map((exam) => (
-                      <div key={exam.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
+                      <div key={exam.id} 
+                        className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
                         onClick={() => router.push(`/staff/exams/${exam.id}/submissions`)}>
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="p-1.5 bg-blue-50 rounded"><MonitorPlay className="h-4 w-4 text-blue-600" /></div>
-                          <div className="min-w-0"><p className="text-sm font-medium truncate">{exam.title}</p><p className="text-xs text-muted-foreground">{exam.subject} · {exam.class}</p></div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{exam.title}</p>
+                            <p className="text-xs text-muted-foreground">{exam.subject} · {exam.class}</p>
+                          </div>
                         </div>
                         <Badge variant="outline" className="text-xs shrink-0 ml-2">{exam.status || 'draft'}</Badge>
                       </div>
@@ -522,8 +619,12 @@ function StaffDashboardContent() {
 
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
-                <CardTitle className="text-sm font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-blue-600" />Recent Assignments</CardTitle>
-                <Button variant="ghost" size="sm" asChild className="h-8 text-xs"><Link href="/staff/assignments">View all <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <FileText className="h-4 w-4 text-blue-600" />Recent Assignments
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
+                  <Link href="/staff/assignments">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                </Button>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-0">
                 {assignments.length === 0 ? (
@@ -531,10 +632,14 @@ function StaffDashboardContent() {
                 ) : (
                   <div className="divide-y">
                     {assignments.map((item) => (
-                      <div key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
+                      <div key={item.id} 
+                        className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
                         onClick={() => router.push(`/staff/assignments/${item.id}`)}>
                         <div className="p-1.5 bg-emerald-50 rounded"><FileText className="h-4 w-4 text-emerald-600" /></div>
-                        <div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{item.title}</p><p className="text-xs text-muted-foreground">{item.subject} · {item.class}</p></div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{item.title}</p>
+                          <p className="text-xs text-muted-foreground">{item.subject} · {item.class}</p>
+                        </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground/30 shrink-0" />
                       </div>
                     ))}
@@ -545,8 +650,12 @@ function StaffDashboardContent() {
 
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
-                <CardTitle className="text-sm font-medium flex items-center gap-2"><BookOpen className="h-4 w-4 text-purple-600" />Study Notes</CardTitle>
-                <Button variant="ghost" size="sm" asChild className="h-8 text-xs"><Link href="/staff/notes">View all <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 text-purple-600" />Study Notes
+                </CardTitle>
+                <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
+                  <Link href="/staff/notes">View all <ArrowRight className="ml-1 h-3 w-3" /></Link>
+                </Button>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-0">
                 {notes.length === 0 ? (
@@ -554,10 +663,14 @@ function StaffDashboardContent() {
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {notes.map((note) => (
-                      <div key={note.id} className="flex items-center gap-3 p-2.5 rounded-lg border hover:border-purple-200 cursor-pointer transition-colors"
+                      <div key={note.id} 
+                        className="flex items-center gap-3 p-2.5 rounded-lg border hover:border-purple-200 cursor-pointer transition-colors"
                         onClick={() => router.push(`/staff/notes/${note.id}`)}>
                         <div className="p-1.5 bg-purple-50 rounded"><BookOpen className="h-4 w-4 text-purple-600" /></div>
-                        <div className="min-w-0"><p className="text-sm font-medium truncate">{note.title}</p><p className="text-xs text-muted-foreground">General</p></div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{note.title}</p>
+                          <p className="text-xs text-muted-foreground">General</p>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -569,21 +682,38 @@ function StaffDashboardContent() {
           <div className="space-y-4">
             <Card>
               <CardHeader className="py-3 px-4">
-                <CardTitle className="text-sm font-medium flex items-center gap-2"><GraduationCap className="h-4 w-4 text-emerald-600" />Overview</CardTitle>
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-emerald-600" />Overview
+                </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-0 space-y-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 bg-slate-50 rounded-lg"><p className="text-2xl font-semibold">{stats.totalStudents}</p><p className="text-xs text-muted-foreground">Students</p></div>
-                  <div className="p-3 bg-slate-50 rounded-lg"><p className="text-2xl font-semibold">{stats.activeClasses}</p><p className="text-xs text-muted-foreground">Classes</p></div>
-                  <div className="p-3 bg-slate-50 rounded-lg"><p className="text-2xl font-semibold">{stats.activeStudents}</p><p className="text-xs text-muted-foreground">Active</p></div>
-                  <div className="p-3 bg-amber-50 rounded-lg"><p className="text-2xl font-semibold text-amber-700">{stats.recentSubmissions.length}</p><p className="text-xs text-amber-600">Need Grading</p></div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-2xl font-semibold">{stats.totalStudents}</p>
+                    <p className="text-xs text-muted-foreground">Students</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-2xl font-semibold">{stats.activeClasses}</p>
+                    <p className="text-xs text-muted-foreground">Classes</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-2xl font-semibold">{stats.activeStudents}</p>
+                    <p className="text-xs text-muted-foreground">Active</p>
+                  </div>
+                  <div className="p-3 bg-amber-50 rounded-lg">
+                    <p className="text-2xl font-semibold text-amber-700">{stats.recentSubmissions.length}</p>
+                    <p className="text-xs text-amber-600">Need Grading</p>
+                  </div>
                 </div>
                 {stats.classBreakdown.length > 0 && (
                   <div>
                     <p className="text-xs font-medium text-muted-foreground mb-2">CLASS BREAKDOWN</p>
                     <div className="space-y-1">
                       {stats.classBreakdown.slice(0, 5).map((cls) => (
-                        <div key={cls.name} className="flex justify-between items-center py-1"><span className="text-sm">{cls.name}</span><span className="text-sm text-muted-foreground">{cls.count}</span></div>
+                        <div key={cls.name} className="flex justify-between items-center py-1">
+                          <span className="text-sm">{cls.name}</span>
+                          <span className="text-sm text-muted-foreground">{cls.count}</span>
+                        </div>
                       ))}
                     </div>
                   </div>
@@ -597,6 +727,7 @@ function StaffDashboardContent() {
                 </div>
               </CardContent>
             </Card>
+
             <Card>
               <CardContent className="p-4 space-y-2">
                 <Button variant="outline" className="w-full justify-start h-10 text-sm" onClick={() => router.push('/staff/ca-scores')}>
@@ -617,10 +748,9 @@ function StaffDashboardContent() {
   )
 }
 
+// ============================================
+// EXPORT
+// ============================================
 export default function StaffDashboardPage() {
-  return (
-    <AuthGuard allowedRoles={['staff', 'admin', 'teacher']}>
-      <StaffDashboardContent />
-    </AuthGuard>
-  )
+  return <StaffDashboardContent />
 }

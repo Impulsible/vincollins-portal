@@ -1,4 +1,4 @@
-// app/admin/report-cards/view/page.tsx - UPDATED TO READ FROM REPORT_CARDS TABLE
+// app/admin/report-cards/view/page.tsx - COMPLETE WITH PROPER CLOSING TAGS
 
 'use client'
 
@@ -14,6 +14,29 @@ import {
   Loader2,
   Sparkles,
 } from 'lucide-react'
+
+// ============================================
+// WAEC/NECO STANDARD SUBJECT ORDERING
+// ============================================
+const SUBJECT_ORDER: Record<string, number> = {
+  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
+  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
+  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
+  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
+  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
+  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
+  'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
+  'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
+  'PHE': 27, 'Physical Education': 27, 'Security Education': 28
+}
+
+const sortSubjectsByOrder = (subjects: any[]) => {
+  return [...subjects].sort((a, b) => {
+    const orderA = SUBJECT_ORDER[a.subject] || 999
+    const orderB = SUBJECT_ORDER[b.subject] || 999
+    return orderA - orderB
+  })
+}
 
 // ============================================
 // WAEC GRADING SYSTEM
@@ -80,100 +103,17 @@ const getOverallGradeColor = (grade: string): string => {
 }
 
 // ============================================
-// AI COMMENT GENERATION (for regeneration only)
-// ============================================
-const generateAIComments = async (firstName: string, averageScore: number, subjects: any[], className: string, gender: string) => {
-  try {
-    const response = await fetch('/api/generate-comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        studentName: firstName,
-        averageScore: averageScore,
-        subjects: subjects.map(s => ({ name: s.name, score: s.total })),
-        className: className,
-        gender: gender
-      })
-    })
-
-    if (response.ok) {
-      return await response.json()
-    }
-  } catch (error) {
-    console.error('API error:', error)
-  }
-  return null
-}
-
-// Fallback comments
-const getFallbackTeacherComment = (firstName: string, avg: number, bestSubject: string, bestScore: number, worstSubject: string, worstScore: number, gender: string): string => {
-  const pronoun = gender === 'female' ? 'She' : 'He'
-  const possessive = gender === 'female' ? 'her' : 'his'
-  
-  if (avg >= 90) return `Absolutely outstanding, ${firstName}! Scoring ${bestScore}% in ${bestSubject} is remarkable. ${pronoun} has set a very high standard. Keep this exceptional work!`
-  if (avg >= 85) return `Excellent performance, ${firstName}! ${possessive} ${bestScore}% in ${bestSubject} is impressive. Keep striving for excellence!`
-  if (avg >= 80) return `Excellent work, ${firstName}! ${possessive} performance in ${bestSubject} shows strong understanding and dedication.`
-  if (avg >= 75) return `Very good work, ${firstName}! ${pronoun} excelled in ${bestSubject} (${bestScore}%). Focus more on ${worstSubject} (${worstScore}%) to reach even greater heights.`
-  if (avg >= 70) return `Good effort, ${firstName}! ${possessive} performance in ${bestSubject} (${bestScore}%) was solid. Keep pushing forward!`
-  if (avg >= 65) return `Fair performance, ${firstName}. ${pronoun} did well in ${bestSubject} (${bestScore}%). With more effort in ${worstSubject} (${worstScore}%), improvement is certain.`
-  if (avg >= 60) return `Credit level achieved, ${firstName}. ${bestSubject} (${bestScore}%) was ${possessive} strongest subject.`
-  if (avg >= 55) return `${firstName}, ${pronoun} narrowly passed. ${bestSubject} (${bestScore}%) was okay, but more effort is needed overall.`
-  if (avg >= 50) return `${firstName}, this was a close one. ${possessive} performance in ${bestSubject} (${bestScore}%) helped ${possessive} pass.`
-  if (avg >= 40) return `${firstName}, unfortunately ${pronoun} struggled this term. Please see your class teacher for support.`
-  return `${firstName}, this is a serious concern. Parent-teacher meeting is required urgently.`
-}
-
-const getFallbackPrincipalComment = (avg: number, firstName: string, gender: string): string => {
-  const pronoun = gender === 'female' ? 'She' : 'He'
-  
-  if (avg >= 90) return `Outstanding academic performance. ${pronoun} is promoted with distinction.`
-  if (avg >= 85) return `Excellent performance. ${pronoun} is promoted with high honors.`
-  if (avg >= 80) return `Excellent performance. ${pronoun} is promoted with honors.`
-  if (avg >= 75) return `Very good performance. ${pronoun} is promoted to the next class.`
-  if (avg >= 70) return `Good performance. Consistent effort will take ${pronoun} further. Promoted.`
-  if (avg >= 65) return `Satisfactory performance. There is room for improvement. Promoted.`
-  if (avg >= 60) return `Fair performance. More dedication needed. Promoted.`
-  if (avg >= 55) return `Credit performance. ${pronoun} passed but can do better. Promoted.`
-  if (avg >= 50) return `${pronoun} passed. Work harder next term. Promoted conditionally.`
-  if (avg >= 45) return `A pass. Significant improvement required. Promoted conditionally.`
-  if (avg >= 40) return `Poor performance. ${pronoun} must improve significantly next term.`
-  return `Failed. ${pronoun} needs to repeat the class or work much harder next term.`
-}
-
-// ============================================
 // TYPES
 // ============================================
-interface SubjectData {
-  name: string
-  ca: number
-  exam: number
+interface SubjectScore {
+  subject: string
+  ca1: number
+  ca2: number
+  exam_obj: number
+  exam_theory: number
   total: number
   grade: string
   remark: string
-}
-
-interface ReportCardData {
-  id: string
-  student_id: string
-  student_name: string
-  student_first_name: string
-  student_vin: string
-  student_admission_number?: string
-  student_photo_url?: string
-  class: string
-  term: string
-  academic_year: string
-  subjects_data: SubjectData[]
-  average_score: number
-  total_score: number
-  grade: string
-  teacher_comments: string
-  principal_comments: string
-  behavior_ratings?: { name: string; rating: number }[]
-  skill_ratings?: { name: string; rating: number }[]
-  status: string
-  generated_at?: string
-  next_term_begins?: string
 }
 
 interface SchoolSettings {
@@ -214,9 +154,14 @@ export default function ViewReportCardPage() {
   const [loading, setLoading] = useState(true)
   const [regenerating, setRegenerating] = useState(false)
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings>(DEFAULT_SCHOOL_SETTINGS)
-  const [reportCard, setReportCard] = useState<ReportCardData | null>(null)
+  const [student, setStudent] = useState<any>(null)
+  const [subjects, setSubjects] = useState<SubjectScore[]>([])
+  const [totalScore, setTotalScore] = useState(0)
+  const [averageScore, setAverageScore] = useState(0)
+  const [overallGrade, setOverallGrade] = useState('')
   const [nextTermDate, setNextTermDate] = useState<string>('')
-  const [studentGender, setStudentGender] = useState<string>('male')
+  const [teacherComment, setTeacherComment] = useState('')
+  const [principalComment, setPrincipalComment] = useState('')
 
   const loadNextTermDate = useCallback(async () => {
     try {
@@ -234,18 +179,167 @@ export default function ViewReportCardPage() {
     }
   }, [])
 
-  useEffect(() => {
-    const handleDateUpdate = (event: CustomEvent) => {
-      setNextTermDate(event.detail.date)
-      toast.info('Next term date has been updated', { duration: 3000 })
-      loadReportCard()
+  // Call API to generate comments
+  const generateCommentsFromAPI = useCallback(async (firstName: string, avgScore: number, subjectsList: any[], className: string, gender: string) => {
+    try {
+      const response = await fetch('/api/generate-comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName: firstName,
+          averageScore: avgScore,
+          subjects: subjectsList.map(s => ({ name: s.subject, score: s.total })),
+          className: className,
+          gender: gender
+        })
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTeacherComment(data.teacher_comment)
+        setPrincipalComment(data.principal_comment)
+        return true
+      }
+      return false
+    } catch (error) {
+      console.error('API error:', error)
+      return false
     }
-
-    window.addEventListener('next-term-date-updated', handleDateUpdate as EventListener)
-    return () => window.removeEventListener('next-term-date-updated', handleDateUpdate as EventListener)
   }, [])
 
-  const generateRatings = (averageScore: number) => {
+  // Load scores directly from ca_scores table
+  const loadScores = useCallback(async () => {
+    if (!studentId) {
+      toast.error('No student selected')
+      router.back()
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      // Get student profile
+      const { data: studentData, error: studentError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', studentId)
+        .single()
+
+      if (studentError) throw studentError
+      setStudent(studentData)
+
+      // Get all scores for this student from ca_scores
+      const { data: scoresData, error: scoresError } = await supabase
+        .from('ca_scores')
+        .select('*')
+        .eq('student_id', studentId)
+        .eq('term', term)
+        .eq('academic_year', year)
+        .eq('status', 'approved')
+
+      if (scoresError) throw scoresError
+
+      // Process scores into subjects
+      let processedSubjects: SubjectScore[] = (scoresData || []).map((score: any) => {
+        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+        const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
+        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+        const grade = getWAECGrade(percentage)
+        const remark = getGradeRemark(grade)
+
+        return {
+          subject: score.subject,
+          ca1: score.ca1_score || 0,
+          ca2: score.ca2_score || 0,
+          exam_obj: score.exam_objective_score || 0,
+          exam_theory: score.exam_theory_score || 0,
+          total: total,
+          grade: grade,
+          remark: remark,
+        }
+      })
+
+      // Sort subjects by WAEC/NECO standard order
+      processedSubjects = sortSubjectsByOrder(processedSubjects)
+      
+      setSubjects(processedSubjects)
+
+      // Calculate totals - average to 2 decimal places
+      const total = processedSubjects.reduce((sum, s) => sum + s.total, 0)
+      const avg = processedSubjects.length > 0 ? total / processedSubjects.length : 0
+      
+      setTotalScore(total)
+      setAverageScore(avg)
+      setOverallGrade(getOverallGrade(avg))
+
+      // Get proper first name
+      let firstName = studentData?.first_name || ''
+      
+      if (!firstName) {
+        const nameToSplit = studentData?.display_name || studentData?.full_name || 'Student'
+        firstName = nameToSplit.split(' ')[0]
+      }
+      
+      if (firstName) {
+        firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+      } else {
+        firstName = 'Student'
+      }
+      
+      const gender = studentData?.gender || 'male'
+      const className = studentData?.class || '—'
+      
+      // Generate comments via API
+      await generateCommentsFromAPI(firstName, avg, processedSubjects, className, gender)
+
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to load scores')
+    } finally {
+      setLoading(false)
+    }
+  }, [studentId, term, year, generateCommentsFromAPI, router])
+
+  // Regenerate comments via API
+  const handleRegenerateComments = useCallback(async () => {
+    if (!student) return
+    
+    setRegenerating(true)
+    try {
+      let firstName = student?.first_name || ''
+      
+      if (!firstName) {
+        const nameToSplit = student?.display_name || student?.full_name || 'Student'
+        firstName = nameToSplit.split(' ')[0]
+      }
+      
+      if (firstName) {
+        firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+      } else {
+        firstName = 'Student'
+      }
+      
+      const gender = student?.gender || 'male'
+      const className = student?.class || '—'
+      
+      const subjectsForAPI = subjects.map(s => ({ name: s.subject, score: s.total }))
+      
+      const success = await generateCommentsFromAPI(firstName, averageScore, subjectsForAPI, className, gender)
+      
+      if (success) {
+        toast.success('Comments regenerated successfully!')
+      } else {
+        toast.error('Failed to regenerate comments')
+      }
+    } catch (error) {
+      console.error(error)
+      toast.error('Failed to regenerate comments')
+    } finally {
+      setRegenerating(false)
+    }
+  }, [student, subjects, averageScore, generateCommentsFromAPI])
+
+  const generateRatings = () => {
     const getRating = (base: number): number => {
       if (averageScore >= 90) return Math.min(5, base + 1)
       if (averageScore >= 80) return base
@@ -275,131 +369,6 @@ export default function ViewReportCardPage() {
     }
   }
 
-  // ✅ FIXED: Load report card from report_cards table, NOT from ca_scores
-  const loadReportCard = useCallback(async () => {
-    setLoading(true)
-
-    try {
-      // Get student profile first
-      const { data: studentData, error: studentError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', studentId)
-        .single()
-
-      if (studentError) throw studentError
-
-      const gender = studentData?.gender || 'male'
-      setStudentGender(gender)
-
-      const fullName = studentData?.display_name || studentData?.full_name || 'Student'
-      const firstName = fullName.split(' ')[0] || fullName
-
-      // ✅ Load from report_cards table
-      const { data: reportCardData, error: reportCardError } = await supabase
-        .from('report_cards')
-        .select('*')
-        .eq('student_id', studentId)
-        .eq('term', term)
-        .eq('academic_year', year)
-        .maybeSingle()
-
-      if (reportCardError || !reportCardData) {
-        toast.error('No report card found for this student')
-        router.back()
-        return
-      }
-
-      // Format subjects data for display (ensure ca and exam are proper numbers)
-      const formattedSubjects = (reportCardData.subjects_data || []).map((subject: any) => ({
-        name: subject.name,
-        ca: subject.ca || subject.ca1 + subject.ca2 || 0,
-        exam: subject.exam || subject.examObj + subject.examTheory || 0,
-        total: subject.total || 0,
-        grade: subject.grade || getWAECGrade(subject.total || 0),
-        remark: subject.remark || getGradeRemark(subject.grade || getWAECGrade(subject.total || 0))
-      }))
-
-      const termLabels: Record<string, string> = {
-        first: 'First Term',
-        second: 'Second Term',
-        third: 'Third Term',
-      }
-
-      setReportCard({
-        id: reportCardData.id,
-        student_id: studentId!,
-        student_name: fullName,
-        student_first_name: firstName,
-        student_vin: studentData?.vin_id || '—',
-        student_admission_number: studentData?.admission_number || '—',
-        student_photo_url: studentData?.photo_url || null,
-        class: reportCardData.class || studentData?.class || '—',
-        term: termLabels[term] || term,
-        academic_year: year,
-        subjects_data: formattedSubjects,
-        average_score: reportCardData.average_score || 0,
-        total_score: reportCardData.total_score || 0,
-        grade: reportCardData.grade || getOverallGrade(reportCardData.average_score || 0),
-        teacher_comments: reportCardData.teacher_comments || 'No comment available.',
-        principal_comments: reportCardData.principal_comments || 'No comment available.',
-        behavior_ratings: generateRatings(reportCardData.average_score || 0).behaviorRatings,
-        skill_ratings: generateRatings(reportCardData.average_score || 0).skillRatings,
-        status: reportCardData.status,
-        next_term_begins: nextTermDate,
-      })
-    } catch (error) {
-      console.error(error)
-      toast.error('Failed to load report card')
-    } finally {
-      setLoading(false)
-    }
-  }, [studentId, term, year, nextTermDate, router])
-
-  // Regenerate just the comments and update the database
-  const handleRegenerateComments = async () => {
-    if (!reportCard) return
-    
-    setRegenerating(true)
-    try {
-      const aiComments = await generateAIComments(
-        reportCard.student_first_name,
-        reportCard.average_score,
-        reportCard.subjects_data,
-        reportCard.class,
-        studentGender
-      )
-      
-      if (aiComments) {
-        // Update the report card in the database
-        const { error } = await supabase
-          .from('report_cards')
-          .update({
-            teacher_comments: aiComments.teacher_comment,
-            principal_comments: aiComments.principal_comment
-          })
-          .eq('id', reportCard.id)
-
-        if (error) throw error
-
-        // Update local state
-        setReportCard({
-          ...reportCard,
-          teacher_comments: aiComments.teacher_comment,
-          principal_comments: aiComments.principal_comment
-        })
-        toast.success('Comments regenerated and saved successfully!')
-      } else {
-        toast.error('Failed to regenerate comments')
-      }
-    } catch (error) {
-      console.error(error)
-      toast.error('Failed to regenerate comments')
-    } finally {
-      setRegenerating(false)
-    }
-  }
-
   useEffect(() => {
     const init = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -416,7 +385,7 @@ export default function ViewReportCardPage() {
       if (schoolData) {
         setSchoolSettings({
           name: schoolData.school_name || DEFAULT_SCHOOL_SETTINGS.name,
-          address: schoolData.address || DEFAULT_SCHOOL_SETTINGS.address,
+          address: schoolData.school_address || DEFAULT_SCHOOL_SETTINGS.address,
           phone: schoolData.school_phone || DEFAULT_SCHOOL_SETTINGS.phone,
           email: schoolData.school_email || DEFAULT_SCHOOL_SETTINGS.email,
           logo_url: schoolData.logo_path,
@@ -427,12 +396,20 @@ export default function ViewReportCardPage() {
       await loadNextTermDate()
       
       if (studentId) {
-        await loadReportCard()
+        await loadScores()
+      } else {
+        toast.error('No student selected')
+        router.back()
       }
     }
 
     init()
-  }, [studentId, term, year])
+  }, [studentId, term, year, router, loadNextTermDate, loadScores])
+
+  // Handle back button - go back to broadsheet
+  const handleBack = () => {
+    router.back()
+  }
 
   if (loading) {
     return (
@@ -442,27 +419,46 @@ export default function ViewReportCardPage() {
     )
   }
 
-  const displaySubjects = reportCard?.subjects_data || []
-  const termDisplay = reportCard?.term || term
-  const formattedNextTermDate = reportCard?.next_term_begins 
-    ? new Date(reportCard.next_term_begins).toLocaleDateString('en-NG', {
+  if (!student) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4">
+        <p className="text-red-600">Student not found</p>
+        <Button onClick={handleBack}>Go Back to Broadsheet</Button>
+      </div>
+    )
+  }
+
+  const termLabels: Record<string, string> = {
+    first: 'First Term',
+    second: 'Second Term',
+    third: 'Third Term',
+  }
+  const termDisplay = termLabels[term] || term
+  const fullName = student.display_name || student.full_name || 'Student'
+  const behaviorSkillRatings = generateRatings()
+  const formattedNextTermDate = nextTermDate 
+    ? new Date(nextTermDate).toLocaleDateString('en-NG', {
         day: 'numeric',
         month: 'long',
         year: 'numeric'
       })
     : 'To be announced'
 
+  // Find best and worst subjects for summary
+  const bestSubject = subjects.length > 0 ? subjects.reduce((a, b) => a.total > b.total ? a : b) : null
+  const worstSubject = subjects.length > 0 ? subjects.reduce((a, b) => a.total < b.total ? a : b) : null
+  const formattedAvg = averageScore.toFixed(2)
+
   return (
     <div className="bg-gray-100 min-h-screen py-4">
-
       {/* TOPBAR */}
       <div className="no-print max-w-[210mm] mx-auto mb-3 flex items-center justify-between">
-        <Button variant="outline" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back
+        <Button variant="outline" onClick={handleBack}>
+          <ArrowLeft className="h-4 w-4 mr-2" /> Back to Broadsheet
         </Button>
 
         <div className="flex gap-2">
-          <Button variant="outline" onClick={loadReportCard}>
+          <Button variant="outline" onClick={loadScores}>
             <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
           <Button 
@@ -485,11 +481,9 @@ export default function ViewReportCardPage() {
 
       {/* REPORT CARD */}
       <div className="bg-white w-[210mm] min-h-[297mm] mx-auto text-[11px] text-black border border-gray-300 p-3 print:p-0 print:border-none">
-
         {/* HEADER */}
         <div className="border-b border-gray-300 pb-2 print:pb-1">
           <div className="flex items-start justify-between">
-
             {/* LOGO */}
             <div className="w-16 print:w-12">
               {schoolSettings.logo_url && (
@@ -513,10 +507,10 @@ export default function ViewReportCardPage() {
 
             {/* PHOTO */}
             <div className="w-20 h-24 border border-gray-300 print:w-16 print:h-20">
-              {reportCard?.student_photo_url ? (
-                <img src={reportCard.student_photo_url} alt="student" className="w-full h-full object-cover" />
+              {student.photo_url ? (
+                <img src={student.photo_url} alt="student" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-gray-100" />
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">Photo</div>
               )}
             </div>
           </div>
@@ -524,27 +518,26 @@ export default function ViewReportCardPage() {
 
         {/* STUDENT INFO */}
         <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-[11px] mt-2 mb-3 print:mt-1 print:mb-2 print:text-[9px]">
-          <div className="flex"><span className="font-bold w-32">Name:</span><span>{reportCard?.student_name}</span></div>
-          <div className="flex"><span className="font-bold w-32">Admission No:</span><span>{reportCard?.student_admission_number}</span></div>
-          <div className="flex"><span className="font-bold w-32">Class:</span><span>{reportCard?.class}</span></div>
+          <div className="flex"><span className="font-bold w-32">Name:</span><span>{fullName}</span></div>
+          <div className="flex"><span className="font-bold w-32">Admission No:</span><span>{student.admission_number || '—'}</span></div>
+          <div className="flex"><span className="font-bold w-32">Class:</span><span>{student.class || '—'}</span></div>
           <div className="flex"><span className="font-bold w-32">Term:</span><span>{termDisplay}</span></div>
-          <div className="flex"><span className="font-bold w-32">Session:</span><span>{reportCard?.academic_year}</span></div>
+          <div className="flex"><span className="font-bold w-32">Session:</span><span>{year}</span></div>
           <div className="flex"><span className="font-bold w-32">Next Term:</span><span>{formattedNextTermDate}</span></div>
         </div>
 
         {/* MAIN CONTENT */}
         <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-3">
-
           {/* LEFT COLUMN - ACADEMIC RESULTS */}
           <div>
-
             {/* SUBJECT TABLE */}
             <div className="overflow-x-auto">
               <table className="w-full border-collapse border border-gray-300 text-[10px] print:text-[8px] min-w-[500px]">
                 <thead className="bg-blue-600 text-white">
                   <tr>
                     <th className="border px-2 py-1 text-left">Subjects</th>
-                    <th className="border px-2 py-1 text-center w-16">CA</th>
+                    <th className="border px-2 py-1 text-center w-16">CA1</th>
+                    <th className="border px-2 py-1 text-center w-16">CA2</th>
                     <th className="border px-2 py-1 text-center w-16">Exam</th>
                     <th className="border px-2 py-1 text-center w-16">Total</th>
                     <th className="border px-2 py-1 text-center w-14">Grade</th>
@@ -552,27 +545,36 @@ export default function ViewReportCardPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {displaySubjects.map((subject) => (
-                    <tr key={subject.name} className="hover:bg-gray-50">
-                      <td className="border px-2 py-1">{subject.name}</td>
-                      <td className="border text-center font-mono">{subject.ca}</td>
-                      <td className="border text-center font-mono">{subject.exam}</td>
-                      <td className="border text-center font-bold font-mono">{subject.total}</td>
-                      <td className="border text-center">
-                        <span className={getGradeStyle(subject.grade)}>{subject.grade}</span>
+                  {subjects.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="text-center py-4 text-gray-500">
+                        No scores available for this student
                       </td>
-                      <td className="border px-2 py-1">{subject.remark}</td>
                     </tr>
-                  ))}
+                  ) : (
+                    subjects.map((subject) => (
+                      <tr key={subject.subject} className="hover:bg-gray-50">
+                        <td className="border px-2 py-1">{subject.subject}</td>
+                        <td className="border text-center font-mono">{subject.ca1}</td>
+                        <td className="border text-center font-mono">{subject.ca2}</td>
+                        <td className="border text-center font-mono">{subject.exam_obj + subject.exam_theory}</td>
+                        <td className="border text-center font-bold font-mono">{subject.total}</td>
+                        <td className="border text-center">
+                          <span className={getGradeStyle(subject.grade)}>{subject.grade}</span>
+                        </td>
+                        <td className="border px-2 py-1">{subject.remark}</td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
                 <tfoot className="bg-gray-100 font-bold">
                   <tr>
-                    <td colSpan={3} className="border px-2 py-1 text-right">TOTAL / AVERAGE:</td>
-                    <td className="border text-center">{reportCard?.total_score}</td>
+                    <td colSpan={4} className="border px-2 py-1 text-right">TOTAL / AVERAGE:</td>
+                    <td className="border text-center">{totalScore}</td>
                     <td className="border text-center">
-                      <span className={getOverallGradeColor(reportCard?.grade || '—')}>{reportCard?.grade || '—'}</span>
+                      <span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span>
                     </td>
-                    <td className="border text-center">{reportCard?.average_score}%</td>
+                    <td className="border text-center">{formattedAvg}%</td>
                   </tr>
                 </tfoot>
               </table>
@@ -582,10 +584,10 @@ export default function ViewReportCardPage() {
             <div className="mt-3 border border-gray-300">
               <div className="bg-purple-600 text-white px-2 py-1 text-[10px] font-bold flex items-center gap-1">
                 <Sparkles className="h-3 w-3" />
-                CLASS TEACHER'S REMARK (AI-Generated)
+                CLASS TEACHER'S REMARK
               </div>
               <div className="p-2 text-[10px] italic leading-relaxed bg-purple-50">
-                {reportCard?.teacher_comments || 'No comment available.'}
+                {teacherComment || 'Generating comment...'}
               </div>
             </div>
 
@@ -595,13 +597,13 @@ export default function ViewReportCardPage() {
                 PRINCIPAL'S REMARK
               </div>
               <div className="p-2 text-[10px] italic leading-relaxed">
-                {reportCard?.principal_comments || 'No comment available.'}
+                {principalComment || 'Generating comment...'}
               </div>
             </div>
 
             {/* GRADE SCALE */}
             <div className="mt-3">
-              <div className="bg-blue-600 text-white text-[10px] px-2 py-1 font-bold">Grade Scale (WAEC)</div>
+              <div className="bg-blue-600 text-white text-[10px] px-2 py-1 font-bold">Grade Scale</div>
               <div className="border border-gray-300 p-2">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[9px]">
                   <div><span className={getGradeStyle('A1')}>A1</span> 75-100</div>
@@ -620,16 +622,24 @@ export default function ViewReportCardPage() {
 
           {/* RIGHT COLUMN - PSYCHOMOTOR & SKILLS */}
           <div>
-
             {/* PERFORMANCE SUMMARY */}
             <Panel title="Performance Summary">
               <div className="space-y-1">
-                <div className="flex justify-between"><span>Total Score</span><span className="font-bold">{reportCard?.total_score}</span></div>
-                <div className="flex justify-between"><span>Average</span><span className="font-bold">{reportCard?.average_score}%</span></div>
-                <div className="flex justify-between">
-                  <span>Grade</span>
-                  <span className={getOverallGradeColor(reportCard?.grade || '—')}>{reportCard?.grade || '—'}</span>
-                </div>
+                <div className="flex justify-between"><span>Total Score</span><span className="font-bold">{totalScore}</span></div>
+                <div className="flex justify-between"><span>Average</span><span className="font-bold">{formattedAvg}%</span></div>
+                <div className="flex justify-between"><span>Grade</span><span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span></div>
+                {bestSubject && (
+                  <div className="flex justify-between text-emerald-600 pt-1 border-t">
+                    <span>Best Subject</span>
+                    <span className="font-bold">{bestSubject.subject} ({bestSubject.total})</span>
+                  </div>
+                )}
+                {worstSubject && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Area for Improvement</span>
+                    <span className="font-bold">{worstSubject.subject} ({worstSubject.total})</span>
+                  </div>
+                )}
               </div>
             </Panel>
 
@@ -638,7 +648,7 @@ export default function ViewReportCardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300 text-[10px]">
                   <tbody>
-                    {reportCard?.behavior_ratings?.map((item) => (
+                    {behaviorSkillRatings.behaviorRatings.map((item) => (
                       <tr key={item.name}>
                         <td className="border px-1 py-1">{item.name}</td>
                         <td className="border text-center w-12 font-bold">{item.rating}</td>
@@ -654,7 +664,7 @@ export default function ViewReportCardPage() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse border border-gray-300 text-[10px]">
                   <tbody>
-                    {reportCard?.skill_ratings?.map((item) => (
+                    {behaviorSkillRatings.skillRatings.map((item) => (
                       <tr key={item.name}>
                         <td className="border px-1 py-1">{item.name}</td>
                         <td className="border text-center w-12 font-bold">{item.rating}</td>
@@ -675,7 +685,6 @@ export default function ViewReportCardPage() {
                 <div>1 - Poor</div>
               </div>
             </Panel>
-
           </div>
         </div>
 
@@ -683,7 +692,6 @@ export default function ViewReportCardPage() {
         <div className="border-t border-gray-300 mt-4 pt-2 text-center text-[9px] text-gray-500 print:mt-2 print:pt-1 print:text-[7px]">
           Powered by Vincollins Portal | {schoolSettings.motto}
         </div>
-
       </div>
 
       {/* PRINT CSS */}

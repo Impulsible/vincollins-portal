@@ -1,8 +1,4 @@
-// components/staff/StaffLoading.tsx - NO SKELETON LOADER
-// ============================================
-// STAFF DASHBOARD LOADING STATE
-// ============================================
-
+// components/staff/StaffLoading.tsx - INSTANT LOADING (No delays)
 'use client'
 
 import { motion } from 'framer-motion'
@@ -15,6 +11,7 @@ interface StaffLoadingProps {
 }
 
 export default function StaffLoading({ profile, onLogout }: StaffLoadingProps) {
+  // ✅ Fast header formatting - no expensive operations
   const formatProfileForHeader = (profile: any) => {
     if (!profile) return undefined
     
@@ -29,42 +26,35 @@ export default function StaffLoading({ profile, onLogout }: StaffLoadingProps) {
     }
   }
 
-  // ✅ NO SKELETON - Just beautiful animated loading
+  // ✅ INSTANT RENDER - No animations that delay perceived loading
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
       <Header user={formatProfileForHeader(profile)} onLogout={onLogout} />
       <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
         <div className="text-center">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-            className="inline-block"
-          >
-            <Briefcase className="h-16 w-16 text-emerald-600 mx-auto" />
-          </motion.div>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="mt-4 text-slate-600 text-lg font-medium"
-          >
+          {/* Faster spinner - no animation delay */}
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-emerald-200 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Briefcase className="h-7 w-7 text-emerald-600" />
+            </div>
+          </div>
+          
+          {/* Immediate text - no fade-in delays */}
+          <p className="mt-4 text-slate-600 text-lg font-medium">
             Loading Staff Dashboard...
-          </motion.p>
-          <motion.p 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="mt-2 text-slate-500 text-sm"
-          >
+          </p>
+          <p className="mt-2 text-slate-500 text-sm">
             Preparing your teaching workspace 📚
-          </motion.p>
+          </p>
+          
+          {/* Instant bouncing dots - no delay */}
           <div className="flex justify-center gap-1.5 mt-4">
             {[0, 1, 2].map((i) => (
-              <motion.div
+              <div
                 key={i}
-                className="h-2.5 w-2.5 rounded-full bg-emerald-400"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+                className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-bounce"
+                style={{ animationDelay: `${i * 0.1}s`, animationDuration: '0.6s' }}
               />
             ))}
           </div>

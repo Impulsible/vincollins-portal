@@ -1,4 +1,4 @@
-// components/layout/header.tsx - FIXED
+// components/layout/header.tsx - SHOW HEADER IMMEDIATELY
 'use client'
 
 import { useState, useEffect, Suspense, lazy, memo } from 'react'
@@ -29,11 +29,12 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
+// ✅ Simple loading shell - no animation, just static placeholder
 const HeaderShell = memo(() => (
   <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-2 sm:py-3">
     <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
       <div className="flex items-center justify-between">
-        <Logo schoolSettings={null} />
+        <div className="h-8 w-32 bg-white/20 rounded animate-pulse" />
         <div className="flex items-center gap-2">
           <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 rounded-full animate-pulse" />
         </div>
@@ -69,33 +70,24 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     setIsHydrated(true)
   }, [])
 
-  // ✅ Use prop user if provided (from ConditionalHeader), otherwise fetched user
+  // Use prop user if provided, otherwise fetched user
   const user = propUser || fetchedUser
 
-  // ✅ Determine page type for navigation
+  // Determine page type for navigation
   const isHomePage = pathname === '/'
   const isPortalPage = pathname === '/portal'
   
-  // ✅ PUBLIC PAGES: Home, Admission, Schools, Contact, Portal
   const publicPages = ['/', '/admission', '/schools', '/contact']
   const isPublicPage = publicPages.includes(pathname || '') || pathname?.startsWith('/admission') || pathname?.startsWith('/schools')
   
-  // ✅ DASHBOARD PAGES: Student, Staff, Admin dashboards
   const isStudentPage = pathname?.startsWith('/student')
   const isStaffPage = pathname?.startsWith('/staff')
   const isAdminPage = pathname?.startsWith('/admin')
+  const isDashboardPage = isStudentPage || isStaffPage || isAdminPage
 
-  // ✅ CRITICAL LOGIC:
-  // Show public nav IF:
-  // 1. User is NOT authenticated (guest) - always show public nav
-  // 2. User IS authenticated BUT visiting a public page (home, admission, etc.) - show public nav
-  // Show dashboard nav IF:
-  // 3. User IS authenticated AND on their dashboard pages - show role-specific nav
-  const showPublicNav = !isHydrated || isLoading 
-    ? false // Don't show anything during loading
-    : !isAuthenticated 
-      ? true // Guest user - always public nav
-      : (isPublicPage || isHomePage) && !isStudentPage && !isStaffPage && !isAdminPage // Authenticated but on public page
+  // Navigation decision
+  const showPublicNav = !isAuthenticated || (isPublicPage || isHomePage || isPortalPage)
+  const showDashboardNav = isAuthenticated && isDashboardPage
 
   // Scroll detection
   useEffect(() => {
@@ -110,6 +102,12 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return () => { document.body.style.overflow = 'unset' }
   }, [mobileMenuOpen])
 
+  // ✅ Show header shell during hydration only (very brief)
+  if (!isHydrated) {
+    return <HeaderShell />
+  }
+
+  // ✅ Always show header - use cached data if available
   return (
     <>
       <header className={cn(
@@ -121,10 +119,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
             
             <Logo schoolSettings={schoolSettings} />
 
-            {/* ✅ Desktop Nav */}
             <div className="hidden lg:flex flex-1 justify-center">
               <DesktopNav 
-                userRole={isHydrated && !isLoading ? user?.role : undefined}
+                userRole={showDashboardNav ? user?.role : undefined}
                 pathname={pathname} 
                 isPublic={showPublicNav}
                 onCbtClick={() => setShowCbtInfo(true)} 
