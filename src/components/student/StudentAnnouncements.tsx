@@ -1,5 +1,4 @@
-// components/student/StudentAnnouncements.tsx
-
+// components/student/StudentAnnouncements.tsx - WITH OPTIONAL HEADER HIDE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -13,9 +12,11 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Megaphone, Pin, Bell, Calendar, Filter, Search, 
-  AlertCircle, Loader2, RefreshCw, Eye, ChevronRight
+  AlertCircle, Loader2, RefreshCw, Eye, ChevronRight, 
+  Home, X, Sparkles
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 interface Announcement {
   id: string
@@ -28,13 +29,20 @@ interface Announcement {
   expires_at: string | null
 }
 
-export function StudentAnnouncements() {
+interface StudentAnnouncementsProps {
+  showBreadcrumb?: boolean
+  hideHeader?: boolean  // ✅ New prop to hide the main header
+  className?: string
+}
+
+export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false, className }: StudentAnnouncementsProps) {
   const [announcements, setAnnouncements] = useState<Announcement[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [filterPriority, setFilterPriority] = useState<string>('all')
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null)
   const [showDetails, setShowDetails] = useState(false)
+  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
 
   const loadAnnouncements = useCallback(async () => {
     setLoading(true)
@@ -49,7 +57,6 @@ export function StudentAnnouncements() {
 
       if (error) throw error
       
-      // Filter out expired announcements
       const now = new Date()
       const activeAnnouncements = (data || []).filter(a => 
         !a.expires_at || new Date(a.expires_at) > now
@@ -70,17 +77,25 @@ export function StudentAnnouncements() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-100 text-red-800 border-red-200'
-      case 'high': return 'bg-orange-100 text-orange-800 border-orange-200'
-      default: return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'urgent': return 'bg-red-500 text-white border-red-600'
+      case 'high': return 'bg-orange-500 text-white border-orange-600'
+      default: return 'bg-blue-500 text-white border-blue-600'
+    }
+  }
+
+  const getPriorityBgLight = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'bg-red-50 border-red-200'
+      case 'high': return 'bg-orange-50 border-orange-200'
+      default: return 'bg-blue-50 border-blue-200'
     }
   }
 
   const getPriorityIcon = (priority: string) => {
     switch (priority) {
-      case 'urgent': return <AlertCircle className="h-4 w-4" />
-      case 'high': return <Bell className="h-4 w-4" />
-      default: return <Megaphone className="h-4 w-4" />
+      case 'urgent': return <AlertCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      case 'high': return <Bell className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+      default: return <Megaphone className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
     }
   }
 
@@ -105,132 +120,230 @@ export function StudentAnnouncements() {
   const pinnedAnnouncements = filteredAnnouncements.filter(a => a.is_pinned)
   const normalAnnouncements = filteredAnnouncements.filter(a => !a.is_pinned)
 
+  const priorityFilters = [
+    { key: 'all', label: 'All', color: 'bg-emerald-600' },
+    { key: 'urgent', label: 'Urgent', color: 'bg-red-600' },
+    { key: 'high', label: 'High', color: 'bg-orange-600' },
+    { key: 'normal', label: 'Normal', color: 'bg-blue-600' },
+  ]
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      <div className="flex items-center justify-center min-h-[300px] sm:min-h-[400px]">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 border-3 sm:border-4 border-emerald-200 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+            </div>
+          </div>
+          <p className="mt-3 sm:mt-4 text-slate-600 text-sm sm:text-base font-medium">
+            Loading announcements...
+          </p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <Megaphone className="h-6 w-6 text-emerald-600" />
-            Announcements
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Stay updated with important information from the school
-          </p>
+    <div className={cn("space-y-5 sm:space-y-6 md:space-y-8", className)}>
+      {/* Breadcrumb - Optional */}
+      {showBreadcrumb && (
+        <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+          <Link 
+            href="/student" 
+            className="hover:text-emerald-600 transition-colors flex items-center gap-1"
+          >
+            <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="hidden sm:inline">Dashboard</span>
+          </Link>
+          <ChevronRight className="h-3 w-3" />
+          <span className="text-foreground font-medium">Announcements</span>
+        </nav>
+      )}
+
+      {/* Header Section - Can be hidden */}
+      {!hideHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 flex items-center gap-2">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+              </div>
+              Announcements
+            </h1>
+            <p className="text-sm text-slate-500 mt-1 ml-0 sm:ml-12">
+              Stay updated with important information from the school
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={loadAnnouncements}
+            className="h-9 sm:h-10 text-sm w-full sm:w-auto border-slate-200 hover:border-emerald-300 hover:bg-emerald-50"
+          >
+            <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
+            Refresh
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={loadAnnouncements}>
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
-      </div>
+      )}
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-xs text-slate-500">Total</p>
-            <p className="text-xl font-bold">{announcements.length}</p>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-slate-50 hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs text-slate-500 font-medium">Total</p>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-700">{announcements.length}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-xs text-slate-500">Pinned</p>
-            <p className="text-xl font-bold text-emerald-600">{announcements.filter(a => a.is_pinned).length}</p>
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-white hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs text-emerald-600 font-medium">Pinned</p>
+            <p className="text-2xl sm:text-3xl font-bold text-emerald-700">
+              {announcements.filter(a => a.is_pinned).length}
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-xs text-slate-500">Urgent</p>
-            <p className="text-xl font-bold text-red-600">{announcements.filter(a => a.priority === 'urgent').length}</p>
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-white hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs text-red-600 font-medium">Urgent</p>
+            <p className="text-2xl sm:text-3xl font-bold text-red-700">
+              {announcements.filter(a => a.priority === 'urgent').length}
+            </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-3">
-            <p className="text-xs text-slate-500">High Priority</p>
-            <p className="text-xl font-bold text-orange-600">{announcements.filter(a => a.priority === 'high').length}</p>
+        <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-white hover:shadow-md transition-shadow">
+          <CardContent className="p-3 sm:p-4">
+            <p className="text-xs text-orange-600 font-medium">High Priority</p>
+            <p className="text-2xl sm:text-3xl font-bold text-orange-700">
+              {announcements.filter(a => a.priority === 'high').length}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search and Filter */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      {/* Search and Filter Section */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
           <Input
-            placeholder="Search announcements..."
+            placeholder="Search announcements by title or content..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="pl-10 h-10 sm:h-11 text-sm border-slate-200 focus:border-emerald-300 focus:ring-emerald-200"
           />
         </div>
-        <div className="flex gap-2">
+        
+        {/* Desktop Filters */}
+        <div className="hidden sm:flex gap-2">
+          {priorityFilters.map((filter) => (
+            <Button
+              key={filter.key}
+              variant={filterPriority === filter.key ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setFilterPriority(filter.key)}
+              className={cn(
+                "h-9 px-4 text-sm font-medium transition-all",
+                filterPriority === filter.key 
+                  ? filter.color + " text-white shadow-md hover:opacity-90" 
+                  : "border-slate-200 hover:border-emerald-300 hover:bg-emerald-50"
+              )}
+            >
+              {filter.label}
+            </Button>
+          ))}
+        </div>
+
+        {/* Mobile Filter */}
+        <div className="sm:hidden relative">
           <Button
-            variant={filterPriority === 'all' ? 'default' : 'outline'}
+            variant="outline"
             size="sm"
-            onClick={() => setFilterPriority('all')}
-            className={filterPriority === 'all' ? 'bg-emerald-600' : ''}
+            onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
+            className="w-full h-9 justify-between border-slate-200"
           >
-            All
+            <span className="flex items-center gap-2">
+              <Filter className="h-3.5 w-3.5" />
+              Filter: {priorityFilters.find(f => f.key === filterPriority)?.label || 'All'}
+            </span>
+            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", mobileFilterOpen && "rotate-90")} />
           </Button>
-          <Button
-            variant={filterPriority === 'urgent' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterPriority('urgent')}
-            className={filterPriority === 'urgent' ? 'bg-red-600' : ''}
-          >
-            Urgent
-          </Button>
-          <Button
-            variant={filterPriority === 'high' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterPriority('high')}
-            className={filterPriority === 'high' ? 'bg-orange-600' : ''}
-          >
-            High
-          </Button>
-          <Button
-            variant={filterPriority === 'normal' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setFilterPriority('normal')}
-            className={filterPriority === 'normal' ? 'bg-blue-600' : ''}
-          >
-            Normal
-          </Button>
+          
+          <AnimatePresence>
+            {mobileFilterOpen && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-slate-100 p-2 z-10"
+              >
+                <div className="grid grid-cols-2 gap-1">
+                  {priorityFilters.map((filter) => (
+                    <button
+                      key={filter.key}
+                      onClick={() => {
+                        setFilterPriority(filter.key)
+                        setMobileFilterOpen(false)
+                      }}
+                      className={cn(
+                        "px-3 py-2 rounded-lg text-sm text-left transition-all",
+                        filterPriority === filter.key 
+                          ? "bg-emerald-50 text-emerald-700 font-medium" 
+                          : "text-slate-600 hover:bg-slate-50"
+                      )}
+                    >
+                      {filter.label}
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
       {/* Announcements List */}
-      <ScrollArea className="h-[calc(100vh-350px)]">
+      <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
         {filteredAnnouncements.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <Megaphone className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 font-medium">No announcements yet</p>
-              <p className="text-sm text-slate-400 mt-1">Check back later for updates</p>
+          <Card className="border-0 shadow-sm">
+            <CardContent className="text-center py-12 sm:py-16">
+              <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <Megaphone className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-slate-500 font-medium">No announcements found</p>
+              <p className="text-sm text-slate-400 mt-1">
+                {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
+              </p>
+              {searchQuery && (
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  onClick={() => setSearchQuery('')}
+                  className="mt-3 text-emerald-600"
+                >
+                  Clear search
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 sm:space-y-5 pb-4">
             {/* Pinned Announcements */}
             {pinnedAnnouncements.length > 0 && (
               <div>
-                <h3 className="text-sm font-medium text-slate-500 mb-3 flex items-center gap-2">
-                  <Pin className="h-4 w-4" /> Pinned ({pinnedAnnouncements.length})
-                </h3>
+                <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                  <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Pin className="h-3 w-3 text-amber-600" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
+                  <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
+                </div>
                 {pinnedAnnouncements.map((announcement, idx) => (
                   <AnnouncementCard
                     key={announcement.id}
                     announcement={announcement}
                     index={idx}
-                    getPriorityColor={getPriorityColor}
+                    getPriorityBgLight={getPriorityBgLight}
                     getPriorityIcon={getPriorityIcon}
                     formatDate={formatDate}
                     onViewDetails={() => {
@@ -242,22 +355,31 @@ export function StudentAnnouncements() {
               </div>
             )}
 
-            {/* Normal Announcements */}
+            {/* Recent Announcements */}
             <div>
-              {normalAnnouncements.map((announcement, idx) => (
-                <AnnouncementCard
-                  key={announcement.id}
-                  announcement={announcement}
-                  index={idx}
-                  getPriorityColor={getPriorityColor}
-                  getPriorityIcon={getPriorityIcon}
-                  formatDate={formatDate}
-                  onViewDetails={() => {
-                    setSelectedAnnouncement(announcement)
-                    setShowDetails(true)
-                  }}
-                />
-              ))}
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Sparkles className="h-3 w-3 text-emerald-600" />
+                </div>
+                <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
+                <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
+              </div>
+              <div className="space-y-3 sm:space-y-4">
+                {normalAnnouncements.map((announcement, idx) => (
+                  <AnnouncementCard
+                    key={announcement.id}
+                    announcement={announcement}
+                    index={idx}
+                    getPriorityBgLight={getPriorityBgLight}
+                    getPriorityIcon={getPriorityIcon}
+                    formatDate={formatDate}
+                    onViewDetails={() => {
+                      setSelectedAnnouncement(announcement)
+                      setShowDetails(true)
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         )}
@@ -270,47 +392,80 @@ export function StudentAnnouncements() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
             onClick={() => setShowDetails(false)}
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-[90%] sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  {getPriorityIcon(selectedAnnouncement.priority)}
-                  <h2 className="text-xl font-bold">{selectedAnnouncement.title}</h2>
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-white border-b px-5 sm:px-6 py-4 flex justify-between items-center">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={cn(
+                    "h-8 w-8 rounded-full flex items-center justify-center",
+                    selectedAnnouncement.priority === 'urgent' ? "bg-red-100" :
+                    selectedAnnouncement.priority === 'high' ? "bg-orange-100" : "bg-blue-100"
+                  )}>
+                    {getPriorityIcon(selectedAnnouncement.priority)}
+                  </div>
+                  <h2 className="font-bold text-lg sm:text-xl truncate text-slate-800">
+                    {selectedAnnouncement.title}
+                  </h2>
                 </div>
-                <Button variant="ghost" size="sm" onClick={() => setShowDetails(false)}>
-                  ✕
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setShowDetails(false)}
+                  className="h-8 w-8 rounded-full hover:bg-slate-100 p-0"
+                >
+                  <X className="h-4 w-4 text-slate-500" />
                 </Button>
               </div>
-              <div className="p-6 space-y-4">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={getPriorityColor(selectedAnnouncement.priority)}>
+              
+              {/* Modal Content */}
+              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[calc(85vh-70px)]">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={cn(
+                    getPriorityColor(selectedAnnouncement.priority),
+                    "text-xs px-2 py-0.5"
+                  )}>
                     {selectedAnnouncement.priority.toUpperCase()}
                   </Badge>
                   {selectedAnnouncement.is_pinned && (
-                    <Badge variant="secondary" className="flex items-center gap-1">
+                    <Badge variant="secondary" className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700">
                       <Pin className="h-3 w-3" /> Pinned
                     </Badge>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-sm text-slate-500">
-                  <span>By: {selectedAnnouncement.created_by_name || 'Admin'}</span>
-                  <span>📅 {formatDate(selectedAnnouncement.created_at)}</span>
+                
+                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <span className="font-medium">By:</span> {selectedAnnouncement.created_by_name || 'Administrator'}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {formatDate(selectedAnnouncement.created_at)}
+                  </span>
                 </div>
+                
                 <div className="border-t pt-4">
-                  <p className="text-slate-700 whitespace-pre-wrap">{selectedAnnouncement.content}</p>
+                  <p className="text-slate-700 text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
+                    {selectedAnnouncement.content}
+                  </p>
                 </div>
+                
                 {selectedAnnouncement.expires_at && (
-                  <div className="bg-amber-50 rounded-lg p-3 text-sm text-amber-700">
+                  <div className="bg-amber-50 rounded-xl p-3 text-sm text-amber-700 border border-amber-200">
                     <Bell className="h-4 w-4 inline mr-2" />
-                    This announcement will expire on {new Date(selectedAnnouncement.expires_at).toLocaleDateString()}
+                    This announcement will expire on {new Date(selectedAnnouncement.expires_at).toLocaleDateString('en-NG', {
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })}
                   </div>
                 )}
               </div>
@@ -326,54 +481,69 @@ export function StudentAnnouncements() {
 function AnnouncementCard({ 
   announcement, 
   index,
-  getPriorityColor,
+  getPriorityBgLight,
   getPriorityIcon,
   formatDate,
   onViewDetails
 }: { 
   announcement: Announcement
   index: number
-  getPriorityColor: (priority: string) => string
+  getPriorityBgLight: (priority: string) => string
   getPriorityIcon: (priority: string) => JSX.Element
   formatDate: (date: string) => string
   onViewDetails: () => void
 }) {
+  const priorityBgLight = getPriorityBgLight(announcement.priority)
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Card className={cn(
-        "mb-3 transition-all hover:shadow-md cursor-pointer",
-        announcement.priority === 'urgent' && "border-l-4 border-l-red-500",
-        announcement.priority === 'high' && "border-l-4 border-l-orange-500",
-        announcement.is_pinned && "bg-emerald-50/30"
-      )}
-      onClick={onViewDetails}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between gap-3">
+      <Card 
+        className={cn(
+          "group cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 border",
+          priorityBgLight,
+          announcement.is_pinned && "border-amber-200 shadow-sm"
+        )}
+        onClick={onViewDetails}
+      >
+        <CardContent className="p-4 sm:p-5">
+          <div className="flex items-start gap-3 sm:gap-4">
+            {/* Icon */}
+            <div className={cn(
+              "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors group-hover:scale-105",
+              announcement.priority === 'urgent' ? "bg-red-100 text-red-600" :
+              announcement.priority === 'high' ? "bg-orange-100 text-orange-600" : "bg-blue-100 text-blue-600"
+            )}>
+              {getPriorityIcon(announcement.priority)}
+            </div>
+            
+            {/* Content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                <Badge className={getPriorityColor(announcement.priority)}>
-                  {announcement.priority.toUpperCase()}
-                </Badge>
+              <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                <h3 className="font-semibold text-slate-800 text-sm sm:text-base">
+                  {announcement.title}
+                </h3>
                 {announcement.is_pinned && (
-                  <Badge variant="secondary" className="flex items-center gap-1">
-                    <Pin className="h-3 w-3" /> Pinned
-                  </Badge>
+                  <Pin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                 )}
               </div>
-              <h3 className="font-bold text-lg truncate">{announcement.title}</h3>
-              <p className="text-slate-500 text-sm mt-1 line-clamp-2">
+              <p className="text-slate-500 text-xs sm:text-sm line-clamp-2">
                 {announcement.content}
               </p>
               <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                <span>By: {announcement.created_by_name || 'Admin'}</span>
-                <span>📅 {formatDate(announcement.created_at)}</span>
+                <span>By: {announcement.created_by_name || 'Administrator'}</span>
+                <span className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  {formatDate(announcement.created_at)}
+                </span>
               </div>
             </div>
-            <ChevronRight className="h-5 w-5 text-slate-400 shrink-0" />
+            
+            {/* Arrow indicator */}
+            <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </CardContent>
       </Card>

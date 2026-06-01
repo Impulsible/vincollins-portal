@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-// components/admin/dashboard/WelcomeBanner.tsx - OPTIMIZED (No loading skeleton)
+// components/admin/dashboard/WelcomeBanner.tsx - OPTIMIZED (Quote visible on mobile)
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -77,7 +77,7 @@ const getPersonalizedQuote = (hour: number, firstName: string): { text: string; 
 }
 
 export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: WelcomeBannerProps) {
-  // ✅ Initialize with current date immediately (no mounted state)
+  // Initialize with current date immediately (no mounted state)
   const [now, setNow] = useState<Date>(() => new Date())
   const [sessionStart, setSessionStart] = useState<Date | null>(null)
   
@@ -136,58 +136,58 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
     return `${h}:${m}:${s}`
   }, [now, sessionStart])
 
-  // ✅ No loading state - render immediately
+  // No loading state - render immediately
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] p-6 sm:p-8 shadow-2xl ring-1 ring-white/10" suppressHydrationWarning>
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] p-4 sm:p-6 md:p-8 shadow-2xl ring-1 ring-white/10" suppressHydrationWarning>
       <div className="absolute inset-0">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_22%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(96,165,250,0.22),transparent_28%)]" />
       </div>
       <div className="absolute inset-0 bg-black/15" />
 
-      <div className="relative z-10 space-y-5">
+      <div className="relative z-10 space-y-4 sm:space-y-5">
         {/* Top Row: Greeting + Time */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <div className="rounded-lg border border-white/15 bg-white/10 p-1.5">
-                <Sparkles className="h-4 w-4 text-amber-300" />
+        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-1 sm:space-y-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <div className="rounded-lg border border-white/15 bg-white/10 p-1 sm:p-1.5">
+                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300" />
               </div>
-              <span className="text-sm text-blue-100/80">Welcome Back, Administrator</span>
+              <span className="text-xs sm:text-sm text-blue-100/80">Welcome Back, Administrator</span>
             </div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white">
+            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white">
               {greeting}, {firstName}!
             </h1>
           </div>
 
           <div className="flex flex-wrap gap-2 sm:gap-3">
-            <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/15 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-100/80" />
-              <span className="text-xs sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedDate}</span>
+            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-white/15 bg-white/10 px-1.5 py-1 sm:px-3 sm:py-2">
+              <Calendar className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-100/80" />
+              <span className="text-[10px] sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedDate}</span>
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-white/15 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2">
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-blue-100/80" />
-              <span className="font-mono text-xs sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedTime}</span>
+            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-white/15 bg-white/10 px-1.5 py-1 sm:px-3 sm:py-2">
+              <Clock className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-100/80" />
+              <span className="font-mono text-[10px] sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedTime}</span>
             </div>
-            <div className="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-cyan-300/20 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2">
-              <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-300" />
-              <span className="font-mono text-xs sm:text-sm text-blue-50/95 whitespace-nowrap">{onlineDuration}</span>
+            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-cyan-300/20 bg-white/10 px-1.5 py-1 sm:px-3 sm:py-2">
+              <Timer className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-cyan-300" />
+              <span className="font-mono text-[10px] sm:text-sm text-blue-50/95 whitespace-nowrap">{onlineDuration}</span>
             </div>
           </div>
         </div>
 
-        {/* Quote - Only show on desktop or if space allows */}
+        {/* ✅ Quote - Visible on ALL devices (mobile, tablet, desktop) */}
         {quote.text && (
-          <div className="hidden sm:block border-t border-white/10 pt-4">
-            <div className="flex items-start gap-3">
-              <div className="rounded-lg border border-amber-300/20 bg-amber-400/10 p-1.5 shrink-0 mt-0.5">
-                <Quote className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300" />
+          <div className="border-t border-white/10 pt-3 sm:pt-4">
+            <div className="flex items-start gap-2 sm:gap-3">
+              <div className="rounded-lg border border-amber-300/20 bg-amber-400/10 p-1 sm:p-1.5 shrink-0 mt-0.5">
+                <Quote className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-amber-300" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm text-blue-50/90 italic leading-relaxed line-clamp-2">
+                <p className="text-xs sm:text-sm md:text-base text-blue-50/90 italic leading-relaxed">
                   &ldquo;{quote.text}&rdquo;
                 </p>
-                <p className="text-[10px] sm:text-xs text-blue-200/60 mt-1 tracking-wide">{quote.author}</p>
+                <p className="text-[9px] sm:text-xs text-blue-200/60 mt-1 tracking-wide">{quote.author}</p>
               </div>
             </div>
           </div>

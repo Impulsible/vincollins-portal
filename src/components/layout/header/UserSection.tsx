@@ -1,4 +1,4 @@
-// components/layout/header/UserSection.tsx - OPTIMIZED FOR SPEED
+// components/layout/header/UserSection.tsx - FIXED PROFILE IMAGE
 'use client'
 
 import { useState, useRef, useEffect, memo, useCallback } from 'react'
@@ -107,7 +107,6 @@ export const UserSection = memo(function UserSection({
     router.push(urls[user?.role || 'student'] || '/student')
   }, [router, user?.role])
 
-  // Handle portal page click - ALWAYS go to /portal (whether authenticated or not)
   const handlePortalClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     setProfileOpen(false)
@@ -119,8 +118,25 @@ export const UserSection = memo(function UserSection({
     onSignOut()
   }, [onSignOut])
 
-  // ✅ FIXED: Always render something - use placeholder for loading state
-  // This prevents the user section from disappearing during navigation
+  // ✅ Get avatar URL from user.avatar or user.photo_url
+  const getAvatarUrl = () => {
+    if (avatarError) return undefined
+    if (user?.avatar) return user.avatar
+    // Try to get from localStorage if available
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('user_profile')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          return parsed.photo_url || parsed.avatar_url || undefined
+        } catch {
+          return undefined
+        }
+      }
+    }
+    return undefined
+  }
+
   const displayUser = user || (typeof window !== 'undefined' && localStorage.getItem('user_profile') ? {
     name: 'User',
     firstName: 'User',
@@ -129,6 +145,7 @@ export const UserSection = memo(function UserSection({
   } as HeaderUser : null)
 
   const showAuthenticated = isAuthenticated || !!displayUser
+  const avatarUrl = getAvatarUrl()
 
   return (
     <div className="flex items-center">
@@ -168,8 +185,12 @@ export const UserSection = memo(function UserSection({
               className="flex items-center gap-1.5 sm:gap-2 rounded-full text-white hover:bg-white/20 px-2 sm:px-3 py-1 transition-all mx-0.5"
             >
               <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-white/50">
-                {user?.avatar && !avatarError ? (
-                  <AvatarImage src={user.avatar} alt={user?.name} onError={() => setAvatarError(true)} />
+                {avatarUrl && !avatarError ? (
+                  <AvatarImage 
+                    src={avatarUrl} 
+                    alt={user?.name || 'User'} 
+                    onError={() => setAvatarError(true)} 
+                  />
                 ) : null}
                 <AvatarFallback className="bg-white/30 text-white text-xs font-bold">
                   {user?.name ? getInitials(user.name) : displayUser?.name ? getInitials(displayUser.name) : 'U'}
@@ -192,6 +213,9 @@ export const UserSection = memo(function UserSection({
                 <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12 ring-2 ring-primary/20 shrink-0">
+                      {avatarUrl && !avatarError ? (
+                        <AvatarImage src={avatarUrl} alt={user?.name || 'User'} />
+                      ) : null}
                       <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
                         {user?.name ? getInitials(user.name) : displayUser?.name ? getInitials(displayUser.name) : 'U'}
                       </AvatarFallback>
@@ -251,7 +275,6 @@ export const UserSection = memo(function UserSection({
                       Home Page
                     </Link>
                   )}
-                  {/* Portal Page - ALWAYS takes user to /portal */}
                   {pathname !== '/portal' && (
                     <button 
                       onClick={handlePortalClick}
@@ -276,7 +299,6 @@ export const UserSection = memo(function UserSection({
             )}
           </div>
         ) : (
-          // Don't show Portal Login button when already on portal page
           !isPortalPage && (
             <Link 
               href="/portal" 

@@ -1,98 +1,168 @@
-// app/student/classmates/page.tsx
+// app/student/classmates/page.tsx - FULLY OPTIMIZED
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Header } from '@/components/layout/header'
+import { useUser } from '@/contexts/UserContext'
+import { instantLogout, getCachedHeaderUser } from '@/lib/auth-utils'
+import { Header, HeaderUser } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { StudentClassRoster } from '@/components/student/StudentClassRoster'
-import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
-import { ArrowLeft, Home } from 'lucide-react'
+import { ArrowLeft, Home, Users, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 
-export default function StudentClassmatesPage() {
-  const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [profile, setProfile] = useState<any>(null)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+// ✅ Get cached user synchronously
+const cachedHeaderUser = getCachedHeaderUser()
 
-  useEffect(() => {
-    loadProfile()
-  }, [])
-
-  const loadProfile = async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        router.push('/portal')
-        return
-      }
-
-      // ✅ Fetch all name fields including display_name
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', session.user.id)
-        .single()
-
-      setProfile(profileData)
-    } catch (error) {
-      console.error('Error loading profile:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut()
-    router.push('/portal')
-  }
-
-  const formatProfileForHeader = (profile: any) => {
-    if (!profile) return undefined
-    return {
-      id: profile.id,
-      name: profile.display_name || profile.full_name,
-      firstName: profile.first_name || profile.display_name?.split(' ')[0] || profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
-      email: profile.email,
-      role: 'student' as const,
-      avatar: profile.photo_url || undefined,
-      isAuthenticated: true
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
-        <Header onLogout={handleLogout} />
-        <div className="flex">
-          <div className="hidden lg:block w-72" />
-          <div className="flex-1">
-            <main className="pt-20 lg:pt-24 pb-8">
-              <div className="container mx-auto px-4">
-                <div className="space-y-6">
-                  <Skeleton className="h-8 w-48" />
-                  <Skeleton className="h-96 w-full rounded-xl" />
-                </div>
-              </div>
-            </main>
+// ============================================
+// PROFESSIONAL LOADING COMPONENT
+// ============================================
+function ClassmatesLoadingScreen() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      {/* Header placeholder */}
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] h-16 sm:h-[72px] flex items-center px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between w-full max-w-[1440px] mx-auto">
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/20 rounded animate-pulse" />
+            <div className="h-4 w-24 sm:h-5 sm:w-32 bg-white/20 rounded animate-pulse hidden sm:block" />
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="h-8 w-8 sm:h-9 sm:w-9 bg-white/20 rounded-full animate-pulse" />
+            <div className="h-8 w-8 sm:h-9 sm:w-9 bg-white/20 rounded-full animate-pulse hidden sm:block" />
           </div>
         </div>
       </div>
-    )
+      
+      <div className="flex items-center justify-center min-h-screen px-4 pt-16 sm:pt-[72px]">
+        <div className="text-center">
+          <div className="relative">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 border-3 sm:border-4 border-emerald-200 rounded-full animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Users className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-600" />
+            </div>
+          </div>
+          <p className="mt-3 sm:mt-4 text-slate-600 text-base sm:text-lg font-medium">
+            Loading Classmates...
+          </p>
+          <p className="mt-1 sm:mt-2 text-slate-500 text-xs sm:text-sm">
+            Getting to know your classmates 👥
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ============================================
+// MAIN COMPONENT
+// ============================================
+export default function StudentClassmatesPage() {
+  const router = useRouter()
+  const { user: contextUser, loading: authLoading, isAuthenticated } = useUser()
+  
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [profile, setProfile] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [showContent, setShowContent] = useState(false)
+
+  // ✅ Build header user - use cached user, then fallback to context
+  const headerUser: HeaderUser | undefined = useMemo(() => {
+    if (contextUser) {
+      return {
+        id: contextUser.id,
+        name: contextUser.full_name || contextUser.first_name || 'Student',
+        firstName: contextUser.first_name || contextUser.full_name?.split(' ')[0] || 'Student',
+        email: contextUser.email || '',
+        role: 'student' as const,
+        avatar: contextUser.avatar_url || contextUser.photo_url || undefined,
+        isAuthenticated: true
+      }
+    }
+    // ✅ Fix: Return cachedHeaderUser directly (already HeaderUser | null)
+    return cachedHeaderUser || undefined
+  }, [contextUser])
+
+  // Load profile data
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (!contextUser?.id) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', contextUser.id)
+          .single()
+
+        setProfile(profileData)
+      } catch (error) {
+        console.error('Error loading profile:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProfile()
+  }, [contextUser?.id])
+
+  // Wait for auth to resolve
+  useEffect(() => {
+    if (!authLoading && (isAuthenticated !== undefined)) {
+      const timer = setTimeout(() => {
+        setShowContent(true)
+      }, 50)
+      return () => clearTimeout(timer)
+    }
+  }, [authLoading, isAuthenticated])
+
+  // Auth redirect check
+  useEffect(() => {
+    if (!authLoading) {
+      if (!isAuthenticated || !contextUser) {
+        if (!cachedHeaderUser) {
+          router.replace('/portal')
+        }
+        return
+      }
+      
+      const userRole = contextUser.role?.toLowerCase()
+      if (userRole !== 'student') {
+        router.replace('/portal')
+        return
+      }
+    }
+  }, [authLoading, isAuthenticated, contextUser, router])
+
+  const handleLogout = () => instantLogout()
+
+  // Show loading screen
+  if (!showContent || authLoading || loading) {
+    return <ClassmatesLoadingScreen />
   }
 
+  // Auth checks
+  if (!isAuthenticated || !contextUser) return null
+  if (contextUser.role?.toLowerCase() !== 'student') return null
+
+  const userClass = profile?.class || contextUser?.class || 'your class'
+  const className = userClass !== 'your class' ? userClass : ''
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden w-full">
-      <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <Header user={headerUser} onLogout={handleLogout} />
       
-      <div className="flex flex-1 w-full overflow-x-hidden">
+      <div className="flex">
+        {/* Sidebar */}
         <StudentSidebar 
-          profile={profile}
+          profile={profile || contextUser}
           onLogout={handleLogout}
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -100,62 +170,64 @@ export default function StudentClassmatesPage() {
           setActiveTab={() => {}}
         />
 
+        {/* Main Content */}
         <div className={cn(
-          "flex-1 transition-all duration-300 w-full overflow-x-hidden",
+          "flex-1 min-w-0 transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-16 lg:pt-20 pb-12 px-4 sm:px-6 lg:px-8 w-full overflow-x-hidden">
-            <div className="max-w-5xl mx-auto">
-              
-              {/* Breadcrumb */}
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
-              >
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Link href="/student" className="hover:text-primary flex items-center gap-1">
-                      <Home className="h-3.5 w-3.5" />
-                      Dashboard
-                    </Link>
-                    <span>/</span>
-                    <span className="text-foreground font-medium">Classmates</span>
+          <main className="pt-[72px] lg:pt-24 pb-8 sm:pb-12">
+            <div className="px-4 sm:px-6 lg:px-8">
+              <div className="max-w-5xl mx-auto">
+                
+                {/* Breadcrumb Navigation */}
+                <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
+                  <Link 
+                    href="/student" 
+                    className="hover:text-emerald-600 transition-colors flex items-center gap-1"
+                  >
+                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="hidden sm:inline">Dashboard</span>
+                  </Link>
+                  <ChevronRight className="h-3 w-3" />
+                  <span className="text-foreground font-medium">Classmates</span>
+                </nav>
+
+                {/* Page Header */}
+                <div className="mb-5 sm:mb-7">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">
+                    My Classmates
+                  </h1>
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mt-2">
+                    <p className="text-sm text-slate-500">
+                      {className ? (
+                        <>Students in <span className="font-medium text-slate-700">{userClass}</span> • Get to know your classmates</>
+                      ) : (
+                        <>View and connect with your classmates</>
+                      )}
+                    </p>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => router.push('/student')}
+                      className="w-full sm:w-auto h-9 text-sm shadow-sm hover:shadow transition-all"
+                    >
+                      <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
+                      Back to Dashboard
+                    </Button>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
-                    <ArrowLeft className="mr-2 h-3.5 w-3.5" />
-                    Back
-                  </Button>
                 </div>
-              </motion.div>
 
-              {/* Page Title */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6"
-              >
-                <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">My Classmates</h1>
-                <p className="text-slate-500 mt-1">
-                  Students in {profile?.class} • Get to know your classmates
-                </p>
-              </motion.div>
-
-              {/* Classmates Roster */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
+                {/* Classmates Roster */}
                 <StudentClassRoster 
-                  studentClass={profile?.class}
-                  studentId={profile?.id}
+                  studentClass={profile?.class || contextUser?.class}
+                  studentId={contextUser?.id}
                   compact={false}
                   onClassmateClick={(classmate) => {
                     console.log('Clicked classmate:', classmate)
                   }}
                 />
-              </motion.div>
+                
+              </div>
             </div>
           </main>
         </div>

@@ -1,7 +1,7 @@
-// components/layout/header/MobileMenu.tsx - CONTEXT-AWARE NAVIGATION
+// components/layout/header/MobileMenu.tsx - FIXED WITH PROFILE IMAGE
 'use client'
 
-import { memo } from 'react'
+import { memo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
@@ -11,7 +11,7 @@ import {
   Mail, MapPin, Phone, Clock, Facebook, Twitter, Instagram, Linkedin, ChevronRight,
   FileText, MessageSquare, Activity, Laptop, PhoneCall
 } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Input } from '@/components/ui/input'
@@ -95,18 +95,40 @@ interface MobileMenuProps {
 export const MobileMenu = memo(function MobileMenu({ open, onClose, user, schoolSettings, onSignOut, pathname }: MobileMenuProps) {
   const router = useRouter()
   const currentYear = new Date().getFullYear()
+  const [avatarError, setAvatarError] = useState(false)
   const isAuthenticated = user?.isAuthenticated ?? false
   
-  // ✅ Determine which nav to show based on current page
+  // Get avatar URL from user
+  const getAvatarUrl = () => {
+    if (avatarError) return undefined
+    if (user?.avatar) return user.avatar
+    // Try to get from localStorage if available
+    if (typeof window !== 'undefined') {
+      const cached = localStorage.getItem('user_profile')
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached)
+          return parsed.photo_url || parsed.avatar_url || undefined
+        } catch {
+          return undefined
+        }
+      }
+    }
+    return undefined
+  }
+
+  const avatarUrl = getAvatarUrl()
+  
+  // Determine which nav to show based on current page
   const isDashboardPage = pathname?.startsWith('/admin') || pathname?.startsWith('/staff') || pathname?.startsWith('/student')
   const isPortalPage = pathname === '/portal'
   
-  // ✅ Show dashboard nav on dashboard pages, public nav everywhere else
+  // Show dashboard nav on dashboard pages, public nav everywhere else
   const navItems = isDashboardPage && isAuthenticated
     ? (dashboardNavMap[user?.role || 'student'] || dashboardNavMap.student)
     : publicNavItems
 
-  // ✅ Check if a specific href is active
+  // Check if a specific href is active
   const isActive = (href: string): boolean => {
     if (href === '/') return pathname === '/'
     if (href === '#cbt') return false
@@ -118,7 +140,7 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
 
   const handleNav = (href: string) => { 
     onClose()
-    if (href === '#cbt') return // CBT handled separately
+    if (href === '#cbt') return
     router.push(href) 
   }
   
@@ -159,11 +181,18 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
               </button>
             </div>
 
-            {/* User Info - only on dashboard pages */}
+            {/* User Info - with Profile Image */}
             {isDashboardPage && isAuthenticated && (
               <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12 ring-2 ring-primary/20 flex-shrink-0">
+                    {avatarUrl && !avatarError ? (
+                      <AvatarImage 
+                        src={avatarUrl} 
+                        alt={user?.name || 'User'} 
+                        onError={() => setAvatarError(true)}
+                      />
+                    ) : null}
                     <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
                       {user?.name ? getInitials(user.name) : 'U'}
                     </AvatarFallback>
@@ -187,12 +216,12 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
 
             <ScrollArea className="flex-1">
               <nav className="p-4">
-                {/* ✅ Section label changes based on context */}
+                {/* Section label changes based on context */}
                 <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
                   {isDashboardPage ? 'Dashboard' : 'Navigation'}
                 </p>
                 
-                {/* ✅ Only ONE active item at a time */}
+                {/* Only ONE active item at a time */}
                 <div className="space-y-1">
                   {navItems.map((item) => {
                     const active = isActive(item.href)
@@ -212,7 +241,6 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                           active ? 'text-primary' : 'text-gray-400'
                         )} />
                         <span className="flex-1 text-left">{item.name}</span>
-                        {/* ✅ Active indicator */}
                         {active && (
                           <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
                         )}
@@ -221,7 +249,7 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                   })}
                 </div>
 
-                {/* ✅ Quick Links - Portal & Home for dashboard users */}
+                {/* Quick Links - Portal & Home for dashboard users */}
                 {isDashboardPage && (
                   <>
                     <div className="my-4 border-t border-gray-100" />
@@ -234,14 +262,14 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                       {!isPortalPage && (
                         <button onClick={() => handleNav('/portal')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 bg-amber-50/50">
                           <KeyRound className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                          <span>Portal Login</span>
+                          <span>Portal page</span>
                         </button>
                       )}
                     </div>
                   </>
                 )}
 
-                {/* ✅ Contact Info + Social + Footer */}
+                {/* Contact Info + Social + Footer */}
                 <div className="mt-4 pt-4 border-t border-gray-100">
                   <div className="space-y-2 mb-4">
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2">Contact Info</p>
@@ -267,14 +295,14 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                     <p className="text-[9px] text-gray-300">Geared Towards Excellence</p>
                   </div>
 
-                  {/* ✅ Portal Login for public pages */}
+                  {/* Portal Login for public pages */}
                   {!isAuthenticated && !isPortalPage && (
                     <button onClick={() => handleNav('/portal')} className="flex items-center justify-center gap-2 w-full py-3 bg-[#F5A623] text-[#0A2472] rounded-xl font-semibold shadow-md text-sm mb-3">
                       <KeyRound className="h-4 w-4" />Portal Login
                     </button>
                   )}
 
-                  {/* ✅ Sign Out for authenticated users */}
+                  {/* Sign Out for authenticated users */}
                   {isAuthenticated && (
                     <button onClick={() => { onClose(); onSignOut() }}
                       className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium text-sm">
