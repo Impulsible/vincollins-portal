@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/assignments/page.tsx - FULLY RESPONSIVE WITH CLASS DELIVERY FIX
+// app/student/assignments/page.tsx - WITH ENHANCED FILE PREVIEW
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -20,8 +20,9 @@ import { cn } from '@/lib/utils'
 import {
   Loader2, FileText, Search, Calendar, Clock,
   Download, Eye, ChevronRight, BookOpen,
-  User, ArrowLeft, Home, CheckCircle,
-  AlertCircle, Upload, Paperclip, Filter, X, Award, Inbox
+  User, Home, CheckCircle,
+  AlertCircle, Upload, Paperclip, Filter, X, Award, Inbox,
+  Image as ImageIcon, Video, Volume2, FileSpreadsheet
 } from 'lucide-react'
 import Link from 'next/link'
 import { format, isPast, differenceInDays } from 'date-fns'
@@ -46,9 +47,8 @@ interface Assignment {
   instructions?: string
   due_date: string
   total_marks: number
-  file_url?: string
-  file_name?: string
-  files?: string[]
+  attachment_urls?: string[]
+  attachment_names?: string[]
   file_count?: number
   teacher_name?: string
   created_by?: string
@@ -65,6 +65,235 @@ interface Assignment {
   }
 }
 
+// Enhanced File Preview Modal for Students
+function FilePreviewModal({ fileUrl, fileName, onClose }: { fileUrl: string; fileName: string; onClose: () => void }) {
+  const [isImage, setIsImage] = useState(false)
+  const [isPdf, setIsPdf] = useState(false)
+  const [isVideo, setIsVideo] = useState(false)
+  const [isAudio, setIsAudio] = useState(false)
+  const [isText, setIsText] = useState(false)
+  const [textContent, setTextContent] = useState<string>('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  useEffect(() => {
+    const ext = fileName.split('.').pop()?.toLowerCase()
+    setIsImage(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg'].includes(ext || ''))
+    setIsPdf(ext === 'pdf')
+    setIsVideo(['mp4', 'webm', 'mov', 'avi', 'mkv'].includes(ext || ''))
+    setIsAudio(['mp3', 'wav', 'ogg', 'm4a', 'flac'].includes(ext || ''))
+    setIsText(['txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'csv'].includes(ext || ''))
+    
+    if (['txt', 'md', 'json', 'xml', 'html', 'css', 'js', 'ts', 'jsx', 'tsx', 'csv'].includes(ext || '')) {
+      loadTextContent()
+    }
+  }, [fileUrl, fileName])
+  
+  const loadTextContent = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await fetch(fileUrl)
+      if (!response.ok) throw new Error('Failed to load file content')
+      const text = await response.text()
+      setTextContent(text.length > 50000 ? text.substring(0, 50000) + '\n\n... (file truncated, too large)' : text)
+    } catch (err) {
+      setError('Could not load file content')
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const getFileIcon = () => {
+    if (isImage) return <ImageIcon className="h-5 w-5 text-green-500" />
+    if (isPdf) return <FileText className="h-5 w-5 text-red-500" />
+    if (isVideo) return <Video className="h-5 w-5 text-blue-500" />
+    if (isAudio) return <Volume2 className="h-5 w-5 text-purple-500" />
+    if (isText) return <FileText className="h-5 w-5 text-slate-500" />
+    return <Paperclip className="h-5 w-5 text-slate-500" />
+  }
+  
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-[90vw] max-h-[90vh] overflow-hidden rounded-xl p-0">
+        <DialogHeader className="p-4 border-b bg-slate-50">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              {getFileIcon()}
+              <DialogTitle className="text-sm font-medium truncate">{fileName}</DialogTitle>
+              <Badge variant="secondary" className="text-xs">
+                {fileName.split('.').pop()?.toUpperCase() || 'FILE'}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => window.open(fileUrl, '_blank')}
+                className="h-8 w-8"
+                title="Download"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={onClose} 
+                className="h-8 w-8"
+                title="Close"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </DialogHeader>
+        
+        <div className="p-4 overflow-auto max-h-[calc(90vh-80px)] bg-white">
+          {/* Image Preview */}
+          {isImage && (
+            <div className="flex items-center justify-center min-h-[400px]">
+              <img 
+                src={fileUrl} 
+                alt={fileName} 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-sm"
+              />
+            </div>
+          )}
+          
+          {/* PDF Preview */}
+          {isPdf && (
+            <div className="w-full">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm text-slate-500">
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  PDF Document
+                </p>
+                <Button size="sm" variant="outline" onClick={() => window.open(fileUrl, '_blank')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Open in New Tab
+                </Button>
+              </div>
+              <iframe 
+                src={`${fileUrl}#toolbar=0`} 
+                className="w-full h-[70vh] rounded-lg border"
+                title={fileName}
+              />
+            </div>
+          )}
+          
+          {/* Video Preview */}
+          {isVideo && (
+            <div className="w-full">
+              <video 
+                controls 
+                className="w-full rounded-lg shadow-sm"
+                style={{ maxHeight: '70vh' }}
+              >
+                <source src={fileUrl} />
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          )}
+          
+          {/* Audio Preview */}
+          {isAudio && (
+            <div className="flex flex-col items-center justify-center p-8">
+              <div className="w-full max-w-md">
+                <div className="bg-slate-100 rounded-lg p-6 text-center mb-4">
+                  <Volume2 className="h-12 w-12 mx-auto text-purple-500 mb-2" />
+                  <p className="text-sm font-medium">{fileName}</p>
+                  <p className="text-xs text-slate-500">Audio File</p>
+                </div>
+                <audio controls className="w-full">
+                  <source src={fileUrl} />
+                  Your browser does not support the audio tag.
+                </audio>
+              </div>
+            </div>
+          )}
+          
+          {/* Text File Preview */}
+          {isText && (
+            <div className="w-full">
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                  <p className="ml-2 text-slate-500">Loading file content...</p>
+                </div>
+              ) : error ? (
+                <div className="text-center py-12">
+                  <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-3" />
+                  <p className="text-red-600">{error}</p>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-3"
+                    onClick={() => window.open(fileUrl, '_blank')}
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    Download File Instead
+                  </Button>
+                </div>
+              ) : (
+                <div className="border rounded-lg overflow-hidden">
+                  <div className="bg-slate-100 px-3 py-2 border-b text-xs text-slate-500 flex items-center justify-between">
+                    <span>File Content</span>
+                    <span className="text-[10px]">{textContent.length.toLocaleString()} characters</span>
+                  </div>
+                  <pre className="p-4 text-xs font-mono bg-slate-50 overflow-auto max-h-[60vh] whitespace-pre-wrap">
+                    {textContent}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Office Documents */}
+          {!isImage && !isPdf && !isVideo && !isAudio && !isText && (
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                {fileName.endsWith('.docx') || fileName.endsWith('.doc') ? (
+                  <FileText className="h-10 w-10 text-blue-500" />
+                ) : fileName.endsWith('.xlsx') || fileName.endsWith('.xls') ? (
+                  <FileSpreadsheet className="h-10 w-10 text-green-500" />
+                ) : fileName.endsWith('.pptx') || fileName.endsWith('.ppt') ? (
+                  <Eye className="h-10 w-10 text-orange-500" />
+                ) : (
+                  <FileText className="h-10 w-10 text-slate-400" />
+                )}
+              </div>
+              <h4 className="font-medium text-slate-800 mb-2">{fileName}</h4>
+              <p className="text-sm text-slate-500 mb-4">
+                Preview not available for this file type
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={() => window.open(fileUrl, '_blank')}>
+                  <Download className="h-4 w-4 mr-2" />
+                  Download File
+                </Button>
+                {(fileName.endsWith('.docx') || fileName.endsWith('.doc') || 
+                  fileName.endsWith('.xlsx') || fileName.endsWith('.xls') || 
+                  fileName.endsWith('.pptx') || fileName.endsWith('.ppt')) && (
+                  <Button variant="outline" onClick={() => {
+                    const googleDocsUrl = `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}`
+                    window.open(googleDocsUrl, '_blank')
+                  }}>
+                    <Eye className="h-4 w-4 mr-2" />
+                    Try Google Docs Viewer
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-slate-400 mt-4">
+                Tip: Download the file to view it with the appropriate software
+              </p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
 export default function StudentAssignmentsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -73,6 +302,7 @@ export default function StudentAssignmentsPage() {
   const [activeTab, setActiveTab] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
+  const [previewFile, setPreviewFile] = useState<{ url: string; name: string } | null>(null)
   
   const [assignments, setAssignments] = useState<Assignment[]>([])
   const [filteredAssignments, setFilteredAssignments] = useState<Assignment[]>([])
@@ -96,12 +326,12 @@ export default function StudentAssignmentsPage() {
     return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase()
   }
 
-const formatProfileForHeader = (profile: StudentProfile | null) => {
+  const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
       id: profile.id,
       name: profile.full_name,
-      firstName: profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
+      firstName: profile.full_name?.split(' ')[0] || 'Student',
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -135,6 +365,25 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (days < 0) return 'text-red-600'
     if (days <= 2) return 'text-orange-600'
     return 'text-slate-500'
+  }
+
+  const getFileName = (assignment: Assignment, index: number): string => {
+    if (assignment.attachment_names && assignment.attachment_names[index]) {
+      return assignment.attachment_names[index]
+    }
+    const url = assignment.attachment_urls?.[index]
+    if (url) {
+      try {
+        const decoded = decodeURIComponent(url)
+        const parts = decoded.split('/')
+        let fileName = parts[parts.length - 1]
+        fileName = fileName.replace(/^\d+_/, '')
+        return fileName
+      } catch {
+        return `Attachment ${index + 1}`
+      }
+    }
+    return `Attachment ${index + 1}`
   }
 
   const loadData = useCallback(async () => {
@@ -175,10 +424,7 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
       }
 
       setProfile(studentProfile)
-      console.log('📚 Loading assignments for class:', studentProfile.class)
 
-      // ✅ FIXED: Get assignments for this student's class
-      // Supports both classes[] array and single class column
       const { data: assignmentsData, error: assignmentsError } = await supabase
         .from('assignments')
         .select('*')
@@ -192,9 +438,6 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
         return
       }
 
-      console.log('📚 Found', assignmentsData?.length || 0, 'assignments for class', studentProfile.class)
-
-      // Get submissions for this student
       const assignmentIds = (assignmentsData || []).map(a => a.id)
       let submissionsMap: Record<string, any> = {}
       
@@ -210,7 +453,6 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
         })
       }
 
-      // Get teacher names
       const teacherIds = [...new Set((assignmentsData || []).map(a => a.created_by).filter(Boolean))]
       const teacherMap: Record<string, string> = {}
       
@@ -224,8 +466,23 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
       }
 
       const processedAssignments: Assignment[] = (assignmentsData || []).map(a => ({
-        ...a,
+        id: a.id,
+        title: a.title,
+        subject: a.subject,
+        class: a.class,
+        classes: a.classes,
+        description: a.description,
+        instructions: a.instructions,
+        due_date: a.due_date,
+        total_marks: a.total_points || a.total_marks || 0,
+        attachment_urls: a.attachment_urls || [],
+        attachment_names: a.attachment_names || [],
+        file_count: a.file_count || (a.attachment_urls?.length || 0),
         teacher_name: a.created_by_name || teacherMap[a.created_by] || 'Teacher',
+        created_by: a.created_by,
+        created_by_name: a.created_by_name,
+        status: a.status,
+        created_at: a.created_at,
         submission: submissionsMap[a.id]
       }))
 
@@ -313,9 +570,8 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
     try {
       const fileExt = selectedFile.name.split('.').pop()
       const fileName = `submission-${selectedAssignment.id}-${Date.now()}.${fileExt}`
-      const filePath = `assignment-submissions/${fileName}`
+      const filePath = `assignment-submissions/${profile.id}/${fileName}`
 
-      // Use assignment-files bucket instead
       const { error: uploadError } = await supabase.storage
         .from('assignment-files')
         .upload(filePath, selectedFile)
@@ -539,14 +795,22 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                         !assignment.submission && isPast(new Date(assignment.due_date)) && "border-l-4 border-l-red-500"
                       )}>
                         <CardContent className="p-3 sm:p-4 md:p-5">
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-start gap-2 sm:gap-3">
                                 <div className="h-9 w-9 sm:h-10 sm:w-10 md:h-12 md:w-12 rounded-xl flex items-center justify-center shrink-0 bg-purple-100">
                                   <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-purple-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">{assignment.title}</h3>
+                                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1">
+                                    <h3 className="font-semibold text-sm sm:text-base text-gray-900 truncate">{assignment.title}</h3>
+                                    {assignment.attachment_urls && assignment.attachment_urls.length > 0 && (
+                                      <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[9px] sm:text-[10px]">
+                                        <Paperclip className="h-2.5 w-2.5 mr-0.5" />
+                                        {assignment.file_count || assignment.attachment_urls.length} file(s)
+                                      </Badge>
+                                    )}
+                                  </div>
                                   <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-1 mt-0.5 sm:mt-1">
                                     <Badge variant="outline" className="text-[9px] sm:text-xs">{assignment.subject}</Badge>
                                     <span className="text-[10px] sm:text-xs text-slate-500 flex items-center gap-0.5 sm:gap-1">
@@ -585,19 +849,14 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                                   variant="outline" size="sm"
                                   onClick={() => { setSelectedAssignment(assignment); setShowDetailsDialog(true) }}
                                   className="h-8 w-8 sm:h-9 sm:w-9 p-0"
-                                ><Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" /></Button>
+                                >
+                                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                                </Button>
                                 {!assignment.submission && (
                                   <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3"
                                     onClick={() => { setSelectedAssignment(assignment); setShowSubmitDialog(true) }}>
                                     <Upload className="h-3 w-3 sm:h-4 sm:w-4 mr-0.5 sm:mr-1" />
                                     <span className="hidden xs:inline">Submit</span>
-                                  </Button>
-                                )}
-                                {assignment.files && assignment.files.length > 0 && (
-                                  <Button variant="ghost" size="sm"
-                                    onClick={() => window.open(assignment.files![0], '_blank')}
-                                    className="h-8 w-8 sm:h-9 sm:w-9 p-0">
-                                    <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                                   </Button>
                                 )}
                               </div>
@@ -614,13 +873,30 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
         </div>
       </div>
 
+      {/* File Preview Modal */}
+      {previewFile && (
+        <FilePreviewModal
+          fileUrl={previewFile.url}
+          fileName={previewFile.name}
+          onClose={() => setPreviewFile(null)}
+        />
+      )}
+
       {/* Assignment Details Dialog */}
       <Dialog open={showDetailsDialog} onOpenChange={setShowDetailsDialog}>
         <DialogContent className="max-w-[90vw] sm:max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl">
           {selectedAssignment && (
             <>
               <DialogHeader className="pb-2">
-                <DialogTitle className="text-base sm:text-lg md:text-xl">{selectedAssignment.title}</DialogTitle>
+                <DialogTitle className="text-base sm:text-lg md:text-xl flex items-center gap-2 flex-wrap">
+                  {selectedAssignment.title}
+                  {selectedAssignment.attachment_urls && selectedAssignment.attachment_urls.length > 0 && (
+                    <Badge className="bg-blue-100 text-blue-700">
+                      <Paperclip className="h-3 w-3 mr-1" />
+                      {selectedAssignment.file_count || selectedAssignment.attachment_urls.length} file(s)
+                    </Badge>
+                  )}
+                </DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
                   {selectedAssignment.subject} • {selectedAssignment.total_marks} marks • Due: {format(new Date(selectedAssignment.due_date), 'MMM dd, yyyy')} • Teacher: {selectedAssignment.teacher_name}
                 </DialogDescription>
@@ -641,24 +917,53 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                   </div>
                 )}
 
-                {/* Attachments */}
-                {selectedAssignment.files && selectedAssignment.files.length > 0 && (
+                {/* Enhanced Attachments Section with Preview */}
+                {selectedAssignment.attachment_urls && selectedAssignment.attachment_urls.length > 0 && (
                   <div>
-                    <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2">Attachments ({selectedAssignment.file_count || selectedAssignment.files.length})</h4>
+                    <h4 className="font-semibold text-sm sm:text-base mb-1.5 sm:mb-2 flex items-center gap-2">
+                      <Paperclip className="h-3.5 w-3.5" />
+                      Attachments ({selectedAssignment.file_count || selectedAssignment.attachment_urls.length})
+                    </h4>
                     <div className="space-y-2">
-                      {selectedAssignment.files.map((fileUrl: string, i: number) => (
-                        <Button
-                          key={i}
-                          variant="outline"
-                          size="sm"
-                          className="w-full justify-start h-9 text-xs"
-                          onClick={() => window.open(fileUrl, '_blank')}
-                        >
-                          <Paperclip className="h-3.5 w-3.5 mr-2" />
-                          Attachment {i + 1}
-                          <Download className="h-3 w-3 ml-auto" />
-                        </Button>
-                      ))}
+                      {selectedAssignment.attachment_urls.map((fileUrl: string, i: number) => {
+                        const fileName = getFileName(selectedAssignment, i)
+                        const ext = fileName.split('.').pop()?.toLowerCase()
+                        const canPreview = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf', 'mp4', 'webm', 'mp3', 'wav', 'txt', 'md'].includes(ext || '')
+                        
+                        return (
+                          <div
+                            key={i}
+                            className="flex items-center justify-between p-2 bg-slate-50 rounded-lg border hover:shadow-sm transition-all"
+                          >
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <Paperclip className="h-4 w-4 text-slate-400 shrink-0" />
+                              <span className="text-sm truncate flex-1">{fileName}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {canPreview && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setPreviewFile({ url: fileUrl, name: fileName })}
+                                  className="h-7 px-2 text-xs"
+                                >
+                                  <Eye className="h-3.5 w-3.5 mr-1" />
+                                  Preview
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => window.open(fileUrl, '_blank')}
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Download className="h-3.5 w-3.5 mr-1" />
+                                Download
+                              </Button>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
                   </div>
                 )}

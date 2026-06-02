@@ -1,4 +1,4 @@
-// lib/cache-buster.ts - FIXED (Skip Supabase URLs)
+// lib/cache-buster.ts - FIXED (Preserves versionBannerSeen)
 'use client'
 
 export const bustCache = () => {
@@ -8,15 +8,15 @@ export const bustCache = () => {
   window.fetch = function(url: RequestInfo | URL, options: RequestInit = {}) {
     const urlString = typeof url === 'string' ? url : url.toString()
     
-    // ✅ Skip cache busting for Supabase API calls
+    // Skip cache busting for Supabase API calls
     const skipPatterns = [
       '/_next/static',
       '/fonts/',
       '/images/',
       'fonts.googleapis.com',
       'fonts.gstatic.com',
-      'supabase.co/rest/v1',  // ✅ Skip all Supabase API calls
-      'supabase.co/auth/v1',   // ✅ Skip Supabase auth calls
+      'supabase.co/rest/v1',
+      'supabase.co/auth/v1',
     ]
     
     const shouldSkip = skipPatterns.some(pattern => urlString.includes(pattern))
@@ -35,6 +35,7 @@ export const bustCache = () => {
 export const clearExpiredCache = () => {
   if (typeof window === 'undefined') return
   
+  // ✅ IMPORTANT: Keep versionBannerSeen to prevent banner showing on every login
   const keysToKeep = [
     'user_profile', 
     'auth_user', 
@@ -45,12 +46,14 @@ export const clearExpiredCache = () => {
     'staff_dashboard_cache',
     'admin_dashboard_cache',
     'school_settings',
-    'versionBannerSeen'
+    'versionBannerSeen',  // ✅ MUST keep this
+    'versionBannerNeverShow'  // ✅ Keep this too if used
   ]
   
   const now = Date.now()
   const lastClear = localStorage.getItem('lastCacheClear')
   
+  // Only clear cache once per day (or if never cleared)
   if (!lastClear || now - parseInt(lastClear) > 24 * 60 * 60 * 1000) {
     const allKeys = Object.keys(localStorage)
     let clearedCount = 0
@@ -70,13 +73,13 @@ export const clearExpiredCache = () => {
     })
     
     localStorage.setItem('lastCacheClear', now.toString())
-    console.log(`Cache cleared: ${clearedCount} items removed`)
+    console.log(`Cache cleared: ${clearedCount} items removed (preserved version banner state)`)
   }
 }
 
 export const getVersion = () => {
   return {
-    version: process.env.NEXT_PUBLIC_APP_VERSION || '2.0.0',
+    version: process.env.NEXT_PUBLIC_APP_VERSION || '1.0.0',  // ✅ Match package.json
     timestamp: new Date().toISOString(),
     buildId: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA || 'dev'
   }
@@ -85,7 +88,15 @@ export const getVersion = () => {
 export const forceRefresh = () => {
   if (typeof window === 'undefined') return
   
-  localStorage.clear()
+  // ✅ Don't clear everything - preserve essential keys
+  const keysToPreserve = ['versionBannerSeen']
+  
+  keysToPreserve.forEach(key => {
+    const value = localStorage.getItem(key)
+    localStorage.clear()
+    if (value) localStorage.setItem(key, value)
+  })
+  
   sessionStorage.clear()
   window.location.href = window.location.href.split('?')[0] + '?_t=' + Date.now()
 }

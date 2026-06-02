@@ -1,18 +1,20 @@
-// components/student/StudentClassRoster.tsx - NO EMAIL, NO VIN ID (Fixed)
+// components/student/StudentClassRoster.tsx - NO LOADING SKELETON
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Users, Search, GraduationCap, Sparkles, Grid3x3, List, Eye, Calendar, User, School, X, Maximize2 } from 'lucide-react'
+import { 
+  Users, Search, GraduationCap, Sparkles, Grid3x3, List, Eye, 
+  Calendar, User, School, X, Maximize2, 
+  Phone, MapPin, ChevronRight, Star, 
+  Heart, Coffee, Target, Brain, Lightbulb
+} from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +33,7 @@ interface Classmate {
   display_name?: string | null
   class: string
   photo_url?: string | null
+  cover_photo_url?: string | null
   is_active?: boolean
   department?: string
   admission_year?: number
@@ -46,7 +49,50 @@ interface StudentClassRosterProps {
   onClassmateClick?: (classmate: Classmate) => void
 }
 
-// Helper function to get best display name
+// Fun facts
+const funFacts = [
+  { emoji: "🌟", message: "Star student" },
+  { emoji: "🚀", message: "Future leader" },
+  { emoji: "💡", message: "Bright mind" },
+  { emoji: "🎯", message: "Goal getter" },
+  { emoji: "📚", message: "Book worm" },
+  { emoji: "🎨", message: "Creative soul" },
+  { emoji: "🔬", message: "Science geek" },
+  { emoji: "💪", message: "Hard worker" },
+  { emoji: "🏆", message: "Champion" },
+  { emoji: "⭐", message: "All-star" },
+  { emoji: "🌈", message: "Positive vibes" },
+  { emoji: "🦁", message: "Brave heart" },
+  { emoji: "🦉", message: "Wise owl" },
+  { emoji: "🐝", message: "Busy bee" },
+  { emoji: "🦋", message: "Social butterfly" },
+  { emoji: "🐉", message: "Dragon energy" },
+]
+
+const departmentFacts: Record<string, { emoji: string; fact: string; color: string }> = {
+  Science: { emoji: '🔬', fact: 'Science whiz', color: 'text-blue-500' },
+  Arts: { emoji: '🎨', fact: 'Creative genius', color: 'text-purple-500' },
+  Commercial: { emoji: '💼', fact: 'Business star', color: 'text-amber-500' },
+  General: { emoji: '🌟', fact: 'Awesome student', color: 'text-emerald-500' },
+}
+
+const motivationalMessages = [
+  "✨ Believe in yourself!",
+  "💪 You've got this!",
+  "⭐ Keep shining!",
+  "🎯 Make today count!",
+  "🌈 Dream big!",
+  "🚀 Be awesome today!",
+]
+
+function getRandomFunFact(): { emoji: string; message: string } {
+  return funFacts[Math.floor(Math.random() * funFacts.length)]
+}
+
+function getRandomMotivationalMessage(): string {
+  return motivationalMessages[Math.floor(Math.random() * motivationalMessages.length)]
+}
+
 function getBestDisplayName(classmate: Classmate): string {
   if (classmate.display_name) return classmate.display_name
   if (classmate.last_name && classmate.first_name) {
@@ -57,15 +103,34 @@ function getBestDisplayName(classmate: Classmate): string {
   return classmate.full_name || 'Student'
 }
 
-// Full Screen Image Viewer - Dark theme
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/)
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+}
+
+function getAvatarColor(name: string): string {
+  const colors = [
+    'from-blue-500 to-indigo-600',
+    'from-emerald-500 to-teal-600',
+    'from-purple-500 to-pink-600',
+    'from-orange-500 to-red-600',
+    'from-cyan-500 to-blue-600',
+    'from-amber-500 to-orange-600',
+  ]
+  const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  return colors[index % colors.length]
+}
+
+// Full Screen Image Viewer
 function FullScreenImageViewer({ 
   imageUrl, 
-  name, 
+  title, 
   open, 
   onClose 
 }: { 
   imageUrl: string | null | undefined; 
-  name: string; 
+  title: string; 
   open: boolean; 
   onClose: () => void;
 }) {
@@ -73,39 +138,21 @@ function FullScreenImageViewer({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[90vw] sm:max-w-2xl md:max-w-3xl lg:max-w-4xl p-0 overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-slate-800 to-slate-900">
+      <DialogContent className="max-w-[90vw] max-h-[90vh] p-0 overflow-hidden rounded-2xl border-0 bg-black/95">
         <div className="relative">
           <div className="absolute top-0 left-0 right-0 z-10 flex items-center justify-between p-3 sm:p-4 bg-gradient-to-b from-black/70 to-transparent">
-            <h3 className="text-white font-medium text-sm sm:text-base truncate">{name}</h3>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white p-0"
-            >
+            <h3 className="text-white font-medium text-sm sm:text-base truncate">{title}</h3>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 text-white p-0">
               <X className="h-4 w-4" />
             </Button>
           </div>
-          
-          <div className="flex items-center justify-center min-h-[300px] sm:min-h-[400px] max-h-[70vh] p-4">
+          <div className="flex items-center justify-center min-h-[300px] max-h-[85vh] p-4">
             {imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imageUrl}
-                alt={`${name}'s profile`}
-                className="max-w-full max-h-[70vh] object-contain rounded-lg"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = 'none'
-                }}
-              />
+              <img src={imageUrl} alt={title} className="max-w-full max-h-[85vh] object-contain rounded-lg" />
             ) : (
               <div className="flex flex-col items-center justify-center p-8">
-                <Avatar className="h-32 w-32 sm:h-48 sm:w-48">
-                  <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-4xl sm:text-6xl font-bold">
-                    {name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-                <p className="mt-4 text-slate-400 text-sm">No profile picture available</p>
+                <User className="h-16 w-16 text-slate-500" />
+                <p className="mt-4 text-slate-400">No image available</p>
               </div>
             )}
           </div>
@@ -115,7 +162,7 @@ function FullScreenImageViewer({
   )
 }
 
-// Classmate Profile Modal - DARK/SLEEK THEME (No email, no VIN)
+// Classmate Profile Modal
 function ClassmateProfileModal({ 
   classmate, 
   open, 
@@ -126,168 +173,139 @@ function ClassmateProfileModal({
   onClose: () => void;
 }) {
   const [showFullImage, setShowFullImage] = useState(false)
+  const [showFullCover, setShowFullCover] = useState(false)
   
   if (!classmate) return null
 
   const displayName = getBestDisplayName(classmate)
-  const firstName = classmate.first_name || displayName.split(' ')[0] || 'Student'
-  
-  const getAvatarColor = (name: string): string => {
-    const colors = [
-      'from-blue-500 to-indigo-600',
-      'from-emerald-500 to-teal-600',
-      'from-purple-500 to-pink-600',
-      'from-orange-500 to-red-600',
-      'from-cyan-500 to-blue-600',
-      'from-amber-500 to-orange-600',
-    ]
-    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    return colors[index % colors.length]
-  }
-
-  const getInitials = (name: string): string => {
-    if (!name) return 'S'
-    const parts = name.split(' ')
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-  }
+  const funFact = getRandomFunFact()
+  const motivationalMessage = getRandomMotivationalMessage()
+  const coverPhotoUrl = classmate.cover_photo_url || '/images/default-cover.jpg'
+  const deptFact = classmate.department ? departmentFacts[classmate.department] || departmentFacts.General : departmentFacts.General
 
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-md sm:max-w-lg rounded-2xl p-0 overflow-hidden shadow-2xl border-0 bg-gradient-to-br from-slate-800 to-slate-900">
-          {/* Header gradient accent */}
-          <div className="h-1.5 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
+        <DialogContent className="max-w-md sm:max-w-lg rounded-2xl p-0 overflow-hidden shadow-2xl border-0 bg-white">
+          {/* Cover Photo */}
+          <div 
+            className="relative h-32 w-full cursor-pointer overflow-hidden bg-gradient-to-r from-emerald-500 to-teal-500"
+            onClick={() => setShowFullCover(true)}
+          >
+            <img 
+              src={coverPhotoUrl}
+              alt="Cover"
+              className="w-full h-32 object-cover"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = 'none'
+              }}
+            />
+            <div className="absolute inset-0 bg-black/30 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
+              <Maximize2 className="h-6 w-6 text-white" />
+            </div>
+          </div>
           
-          <div className="p-5 sm:p-6">
-            <DialogHeader className="text-center sm:text-left">
-              <DialogTitle className="text-2xl font-bold text-white">Classmate Profile</DialogTitle>
-              <DialogDescription className="text-slate-300 text-sm">
-                View classmate information
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="mt-5 flex flex-col items-center sm:flex-row sm:items-start gap-5">
-              {/* Avatar section */}
-              <div className="flex flex-col items-center gap-2">
-                <div 
-                  className="relative cursor-pointer group"
-                  onClick={() => classmate.photo_url && setShowFullImage(true)}
-                >
-                  <Avatar className="h-24 w-24 ring-4 ring-emerald-400/30 shadow-xl">
-                    <AvatarImage src={classmate.photo_url || undefined} />
-                    <AvatarFallback className={cn(
-                      "bg-gradient-to-br text-white text-2xl font-bold",
-                      getAvatarColor(displayName)
-                    )}>
-                      {getInitials(displayName)}
-                    </AvatarFallback>
-                  </Avatar>
-                  {classmate.photo_url && (
-                    <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
-                      <Maximize2 className="h-5 w-5 text-white" />
-                    </div>
-                  )}
+          {/* Avatar - Below cover, centered */}
+          <div className="flex justify-center -mt-12 mb-3">
+            <div 
+              className="relative cursor-pointer"
+              onClick={() => classmate.photo_url && setShowFullImage(true)}
+            >
+              <Avatar className="h-24 w-24 ring-4 ring-white shadow-xl">
+                <AvatarImage src={classmate.photo_url || undefined} />
+                <AvatarFallback className={cn(
+                  "bg-gradient-to-br text-white text-2xl font-bold",
+                  getAvatarColor(displayName)
+                )}>
+                  {getInitials(displayName)}
+                </AvatarFallback>
+              </Avatar>
+              {classmate.photo_url && (
+                <div className="absolute inset-0 bg-black/60 rounded-full opacity-0 hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+                  <Maximize2 className="h-5 w-5 text-white" />
                 </div>
-                <Badge className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-3 py-0.5">
-                  Classmate
+              )}
+            </div>
+          </div>
+          
+          <div className="px-6 pb-6">
+            <div className="text-center mb-4">
+              <h3 className="text-xl font-bold text-slate-800">{displayName}</h3>
+              <div className="flex items-center justify-center gap-2 mt-1">
+                <Badge className="bg-emerald-100 text-emerald-700">
+                  <GraduationCap className="h-3 w-3 mr-1" />
+                  {classmate.class}
+                </Badge>
+                <Badge variant="outline" className="text-slate-500">
+                  <User className="h-3 w-3 mr-1" />
+                  Student
                 </Badge>
               </div>
-
-              {/* Info Grid - Dark theme (NO email, NO VIN) */}
-              <div className="flex-1 space-y-3 w-full">
-                {/* Name section */}
-                <div className="text-center sm:text-left pb-2 border-b border-slate-700">
-                  <h3 className="text-xl font-bold text-white">{displayName}</h3>
-                  <p className="text-sm text-slate-400 mt-0.5">{firstName}&apos;s Profile</p>
-                </div>
-
-                {/* Details grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {/* Class */}
-                  <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-700/50 border border-slate-600">
-                    <div className="h-7 w-7 rounded-lg bg-emerald-500/20 flex items-center justify-center shrink-0">
-                      <GraduationCap className="h-3.5 w-3.5 text-emerald-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Class</p>
-                      <p className="text-sm font-semibold text-white truncate">{classmate.class || 'Not assigned'}</p>
-                    </div>
-                  </div>
-
-                  {/* Department */}
-                  <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-700/50 border border-slate-600">
-                    <div className="h-7 w-7 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
-                      <School className="h-3.5 w-3.5 text-purple-400" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Department</p>
-                      <p className="text-sm font-semibold text-white truncate">{classmate.department || 'General'}</p>
-                    </div>
-                  </div>
-
-                  {/* Phone - Only if exists */}
-                  {classmate.phone && (
-                    <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-700/50 border border-slate-600">
-                      <div className="h-7 w-7 rounded-lg bg-blue-500/20 flex items-center justify-center shrink-0">
-                        <svg className="h-3.5 w-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Phone</p>
-                        <p className="text-sm font-semibold text-white">{classmate.phone}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Admission Year */}
-                  {classmate.admission_year && (
-                    <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-700/50 border border-slate-600">
-                      <div className="h-7 w-7 rounded-lg bg-amber-500/20 flex items-center justify-center shrink-0">
-                        <Calendar className="h-3.5 w-3.5 text-amber-400" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Admission Year</p>
-                        <p className="text-sm font-semibold text-white">{classmate.admission_year}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Address - Only if exists */}
-                  {classmate.address && (
-                    <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-700/50 border border-slate-600 sm:col-span-2">
-                      <div className="h-7 w-7 rounded-lg bg-slate-500/20 flex items-center justify-center shrink-0">
-                        <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                      </div>
-                      <div className="flex-1">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">Address</p>
-                        <p className="text-sm font-medium text-slate-300">{classmate.address}</p>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Status */}
-                  <div className="flex items-center gap-2.5 p-2 rounded-lg bg-slate-700/50 border border-slate-600">
-                    <div className="h-7 w-7 rounded-lg bg-green-500/20 flex items-center justify-center shrink-0">
-                      <User className="h-3.5 w-3.5 text-green-400" />
-                    </div>
-                    <div>
-                      <p className="text-[10px] text-slate-400 uppercase tracking-wide">Status</p>
-                      <Badge className="mt-0.5 bg-green-500/20 text-green-300 border border-green-500/30 text-[10px]">
-                        Active Student
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
+              <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 bg-amber-50 rounded-full">
+                <span className="text-sm">{funFact.emoji}</span>
+                <span className="text-xs text-amber-600">{funFact.message}</span>
               </div>
             </div>
 
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {classmate.department && (
+                  <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                    <div className="h-9 w-9 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <School className="h-4 w-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Department</p>
+                      <p className="text-sm font-medium text-slate-700">{classmate.department}</p>
+                    </div>
+                  </div>
+                )}
+
+                {classmate.admission_year && (
+                  <div className="flex items-center gap-3 p-3 bg-amber-50 rounded-xl">
+                    <div className="h-9 w-9 rounded-lg bg-amber-100 flex items-center justify-center">
+                      <Calendar className="h-4 w-4 text-amber-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Class of</p>
+                      <p className="text-sm font-medium text-slate-700">{classmate.admission_year}</p>
+                    </div>
+                  </div>
+                )}
+
+                {classmate.phone && (
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-xl">
+                    <div className="h-9 w-9 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <Phone className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-400">Phone</p>
+                      <p className="text-sm font-medium text-slate-700">{classmate.phone}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {classmate.address && (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl">
+                  <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center">
+                    <MapPin className="h-4 w-4 text-slate-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs text-slate-400">Location</p>
+                    <p className="text-sm font-medium text-slate-700">{classmate.address}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-4 p-3 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl text-center">
+              <Lightbulb className="h-4 w-4 text-emerald-500 mx-auto mb-1" />
+              <p className="text-xs text-emerald-700">{motivationalMessage}</p>
+            </div>
+
             <DialogClose asChild>
-              <Button className="w-full mt-5 bg-emerald-600 hover:bg-emerald-700 text-white">
+              <Button className="w-full mt-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg">
                 Close
               </Button>
             </DialogClose>
@@ -297,11 +315,152 @@ function ClassmateProfileModal({
 
       <FullScreenImageViewer
         imageUrl={classmate.photo_url}
-        name={displayName}
+        title={displayName}
         open={showFullImage}
         onClose={() => setShowFullImage(false)}
       />
+      <FullScreenImageViewer
+        imageUrl={classmate.cover_photo_url}
+        title={`${displayName}'s cover photo`}
+        open={showFullCover}
+        onClose={() => setShowFullCover(false)}
+      />
     </>
+  )
+}
+
+// Classmate Card - Grid View
+function ClassmateCard({ classmate, onClick }: { classmate: Classmate; onClick: () => void }) {
+  const displayName = getBestDisplayName(classmate)
+  const funFact = getRandomFunFact()
+  const coverPhotoUrl = classmate.cover_photo_url || '/images/default-cover.jpg'
+
+  return (
+    <motion.div
+      whileHover={{ y: -4, transition: { duration: 0.2 } }}
+      className="group cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+        <div className="h-24 bg-gradient-to-r from-emerald-500 to-teal-500 overflow-hidden">
+          <img 
+            src={coverPhotoUrl}
+            alt="Cover"
+            className="w-full h-24 object-cover"
+            onError={(e) => {
+              (e.target as HTMLImageElement).src = '/images/default-cover.jpg'
+            }}
+          />
+        </div>
+        
+        <div className="flex justify-center -mt-10">
+          <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
+            <AvatarImage src={classmate.photo_url || undefined} />
+            <AvatarFallback className={cn(
+              "bg-gradient-to-br text-white text-lg font-bold",
+              getAvatarColor(displayName)
+            )}>
+              {getInitials(displayName)}
+            </AvatarFallback>
+          </Avatar>
+        </div>
+        
+        <div className="px-3 pb-4 pt-2 text-center">
+          <h3 className="font-semibold text-slate-800 text-sm mt-1 truncate">{displayName}</h3>
+          <div className="flex items-center justify-center gap-1 mt-1">
+            <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+              {classmate.class}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-center gap-0.5 mt-2">
+            <span className="text-xs">{funFact.emoji}</span>
+            <p className="text-[9px] text-slate-400 truncate">{funFact.message}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            className="mt-2 h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+          >
+            <Eye className="h-3 w-3 mr-1" />
+            View Profile
+          </Button>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// Classmate Row - List View
+function ClassmateRow({ classmate, onClick }: { classmate: Classmate; onClick: () => void }) {
+  const displayName = getBestDisplayName(classmate)
+  const funFact = getRandomFunFact()
+  const coverPhotoUrl = classmate.cover_photo_url || '/images/default-cover.jpg'
+
+  return (
+    <motion.div
+      whileHover={{ scale: 1.01 }}
+      className="group cursor-pointer"
+      onClick={onClick}
+    >
+      <div className="bg-white rounded-xl border border-slate-200 p-3 hover:shadow-md transition-all duration-200">
+        <div className="flex items-center gap-4">
+          <div className="flex-shrink-0">
+            <div className="relative w-14 h-14 rounded-lg overflow-hidden">
+              <img 
+                src={coverPhotoUrl} 
+                alt="Cover" 
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = '/images/default-cover.jpg'
+                }}
+              />
+              <div className="absolute inset-0 bg-black/20" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Avatar className="h-9 w-9 ring-2 ring-white">
+                  <AvatarImage src={classmate.photo_url || undefined} />
+                  <AvatarFallback className={cn(
+                    "bg-gradient-to-br text-white text-xs font-bold",
+                    getAvatarColor(displayName)
+                  )}>
+                    {getInitials(displayName)}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-slate-800 text-sm">{displayName}</h3>
+              <Badge className="bg-green-100 text-green-700 text-[9px]">
+                Active
+              </Badge>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              <span className="text-xs text-slate-500 flex items-center gap-1">
+                <GraduationCap className="h-3 w-3" />
+                {classmate.class}
+              </span>
+              {classmate.department && (
+                <span className="text-xs text-slate-400">• {classmate.department}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-xs">{funFact.emoji}</span>
+              <span className="text-[10px] text-slate-400">{funFact.message}</span>
+            </div>
+          </div>
+          
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="h-8 w-8 rounded-full text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </motion.div>
   )
 }
 
@@ -313,27 +472,24 @@ export function StudentClassRoster({
   onClassmateClick 
 }: StudentClassRosterProps) {
   const [classmates, setClassmates] = useState<Classmate[]>([])
-  const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [selectedClassmate, setSelectedClassmate] = useState<Classmate | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [motivationalMessage] = useState(getRandomMotivationalMessage())
 
-  // Fetch classmates from the same class (NO email, NO vin_id)
+  // Fetch classmates - NO LOADING STATE
   useEffect(() => {
     const fetchClassmates = async () => {
-      if (!studentClass) {
-        setLoading(false)
-        return
-      }
+      if (!studentClass) return
 
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('id, first_name, middle_name, last_name, full_name, display_name, class, photo_url, department, admission_year, phone, address')
+          .select('id, first_name, middle_name, last_name, full_name, display_name, class, photo_url, cover_photo_url, department, admission_year, phone, address')
           .eq('class', studentClass)
           .eq('role', 'student')
-          .order('display_name')
+          .order('first_name')
 
         if (error) {
           console.error('Error fetching classmates:', error)
@@ -354,6 +510,7 @@ export function StudentClassRoster({
             display_name: student.display_name,
             class: student.class,
             photo_url: student.photo_url,
+            cover_photo_url: student.cover_photo_url,
             department: student.department,
             admission_year: student.admission_year,
             phone: student.phone,
@@ -367,35 +524,12 @@ export function StudentClassRoster({
         }
       } catch (error) {
         console.error('Error in fetchClassmates:', error)
-      } finally {
-        setLoading(false)
       }
     }
 
     fetchClassmates()
-
-    const classmatesChannel = supabase
-      .channel('classmates-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'profiles',
-          filter: `class=eq.${studentClass}`
-        },
-        () => {
-          fetchClassmates()
-        }
-      )
-      .subscribe()
-
-    return () => {
-      classmatesChannel.unsubscribe()
-    }
   }, [studentClass, studentId])
 
-  // Filter classmates by search
   const filteredClassmates = useMemo(() => {
     return classmates.filter(classmate => {
       const displayName = getBestDisplayName(classmate)
@@ -403,269 +537,162 @@ export function StudentClassRoster({
     })
   }, [classmates, searchQuery])
 
-  // Get initials for avatar
-  const getInitials = (classmate: Classmate): string => {
-    const displayName = getBestDisplayName(classmate)
-    if (!displayName) return 'S'
-    const parts = displayName.split(' ')
-    if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
-    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
-  }
-
-  // Get avatar color
-  const getAvatarColor = (name: string): string => {
-    const colors = [
-      'from-blue-500 to-indigo-600',
-      'from-emerald-500 to-teal-600',
-      'from-purple-500 to-pink-600',
-      'from-orange-500 to-red-600',
-      'from-cyan-500 to-blue-600',
-      'from-amber-500 to-orange-600',
-    ]
-    const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-    return colors[index % colors.length]
-  }
-
   const handleClassmateClick = (classmate: Classmate) => {
     setSelectedClassmate(classmate)
     setModalOpen(true)
     onClassmateClick?.(classmate)
   }
 
-  if (loading) {
-    return (
-      <Card className={cn("border-0 shadow-sm", className)}>
-        <CardHeader className="pb-3">
-          <Skeleton className="h-6 w-40" />
-          <Skeleton className="h-4 w-24 mt-1" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="flex items-center gap-3">
-                <Skeleton className="h-10 w-10 rounded-full" />
-                <div className="flex-1">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-3 w-48 mt-1" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    )
-  }
-
   if (!studentClass) {
     return (
-      <Card className={cn("border-0 shadow-sm", className)}>
-        <CardContent className="py-8 text-center">
-          <GraduationCap className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500">Class not assigned</p>
-          <p className="text-xs text-slate-400 mt-1">
-            Please contact your administrator to assign a class.
-          </p>
-        </CardContent>
-      </Card>
+      <div className={cn("bg-white rounded-xl border p-8 text-center", className)}>
+        <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+          <GraduationCap className="h-8 w-8 text-slate-400" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800 mb-2">No Class Assigned</h3>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          You haven't been assigned to a class yet. Please contact your administrator.
+        </p>
+      </div>
     )
   }
 
-  if (classmates.length === 0 && !loading) {
+  if (classmates.length === 0) {
     return (
-      <Card className={cn("border-0 shadow-sm", className)}>
-        <CardContent className="py-12 text-center">
-          <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500 font-medium">No classmates found</p>
-          <p className="text-sm text-slate-400 mt-1">
-            Students in {studentClass} will appear here once enrolled.
-          </p>
-        </CardContent>
-      </Card>
+      <div className={cn("bg-white rounded-xl border p-8 text-center", className)}>
+        <div className="h-16 w-16 rounded-full bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center mx-auto mb-4">
+          <Coffee className="h-8 w-8 text-amber-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-slate-800 mb-2">No Classmates Yet</h3>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          Grab a coffee ☕ and check back soon! Students in <span className="font-medium text-emerald-600">{studentClass}</span> will appear here once enrolled.
+        </p>
+      </div>
     )
   }
 
   return (
     <>
-      <Card className={cn(
-        "border-0 shadow-sm bg-gradient-to-br from-white to-slate-50 overflow-hidden",
-        className
-      )}>
-        <div className="h-1 bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500" />
-        
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
-                </div>
-                <span>My Classmates</span>
-                <Badge className="bg-emerald-100 text-emerald-700 ml-1 sm:ml-2 text-xs">
-                  {classmates.length}
-                </Badge>
-              </CardTitle>
-              <CardDescription className="flex items-center gap-1 mt-1 text-xs sm:text-sm">
-                <GraduationCap className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                {studentClass} • {classmates.length} student{classmates.length !== 1 ? 's' : ''} enrolled
-              </CardDescription>
+      <div className={cn("space-y-5", className)}>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
+              <Users className="h-6 w-6 text-emerald-600" />
+              Classmates
+              <Badge className="bg-emerald-100 text-emerald-700 ml-2">
+                {classmates.length} {classmates.length === 1 ? 'Student' : 'Students'}
+              </Badge>
+            </h2>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-sm text-slate-500">
+                <GraduationCap className="h-3.5 w-3.5 inline mr-1" />
+                {studentClass}
+              </p>
+              <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-600 border-amber-200">
+                <Sparkles className="h-2.5 w-2.5 mr-0.5" />
+                {motivationalMessage}
+              </Badge>
             </div>
-            
-            {!compact && classmates.length > 0 && (
-              <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1 self-start">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-7 w-7 sm:h-8 sm:w-8 p-0",
-                    viewMode === 'list' && "bg-white shadow-sm"
-                  )}
-                  onClick={() => setViewMode('list')}
-                >
-                  <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className={cn(
-                    "h-7 w-7 sm:h-8 sm:w-8 p-0",
-                    viewMode === 'grid' && "bg-white shadow-sm"
-                  )}
-                  onClick={() => setViewMode('grid')}
-                >
-                  <Grid3x3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                </Button>
-              </div>
-            )}
           </div>
-
-          {!compact && classmates.length > 0 && (
-            <div className="relative mt-3">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
+          
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
-                placeholder="Search classmates by name..."
+                placeholder="Find a classmate..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 h-9 sm:h-10 text-sm"
+                className="pl-9 h-10 w-56 text-sm bg-white border-slate-200 focus:border-emerald-300"
               />
             </div>
-          )}
-        </CardHeader>
-
-        <CardContent className="p-0">
-          {filteredClassmates.length === 0 ? (
-            <div className="py-12 px-6 text-center">
-              <Search className="h-10 w-10 sm:h-12 sm:w-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-500 text-sm">No classmates found matching "{searchQuery}"</p>
-              <Button variant="link" size="sm" onClick={() => setSearchQuery('')} className="mt-2">
-                Clear search
+            
+            <div className="flex items-center gap-1 bg-slate-100 rounded-lg p-1">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 w-8 p-0 transition-all",
+                  viewMode === 'grid' && "bg-white shadow-sm text-emerald-600"
+                )}
+                onClick={() => setViewMode('grid')}
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  "h-8 w-8 p-0 transition-all",
+                  viewMode === 'list' && "bg-white shadow-sm text-emerald-600"
+                )}
+                onClick={() => setViewMode('list')}
+              >
+                <List className="h-4 w-4" />
               </Button>
             </div>
-          ) : viewMode === 'list' ? (
-            <ScrollArea className="px-3 sm:px-4 max-h-[400px] sm:max-h-[450px]">
-              <div className="space-y-1 pb-4">
-                {filteredClassmates.map((classmate, index) => {
-                  const displayName = getBestDisplayName(classmate)
-                  return (
-                    <motion.div
-                      key={classmate.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl hover:bg-slate-100 transition-all cursor-pointer group"
-                      onClick={() => handleClassmateClick(classmate)}
-                    >
-                      <div className="relative">
-                        <Avatar className="h-9 w-9 sm:h-10 sm:w-10 ring-2 ring-white shadow-sm">
-                          <AvatarImage src={classmate.photo_url || undefined} />
-                          <AvatarFallback className={cn(
-                            "bg-gradient-to-br text-white text-xs font-medium",
-                            getAvatarColor(displayName)
-                          )}>
-                            {getInitials(classmate)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-0.5 -right-0.5">
-                          <div className="h-2 w-2 sm:h-2.5 sm:w-2.5 bg-green-500 rounded-full ring-2 ring-white" />
-                        </div>
-                      </div>
+          </div>
+        </div>
 
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-slate-900 text-sm sm:text-base truncate">
-                          {displayName}
-                        </p>
-                        <p className="text-xs text-slate-500 truncate">
-                          {classmate.class}
-                        </p>
-                      </div>
+        {/* Search Results */}
+        {searchQuery && filteredClassmates.length !== classmates.length && (
+          <div className="text-sm text-slate-500 flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            Found {filteredClassmates.length} of {classmates.length} classmates matching "{searchQuery}"
+            <Button 
+              variant="link" 
+              size="sm" 
+              onClick={() => setSearchQuery('')}
+              className="h-auto p-0 text-xs text-emerald-600"
+            >
+              Clear search
+            </Button>
+          </div>
+        )}
 
-                      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-                        <Badge className="bg-green-100 text-green-700 text-[9px] sm:text-[10px]">
-                          Active
-                        </Badge>
-                        <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </ScrollArea>
-          ) : (
-            <ScrollArea className="max-h-[400px] sm:max-h-[450px] px-3 sm:px-4 pb-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
-                {filteredClassmates.map((classmate, index) => {
-                  const displayName = getBestDisplayName(classmate)
-                  return (
-                    <motion.div
-                      key={classmate.id}
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.02 }}
-                      className="p-3 sm:p-4 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all cursor-pointer text-center"
-                      onClick={() => handleClassmateClick(classmate)}
-                    >
-                      <div className="relative inline-block">
-                        <Avatar className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 ring-2 ring-white shadow-md mx-auto">
-                          <AvatarImage src={classmate.photo_url || undefined} />
-                          <AvatarFallback className={cn(
-                            "bg-gradient-to-br text-white text-sm sm:text-base md:text-lg font-medium",
-                            getAvatarColor(displayName)
-                          )}>
-                            {getInitials(classmate)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-0.5 -right-0.5">
-                          <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 bg-green-500 rounded-full ring-2 ring-white" />
-                        </div>
-                      </div>
-                      <p className="font-medium text-slate-900 text-xs sm:text-sm mt-2 truncate">
-                        {displayName}
-                      </p>
-                      <p className="text-[10px] sm:text-xs text-slate-500 truncate">
-                        {classmate.class}
-                      </p>
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </ScrollArea>
-          )}
+        {/* Classmates Display */}
+        {filteredClassmates.length === 0 ? (
+          <div className="bg-white rounded-xl border p-12 text-center">
+            <Search className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+            <p className="text-slate-500 font-medium">No classmates found</p>
+            <p className="text-sm text-slate-400 mt-1">Try a different search term</p>
+          </div>
+        ) : viewMode === 'grid' ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filteredClassmates.map((classmate) => (
+              <ClassmateCard
+                key={classmate.id}
+                classmate={classmate}
+                onClick={() => handleClassmateClick(classmate)}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {filteredClassmates.map((classmate) => (
+              <ClassmateRow
+                key={classmate.id}
+                classmate={classmate}
+                onClick={() => handleClassmateClick(classmate)}
+              />
+            ))}
+          </div>
+        )}
 
-          {!compact && filteredClassmates.length > 0 && (
-            <div className="px-4 sm:px-6 py-2 sm:py-3 border-t border-slate-200 bg-slate-50/50">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-[10px] sm:text-xs">
-                <span className="text-slate-500 flex items-center gap-1">
-                  <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500" />
-                  Showing {filteredClassmates.length} of {classmates.length} classmates
-                </span>
-                <span className="text-slate-400">
-                  {studentClass} • {classmates.length} total
-                </span>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {/* Footer */}
+        {!compact && filteredClassmates.length > 0 && (
+          <div className="pt-2 text-center">
+            <p className="text-xs text-slate-400 flex items-center justify-center gap-1">
+              <Heart className="h-3 w-3 text-red-400" />
+              Showing <span className="font-medium text-slate-500">{filteredClassmates.length}</span> of{' '}
+              <span className="font-medium text-slate-500">{classmates.length}</span> classmates
+              <Star className="h-3 w-3 text-amber-400" />
+            </p>
+          </div>
+        )}
+      </div>
 
+      {/* Profile Modal */}
       <ClassmateProfileModal
         classmate={selectedClassmate}
         open={modalOpen}

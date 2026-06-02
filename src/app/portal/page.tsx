@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - COMPLETE FIXED VERSION (No image height warning)
+// app/portal/page.tsx - COMPLETE FIXED VERSION (Image touches footer)
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -480,11 +480,11 @@ export default function LoginPage() {
       <div className="min-h-screen flex flex-col bg-gray-50">
         <Header />
         
-        <div className="flex-1 flex items-stretch pt-16 sm:pt-20">
+        <div className="flex-1 flex pt-16 sm:pt-20">
           <div className="flex w-full">
-            {/* LEFT SIDE - IMAGE with explicit height container */}
-            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%]">
-              <div className="relative w-full h-screen">
+            {/* LEFT SIDE - IMAGE that touches footer */}
+            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]">
+              <div className="relative w-full">
                 {!imageError && (
                   <>
                     {!heroImageLoaded && (
@@ -509,7 +509,7 @@ export default function LoginPage() {
                   <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] z-0" />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent z-10" />
-                <div className="relative z-20 flex flex-col justify-center px-12 xl:px-16 py-12 w-full h-full">
+                <div className="relative z-20 flex flex-col justify-center px-12 xl:px-16 py-12 w-full min-h-[calc(100vh-80px)]">
                   <motion.div
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -566,7 +566,7 @@ export default function LoginPage() {
             </div>
 
             {/* RIGHT SIDE - LOGIN FORM */}
-            <div className="w-full lg:w-[45%] xl:w-[40%] bg-white flex items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-8">
+            <div className="w-full lg:w-[45%] xl:w-[40%] bg-white flex items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-8 min-h-[calc(100vh-80px)]">
               <div className="w-full max-w-md">
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}

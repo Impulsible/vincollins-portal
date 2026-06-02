@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/staff/StaffSidebar.tsx - WITH ANNOUNCEMENTS
+// components/staff/StaffSidebar.tsx - WITH GRADE ASSIGNMENTS
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +10,8 @@ import {
   LayoutDashboard, BookOpen, FileText, Settings,
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, User, CalendarDays,
-  Bell, HelpCircle, Notebook, Megaphone
+  Bell, HelpCircle, Notebook, Megaphone,
+  CheckSquare  // Add this for grading icon
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -63,14 +64,16 @@ interface NavigationItem {
 interface SidebarStats {
   studentCount: number
   examCount: number
+  pendingGradingCount: number  // Add this
 }
 
-// ✅ Primary navigation with Announcements added
+// ✅ Primary navigation with Announcements and Grade Assignments
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
   { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'School Updates', route: '/staff/announcements' },
   { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory', route: '/staff/exams' },
   { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks', route: '/staff/assignments' },
+  { id: 'grade-assignments', name: 'Grade', icon: CheckSquare, description: 'Grade Submissions', route: '/staff/assignments/grade', badge: 'Pending' },
   { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
   { id: 'students', name: 'Students', icon: User, description: 'Class Roster', route: '/staff/students' },
   { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class Schedule', route: '/staff/schedule' },
@@ -156,7 +159,11 @@ export function StaffSidebar({
   const userRole = profile?.role
   const department = profile?.department
 
-  const [stats, setStats] = useState<SidebarStats>({ studentCount: 0, examCount: 0 })
+  const [stats, setStats] = useState<SidebarStats>({ 
+    studentCount: 0, 
+    examCount: 0,
+    pendingGradingCount: 0 
+  })
 
   // Fetch stats in background
   useEffect(() => {
@@ -174,9 +181,29 @@ export function StaffSidebar({
           .select('*', { count: 'exact', head: true })
           .eq('created_by', profile.id)
 
+        // Get pending grading count
+        const { data: teacherAssignments } = await supabase
+          .from('assignments')
+          .select('id')
+          .eq('created_by', profile.id)
+
+        const assignmentIds = teacherAssignments?.map(a => a.id) || []
+
+        let pendingCount = 0
+        if (assignmentIds.length > 0) {
+          const { count } = await supabase
+            .from('assignment_submissions')
+            .select('*', { count: 'exact', head: true })
+            .in('assignment_id', assignmentIds)
+            .eq('status', 'submitted')
+          
+          pendingCount = count || 0
+        }
+
         setStats({
           studentCount: studentsCount || 0,
-          examCount: examsCount || 0
+          examCount: examsCount || 0,
+          pendingGradingCount: pendingCount
         })
       } catch (error) {
         console.error('Error fetching stats:', error)
@@ -195,7 +222,11 @@ export function StaffSidebar({
     } else if (pathname?.startsWith('/staff/exams')) {
       setActiveTab('exams')
     } else if (pathname?.startsWith('/staff/assignments')) {
-      setActiveTab('assignments')
+      if (pathname?.includes('/grade')) {
+        setActiveTab('grade-assignments')
+      } else {
+        setActiveTab('assignments')
+      }
     } else if (pathname?.startsWith('/staff/notes')) {
       setActiveTab('notes')
     } else if (pathname?.startsWith('/staff/students')) {
@@ -231,6 +262,11 @@ export function StaffSidebar({
     const isActive = activeTab === item.id
     const Icon = item.icon
     
+    // Update badge for grade-assignments with actual count
+    const displayBadge = item.id === 'grade-assignments' && stats.pendingGradingCount > 0 
+      ? stats.pendingGradingCount.toString() 
+      : item.badge
+    
     const buttonContent = (
       <button
         key={item.id}
@@ -256,9 +292,14 @@ export function StaffSidebar({
           <div className="flex-1 text-left">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium block">{item.name}</span>
-              {item.badge && (
-                <Badge className="bg-amber-100 text-amber-700 text-[9px] px-1.5 py-0.5 border-amber-200">
-                  {item.badge}
+              {displayBadge && (
+                <Badge className={cn(
+                  "text-[9px] px-1.5 py-0.5",
+                  isActive 
+                    ? "bg-white/20 text-white" 
+                    : "bg-amber-100 text-amber-700 border-amber-200"
+                )}>
+                  {displayBadge}
                 </Badge>
               )}
             </div>
@@ -283,6 +324,9 @@ export function StaffSidebar({
             <div>
               <p className="font-medium">{item.name}</p>
               <p className="text-xs text-slate-400">{item.description}</p>
+              {displayBadge && (
+                <p className="text-xs text-amber-500 mt-1">{displayBadge} pending</p>
+              )}
             </div>
           </TooltipContent>
         </Tooltip>
@@ -386,7 +430,7 @@ export function StaffSidebar({
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 gap-2 pt-2">
+              <div className="grid grid-cols-3 gap-2 pt-2">
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Students</p>
                   <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
@@ -394,9 +438,15 @@ export function StaffSidebar({
                   </p>
                 </div>
                 <div className="bg-teal-50 dark:bg-teal-950/30 rounded-lg p-2">
-                  <p className="text-[9px] text-teal-600 dark:text-teal-400 font-medium">My Exams</p>
+                  <p className="text-[9px] text-teal-600 dark:text-teal-400 font-medium">Exams</p>
                   <p className="text-xs font-bold text-teal-700 dark:text-teal-300">
                     {stats.examCount}
+                  </p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">
+                  <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">To Grade</p>
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
+                    {stats.pendingGradingCount}
                   </p>
                 </div>
               </div>
