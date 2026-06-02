@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - COMPLETE FIXED VERSION
+// app/portal/page.tsx - OPTIMIZED WITH FAST LOGO & CACHE PREVENTION
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/contexts/UserContext'
@@ -28,6 +28,16 @@ interface SchoolSettings {
   school_motto: string
   school_phone?: string
   school_email?: string
+}
+
+// ✅ Preload critical images for faster loading
+const preloadImages = [
+  '/images/portal.jpg',
+]
+
+// ✅ Fixed cn utility function - handles undefined, null, and false values
+function cn(...classes: (string | undefined | null | false)[]) {
+  return classes.filter(Boolean).join(' ')
 }
 
 export default function LoginPage() {
@@ -57,25 +67,86 @@ export default function LoginPage() {
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null)
   const redirectStartedRef = useRef(false)
   const [imageError, setImageError] = useState(false)
-  
+  const [logoLoaded, setLogoLoaded] = useState(false)
+  const [heroImageLoaded, setHeroImageLoaded] = useState(false)
+
+  // ✅ Preload images on mount
+  useEffect(() => {
+    preloadImages.forEach((src) => {
+      const img = document.createElement('img')
+      img.src = src
+    })
+  }, [])
+
+  // ✅ Cache prevention - Clear stale data on portal load
+  useEffect(() => {
+    // Clear any stale auth state
+    const clearStaleCache = () => {
+      const keysToKeep = ['user_profile', 'auth_user', 'auth_role']
+      const now = Date.now()
+      const lastClear = localStorage.getItem('portalCacheClear')
+      
+      // Clear once per day
+      if (!lastClear || now - parseInt(lastClear) > 24 * 60 * 60 * 1000) {
+        Object.keys(localStorage).forEach(key => {
+          if (!keysToKeep.includes(key) && !key.startsWith('sb-')) {
+            localStorage.removeItem(key)
+          }
+        })
+        localStorage.setItem('portalCacheClear', now.toString())
+      }
+    }
+    
+    clearStaleCache()
+    
+    // Prevent back/forward cache
+    const handlePageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) {
+        console.log('Page restored from bfcache - reloading...')
+        window.location.reload()
+      }
+    }
+    
+    window.addEventListener('pageshow', handlePageShow)
+    
+    return () => {
+      window.removeEventListener('pageshow', handlePageShow)
+    }
+  }, [])
+
   // Load school settings
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
+        // Try to get from cache first
+        const cachedSettings = localStorage.getItem('school_settings')
+        if (cachedSettings) {
+          try {
+            const parsed = JSON.parse(cachedSettings)
+            setSchoolSettings(prev => ({
+              ...prev,
+              ...parsed
+            }))
+          } catch (e) {
+            // Invalid cache
+          }
+        }
+        
         const { data } = await supabase
           .from('school_settings')
           .select('*')
           .maybeSingle()
 
         if (data) {
-          setSchoolSettings(prev => ({
-            ...prev,
+          const newSettings = {
             logo_path: data.logo_path || '',
             school_name: data.school_name || 'Vincollins College',
             school_motto: data.school_motto || 'Geared Towards Excellence',
             school_phone: data.school_phone || '+234 912 1155 554',
             school_email: data.school_email || 'vincollinscollege@gmail.com',
-          }))
+          }
+          setSchoolSettings(newSettings)
+          localStorage.setItem('school_settings', JSON.stringify(newSettings))
         }
       } catch (err) {
         console.error('Failed to load school settings:', err)
@@ -218,16 +289,18 @@ export default function LoginPage() {
       
       const redirectPath = redirectMap[mappedRole] || '/student'
 
-      // Save to localStorage for instant header update
-      localStorage.setItem('auth_user', JSON.stringify({ id: signInData.user.id, role: mappedRole }))
-      localStorage.setItem('auth_role', mappedRole)
-      localStorage.setItem('user_profile', JSON.stringify({
+      // ✅ Save to localStorage with timestamp for cache busting
+      const userData = {
         id: signInData.user.id,
         full_name: formattedName,
         first_name: formattedName.split(' ')[0],
         email: cleanEmail,
         role: mappedRole,
-      }))
+        timestamp: Date.now()
+      }
+      localStorage.setItem('auth_user', JSON.stringify({ id: signInData.user.id, role: mappedRole }))
+      localStorage.setItem('auth_role', mappedRole)
+      localStorage.setItem('user_profile', JSON.stringify(userData))
 
       console.log('Setting modal data:', { userName: formattedName, role: mappedRole, redirectPath })
       
@@ -422,17 +495,27 @@ export default function LoginPage() {
           <div className="flex w-full">
             {/* LEFT SIDE - IMAGE with fixed height container */}
             <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative min-h-[calc(100vh-80px)]">
-              {!imageError ? (
-                <Image
-                  src="/images/portal.jpg"
-                  alt="Vincollins College Campus"
-                  fill
-                  className="object-cover object-center"
-                  priority
-                  sizes="(max-width: 1024px) 55vw, 60vw"
-                  onError={() => setImageError(true)}
-                />
-              ) : (
+              {!imageError && (
+                <>
+                  {!heroImageLoaded && (
+                    <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] animate-pulse" />
+                  )}
+                  <Image
+                    src="/images/portal.jpg"
+                    alt="Vincollins College Campus"
+                    fill
+                    className={cn(
+                      "object-cover object-center transition-opacity duration-500",
+                      heroImageLoaded ? "opacity-100" : "opacity-0"
+                    )}
+                    priority
+                    sizes="(max-width: 1024px) 55vw, 60vw"
+                    onLoadingComplete={() => setHeroImageLoaded(true)}
+                    onError={() => setImageError(true)}
+                  />
+                </>
+              )}
+              {imageError && (
                 <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]" />
               )}
               <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
@@ -449,19 +532,28 @@ export default function LoginPage() {
                   </div>
 
                   <div className="flex items-center gap-4 mb-8">
+                    {/* ✅ Fast Loading Logo */}
                     {schoolSettings?.logo_path ? (
-                      <div className="relative h-16 w-16 xl:h-20 xl:w-20">
+                      <div className="relative h-16 w-16 xl:h-20 xl:w-20 shrink-0">
                         <Image 
                           src={schoolSettings.logo_path} 
                           alt="Logo" 
                           fill 
                           sizes="80px"
-                          className="object-contain"
+                          className={cn(
+                            "object-contain transition-opacity duration-300",
+                            logoLoaded ? "opacity-100" : "opacity-0"
+                          )}
                           priority
+                          onLoadingComplete={() => setLogoLoaded(true)}
+                          onError={() => setLogoLoaded(true)}
                         />
+                        {!logoLoaded && (
+                          <div className="absolute inset-0 bg-white/20 rounded-full animate-pulse" />
+                        )}
                       </div>
                     ) : (
-                      <div className="h-16 w-16 xl:h-20 xl:w-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <div className="h-16 w-16 xl:h-20 xl:w-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
                         <GraduationCap className="h-8 w-8 xl:h-10 xl:w-10 text-white" />
                       </div>
                     )}
@@ -491,7 +583,7 @@ export default function LoginPage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
-                  {/* Mobile Logo */}
+                  {/* Mobile Logo - Fast Loading */}
                   <div className="lg:hidden text-center mb-8">
                     <motion.div
                       initial={{ scale: 0 }}
@@ -505,7 +597,7 @@ export default function LoginPage() {
                             alt="Logo" 
                             fill 
                             sizes="80px"
-                            className="object-contain" 
+                            className="object-contain"
                             priority
                           />
                         </div>

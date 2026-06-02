@@ -1,4 +1,4 @@
-// src/app/layout.tsx
+// src/app/layout.tsx - UPDATED WITH VERSION BANNER
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
@@ -8,7 +8,7 @@ import './globals.css';
 import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ClientLayout } from '@/components/ClientLayout';
-
+import { VersionBanner } from '@/components/VersionBanner';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -164,6 +164,17 @@ const organizationSchema = {
   },
 };
 
+// ✅ Cache Control Headers Component
+function CacheControlHeaders() {
+  return (
+    <>
+      <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+      <meta httpEquiv="Pragma" content="no-cache" />
+      <meta httpEquiv="Expires" content="0" />
+    </>
+  )
+}
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html 
@@ -179,6 +190,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
+        {/* ✅ Cache Control Meta Tags */}
+        <CacheControlHeaders />
+        
         <meta name="format-detection" content="telephone=no, email=no, address=no" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -204,7 +218,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <ProgressBar />
-        <ClientLayout>{children}</ClientLayout>
+        <ClientLayout>
+          {children}
+          {/* ✅ Version Banner - Shows when app updates */}
+          <VersionBanner />
+        </ClientLayout>
       </body>
     </html>
   );

@@ -1,4 +1,4 @@
-// components/staff/StaffAnnouncements.tsx - PROFESSIONALLY STYLED & RESPONSIVE
+// components/staff/StaffAnnouncements.tsx - MATCHES STUDENT VERSION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -29,7 +29,7 @@ interface Announcement {
 }
 
 interface StaffAnnouncementsProps {
-  hideHeader?: boolean
+  hideHeader?: boolean  // ✅ Hide main header when used in page layout
   className?: string
 }
 
@@ -145,7 +145,7 @@ export function StaffAnnouncements({ hideHeader = false, className }: StaffAnnou
 
   return (
     <div className={cn("space-y-5 sm:space-y-6 md:space-y-8", className)}>
-      {/* Header Section - Can be hidden */}
+      {/* Header Section - Can be hidden when used in page layout */}
       {!hideHeader && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>

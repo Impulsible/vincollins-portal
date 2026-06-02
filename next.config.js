@@ -1,10 +1,11 @@
-// next.config.js - FULLY OPTIMIZED
+// next.config.js - COMPLETE WITH CACHE PREVENTION
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // ✅ Keep StrictMode OFF to prevent double auth calls in development
   reactStrictMode: false,
   
-  output: 'standalone',
+  // ✅ COMMENT THIS OUT TO FIX WINDOWS + PNPM SYMLINK ERRORS
+  // output: 'standalone',
   
   // ✅ Image optimization
   images: {
@@ -73,7 +74,6 @@ const nextConfig = {
       'framer-motion',
       'recharts',
     ],
-    // ✅ Enable scroll restoration
     scrollRestoration: true,
   },
   
@@ -108,7 +108,7 @@ const nextConfig = {
         'C:/Program Files',
         'C:/Program Files (x86)',
       ],
-      poll: dev ? 1000 : false, // Poll in dev, no poll in production
+      poll: dev ? 1000 : false,
       aggregateTimeout: 300,
     };
     
@@ -131,37 +131,28 @@ const nextConfig = {
         splitChunks: {
           chunks: 'all',
           cacheGroups: {
-            // Separate vendor chunks
             vendor: {
               test: /[\\/]node_modules[\\/]/,
               name(module) {
-                // 🔧 Fix: Handle null context for virtual modules
                 if (!module.context) {
                   return 'vendor.unknown';
                 }
-                
-                const match = module.context.match(
-                  /[\\/]node_modules[\\/](.*?)([\\/]|$)/
-                );
-                
+                const match = module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/);
                 if (!match) {
                   return 'vendor.unknown';
                 }
-                
                 const packageName = match[1];
                 return `vendor.${packageName.replace('@', '')}`;
               },
               priority: 10,
               minChunks: 1,
             },
-            // Common chunks
             common: {
               name: 'common',
               minChunks: 2,
               priority: 5,
               reuseExistingChunk: true,
             },
-            // Supabase chunk
             supabase: {
               test: /[\\/]node_modules[\\/]@supabase[\\/]/,
               name: 'vendor.supabase',
@@ -169,7 +160,6 @@ const nextConfig = {
             },
           },
         },
-        // Minimize CSS
         minimize: true,
       };
     }
@@ -199,7 +189,7 @@ const nextConfig = {
     ];
   },
   
-  // ✅ Security headers + Caching
+  // ✅ Security headers + Caching (COMPLETE)
   async headers() {
     return [
       // Global security headers
@@ -228,36 +218,136 @@ const nextConfig = {
           },
         ],
       },
-      // Admin pages - no cache
+      
+      // ✅ PORTAL PAGE - NO CACHE (critical for login)
+      {
+        source: '/portal',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      
+      // ✅ ADMIN PORTAL
+      {
+        source: '/admin/portal',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      
+      // ✅ FORGOT PASSWORD - NO CACHE
+      {
+        source: '/forgot-password',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      
+      // ✅ RESET PASSWORD - NO CACHE
+      {
+        source: '/reset-password',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      
+      // ✅ Dashboard pages - NO CACHE
       {
         source: '/admin/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'private, no-cache, no-store, must-revalidate',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
           },
         ],
       },
-      // Staff pages - short cache
       {
         source: '/staff/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'private, max-age=0, must-revalidate',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
           },
         ],
       },
-      // Student pages - short cache
       {
         source: '/student/:path*',
         headers: [
           {
             key: 'Cache-Control',
-            value: 'private, max-age=0, must-revalidate',
+            value: 'no-cache, no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
           },
         ],
       },
+      
       // Static images - long cache
       {
         source: '/images/:path*',
@@ -294,7 +384,61 @@ const nextConfig = {
         headers: [
           {
             key: 'Cache-Control',
-            value: 'no-store, must-revalidate',
+            value: 'no-store, must-revalidate, private',
+          },
+          {
+            key: 'Pragma',
+            value: 'no-cache',
+          },
+          {
+            key: 'Expires',
+            value: '0',
+          },
+        ],
+      },
+      // Home and public pages - short cache
+      {
+        source: '/',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=300, stale-while-revalidate=600',
+          },
+        ],
+      },
+      {
+        source: '/about',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        source: '/contact',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        source: '/admission',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, stale-while-revalidate=86400',
+          },
+        ],
+      },
+      {
+        source: '/schools',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, stale-while-revalidate=86400',
           },
         ],
       },
@@ -303,7 +447,7 @@ const nextConfig = {
   
   // ✅ Development optimizations
   onDemandEntries: {
-    maxInactiveAge: 60 * 1000, // 60 seconds
+    maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,
   },
   

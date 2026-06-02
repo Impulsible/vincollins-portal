@@ -25,7 +25,7 @@ const footerNavItems = {
     { id: 'nursery', title: 'Nursery', href: '/academics/nursery' },
     { id: 'primary', title: 'Primary', href: '/academics/primary' },
     { id: 'college', title: 'College', href: '/academics/college' },
-    { id: 'cbt', title: 'CBT Platform', href: '#cbt', isCbt: true },
+    // ❌ Removed: CBT Platform
   ],
   about: [
     { id: 'story', title: 'Our Story', href: '/about' },
@@ -38,8 +38,6 @@ const footerNavItems = {
     { id: 'student-portal', title: 'Student Portal', href: '/portal' },
     { id: 'staff-portal', title: 'Staff Portal', href: '/portal' },
     { id: 'admin-portal', title: 'Admin Portal', href: '/portal' },
-    { id: 'results', title: 'Results Checker', href: '/results' },
-    { id: 'admissions', title: 'Admissions', href: '/admissions' },
   ],
 }
 
@@ -58,7 +56,7 @@ const socialLinks = [
   { icon: Linkedin, href: 'https://linkedin.com/school/vincollins', label: 'LinkedIn' },
 ]
 
-// CBT Features
+// CBT Features (kept for reference, but no longer linked from footer)
 const cbtFeatures = [
   { title: 'Secure Exam Environment', description: 'Full-screen lockdown with tab-switch detection', icon: Lock },
   { title: 'Smart Timer System', description: 'Real-time countdown with auto-submit feature', icon: Timer },
@@ -85,10 +83,10 @@ export function Footer() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userRole, setUserRole] = useState<string>('student')
   
-  // ✅ Hydration fix: Track client-side mounting
+  // Hydration fix: Track client-side mounting
   const [mounted, setMounted] = useState(false)
   
-  // ✅ Dynamic contact info state
+  // Dynamic contact info state
   const [contactData, setContactData] = useState({
     address: defaultContactInfo.address,
     phone: defaultContactInfo.phone,
@@ -96,7 +94,7 @@ export function Footer() {
     hours: defaultContactInfo.hours,
   })
 
-  // ✅ Mark component as mounted on client
+  // Mark component as mounted on client
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -159,7 +157,7 @@ export function Footer() {
         if (!error && data) {
           setSchoolSettings(data)
           
-          // ✅ Update contact data with database values
+          // Update contact data with database values
           setContactData({
             address: data.school_address || defaultContactInfo.address,
             phone: data.school_phone || defaultContactInfo.phone,
@@ -180,13 +178,6 @@ export function Footer() {
       setSubscribed(true)
       setEmail('')
       setTimeout(() => setSubscribed(false), 3000)
-    }
-  }
-
-  const handleCbtClick = (e: React.MouseEvent, isCbt: boolean) => {
-    if (isCbt) {
-      e.preventDefault()
-      setShowCbtInfo(true)
     }
   }
 
@@ -293,7 +284,6 @@ export function Footer() {
                       <li key={item.id}>
                         <Link 
                           href={item.href}
-                          onClick={(e) => item.isCbt && handleCbtClick(e, true)}
                           className="group inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#F5A623] transition-all duration-300"
                         >
                           <ChevronRight className="h-3.5 w-3.5 text-[#F5A623]/60 group-hover:text-[#F5A623] transition-all duration-300 group-hover:translate-x-0.5" />
@@ -377,14 +367,13 @@ export function Footer() {
                 </div>
               </div>
 
-              {/* Contact Column - FIXED: Only render dynamic content after client mount */}
+              {/* Contact Column */}
               <div className="lg:col-span-3 space-y-5">
                 <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
                   <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
                   Contact Us
                 </h3>
                 <ul className="space-y-4">
-                  {/* Address - Fixed hydration */}
                   <li className="flex items-start gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <MapPin className="h-4 w-4 text-[#F5A623]" />
@@ -400,7 +389,6 @@ export function Footer() {
                     )}
                   </li>
                   
-                  {/* Phone - Fixed hydration */}
                   <li className="flex items-center gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <Phone className="h-4 w-4 text-[#F5A623]" />
@@ -422,7 +410,6 @@ export function Footer() {
                     )}
                   </li>
                   
-                  {/* Email - Fixed hydration */}
                   <li className="flex items-center gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <Mail className="h-4 w-4 text-[#F5A623]" />
@@ -444,7 +431,6 @@ export function Footer() {
                     )}
                   </li>
                   
-                  {/* Hours - Fixed hydration */}
                   <li className="flex items-center gap-3 text-sm group">
                     <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
                       <Clock className="h-4 w-4 text-[#F5A623]" />
@@ -505,14 +491,14 @@ export function Footer() {
             </div>
           </div>
 
-          {/* Bottom Bar - Fixed hydration for currentYear */}
+          {/* Bottom Bar */}
           <div className="py-6 border-t border-white/15">
             <div className="flex flex-col md:flex-row justify-between items-center gap-4">
               <p className="text-xs text-white/60 text-center md:text-left">
                 {mounted ? (
                   <>© {currentYear} Vincollins College. All rights reserved.</>
                 ) : (
-                  <>© 2024 Vincollins College. All rights reserved.</>
+                  <>© 2026 Vincollins College. All rights reserved.</>
                 )}
               </p>
               <div className="flex flex-wrap items-center justify-center gap-6">
@@ -535,35 +521,6 @@ export function Footer() {
           </div>
         </div>
       </footer>
-
-      {/* CBT Info Dialog */}
-      <Dialog open={showCbtInfo} onOpenChange={setShowCbtInfo}>
-        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl">CBT Platform</DialogTitle>
-            <DialogDescription>
-              Computer-Based Testing System for secure online examinations
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-4 mt-4">
-            {cbtFeatures.map((feature, idx) => (
-              <div key={idx} className="p-4 bg-gray-50 rounded-xl">
-                <feature.icon className="h-6 w-6 text-[#0A2472] mb-2" />
-                <p className="font-semibold">{feature.title}</p>
-                <p className="text-sm text-gray-500">{feature.description}</p>
-              </div>
-            ))}
-          </div>
-          <div className="flex gap-3 mt-6">
-            <Button onClick={() => router.push('/portal')} className="flex-1">
-              Login to Access CBT
-            </Button>
-            <Button variant="outline" onClick={() => setShowCbtInfo(false)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
   )
 }
