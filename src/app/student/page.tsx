@@ -1,4 +1,4 @@
-// app/student/page.tsx - UPDATED WITH BEAUTIFUL LOADING TEXT
+// app/student/page.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -13,9 +13,8 @@ import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Award, RefreshCw, AlertTriangle, Loader2, Briefcase, GraduationCap } from 'lucide-react'
+import { BookOpen, Award, RefreshCw, AlertTriangle, Loader2, GraduationCap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { toast } from 'sonner'
 
 // ============================================
 // TYPES & CONSTANTS
@@ -56,6 +55,16 @@ function calculateGrade(percentage: number): { grade: string; color: string } {
   return { grade: 'F', color: 'text-red-600' }
 }
 
+// Helper to extract year from class name
+function extractYear(className: string | undefined | null): string {
+  if (!className) return ''
+  if (className.startsWith('JSS')) return 'JSS'
+  if (className.startsWith('SS1')) return 'SS1'
+  if (className.startsWith('SS2')) return 'SS2'
+  if (className.startsWith('SS3')) return 'SS3'
+  return className
+}
+
 const DEFAULT_STATS: DashboardStats = {
   availableExams: [],
   classmates: [],
@@ -80,7 +89,7 @@ const DEFAULT_STATS: DashboardStats = {
 const cachedHeaderUser = getCachedHeaderUser()
 
 // ============================================
-// BEAUTIFUL LOADING SPINNER COMPONENT
+// LOADING SPINNER COMPONENT
 // ============================================
 function LoadingSpinner() {
   const loadingMessages = [
@@ -148,7 +157,7 @@ function LoadingTimeoutError({ onRetry }: { onRetry: () => void }) {
 }
 
 // ============================================
-// MAIN COMPONENT - Single Header
+// MAIN COMPONENT
 // ============================================
 function StudentDashboardContent() {
   const router = useRouter()
@@ -241,7 +250,10 @@ function StudentDashboardContent() {
       
       try {
         const userId = contextUser.id
-        const userClass = contextUser.class
+        const userClass = contextUser.class || ''
+        const userYear = extractYear(userClass)
+
+        console.log('📚 Fetching data for:', { userId, userClass, userYear })
 
         if (!userClass) {
           console.warn('No class assigned to student')
@@ -263,7 +275,12 @@ function StudentDashboardContent() {
           supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
           supabase.from('exam_attempts').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(50),
           supabase.from('ca_scores').select('*').eq('student_id', userId),
-          supabase.from('assignments').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
+          supabase.from('assignments')
+            .select('*')
+            .eq('status', 'published')
+            .or(`classes.cs.{${userClass}},class.eq.${userClass},classes.cs.{${userYear}},class.eq.${userYear}`)
+            .order('created_at', { ascending: false })
+            .limit(10),
           supabase.from('notes').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
         ])
 
@@ -274,6 +291,11 @@ function StudentDashboardContent() {
         const caScores = caScoresResult.error ? [] : caScoresResult.data || []
         const assignments = assignmentsResult.error ? [] : assignmentsResult.data || []
         const notes = notesResult.error ? [] : notesResult.data || []
+
+        console.log('📚 Assignments fetched:', {
+          count: assignments.length,
+          assignments: assignments.map(a => ({ title: a.title, class: a.class, classes: a.classes }))
+        })
 
         const caScoresMap: Record<string, any> = {}
         caScores.forEach((ca: any) => { if (ca.exam_id) caScoresMap[ca.exam_id] = ca })
@@ -395,7 +417,8 @@ function StudentDashboardContent() {
     
     try {
       const userId = contextUser.id
-      const userClass = contextUser.class
+      const userClass = contextUser.class || ''
+      const userYear = extractYear(userClass)
 
       if (!userClass) {
         setRefreshing(false)
@@ -416,7 +439,12 @@ function StudentDashboardContent() {
         supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
         supabase.from('exam_attempts').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('ca_scores').select('*').eq('student_id', userId),
-        supabase.from('assignments').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
+        supabase.from('assignments')
+          .select('*')
+          .eq('status', 'published')
+          .or(`classes.cs.{${userClass}},class.eq.${userClass},classes.cs.{${userYear}},class.eq.${userYear}`)
+          .order('created_at', { ascending: false })
+          .limit(10),
         supabase.from('notes').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
       ])
 
@@ -643,8 +671,6 @@ function StudentDashboardContent() {
           </div>
         </>
       )}
-
-      <div className="lg:hidden h-16" />
     </div>
   )
 }

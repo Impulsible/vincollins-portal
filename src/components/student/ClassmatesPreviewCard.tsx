@@ -1,4 +1,4 @@
-// components/student/ClassmatesPreviewCard.tsx - FUN & ENGAGING VERSION
+// components/student/ClassmatesPreviewCard.tsx - FULL NAME DISPLAY
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -57,23 +57,30 @@ const departmentFunFact: Record<string, { emoji: string; fact: string; icon: Rea
 const funGreetings = [
   '✨ Study buddy!', '🎓 Classmate!', '📚 Learning partner!', '⭐ Star student!', 
   '🚀 Future leader!', '🎯 Goal getter!', '💡 Bright mind!', '🏆 Champion!',
-  '🎨 Creative genius!', '🔍 Problem solver!', '💪 Hard worker!', '🤝 Team player!'
+  '🎨 Creative genius!', '🔍 Problem solver!', '💪 Hard worker!', '🤝 Team player!',
+  '🌈 Positive energy!', '🦁 Brave heart!', '🦉 Wise owl!', '🐝 Busy bee!'
 ]
 
-function getRandomGreeting(name: string): string {
-  const greeting = funGreetings[Math.floor(Math.random() * funGreetings.length)]
-  return greeting
+function getRandomGreeting(): string {
+  return funGreetings[Math.floor(Math.random() * funGreetings.length)]
 }
 
 // Helper functions
 function getInitials(first_name?: string | null, last_name?: string | null, displayName?: string): string {
-  if (first_name && last_name) {
-    return (first_name[0] + last_name[0]).toUpperCase()
-  }
+  // Use display name first
   if (displayName) {
-    const parts = displayName.split(' ')
-    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-    return parts[0][0]?.toUpperCase() || 'S'
+    const parts = displayName.trim().split(/\s+/)
+    if (parts.length >= 2) {
+      return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
+    }
+    return parts[0].charAt(0).toUpperCase()
+  }
+  // Fallback to first and last name
+  if (first_name && last_name) {
+    return (first_name.charAt(0) + last_name.charAt(0)).toUpperCase()
+  }
+  if (first_name) {
+    return first_name.charAt(0).toUpperCase()
   }
   return 'S'
 }
@@ -86,9 +93,39 @@ function getAvatarColor(name: string): string {
     'from-orange-500 to-red-600',
     'from-cyan-500 to-blue-600',
     'from-amber-500 to-orange-600',
+    'from-rose-500 to-pink-600',
+    'from-violet-500 to-purple-600',
   ]
   const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
   return colors[index % colors.length]
+}
+
+// Helper to extract year from class name
+function extractYear(className: string): string {
+  if (!className) return ''
+  if (className.startsWith('JSS')) return 'JSS'
+  if (className.startsWith('SS1')) return 'SS1'
+  if (className.startsWith('SS2')) return 'SS2'
+  if (className.startsWith('SS3')) return 'SS3'
+  return className
+}
+
+// Get best display name for a classmate
+function getBestDisplayName(classmate: Classmate): string {
+  // Priority: display_name > full_name > first_name + last_name > first_name > 'Student'
+  if (classmate.display_name) {
+    return classmate.display_name
+  }
+  if (classmate.full_name) {
+    return classmate.full_name
+  }
+  if (classmate.first_name && classmate.last_name) {
+    return `${classmate.first_name} ${classmate.last_name}`
+  }
+  if (classmate.first_name) {
+    return classmate.first_name
+  }
+  return 'Student'
 }
 
 // Fun badge component
@@ -113,6 +150,8 @@ function MotivationalQuote() {
     { text: "Education is the most powerful weapon which you can use to change the world", emoji: "🌍" },
     { text: "The future belongs to those who believe in the beauty of their dreams", emoji: "⭐" },
     { text: "Your classmates are your greatest resource", emoji: "🤝" },
+    { text: "Together we achieve more", emoji: "🤝" },
+    { text: "Study smarter, not harder", emoji: "🧠" },
   ]
   const randomQuote = quotes[Math.floor(Math.random() * quotes.length)]
   
@@ -127,6 +166,7 @@ function MotivationalQuote() {
 export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: ClassmatesPreviewCardProps) {
   const displayClassmates = classmates.slice(0, 4)
   const hasMore = classmates.length > 4
+  const yearGroup = extractYear(studentClass)
 
   return (
     <Card className="border-0 shadow-sm bg-white overflow-hidden w-full group">
@@ -140,14 +180,14 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
               <div className="h-7 w-7 rounded-lg bg-emerald-100 flex items-center justify-center">
                 <Users className="h-3.5 w-3.5 text-emerald-600" />
               </div>
-              <span>My Classmates</span>
+              <span>{yearGroup} Classmates</span>
               <Badge className="bg-emerald-100 text-emerald-700 text-xs">
                 {classmates.length}
               </Badge>
             </CardTitle>
             <CardDescription className="text-xs mt-1 flex items-center gap-1">
               <GraduationCap className="h-3 w-3" />
-              {studentClass} • {classmates.length} amazing student{classmates.length !== 1 ? 's' : ''}
+              {yearGroup} • {classmates.length} amazing student{classmates.length !== 1 ? 's' : ''}
             </CardDescription>
           </div>
           <Button 
@@ -156,7 +196,7 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
             onClick={onViewAll}
             className="h-8 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 w-fit"
           >
-            Say Hello 👋
+            View All 👥
             <ArrowRight className="ml-1 h-3 w-3" />
           </Button>
         </div>
@@ -181,9 +221,9 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
           <>
             <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 lg:grid-cols-4">
               {displayClassmates.map((classmate, index) => {
-                const displayName = classmate.display_name || classmate.full_name || 'Student'
+                const displayName = getBestDisplayName(classmate)
                 const firstName = displayName.split(' ')[0]
-                const greeting = getRandomGreeting(displayName)
+                const greeting = getRandomGreeting()
                 
                 return (
                   <motion.div
@@ -211,8 +251,9 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
                       </div>
                       
                       <div className="mt-2 text-center">
-                        <p className="font-semibold text-sm truncate max-w-[100px]">
-                          {firstName}
+                        {/* ✅ Show full display name */}
+                        <p className="font-semibold text-xs sm:text-sm truncate max-w-[100px]" title={displayName}>
+                          {displayName.length > 15 ? displayName.substring(0, 12) + '...' : displayName}
                         </p>
                         <div className="flex items-center justify-center gap-1 mt-1">
                           <FunBadge department={classmate.department} />

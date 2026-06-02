@@ -1,4 +1,4 @@
-// components/student/StudentClassRoster.tsx - NO LOADING SKELETON
+// components/student/StudentClassRoster.tsx - GROUPED BY YEAR (SS1, SS2, SS3)
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
@@ -32,10 +32,11 @@ interface Classmate {
   full_name: string
   display_name?: string | null
   class: string
+  year?: string // Extract year (SS1, SS2, SS3, JSS1, etc.)
+  department?: string
   photo_url?: string | null
   cover_photo_url?: string | null
   is_active?: boolean
-  department?: string
   admission_year?: number
   phone?: string
   address?: string
@@ -49,6 +50,16 @@ interface StudentClassRosterProps {
   onClassmateClick?: (classmate: Classmate) => void
 }
 
+// Helper to extract year from class name
+function extractYear(className: string): string {
+  // Map class names to year groups
+  if (className.startsWith('JSS')) return 'JSS'
+  if (className.startsWith('SS1')) return 'SS1'
+  if (className.startsWith('SS2')) return 'SS2'
+  if (className.startsWith('SS3')) return 'SS3'
+  return className
+}
+
 // Fun facts
 const funFacts = [
   { emoji: "🌟", message: "Star student" },
@@ -57,7 +68,7 @@ const funFacts = [
   { emoji: "🎯", message: "Goal getter" },
   { emoji: "📚", message: "Book worm" },
   { emoji: "🎨", message: "Creative soul" },
-  { emoji: "🔬", message: "Science geek" },
+  { emoji: "🔬", message: "Science whiz" },
   { emoji: "💪", message: "Hard worker" },
   { emoji: "🏆", message: "Champion" },
   { emoji: "⭐", message: "All-star" },
@@ -478,16 +489,20 @@ export function StudentClassRoster({
   const [modalOpen, setModalOpen] = useState(false)
   const [motivationalMessage] = useState(getRandomMotivationalMessage())
 
-  // Fetch classmates - NO LOADING STATE
+  // Get current student's year group
+  const currentYear = studentClass ? extractYear(studentClass) : ''
+
   useEffect(() => {
     const fetchClassmates = async () => {
-      if (!studentClass) return
+      if (!studentClass || !currentYear) return
 
       try {
+        // Fetch ALL students in the same year group (SS1, SS2, SS3, etc.)
+        // This will include SS1 Science, SS1 Arts, SS1 Commercial all together
         const { data, error } = await supabase
           .from('profiles')
           .select('id, first_name, middle_name, last_name, full_name, display_name, class, photo_url, cover_photo_url, department, admission_year, phone, address')
-          .eq('class', studentClass)
+          .like('class', `${currentYear}%`) // Match any class starting with SS1, SS2, etc.
           .eq('role', 'student')
           .order('first_name')
 
@@ -509,6 +524,7 @@ export function StudentClassRoster({
             full_name: student.full_name || `${student.first_name || ''} ${student.last_name || ''}`.trim(),
             display_name: student.display_name,
             class: student.class,
+            year: extractYear(student.class),
             photo_url: student.photo_url,
             cover_photo_url: student.cover_photo_url,
             department: student.department,
@@ -528,7 +544,7 @@ export function StudentClassRoster({
     }
 
     fetchClassmates()
-  }, [studentClass, studentId])
+  }, [studentClass, studentId, currentYear])
 
   const filteredClassmates = useMemo(() => {
     return classmates.filter(classmate => {
@@ -565,9 +581,21 @@ export function StudentClassRoster({
         </div>
         <h3 className="text-lg font-semibold text-slate-800 mb-2">No Classmates Yet</h3>
         <p className="text-sm text-slate-500 max-w-md mx-auto">
-          Grab a coffee ☕ and check back soon! Students in <span className="font-medium text-emerald-600">{studentClass}</span> will appear here once enrolled.
+          Grab a coffee ☕ and check back soon! Students in <span className="font-medium text-emerald-600">{currentYear}</span> will appear here once enrolled.
         </p>
       </div>
+    )
+  }
+
+  // Show different badges based on department
+  const getDepartmentBadge = (classmate: Classmate) => {
+    if (!classmate.department) return null
+    const deptInfo = departmentFacts[classmate.department] || departmentFacts.General
+    return (
+      <span className="text-[10px] text-slate-400 flex items-center gap-0.5">
+        <span>{deptInfo.emoji}</span>
+        <span>{classmate.department}</span>
+      </span>
     )
   }
 
@@ -579,7 +607,7 @@ export function StudentClassRoster({
           <div>
             <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
               <Users className="h-6 w-6 text-emerald-600" />
-              Classmates
+              {currentYear} Classmates
               <Badge className="bg-emerald-100 text-emerald-700 ml-2">
                 {classmates.length} {classmates.length === 1 ? 'Student' : 'Students'}
               </Badge>
@@ -587,7 +615,7 @@ export function StudentClassRoster({
             <div className="flex items-center gap-2 mt-1">
               <p className="text-sm text-slate-500">
                 <GraduationCap className="h-3.5 w-3.5 inline mr-1" />
-                {studentClass}
+                {currentYear} • All departments (Science, Arts, Commercial)
               </p>
               <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-600 border-amber-200">
                 <Sparkles className="h-2.5 w-2.5 mr-0.5" />
@@ -685,7 +713,7 @@ export function StudentClassRoster({
             <p className="text-xs text-slate-400 flex items-center justify-center gap-1">
               <Heart className="h-3 w-3 text-red-400" />
               Showing <span className="font-medium text-slate-500">{filteredClassmates.length}</span> of{' '}
-              <span className="font-medium text-slate-500">{classmates.length}</span> classmates
+              <span className="font-medium text-slate-500">{classmates.length}</span> {currentYear} students
               <Star className="h-3 w-3 text-amber-400" />
             </p>
           </div>
