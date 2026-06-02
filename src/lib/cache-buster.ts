@@ -1,21 +1,22 @@
-// lib/cache-buster.ts - COMPLETE CACHE BUSTING UTILITIES
+// lib/cache-buster.ts - FIXED (Skip Supabase URLs)
 'use client'
 
 export const bustCache = () => {
   if (typeof window === 'undefined') return
   
-  // Add timestamp to all fetch requests
   const originalFetch = window.fetch
   window.fetch = function(url: RequestInfo | URL, options: RequestInit = {}) {
     const urlString = typeof url === 'string' ? url : url.toString()
     
-    // Skip cache busting for static assets and same-origin fonts/images
+    // ✅ Skip cache busting for Supabase API calls
     const skipPatterns = [
       '/_next/static',
       '/fonts/',
       '/images/',
       'fonts.googleapis.com',
-      'fonts.gstatic.com'
+      'fonts.gstatic.com',
+      'supabase.co/rest/v1',  // ✅ Skip all Supabase API calls
+      'supabase.co/auth/v1',   // ✅ Skip Supabase auth calls
     ]
     
     const shouldSkip = skipPatterns.some(pattern => urlString.includes(pattern))
@@ -50,7 +51,6 @@ export const clearExpiredCache = () => {
   const now = Date.now()
   const lastClear = localStorage.getItem('lastCacheClear')
   
-  // Clear cache once per day
   if (!lastClear || now - parseInt(lastClear) > 24 * 60 * 60 * 1000) {
     const allKeys = Object.keys(localStorage)
     let clearedCount = 0
@@ -62,7 +62,6 @@ export const clearExpiredCache = () => {
       }
     })
     
-    // Clear session storage except auth-related
     const sessionKeys = Object.keys(sessionStorage)
     sessionKeys.forEach(key => {
       if (!key.startsWith('supabase') && !key.startsWith('sb-')) {
@@ -86,10 +85,7 @@ export const getVersion = () => {
 export const forceRefresh = () => {
   if (typeof window === 'undefined') return
   
-  // Clear all storage
   localStorage.clear()
   sessionStorage.clear()
-  
-  // Hard reload with cache bust
   window.location.href = window.location.href.split('?')[0] + '?_t=' + Date.now()
 }

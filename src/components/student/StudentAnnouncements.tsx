@@ -1,4 +1,4 @@
-// components/student/StudentAnnouncements.tsx - WITH OPTIONAL HEADER HIDE
+// components/student/StudentAnnouncements.tsx - UPDATED WITH SCROLLAREA FIX
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -31,7 +31,7 @@ interface Announcement {
 
 interface StudentAnnouncementsProps {
   showBreadcrumb?: boolean
-  hideHeader?: boolean  // ✅ New prop to hide the main header
+  hideHeader?: boolean
   className?: string
 }
 
@@ -302,88 +302,90 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
         </div>
       </div>
 
-      {/* Announcements List */}
-      <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
-        {filteredAnnouncements.length === 0 ? (
-          <Card className="border-0 shadow-sm">
-            <CardContent className="text-center py-12 sm:py-16">
-              <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                <Megaphone className="h-8 w-8 text-slate-300" />
-              </div>
-              <p className="text-slate-500 font-medium">No announcements found</p>
-              <p className="text-sm text-slate-400 mt-1">
-                {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
-              </p>
-              {searchQuery && (
-                <Button 
-                  variant="link" 
-                  size="sm" 
-                  onClick={() => setSearchQuery('')}
-                  className="mt-3 text-emerald-600"
-                >
-                  Clear search
-                </Button>
+      {/* ✅ Announcements List - WRAPPED with relative positioning to fix ScrollArea warning */}
+      <div className="relative w-full">
+        <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
+          {filteredAnnouncements.length === 0 ? (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="text-center py-12 sm:py-16">
+                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <Megaphone className="h-8 w-8 text-slate-300" />
+                </div>
+                <p className="text-slate-500 font-medium">No announcements found</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
+                </p>
+                {searchQuery && (
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    onClick={() => setSearchQuery('')}
+                    className="mt-3 text-emerald-600"
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4 sm:space-y-5 pb-4">
+              {/* Pinned Announcements */}
+              {pinnedAnnouncements.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
+                      <Pin className="h-3 w-3 text-amber-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
+                    <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
+                  </div>
+                  {pinnedAnnouncements.map((announcement, idx) => (
+                    <AnnouncementCard
+                      key={announcement.id}
+                      announcement={announcement}
+                      index={idx}
+                      getPriorityBgLight={getPriorityBgLight}
+                      getPriorityIcon={getPriorityIcon}
+                      formatDate={formatDate}
+                      onViewDetails={() => {
+                        setSelectedAnnouncement(announcement)
+                        setShowDetails(true)
+                      }}
+                    />
+                  ))}
+                </div>
               )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4 sm:space-y-5 pb-4">
-            {/* Pinned Announcements */}
-            {pinnedAnnouncements.length > 0 && (
+
+              {/* Recent Announcements */}
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                    <Pin className="h-3 w-3 text-amber-600" />
+                  <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <Sparkles className="h-3 w-3 text-emerald-600" />
                   </div>
-                  <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
-                  <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
+                  <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
+                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
                 </div>
-                {pinnedAnnouncements.map((announcement, idx) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    index={idx}
-                    getPriorityBgLight={getPriorityBgLight}
-                    getPriorityIcon={getPriorityIcon}
-                    formatDate={formatDate}
-                    onViewDetails={() => {
-                      setSelectedAnnouncement(announcement)
-                      setShowDetails(true)
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Recent Announcements */}
-            <div>
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Sparkles className="h-3 w-3 text-emerald-600" />
+                <div className="space-y-3 sm:space-y-4">
+                  {normalAnnouncements.map((announcement, idx) => (
+                    <AnnouncementCard
+                      key={announcement.id}
+                      announcement={announcement}
+                      index={idx}
+                      getPriorityBgLight={getPriorityBgLight}
+                      getPriorityIcon={getPriorityIcon}
+                      formatDate={formatDate}
+                      onViewDetails={() => {
+                        setSelectedAnnouncement(announcement)
+                        setShowDetails(true)
+                      }}
+                    />
+                  ))}
                 </div>
-                <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
-                <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
-              </div>
-              <div className="space-y-3 sm:space-y-4">
-                {normalAnnouncements.map((announcement, idx) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    index={idx}
-                    getPriorityBgLight={getPriorityBgLight}
-                    getPriorityIcon={getPriorityIcon}
-                    formatDate={formatDate}
-                    onViewDetails={() => {
-                      setSelectedAnnouncement(announcement)
-                      setShowDetails(true)
-                    }}
-                  />
-                ))}
               </div>
             </div>
-          </div>
-        )}
-      </ScrollArea>
+          )}
+        </ScrollArea>
+      </div>
 
       {/* Announcement Details Modal */}
       <AnimatePresence>

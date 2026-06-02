@@ -1,4 +1,4 @@
-// components/staff/StaffAnnouncements.tsx - MATCHES STUDENT VERSION
+// components/staff/StaffAnnouncements.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -29,7 +29,7 @@ interface Announcement {
 }
 
 interface StaffAnnouncementsProps {
-  hideHeader?: boolean  // ✅ Hide main header when used in page layout
+  hideHeader?: boolean
   className?: string
 }
 
@@ -145,7 +145,7 @@ export function StaffAnnouncements({ hideHeader = false, className }: StaffAnnou
 
   return (
     <div className={cn("space-y-5 sm:space-y-6 md:space-y-8", className)}>
-      {/* Header Section - Can be hidden when used in page layout */}
+      {/* Header Section - Can be hidden */}
       {!hideHeader && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
@@ -285,88 +285,90 @@ export function StaffAnnouncements({ hideHeader = false, className }: StaffAnnou
         </div>
       </div>
 
-      {/* Announcements List */}
-      <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
-        {filteredAnnouncements.length === 0 ? (
-          <Card className="border-0 shadow-sm">
-            <CardContent className="text-center py-12 sm:py-16">
-              <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                <Megaphone className="h-8 w-8 text-slate-300" />
-              </div>
-              <p className="text-slate-500 font-medium">No announcements found</p>
-              <p className="text-sm text-slate-400 mt-1">
-                {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
-              </p>
-              {searchQuery && (
-                <Button 
-                  variant="link" 
-                  size="sm" 
-                  onClick={() => setSearchQuery('')}
-                  className="mt-3 text-emerald-600"
-                >
-                  Clear search
-                </Button>
+      {/* ✅ Announcements List - WRAPPED with relative positioning */}
+      <div className="relative w-full">
+        <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
+          {filteredAnnouncements.length === 0 ? (
+            <Card className="border-0 shadow-sm">
+              <CardContent className="text-center py-12 sm:py-16">
+                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                  <Megaphone className="h-8 w-8 text-slate-300" />
+                </div>
+                <p className="text-slate-500 font-medium">No announcements found</p>
+                <p className="text-sm text-slate-400 mt-1">
+                  {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
+                </p>
+                {searchQuery && (
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    onClick={() => setSearchQuery('')}
+                    className="mt-3 text-emerald-600"
+                  >
+                    Clear search
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4 sm:space-y-5 pb-4">
+              {/* Pinned Announcements */}
+              {pinnedAnnouncements.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
+                      <Pin className="h-3 w-3 text-amber-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
+                    <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
+                  </div>
+                  {pinnedAnnouncements.map((announcement, idx) => (
+                    <AnnouncementCard
+                      key={announcement.id}
+                      announcement={announcement}
+                      index={idx}
+                      getPriorityBgLight={getPriorityBgLight}
+                      getPriorityIcon={getPriorityIcon}
+                      formatDate={formatDate}
+                      onViewDetails={() => {
+                        setSelectedAnnouncement(announcement)
+                        setShowDetails(true)
+                      }}
+                    />
+                  ))}
+                </div>
               )}
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="space-y-4 sm:space-y-5 pb-4">
-            {/* Pinned Announcements */}
-            {pinnedAnnouncements.length > 0 && (
+
+              {/* Recent Announcements */}
               <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                    <Pin className="h-3 w-3 text-amber-600" />
+                  <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                    <Sparkles className="h-3 w-3 text-emerald-600" />
                   </div>
-                  <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
-                  <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
+                  <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
+                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
                 </div>
-                {pinnedAnnouncements.map((announcement, idx) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    index={idx}
-                    getPriorityBgLight={getPriorityBgLight}
-                    getPriorityIcon={getPriorityIcon}
-                    formatDate={formatDate}
-                    onViewDetails={() => {
-                      setSelectedAnnouncement(announcement)
-                      setShowDetails(true)
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-
-            {/* Recent Announcements */}
-            <div>
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                  <Sparkles className="h-3 w-3 text-emerald-600" />
+                <div className="space-y-3 sm:space-y-4">
+                  {normalAnnouncements.map((announcement, idx) => (
+                    <AnnouncementCard
+                      key={announcement.id}
+                      announcement={announcement}
+                      index={idx}
+                      getPriorityBgLight={getPriorityBgLight}
+                      getPriorityIcon={getPriorityIcon}
+                      formatDate={formatDate}
+                      onViewDetails={() => {
+                        setSelectedAnnouncement(announcement)
+                        setShowDetails(true)
+                      }}
+                    />
+                  ))}
                 </div>
-                <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
-                <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
-              </div>
-              <div className="space-y-3 sm:space-y-4">
-                {normalAnnouncements.map((announcement, idx) => (
-                  <AnnouncementCard
-                    key={announcement.id}
-                    announcement={announcement}
-                    index={idx}
-                    getPriorityBgLight={getPriorityBgLight}
-                    getPriorityIcon={getPriorityIcon}
-                    formatDate={formatDate}
-                    onViewDetails={() => {
-                      setSelectedAnnouncement(announcement)
-                      setShowDetails(true)
-                    }}
-                  />
-                ))}
               </div>
             </div>
-          </div>
-        )}
-      </ScrollArea>
+          )}
+        </ScrollArea>
+      </div>
 
       {/* Announcement Details Modal */}
       <AnimatePresence>
@@ -385,7 +387,6 @@ export function StaffAnnouncements({ hideHeader = false, className }: StaffAnnou
               className="bg-white rounded-2xl shadow-2xl w-full max-w-[90%] sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b px-5 sm:px-6 py-4 flex justify-between items-center">
                 <div className="flex items-center gap-2 min-w-0">
                   <div className={cn(
@@ -409,7 +410,6 @@ export function StaffAnnouncements({ hideHeader = false, className }: StaffAnnou
                 </Button>
               </div>
               
-              {/* Modal Content */}
               <div className="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[calc(85vh-70px)]">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge className={cn(
@@ -494,7 +494,6 @@ function AnnouncementCard({
       >
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-start gap-3 sm:gap-4">
-            {/* Icon */}
             <div className={cn(
               "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors group-hover:scale-105",
               announcement.priority === 'urgent' ? "bg-red-100 text-red-600" :
@@ -503,7 +502,6 @@ function AnnouncementCard({
               {getPriorityIcon(announcement.priority)}
             </div>
             
-            {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1.5">
                 <h3 className="font-semibold text-slate-800 text-sm sm:text-base">
@@ -525,7 +523,6 @@ function AnnouncementCard({
               </div>
             </div>
             
-            {/* Arrow indicator */}
             <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
           </div>
         </CardContent>

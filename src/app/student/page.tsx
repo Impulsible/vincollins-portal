@@ -1,4 +1,4 @@
-// app/student/page.tsx - SINGLE HEADER (No double render)
+// app/student/page.tsx - UPDATED WITH BEAUTIFUL LOADING TEXT
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -13,7 +13,7 @@ import { ClassmatesTab } from '@/components/student/ClassmatesTab'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { BookOpen, Award, RefreshCw, AlertTriangle, Loader2, Briefcase } from 'lucide-react'
+import { BookOpen, Award, RefreshCw, AlertTriangle, Loader2, Briefcase, GraduationCap } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast } from 'sonner'
 
@@ -76,23 +76,56 @@ const DEFAULT_STATS: DashboardStats = {
   subjectsWithCA: [],
 }
 
-// ✅ Get cached user synchronously (runs before React renders)
+// Get cached user synchronously
 const cachedHeaderUser = getCachedHeaderUser()
 
 // ============================================
-// LOADING SPINNER COMPONENT (No header)
+// BEAUTIFUL LOADING SPINNER COMPONENT
 // ============================================
 function LoadingSpinner() {
+  const loadingMessages = [
+    { text: "Loading your learning space...", emoji: "📚" },
+    { text: "Preparing your dashboard...", emoji: "🎓" },
+    { text: "Almost there...", emoji: "✨" }
+  ]
+  
+  const [messageIndex, setMessageIndex] = useState(0)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setMessageIndex((prev) => (prev + 1) % loadingMessages.length)
+    }, 2000)
+    return () => clearInterval(interval)
+  }, [])
+
   return (
     <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center z-40">
       <div className="text-center">
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-emerald-200 rounded-full animate-spin" />
+          <div className="w-20 h-20 border-4 border-emerald-200 rounded-full animate-spin" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <Briefcase className="h-7 w-7 text-emerald-600" />
+            <GraduationCap className="h-8 w-8 text-emerald-600" />
           </div>
         </div>
-        <p className="mt-4 text-slate-600 text-lg font-medium">Loading...</p>
+        <motion.p 
+          key={messageIndex}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="mt-6 text-slate-600 text-lg font-medium"
+        >
+          {loadingMessages[messageIndex].text}
+        </motion.p>
+        <div className="flex justify-center gap-2 mt-4">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="h-2 w-2 rounded-full bg-emerald-400"
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -146,7 +179,7 @@ function StudentDashboardContent() {
   const dataFetchedRef = useRef(false)
   const redirectCheckedRef = useRef(false)
 
-  // ✅ Build header user - use cached user immediately, fallback to context
+  // Build header user
   const headerUser: HeaderUser | undefined = useMemo(() => {
     if (contextUser) {
       return {
@@ -159,14 +192,13 @@ function StudentDashboardContent() {
         isAuthenticated: true
       }
     }
-    // Use cached user from localStorage (loaded synchronously)
     if (cachedHeaderUser) {
       return cachedHeaderUser
     }
     return undefined
   }, [contextUser])
 
-  // Integrated auth check (for redirect only)
+  // Integrated auth check
   useEffect(() => {
     if (redirectCheckedRef.current) return
     
@@ -174,7 +206,6 @@ function StudentDashboardContent() {
       redirectCheckedRef.current = true
       
       if (!isAuthenticated || !contextUser) {
-        // Don't redirect if we have cached user
         if (!cachedHeaderUser) {
           router.replace('/portal')
         }
@@ -190,7 +221,7 @@ function StudentDashboardContent() {
     }
   }, [authLoading, isAuthenticated, contextUser, router])
 
-  // Fetch data in background (doesn't block header)
+  // Fetch data in background
   useEffect(() => {
     if (authLoading) return
     if (!isAuthenticated || !contextUser?.id) return
@@ -501,23 +532,18 @@ function StudentDashboardContent() {
     return { completedExams, totalExams, availableExams, avgScore, gradeInfo }
   }, [stats.completedExams, stats.availableExams, stats.averageScore, termProgress?.total_subjects])
 
-  // ✅ CRITICAL: Header renders IMMEDIATELY with cached user
-  // Only show loading spinner for dashboard content, not for header
   const showLoadingSpinner = (loading && !dashboardData && !loadingTimeout) || (authLoading && !cachedHeaderUser)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
-      {/* ✅ SINGLE HEADER - Renders once, never replaced */}
       <Header user={headerUser} onLogout={handleLogout} />
       
-      {/* Dashboard content or loading spinner */}
       {showLoadingSpinner ? (
         <LoadingSpinner />
       ) : loading && loadingTimeout ? (
         <LoadingTimeoutError onRetry={handleRetry} />
       ) : (
         <>
-          {/* Subtle refreshing indicator */}
           {refreshing && (
             <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg px-3 py-1.5 flex items-center gap-2 text-xs text-slate-500">
               <Loader2 className="h-3 w-3 animate-spin" />

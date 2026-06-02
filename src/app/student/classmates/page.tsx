@@ -1,4 +1,4 @@
-// app/student/classmates/page.tsx - FULLY OPTIMIZED
+// app/student/classmates/page.tsx - FULLY OPTIMIZED WITH PROPER FOOTER SPACING
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -15,7 +15,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { motion } from 'framer-motion'
 
-// ✅ Get cached user synchronously
+// Get cached user synchronously
 const cachedHeaderUser = getCachedHeaderUser()
 
 // ============================================
@@ -70,7 +70,7 @@ export default function StudentClassmatesPage() {
   const [loading, setLoading] = useState(true)
   const [showContent, setShowContent] = useState(false)
 
-  // ✅ Build header user - use cached user, then fallback to context
+  // Build header user
   const headerUser: HeaderUser | undefined = useMemo(() => {
     if (contextUser) {
       return {
@@ -83,7 +83,6 @@ export default function StudentClassmatesPage() {
         isAuthenticated: true
       }
     }
-    // ✅ Fix: Return cachedHeaderUser directly (already HeaderUser | null)
     return cachedHeaderUser || undefined
   }, [contextUser])
 
@@ -175,7 +174,8 @@ export default function StudentClassmatesPage() {
           "flex-1 min-w-0 transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="pt-[72px] lg:pt-24 pb-8 sm:pb-12">
+          <main className="pt-[72px] lg:pt-24 pb-24 sm:pb-32">
+            {/* ✅ Increased bottom padding for footer spacing */}
             <div className="px-4 sm:px-6 lg:px-8">
               <div className="max-w-5xl mx-auto">
                 
@@ -226,6 +226,9 @@ export default function StudentClassmatesPage() {
                     console.log('Clicked classmate:', classmate)
                   }}
                 />
+                
+                {/* ✅ Extra spacing at bottom for footer */}
+                <div className="h-8 sm:h-12" />
                 
               </div>
             </div>

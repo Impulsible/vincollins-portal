@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable react/no-unescaped-entities */
-// app/portal/page.tsx - OPTIMIZED WITH FAST LOGO & CACHE PREVENTION
+// app/portal/page.tsx - COMPLETE FIXED VERSION (No image height warning)
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -21,6 +21,7 @@ import {
 import Link from 'next/link'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
+import { cn } from '@/lib/utils'
 
 interface SchoolSettings {
   logo_path: string
@@ -30,15 +31,10 @@ interface SchoolSettings {
   school_email?: string
 }
 
-// ✅ Preload critical images for faster loading
+// Preload critical images for faster loading
 const preloadImages = [
   '/images/portal.jpg',
 ]
-
-// ✅ Fixed cn utility function - handles undefined, null, and false values
-function cn(...classes: (string | undefined | null | false)[]) {
-  return classes.filter(Boolean).join(' ')
-}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -70,7 +66,7 @@ export default function LoginPage() {
   const [logoLoaded, setLogoLoaded] = useState(false)
   const [heroImageLoaded, setHeroImageLoaded] = useState(false)
 
-  // ✅ Preload images on mount
+  // Preload images on mount
   useEffect(() => {
     preloadImages.forEach((src) => {
       const img = document.createElement('img')
@@ -78,15 +74,13 @@ export default function LoginPage() {
     })
   }, [])
 
-  // ✅ Cache prevention - Clear stale data on portal load
+  // Cache prevention - Clear stale data on portal load
   useEffect(() => {
-    // Clear any stale auth state
     const clearStaleCache = () => {
       const keysToKeep = ['user_profile', 'auth_user', 'auth_role']
       const now = Date.now()
       const lastClear = localStorage.getItem('portalCacheClear')
       
-      // Clear once per day
       if (!lastClear || now - parseInt(lastClear) > 24 * 60 * 60 * 1000) {
         Object.keys(localStorage).forEach(key => {
           if (!keysToKeep.includes(key) && !key.startsWith('sb-')) {
@@ -99,7 +93,6 @@ export default function LoginPage() {
     
     clearStaleCache()
     
-    // Prevent back/forward cache
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
         console.log('Page restored from bfcache - reloading...')
@@ -118,7 +111,6 @@ export default function LoginPage() {
   useEffect(() => {
     async function loadSchoolSettings() {
       try {
-        // Try to get from cache first
         const cachedSettings = localStorage.getItem('school_settings')
         if (cachedSettings) {
           try {
@@ -289,7 +281,6 @@ export default function LoginPage() {
       
       const redirectPath = redirectMap[mappedRole] || '/student'
 
-      // ✅ Save to localStorage with timestamp for cache busting
       const userData = {
         id: signInData.user.id,
         full_name: formattedName,
@@ -304,7 +295,6 @@ export default function LoginPage() {
 
       console.log('Setting modal data:', { userName: formattedName, role: mappedRole, redirectPath })
       
-      // Show modal first
       setLoginSuccessData({
         userName: formattedName,
         role: mappedRole as 'student' | 'teacher' | 'admin',
@@ -313,7 +303,6 @@ export default function LoginPage() {
       setShowSuccessModal(true)
       setLoading(false)
       
-      // Refresh user in background
       await refreshUser()
       
       setTimeout(() => {
@@ -493,85 +482,86 @@ export default function LoginPage() {
         
         <div className="flex-1 flex items-stretch pt-16 sm:pt-20">
           <div className="flex w-full">
-            {/* LEFT SIDE - IMAGE with fixed height container */}
-            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] relative min-h-[calc(100vh-80px)]">
-              {!imageError && (
-                <>
-                  {!heroImageLoaded && (
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] animate-pulse" />
-                  )}
-                  <Image
-                    src="/images/portal.jpg"
-                    alt="Vincollins College Campus"
-                    fill
-                    className={cn(
-                      "object-cover object-center transition-opacity duration-500",
-                      heroImageLoaded ? "opacity-100" : "opacity-0"
+            {/* LEFT SIDE - IMAGE with explicit height container */}
+            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%]">
+              <div className="relative w-full h-screen">
+                {!imageError && (
+                  <>
+                    {!heroImageLoaded && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] animate-pulse z-0" />
                     )}
-                    priority
-                    sizes="(max-width: 1024px) 55vw, 60vw"
-                    onLoadingComplete={() => setHeroImageLoaded(true)}
-                    onError={() => setImageError(true)}
-                  />
-                </>
-              )}
-              {imageError && (
-                <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent" />
-              <div className="relative flex flex-col justify-center px-12 xl:px-16 py-12 w-full">
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                  className="text-white"
-                >
-                  <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/30 mb-8">
-                    <Sparkles className="h-4 w-4 text-yellow-300" />
-                    <span className="text-sm font-medium tracking-wide">Secure Portal Access</span>
-                  </div>
-
-                  <div className="flex items-center gap-4 mb-8">
-                    {/* ✅ Fast Loading Logo */}
-                    {schoolSettings?.logo_path ? (
-                      <div className="relative h-16 w-16 xl:h-20 xl:w-20 shrink-0">
-                        <Image 
-                          src={schoolSettings.logo_path} 
-                          alt="Logo" 
-                          fill 
-                          sizes="80px"
-                          className={cn(
-                            "object-contain transition-opacity duration-300",
-                            logoLoaded ? "opacity-100" : "opacity-0"
-                          )}
-                          priority
-                          onLoadingComplete={() => setLogoLoaded(true)}
-                          onError={() => setLogoLoaded(true)}
-                        />
-                        {!logoLoaded && (
-                          <div className="absolute inset-0 bg-white/20 rounded-full animate-pulse" />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="h-16 w-16 xl:h-20 xl:w-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-                        <GraduationCap className="h-8 w-8 xl:h-10 xl:w-10 text-white" />
-                      </div>
-                    )}
-                    <div>
-                      <h2 className="text-2xl xl:text-3xl font-bold">
-                        {schoolSettings.school_name}
-                      </h2>
-                      <p className="text-white/60 text-sm italic mt-1">
-                        &ldquo;{schoolSettings.school_motto}&rdquo;
-                      </p>
+                    <Image
+                      src="/images/portal.jpg"
+                      alt="Vincollins College Campus"
+                      fill
+                      className={cn(
+                        "object-cover object-center transition-opacity duration-500 z-0",
+                        heroImageLoaded ? "opacity-100" : "opacity-0"
+                      )}
+                      priority
+                      sizes="(max-width: 1024px) 55vw, 60vw"
+                      onLoad={() => setHeroImageLoaded(true)}
+                      onError={() => setImageError(true)}
+                    />
+                  </>
+                )}
+                {imageError && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] z-0" />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent z-10" />
+                <div className="relative z-20 flex flex-col justify-center px-12 xl:px-16 py-12 w-full h-full">
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6, ease: "easeOut" }}
+                    className="text-white"
+                  >
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/30 mb-8">
+                      <Sparkles className="h-4 w-4 text-yellow-300" />
+                      <span className="text-sm font-medium tracking-wide">Secure Portal Access</span>
                     </div>
-                  </div>
 
-                  <h1 className="text-4xl xl:text-5xl 2xl:text-6xl font-bold leading-tight">
-                    Welcome to Your{' '}
-                    <span className="text-[#F5A623]">Digital Campus</span>
-                  </h1>
-                </motion.div>
+                    <div className="flex items-center gap-4 mb-8">
+                      {schoolSettings?.logo_path ? (
+                        <div className="relative h-16 w-16 xl:h-20 xl:w-20 shrink-0">
+                          <Image 
+                            src={schoolSettings.logo_path} 
+                            alt="Logo" 
+                            fill 
+                            sizes="80px"
+                            className={cn(
+                              "object-contain transition-opacity duration-300",
+                              logoLoaded ? "opacity-100" : "opacity-0"
+                            )}
+                            priority
+                            onLoad={() => setLogoLoaded(true)}
+                            onError={() => setLogoLoaded(true)}
+                          />
+                          {!logoLoaded && (
+                            <div className="absolute inset-0 bg-white/20 rounded-full animate-pulse" />
+                          )}
+                        </div>
+                      ) : (
+                        <div className="h-16 w-16 xl:h-20 xl:w-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                          <GraduationCap className="h-8 w-8 xl:h-10 xl:w-10 text-white" />
+                        </div>
+                      )}
+                      <div>
+                        <h2 className="text-2xl xl:text-3xl font-bold">
+                          {schoolSettings.school_name}
+                        </h2>
+                        <p className="text-white/60 text-sm italic mt-1">
+                          &ldquo;{schoolSettings.school_motto}&rdquo;
+                        </p>
+                      </div>
+                    </div>
+
+                    <h1 className="text-4xl xl:text-5xl 2xl:text-6xl font-bold leading-tight">
+                      Welcome to Your{' '}
+                      <span className="text-[#F5A623]">Digital Campus</span>
+                    </h1>
+                  </motion.div>
+                </div>
               </div>
             </div>
 
@@ -583,7 +573,7 @@ export default function LoginPage() {
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.5, delay: 0.2 }}
                 >
-                  {/* Mobile Logo - Fast Loading */}
+                  {/* Mobile Logo */}
                   <div className="lg:hidden text-center mb-8">
                     <motion.div
                       initial={{ scale: 0 }}
@@ -599,7 +589,12 @@ export default function LoginPage() {
                             sizes="80px"
                             className="object-contain"
                             priority
+                            onLoad={() => setLogoLoaded(true)}
+                            onError={() => setLogoLoaded(true)}
                           />
+                          {!logoLoaded && (
+                            <div className="absolute inset-0 bg-white/20 rounded-full animate-pulse" />
+                          )}
                         </div>
                       ) : (
                         <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] flex items-center justify-center mx-auto mb-3 shadow-xl">
@@ -804,7 +799,6 @@ export default function LoginPage() {
         </div>
       </div>
       
-      {/* Success Modal */}
       <SuccessModal />
     </>
   )

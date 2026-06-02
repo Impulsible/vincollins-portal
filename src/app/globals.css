@@ -1201,3 +1201,36 @@ header {
   opacity: 1;
   visibility: visible;
 }
+
+/* app/globals.css - Add these at the bottom */
+
+/* Fix scroll area warnings */
+[data-radix-scroll-area-viewport] {
+  position: relative !important;
+}
+
+.radix-scroll-area-viewport {
+  position: relative !important;
+}
+
+/* Ensure smooth scrolling */
+* {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Better scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+
+/* app/globals.css - Add at the bottom */
+
+/* Fix ScrollArea warning */
+[data-radix-scroll-area-viewport] {
+  position: relative !important;
+}
+
+.radix-scroll-area-viewport {
+  position: relative !important;
+}

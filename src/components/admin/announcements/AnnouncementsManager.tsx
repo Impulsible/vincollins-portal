@@ -1,4 +1,4 @@
-// components/admin/announcements/AnnouncementsManager.tsx - FIXED
+// components/admin/announcements/AnnouncementsManager.tsx - WITH SCROLLAREA FIX
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,7 +22,7 @@ import {
   Loader2, Megaphone, Send, X, Pin, PinOff, Trash2, 
   Edit2, Eye, Calendar, Users, UserCheck, Bell, AlertCircle,
   Filter, Search, RefreshCw, CheckCircle2, Sparkles, ChevronRight
-} from 'lucide-react'  // ✅ Added ChevronRight
+} from 'lucide-react'
 
 interface Announcement {
   id: string
@@ -87,7 +87,6 @@ export function AnnouncementsManager({ profile, hideHeader = false, className }:
 
   const sendNotifications = async (announcement: { title: string; content: string; audience: string; priority: string }) => {
     try {
-      // Insert notification for all users based on audience
       const { error } = await supabase
         .from('notifications')
         .insert({
@@ -153,7 +152,6 @@ export function AnnouncementsManager({ profile, hideHeader = false, className }:
         if (error) throw error
         toast.success('Announcement published successfully!')
         
-        // Send notifications in background (don't await to avoid blocking)
         sendNotifications({
           title: title.trim(),
           content: content.trim(),
@@ -361,6 +359,7 @@ export function AnnouncementsManager({ profile, hideHeader = false, className }:
               </div>
 
               <div className="p-5 sm:p-6 space-y-5 overflow-y-auto max-h-[calc(90vh-70px)]">
+                {/* Form fields - same as before */}
                 <div>
                   <Label className="text-sm font-medium">Title *</Label>
                   <Input
@@ -600,78 +599,80 @@ export function AnnouncementsManager({ profile, hideHeader = false, className }:
         </CardContent>
       </Card>
 
-      {/* Announcements List */}
-      <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
-        <div className="space-y-4 sm:space-y-5 pb-4">
-          {/* Pinned Announcements */}
-          {pinnedAnnouncements.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                  <Pin className="h-3 w-3 text-amber-600" />
-                </div>
-                <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
-                <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
-              </div>
-              {pinnedAnnouncements.map((announcement) => (
-                <AnnouncementCard
-                  key={announcement.id}
-                  announcement={announcement}
-                  onEdit={handleEdit}
-                  onDelete={handleDelete}
-                  onTogglePin={handleTogglePin}
-                  getPriorityBgLight={getPriorityBgLight}
-                  getAudienceIcon={getAudienceIcon}
-                  getAudienceLabel={getAudienceLabel}
-                  formatDate={formatDate}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Recent Announcements */}
-          <div>
-            {normalAnnouncements.length === 0 && pinnedAnnouncements.length === 0 ? (
-              <Card className="border-0 shadow-sm">
-                <CardContent className="text-center py-12 sm:py-16">
-                  <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                    <Megaphone className="h-8 w-8 text-slate-300" />
-                  </div>
-                  <p className="text-slate-500 font-medium">No announcements yet</p>
-                  <p className="text-sm text-slate-400 mt-1">
-                    Click "New Announcement" to create your first announcement
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
+      {/* ✅ Announcements List - WRAPPED with relative positioning to fix ScrollArea warning */}
+      <div className="relative w-full">
+        <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
+          <div className="space-y-4 sm:space-y-5 pb-4">
+            {/* Pinned Announcements */}
+            {pinnedAnnouncements.length > 0 && (
+              <div>
                 <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <Sparkles className="h-3 w-3 text-emerald-600" />
+                  <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
+                    <Pin className="h-3 w-3 text-amber-600" />
                   </div>
-                  <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
-                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
+                  <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
+                  <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
                 </div>
-                <div className="space-y-3 sm:space-y-4">
-                  {normalAnnouncements.map((announcement) => (
-                    <AnnouncementCard
-                      key={announcement.id}
-                      announcement={announcement}
-                      onEdit={handleEdit}
-                      onDelete={handleDelete}
-                      onTogglePin={handleTogglePin}
-                      getPriorityBgLight={getPriorityBgLight}
-                      getAudienceIcon={getAudienceIcon}
-                      getAudienceLabel={getAudienceLabel}
-                      formatDate={formatDate}
-                    />
-                  ))}
-                </div>
-              </>
+                {pinnedAnnouncements.map((announcement) => (
+                  <AnnouncementCard
+                    key={announcement.id}
+                    announcement={announcement}
+                    onEdit={handleEdit}
+                    onDelete={handleDelete}
+                    onTogglePin={handleTogglePin}
+                    getPriorityBgLight={getPriorityBgLight}
+                    getAudienceIcon={getAudienceIcon}
+                    getAudienceLabel={getAudienceLabel}
+                    formatDate={formatDate}
+                  />
+                ))}
+              </div>
             )}
+
+            {/* Recent Announcements */}
+            <div>
+              {normalAnnouncements.length === 0 && pinnedAnnouncements.length === 0 ? (
+                <Card className="border-0 shadow-sm">
+                  <CardContent className="text-center py-12 sm:py-16">
+                    <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                      <Megaphone className="h-8 w-8 text-slate-300" />
+                    </div>
+                    <p className="text-slate-500 font-medium">No announcements yet</p>
+                    <p className="text-sm text-slate-400 mt-1">
+                      Click "New Announcement" to create your first announcement
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                    <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
+                      <Sparkles className="h-3 w-3 text-emerald-600" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
+                    <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
+                  </div>
+                  <div className="space-y-3 sm:space-y-4">
+                    {normalAnnouncements.map((announcement) => (
+                      <AnnouncementCard
+                        key={announcement.id}
+                        announcement={announcement}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                        onTogglePin={handleTogglePin}
+                        getPriorityBgLight={getPriorityBgLight}
+                        getAudienceIcon={getAudienceIcon}
+                        getAudienceLabel={getAudienceLabel}
+                        formatDate={formatDate}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </ScrollArea>
+        </ScrollArea>
+      </div>
     </div>
   )
 }

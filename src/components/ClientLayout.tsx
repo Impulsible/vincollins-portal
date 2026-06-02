@@ -1,4 +1,4 @@
-// components/ClientLayout.tsx - UPDATED WITH CACHE PREVENTION
+// components/ClientLayout.tsx - Remove bustCache call
 'use client'
 
 import { Suspense, useEffect } from 'react'
@@ -8,14 +8,12 @@ import { UserProvider, useUser } from '@/contexts/UserContext'
 import { ConditionalHeader } from '@/components/ConditionalHeader'
 import { GlobalLoadingWrapper } from '@/components/GlobalLoadingWrapper'
 import { Loader2 } from 'lucide-react'
-import { clearExpiredCache, bustCache } from '@/lib/cache-buster'
+import { clearExpiredCache } from '@/lib/cache-buster'  // ✅ Only import clearExpiredCache
 
 function ClientLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
 
-  // ✅ Cache prevention on route change
   useEffect(() => {
-    // Clear expired cache when entering dashboard pages
     if (pathname?.startsWith('/admin') || 
         pathname?.startsWith('/staff') || 
         pathname?.startsWith('/student')) {
@@ -23,7 +21,6 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
     }
   }, [pathname])
 
-  // ✅ Prevent back/forward cache issues
   useEffect(() => {
     const handlePageShow = (event: PageTransitionEvent) => {
       if (event.persisted) {
@@ -33,11 +30,9 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
     }
     
     window.addEventListener('pageshow', handlePageShow)
-    
     return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
-  // ✅ Handle online/offline recovery
   useEffect(() => {
     const handleOnline = () => {
       console.log('Back online - refreshing...')
@@ -45,16 +40,13 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
     }
     
     window.addEventListener('online', handleOnline)
-    
     return () => window.removeEventListener('online', handleOnline)
   }, [])
 
-  // Pages that shouldn't show header
   const isExamPage = pathname?.startsWith('/student/exam/')
   const isExamListPage = pathname === '/student/exams'
   const hideHeader = isExamPage && !isExamListPage
 
-  // Auth pages that shouldn't show header
   const authPages = ['/portal', '/admin/portal', '/forgot-password', '/reset-password']
   const isAuthPage = authPages.some(page => pathname?.startsWith(page))
 
@@ -78,15 +70,9 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
 }
 
 export function ClientLayout({ children }: { children: React.ReactNode }) {
-  // ✅ Initial cache cleanup on app start
+  // ✅ Only clear cache - NO bustCache() call
   useEffect(() => {
-    // Clear expired cache once per session
     clearExpiredCache()
-    
-    // Optional: Enable cache busting for all fetch requests
-    if (process.env.NODE_ENV === 'production') {
-      bustCache()
-    }
   }, [])
 
   return (

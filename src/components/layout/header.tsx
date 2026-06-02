@@ -1,4 +1,4 @@
-// components/layout/header.tsx - SHOW HEADER IMMEDIATELY
+// components/layout/header.tsx - OPTIMIZED VERSION
 'use client'
 
 import { useState, useEffect, Suspense, lazy, memo } from 'react'
@@ -29,7 +29,7 @@ interface HeaderProps {
   onLogout?: () => void
 }
 
-// ✅ Simple loading shell - no animation, just static placeholder
+// ✅ Simple loading shell
 const HeaderShell = memo(() => (
   <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-2 sm:py-3">
     <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
@@ -85,9 +85,34 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   const isAdminPage = pathname?.startsWith('/admin')
   const isDashboardPage = isStudentPage || isStaffPage || isAdminPage
 
-  // Navigation decision
-  const showPublicNav = !isAuthenticated || (isPublicPage || isHomePage || isPortalPage)
-  const showDashboardNav = isAuthenticated && isDashboardPage
+  // ✅ Navigation decision - with cached user check
+  const hasCachedUser = typeof window !== 'undefined' && localStorage.getItem('user_profile') !== null
+  const effectiveIsAuthenticated = isAuthenticated || hasCachedUser || !!user
+  
+  let showPublicNav = false
+  let showDashboardNav = false
+
+  if (!isHydrated || isLoading) {
+    // Still loading, show nothing or shell
+    showPublicNav = false
+    showDashboardNav = false
+  } else if (isDashboardPage && effectiveIsAuthenticated) {
+    // On dashboard page and authenticated (or has cached user) → dashboard nav
+    showDashboardNav = true
+    showPublicNav = false
+  } else if (!effectiveIsAuthenticated && !isDashboardPage) {
+    // Not authenticated and not on dashboard → public nav
+    showPublicNav = true
+  } else if (isPublicPage || isHomePage || isPortalPage) {
+    // On public page → public nav
+    showPublicNav = true
+  } else if (effectiveIsAuthenticated) {
+    // Authenticated on unknown page → dashboard nav
+    showDashboardNav = true
+  } else {
+    // Fallback to public nav
+    showPublicNav = true
+  }
 
   // Scroll detection
   useEffect(() => {
@@ -130,7 +155,7 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
 
             <UserSection
               user={user}
-              isAuthenticated={isAuthenticated}
+              isAuthenticated={effectiveIsAuthenticated}
               pathname={pathname}
               notifications={notifications}
               unreadCount={unreadCount}
