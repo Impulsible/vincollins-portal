@@ -1,4 +1,27 @@
 // app/student/types.ts
+export interface StudentProfile {
+  id: string
+  full_name: string
+  display_name?: string
+  first_name?: string
+  middle_name?: string
+  last_name?: string
+  email: string
+  vin_id: string
+  admission_number?: string
+  class: string
+  department: string
+  phone: string
+  address: string
+  admission_year: number
+  photo_url: string | null
+  cover_photo_url?: string | null
+  avatar_url?: string | null
+  is_active: boolean
+  created_at: string
+  bio?: string
+}
+
 export interface Assignment {
   id: string
   title: string
@@ -13,8 +36,8 @@ export interface Assignment {
   attachment_urls?: string[]
   attachment_names?: string[]
   file_count?: number
-  file_url?: string  // Legacy support
-  file_name?: string  // Legacy support
+  file_url?: string
+  file_name?: string
   teacher_name?: string
   created_by?: string
   created_by_name?: string
@@ -28,4 +51,20 @@ export interface Assignment {
     feedback?: string
     status: string
   }
+}
+
+export interface ExamAttempt {
+  id: string
+  exam_id: string
+  student_id: string
+  status: string
+  score?: number
+  percentage?: number
+  is_passed?: boolean
+  submitted_at?: string
+  created_at: string
+  exam_title?: string
+  exam_subject?: string
+  ca_score?: any
+  has_ca?: boolean
 }
