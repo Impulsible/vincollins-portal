@@ -20,7 +20,7 @@ export interface StudentProfile {
   is_active: boolean
   created_at: string
   bio?: string
-  role?: string  // ✅ ADD THIS - for user role (student/staff/admin)
+  role?: string
 }
 
 export interface Assignment {
@@ -68,4 +68,23 @@ export interface ExamAttempt {
   exam_subject?: string
   ca_score?: any
   has_ca?: boolean
+}
+
+// ✅ ADD THIS - StudyNote interface
+export interface StudyNote {
+  id: string
+  title: string
+  subject: string
+  class: string
+  description?: string
+  file_url?: string
+  attachment_urls?: string[]
+  attachment_names?: string[]
+  file_count?: number
+  teacher_name?: string
+  created_by?: string
+  created_by_name?: string
+  created_at: string
+  updated_at?: string
+  status: string
 }
