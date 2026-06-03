@@ -20,6 +20,7 @@ export interface StudentProfile {
   is_active: boolean
   created_at: string
   bio?: string
+  role?: string  // ✅ ADD THIS - for user role (student/staff/admin)
 }
 
 export interface Assignment {

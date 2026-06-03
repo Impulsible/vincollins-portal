@@ -45,12 +45,19 @@ export function useStudentProfile() {
             display_name: profileData.display_name || null,
             email: profileData.email,
             class: profileData.class || 'Not Assigned',
-            department: profileData.department || null,
+            department: profileData.department || 'General',
+            phone: profileData.phone || '',
+            address: profileData.address || '',
+            admission_year: profileData.admission_year || new Date().getFullYear(),
             photo_url: profileData.photo_url || null,
-            vin_id: profileData.vin_id || null,
-            admission_year: profileData.admission_year || null,
-            subject_count: profileData.subject_count || null,
-            role: profileData.role || 'student'
+            cover_photo_url: profileData.cover_photo_url || null,
+            avatar_url: profileData.avatar_url || null,
+            is_active: profileData.is_active ?? true,
+            created_at: profileData.created_at || new Date().toISOString(),
+            bio: profileData.bio || '',
+            vin_id: profileData.vin_id || '',
+            admission_number: profileData.admission_number || '',
+            role: profileData.role || 'student'  // ✅ This now matches the type
           })
         }
       } catch (error) {
