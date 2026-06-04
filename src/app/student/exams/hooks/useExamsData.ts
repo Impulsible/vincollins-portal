@@ -11,7 +11,7 @@ import { TERM_NAMES } from "../constants"
 
 type LocalStatsState = StatsState & { pendingTheoryCount: number }
 
-// ✅ FIXED: Extract year from class name - PREVENTS JSS1 from matching SS1
+// ✅ Extract year from class name - Prevents JSS1 from matching SS1
 const extractYear = (className: string): string => {
   if (!className) return ''
   
@@ -51,6 +51,11 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
   })
   
   const hasLoaded = useRef(false)
+
+  // Helper to ensure consistent term/session for exams
+  const getCurrentTermSession = (): { term: string; session_year: string } => {
+    return { term: "third", session_year: "2025/2026" }
+  }
 
   const loadData = useCallback(async (term?: string, session?: string) => {
     setLoading(true)
@@ -119,6 +124,8 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
             .from("exams")
             .select("term, session_year")
             .eq("status", "published")
+            // Include exams with null session_year
+            .or(`session_year.not.is.null,session_year.is.null`)
           
           if (examTerms) {
             examTerms.forEach((t: any) => {
@@ -135,6 +142,16 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
             })
           }
           
+          // Ensure "Third Term 2025/2026" is always available
+          const currentKey = "third|2025/2026"
+          if (!termsMap.has(currentKey)) {
+            termsMap.set(currentKey, {
+              term: "third",
+              session_year: "2025/2026",
+              label: getTermLabel("third", "2025/2026")
+            })
+          }
+          
           const terms = Array.from(termsMap.values())
           terms.sort((a, b) => {
             if (a.session_year !== b.session_year) {
@@ -146,36 +163,51 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           
           setAvailableTerms(terms)
           
+          // Default to Third Term 2025/2026 if no selection exists
           if (terms.length > 0 && !selectedTermSession) {
-            const defaultTerm = terms[0]
-            setSelectedTermSession({ 
-              term: defaultTerm.term, 
-              session_year: defaultTerm.session_year 
-            })
+            // Try to find Third Term 2025/2026 first
+            const currentTerm = terms.find(t => t.term === "third" && t.session_year === "2025/2026")
+            if (currentTerm) {
+              setSelectedTermSession({ term: currentTerm.term, session_year: currentTerm.session_year })
+            } else {
+              const defaultTerm = terms[0]
+              setSelectedTermSession({ term: defaultTerm.term, session_year: defaultTerm.session_year })
+            }
           }
         } catch (e) { 
           console.error("Error loading terms:", e) 
         }
       }
 
-      const targetTerm = term || selectedTermSession?.term || "third"
-      const targetSession = session || selectedTermSession?.session_year || "2025/2026"
+      // Use current term/session if not provided
+      const current = getCurrentTermSession()
+      const targetTerm = term || selectedTermSession?.term || current.term
+      const targetSession = session || selectedTermSession?.session_year || current.session_year
 
-      // Fetch exams
-      const { data: examsData } = await supabase
+      console.log(`🔍 Fetching exams for: ${targetTerm} ${targetSession}`)
+
+      // ✅ FIXED: Fetch exams with flexible session_year matching
+      const { data: examsData, error: examsError } = await supabase
         .from("exams")
         .select("*")
         .eq("status", "published")
         .eq("term", targetTerm)
-        .eq("session_year", targetSession)
+        // Allow exams with null session_year OR matching the target session
+        .or(`session_year.eq.${targetSession},session_year.is.null`)
         .order("created_at", { ascending: false })
+
+      if (examsError) {
+        console.error("Error fetching exams:", examsError)
+      }
+
+      console.log(`📚 Raw exams from DB: ${examsData?.length || 0}`)
 
       // Extract year from student's class
       const studentYear = extractYear(sp.class)
       const isJSS = studentYear?.startsWith('JSS') || false
       const isSS = studentYear?.startsWith('SS') || false
       
-      // ✅ Filter exams by YEAR using exact matching (prevents JSS1 matching SS1)
+      // Filter exams by YEAR using exact matching
       const filteredExams = (examsData || []).filter((exam: any) => {
         // If no class assigned to exam, skip
         if (!exam.class) return false
@@ -185,7 +217,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         
         // For JSS students, only match exact JSS level
         if (isJSS) {
-          // JSS1 only matches exams with JSS1, not SS1
           const examIsJSS = examYear?.startsWith('JSS') || false
           if (!examIsJSS) return false
           return studentYear === examYear
@@ -204,6 +235,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       
       console.log(`📚 Student: ${sp.class} (year: ${studentYear}, type: ${isJSS ? 'JSS' : isSS ? 'SS' : 'Other'})`)
       console.log(`📚 Found ${filteredExams.length} exams after filtering`)
+      console.log(`📚 Exam details:`, filteredExams.map(e => ({ title: e.title, class: e.class, term: e.term, session: e.session_year })))
       
       setExams(filteredExams)
 
