@@ -1,4 +1,3 @@
-// app/student/page.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -55,13 +54,20 @@ function calculateGrade(percentage: number): { grade: string; color: string } {
   return { grade: 'F', color: 'text-red-600' }
 }
 
-// Helper to extract year from class name
+// Extract year from class name (JSS1, JSS2, JSS3, SS1, SS2, SS3)
 function extractYear(className: string | undefined | null): string {
   if (!className) return ''
-  if (className.startsWith('JSS')) return 'JSS'
-  if (className.startsWith('SS1')) return 'SS1'
-  if (className.startsWith('SS2')) return 'SS2'
-  if (className.startsWith('SS3')) return 'SS3'
+  
+  // Extract SS1, SS2, SS3 from any format
+  if (className.includes('SS1')) return 'SS1'
+  if (className.includes('SS2')) return 'SS2'
+  if (className.includes('SS3')) return 'SS3'
+  
+  // Extract JSS1, JSS2, JSS3 from any format
+  if (className.includes('JSS1')) return 'JSS1'
+  if (className.includes('JSS2')) return 'JSS2'
+  if (className.includes('JSS3')) return 'JSS3'
+  
   return className
 }
 
@@ -253,17 +259,23 @@ function StudentDashboardContent() {
         const userClass = contextUser.class || ''
         const userYear = extractYear(userClass)
 
-        console.log('📚 Fetching data for:', { userId, userClass, userYear })
-
         if (!userClass) {
-          console.warn('No class assigned to student')
           setLoading(false)
           return
         }
 
+        // Fetch classmates in the same year across all departments
+        const { data: allClassmates, error: classmatesError } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
+          .eq('role', 'student')
+          .neq('id', userId)
+          .ilike('class', `%${userYear}%`)
+
+        const allClassmatesList = allClassmates || []
+
         const [
           progressResult,
-          classmatesResult,
           examsResult,
           attemptsResult,
           caScoresResult,
@@ -271,7 +283,6 @@ function StudentDashboardContent() {
           notesResult
         ] = await Promise.all([
           supabase.from('student_term_progress').select('*').eq('student_id', userId).eq('term', 'third').eq('session_year', '2025/2026').maybeSingle(),
-          supabase.from('profiles').select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id').eq('class', userClass).eq('role', 'student').neq('id', userId).limit(6),
           supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
           supabase.from('exam_attempts').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(50),
           supabase.from('ca_scores').select('*').eq('student_id', userId),
@@ -285,17 +296,11 @@ function StudentDashboardContent() {
         ])
 
         const progress = progressResult.data
-        const classmates = classmatesResult.error ? [] : classmatesResult.data || []
         const exams = examsResult.error ? [] : examsResult.data || []
         const attempts = attemptsResult.error ? [] : attemptsResult.data || []
         const caScores = caScoresResult.error ? [] : caScoresResult.data || []
         const assignments = assignmentsResult.error ? [] : assignmentsResult.data || []
         const notes = notesResult.error ? [] : notesResult.data || []
-
-        console.log('📚 Assignments fetched:', {
-          count: assignments.length,
-          assignments: assignments.map(a => ({ title: a.title, class: a.class, classes: a.classes }))
-        })
 
         const caScoresMap: Record<string, any> = {}
         caScores.forEach((ca: any) => { if (ca.exam_id) caScoresMap[ca.exam_id] = ca })
@@ -351,7 +356,7 @@ function StudentDashboardContent() {
         const newData = {
           stats: {
             availableExams,
-            classmates,
+            classmates: allClassmatesList,
             recentAttempts: enrichedAttempts.slice(0, 10),
             allAttempts: enrichedAttempts,
             allAssignments: assignments,
@@ -425,9 +430,17 @@ function StudentDashboardContent() {
         return
       }
 
+      const { data: classmatesData, error: classmatesError } = await supabase
+        .from('profiles')
+        .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
+        .eq('role', 'student')
+        .neq('id', userId)
+        .ilike('class', `%${userYear}%`)
+
+      const classmates = classmatesError ? [] : classmatesData || []
+
       const [
         progressResult,
-        classmatesResult,
         examsResult,
         attemptsResult,
         caScoresResult,
@@ -435,7 +448,6 @@ function StudentDashboardContent() {
         notesResult
       ] = await Promise.all([
         supabase.from('student_term_progress').select('*').eq('student_id', userId).eq('term', 'third').eq('session_year', '2025/2026').maybeSingle(),
-        supabase.from('profiles').select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id').eq('class', userClass).eq('role', 'student').neq('id', userId).limit(6),
         supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
         supabase.from('exam_attempts').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(50),
         supabase.from('ca_scores').select('*').eq('student_id', userId),
@@ -449,7 +461,6 @@ function StudentDashboardContent() {
       ])
 
       const progress = progressResult.data
-      const classmates = classmatesResult.error ? [] : classmatesResult.data || []
       const exams = examsResult.error ? [] : examsResult.data || []
       const attempts = attemptsResult.error ? [] : attemptsResult.data || []
       const caScores = caScoresResult.error ? [] : caScoresResult.data || []
@@ -678,6 +689,4 @@ function StudentDashboardContent() {
 // ============================================
 // EXPORT
 // ============================================
-export default function StudentDashboardPage() {
-  return <StudentDashboardContent />
-}
+export default StudentDashboardContent

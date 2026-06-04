@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/types.ts
+// src/components/staff/exams/edit/types.ts - COMPLETE WITH target_audience
 export interface Question {
   id: string
   question_text: string
@@ -51,6 +51,7 @@ export interface Exam {
   pass_mark: number
   term?: string
   session_year?: string
+  target_audience?: string
   created_at: string
   published_at: string | null
   created_by: string
@@ -78,4 +79,5 @@ export interface ExamDetailsForm {
   negative_marking_value: number
   term: string
   session_year: string
+  target_audience: string
 }

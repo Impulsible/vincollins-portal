@@ -1,4 +1,4 @@
-// src/app/student/exams/page.tsx
+// src/app/student/exams/page.tsx - WITHOUT AUTO-RELOAD
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -55,24 +55,8 @@ export default function StudentExamsPage() {
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    if (!mounted) return
-
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        if (selectedTermSession) {
-          loadData(selectedTermSession.term, selectedTermSession.session_year)
-        } else {
-          loadData()
-        }
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [mounted, loadData, selectedTermSession])
+  // ✅ REMOVED: Auto-reload on visibility change
+  // Data only loads when user manually refreshes or changes term
 
   const handleTakeExam = (examId: string) => {
     const attempt = examAttempts[examId]

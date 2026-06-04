@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/ExamDetailsTab.tsx
+// src/components/staff/exams/edit/ExamDetailsTab.tsx - WITH TARGET AUDIENCE
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,8 +7,9 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { BookOpen, Clock, GraduationCap, FileText, Settings2, HelpCircle, Calendar } from 'lucide-react'
+import { BookOpen, Clock, GraduationCap, FileText, Settings2, HelpCircle, Calendar, Users, Target } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { cn } from '@/lib/utils'
 import type { ExamDetailsForm } from './types'
 
 interface ExamDetailsTabProps {
@@ -28,6 +29,54 @@ const termOptions = [
   { value: 'third', label: 'Third Term' }
 ]
 
+// ✅ Target Audience Options
+const TARGET_AUDIENCE_OPTIONS = [
+  { 
+    value: 'all', 
+    label: 'All Students', 
+    description: 'Available to all students in this class/year',
+    icon: '📚',
+    color: 'text-emerald-600',
+    bgColor: 'bg-emerald-50'
+  },
+  { 
+    value: 'Science', 
+    label: 'Science Department Only', 
+    description: 'Only students in Science department can see this exam',
+    icon: '🔬',
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50'
+  },
+  { 
+    value: 'Arts', 
+    label: 'Arts Department Only', 
+    description: 'Only students in Arts department can see this exam',
+    icon: '🎨',
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-50'
+  },
+  { 
+    value: 'Commercial', 
+    label: 'Commercial Department Only', 
+    description: 'Only students in Commercial department can see this exam',
+    icon: '💼',
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50'
+  }
+]
+
+// Helper to get year from class
+const getYearFromClass = (className: string): string => {
+  if (!className) return ''
+  if (className.includes('SS1')) return 'SS1'
+  if (className.includes('SS2')) return 'SS2'
+  if (className.includes('SS3')) return 'SS3'
+  if (className.includes('JSS1')) return 'JSS1'
+  if (className.includes('JSS2')) return 'JSS2'
+  if (className.includes('JSS3')) return 'JSS3'
+  return className
+}
+
 export function ExamDetailsTab({
   formData,
   onChange,
@@ -38,6 +87,11 @@ export function ExamDetailsTab({
   hasTheory,
   onHasTheoryChange
 }: ExamDetailsTabProps) {
+  const yearGroup = getYearFromClass(formData.class)
+  const isSSClass = formData.class.includes('SS')
+  const isJSSClass = formData.class.includes('JSS')
+  const showAudienceSelector = formData.class && (isSSClass || isJSSClass)
+
   return (
     <TooltipProvider>
       <div className="space-y-4 sm:space-y-6">
@@ -77,7 +131,7 @@ export function ExamDetailsTab({
                 </div>
                 <Select
                   value={formData.class}
-                  onValueChange={(v) => onChange({ class: v, subject: '' })}
+                  onValueChange={(v) => onChange({ class: v, subject: '', target_audience: 'all' })}
                 >
                   <SelectTrigger className="h-9 sm:h-10 text-sm">
                     <SelectValue placeholder="Select class" />
@@ -132,6 +186,75 @@ export function ExamDetailsTab({
             </div>
           </CardContent>
         </Card>
+
+        {/* ✅ NEW: Target Audience Card - Who should see this exam */}
+        {showAudienceSelector && (
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
+                <CardTitle className="text-base sm:text-lg">Target Audience</CardTitle>
+              </div>
+              <CardDescription className="text-xs sm:text-sm">
+                Choose which students can see this exam
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className="grid gap-3">
+                {TARGET_AUDIENCE_OPTIONS.map((option) => {
+                  const isSelected = (formData.target_audience || 'all') === option.value
+                  return (
+                    <label
+                      key={option.value}
+                      className={cn(
+                        "flex items-start gap-3 p-3 sm:p-4 rounded-xl cursor-pointer transition-all border-2",
+                        isSelected
+                          ? `${option.bgColor} border-${option.color.split('-')[1]}-500`
+                          : "bg-white border-slate-200 hover:border-slate-300"
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name="target_audience"
+                        value={option.value}
+                        checked={isSelected}
+                        onChange={(e) => onChange({ target_audience: e.target.value })}
+                        className="mt-0.5 h-4 w-4"
+                      />
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-base sm:text-lg">{option.icon}</span>
+                          <p className={cn("font-medium text-sm sm:text-base", option.color)}>
+                            {option.label}
+                          </p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {option.description}
+                        </p>
+                        {option.value === 'all' && (
+                          <p className="text-xs text-emerald-600 mt-2">
+                            ✓ All {yearGroup} students will see this exam (Science, Arts, Commercial)
+                          </p>
+                        )}
+                        {option.value !== 'all' && (
+                          <p className="text-xs text-blue-600 mt-2">
+                            ✓ Only {option.value} department students in {yearGroup} will see this exam
+                          </p>
+                        )}
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+              <div className="mt-2 p-2 bg-slate-50 rounded-lg">
+                <p className="text-[10px] text-slate-500 flex items-center gap-1">
+                  <Target className="h-3 w-3" />
+                  Tip: Use "All Students" for general subjects like Mathematics, English. Use department-specific for specialized subjects.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Academic Period Card */}
         <Card className="border-0 shadow-sm overflow-hidden">

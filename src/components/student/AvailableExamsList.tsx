@@ -359,10 +359,10 @@ export function AvailableExamsList({
         </CardHeader>
         
         <CardContent className={cn(
-          "px-4 pb-6 sm:pb-8 md:pb-10", // ✅ Increased bottom padding to prevent footer sticking
+          "px-4 pb-6 sm:pb-8 md:pb-10",
           compact ? "space-y-2" : "space-y-3 sm:space-y-4"
         )}>
-          {/* Empty State - With proper bottom spacing */}
+          {/* Empty State */}
           {displayExams.length === 0 && (
             <EmptyState 
               exams={exams}

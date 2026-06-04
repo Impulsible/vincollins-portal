@@ -1,4 +1,4 @@
-// components/student/ClassmatesTab.tsx - SECURE VERSION (No IDs or Emails Displayed)
+// components/student/ClassmatesTab.tsx - FIXED VERSION (Shows classmates across departments)
 'use client'
 
 import React from 'react'
@@ -13,6 +13,23 @@ import { Search, ArrowLeft, Users, Grid3x3, List, ExternalLink, GraduationCap, B
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
+
+// ✅ Helper to extract year from class name
+function extractYear(className: string | undefined | null): string {
+  if (!className) return ''
+  
+  // Extract SS1, SS2, SS3 from any format
+  if (className.includes('SS1')) return 'SS1'
+  if (className.includes('SS2')) return 'SS2'
+  if (className.includes('SS3')) return 'SS3'
+  
+  // Extract JSS1, JSS2, JSS3 from any format
+  if (className.includes('JSS1')) return 'JSS1'
+  if (className.includes('JSS2')) return 'JSS2'
+  if (className.includes('JSS3')) return 'JSS3'
+  
+  return className
+}
 
 // Helper functions
 const getInitials = (firstName?: string | null, lastName?: string | null, fullName?: string): string => {
@@ -79,16 +96,32 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
     
     setLoading(true)
     try {
-      // ✅ ONLY fetch public info - no email, no vin_id, no first_name/last_name
+      // ✅ FIXED: Extract the year from the student's class
+      const userClass = profile.class
+      const userYear = extractYear(userClass)
+      
+      console.log('🔍 ClassmatesTab - Loading classmates for:', {
+        userClass,
+        userYear,
+        searchPattern: `%${userYear}%`
+      })
+
+      // ✅ FIXED: Fetch students in the same YEAR, not exact class
+      // This will find "SS1 Science" students when user is in "SS1 Arts"
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, display_name, class, photo_url, department')
-        .eq('class', profile.class)
         .eq('role', 'student')
         .neq('id', profile.id)
+        .ilike('class', `%${userYear}%`)  // Match any class containing "SS1"
         .order('full_name', { ascending: true })
 
       if (error) throw error
+      
+      console.log('✅ ClassmatesTab - Found classmates:', {
+        count: data?.length || 0,
+        classmates: data?.map(c => ({ name: c.full_name, class: c.class, department: c.department }))
+      })
       
       const formattedClassmates = (data || []).map((c: any) => ({
         id: c.id,
@@ -112,7 +145,7 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
     return classmate.full_name || 'Student'
   }
 
-  // ✅ Only search by name - no email or VIN search
+  // Search by name only
   const filteredClassmates = classmates.filter((classmate) => {
     const displayName = getBestDisplayName(classmate)
     return displayName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -124,6 +157,9 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
   const loadMore = () => {
     setDisplayCount(prev => prev + 8)
   }
+
+  // Get the year group for display
+  const displayYear = extractYear(profile?.class)
 
   if (loading) {
     return (
@@ -181,7 +217,7 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
           <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
           <p className="text-muted-foreground">No classmates found</p>
           <p className="text-xs text-muted-foreground mt-1">
-            You're the only student in {profile.class}
+            You're the only student in {displayYear}
           </p>
           {handleTabChange && (
             <Button variant="link" size="sm" onClick={() => handleTabChange('overview')} className="mt-3">
@@ -206,7 +242,7 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900">My Classmates</h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Students in <span className="font-semibold text-emerald-600">{profile.class}</span>
+            {classmates.length} student{classmates.length !== 1 ? 's' : ''} in <span className="font-semibold text-emerald-600">{displayYear}</span> • All Departments
           </p>
         </div>
         {handleTabChange && (
@@ -227,6 +263,10 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
         <Badge className="bg-emerald-100 text-emerald-700 text-[10px] sm:text-xs">
           <Users className="h-3 w-3 mr-1" />
           {classmates.length} classmates
+        </Badge>
+        <Badge variant="outline" className="text-[10px] sm:text-xs">
+          <GraduationCap className="h-3 w-3 mr-1" />
+          {displayYear}
         </Badge>
       </div>
 
@@ -358,7 +398,7 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
 
       <div className="text-center pt-2">
         <p className="text-[10px] sm:text-xs text-muted-foreground">
-          Showing classmates from {profile.class}
+          Showing all {displayYear} students across all departments
         </p>
       </div>
     </motion.div>

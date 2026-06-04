@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/EditExamPage.tsx
+// src/components/staff/exams/edit/EditExamPage.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -8,10 +8,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
 import { Eye, Calculator } from 'lucide-react'
-import { Button } from '@/components/ui/button' // ✅ ADD MISSING IMPORT
-import { Card, CardContent } from '@/components/ui/card' // ✅ ADD MISSING IMPORT
-import { Label } from '@/components/ui/label' // ✅ ADD MISSING IMPORT
-import { Input } from '@/components/ui/input' // ✅ ADD MISSING IMPORT
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { ExamHeader } from './ExamHeader'
 import { ExamDetailsTab } from './ExamDetailsTab'
 import { ObjectiveQuestionsTab } from './ObjectiveQuestionsTab'
@@ -31,7 +31,12 @@ const TERM_NAMES: Record<string, string> = {
   third: 'Third Term'
 }
 
-const CLASSES = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+const CLASSES = [
+  'JSS 1', 'JSS 2', 'JSS 3',
+  'SS1 Science', 'SS1 Arts', 'SS1 Commercial',
+  'SS2 Science', 'SS2 Arts', 'SS2 Commercial',
+  'SS3 Science', 'SS3 Arts', 'SS3 Commercial'
+]
 const AVAILABLE_SESSIONS = ['2025/2026', '2026/2027']
 
 const JSS_SUBJECTS = [
@@ -39,13 +44,13 @@ const JSS_SUBJECTS = [
   'Social Studies', 'Civic Education', 'Christian Religious Studies',
   'Islamic Religious Studies', 'Business Studies', 'Home Economics',
   'Agricultural Science', 'Physical and Health Education',
-  'Information Technology', 'Security Education', 'Yoruba','Cultural and Creative Arts', 'French'
+  'Information Technology', 'Security Education', 'Yoruba', 'Cultural and Creative Arts', 'French'
 ]
 
 const SS_SUBJECTS = [
   'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
   'Economics', 'Government', 'Literature in English', 'Geography',
-  'Commerce', 'Data Processing', 'Further Mathematics', 'Civic Education', 'CRS','Financial Accounting', 'Agricultural Science'
+  'Commerce', 'Data Processing', 'Further Mathematics', 'Civic Education', 'CRS', 'Financial Accounting', 'Agricultural Science'
 ]
 
 interface EditExamPageProps {
@@ -80,7 +85,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     negative_marking: false,
     negative_marking_value: 0.5,
     term: CURRENT_TERM,
-    session_year: CURRENT_SESSION
+    session_year: CURRENT_SESSION,
+    target_audience: 'all'
   })
   
   const [showQuestionDialog, setShowQuestionDialog] = useState(false)
@@ -112,7 +118,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       .from('questions')
       .update({ points: objectivePointsPerQuestion })
       .eq('exam_id', examId)
-      .eq('question_type', 'objective')
+      .eq('type', 'objective')
 
     if (error) {
       console.error('Error updating question points:', error)
@@ -131,7 +137,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       .from('questions')
       .update({ points: theoryPointsPerQuestion })
       .eq('exam_id', examId)
-      .eq('question_type', 'theory')
+      .eq('type', 'theory')
 
     if (error) {
       console.error('Error updating theory points:', error)
@@ -177,7 +183,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         negative_marking: examWithDefaults.negative_marking,
         negative_marking_value: examWithDefaults.negative_marking_value,
         term: examData.term || CURRENT_TERM,
-        session_year: examData.session_year || CURRENT_SESSION
+        session_year: examData.session_year || CURRENT_SESSION,
+        target_audience: examData.target_audience || 'all'
       })
 
       // Load objective questions
@@ -185,7 +192,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         .from('questions')
         .select('*')
         .eq('exam_id', examId)
-        .eq('question_type', 'objective')
+        .eq('type', 'objective')
         .order('order_number', { ascending: true })
 
       if (questionsData && questionsData.length > 0) {
@@ -207,7 +214,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           .from('questions')
           .select('*')
           .eq('exam_id', examId)
-          .eq('question_type', 'theory')
+          .eq('type', 'theory')
           .order('order_number', { ascending: true })
 
         if (theoryData && theoryData.length > 0) {
@@ -277,6 +284,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           has_theory: hasTheory,
           term: examDetails.term,
           session_year: examDetails.session_year,
+          target_audience: examDetails.target_audience,
           total_questions: totalQuestions,
           total_marks: totalExamPoints,
           updated_at: new Date().toISOString()
@@ -301,7 +309,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       const newQuestion = {
         exam_id: examId,
         question_text: data.question_text,
-        question_type: 'objective',
+        type: 'objective' as const,
         options: data.options,
         correct_answer: data.correct_answer,
         points: objectivePointsPerQuestion,
@@ -384,7 +392,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       const newQuestion = {
         exam_id: examId,
         question_text: data.question_text,
-        question_type: 'theory',
+        type: 'theory' as const,
         points: theoryPointsPerQuestion,
         order_number: theoryQuestions.length + 1
       }
@@ -520,7 +528,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           onSave={handleSaveExam}
         />
 
-        {/* Dynamic Points Summary */}
         <PointsSummary />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -551,7 +558,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
 
           <TabsContent value="questions">
-            {/* Points per question control for objective */}
             <div className="mb-4">
               <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg border border-green-200 dark:border-green-800">
                 <Label className="text-green-800 dark:text-green-300 font-medium text-sm">Objective Questions Points</Label>
@@ -597,7 +603,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
 
           <TabsContent value="theory">
-            {/* Points per question control for theory */}
             <div className="mb-4">
               <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
                 <Label className="text-purple-800 dark:text-purple-300 font-medium text-sm">Theory Questions Points</Label>
@@ -653,7 +658,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
         </Tabs>
 
-        {/* Dialogs */}
         <QuestionFormDialog
           open={showQuestionDialog}
           onOpenChange={setShowQuestionDialog}

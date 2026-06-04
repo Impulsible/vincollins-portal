@@ -1,4 +1,4 @@
-// src/app/student/exams/hooks/useExamsData.ts - UPDATED WITH CA ENRICHMENT
+// src/app/student/exams/hooks/useExamsData.ts - WITH DEPARTMENT FILTERING
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -6,10 +6,65 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import type { Exam, StudentProfile, ExamAttempt, TermOption, TermSession, StatsState } from "../types"
-import { getSubjectCountForClass, calculateGrade, getTermLabel, normalizeClassName } from "../utils"
+import { getSubjectCountForClass, calculateGrade, getTermLabel } from "../utils"
 import { TERM_NAMES } from "../constants"
 
 type LocalStatsState = StatsState & { pendingTheoryCount: number }
+
+// Extract year from class name (normalizes spaces)
+const extractYear = (className: string): string => {
+  if (!className) return ''
+  
+  // Remove spaces and convert to uppercase for consistent matching
+  const normalized = className.toUpperCase().replace(/\s/g, '')
+  
+  // Handle SS classes (SS1, SS1Arts, SS1Science, SS1Glory, etc.)
+  if (normalized.includes('SS1')) return 'SS1'
+  if (normalized.includes('SS2')) return 'SS2'
+  if (normalized.includes('SS3')) return 'SS3'
+  
+  // Handle JSS classes
+  if (normalized.includes('JSS1')) return 'JSS1'
+  if (normalized.includes('JSS2')) return 'JSS2'
+  if (normalized.includes('JSS3')) return 'JSS3'
+  
+  return className
+}
+
+// ✅ Helper to check if exam matches student's department
+const isExamVisibleToStudent = (exam: any, studentDepartment: string): boolean => {
+  // Check target_audience field (new exams)
+  const targetAudience = exam.target_audience || 'all'
+  
+  // If exam is for all students, always visible
+  if (targetAudience === 'all') return true
+  
+  // If exam is department-specific, check if student's department matches
+  if (targetAudience === studentDepartment) return true
+  
+  // For legacy exams without target_audience, check exam.class for department
+  const examClassLower = exam.class?.toLowerCase() || ''
+  const studentDeptLower = studentDepartment.toLowerCase()
+  
+  // Check if exam class contains the department
+  if (examClassLower.includes(studentDeptLower)) return true
+  
+  // Also check if exam class contains department variations
+  const deptVariations: Record<string, string[]> = {
+    'arts': ['arts', 'art', 'humanities'],
+    'science': ['science', 'sci'],
+    'commercial': ['commercial', 'comm', 'business']
+  }
+  
+  const variations = deptVariations[studentDeptLower]
+  if (variations) {
+    for (const variation of variations) {
+      if (examClassLower.includes(variation)) return true
+    }
+  }
+  
+  return false
+}
 
 export function useExamsData(router: ReturnType<typeof useRouter>) {
   const [loading, setLoading] = useState(true)
@@ -31,7 +86,10 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
     setLoading(true)
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) { router.push("/portal"); return }
+      if (!user) { 
+        router.push("/portal")
+        return 
+      }
 
       const { data: profileData } = await supabase
         .from("profiles")
@@ -62,61 +120,154 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       }
       setProfile(sp)
 
+      // Load available terms (only once)
       if (!hasLoaded.current) {
         hasLoaded.current = true
         try {
           const termsMap = new Map<string, TermOption>()
-          const { data: progressData } = await supabase.from("student_term_progress").select("term, session_year").eq("student_id", sp.id)
+          const { data: progressData } = await supabase
+            .from("student_term_progress")
+            .select("term, session_year")
+            .eq("student_id", sp.id)
+          
           if (progressData) {
             progressData.forEach((p: any) => {
               if (p.term && p.session_year) {
-                const key = p.term + "|" + p.session_year
-                if (!termsMap.has(key)) termsMap.set(key, { term: p.term, session_year: p.session_year, label: getTermLabel(p.term, p.session_year) })
+                const key = `${p.term}|${p.session_year}`
+                if (!termsMap.has(key)) {
+                  termsMap.set(key, { 
+                    term: p.term, 
+                    session_year: p.session_year, 
+                    label: getTermLabel(p.term, p.session_year) 
+                  })
+                }
               }
             })
           }
-          const { data: examTerms } = await supabase.from("exams").select("term, session_year").eq("status", "published")
+          
+          const { data: examTerms } = await supabase
+            .from("exams")
+            .select("term, session_year")
+            .eq("status", "published")
+          
           if (examTerms) {
             examTerms.forEach((t: any) => {
               if (t.term && t.session_year) {
-                const key = t.term + "|" + t.session_year
-                if (!termsMap.has(key)) termsMap.set(key, { term: t.term, session_year: t.session_year, label: getTermLabel(t.term, t.session_year) })
+                const key = `${t.term}|${t.session_year}`
+                if (!termsMap.has(key)) {
+                  termsMap.set(key, { 
+                    term: t.term, 
+                    session_year: t.session_year, 
+                    label: getTermLabel(t.term, t.session_year) 
+                  })
+                }
               }
             })
           }
+          
           const terms = Array.from(termsMap.values())
-          terms.sort((a, b) => b.session_year.localeCompare(a.session_year) || (a.term === "third" ? -1 : a.term === "second" ? 0 : 1) - (b.term === "third" ? -1 : b.term === "second" ? 0 : 1))
+          terms.sort((a, b) => {
+            if (a.session_year !== b.session_year) {
+              return b.session_year.localeCompare(a.session_year)
+            }
+            const termOrder = { third: 3, second: 2, first: 1 }
+            return (termOrder[b.term as keyof typeof termOrder] || 0) - (termOrder[a.term as keyof typeof termOrder] || 0)
+          })
+          
           setAvailableTerms(terms)
+          
           if (terms.length > 0 && !selectedTermSession) {
             const defaultTerm = terms[0]
-            setSelectedTermSession({ term: defaultTerm.term, session_year: defaultTerm.session_year })
+            setSelectedTermSession({ 
+              term: defaultTerm.term, 
+              session_year: defaultTerm.session_year 
+            })
           }
-        } catch (e) { console.error("Error loading terms:", e) }
+        } catch (e) { 
+          console.error("Error loading terms:", e) 
+        }
       }
 
       const targetTerm = term || selectedTermSession?.term || "third"
       const targetSession = session || selectedTermSession?.session_year || "2025/2026"
 
-      const { data: examsData } = await supabase.from("exams").select("*").eq("status", "published").eq("term", targetTerm).eq("session_year", targetSession).order("created_at", { ascending: false })
-      const nsc = normalizeClassName(sp.class)
-      const filtered = (examsData || []).filter((exam: any) => !exam.class || normalizeClassName(exam.class) === nsc)
-      setExams(filtered)
+      // Fetch exams
+      const { data: examsData } = await supabase
+        .from("exams")
+        .select("*")
+        .eq("status", "published")
+        .eq("term", targetTerm)
+        .eq("session_year", targetSession)
+        .order("created_at", { ascending: false })
 
-      const { data: attemptsData } = await supabase.from("exam_attempts").select("*").eq("student_id", sp.id).eq("term", targetTerm).eq("session_year", targetSession)
+      // Extract year from student's class
+      const studentYear = extractYear(sp.class)
+      const studentDepartment = sp.department || 'General'
+      
+      // ✅ Filter exams by YEAR and DEPARTMENT
+      const filteredExams = (examsData || []).filter((exam: any) => {
+        // If no class assigned to exam, include it
+        if (!exam.class) return false
+        
+        // Extract year from exam class
+        const examYear = extractYear(exam.class)
+        
+        // First: Must match by year
+        if (studentYear !== examYear) {
+          console.log(`❌ Exam "${exam.title}" (class: "${exam.class}", year: "${examYear}") - Year mismatch (student year: ${studentYear})`)
+          return false
+        }
+        
+        // Second: Check if exam is visible to this student's department
+        const isVisible = isExamVisibleToStudent(exam, studentDepartment)
+        
+        if (isVisible) {
+          console.log(`✅ Exam "${exam.title}" (class: "${exam.class}", target: "${exam.target_audience || 'legacy'}") - VISIBLE to ${studentDepartment}`)
+        } else {
+          console.log(`❌ Exam "${exam.title}" (class: "${exam.class}", target: "${exam.target_audience || 'legacy'}") - NOT visible to ${studentDepartment}`)
+        }
+        
+        return isVisible
+      })
+      
+      console.log(`📚 Found ${filteredExams.length} exams for ${sp.class} (${studentDepartment})`)
+      
+      setExams(filteredExams)
+
+      // Fetch exam attempts for this student
+      const { data: attemptsData } = await supabase
+        .from("exam_attempts")
+        .select("*")
+        .eq("student_id", sp.id)
+        .eq("term", targetTerm)
+        .eq("session_year", targetSession)
       
       const am: Record<string, ExamAttempt> = {}
       attemptsData?.forEach((a: any) => {
         am[a.exam_id] = { 
-          id: a.id, exam_id: a.exam_id, status: a.status, percentage: a.percentage, 
-          total_score: a.total_score, total_marks: a.total_marks,
-          objective_score: a.objective_score, theory_feedback: a.theory_feedback,
+          id: a.id, 
+          exam_id: a.exam_id, 
+          status: a.status, 
+          percentage: a.percentage, 
+          total_score: a.total_score, 
+          total_marks: a.total_marks,
+          objective_score: a.objective_score, 
+          theory_feedback: a.theory_feedback,
         }
       })
 
       // Load CA scores and enrich attempts
-      const { data: caScoresData } = await supabase.from("ca_scores").select("*").eq("student_id", sp.id).eq("term", targetTerm).eq("academic_year", targetSession)
+      const { data: caScoresData } = await supabase
+        .from("ca_scores")
+        .select("*")
+        .eq("student_id", sp.id)
+        .eq("term", targetTerm)
+        .eq("academic_year", targetSession)
+      
       const caMap: Record<string, any> = {}
-      caScoresData?.forEach((ca: any) => { if (ca.exam_id) caMap[ca.exam_id] = ca })
+      caScoresData?.forEach((ca: any) => { 
+        if (ca.exam_id) caMap[ca.exam_id] = ca 
+      })
 
       // Enrich attempts with CA data
       const enrichedAm: Record<string, ExamAttempt> = {}
@@ -131,7 +282,13 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       setExamAttempts(enrichedAm)
 
       // Get term progress
-      const { data: termProgressData } = await supabase.from("student_term_progress").select("total_subjects, completed_exams, average_score, grade").eq("student_id", sp.id).eq("term", targetTerm).eq("session_year", targetSession).maybeSingle()
+      const { data: termProgressData } = await supabase
+        .from("student_term_progress")
+        .select("total_subjects, completed_exams, average_score, grade")
+        .eq("student_id", sp.id)
+        .eq("term", targetTerm)
+        .eq("session_year", targetSession)
+        .maybeSingle()
 
       const completedAttempts = Object.values(enrichedAm).filter(a => ['completed', 'graded'].includes(a.status))
       const pendingTheoryAttempts = Object.values(enrichedAm).filter(a => a.status === 'pending_theory')
@@ -157,10 +314,21 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       const actualAverageScore = termProgressData?.average_score || avgScore
       const actualGrade = termProgressData?.grade || (completedAttempts.length > 0 ? gi.grade : "N/A")
 
+      // Count available exams (not completed)
+      const availableCount = filteredExams.filter((e: Exam) => {
+        const a = enrichedAm[e.id]
+        if (!a) return true
+        return !['completed', 'graded'].includes(a.status)
+      }).length
+
+      const upcomingCount = filteredExams.filter((e: Exam) => 
+        e.starts_at && new Date(e.starts_at) > new Date()
+      ).length
+
       setStats({
-        available: filtered.filter((e: Exam) => { const a = enrichedAm[e.id]; if (!a) return true; return !['completed', 'graded'].includes(a.status) }).length,
+        available: availableCount,
         completed: actualCompleted,
-        upcoming: filtered.filter((e: Exam) => e.starts_at && new Date(e.starts_at) > new Date()).length,
+        upcoming: upcomingCount,
         averageScore: actualAverageScore,
         currentGrade: actualGrade,
         gradeColor: completedAttempts.length > 0 ? gi.color : "text-gray-400",
@@ -169,11 +337,17 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         sessionYear: targetSession,
         pendingTheoryCount: pendingTheoryAttempts.length,
       })
-    } catch (e) { console.error("Error loading exams data:", e); toast.error("Failed to load exams") }
-    finally { setLoading(false) }
+    } catch (e) { 
+      console.error("Error loading exams data:", e)
+      toast.error("Failed to load exams")
+    } finally { 
+      setLoading(false) 
+    }
   }, [router, selectedTermSession])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { 
+    loadData() 
+  }, [loadData])
 
   const handleTermSessionChange = async (value: string) => {
     const [term, session] = value.split("|")
@@ -181,5 +355,15 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
     await loadData(term, session)
   }
 
-  return { loading, exams, profile, examAttempts, availableTerms, selectedTermSession, stats, loadData, handleTermSessionChange }
+  return { 
+    loading, 
+    exams, 
+    profile, 
+    examAttempts, 
+    availableTerms, 
+    selectedTermSession, 
+    stats, 
+    loadData, 
+    handleTermSessionChange 
+  }
 }
