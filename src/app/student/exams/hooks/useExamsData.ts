@@ -1,4 +1,4 @@
-// src/app/student/exams/hooks/useExamsData.ts - WITH DEPARTMENT FILTERING
+// src/app/student/exams/hooks/useExamsData.ts - COMPLETE FIXED VERSION
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -11,59 +11,29 @@ import { TERM_NAMES } from "../constants"
 
 type LocalStatsState = StatsState & { pendingTheoryCount: number }
 
-// Extract year from class name (normalizes spaces)
+// ✅ FIXED: Extract year from class name - PREVENTS JSS1 from matching SS1
 const extractYear = (className: string): string => {
   if (!className) return ''
   
-  // Remove spaces and convert to uppercase for consistent matching
-  const normalized = className.toUpperCase().replace(/\s/g, '')
+  // Remove spaces and convert to uppercase
+  const normalized = className.trim().toUpperCase().replace(/\s/g, '')
   
-  // Handle SS classes (SS1, SS1Arts, SS1Science, SS1Glory, etc.)
-  if (normalized.includes('SS1')) return 'SS1'
-  if (normalized.includes('SS2')) return 'SS2'
-  if (normalized.includes('SS3')) return 'SS3'
+  // JSS Classes - check these FIRST (before SS)
+  if (normalized === 'JSS1') return 'JSS1'
+  if (normalized === 'JSS2') return 'JSS2'
+  if (normalized === 'JSS3') return 'JSS3'
   
-  // Handle JSS classes
-  if (normalized.includes('JSS1')) return 'JSS1'
-  if (normalized.includes('JSS2')) return 'JSS2'
-  if (normalized.includes('JSS3')) return 'JSS3'
+  // SS Classes - exact match
+  if (normalized === 'SS1') return 'SS1'
+  if (normalized === 'SS2') return 'SS2'
+  if (normalized === 'SS3') return 'SS3'
+  
+  // Handle subject-specific SS classes (SS1SCIENCE -> SS1)
+  if (normalized.startsWith('SS1') && !normalized.startsWith('JSS')) return 'SS1'
+  if (normalized.startsWith('SS2') && !normalized.startsWith('JSS')) return 'SS2'
+  if (normalized.startsWith('SS3') && !normalized.startsWith('JSS')) return 'SS3'
   
   return className
-}
-
-// ✅ Helper to check if exam matches student's department
-const isExamVisibleToStudent = (exam: any, studentDepartment: string): boolean => {
-  // Check target_audience field (new exams)
-  const targetAudience = exam.target_audience || 'all'
-  
-  // If exam is for all students, always visible
-  if (targetAudience === 'all') return true
-  
-  // If exam is department-specific, check if student's department matches
-  if (targetAudience === studentDepartment) return true
-  
-  // For legacy exams without target_audience, check exam.class for department
-  const examClassLower = exam.class?.toLowerCase() || ''
-  const studentDeptLower = studentDepartment.toLowerCase()
-  
-  // Check if exam class contains the department
-  if (examClassLower.includes(studentDeptLower)) return true
-  
-  // Also check if exam class contains department variations
-  const deptVariations: Record<string, string[]> = {
-    'arts': ['arts', 'art', 'humanities'],
-    'science': ['science', 'sci'],
-    'commercial': ['commercial', 'comm', 'business']
-  }
-  
-  const variations = deptVariations[studentDeptLower]
-  if (variations) {
-    for (const variation of variations) {
-      if (examClassLower.includes(variation)) return true
-    }
-  }
-  
-  return false
 }
 
 export function useExamsData(router: ReturnType<typeof useRouter>) {
@@ -202,35 +172,38 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
 
       // Extract year from student's class
       const studentYear = extractYear(sp.class)
-      const studentDepartment = sp.department || 'General'
+      const isJSS = studentYear?.startsWith('JSS') || false
+      const isSS = studentYear?.startsWith('SS') || false
       
-      // ✅ Filter exams by YEAR and DEPARTMENT
+      // ✅ Filter exams by YEAR using exact matching (prevents JSS1 matching SS1)
       const filteredExams = (examsData || []).filter((exam: any) => {
-        // If no class assigned to exam, include it
+        // If no class assigned to exam, skip
         if (!exam.class) return false
         
         // Extract year from exam class
         const examYear = extractYear(exam.class)
         
-        // First: Must match by year
-        if (studentYear !== examYear) {
-          console.log(`❌ Exam "${exam.title}" (class: "${exam.class}", year: "${examYear}") - Year mismatch (student year: ${studentYear})`)
-          return false
+        // For JSS students, only match exact JSS level
+        if (isJSS) {
+          // JSS1 only matches exams with JSS1, not SS1
+          const examIsJSS = examYear?.startsWith('JSS') || false
+          if (!examIsJSS) return false
+          return studentYear === examYear
         }
         
-        // Second: Check if exam is visible to this student's department
-        const isVisible = isExamVisibleToStudent(exam, studentDepartment)
-        
-        if (isVisible) {
-          console.log(`✅ Exam "${exam.title}" (class: "${exam.class}", target: "${exam.target_audience || 'legacy'}") - VISIBLE to ${studentDepartment}`)
-        } else {
-          console.log(`❌ Exam "${exam.title}" (class: "${exam.class}", target: "${exam.target_audience || 'legacy'}") - NOT visible to ${studentDepartment}`)
+        // For SS students, match by year (SS1 matches SS1 across departments)
+        if (isSS) {
+          const examIsSS = examYear?.startsWith('SS') || false
+          if (!examIsSS) return false
+          return studentYear === examYear
         }
         
-        return isVisible
+        // Fallback: exact match
+        return studentYear === examYear
       })
       
-      console.log(`📚 Found ${filteredExams.length} exams for ${sp.class} (${studentDepartment})`)
+      console.log(`📚 Student: ${sp.class} (year: ${studentYear}, type: ${isJSS ? 'JSS' : isSS ? 'SS' : 'Other'})`)
+      console.log(`📚 Found ${filteredExams.length} exams after filtering`)
       
       setExams(filteredExams)
 
