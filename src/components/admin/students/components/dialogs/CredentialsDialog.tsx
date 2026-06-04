@@ -75,9 +75,8 @@ export function CredentialsDialog({
           <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200">
             <p className="text-xs text-amber-800 flex items-center gap-2">
               <Shield className="h-3 w-3" />
-              <strong>Note:</strong> Student will use admission number for CBT
-              exams and report cards. They will be prompted to change password on
-              first login.
+              <strong>Note:</strong> Student will use these credentials for CBT
+              exams and report cards.
             </p>
           </div>
         </div>

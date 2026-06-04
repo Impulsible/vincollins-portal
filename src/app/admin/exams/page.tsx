@@ -1,4 +1,4 @@
-// app/admin/exams/page.tsx - PROFESSIONAL EXAM APPROVALS FOR ADMIN LAYOUT
+// app/admin/exams/page.tsx - UPDATED WITH DEPARTMENT SUPPORT
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -27,7 +27,7 @@ import {
   Loader2, RefreshCw, Eye, CheckCircle, XCircle, FileText,
   Users, ChevronDown, ChevronRight, Brain, AlertCircle,
   Search, Filter, Clock, Award, BookOpen, MonitorPlay,
-  ArrowUpDown, LayoutGrid, List, CheckCircle2
+  ArrowUpDown, LayoutGrid, List, CheckCircle2, GraduationCap
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────
@@ -54,10 +54,43 @@ interface Exam {
   randomize_options?: boolean
   questions?: any[]
   theory_questions?: any[]
+  target_audience?: string
+}
+
+// ─── Helper Functions ─────────────────────────────────
+// ✅ Extract year from class name (e.g., "SS1 Arts" → "SS1")
+const extractYear = (className: string): string => {
+  if (!className) return ''
+  const normalized = className.trim().toUpperCase().replace(/\s/g, '')
+  if (normalized.includes('JSS1')) return 'JSS 1'
+  if (normalized.includes('JSS2')) return 'JSS 2'
+  if (normalized.includes('JSS3')) return 'JSS 3'
+  if (normalized.includes('SS1')) return 'SS 1'
+  if (normalized.includes('SS2')) return 'SS 2'
+  if (normalized.includes('SS3')) return 'SS 3'
+  return className
+}
+
+// ✅ Get department from class or target_audience
+const getExamDepartment = (exam: Exam): string => {
+  if (exam.target_audience && exam.target_audience !== 'all') {
+    return exam.target_audience
+  }
+  if (exam.class?.includes('Science')) return 'Science'
+  if (exam.class?.includes('Arts')) return 'Arts'
+  if (exam.class?.includes('Commercial')) return 'Commercial'
+  return 'All Students'
 }
 
 // ─── Constants ────────────────────────────────────────
 const CLASS_ORDER = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+const DEPARTMENT_OPTIONS = [
+  { value: 'all', label: 'All Departments' },
+  { value: 'All Students', label: '📚 All Students' },
+  { value: 'Science', label: '🔬 Science' },
+  { value: 'Arts', label: '🎨 Arts' },
+  { value: 'Commercial', label: '💼 Commercial' },
+]
 
 const STATUS_OPTIONS = [
   { value: 'all', label: 'All Status' },
@@ -102,6 +135,27 @@ const getClassColor = (className: string): string => {
   return colors[className] || 'bg-slate-100 text-slate-600'
 }
 
+const getDepartmentBadge = (exam: Exam) => {
+  const dept = getExamDepartment(exam)
+  const styles: Record<string, string> = {
+    'All Students': 'bg-emerald-100 text-emerald-700',
+    'Science': 'bg-blue-100 text-blue-700',
+    'Arts': 'bg-purple-100 text-purple-700',
+    'Commercial': 'bg-amber-100 text-amber-700',
+  }
+  const icons: Record<string, string> = {
+    'All Students': '📚',
+    'Science': '🔬',
+    'Arts': '🎨',
+    'Commercial': '💼',
+  }
+  return (
+    <Badge className={cn("text-[9px] px-1.5 py-0", styles[dept] || 'bg-slate-100')}>
+      {icons[dept] || '📖'} {dept}
+    </Badge>
+  )
+}
+
 // ─── Main Component ───────────────────────────────────
 export default function AdminExamsPage() {
   const [loading, setLoading] = useState(true)
@@ -113,6 +167,7 @@ export default function AdminExamsPage() {
   const [activeTab, setActiveTab] = useState('pending')
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedClass, setSelectedClass] = useState<string>('all')
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'grouped' | 'list'>('grouped')
   const [expandedClass, setExpandedClass] = useState<string | null>(null)
   
@@ -186,8 +241,17 @@ export default function AdminExamsPage() {
     if (activeTab === 'pending' && !['pending', 'draft', 'submitted'].includes(exam.status)) return false
     if (activeTab === 'published' && exam.status !== 'published') return false
     
-    // Class filter
-    if (selectedClass !== 'all' && exam.class !== selectedClass) return false
+    // Class filter - ✅ FIXED: Match by year pattern
+    if (selectedClass !== 'all') {
+      const examYear = extractYear(exam.class)
+      if (examYear !== selectedClass) return false
+    }
+    
+    // Department filter - ✅ NEW
+    if (selectedDepartment !== 'all') {
+      const examDept = getExamDepartment(exam)
+      if (examDept !== selectedDepartment) return false
+    }
     
     // Search
     if (searchQuery) {
@@ -203,10 +267,11 @@ export default function AdminExamsPage() {
     return true
   })
 
-  // Group by class
+  // Group by class year (SS1 groups SS1 Arts, SS1 Science, etc.)
   const groupedExams = filteredExams.reduce((acc, exam) => {
-    if (!acc[exam.class]) acc[exam.class] = []
-    acc[exam.class].push(exam)
+    const yearGroup = extractYear(exam.class)
+    if (!acc[yearGroup]) acc[yearGroup] = []
+    acc[yearGroup].push(exam)
     return acc
   }, {} as Record<string, Exam[]>)
 
@@ -357,13 +422,21 @@ export default function AdminExamsPage() {
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Class" /></SelectTrigger>
+            <SelectTrigger className="h-8 text-xs w-[110px]"><SelectValue placeholder="Class" /></SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Classes</SelectItem>
-              {CLASS_ORDER.filter(c => exams.some(e => e.class === c)).map(c => (
+              {CLASS_ORDER.map(c => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+            <SelectTrigger className="h-8 text-xs w-[140px]"><SelectValue placeholder="Department" /></SelectTrigger>
+            <SelectContent>
+              {DEPARTMENT_OPTIONS.map(d => (
+                <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -391,17 +464,17 @@ export default function AdminExamsPage() {
         </Card>
       ) : viewMode === 'grouped' ? (
         <div className="space-y-3">
-          {CLASS_ORDER.map(className => {
-            const classExams = groupedExams[className]
+          {CLASS_ORDER.map(yearGroup => {
+            const classExams = groupedExams[yearGroup]
             if (!classExams?.length) return null
-            const isOpen = expandedClass === className
+            const isOpen = expandedClass === yearGroup
             return (
-              <Card key={className} className="border-0 shadow-sm overflow-hidden">
-                <button onClick={() => setExpandedClass(isOpen ? null : className)}
+              <Card key={yearGroup} className="border-0 shadow-sm overflow-hidden">
+                <button onClick={() => setExpandedClass(isOpen ? null : yearGroup)}
                   className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors">
                   <div className="flex items-center gap-3">
                     {isOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronRight className="h-4 w-4 text-slate-400" />}
-                    <Badge className={cn("text-xs", getClassColor(className))}>{className}</Badge>
+                    <Badge className={cn("text-xs", getClassColor(yearGroup))}>{yearGroup}</Badge>
                     <span className="text-sm text-slate-500">{classExams.length} exam{classExams.length > 1 ? 's' : ''}</span>
                   </div>
                   <Badge variant="outline" className="text-xs">
@@ -417,6 +490,8 @@ export default function AdminExamsPage() {
                             <TableRow>
                               <TableHead className="text-xs">Title</TableHead>
                               <TableHead className="text-xs">Subject</TableHead>
+                              <TableHead className="text-xs">Class</TableHead>
+                              <TableHead className="text-xs">Audience</TableHead>
                               <TableHead className="text-xs">Teacher</TableHead>
                               <TableHead className="text-xs text-center">Q's</TableHead>
                               <TableHead className="text-xs text-center">Marks</TableHead>
@@ -431,6 +506,10 @@ export default function AdminExamsPage() {
                               <TableRow key={exam.id} className="hover:bg-slate-50/50">
                                 <TableCell className="font-medium text-xs">{exam.title}</TableCell>
                                 <TableCell className="text-xs">{exam.subject}</TableCell>
+                                <TableCell className="text-xs">
+                                  <Badge variant="outline" className="text-[9px]">{exam.class}</Badge>
+                                </TableCell>
+                                <TableCell>{getDepartmentBadge(exam)}</TableCell>
                                 <TableCell className="text-xs">{exam.teacher_name}</TableCell>
                                 <TableCell className="text-center text-xs">{exam.total_questions}</TableCell>
                                 <TableCell className="text-center text-xs">{exam.total_marks}</TableCell>
@@ -477,6 +556,7 @@ export default function AdminExamsPage() {
                   <TableHead className="text-xs">Title</TableHead>
                   <TableHead className="text-xs">Subject</TableHead>
                   <TableHead className="text-xs">Class</TableHead>
+                  <TableHead className="text-xs">Audience</TableHead>
                   <TableHead className="text-xs">Teacher</TableHead>
                   <TableHead className="text-xs text-center">Questions</TableHead>
                   <TableHead className="text-xs text-center">Marks</TableHead>
@@ -490,7 +570,8 @@ export default function AdminExamsPage() {
                   <TableRow key={exam.id} className="hover:bg-slate-50/50">
                     <TableCell className="font-medium text-xs">{exam.title}</TableCell>
                     <TableCell className="text-xs">{exam.subject}</TableCell>
-                    <TableCell><Badge variant="outline" className="text-[10px]">{exam.class}</Badge></TableCell>
+                    <TableCell><Badge variant="outline" className="text-[9px]">{exam.class}</Badge></TableCell>
+                    <TableCell>{getDepartmentBadge(exam)}</TableCell>
                     <TableCell className="text-xs">{exam.teacher_name}</TableCell>
                     <TableCell className="text-center text-xs">{exam.total_questions}</TableCell>
                     <TableCell className="text-center text-xs">{exam.total_marks}</TableCell>
@@ -528,6 +609,7 @@ export default function AdminExamsPage() {
                 <div><span className="text-slate-400">Title:</span><p className="font-medium">{selectedExam.title}</p></div>
                 <div><span className="text-slate-400">Subject:</span><p className="font-medium">{selectedExam.subject}</p></div>
                 <div><span className="text-slate-400">Class:</span><p className="font-medium">{selectedExam.class}</p></div>
+                <div><span className="text-slate-400">Audience:</span><p className="font-medium">{getExamDepartment(selectedExam)}</p></div>
                 <div><span className="text-slate-400">Teacher:</span><p className="font-medium">{selectedExam.teacher_name}</p></div>
                 <div><span className="text-slate-400">Questions:</span><p className="font-medium">{selectedExam.total_questions}</p></div>
                 <div><span className="text-slate-400">Duration:</span><p className="font-medium">{selectedExam.duration} min</p></div>

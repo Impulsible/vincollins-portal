@@ -1,8 +1,7 @@
-// components/admin/students/components/dialogs/AddStudentDialog.tsx - WITH BUTTON
-
+// components/admin/students/components/dialogs/AddStudentDialog.tsx - UPDATED WITH PROPER SS CLASSES
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -23,12 +22,46 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { UserPlus, Loader2, Eye, Hash, Fingerprint, Phone, GraduationCap, Users } from 'lucide-react'
+import { UserPlus, Loader2, Eye, Hash, Fingerprint, Phone, GraduationCap, Users, Building2 } from 'lucide-react'
 import { StudentFormData, Credentials } from '../../types'
 
-// Define constants locally
-const CLASSES = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+// ✅ UPDATED: Proper class options with departments
+const JSS_CLASSES = ['JSS 1', 'JSS 2', 'JSS 3']
+
+const SS_CLASS_OPTIONS = {
+  general: [
+    { value: 'SS1', label: 'SS1 (All Students)', description: 'General subjects - Math, English' },
+    { value: 'SS2', label: 'SS2 (All Students)', description: 'General subjects - Math, English' },
+    { value: 'SS3', label: 'SS3 (All Students)', description: 'General subjects - Math, English' },
+  ],
+  science: [
+    { value: 'SS1 Science', label: 'SS1 Science', description: 'Physics, Chemistry, Biology' },
+    { value: 'SS2 Science', label: 'SS2 Science', description: 'Physics, Chemistry, Biology' },
+    { value: 'SS3 Science', label: 'SS3 Science', description: 'Physics, Chemistry, Biology' },
+  ],
+  arts: [
+    { value: 'SS1 Arts', label: 'SS1 Arts', description: 'Literature, Government, CRS' },
+    { value: 'SS2 Arts', label: 'SS2 Arts', description: 'Literature, Government, CRS' },
+    { value: 'SS3 Arts', label: 'SS3 Arts', description: 'Literature, Government, CRS' },
+  ],
+  commercial: [
+    { value: 'SS1 Commercial', label: 'SS1 Commercial', description: 'Accounting, Commerce, Economics' },
+    { value: 'SS2 Commercial', label: 'SS2 Commercial', description: 'Accounting, Commerce, Economics' },
+    { value: 'SS3 Commercial', label: 'SS3 Commercial', description: 'Accounting, Commerce, Economics' },
+  ],
+}
+
+// Combine all class options for the dropdown
+const ALL_CLASS_OPTIONS = [
+  ...JSS_CLASSES.map(c => ({ value: c, label: c, group: 'Junior Secondary', description: 'Junior Secondary School' })),
+  ...SS_CLASS_OPTIONS.general,
+  ...SS_CLASS_OPTIONS.science,
+  ...SS_CLASS_OPTIONS.arts,
+  ...SS_CLASS_OPTIONS.commercial,
+]
+
 const DEPARTMENTS = ['Science', 'Arts', 'Commercial']
+
 const GENDERS = [
   { value: 'male', label: 'Male', emoji: '👨' },
   { value: 'female', label: 'Female', emoji: '👩' },
@@ -63,6 +96,19 @@ const generateEmailPreview = (firstName: string, lastName: string): string => {
   return `${firstName.toLowerCase()}.${lastName.toLowerCase()}@vincollins.edu.ng`
 }
 
+// Helper to extract department from class
+const extractDepartmentFromClass = (className: string): string => {
+  if (className.includes('Science')) return 'Science'
+  if (className.includes('Arts')) return 'Arts'
+  if (className.includes('Commercial')) return 'Commercial'
+  return ''
+}
+
+// Helper to check if class is JSS
+const isJSSClass = (className: string): boolean => {
+  return className?.startsWith('JSS') || false
+}
+
 interface AddStudentDialogProps {
   onCreateStudent: (data: StudentFormData) => Promise<Credentials | null>
   onCredentialsGenerated: (credentials: Credentials) => void
@@ -77,6 +123,14 @@ export function AddStudentDialog({
   const [open, setOpen] = useState(false)
   const admissionYears = generateAdmissionYears()
   const [formData, setFormData] = useState<StudentFormData>(INITIAL_FORM_DATA)
+
+  // Auto-set department when class is selected
+  useEffect(() => {
+    const autoDepartment = extractDepartmentFromClass(formData.class)
+    if (autoDepartment && autoDepartment !== formData.department) {
+      setFormData(prev => ({ ...prev, department: autoDepartment }))
+    }
+  }, [formData.class])
 
   const handleSubmit = async () => {
     if (!formData.first_name || !formData.last_name || !formData.class) {
@@ -104,6 +158,10 @@ export function AddStudentDialog({
   ) => {
     setFormData(prev => ({ ...prev, [key]: value }))
   }
+
+  const selectedClassOption = ALL_CLASS_OPTIONS.find(opt => opt.value === formData.class)
+  const isJSS = isJSSClass(formData.class)
+  const showDepartmentField = !isJSS && formData.class && !formData.class.includes('All Students')
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -172,18 +230,79 @@ export function AddStudentDialog({
               <h3 className="text-sm font-semibold text-slate-700">Academic Info</h3>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-xs text-slate-500">Class</Label>
+              <div className="col-span-2">
+                <Label className="text-xs text-slate-500">Class *</Label>
                 <Select value={formData.class} onValueChange={v => updateField('class', v)}>
                   <SelectTrigger className="h-9">
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {CLASSES.map(c => (
+                  <SelectContent className="max-h-[300px]">
+                    {/* Junior Secondary */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 sticky top-0">
+                      📖 Junior Secondary School
+                    </div>
+                    {JSS_CLASSES.map(c => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                    
+                    {/* All Students (General) */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
+                      📚 All Students (General Subjects)
+                    </div>
+                    {SS_CLASS_OPTIONS.general.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Science Department */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
+                      🔬 Science Department
+                    </div>
+                    {SS_CLASS_OPTIONS.science.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Arts Department */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 mt-2">
+                      🎨 Arts Department
+                    </div>
+                    {SS_CLASS_OPTIONS.arts.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Commercial Department */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-amber-600 bg-amber-50 mt-2">
+                      💼 Commercial Department
+                    </div>
+                    {SS_CLASS_OPTIONS.commercial.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {selectedClassOption?.description && (
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    {selectedClassOption.description}
+                  </p>
+                )}
               </div>
               <div>
                 <Label className="text-xs text-slate-500">Admission Year</Label>
@@ -201,22 +320,29 @@ export function AddStudentDialog({
                   </SelectContent>
                 </Select>
               </div>
-              <div className="col-span-2">
-                <Label className="text-xs text-slate-500">Department (SS Only)</Label>
-                <Select
-                  value={formData.department}
-                  onValueChange={v => updateField('department', v)}
-                >
-                  <SelectTrigger className="h-9">
-                    <SelectValue placeholder="Select department (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DEPARTMENTS.map(d => (
-                      <SelectItem key={d} value={d}>{d}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              
+              {/* Department field - only shown for department-specific SS classes */}
+              {showDepartmentField && (
+                <div>
+                  <Label className="text-xs text-slate-500">Department</Label>
+                  <Select
+                    value={formData.department}
+                    onValueChange={v => updateField('department', v)}
+                  >
+                    <SelectTrigger className="h-9 bg-slate-50">
+                      <SelectValue placeholder="Auto-detected" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DEPARTMENTS.map(d => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Automatically set based on class selection
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -227,7 +353,7 @@ export function AddStudentDialog({
               <h3 className="text-sm font-semibold text-slate-700">Identification</h3>
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Admission Number</Label>
+              <Label className="text-xs text-slate-500">Admission Number *</Label>
               <Input
                 value={formData.admission_number}
                 onChange={e => updateField('admission_number', e.target.value)}

@@ -1,4 +1,4 @@
-// components/staff/CreateExamDialog.tsx - COMPLETE WITH AUTO-CALCULATION
+// components/staff/CreateExamDialog.tsx - UPDATED WITH DEPARTMENT CLASSES
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
@@ -31,10 +31,8 @@ import { cn } from '@/lib/utils'
 // ✅ FIX: PDF parser using PDF.js instead of pdf-parse (permanent fix)
 const parsePDFWithPDFJS = async (arrayBuffer: ArrayBuffer): Promise<string> => {
   try {
-    // Dynamically import pdfjs-dist to avoid SSR issues
     const pdfjsLib = await import('pdfjs-dist')
     
-    // Set worker path (required for pdf.js v3+)
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`
     }
@@ -82,7 +80,6 @@ const parseDocument = async (file: File): Promise<string> => {
   if (fileExt === 'pdf') {
     try {
       const arrayBuffer = await file.arrayBuffer()
-      // ✅ Use PDF.js instead of pdf-parse
       return await parsePDFWithPDFJS(arrayBuffer)
     } catch (error: any) {
       console.error('PDF parse error:', error)
@@ -115,21 +112,49 @@ interface CreateExamDialogProps {
   teacherProfile: any
 }
 
-const classes = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+// ✅ UPDATED: Department-specific class options for Senior Secondary
+const CLASS_OPTIONS = {
+  jss: [
+    { value: 'JSS 1', label: 'JSS 1' },
+    { value: 'JSS 2', label: 'JSS 2' },
+    { value: 'JSS 3', label: 'JSS 3' }
+  ],
+  general: [
+    { value: 'SS1', label: 'SS1 (All Departments)', description: 'All SS1 students - Science, Arts, Commercial' },
+    { value: 'SS2', label: 'SS2 (All Departments)', description: 'All SS2 students - Science, Arts, Commercial' },
+    { value: 'SS3', label: 'SS3 (All Departments)', description: 'All SS3 students - Science, Arts, Commercial' }
+  ],
+  science: [
+    { value: 'SS1 Science', label: 'SS1 Science', description: 'Science department only' },
+    { value: 'SS2 Science', label: 'SS2 Science', description: 'Science department only' },
+    { value: 'SS3 Science', label: 'SS3 Science', description: 'Science department only' }
+  ],
+  arts: [
+    { value: 'SS1 Arts', label: 'SS1 Arts', description: 'Arts department only' },
+    { value: 'SS2 Arts', label: 'SS2 Arts', description: 'Arts department only' },
+    { value: 'SS3 Arts', label: 'SS3 Arts', description: 'Arts department only' }
+  ],
+  commercial: [
+    { value: 'SS1 Commercial', label: 'SS1 Commercial', description: 'Commercial department only' },
+    { value: 'SS2 Commercial', label: 'SS2 Commercial', description: 'Commercial department only' },
+    { value: 'SS3 Commercial', label: 'SS3 Commercial', description: 'Commercial department only' }
+  ]
+}
 
+// ✅ UPDATED: Changed Computer Studies to Information Technology
 const jssSubjects = [
   'Mathematics', 'English Studies', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Christian Religious Studies',
   'Islamic Religious Studies', 'Business Studies', 'Home Economics',
   'Agricultural Science', 'Physical and Health Education',
-  'Computer Studies', 'Cultural and Creative Arts', 'French',
+  'Information Technology', 'Cultural and Creative Arts', 'French',
   'Hausa', 'Igbo', 'Yoruba'
 ]
 
 const ssSubjects = [
   'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
   'Economics', 'Government', 'Literature in English', 'Geography',
-  'Commerce', 'Financial Accounting', 'Agricultural Science'
+  'Commerce', 'Financial Accounting', 'Agricultural Science', 'Information Technology', 'Data Processing'
 ]
 
 // CBT Preview Component
@@ -382,7 +407,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
     marks: 5
   })
 
-  // ✅ AUTO-CALCULATION - Calculate totals dynamically
+  // AUTO-CALCULATION
   const totalObjectiveMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0)
   const totalTheoryMarks = hasTheory ? theoryQuestions.reduce((sum, q) => sum + (q.marks || 0), 0) : 0
   const totalMarks = totalObjectiveMarks + totalTheoryMarks
@@ -620,7 +645,6 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
       const teacherName = profileData?.full_name || teacherProfile?.full_name || session.user.email?.split('@')[0] || 'Teacher'
       const department = profileData?.department || teacherProfile?.department || 'General'
 
-      // ✅ AUTO-CALCULATE totals from questions
       let objectiveCount = 0
       let objectiveMarks = 0
       questions.forEach(q => {
@@ -640,7 +664,6 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
       const totalQuestionsCount = objectiveCount + theoryCount
       const totalMarksSum = objectiveMarks + theoryMarks
 
-      // Build questions array for JSONB storage
       const questionsArray: any[] = []
       
       questions.forEach((q, idx) => {
@@ -781,14 +804,76 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
                   <Label className="text-sm font-medium">Class *</Label>
                   <Select value={examDetails.class} onValueChange={(v) => setExamDetails({ ...examDetails, class: v, subject: '' })}>
                     <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select class" /></SelectTrigger>
-                    <SelectContent>{classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    <SelectContent className="max-h-[400px]">
+                      {/* Junior Secondary */}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-600 bg-slate-50 sticky top-0">
+                        📖 Junior Secondary School
+                      </div>
+                      {CLASS_OPTIONS.jss.map(c => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
+                      
+                      {/* All Students (General) */}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 mt-2">
+                        📚 All Students (General Subjects)
+                      </div>
+                      {CLASS_OPTIONS.general.map(c => (
+                        <SelectItem key={c.value} value={c.value}>
+                          <div>
+                            <div>{c.label}</div>
+                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      
+                      {/* Science Department */}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
+                        🔬 Science Department
+                      </div>
+                      {CLASS_OPTIONS.science.map(c => (
+                        <SelectItem key={c.value} value={c.value}>
+                          <div>
+                            <div>{c.label}</div>
+                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      
+                      {/* Arts Department */}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 mt-2">
+                        🎨 Arts Department
+                      </div>
+                      {CLASS_OPTIONS.arts.map(c => (
+                        <SelectItem key={c.value} value={c.value}>
+                          <div>
+                            <div>{c.label}</div>
+                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                      
+                      {/* Commercial Department */}
+                      <div className="px-2 py-1.5 text-xs font-semibold text-amber-600 bg-amber-50 mt-2">
+                        💼 Commercial Department
+                      </div>
+                      {CLASS_OPTIONS.commercial.map(c => (
+                        <SelectItem key={c.value} value={c.value}>
+                          <div>
+                            <div>{c.label}</div>
+                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-sm font-medium">Subject *</Label>
                   <Select value={examDetails.subject} onValueChange={(v) => setExamDetails({ ...examDetails, subject: v })} disabled={!examDetails.class}>
                     <SelectTrigger className="mt-1.5"><SelectValue placeholder={examDetails.class ? "Select subject" : "Select class first"} /></SelectTrigger>
-                    <SelectContent>{availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                    <SelectContent>
+                      {availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div>

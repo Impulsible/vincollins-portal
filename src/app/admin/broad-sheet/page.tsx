@@ -1,5 +1,4 @@
-// app/admin/broad-sheet/page.tsx - COMPLETE FIXED VERSION
-
+// app/admin/broad-sheet/page.tsx - COMPLETE FIXED VERSION FOR JSS CLASSES
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -77,58 +76,84 @@ const sortSubjectsByOrder = (subjects: string[]): string[] => {
   })
 }
 
-const getSubjectsForStudent = (className: string, department?: string | null): string[] => {
-  if (!className) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
-  const upperClass = className.toUpperCase()
+// ✅ FIXED: Extract year from class name - preserves spaces for JSS
+const extractYear = (className: string): string => {
+  if (!className) return ''
+  const normalized = className.trim()
   
-  let subjects: string[] = []
+  // JSS Classes - preserve space format
+  if (normalized === 'JSS 1' || normalized === 'JSS1') return 'JSS 1'
+  if (normalized === 'JSS 2' || normalized === 'JSS2') return 'JSS 2'
+  if (normalized === 'JSS 3' || normalized === 'JSS3') return 'JSS 3'
   
-  if (upperClass.startsWith('JSS')) {
-    subjects = [...JSS_SUBJECTS]
-  } else if (upperClass.startsWith('SS')) {
-    const dept = department?.toUpperCase() || ''
-    if (dept.includes('SCIENCE') || dept === 'SCIENCE') {
-      subjects = [...SS_SUBJECTS_SCIENCE]
-    } else if (dept.includes('ART') || dept === 'ARTS') {
-      subjects = [...SS_SUBJECTS_ARTS]
-    } else if (dept.includes('COMMERCIAL') || dept === 'COMMERCIAL' || dept === 'COMM') {
-      subjects = [...SS_SUBJECTS_COMMERCIAL]
-    } else {
-      subjects = [...SS_SUBJECTS_SCIENCE]
-    }
-  } else {
-    subjects = [...SS_SUBJECTS_SCIENCE]
-  }
+  // SS Classes - extract level
+  if (normalized.includes('SS1')) return 'SS1'
+  if (normalized.includes('SS2')) return 'SS2'
+  if (normalized.includes('SS3')) return 'SS3'
   
-  return sortSubjectsByOrder(subjects)
+  return className
 }
 
+// ✅ FIXED: Get subjects for student based on their actual class and department
+const getSubjectsForStudent = (studentClass: string, department?: string | null): string[] => {
+  if (!studentClass) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
+  
+  const year = extractYear(studentClass)
+  
+  // JSS Classes
+  if (year.startsWith('JSS')) {
+    return sortSubjectsByOrder(JSS_SUBJECTS)
+  }
+  
+  // SS Classes - determine by department
+  const dept = department?.toLowerCase() || ''
+  
+  if (dept.includes('science')) {
+    return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
+  } else if (dept.includes('art')) {
+    return sortSubjectsByOrder(SS_SUBJECTS_ARTS)
+  } else if (dept.includes('commercial') || dept.includes('comm')) {
+    return sortSubjectsByOrder(SS_SUBJECTS_COMMERCIAL)
+  }
+  
+  // Also check class name for department
+  const classLower = studentClass.toLowerCase()
+  if (classLower.includes('science')) {
+    return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
+  } else if (classLower.includes('arts')) {
+    return sortSubjectsByOrder(SS_SUBJECTS_ARTS)
+  } else if (classLower.includes('commercial')) {
+    return sortSubjectsByOrder(SS_SUBJECTS_COMMERCIAL)
+  }
+  
+  // Default to Science
+  return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
+}
+
+// ✅ FIXED: Get all subjects for a class (for header)
 const getAllSubjectsForClass = (className: string): string[] => {
   if (!className) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
-  const upperClass = className.toUpperCase()
   
-  let allSubjects: string[] = []
+  const year = extractYear(className)
   
-  if (upperClass.startsWith('JSS')) {
-    allSubjects = [...JSS_SUBJECTS]
-  } else if (upperClass.startsWith('SS')) {
+  if (year.startsWith('JSS')) {
+    return sortSubjectsByOrder(JSS_SUBJECTS)
+  } else if (year.startsWith('SS')) {
     const uniqueSubjects = new Set([
       ...SS_SUBJECTS_SCIENCE,
       ...SS_SUBJECTS_ARTS,
       ...SS_SUBJECTS_COMMERCIAL
     ])
-    allSubjects = Array.from(uniqueSubjects)
-  } else {
-    allSubjects = [...SS_SUBJECTS_SCIENCE]
+    return sortSubjectsByOrder(Array.from(uniqueSubjects))
   }
   
-  return sortSubjectsByOrder(allSubjects)
+  return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
 }
 
 const meetsMinimumSubjects = (className: string, completedSubjects: number): boolean => {
   if (!className) return completedSubjects >= SS_MIN_SUBJECTS
-  const upper = className.toUpperCase()
-  if (upper.startsWith('JSS')) return completedSubjects >= JSS_MIN_SUBJECTS
+  const year = extractYear(className)
+  if (year.startsWith('JSS')) return completedSubjects >= JSS_MIN_SUBJECTS
   return completedSubjects >= SS_MIN_SUBJECTS
 }
 
@@ -270,13 +295,22 @@ const TERMS = [
   { value: 'third', label: 'Third Term' },
 ]
 
-const YEARS = ['2024/2025', '2025/2026', '2026/2027']
+const YEARS = ['2025/2026', '2026/2027', '2027/2028']
 
 const DEPARTMENTS = [
   { value: 'all', label: 'All Departments', icon: '📊' },
   { value: 'Science', label: 'Science', icon: '🔬' },
   { value: 'Arts', label: 'Arts', icon: '🎭' },
   { value: 'Commercial', label: 'Commercial', icon: '💼' },
+]
+
+// All possible classes - JSS with spaces, SS with departments
+const ALL_CLASSES = [
+  'JSS 1', 'JSS 2', 'JSS 3',
+  'SS1 Science', 'SS1 Arts', 'SS1 Commercial',
+  'SS2 Science', 'SS2 Arts', 'SS2 Commercial',
+  'SS3 Science', 'SS3 Arts', 'SS3 Commercial',
+  'SS1', 'SS2', 'SS3'
 ]
 
 const getTermLabel = (term: string): string => {
@@ -295,7 +329,7 @@ export default function BroadSheetPage() {
   const [generating, setGenerating] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [expectedSubjects, setExpectedSubjects] = useState<string[]>(sortSubjectsByOrder(SS_SUBJECTS_SCIENCE))
-  const [classes, setClasses] = useState<string[]>([])
+  const [classes, setClasses] = useState<string[]>(ALL_CLASSES)
   const [selectedClass, setSelectedClass] = useState<string>('')
   const [selectedTerm, setSelectedTerm] = useState('third')
   const [selectedYear, setSelectedYear] = useState('2025/2026')
@@ -329,17 +363,10 @@ export default function BroadSheetPage() {
           .from('profiles').select('*').eq('id', session.user.id).single()
         if (profileData) setProfile(profileData)
 
-        const { data: studentsData } = await supabase
-          .from('profiles').select('class').eq('role', 'student').not('class', 'is', null).limit(1000)
-
-        if (studentsData) {
-          const uniqueClasses = [...new Set(studentsData.map(s => s.class).filter(Boolean))] as string[]
-          const sorted = uniqueClasses.sort()
-          setClasses(sorted)
-          if (sorted.length > 0) {
-            setSelectedClass(sorted[0])
-            setExpectedSubjects(getAllSubjectsForClass(sorted[0]))
-          }
+        // Set default selected class to first available
+        if (ALL_CLASSES.length > 0 && !selectedClass) {
+          setSelectedClass(ALL_CLASSES[0])
+          setExpectedSubjects(getAllSubjectsForClass(ALL_CLASSES[0]))
         }
         setLoading(false)
       } catch {
@@ -400,7 +427,7 @@ export default function BroadSheetPage() {
           event: '*',
           schema: 'public',
           table: 'ca_scores',
-          filter: `class=eq.${selectedClass}`
+          filter: `term=eq.${selectedTerm},academic_year=eq.${selectedYear}`
         },
         async (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
@@ -426,27 +453,48 @@ export default function BroadSheetPage() {
     }
   }, [newScoreAlert])
 
-  // Load broadsheet data
+  // Load broadsheet data - FIXED FOR JSS
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
     
     setLoading(true)
     setLoadError(false)
     try {
-      const { data: classStudents, error: studentError } = await supabase
+      const isJSS = selectedClass?.toUpperCase().includes('JSS')
+      const isSS = selectedClass?.toUpperCase().includes('SS')
+      
+      // Build query based on class type
+      let query = supabase
         .from('profiles')
         .select('id, full_name, display_name, admission_number, vin_id, class, department, gender')
         .eq('role', 'student')
-        .eq('class', selectedClass)
         .order('display_name')
         .limit(500)
+      
+      if (isJSS) {
+        // JSS: Exact match (e.g., "JSS 1" matches exactly "JSS 1")
+        query = query.eq('class', selectedClass)
+        console.log('Fetching JSS students with exact class:', selectedClass)
+      } else if (isSS) {
+        // SS: Extract year and match by pattern
+        const yearPattern = extractYear(selectedClass)
+        query = query.ilike('class', `%${yearPattern}%`)
+        console.log('Fetching SS students with pattern:', `%${yearPattern}%`)
+      } else {
+        query = query.eq('class', selectedClass)
+      }
+      
+      const { data: classStudents, error: studentError } = await query
 
       if (studentError) throw studentError
       if (!classStudents || classStudents.length === 0) {
+        console.log('No students found for class:', selectedClass)
         setStudents([])
         setLoading(false)
         return
       }
+
+      console.log(`Found ${classStudents.length} students for ${selectedClass}`)
 
       const studentIds = classStudents.map(s => s.id)
 
@@ -461,10 +509,8 @@ export default function BroadSheetPage() {
 
       if (scoresError) throw scoresError
 
-      const isJSS = selectedClass?.toUpperCase().startsWith('JSS')
-
       const studentRecords: StudentRecord[] = classStudents.map(student => {
-        const subjectsForStudent = getSubjectsForStudent(selectedClass, student.department)
+        const subjectsForStudent = getSubjectsForStudent(student.class, student.department)
         const totalExpected = subjectsForStudent.length
         
         const studentScores = (allScores || []).filter(s => s.student_id === student.id)
@@ -492,7 +538,7 @@ export default function BroadSheetPage() {
         const averageScore = scoredSubjects > 0 ? Math.round(totalScore / scoredSubjects) : 0
         const grade = scoredSubjects > 0 ? getGrade(averageScore) : '—'
 
-        const meetsMinimum = meetsMinimumSubjects(selectedClass, scoredSubjects)
+        const meetsMinimum = meetsMinimumSubjects(student.class, scoredSubjects)
         const allSubmitted = meetsMinimum
 
         return {
@@ -501,7 +547,7 @@ export default function BroadSheetPage() {
           admission_number: student.admission_number || '—',
           vin_id: student.vin_id || '—',
           class: student.class,
-          department: student.department || (isJSS ? 'Junior' : 'Science'),
+          department: student.department || (isJSS ? 'Junior' : 'General'),
           subjectMap,
           totalScore,
           averageScore,
@@ -711,7 +757,6 @@ export default function BroadSheetPage() {
     loadBroadSheet()
   }
 
-  // ✅ FIXED STATS CALCULATION
   const stats = useMemo(() => {
     const readyForReport = students.filter(s => s.meetsMinimum && s.allSubmitted)
     const complete = students.filter(s => s.hasAllSubjects)
@@ -878,7 +923,7 @@ export default function BroadSheetPage() {
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent>
-                    {classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    {ALL_CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -1035,7 +1080,7 @@ export default function BroadSheetPage() {
         </div>
       )}
 
-      {/* Broadsheet Table - VIN ID COLUMN REMOVED */}
+      {/* Broadsheet Table */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
         <Card className="border shadow-lg overflow-hidden print:shadow-none">
           {/* Print Header */}
@@ -1080,11 +1125,14 @@ export default function BroadSheetPage() {
                 ) : (
                   displayedStudents.map((student, idx) => {
                     const isJSS = student.class?.toUpperCase().startsWith('JSS')
-                    const departmentDisplay = student.department ? 
-                      (student.department === 'Science' ? '🔬 Science' : 
-                       student.department === 'Arts' ? '🎭 Arts' : 
-                       student.department === 'Commercial' ? '💼 Commercial' : student.department) : 
-                      (isJSS ? 'Junior' : 'General')
+                    let departmentDisplay = 'General'
+                    if (student.department === 'Science') departmentDisplay = '🔬 Science'
+                    else if (student.department === 'Arts') departmentDisplay = '🎭 Arts'
+                    else if (student.department === 'Commercial') departmentDisplay = '💼 Commercial'
+                    else if (isJSS) departmentDisplay = 'Junior'
+                    else if (student.class?.includes('Science')) departmentDisplay = '🔬 Science'
+                    else if (student.class?.includes('Arts')) departmentDisplay = '🎭 Arts'
+                    else if (student.class?.includes('Commercial')) departmentDisplay = '💼 Commercial'
                     
                     return (
                       <tr
@@ -1132,7 +1180,7 @@ export default function BroadSheetPage() {
                               ) : (
                                 <span className="text-slate-200 text-[8px]">—</span>
                               )}
-                            </td>
+                             </td>
                           )
                         })}
                         <td className="px-2 py-2 text-center font-bold text-sm text-slate-800">

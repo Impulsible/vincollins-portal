@@ -1,4 +1,4 @@
-// components/staff/UploadAssignmentDialog.tsx
+// components/staff/UploadAssignmentDialog.tsx - UPDATED VERSION
 'use client'
 
 import { useState, useRef } from 'react'
@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   Loader2, Upload, X, FileText, Calendar as CalendarIcon,
-  Send, Users, BookOpen, Bell
+  Send, Users, BookOpen, Bell, GraduationCap
 } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -38,15 +38,33 @@ interface UploadAssignmentDialogProps {
   teacherProfile: any
 }
 
+// ✅ UPDATED: Changed Computer Studies to Information Technology
 const subjects = [
   'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
   'Economics', 'Government', 'Literature in English', 'Geography',
   'Commerce', 'Financial Accounting', 'Agricultural Science',
-  'Christian Religious Studies', 'Civic Education', 'Computer Studies',
-  'Basic Science', 'Basic Technology', 'Social Studies', 'Business Studies'
+  'Christian Religious Studies', 'Civic Education', 'Information Technology',
+  'Data Processing', 'Further Mathematics', 'Basic Science', 'Basic Technology', 
+  'Social Studies', 'Business Studies'
 ]
 
-const classes = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+// ✅ UPDATED: Department-specific class options for Senior Secondary
+const classCategories = {
+  jss: ['JSS 1', 'JSS 2', 'JSS 3'],
+  allStudents: ['SS1', 'SS2', 'SS3'],
+  science: ['SS1 Science', 'SS2 Science', 'SS3 Science'],
+  arts: ['SS1 Arts', 'SS2 Arts', 'SS3 Arts'],
+  commercial: ['SS1 Commercial', 'SS2 Commercial', 'SS3 Commercial']
+}
+
+// Flatten all classes for selection
+const allClasses = [
+  ...classCategories.jss,
+  ...classCategories.allStudents,
+  ...classCategories.science,
+  ...classCategories.arts,
+  ...classCategories.commercial
+]
 
 export function UploadAssignmentDialog({
   open,
@@ -88,6 +106,20 @@ export function UploadAssignmentDialog({
     )
   }
 
+  // Select all classes in a category
+  const selectCategory = (category: keyof typeof classCategories) => {
+    const categoryClasses = classCategories[category]
+    const allSelected = categoryClasses.every(c => selectedClasses.includes(c))
+    
+    if (allSelected) {
+      // Remove all classes in this category
+      setSelectedClasses(prev => prev.filter(c => !categoryClasses.includes(c)))
+    } else {
+      // Add all classes in this category
+      setSelectedClasses(prev => [...new Set([...prev, ...categoryClasses])])
+    }
+  }
+
   // Get minimum date for due date input (tomorrow)
   const getMinDate = () => {
     const tomorrow = new Date()
@@ -119,78 +151,81 @@ export function UploadAssignmentDialog({
         const filePath = `assignments/${fileName}`
 
         const { error: uploadError } = await supabase.storage
-          .from('student-photos')
+          .from('assignment-files')
           .upload(filePath, selectedFile)
 
-        if (uploadError) throw uploadError
+        if (uploadError) {
+          // Try alternative bucket
+          const { error: uploadError2 } = await supabase.storage
+            .from('student-photos')
+            .upload(filePath, selectedFile)
+          if (uploadError2) throw uploadError2
+        }
 
         const { data: { publicUrl } } = supabase.storage
-          .from('student-photos')
+          .from('assignment-files')
           .getPublicUrl(filePath)
         
         fileUrl = publicUrl
       }
 
-      // Create assignments for each selected class
-      for (const className of selectedClasses) {
-        const { data: assignment, error: assignmentError } = await supabase
-          .from('assignments')
-          .insert({
-            title: formData.title,
-            subject: formData.subject,
-            class: className,
-            description: formData.description,
-            instructions: formData.instructions,
-            due_date: new Date(dueDate).toISOString(),
-            total_marks: formData.total_marks,
-            file_url: fileUrl,
-            file_name: selectedFile?.name || null,
-            created_by: teacherProfile?.id,
-            teacher_name: teacherProfile?.full_name || 'Teacher',
-            status: 'published',
+      // ✅ Create assignments for each selected class using classes array
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('assignments')
+        .insert({
+          title: formData.title,
+          subject: formData.subject,
+          classes: selectedClasses,  // ✅ Use classes array instead of single class
+          description: formData.description,
+          instructions: formData.instructions,
+          due_date: new Date(dueDate).toISOString(),
+          total_points: formData.total_marks,
+          file_url: fileUrl,
+          file_name: selectedFile?.name || null,
+          created_by: teacherProfile?.id,
+          created_by_name: teacherProfile?.full_name || 'Teacher',
+          status: 'published',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('id')
+        .single()
+
+      if (assignmentError) throw assignmentError
+
+      // Send notifications to students in selected classes
+      if (notifyStudents && assignment) {
+        // Get all students in selected classes
+        const { data: students } = await supabase
+          .from('profiles')
+          .select('id, full_name, class')
+          .in('class', selectedClasses)
+          .eq('role', 'student')
+
+        if (students && students.length > 0) {
+          const notifications = students.map((student: any) => ({
+            user_id: student.id,
+            title: '📚 New Assignment',
+            message: `${formData.title} - ${formData.subject}. Due: ${format(new Date(dueDate), 'MMM dd, yyyy')}`,
+            type: 'new_assignment',
+            link: '/student/assignments',
+            metadata: {
+              assignment_id: assignment.id,
+              classes: selectedClasses,
+              subject: formData.subject,
+              due_date: new Date(dueDate).toISOString()
+            },
+            read: false,
             created_at: new Date().toISOString()
-          })
-          .select('id')
-          .single()
+          }))
 
-        if (assignmentError) throw assignmentError
-
-        // Send notifications to students in this class
-        if (notifyStudents && assignment) {
-          // Get all students in this class
-          const { data: students } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .eq('class', className)
-            .eq('role', 'student')
-
-          if (students && students.length > 0) {
-            const notifications = students.map((student: any) => ({
-              user_id: student.id,
-              title: '📚 New Assignment',
-              message: `${formData.title} - ${formData.subject}. Due: ${format(new Date(dueDate), 'MMM dd, yyyy')}`,
-              type: 'new_assignment',
-              link: '/student/assignments',
-              metadata: {
-                assignment_id: assignment.id,
-                class: className,
-                subject: formData.subject,
-                due_date: new Date(dueDate).toISOString()
-              },
-              read: false,
-              created_at: new Date().toISOString()
-            }))
-
-            await supabase.from('notifications').insert(notifications)
-          }
+          // Batch insert notifications
+          await supabase.from('notifications').insert(notifications)
+          toast.success(`Notified ${students.length} students`)
         }
       }
 
       toast.success(`Assignment published to ${selectedClasses.length} class(es)!`)
-      if (notifyStudents) {
-        toast.info('Students have been notified')
-      }
-      
       onSuccess()
       handleClose()
       
@@ -209,6 +244,15 @@ export function UploadAssignmentDialog({
     setDueDate('')
     setNotifyStudents(true)
     onOpenChange(false)
+  }
+
+  // Count classes by category for display
+  const categoryCounts = {
+    jss: selectedClasses.filter(c => classCategories.jss.includes(c)).length,
+    allStudents: selectedClasses.filter(c => classCategories.allStudents.includes(c)).length,
+    science: selectedClasses.filter(c => classCategories.science.includes(c)).length,
+    arts: selectedClasses.filter(c => classCategories.arts.includes(c)).length,
+    commercial: selectedClasses.filter(c => classCategories.commercial.includes(c)).length
   }
 
   return (
@@ -264,31 +308,181 @@ export function UploadAssignmentDialog({
             </div>
           </div>
 
-          {/* Target Classes */}
+          {/* Target Classes - Updated with categories */}
           <div>
             <Label>Publish to Classes *</Label>
-            <div className="flex flex-wrap gap-2 mt-2 p-3 bg-slate-50 rounded-lg">
-              {classes.map(className => (
-                <Badge
-                  key={className}
-                  variant={selectedClasses.includes(className) ? 'default' : 'outline'}
-                  className={cn(
-                    "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
-                    selectedClasses.includes(className) && "bg-primary text-white"
-                  )}
-                  onClick={() => toggleClass(className)}
-                >
-                  <Users className="h-3 w-3 mr-1" />
-                  {className}
-                </Badge>
-              ))}
+            <div className="space-y-3 mt-2">
+              {/* JSS Section */}
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <GraduationCap className="h-4 w-4 text-slate-600" />
+                    <span className="font-medium text-sm">Junior Secondary School</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => selectCategory('jss')}
+                    className="h-6 text-xs"
+                  >
+                    {categoryCounts.jss === classCategories.jss.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {classCategories.jss.map(className => (
+                    <Badge
+                      key={className}
+                      variant={selectedClasses.includes(className) ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
+                        selectedClasses.includes(className) && "bg-primary text-white"
+                      )}
+                      onClick={() => toggleClass(className)}
+                    >
+                      {className}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* All Students (General Subjects) */}
+              <div className="p-3 bg-emerald-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-emerald-600" />
+                    <span className="font-medium text-sm">📚 All Students (General Subjects)</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => selectCategory('allStudents')}
+                    className="h-6 text-xs"
+                  >
+                    {categoryCounts.allStudents === classCategories.allStudents.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {classCategories.allStudents.map(className => (
+                    <Badge
+                      key={className}
+                      variant={selectedClasses.includes(className) ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
+                        selectedClasses.includes(className) && "bg-primary text-white"
+                      )}
+                      onClick={() => toggleClass(className)}
+                    >
+                      {className}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Science Department */}
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <span className="font-medium text-sm">🔬 Science Department</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => selectCategory('science')}
+                    className="h-6 text-xs"
+                  >
+                    {categoryCounts.science === classCategories.science.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {classCategories.science.map(className => (
+                    <Badge
+                      key={className}
+                      variant={selectedClasses.includes(className) ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
+                        selectedClasses.includes(className) && "bg-primary text-white"
+                      )}
+                      onClick={() => toggleClass(className)}
+                    >
+                      {className}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Arts Department */}
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-purple-600" />
+                    <span className="font-medium text-sm">🎨 Arts Department</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => selectCategory('arts')}
+                    className="h-6 text-xs"
+                  >
+                    {categoryCounts.arts === classCategories.arts.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {classCategories.arts.map(className => (
+                    <Badge
+                      key={className}
+                      variant={selectedClasses.includes(className) ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
+                        selectedClasses.includes(className) && "bg-primary text-white"
+                      )}
+                      onClick={() => toggleClass(className)}
+                    >
+                      {className}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Commercial Department */}
+              <div className="p-3 bg-amber-50 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-amber-600" />
+                    <span className="font-medium text-sm">💼 Commercial Department</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => selectCategory('commercial')}
+                    className="h-6 text-xs"
+                  >
+                    {categoryCounts.commercial === classCategories.commercial.length ? 'Deselect All' : 'Select All'}
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {classCategories.commercial.map(className => (
+                    <Badge
+                      key={className}
+                      variant={selectedClasses.includes(className) ? 'default' : 'outline'}
+                      className={cn(
+                        "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
+                        selectedClasses.includes(className) && "bg-primary text-white"
+                      )}
+                      onClick={() => toggleClass(className)}
+                    >
+                      {className}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-2">
               {selectedClasses.length} class(es) selected
             </p>
           </div>
 
-          {/* Due Date - Using native date input instead of Calendar component */}
+          {/* Due Date */}
           <div>
             <Label htmlFor="dueDate">Due Date *</Label>
             <div className="relative">

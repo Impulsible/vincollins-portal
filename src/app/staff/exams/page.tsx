@@ -1,4 +1,4 @@
-// app/staff/exams/page.tsx
+// app/staff/exams/page.tsx - FIXED IMPORTS
 'use client'
 
 import { useState } from 'react'
@@ -7,8 +7,7 @@ import { useStaffContext } from '../layout'
 import { useExams } from './hooks/useExams'
 import { ExamList } from '@/components/staff/exams/ExamList'
 import { ExamViewer } from '@/components/staff/exams/ExamViewer'
-// ✅ FIX: Change to named import since ExamEditor doesn't have default export
-import { ExamEditor } from '@/components/staff/exams/ExamEditor'
+import { EditExamPage } from '@/components/staff/exams/edit/EditExamPage'  // ✅ Changed from ExamEditor to EditExamPage
 import { CreateExamDialog } from '@/components/staff/CreateExamDialog'
 import { Skeleton } from '@/components/ui/skeleton'
 
@@ -80,11 +79,8 @@ export default function StaffExamsPage() {
           )}
           {viewMode === 'edit' && selectedExamId && (
             <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ExamEditor 
+              <EditExamPage 
                 examId={selectedExamId} 
-                onBack={() => { setViewMode('list'); setSelectedExamId(null) }} 
-                onCancel={() => setViewMode('view')} 
-                onSave={() => { setViewMode('list'); setSelectedExamId(null) }} 
               />
             </motion.div>
           )}

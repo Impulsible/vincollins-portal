@@ -511,7 +511,7 @@ INSERT INTO subjects (name, code, category) VALUES
 ('Home Economics', 'HEC-JSS', 'junior'),
 ('Business Studies', 'BUS-JSS', 'junior'),
 ('French', 'FRE-JSS', 'junior'),
-('Computer Studies', 'CSC-JSS', 'junior'),
+('Information Technology', 'CSC-JSS', 'junior'),
 ('Physical & Health Education', 'PHE-JSS', 'junior'),
 ('Cultural & Creative Arts', 'CCA-JSS', 'junior'),
 ('History', 'HIS-JSS', 'junior'),

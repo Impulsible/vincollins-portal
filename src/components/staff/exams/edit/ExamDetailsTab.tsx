@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/ExamDetailsTab.tsx - WITH TARGET AUDIENCE
+// src/components/staff/exams/edit/ExamDetailsTab.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,53 +29,44 @@ const termOptions = [
   { value: 'third', label: 'Third Term' }
 ]
 
-// ✅ Target Audience Options
-const TARGET_AUDIENCE_OPTIONS = [
-  { 
-    value: 'all', 
-    label: 'All Students', 
-    description: 'Available to all students in this class/year',
-    icon: '📚',
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50'
-  },
-  { 
-    value: 'Science', 
-    label: 'Science Department Only', 
-    description: 'Only students in Science department can see this exam',
-    icon: '🔬',
-    color: 'text-blue-600',
-    bgColor: 'bg-blue-50'
-  },
-  { 
-    value: 'Arts', 
-    label: 'Arts Department Only', 
-    description: 'Only students in Arts department can see this exam',
-    icon: '🎨',
-    color: 'text-purple-600',
-    bgColor: 'bg-purple-50'
-  },
-  { 
-    value: 'Commercial', 
-    label: 'Commercial Department Only', 
-    description: 'Only students in Commercial department can see this exam',
-    icon: '💼',
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50'
-  }
+// ✅ Senior Secondary Class Options with proper targeting
+const SENIOR_CLASS_OPTIONS = {
+  general: [
+    { value: 'SS1', label: '📚 SS1 (All Students)', description: 'Visible to ALL SS1 students - Science, Arts, Commercial', year: 'SS1' },
+    { value: 'SS2', label: '📚 SS2 (All Students)', description: 'Visible to ALL SS2 students - Science, Arts, Commercial', year: 'SS2' },
+    { value: 'SS3', label: '📚 SS3 (All Students)', description: 'Visible to ALL SS3 students - Science, Arts, Commercial', year: 'SS3' },
+  ],
+  science: [
+    { value: 'SS1 Science', label: '🔬 SS1 Science', description: 'Science department only', year: 'SS1', department: 'Science' },
+    { value: 'SS2 Science', label: '🔬 SS2 Science', description: 'Science department only', year: 'SS2', department: 'Science' },
+    { value: 'SS3 Science', label: '🔬 SS3 Science', description: 'Science department only', year: 'SS3', department: 'Science' },
+  ],
+  arts: [
+    { value: 'SS1 Arts', label: '🎨 SS1 Arts', description: 'Arts department only', year: 'SS1', department: 'Arts' },
+    { value: 'SS2 Arts', label: '🎨 SS2 Arts', description: 'Arts department only', year: 'SS2', department: 'Arts' },
+    { value: 'SS3 Arts', label: '🎨 SS3 Arts', description: 'Arts department only', year: 'SS3', department: 'Arts' },
+  ],
+  commercial: [
+    { value: 'SS1 Commercial', label: '💼 SS1 Commercial', description: 'Commercial department only', year: 'SS1', department: 'Commercial' },
+    { value: 'SS2 Commercial', label: '💼 SS2 Commercial', description: 'Commercial department only', year: 'SS2', department: 'Commercial' },
+    { value: 'SS3 Commercial', label: '💼 SS3 Commercial', description: 'Commercial department only', year: 'SS3', department: 'Commercial' },
+  ]
+}
+
+// JSS Options
+const JSS_OPTIONS = [
+  { value: 'JSS 1', label: 'JSS 1', description: 'Junior Secondary 1' },
+  { value: 'JSS 2', label: 'JSS 2', description: 'Junior Secondary 2' },
+  { value: 'JSS 3', label: 'JSS 3', description: 'Junior Secondary 3' },
 ]
 
-// Helper to get year from class
-const getYearFromClass = (className: string): string => {
-  if (!className) return ''
-  if (className.includes('SS1')) return 'SS1'
-  if (className.includes('SS2')) return 'SS2'
-  if (className.includes('SS3')) return 'SS3'
-  if (className.includes('JSS1')) return 'JSS1'
-  if (className.includes('JSS2')) return 'JSS2'
-  if (className.includes('JSS3')) return 'JSS3'
-  return className
-}
+// Target Audience Options
+const TARGET_AUDIENCE_OPTIONS = [
+  { value: 'all', label: 'All Students', description: 'All students in this class/year can see this exam', icon: '🌍' },
+  { value: 'Science', label: 'Science Department Only', description: 'Only Science department students can see this exam', icon: '🔬' },
+  { value: 'Arts', label: 'Arts Department Only', description: 'Only Arts department students can see this exam', icon: '🎨' },
+  { value: 'Commercial', label: 'Commercial Department Only', description: 'Only Commercial department students can see this exam', icon: '💼' },
+]
 
 export function ExamDetailsTab({
   formData,
@@ -87,10 +78,9 @@ export function ExamDetailsTab({
   hasTheory,
   onHasTheoryChange
 }: ExamDetailsTabProps) {
-  const yearGroup = getYearFromClass(formData.class)
-  const isSSClass = formData.class.includes('SS')
-  const isJSSClass = formData.class.includes('JSS')
-  const showAudienceSelector = formData.class && (isSSClass || isJSSClass)
+  const isSeniorClass = formData.class?.startsWith('SS') || false
+  const isJSSClass = formData.class?.startsWith('JSS') || false
+  const showTargetAudience = isSeniorClass && formData.class && !formData.class.includes(' ')
 
   return (
     <TooltipProvider>
@@ -122,7 +112,7 @@ export function ExamDetailsTab({
                 />
               </div>
               
-              {/* Class */}
+              {/* Class Selection */}
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
@@ -136,9 +126,70 @@ export function ExamDetailsTab({
                   <SelectTrigger className="h-9 sm:h-10 text-sm">
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {classes.map(c => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                  <SelectContent className="max-h-[400px]">
+                    {/* All Students (General Subjects) - Senior Secondary */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 sticky top-0">
+                      📚 All Students (General Subjects)
+                    </div>
+                    {SENIOR_CLASS_OPTIONS.general.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div className="font-medium">{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Science Department */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
+                      🔬 Science Department
+                    </div>
+                    {SENIOR_CLASS_OPTIONS.science.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Arts Department */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 mt-2">
+                      🎨 Arts Department
+                    </div>
+                    {SENIOR_CLASS_OPTIONS.arts.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Commercial Department */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-amber-600 bg-amber-50 mt-2">
+                      💼 Commercial Department
+                    </div>
+                    {SENIOR_CLASS_OPTIONS.commercial.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
+                    ))}
+                    
+                    {/* Junior Secondary */}
+                    <div className="px-2 py-1.5 text-xs font-semibold text-slate-600 bg-slate-50 mt-2">
+                      📖 Junior Secondary School
+                    </div>
+                    {JSS_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        <div>
+                          <div>{opt.label}</div>
+                          <div className="text-[10px] text-muted-foreground">{opt.description}</div>
+                        </div>
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -187,12 +238,12 @@ export function ExamDetailsTab({
           </CardContent>
         </Card>
 
-        {/* ✅ NEW: Target Audience Card - Who should see this exam */}
-        {showAudienceSelector && (
+        {/* Target Audience Card - Only for Senior Secondary General Classes */}
+        {showTargetAudience && (
           <Card className="border-0 shadow-sm overflow-hidden">
             <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
+                <Target className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-600" />
                 <CardTitle className="text-base sm:text-lg">Target Audience</CardTitle>
               </div>
               <CardDescription className="text-xs sm:text-sm">
@@ -201,56 +252,45 @@ export function ExamDetailsTab({
             </CardHeader>
             <CardContent className="space-y-3 px-4 sm:px-6 pb-4 sm:pb-6">
               <div className="grid gap-3">
-                {TARGET_AUDIENCE_OPTIONS.map((option) => {
-                  const isSelected = (formData.target_audience || 'all') === option.value
-                  return (
-                    <label
-                      key={option.value}
-                      className={cn(
-                        "flex items-start gap-3 p-3 sm:p-4 rounded-xl cursor-pointer transition-all border-2",
-                        isSelected
-                          ? `${option.bgColor} border-${option.color.split('-')[1]}-500`
-                          : "bg-white border-slate-200 hover:border-slate-300"
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name="target_audience"
-                        value={option.value}
-                        checked={isSelected}
-                        onChange={(e) => onChange({ target_audience: e.target.value })}
-                        className="mt-0.5 h-4 w-4"
-                      />
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base sm:text-lg">{option.icon}</span>
-                          <p className={cn("font-medium text-sm sm:text-base", option.color)}>
-                            {option.label}
-                          </p>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {option.description}
-                        </p>
-                        {option.value === 'all' && (
-                          <p className="text-xs text-emerald-600 mt-2">
-                            ✓ All {yearGroup} students will see this exam (Science, Arts, Commercial)
-                          </p>
-                        )}
-                        {option.value !== 'all' && (
-                          <p className="text-xs text-blue-600 mt-2">
-                            ✓ Only {option.value} department students in {yearGroup} will see this exam
-                          </p>
-                        )}
+                {TARGET_AUDIENCE_OPTIONS.map((option) => (
+                  <label
+                    key={option.value}
+                    className={cn(
+                      "flex items-start gap-3 p-3 sm:p-4 rounded-xl cursor-pointer transition-all border-2",
+                      formData.target_audience === option.value
+                        ? "border-indigo-500 bg-indigo-50"
+                        : "border-slate-200 bg-white hover:border-slate-300"
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="target_audience"
+                      value={option.value}
+                      checked={formData.target_audience === option.value}
+                      onChange={(e) => onChange({ target_audience: e.target.value })}
+                      className="mt-0.5 h-4 w-4"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-base sm:text-lg">{option.icon}</span>
+                        <p className="font-medium text-sm sm:text-base">{option.label}</p>
                       </div>
-                    </label>
-                  )
-                })}
-              </div>
-              <div className="mt-2 p-2 bg-slate-50 rounded-lg">
-                <p className="text-[10px] text-slate-500 flex items-center gap-1">
-                  <Target className="h-3 w-3" />
-                  Tip: Use "All Students" for general subjects like Mathematics, English. Use department-specific for specialized subjects.
-                </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {option.description}
+                      </p>
+                      {option.value === 'all' && (
+                        <p className="text-xs text-emerald-600 mt-2">
+                          ✓ All {formData.class} students will see this exam
+                        </p>
+                      )}
+                      {option.value !== 'all' && (
+                        <p className="text-xs text-blue-600 mt-2">
+                          ✓ Only {option.value} department students in {formData.class} will see this exam
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                ))}
               </div>
             </CardContent>
           </Card>
@@ -304,7 +344,7 @@ export function ExamDetailsTab({
           </CardContent>
         </Card>
 
-        {/* Pass Mark & Instructions Card */}
+        {/* Assessment Criteria Card */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">
@@ -316,7 +356,6 @@ export function ExamDetailsTab({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
-            {/* Pass Mark */}
             <div>
               <Label className="text-xs sm:text-sm font-medium mb-1.5 block">Pass Mark (%)</Label>
               <Input
@@ -332,7 +371,6 @@ export function ExamDetailsTab({
               </p>
             </div>
 
-            {/* Instructions */}
             <div>
               <Label className="text-xs sm:text-sm font-medium mb-1.5 block">Instructions for Students</Label>
               <Textarea
@@ -359,7 +397,7 @@ export function ExamDetailsTab({
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
             {/* Shuffle Questions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-800/30 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
               <div>
                 <div className="flex items-center gap-1.5">
                   <Label className="text-sm font-medium">Shuffle Questions</Label>
@@ -383,7 +421,7 @@ export function ExamDetailsTab({
             </div>
 
             {/* Shuffle Options */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-800/30 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
               <div>
                 <div className="flex items-center gap-1.5">
                   <Label className="text-sm font-medium">Shuffle Options</Label>
@@ -407,7 +445,7 @@ export function ExamDetailsTab({
             </div>
 
             {/* Negative Marking */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-800/30 rounded-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
               <div>
                 <div className="flex items-center gap-1.5">
                   <Label className="text-sm font-medium">Negative Marking</Label>
@@ -453,7 +491,7 @@ export function ExamDetailsTab({
         {/* Theory Questions Toggle Card */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardContent className="p-0">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 rounded-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
               <div>
                 <div className="flex items-center gap-2">
                   <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600" />

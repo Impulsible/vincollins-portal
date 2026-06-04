@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/staff/students/[id]/page.tsx - WITH SUBMIT FOR APPROVAL
+// app/staff/students/[id]/page.tsx - UPDATED WITH FIXES
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -133,6 +133,7 @@ interface ExamResult {
   unanswered_count?: number
 }
 
+// ✅ FIXED: Changed from exam_scores to ca_scores
 interface CAScore {
   id: string
   subject: string
@@ -142,7 +143,6 @@ interface CAScore {
   ca2_score: number
   exam_objective_score: number
   exam_theory_score: number
-  exam_total_score: number
   total_score: number
   grade: string
   remark: string
@@ -183,11 +183,14 @@ interface PerformanceStats {
 
 const terms = ['First Term', 'Second Term', 'Third Term']
 const academicYears = ['2024/2025', '2025/2026', '2026/2027']
+
+// ✅ FIXED: Changed Computer Studies to Information Technology
 const subjects = [
   'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
   'Economics', 'Government', 'Literature in English', 'Geography',
   'Commerce', 'Financial Accounting', 'Agricultural Science',
-  'Christian Religious Studies', 'Civic Education', 'Computer Studies'
+  'Christian Religious Studies', 'Civic Education', 'Information Technology',
+  'Data Processing', 'Further Mathematics'
 ]
 
 // Star Rating Component
@@ -215,7 +218,7 @@ const StarRating = ({ value, onChange, readonly = false }: { value: number; onCh
   )
 }
 
-// ✅ FIXED: Helper function to format profile for Header component with firstName
+// Helper function to format profile for Header component
 const formatProfileForHeader = (profile: any) => {
   if (!profile) return undefined
   
@@ -529,16 +532,41 @@ export default function StudentDetailsPage() {
         vin_id: userData?.vin_id || studentData.vin_id || `VIN-${studentId.slice(0, 8)}`
       })
       
-      const { data: examScoresData, error: scoresError } = await supabase
-        .from('exam_scores')
+      // ✅ FIXED: Changed from exam_scores to ca_scores
+      const { data: caScoresData, error: caScoresError } = await supabase
+        .from('ca_scores')
         .select('*')
         .eq('student_id', studentId)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
         .order('created_at', { ascending: false })
-
-      if (scoresError) {
-        console.error('Exam scores error:', scoresError)
+        
+      if (caScoresError) {
+        console.error('CA Scores error:', caScoresError)
       }
-
+      
+      if (caScoresData && caScoresData.length > 0) {
+        setCAScores(caScoresData.map((ca: any) => ({
+          id: ca.id,
+          subject: ca.subject,
+          term: ca.term,
+          academic_year: ca.academic_year,
+          ca1_score: ca.ca1_score || 0,
+          ca2_score: ca.ca2_score || 0,
+          exam_objective_score: ca.exam_objective_score || 0,
+          exam_theory_score: ca.exam_theory_score || 0,
+          total_score: ca.total_score || 0,
+          grade: ca.grade || 'N/A',
+          remark: ca.remark || 'N/A',
+          teacher_name: ca.teacher_name || 'Unknown',
+          created_at: ca.created_at,
+          updated_at: ca.updated_at
+        })))
+      } else {
+        setCAScores([])
+      }
+      
+      // Fetch exam attempts for results
       const { data: attemptsData, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -550,9 +578,10 @@ export default function StudentDetailsPage() {
         console.error('Exam attempts error:', attemptsError)
       }
 
+      // Get exam details for attempts
       let examDetailsMap: Record<string, any> = {}
-      if (examScoresData && examScoresData.length > 0) {
-        const examIds = [...new Set(examScoresData.map(s => s.exam_id).filter(Boolean))]
+      if (attemptsData && attemptsData.length > 0) {
+        const examIds = [...new Set(attemptsData.map(a => a.exam_id).filter(Boolean))]
         if (examIds.length > 0) {
           const { data: examsData } = await supabase
             .from('exams')
@@ -570,71 +599,37 @@ export default function StudentDetailsPage() {
 
       const mergedResults: ExamResult[] = []
       
-      if (examScoresData) {
-        for (const score of examScoresData) {
-          const attempt = (attemptsData || []).find(a => a.exam_id === score.exam_id)
-          const examInfo = examDetailsMap[score.exam_id] || {}
-          
-          mergedResults.push({
-            id: score.id,
-            exam_id: score.exam_id,
-            exam_title: examInfo.title || score.exam_title || 'Unknown Exam',
-            subject: score.subject || examInfo.subject || 'Unknown',
-            objective_score: attempt?.objective_score || score.objective_score || 0,
-            objective_total: attempt?.objective_total || 20,
-            theory_score: attempt?.theory_score ?? score.theory_score ?? null,
-            theory_total: attempt?.theory_total || 40,
-            total_score: score.total_score || 0,
-            percentage: score.percentage || 0,
-            grade: score.grade || 'N/A',
-            remark: score.remark || 'N/A',
-            is_passed: (score.percentage || 0) >= (examInfo.passing_percentage || 50),
-            status: score.status || 'completed',
-            completed_at: attempt?.submitted_at || score.created_at,
-            term: score.term || selectedTerm,
-            academic_year: score.academic_year || selectedYear,
-            has_theory: examInfo.has_theory || false,
-            correct_count: attempt?.correct_count || 0,
-            incorrect_count: attempt?.incorrect_count || 0,
-            unanswered_count: attempt?.unanswered_count || 0
-          })
-        }
-      }
-      
       if (attemptsData) {
         for (const attempt of attemptsData) {
-          const existingScore = mergedResults.find(r => r.exam_id === attempt.exam_id)
-          if (!existingScore) {
-            const examInfo = examDetailsMap[attempt.exam_id] || {}
-            const totalScore = (attempt.objective_score || 0) + (attempt.theory_score || 0)
-            const totalPossible = (attempt.objective_total || 20) + (attempt.theory_total || 40)
-            const percentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0
-            const { grade, remark } = calculateGradeAndRemark(percentage)
-            
-            mergedResults.push({
-              id: attempt.id,
-              exam_id: attempt.exam_id,
-              exam_title: examInfo.title || 'Unknown Exam',
-              subject: examInfo.subject || 'Unknown',
-              objective_score: attempt.objective_score || 0,
-              objective_total: attempt.objective_total || 20,
-              theory_score: attempt.theory_score ?? null,
-              theory_total: attempt.theory_total || 40,
-              total_score: totalScore,
-              percentage: percentage,
-              grade: grade,
-              remark: remark,
-              is_passed: attempt.is_passed || false,
-              status: attempt.status || 'completed',
-              completed_at: attempt.submitted_at,
-              term: selectedTerm,
-              academic_year: selectedYear,
-              has_theory: examInfo.has_theory || false,
-              correct_count: attempt.correct_count || 0,
-              incorrect_count: attempt.incorrect_count || 0,
-              unanswered_count: attempt.unanswered_count || 0
-            })
-          }
+          const examInfo = examDetailsMap[attempt.exam_id] || {}
+          const totalScore = (attempt.objective_score || 0) + (attempt.theory_score || 0)
+          const totalPossible = (attempt.objective_total || 20) + (attempt.theory_total || 40)
+          const percentage = totalPossible > 0 ? Math.round((totalScore / totalPossible) * 100) : 0
+          const { grade, remark } = calculateGradeAndRemark(percentage)
+          
+          mergedResults.push({
+            id: attempt.id,
+            exam_id: attempt.exam_id,
+            exam_title: examInfo.title || 'Unknown Exam',
+            subject: examInfo.subject || 'Unknown',
+            objective_score: attempt.objective_score || 0,
+            objective_total: attempt.objective_total || 20,
+            theory_score: attempt.theory_score ?? null,
+            theory_total: attempt.theory_total || 40,
+            total_score: totalScore,
+            percentage: percentage,
+            grade: grade,
+            remark: remark,
+            is_passed: attempt.is_passed || false,
+            status: attempt.status || 'completed',
+            completed_at: attempt.submitted_at,
+            term: selectedTerm,
+            academic_year: selectedYear,
+            has_theory: examInfo.has_theory || false,
+            correct_count: attempt.correct_count || 0,
+            incorrect_count: attempt.incorrect_count || 0,
+            unanswered_count: attempt.unanswered_count || 0
+          })
         }
       }
       
@@ -672,40 +667,6 @@ export default function StudentDetailsPage() {
         bestSubject,
         bestSubjectScore: Math.round(bestScore)
       }))
-      
-      const { data: caData, error: caError } = await supabase
-        .from('exam_scores')
-        .select('*')
-        .eq('student_id', studentId)
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-        .order('created_at', { ascending: false })
-        
-      if (caError) {
-        console.error('CA Scores error:', caError)
-      }
-      
-      if (caData && caData.length > 0) {
-        setCAScores(caData.map((ca: any) => ({
-          id: ca.id,
-          subject: ca.subject,
-          term: ca.term,
-          academic_year: ca.academic_year,
-          ca1_score: ca.ca1_score || 0,
-          ca2_score: ca.ca2_score || 0,
-          exam_objective_score: ca.exam_objective_score || 0,
-          exam_theory_score: ca.exam_theory_score || 0,
-          exam_total_score: ca.exam_score || 0,
-          total_score: ca.total_score || 0,
-          grade: ca.grade || 'N/A',
-          remark: ca.remark || 'N/A',
-          teacher_name: ca.teacher_name || 'Unknown',
-          created_at: ca.created_at,
-          updated_at: ca.updated_at
-        })))
-      } else {
-        setCAScores([])
-      }
       
       const { data: assessmentData, error: assessmentError } = await supabase
         .from('student_assessments')
@@ -802,12 +763,10 @@ export default function StudentDetailsPage() {
         ca2_score: caForm.ca2_score,
         exam_objective_score: caForm.exam_objective_score,
         exam_theory_score: caForm.exam_theory_score,
-        exam_score: caForm.exam_objective_score + caForm.exam_theory_score,
         total_score: totalScore,
-        percentage: totalScore,
         grade,
         remark,
-        status: 'completed',
+        status: 'approved',
         graded_by: session?.user?.id,
         graded_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -816,17 +775,15 @@ export default function StudentDetailsPage() {
       let error
       if (editingCA?.id) {
         const { error: updateError } = await supabase
-          .from('exam_scores')
+          .from('ca_scores')
           .update(caData)
           .eq('id', editingCA.id)
         error = updateError
       } else {
-        const { error: upsertError } = await supabase
-          .from('exam_scores')
-          .upsert(caData, {
-            onConflict: 'student_id,subject,term,academic_year'
-          })
-        error = upsertError
+        const { error: insertError } = await supabase
+          .from('ca_scores')
+          .insert(caData)
+        error = insertError
       }
         
       if (error) throw error
@@ -847,7 +804,7 @@ export default function StudentDetailsPage() {
     
     try {
       const { error } = await supabase
-        .from('exam_scores')
+        .from('ca_scores')
         .delete()
         .eq('id', caId)
         
@@ -1511,7 +1468,7 @@ export default function StudentDetailsPage() {
                               <TableCell className="font-medium">{ca.subject}</TableCell>
                               <TableCell className="text-center">{ca.ca1_score}</TableCell>
                               <TableCell className="text-center">{ca.ca2_score}</TableCell>
-                              <TableCell className="text-center">{ca.exam_total_score}/60</TableCell>
+                              <TableCell className="text-center">{ca.exam_objective_score + ca.exam_theory_score}/60</TableCell>
                               <TableCell className="text-center font-bold">{ca.total_score}</TableCell>
                               <TableCell className="text-center">
                                 <Badge className={getGradeColor(ca.grade)}>{ca.grade}</Badge>

@@ -1,4 +1,4 @@
-// src/components/staff/NotificationDropdown.tsx
+// src/components/staff/NotificationDropdown.tsx - UPDATED (auto-get userId)
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -14,20 +14,32 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useRouter } from 'next/navigation'
+import { toast } from 'sonner'
 
 interface Notification {
   id: string; title: string; message: string
-  type?: 'exam_graded' | 'new_exam' | 'needs_grading' | 'general'
+  type?: 'exam_graded' | 'new_exam' | 'needs_grading' | 'general' | 'exam_submitted'
   read: boolean; created_at: string; link?: string
 }
 
-export function NotificationDropdown({ userId }: { userId: string }) {
+export function NotificationDropdown() {
   const router = useRouter()
+  const [userId, setUserId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
 
+  // Get current user ID
+  useEffect(() => {
+    const getUserId = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) setUserId(user.id)
+    }
+    getUserId()
+  }, [])
+
   const loadNotifications = useCallback(async () => {
+    if (!userId) return
     setLoading(true)
     try {
       const { data } = await supabase
@@ -43,17 +55,22 @@ export function NotificationDropdown({ userId }: { userId: string }) {
     finally { setLoading(false) }
   }, [userId])
 
-  useEffect(() => { loadNotifications() }, [loadNotifications])
+  useEffect(() => { 
+    if (userId) loadNotifications() 
+  }, [userId, loadNotifications])
+  
   useEffect(() => {
+    if (!userId) return
     const interval = setInterval(loadNotifications, 30000)
     return () => clearInterval(interval)
-  }, [loadNotifications])
+  }, [userId, loadNotifications])
 
   const getIcon = (type?: string) => {
     switch (type) {
       case 'exam_graded': return <Award className="h-4 w-4 text-green-500" />
       case 'new_exam': return <BookOpen className="h-4 w-4 text-blue-500" />
       case 'needs_grading': return <CheckCircle className="h-4 w-4 text-amber-500" />
+      case 'exam_submitted': return <Bell className="h-4 w-4 text-amber-500" />
       default: return <Bell className="h-4 w-4 text-slate-500" />
     }
   }
@@ -76,12 +93,18 @@ export function NotificationDropdown({ userId }: { userId: string }) {
     e.stopPropagation()
     await supabase.from('notifications').delete().eq('id', id)
     loadNotifications()
+    toast.success('Notification deleted')
   }
 
   const markAllRead = async () => {
+    if (!userId) return
     await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
     loadNotifications()
+    toast.success('All notifications marked as read')
   }
+
+  // Don't render anything until we have userId
+  if (!userId) return null
 
   return (
     <DropdownMenu>

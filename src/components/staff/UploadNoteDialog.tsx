@@ -1,9 +1,9 @@
 // components/staff/UploadNoteDialog.tsx
-'use client'
+"use client";
 
-import { useState, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
+import { useState, useRef } from "react";
+import { supabase } from "@/lib/supabase";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -11,113 +11,136 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+} from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import {
-  Loader2, Upload, X, FileText, Users, BookOpen, Bell, Send
-} from 'lucide-react'
+  Loader2,
+  Upload,
+  X,
+  FileText,
+  Users,
+  BookOpen,
+  Bell,
+  Send,
+} from "lucide-react";
 
 interface UploadNoteDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSuccess: () => void
-  teacherProfile: any
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess: () => void;
+  teacherProfile: any;
 }
 
 const subjects = [
-  'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
-  'Economics', 'Government', 'Literature in English', 'Geography',
-  'Commerce', 'Financial Accounting', 'Agricultural Science',
-  'Christian Religious Studies', 'Civic Education', 'Computer Studies',
-  'Basic Science', 'Basic Technology', 'Social Studies', 'Business Studies'
-]
+  "Mathematics",
+  "English Language",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "Economics",
+  "Government",
+  "Literature in English",
+  "Geography",
+  "Commerce",
+  "Financial Accounting",
+  "Agricultural Science",
+  "Christian Religious Studies",
+  "Civic Education",
+  "",
+  "Basic Science",
+  "Basic Technology",
+  "Social Studies",
+  "Business Studies",
+];
 
-const classes = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
+const classes = ["JSS 1", "JSS 2", "JSS 3", "SS 1", "SS 2", "SS 3"];
 
 export function UploadNoteDialog({
   open,
   onOpenChange,
   onSuccess,
-  teacherProfile
+  teacherProfile,
 }: UploadNoteDialogProps) {
-  const [loading, setLoading] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [selectedClasses, setSelectedClasses] = useState<string[]>([])
-  const [notifyStudents, setNotifyStudents] = useState(true)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  
+  const [loading, setLoading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+  const [notifyStudents, setNotifyStudents] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [formData, setFormData] = useState({
-    title: '',
-    subject: '',
-    description: ''
-  })
+    title: "",
+    subject: "",
+    description: "",
+  });
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
       if (file.size > 50 * 1024 * 1024) {
-        toast.error('File size should be less than 50MB')
-        return
+        toast.error("File size should be less than 50MB");
+        return;
       }
-      setSelectedFile(file)
+      setSelectedFile(file);
     }
-  }
+  };
 
   const toggleClass = (className: string) => {
-    setSelectedClasses(prev =>
+    setSelectedClasses((prev) =>
       prev.includes(className)
-        ? prev.filter(c => c !== className)
-        : [...prev, className]
-    )
-  }
+        ? prev.filter((c) => c !== className)
+        : [...prev, className],
+    );
+  };
 
   const handleSubmit = async () => {
     if (!formData.title || !formData.subject || selectedClasses.length === 0) {
-      toast.error('Please fill in all required fields and select at least one class')
-      return
+      toast.error(
+        "Please fill in all required fields and select at least one class",
+      );
+      return;
     }
 
-    setLoading(true)
-    
+    setLoading(true);
+
     try {
-      let fileUrl = null
-      let fileName = null
+      let fileUrl = null;
+      let fileName = null;
 
       // Upload file
       if (selectedFile) {
-        const fileExt = selectedFile.name.split('.').pop()
-        fileName = `${Date.now()}-${selectedFile.name}`
-        const filePath = `notes/${fileName}`
+        const fileExt = selectedFile.name.split(".").pop();
+        fileName = `${Date.now()}-${selectedFile.name}`;
+        const filePath = `notes/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
-          .from('student-photos')
-          .upload(filePath, selectedFile)
+          .from("student-photos")
+          .upload(filePath, selectedFile);
 
-        if (uploadError) throw uploadError
+        if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
-          .from('student-photos')
-          .getPublicUrl(filePath)
-        
-        fileUrl = publicUrl
+        const {
+          data: { publicUrl },
+        } = supabase.storage.from("student-photos").getPublicUrl(filePath);
+
+        fileUrl = publicUrl;
       }
 
       // Create notes for each selected class
       for (const className of selectedClasses) {
         const { data: note, error: noteError } = await supabase
-          .from('notes')
+          .from("notes")
           .insert({
             title: formData.title,
             subject: formData.subject,
@@ -126,67 +149,68 @@ export function UploadNoteDialog({
             file_url: fileUrl,
             file_name: selectedFile?.name || null,
             created_by: teacherProfile?.id,
-            teacher_name: teacherProfile?.full_name || 'Teacher',
-            status: 'published',
-            created_at: new Date().toISOString()
+            teacher_name: teacherProfile?.full_name || "Teacher",
+            status: "published",
+            created_at: new Date().toISOString(),
           })
-          .select('id')
-          .single()
+          .select("id")
+          .single();
 
-        if (noteError) throw noteError
+        if (noteError) throw noteError;
 
         // Send notifications
         if (notifyStudents && note) {
           const { data: students } = await supabase
-            .from('profiles')
-            .select('id, full_name')
-            .eq('class', className)
-            .eq('role', 'student')
+            .from("profiles")
+            .select("id, full_name")
+            .eq("class", className)
+            .eq("role", "student");
 
           if (students && students.length > 0) {
             const notifications = students.map((student: any) => ({
               user_id: student.id,
-              title: '📖 New Study Material',
+              title: "📖 New Study Material",
               message: `${formData.title} - ${formData.subject}`,
-              type: 'new_note',
-              link: '/student/courses',
+              type: "new_note",
+              link: "/student/courses",
               metadata: {
                 note_id: note.id,
                 class: className,
-                subject: formData.subject
+                subject: formData.subject,
               },
               read: false,
-              created_at: new Date().toISOString()
-            }))
+              created_at: new Date().toISOString(),
+            }));
 
-            await supabase.from('notifications').insert(notifications)
+            await supabase.from("notifications").insert(notifications);
           }
         }
       }
 
-      toast.success(`Study note published to ${selectedClasses.length} class(es)!`)
+      toast.success(
+        `Study note published to ${selectedClasses.length} class(es)!`,
+      );
       if (notifyStudents) {
-        toast.info('Students have been notified')
+        toast.info("Students have been notified");
       }
-      
-      onSuccess()
-      handleClose()
-      
+
+      onSuccess();
+      handleClose();
     } catch (error) {
-      console.error('Error creating note:', error)
-      toast.error('Failed to publish study note')
+      console.error("Error creating note:", error);
+      toast.error("Failed to publish study note");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const handleClose = () => {
-    setFormData({ title: '', subject: '', description: '' })
-    setSelectedFile(null)
-    setSelectedClasses([])
-    setNotifyStudents(true)
-    onOpenChange(false)
-  }
+    setFormData({ title: "", subject: "", description: "" });
+    setSelectedFile(null);
+    setSelectedClasses([]);
+    setNotifyStudents(true);
+    onOpenChange(false);
+  };
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -208,7 +232,9 @@ export function UploadNoteDialog({
             <Input
               id="title"
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, title: e.target.value })
+              }
               placeholder="e.g., Week 1 Lecture Notes"
             />
           </div>
@@ -216,13 +242,18 @@ export function UploadNoteDialog({
           {/* Subject */}
           <div>
             <Label htmlFor="subject">Subject *</Label>
-            <Select value={formData.subject} onValueChange={(v) => setFormData({ ...formData, subject: v })}>
+            <Select
+              value={formData.subject}
+              onValueChange={(v) => setFormData({ ...formData, subject: v })}
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
-                {subjects.map(subject => (
-                  <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                {subjects.map((subject) => (
+                  <SelectItem key={subject} value={subject}>
+                    {subject}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -232,13 +263,16 @@ export function UploadNoteDialog({
           <div>
             <Label>Share with Classes *</Label>
             <div className="flex flex-wrap gap-2 mt-2 p-3 bg-slate-50 rounded-lg">
-              {classes.map(className => (
+              {classes.map((className) => (
                 <Badge
                   key={className}
-                  variant={selectedClasses.includes(className) ? 'default' : 'outline'}
+                  variant={
+                    selectedClasses.includes(className) ? "default" : "outline"
+                  }
                   className={cn(
                     "cursor-pointer hover:bg-primary/10 transition-all px-3 py-1.5 text-sm",
-                    selectedClasses.includes(className) && "bg-primary text-white"
+                    selectedClasses.includes(className) &&
+                      "bg-primary text-white",
                   )}
                   onClick={() => toggleClass(className)}
                 >
@@ -258,7 +292,9 @@ export function UploadNoteDialog({
             <Textarea
               id="description"
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               placeholder="Describe the study material..."
               rows={3}
             />
@@ -274,7 +310,7 @@ export function UploadNoteDialog({
               className="hidden"
               accept=".pdf,.doc,.docx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.mp4,.mp3"
             />
-            <div 
+            <div
               className="border-2 border-dashed border-slate-200 rounded-lg p-4 text-center cursor-pointer hover:border-primary/50 transition-colors"
               onClick={() => fileInputRef.current?.click()}
             >
@@ -282,7 +318,9 @@ export function UploadNoteDialog({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="h-5 w-5 text-blue-500" />
-                    <span className="text-sm truncate">{selectedFile.name}</span>
+                    <span className="text-sm truncate">
+                      {selectedFile.name}
+                    </span>
                     <span className="text-xs text-slate-500">
                       ({(selectedFile.size / 1024 / 1024).toFixed(2)} MB)
                     </span>
@@ -291,8 +329,8 @@ export function UploadNoteDialog({
                     variant="ghost"
                     size="sm"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedFile(null)
+                      e.stopPropagation();
+                      setSelectedFile(null);
                     }}
                   >
                     <X className="h-4 w-4" />
@@ -301,8 +339,12 @@ export function UploadNoteDialog({
               ) : (
                 <div>
                   <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
-                  <p className="text-sm text-slate-600">Click to upload a file</p>
-                  <p className="text-xs text-slate-400 mt-1">PDF, DOC, PPT, Images, Videos (Max 50MB)</p>
+                  <p className="text-sm text-slate-600">
+                    Click to upload a file
+                  </p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    PDF, DOC, PPT, Images, Videos (Max 50MB)
+                  </p>
                 </div>
               )}
             </div>
@@ -313,17 +355,16 @@ export function UploadNoteDialog({
             <Bell className="h-5 w-5 text-green-600" />
             <div className="flex-1">
               <p className="font-medium text-green-800">Notify Students</p>
-              <p className="text-xs text-green-600">Send notification to all students in selected classes</p>
+              <p className="text-xs text-green-600">
+                Send notification to all students in selected classes
+              </p>
             </div>
             <Badge
-              variant={notifyStudents ? 'default' : 'outline'}
-              className={cn(
-                "cursor-pointer",
-                notifyStudents && "bg-green-600"
-              )}
+              variant={notifyStudents ? "default" : "outline"}
+              className={cn("cursor-pointer", notifyStudents && "bg-green-600")}
               onClick={() => setNotifyStudents(!notifyStudents)}
             >
-              {notifyStudents ? 'ON' : 'OFF'}
+              {notifyStudents ? "ON" : "OFF"}
             </Badge>
           </div>
         </div>
@@ -332,7 +373,11 @@ export function UploadNoteDialog({
           <Button variant="outline" onClick={handleClose}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} disabled={loading} className="bg-green-600">
+          <Button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="bg-green-600"
+          >
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" />
             ) : (
@@ -343,5 +388,5 @@ export function UploadNoteDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

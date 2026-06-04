@@ -1,37 +1,4 @@
-// src/components/staff/exams/edit/types.ts - COMPLETE WITH target_audience
-export interface Question {
-  id: string
-  question_text: string
-  type: 'objective' | 'theory'
-  options: string[]
-  correct_answer: string
-  points: number
-  order_number: number
-  exam_id?: string
-  created_at?: string
-  updated_at?: string
-}
-
-export interface TheorySubQuestion {
-  id: string
-  text: string
-  points: number
-  keywords?: string[]
-  model_answer?: string
-}
-
-export interface TheoryQuestion {
-  id: string
-  question_text: string
-  points: number
-  sub_questions?: TheorySubQuestion[]
-  keywords?: string[]
-  model_answer?: string
-  order_number: number
-  exam_id?: string
-  created_at?: string
-  updated_at?: string
-}
+// src/components/staff/exams/edit/types.ts - COMPLETE TYPES FILE
 
 export interface Exam {
   id: string
@@ -52,9 +19,48 @@ export interface Exam {
   term?: string
   session_year?: string
   target_audience?: string
+  description?: string
+  starts_at?: string
+  ends_at?: string
   created_at: string
   published_at: string | null
   created_by: string
+  updated_at?: string
+}
+
+export interface Question {
+  id: string
+  exam_id?: string
+  question_text: string
+  type: 'objective' | 'theory'
+  options: string[]
+  correct_answer: string
+  points: number
+  order_number: number
+  created_at?: string
+  updated_at?: string
+}
+
+export interface TheoryQuestion {
+  id: string
+  exam_id?: string
+  question_text: string
+  type: 'theory'
+  points: number
+  order_number: number
+  created_at?: string
+  updated_at?: string
+  sub_questions?: TheorySubQuestion[]
+  keywords?: string[]
+  model_answer?: string
+}
+
+export interface TheorySubQuestion {
+  id: string
+  text: string
+  points: number
+  keywords?: string[]
+  model_answer?: string
 }
 
 export interface StaffProfile {
@@ -80,4 +86,34 @@ export interface ExamDetailsForm {
   term: string
   session_year: string
   target_audience: string
+}
+
+export interface ExamAttempt {
+  id: string
+  exam_id: string
+  student_id: string
+  status: 'in_progress' | 'completed' | 'graded' | 'pending_theory'
+  started_at?: string
+  submitted_at?: string
+  completed_at?: string
+  score?: number
+  percentage?: number
+  total_score?: number
+  total_marks?: number
+  objective_score?: number
+  theory_feedback?: any
+  ca_total_score?: number
+  ca_percentage?: number
+}
+
+export interface Subject {
+  id: string
+  name: string
+  code?: string
+}
+
+export interface Class {
+  id: string
+  name: string
+  department?: string
 }

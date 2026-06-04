@@ -1,7 +1,5 @@
-// app/admin/report-cards/view/page.tsx - COMPLETE WITH PROPER CLOSING TAGS
-
 'use client'
-
+import React from 'react'
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -107,8 +105,7 @@ const getOverallGradeColor = (grade: string): string => {
 // ============================================
 interface SubjectScore {
   subject: string
-  ca1: number
-  ca2: number
+  ca: number  // Combined CA (CA1 + CA2) - Max 40
   exam_obj: number
   exam_theory: number
   total: number
@@ -239,18 +236,20 @@ export default function ViewReportCardPage() {
 
       if (scoresError) throw scoresError
 
-      // Process scores into subjects
+      // Process scores into subjects - combine CA1 and CA2 into single CA (max 40)
+      // Exam total max 60 (objective + theory)
       let processedSubjects: SubjectScore[] = (scoresData || []).map((score: any) => {
+        const combinedCA = (score.ca1_score || 0) + (score.ca2_score || 0)
         const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-        const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
+        const total = combinedCA + examTotal
+        // Calculate percentage out of 100 for grading
         const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
         const grade = getWAECGrade(percentage)
         const remark = getGradeRemark(grade)
 
         return {
           subject: score.subject,
-          ca1: score.ca1_score || 0,
-          ca2: score.ca2_score || 0,
+          ca: combinedCA,  // Combined CA1 + CA2 (max 40)
           exam_obj: score.exam_objective_score || 0,
           exam_theory: score.exam_theory_score || 0,
           total: total,
@@ -444,9 +443,17 @@ export default function ViewReportCardPage() {
       })
     : 'To be announced'
 
-  // Find best and worst subjects for summary
-  const bestSubject = subjects.length > 0 ? subjects.reduce((a, b) => a.total > b.total ? a : b) : null
-  const worstSubject = subjects.length > 0 ? subjects.reduce((a, b) => a.total < b.total ? a : b) : null
+  // Find best and worst subjects
+  const bestSubject = subjects.length > 0 
+    ? subjects.reduce((a, b) => a.total > b.total ? a : b) 
+    : null
+  
+  // Only show worst subject if score is below 50%
+  const worstSubject = subjects.length > 0 
+    ? subjects.reduce((a, b) => a.total < b.total ? a : b) 
+    : null
+  
+  const showAreaForImprovement = worstSubject && worstSubject.total < 50
   const formattedAvg = averageScore.toFixed(2)
 
   return (
@@ -536,18 +543,17 @@ export default function ViewReportCardPage() {
                 <thead className="bg-blue-600 text-white">
                   <tr>
                     <th className="border px-2 py-1 text-left">Subjects</th>
-                    <th className="border px-2 py-1 text-center w-16">CA1</th>
-                    <th className="border px-2 py-1 text-center w-16">CA2</th>
+                    <th className="border px-2 py-1 text-center w-16">CA</th>
                     <th className="border px-2 py-1 text-center w-16">Exam</th>
                     <th className="border px-2 py-1 text-center w-16">Total</th>
                     <th className="border px-2 py-1 text-center w-14">Grade</th>
-                    <th className="border px-2 py-1 text-left">Remarks</th>
+                    <th className="border px-2 py-1 text-left">Remark</th>
                   </tr>
                 </thead>
                 <tbody>
                   {subjects.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="text-center py-4 text-gray-500">
+                      <td colSpan={6} className="text-center py-4 text-gray-500">
                         No scores available for this student
                       </td>
                     </tr>
@@ -555,8 +561,7 @@ export default function ViewReportCardPage() {
                     subjects.map((subject) => (
                       <tr key={subject.subject} className="hover:bg-gray-50">
                         <td className="border px-2 py-1">{subject.subject}</td>
-                        <td className="border text-center font-mono">{subject.ca1}</td>
-                        <td className="border text-center font-mono">{subject.ca2}</td>
+                        <td className="border text-center font-mono">{subject.ca}</td>
                         <td className="border text-center font-mono">{subject.exam_obj + subject.exam_theory}</td>
                         <td className="border text-center font-bold font-mono">{subject.total}</td>
                         <td className="border text-center">
@@ -569,7 +574,7 @@ export default function ViewReportCardPage() {
                 </tbody>
                 <tfoot className="bg-gray-100 font-bold">
                   <tr>
-                    <td colSpan={4} className="border px-2 py-1 text-right">TOTAL / AVERAGE:</td>
+                    <td colSpan={3} className="border px-2 py-1 text-right">TOTAL / AVERAGE:</td>
                     <td className="border text-center">{totalScore}</td>
                     <td className="border text-center">
                       <span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span>
@@ -634,7 +639,7 @@ export default function ViewReportCardPage() {
                     <span className="font-bold">{bestSubject.subject} ({bestSubject.total})</span>
                   </div>
                 )}
-                {worstSubject && (
+                {showAreaForImprovement && (
                   <div className="flex justify-between text-red-600">
                     <span>Area for Improvement</span>
                     <span className="font-bold">{worstSubject.subject} ({worstSubject.total})</span>
