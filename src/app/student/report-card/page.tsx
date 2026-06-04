@@ -486,109 +486,119 @@ export default function StudentReportCardPage() {
   ]
 
   return (
-    <div className="bg-gray-100 min-h-screen py-4">
-      {/* TOPBAR */}
-      <div className="no-print max-w-[210mm] mx-auto mb-4 flex items-center justify-between px-4">
-        <Button variant="outline" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4 mr-2" /> Back
-        </Button>
+    <div className="bg-gray-100 min-h-screen py-4 print:py-0">
+      {/* TOPBAR - Responsive flex wrapping */}
+      <div className="no-print max-w-[210mm] mx-auto mb-4 px-4 print:hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Button variant="outline" onClick={() => router.back()} size="sm">
+            <ArrowLeft className="h-4 w-4 mr-2" /> Back
+          </Button>
 
-        <div className="flex gap-2">
-          <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-            <SelectTrigger className="h-8 text-xs w-[130px]">
-              <SelectValue placeholder="Term" />
-            </SelectTrigger>
-            <SelectContent>
-              {TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="h-8 text-xs w-[140px]">
-              <SelectValue placeholder="Year" />
-            </SelectTrigger>
-            <SelectContent>
-              {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
-          </Button>
-          <Button variant="outline" size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-2" /> Print
-          </Button>
-          <Button size="sm" onClick={handleDownloadPDF} disabled={downloading}>
-            {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
-            {downloading ? 'Generating...' : 'PDF'}
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+              <SelectTrigger className="h-8 text-xs w-[130px]">
+                <SelectValue placeholder="Term" />
+              </SelectTrigger>
+              <SelectContent>
+                {TERMS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <SelectTrigger className="h-8 text-xs w-[140px]">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent>
+                {YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={handleRefresh}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+            </Button>
+            <Button variant="outline" size="sm" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-2" /> Print
+            </Button>
+            <Button size="sm" onClick={handleDownloadPDF} disabled={downloading}>
+              {downloading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Download className="h-4 w-4 mr-2" />}
+              {downloading ? 'Generating...' : 'PDF'}
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* REPORT CARD - EXACT MATCH TO ADMIN VIEW WITH PROPER SPACING */}
+      {/* REPORT CARD - Fully responsive with proper sizing */}
       <div 
         ref={reportCardRef}
-        className="bg-white w-[210mm] min-h-[297mm] mx-auto text-[11px] text-black border border-gray-300 p-4 print:p-3 print:border-none"
+        className="bg-white w-full max-w-[210mm] mx-auto text-[11px] text-black border border-gray-300 p-4 print:p-3 print:border-none shadow-lg print:shadow-none"
+        style={{ margin: '0 auto' }}
       >
-        {/* HEADER - Increased bottom padding */}
-        <div className="border-b border-gray-300 pb-4 mb-3 print:pb-3 print:mb-2">
-          <div className="flex items-start justify-between gap-4">
-            {/* LOGO */}
-            <div className="w-16 print:w-12 flex-shrink-0">
-              {schoolSettings.logo_url && (
-                <img src={schoolSettings.logo_url} alt="logo" className="w-14 h-14 object-contain print:w-10 print:h-10" />
+        {/* HEADER - Responsive grid layout */}
+        <div className="border-b border-gray-300 pb-3 print:pb-2 mb-2">
+          <div className="grid grid-cols-[auto,1fr,auto] gap-3 items-start">
+            {/* LOGO - Responsive sizing */}
+            <div className="w-16 sm:w-20 print:w-12 flex-shrink-0">
+              {schoolSettings.logo_url ? (
+                <img src={schoolSettings.logo_url} alt="logo" className="w-full h-auto object-contain max-h-16 sm:max-h-20 print:max-h-12" />
+              ) : (
+                <div className="w-full h-16 sm:h-20 bg-gray-100 border border-gray-200 flex items-center justify-center text-gray-400 text-xs">
+                  Logo
+                </div>
               )}
             </div>
 
-            {/* SCHOOL INFO */}
-            <div className="flex-1 text-center">
-              <h1 className="text-[18px] font-bold uppercase text-blue-900 print:text-[14px]">
+            {/* SCHOOL INFO - Responsive text sizing */}
+            <div className="flex-1 text-center px-2">
+              <h1 className="text-lg sm:text-xl font-bold uppercase text-blue-900 print:text-[14px] leading-tight">
                 {schoolSettings.name}
               </h1>
-              <p className="text-[10px] print:text-[8px]">{schoolSettings.address}</p>
-              <p className="text-[10px] print:text-[8px]">Tel: {schoolSettings.phone} | Email: {schoolSettings.email}</p>
-              <p className="text-[9px] italic text-amber-600 mt-1 print:text-[7px]">"{schoolSettings.motto}"</p>
-              <h2 className="font-bold mt-2 text-[14px] print:text-[11px]">
+              <p className="text-[10px] sm:text-[11px] print:text-[8px] text-gray-600">{schoolSettings.address}</p>
+              <p className="text-[9px] sm:text-[10px] print:text-[8px] text-gray-600">Tel: {schoolSettings.phone}</p>
+              <p className="text-[9px] sm:text-[10px] print:text-[8px] text-gray-600">Email: {schoolSettings.email}</p>
+              <p className="text-[8px] sm:text-[9px] italic text-amber-600 mt-1 print:text-[7px]">"{schoolSettings.motto}"</p>
+              <h2 className="font-bold mt-2 text-sm sm:text-base print:text-[11px] text-gray-800">
                 {getTermLabel(selectedReportCard?.term || selectedTerm)} Student&apos;s Performance Report
               </h2>
             </div>
 
-            {/* PHOTO */}
-            <div className="w-20 h-24 border border-gray-300 print:w-16 print:h-20 flex-shrink-0">
+            {/* PHOTO - Responsive sizing */}
+            <div className="w-16 h-20 sm:w-20 sm:h-24 print:w-16 print:h-20 border border-gray-300 flex-shrink-0 bg-gray-50">
               {selectedReportCard?.student_photo_url ? (
                 <img src={selectedReportCard.student_photo_url} alt="student" className="w-full h-full object-cover" />
               ) : studentProfile?.photo_url ? (
                 <img src={studentProfile.photo_url} alt="student" className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-xs">Photo</div>
+                <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-[10px] text-center p-1">
+                  Student Photo
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        {/* STUDENT INFO - Clean grid with proper spacing */}
-        <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-[11px] mb-4 print:mb-3 print:text-[9px]">
-          <div className="flex"><span className="font-bold w-32">Name:</span><span>{selectedReportCard?.student_name}</span></div>
-          <div className="flex"><span className="font-bold w-32">Admission No:</span><span>{selectedReportCard?.student_admission_number || studentProfile?.admission_number || '—'}</span></div>
-          <div className="flex"><span className="font-bold w-32">Class:</span><span>{selectedReportCard?.class || studentProfile?.class || '—'}</span></div>
-          <div className="flex"><span className="font-bold w-32">Term:</span><span>{getTermLabel(selectedReportCard?.term || selectedTerm)}</span></div>
-          <div className="flex"><span className="font-bold w-32">Session:</span><span>{selectedReportCard?.academic_year || selectedYear}</span></div>
-          <div className="flex"><span className="font-bold w-32">Next Term:</span><span>{formattedNextTermDate}</span></div>
+        {/* STUDENT INFO - Responsive grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[11px] mb-4 print:mb-2 print:text-[9px]">
+          <div className="flex flex-wrap"><span className="font-bold w-32">Name:</span><span className="flex-1">{selectedReportCard?.student_name}</span></div>
+          <div className="flex flex-wrap"><span className="font-bold w-32">Admission No:</span><span className="flex-1">{selectedReportCard?.student_admission_number || studentProfile?.admission_number || '—'}</span></div>
+          <div className="flex flex-wrap"><span className="font-bold w-32">Class:</span><span className="flex-1">{selectedReportCard?.class || studentProfile?.class || '—'}</span></div>
+          <div className="flex flex-wrap"><span className="font-bold w-32">Term:</span><span className="flex-1">{getTermLabel(selectedReportCard?.term || selectedTerm)}</span></div>
+          <div className="flex flex-wrap"><span className="font-bold w-32">Session:</span><span className="flex-1">{selectedReportCard?.academic_year || selectedYear}</span></div>
+          <div className="flex flex-wrap"><span className="font-bold w-32">Next Term:</span><span className="flex-1 text-xs sm:text-sm">{formattedNextTermDate}</span></div>
         </div>
 
-        {/* MAIN CONTENT */}
-        <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-4">
+        {/* MAIN CONTENT - Responsive column layout */}
+        <div className="flex flex-col lg:flex-row gap-4">
           {/* LEFT COLUMN - ACADEMIC RESULTS */}
-          <div>
-            {/* SUBJECT TABLE */}
+          <div className="flex-1 min-w-0">
+            {/* SUBJECT TABLE - Responsive overflow */}
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300 text-[10px] print:text-[8px] min-w-[500px]">
+              <table className="w-full border-collapse border border-gray-300 text-[10px] sm:text-[11px] print:text-[8px] min-w-[500px]">
                 <thead className="bg-blue-600 text-white">
                   <tr>
-                    <th className="border px-2 py-1.5 text-left">Subjects</th>
-                    <th className="border px-2 py-1.5 text-center w-16">CA</th>
-                    <th className="border px-2 py-1.5 text-center w-16">Exam</th>
-                    <th className="border px-2 py-1.5 text-center w-16">Total</th>
-                    <th className="border px-2 py-1.5 text-center w-14">Grade</th>
-                    <th className="border px-2 py-1.5 text-left">Remark</th>
+                    <th className="border px-2 py-1 text-left">Subjects</th>
+                    <th className="border px-2 py-1 text-center w-16">CA</th>
+                    <th className="border px-2 py-1 text-center w-16">Exam</th>
+                    <th className="border px-2 py-1 text-center w-16">Total</th>
+                    <th className="border px-2 py-1 text-center w-14">Grade</th>
+                    <th className="border px-2 py-1 text-left">Remark</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -611,7 +621,7 @@ export default function StudentReportCardPage() {
                 </tbody>
                 <tfoot className="bg-gray-100 font-bold">
                   <tr>
-                    <td colSpan={3} className="border px-2 py-1.5 text-right">TOTAL / AVERAGE:</td>
+                    <td colSpan={3} className="border px-2 py-1 text-right">TOTAL / AVERAGE:</td>
                     <td className="border text-center">{selectedReportCard?.total_score || 0}</td>
                     <td className="border text-center">
                       <span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span>
@@ -623,31 +633,31 @@ export default function StudentReportCardPage() {
             </div>
 
             {/* CLASS TEACHER'S REMARK */}
-            <div className="mt-4 border border-gray-300">
-              <div className="bg-purple-600 text-white px-3 py-1.5 text-[10px] font-bold flex items-center gap-1">
+            <div className="mt-3 border border-gray-300">
+              <div className="bg-purple-600 text-white px-2 py-1 text-[10px] font-bold flex items-center gap-1">
                 <Sparkles className="h-3 w-3" />
                 CLASS TEACHER'S REMARK
               </div>
-              <div className="p-3 text-[10px] italic leading-relaxed bg-purple-50">
+              <div className="p-2 text-[10px] italic leading-relaxed bg-purple-50">
                 {selectedReportCard?.teacher_comments || 'No comment available.'}
               </div>
             </div>
 
             {/* PRINCIPAL'S REMARK */}
-            <div className="mt-3 border border-gray-300">
-              <div className="bg-blue-600 text-white px-3 py-1.5 text-[10px] font-bold">
+            <div className="mt-2 border border-gray-300">
+              <div className="bg-blue-600 text-white px-2 py-1 text-[10px] font-bold">
                 PRINCIPAL'S REMARK
               </div>
-              <div className="p-3 text-[10px] italic leading-relaxed">
+              <div className="p-2 text-[10px] italic leading-relaxed">
                 {selectedReportCard?.principal_comments || 'No comment available.'}
               </div>
             </div>
 
-            {/* GRADE SCALE */}
-            <div className="mt-4">
-              <div className="bg-blue-600 text-white text-[10px] px-3 py-1.5 font-bold">Grade Scale</div>
-              <div className="border border-gray-300 p-3">
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[9px]">
+            {/* GRADE SCALE - Responsive grid */}
+            <div className="mt-3">
+              <div className="bg-blue-600 text-white text-[10px] px-2 py-1 font-bold">Grade Scale</div>
+              <div className="border border-gray-300 p-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 text-[9px]">
                   <div><span className={getGradeStyle('A1')}>A1</span> 75-100</div>
                   <div><span className={getGradeStyle('B2')}>B2</span> 70-74</div>
                   <div><span className={getGradeStyle('B3')}>B3</span> 65-69</div>
@@ -663,10 +673,10 @@ export default function StudentReportCardPage() {
           </div>
 
           {/* RIGHT COLUMN - PSYCHOMOTOR & SKILLS */}
-          <div>
+          <div className="w-full lg:w-64 xl:w-72 flex-shrink-0">
             {/* PERFORMANCE SUMMARY */}
             <Panel title="Performance Summary">
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 <div className="flex justify-between"><span>Total Score</span><span className="font-bold">{selectedReportCard?.total_score || 0}</span></div>
                 <div className="flex justify-between"><span>Average</span><span className="font-bold">{formattedAvg}%</span></div>
                 <div className="flex justify-between"><span>Grade</span><span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span></div>
@@ -692,7 +702,7 @@ export default function StudentReportCardPage() {
                   <tbody>
                     {behaviorRatings.map((item) => (
                       <tr key={item.name}>
-                        <td className="border px-2 py-1">{item.name}</td>
+                        <td className="border px-1 py-1">{item.name}</td>
                         <td className="border text-center w-12 font-bold">{item.rating}</td>
                       </tr>
                     ))}
@@ -708,7 +718,7 @@ export default function StudentReportCardPage() {
                   <tbody>
                     {skillRatings.map((item) => (
                       <tr key={item.name}>
-                        <td className="border px-2 py-1">{item.name}</td>
+                        <td className="border px-1 py-1">{item.name}</td>
                         <td className="border text-center w-12 font-bold">{item.rating}</td>
                       </tr>
                     ))}
@@ -720,23 +730,23 @@ export default function StudentReportCardPage() {
             {/* RATING KEY */}
             <Panel title="Key To Ratings">
               <div className="space-y-1 text-[9px]">
-                <div><span className="font-bold">5</span> - Excellent</div>
-                <div><span className="font-bold">4</span> - Very Good</div>
-                <div><span className="font-bold">3</span> - Good</div>
-                <div><span className="font-bold">2</span> - Fair</div>
-                <div><span className="font-bold">1</span> - Poor</div>
+                <div>5 - Excellent</div>
+                <div>4 - Very Good</div>
+                <div>3 - Good</div>
+                <div>2 - Fair</div>
+                <div>1 - Poor</div>
               </div>
             </Panel>
           </div>
         </div>
 
-        {/* FOOTER - Clean with proper spacing */}
-        <div className="border-t border-gray-300 mt-5 pt-3 text-center text-[9px] text-gray-500 print:mt-4 print:pt-2 print:text-[7px]">
-          <p>Powered by Vincollins Portal | {schoolSettings.motto}</p>
+        {/* FOOTER */}
+        <div className="border-t border-gray-300 mt-4 pt-2 text-center text-[9px] text-gray-500 print:mt-2 print:pt-1 print:text-[7px]">
+          Powered by Vincollins Portal | {schoolSettings.motto}
         </div>
       </div>
 
-      {/* PRINT CSS */}
+      {/* PRINT CSS - Ensures proper rendering when printing */}
       <style jsx global>{`
         @media print {
           body { 
@@ -760,6 +770,28 @@ export default function StudentReportCardPage() {
           }
           .border {
             border-color: #000 !important;
+          }
+          /* Ensure proper scaling on print */
+          .report-card-container {
+            width: 100%;
+            margin: 0 auto;
+          }
+          img {
+            max-width: 100%;
+            height: auto;
+          }
+        }
+        
+        /* Responsive adjustments for very small screens */
+        @media (max-width: 640px) {
+          .grid-cols-[auto,1fr,auto] {
+            gap: 0.5rem;
+          }
+          .text-lg {
+            font-size: 1rem;
+          }
+          .text-sm {
+            font-size: 0.75rem;
           }
         }
       `}</style>
