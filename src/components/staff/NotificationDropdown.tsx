@@ -1,4 +1,4 @@
-// src/components/staff/NotificationDropdown.tsx - UPDATED (auto-get userId)
+// src/components/staff/NotificationDropdown.tsx
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,21 +22,16 @@ interface Notification {
   read: boolean; created_at: string; link?: string
 }
 
-export function NotificationDropdown() {
+// ✅ Add userId as a prop
+interface NotificationDropdownProps {
+  userId: string
+}
+
+export function NotificationDropdown({ userId }: NotificationDropdownProps) {
   const router = useRouter()
-  const [userId, setUserId] = useState<string | null>(null)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
-
-  // Get current user ID
-  useEffect(() => {
-    const getUserId = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) setUserId(user.id)
-    }
-    getUserId()
-  }, [])
 
   const loadNotifications = useCallback(async () => {
     if (!userId) return
@@ -55,15 +50,11 @@ export function NotificationDropdown() {
     finally { setLoading(false) }
   }, [userId])
 
-  useEffect(() => { 
-    if (userId) loadNotifications() 
-  }, [userId, loadNotifications])
-  
+  useEffect(() => { loadNotifications() }, [loadNotifications])
   useEffect(() => {
-    if (!userId) return
     const interval = setInterval(loadNotifications, 30000)
     return () => clearInterval(interval)
-  }, [userId, loadNotifications])
+  }, [loadNotifications])
 
   const getIcon = (type?: string) => {
     switch (type) {
@@ -97,13 +88,11 @@ export function NotificationDropdown() {
   }
 
   const markAllRead = async () => {
-    if (!userId) return
     await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false)
     loadNotifications()
     toast.success('All notifications marked as read')
   }
 
-  // Don't render anything until we have userId
   if (!userId) return null
 
   return (
