@@ -1,11 +1,9 @@
-// src/components/staff/exams/index.ts
+// src/components/staff/exams/index.ts - CLEAN VERSION
 export { ExamList } from './ExamList'
 export { ExamStats } from './ExamStats'
 export { ExamFilters } from './ExamFilters'
 export { ExamTable } from './ExamTable'
 export { ExamViewer } from './ExamViewer'
-export { ExamEditor } from './ExamEditor'
+// ExamEditor removed - use EditExamPage instead
 export { DeleteExamDialog } from './DeleteExamDialog'
 export { GrantAttemptDialog } from './GrantAttemptDialog'
-// Remove this line if the export doesn't exist:
-// export { ExamSubmissionsTable } from './ExamSubmissionsTable'
