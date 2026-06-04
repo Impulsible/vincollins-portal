@@ -1,4 +1,4 @@
-// components/student/StudentClassRoster.tsx - FULLY CORRECTED VERSION
+// components/student/StudentClassRoster.tsx - FULLY CORRECTED WITH PROPER JSS/SS FILTERING
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
@@ -63,14 +63,20 @@ const AVATAR_COLORS = [
 function extractYear(className: string): string {
   if (!className) return ''
   
-  const normalized = className.trim().replace(/\s+/g, ' ')
+  // Normalize: remove spaces and convert to uppercase
+  const normalized = className.trim().toUpperCase().replace(/\s/g, '')
   
-  if (normalized === 'JSS 1' || normalized === 'JSS1') return 'JSS1'
-  if (normalized === 'JSS 2' || normalized === 'JSS2') return 'JSS2'
-  if (normalized === 'JSS 3' || normalized === 'JSS3') return 'JSS3'
-  if (normalized === 'SS 1' || normalized === 'SS1') return 'SS1'
-  if (normalized === 'SS 2' || normalized === 'SS2') return 'SS2'
-  if (normalized === 'SS 3' || normalized === 'SS3') return 'SS3'
+  // Handle JSS classes
+  if (normalized === 'JSS1') return 'JSS1'
+  if (normalized === 'JSS2') return 'JSS2'
+  if (normalized === 'JSS3') return 'JSS3'
+  
+  // Handle SS classes
+  if (normalized === 'SS1') return 'SS1'
+  if (normalized === 'SS2') return 'SS2'
+  if (normalized === 'SS3') return 'SS3'
+  
+  // Handle subject-specific SS classes (SS1SCIENCE -> SS1)
   if (normalized.startsWith('SS1')) return 'SS1'
   if (normalized.startsWith('SS2')) return 'SS2'
   if (normalized.startsWith('SS3')) return 'SS3'
@@ -421,6 +427,8 @@ export function StudentClassRoster({
   const [modalOpen, setModalOpen] = useState(false)
 
   const yearGroup = extractYear(studentClass || '')
+  const isJSS = studentClass?.toUpperCase().includes('JSS') || false
+  const isSS = studentClass?.toUpperCase().includes('SS') || false
 
   useEffect(() => {
     const fetchClassmates = async () => {
@@ -434,14 +442,25 @@ export function StudentClassRoster({
           .neq('id', studentId || '')
           .order('first_name')
 
-        if (yearGroup.startsWith('JSS') || yearGroup.startsWith('SS')) {
+        // ✅ FIXED: JSS students see ONLY their exact class
+        // ✅ SS students see ALL students in the same year (across departments)
+        if (isJSS) {
+          // JSS: Exact match (JSS 1 only sees JSS 1)
+          query = query.eq('class', studentClass)
+          console.log(`🔍 JSS Student - Fetching exact class: ${studentClass}`)
+        } else if (isSS) {
+          // SS: Match by year (SS1 Arts sees SS1 Science, SS1 Commercial)
           query = query.ilike('class', `%${yearGroup}%`)
+          console.log(`🔍 SS Student - Fetching year group: ${yearGroup}%`)
         } else {
+          // Fallback: Exact match
           query = query.eq('class', studentClass)
         }
 
         const { data, error } = await query
         if (error) throw error
+
+        console.log(`✅ Found ${data?.length || 0} classmates`)
 
         if (data) {
           const mappedClassmates = data.map((student: any) => ({
@@ -467,7 +486,7 @@ export function StudentClassRoster({
     }
 
     fetchClassmates()
-  }, [studentClass, studentId, yearGroup])
+  }, [studentClass, studentId, yearGroup, isJSS, isSS])
 
   const filteredClassmates = useMemo(() => {
     return classmates.filter(classmate => {
@@ -492,7 +511,7 @@ export function StudentClassRoster({
   if (classmates.length === 0) return <NoClassmatesFound />
 
   const totalCount = filteredClassmates.length
-  const showDepartmentsNote = yearGroup.startsWith('SS')
+  const showDepartmentsNote = isSS
 
   return (
     <>
@@ -502,14 +521,19 @@ export function StudentClassRoster({
           <div>
             <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
               <Users className="h-5 w-5 text-emerald-600" aria-hidden="true" />
-              {yearGroup} Classmates
+              {isJSS ? studentClass : `${yearGroup} Classmates`}
               <Badge variant="secondary" className="text-xs" aria-label={`${classmates.length} students`}>
                 {classmates.length}
               </Badge>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5">
               <GraduationCap className="h-3 w-3 inline mr-1" aria-hidden="true" />
-              {showDepartmentsNote ? `${yearGroup} • Science, Arts, Commercial` : yearGroup}
+              {isJSS 
+                ? `${studentClass} • ${classmates.length} student${classmates.length !== 1 ? 's' : ''}`
+                : showDepartmentsNote 
+                  ? `${yearGroup} • Science, Arts, Commercial`
+                  : yearGroup
+              }
             </p>
           </div>
           
