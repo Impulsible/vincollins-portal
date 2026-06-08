@@ -15,7 +15,7 @@ import { supabase } from '@/lib/supabase'
 import { 
   Save, Search, Edit, Trash2, Users, Loader2, RefreshCw, 
   CheckCircle2, Bell, FileText, TrendingUp,
-  Award, GraduationCap, BarChart3
+  Award, GraduationCap, BarChart3, SaveAll
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -78,6 +78,7 @@ interface ScoreEntry {
   ca1: string
   ca2: string
   exam: string
+  is_saved?: boolean
 }
 
 interface Stats {
@@ -116,6 +117,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [selectedTerm, setSelectedTerm] = useState(termInfo?.termCode || 'third')
   const [selectedYear, setSelectedYear] = useState(termInfo?.sessionYear || '2025/2026')
   const [selectedExamId, setSelectedExamId] = useState('')
+  const [skipExam, setSkipExam] = useState(false)
   
   const [isRestoring, setIsRestoring] = useState(true)
 
@@ -132,6 +134,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [scoreEntries, setScoreEntries] = useState<Record<string, ScoreEntry>>({})
   const [editingScore, setEditingScore] = useState<any>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
+  const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({})
 
   const [stats, setStats] = useState<Stats>({
     totalStudents: 0,
@@ -144,7 +147,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   })
 
   const isInitialMount = useRef(true)
-  const hasLoadedData = useRef(false)
 
   // Load saved selections from localStorage on mount
   useEffect(() => {
@@ -155,8 +157,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       const savedYear = localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR)
       const savedExam = localStorage.getItem(STORAGE_KEYS.SELECTED_EXAM)
       const savedTab = localStorage.getItem(STORAGE_KEYS.ACTIVE_TAB)
-      
-      console.log('Restoring saved selections:', { savedClass, savedSubject, savedTerm, savedYear, savedExam })
       
       if (savedClass) setSelectedClass(savedClass)
       if (savedSubject) setSelectedSubject(savedSubject)
@@ -169,14 +169,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setMounted(true)
   }, [])
 
-  // Mark initial mount as complete after first render
+  // Mark initial mount as complete
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
     }
   }, [])
 
-  // Save selections to localStorage whenever they change (after initial mount)
+  // Save selections to localStorage
   useEffect(() => {
     if (isInitialMount.current || isRestoring) return
     if (typeof window !== 'undefined' && selectedClass) {
@@ -219,49 +219,49 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }, [activeTab, isRestoring])
 
-  // Handle tab change
   const handleTabChange = (value: string) => {
     setActiveTab(value)
   }
 
-  // Handle class change
   const handleClassChange = (value: string) => {
     setSelectedClass(value)
-    setSelectedSubject('') // Reset subject when class changes
-    hasLoadedData.current = false // Reset data loaded flag
+    setSelectedSubject('')
   }
 
-  // Handle subject change
   const handleSubjectChange = (value: string) => {
     setSelectedSubject(value)
-    setSelectedExamId('') // Reset exam when subject changes
-    hasLoadedData.current = false
+    setSelectedExamId('')
+    setSkipExam(false)
   }
 
-  // Handle term change
   const handleTermChange = (value: string) => {
     setSelectedTerm(value)
-    setSelectedExamId('') // Reset exam when term changes
-    hasLoadedData.current = false
+    setSelectedExamId('')
+    setSkipExam(false)
   }
 
-  // Handle year change
   const handleYearChange = (value: string) => {
     setSelectedYear(value)
-    setSelectedExamId('') // Reset exam when year changes
-    hasLoadedData.current = false
+    setSelectedExamId('')
+    setSkipExam(false)
   }
 
-  // Handle exam change
   const handleExamChange = (value: string) => {
     setSelectedExamId(value)
-    // Reload scores when exam changes
+    setSkipExam(false)
     if (students.length > 0 && value) {
       loadScoresForStudents(students.map(s => s.id))
     }
   }
 
-  // Load classes
+  const handleSkipExam = () => {
+    setSkipExam(true)
+    setSelectedExamId('')
+    if (selectedClass && selectedSubject) {
+      loadStudentsWithoutExam()
+    }
+  }
+
   const loadClasses = useCallback(async () => {
     const { data } = await supabase
       .from('profiles')
@@ -272,7 +272,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     const uniqueClasses = [...new Set((data || []).map(d => d.class).filter(Boolean))] as string[]
     setClasses(uniqueClasses.sort())
     
-    // Only auto-select first class if no class is selected and not restoring
     if (uniqueClasses.length > 0 && !selectedClass && !isRestoring) {
       setSelectedClass(uniqueClasses[0])
     }
@@ -284,7 +283,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }, [mounted, isRestoring, loadClasses])
 
-  // Update subjects based on selected class
   useEffect(() => {
     if (!selectedClass || isRestoring) return
     
@@ -292,15 +290,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     const list = isJSS ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
     setSubjects(list)
     
-    // Only auto-select first subject if no subject is selected
     if (!selectedSubject && list.length > 0) {
       setSelectedSubject(list[0])
     }
   }, [selectedClass, selectedSubject, isRestoring])
 
-  // Load exams
+  // Load exams (optional)
   useEffect(() => {
-    if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring) return
+    if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring || skipExam) return
     
     const loadExams = async () => {
       const { data } = await supabase
@@ -312,151 +309,228 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         .eq('status', 'published')
         .order('created_at', { ascending: false })
 
-      console.log('Loaded exams:', data)
       setAvailableExams(data || [])
       
-      if (data && data.length > 0) {
-        // Only auto-select first exam if no exam is selected
-        if (!selectedExamId) {
-          setSelectedExamId(data[0].id)
-        } else {
-          // Check if saved exam exists in available exams
-          const examExists = data.some(exam => exam.id === selectedExamId)
-          if (!examExists && data.length > 0) {
-            setSelectedExamId(data[0].id)
-          }
-        }
-      } else {
-        setSelectedExamId('')
+      if (data && data.length > 0 && !selectedExamId && !skipExam) {
+        setSelectedExamId(data[0].id)
       }
     }
     
     loadExams()
-  }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring])
+  }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring, skipExam])
 
-  // Load students and scores - THIS IS THE MAIN DATA LOADER
-  useEffect(() => {
-    // Don't load if we're restoring or missing required data
-    if (isRestoring) {
-      console.log('Skipping load - restoring')
-      return
-    }
+  // Load students with exam filter
+  const loadStudentsWithExam = async () => {
+    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear || !selectedExamId) return
     
-    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) {
-      console.log('Skipping load - missing required fields')
-      return
-    }
+    setLoading(true)
     
-    if (!selectedExamId) {
-      console.log('Skipping load - no exam selected')
-      return
-    }
-    
-    const loadData = async () => {
-      console.log('Loading data with:', { selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId })
-      setLoading(true)
-      
-      try {
-        // Get all students in the selected class
-        const { data: profileData, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, full_name, display_name, class, admission_number, vin_id')
-          .eq('role', 'student')
-          .eq('class', selectedClass)
-          .order('display_name')
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, display_name, class, admission_number, vin_id')
+        .eq('role', 'student')
+        .eq('class', selectedClass)
+        .order('display_name')
 
-        if (profileError) throw profileError
+      if (profileError) throw profileError
 
-        if (!profileData || profileData.length === 0) {
-          console.log('No students found')
-          setStudents([])
-          setCAScores([])
-          setLoading(false)
-          return
-        }
-
-        const formatted: Student[] = profileData.map(profile => ({
-          id: profile.id,
-          full_name: profile.display_name || profile.full_name || 'Unknown',
-          class: profile.class,
-          admission_number: profile.admission_number || '—',
-          vin_id: profile.vin_id || '—'
-        }))
-
-        console.log(`Found ${formatted.length} students`)
-        setStudents(formatted)
-        
-        // Initialize entries
-        const entries: Record<string, ScoreEntry> = {}
-        formatted.forEach(s => {
-          entries[s.id] = { ca1: '', ca2: '', exam: '' }
-        })
-        
-        // Load scores for these students
-        console.log('Fetching scores for exam:', selectedExamId)
-        const { data: scoresData, error: scoresError } = await supabase
-          .from('ca_scores')
-          .select('*')
-          .in('student_id', formatted.map(s => s.id))
-          .eq('exam_id', selectedExamId)
-          .eq('subject', selectedSubject)
-
-        if (scoresError) throw scoresError
-        
-        console.log(`Found ${scoresData?.length || 0} scores`)
-        setCAScores(scoresData || [])
-        
-        // Update entries with existing scores
-        let totalScoreSum = 0
-        let gradedCount = 0
-        let highestScore = 0
-        let passCount = 0
-        let failCount = 0
-        
-        ;(scoresData || []).forEach((score: any) => {
-          const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-          const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
-          const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-          const grade = getGrade(percentage)
-          
-          entries[score.student_id] = {
-            ca1: score.ca1_score?.toString() || '',
-            ca2: score.ca2_score?.toString() || '',
-            exam: examTotal > 0 ? examTotal.toString() : ''
-          }
-          
-          if (total > 0) {
-            totalScoreSum += total
-            gradedCount++
-            if (total > highestScore) highestScore = total
-            if (grade !== 'F9') passCount++
-            else failCount++
-          }
-        })
-        
-        setScoreEntries(entries)
-        setStats({
-          totalStudents: formatted.length,
-          gradedStudents: gradedCount,
-          classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
-          highestScore: highestScore,
-          passCount: passCount,
-          failCount: failCount,
-          passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
-        })
-        
-        hasLoadedData.current = true
-        
-      } catch (error) {
-        console.error('Error loading data:', error)
-        toast.error('Failed to load data')
-      } finally {
+      if (!profileData || profileData.length === 0) {
+        setStudents([])
+        setCAScores([])
         setLoading(false)
+        return
       }
+
+      const formatted: Student[] = profileData.map(profile => ({
+        id: profile.id,
+        full_name: profile.display_name || profile.full_name || 'Unknown',
+        class: profile.class,
+        admission_number: profile.admission_number || '—',
+        vin_id: profile.vin_id || '—'
+      }))
+
+      setStudents(formatted)
+      
+      const entries: Record<string, ScoreEntry> = {}
+      formatted.forEach(s => {
+        entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false }
+      })
+      
+      const { data: scoresData, error: scoresError } = await supabase
+        .from('ca_scores')
+        .select('*')
+        .in('student_id', formatted.map(s => s.id))
+        .eq('exam_id', selectedExamId)
+        .eq('subject', selectedSubject)
+
+      if (scoresError) throw scoresError
+      
+      setCAScores(scoresData || [])
+      
+      const savedMap: Record<string, boolean> = {}
+      let totalScoreSum = 0
+      let gradedCount = 0
+      let highestScore = 0
+      let passCount = 0
+      let failCount = 0
+      
+      ;(scoresData || []).forEach((score: any) => {
+        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+        const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
+        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+        const grade = getGrade(percentage)
+        
+        entries[score.student_id] = {
+          ca1: score.ca1_score?.toString() || '',
+          ca2: score.ca2_score?.toString() || '',
+          exam: examTotal > 0 ? examTotal.toString() : '',
+          is_saved: true
+        }
+        
+        savedMap[score.student_id] = true
+        
+        if (total > 0) {
+          totalScoreSum += total
+          gradedCount++
+          if (total > highestScore) highestScore = total
+          if (grade !== 'F9') passCount++
+          else failCount++
+        }
+      })
+      
+      setScoreEntries(entries)
+      setSavedStatus(savedMap)
+      setStats({
+        totalStudents: formatted.length,
+        gradedStudents: gradedCount,
+        classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
+        highestScore: highestScore,
+        passCount: passCount,
+        failCount: failCount,
+        passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
+      })
+      
+    } catch (error) {
+      console.error('Error loading data:', error)
+      toast.error('Failed to load data')
+    } finally {
+      setLoading(false)
     }
+  }
+
+  // Load students without exam filter (for CA scores only)
+  const loadStudentsWithoutExam = async () => {
+    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
     
-    loadData()
-  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring])
+    setLoading(true)
+    
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, full_name, display_name, class, admission_number, vin_id')
+        .eq('role', 'student')
+        .eq('class', selectedClass)
+        .order('display_name')
+
+      if (profileError) throw profileError
+
+      if (!profileData || profileData.length === 0) {
+        setStudents([])
+        setCAScores([])
+        setLoading(false)
+        return
+      }
+
+      const formatted: Student[] = profileData.map(profile => ({
+        id: profile.id,
+        full_name: profile.display_name || profile.full_name || 'Unknown',
+        class: profile.class,
+        admission_number: profile.admission_number || '—',
+        vin_id: profile.vin_id || '—'
+      }))
+
+      setStudents(formatted)
+      
+      const entries: Record<string, ScoreEntry> = {}
+      formatted.forEach(s => {
+        entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false }
+      })
+      
+      const { data: scoresData, error: scoresError } = await supabase
+        .from('ca_scores')
+        .select('*')
+        .in('student_id', formatted.map(s => s.id))
+        .eq('subject', selectedSubject)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+
+      if (scoresError) throw scoresError
+      
+      setCAScores(scoresData || [])
+      
+      const savedMap: Record<string, boolean> = {}
+      let totalScoreSum = 0
+      let gradedCount = 0
+      let highestScore = 0
+      let passCount = 0
+      let failCount = 0
+      
+      ;(scoresData || []).forEach((score: any) => {
+        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+        const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
+        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+        const grade = getGrade(percentage)
+        
+        entries[score.student_id] = {
+          ca1: score.ca1_score?.toString() || '',
+          ca2: score.ca2_score?.toString() || '',
+          exam: examTotal > 0 ? examTotal.toString() : '',
+          is_saved: true
+        }
+        
+        savedMap[score.student_id] = true
+        
+        if (total > 0) {
+          totalScoreSum += total
+          gradedCount++
+          if (total > highestScore) highestScore = total
+          if (grade !== 'F9') passCount++
+          else failCount++
+        }
+      })
+      
+      setScoreEntries(entries)
+      setSavedStatus(savedMap)
+      setStats({
+        totalStudents: formatted.length,
+        gradedStudents: gradedCount,
+        classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
+        highestScore: highestScore,
+        passCount: passCount,
+        failCount: failCount,
+        passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
+      })
+      
+    } catch (error) {
+      console.error('Error loading data:', error)
+      toast.error('Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Main data loading effect
+  useEffect(() => {
+    if (isRestoring) return
+    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
+    
+    if (skipExam || !selectedExamId) {
+      loadStudentsWithoutExam()
+    } else {
+      loadStudentsWithExam()
+    }
+  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId, skipExam, isRestoring])
 
   const calculateSubjectScore = (ca1: number, ca2: number, exam: number) => {
     const total = ca1 + ca2 + exam
@@ -464,6 +538,216 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     const grade = getGrade(percentage)
     const remark = getGradeRemark(grade)
     return { total_score: total, percentage, grade, remark }
+  }
+
+  // Save a single student's scores
+  const handleSaveSingle = async (studentId: string) => {
+    if (!staffProfile?.id) {
+      toast.error('Missing teacher information')
+      return
+    }
+
+    const entry = scoreEntries[studentId]
+    if (!entry) return
+
+    const ca1Score = parseInt(entry.ca1) || 0
+    const ca2Score = parseInt(entry.ca2) || 0
+    const examScore = parseInt(entry.exam) || 0
+
+    if (ca1Score === 0 && ca2Score === 0 && examScore === 0) {
+      toast.info('No scores to save for this student')
+      return
+    }
+
+    setSaving(true)
+
+    try {
+      const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
+
+      const scoreData = {
+        student_id: studentId,
+        subject: selectedSubject,
+        term: selectedTerm,
+        academic_year: selectedYear,
+        ca1_score: ca1Score,
+        ca2_score: ca2Score,
+        exam_objective_score: Math.round(examScore * 0.6),
+        exam_theory_score: Math.round(examScore * 0.4),
+        total_score: total_score,
+        percentage: percentage,
+        grade: grade,
+        remark: remark,
+        exam_id: selectedExamId || null,
+        teacher_id: staffProfile.id,
+        teacher_name: staffProfile.full_name || staffProfile.display_name,
+        class: selectedClass,
+        status: 'approved',
+        updated_at: new Date().toISOString()
+      }
+
+      let query = supabase
+        .from('ca_scores')
+        .select('id')
+        .eq('student_id', studentId)
+        .eq('subject', selectedSubject)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+
+      if (selectedExamId && !skipExam) {
+        query = query.eq('exam_id', selectedExamId)
+      }
+
+      const { data: existing } = await query.maybeSingle()
+
+      if (existing) {
+        const { error } = await supabase
+          .from('ca_scores')
+          .update(scoreData)
+          .eq('id', existing.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('ca_scores')
+          .insert([scoreData])
+        if (error) throw error
+      }
+
+      setSavedStatus(prev => ({ ...prev, [studentId]: true }))
+      setScoreEntries(prev => ({
+        ...prev,
+        [studentId]: { ...prev[studentId], is_saved: true }
+      }))
+      
+      toast.success(`Scores saved for ${getStudentName(studentId)}`)
+      
+      if (skipExam || !selectedExamId) {
+        await loadStudentsWithoutExam()
+      } else {
+        await loadStudentsWithExam()
+      }
+      
+    } catch (error: any) {
+      console.error('Save error:', error)
+      toast.error(`Failed to save: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Save all scores
+  const handleSaveAll = async () => {
+    if (!staffProfile?.id) {
+      toast.error('Missing teacher information')
+      return
+    }
+
+    setSaving(true)
+    let savedCount = 0
+    let errorCount = 0
+
+    try {
+      for (const student of students) {
+        const entry = scoreEntries[student.id]
+        if (!entry) continue
+
+        const ca1Score = parseInt(entry.ca1) || 0
+        const ca2Score = parseInt(entry.ca2) || 0
+        const examScore = parseInt(entry.exam) || 0
+
+        if (ca1Score === 0 && ca2Score === 0 && examScore === 0) continue
+
+        const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
+
+        const scoreData = {
+          student_id: student.id,
+          subject: selectedSubject,
+          term: selectedTerm,
+          academic_year: selectedYear,
+          ca1_score: ca1Score,
+          ca2_score: ca2Score,
+          exam_objective_score: Math.round(examScore * 0.6),
+          exam_theory_score: Math.round(examScore * 0.4),
+          total_score: total_score,
+          percentage: percentage,
+          grade: grade,
+          remark: remark,
+          exam_id: selectedExamId || null,
+          teacher_id: staffProfile.id,
+          teacher_name: staffProfile.full_name || staffProfile.display_name,
+          class: selectedClass,
+          status: 'approved',
+          updated_at: new Date().toISOString()
+        }
+
+        let query = supabase
+          .from('ca_scores')
+          .select('id')
+          .eq('student_id', student.id)
+          .eq('subject', selectedSubject)
+          .eq('term', selectedTerm)
+          .eq('academic_year', selectedYear)
+
+        if (selectedExamId && !skipExam) {
+          query = query.eq('exam_id', selectedExamId)
+        }
+
+        const { data: existing } = await query.maybeSingle()
+
+        if (existing) {
+          const { error } = await supabase
+            .from('ca_scores')
+            .update(scoreData)
+            .eq('id', existing.id)
+          if (!error) savedCount++
+          else errorCount++
+        } else {
+          const { error } = await supabase
+            .from('ca_scores')
+            .insert([scoreData])
+          if (!error) savedCount++
+          else errorCount++
+        }
+      }
+
+      if (savedCount > 0) {
+        toast.success(`✅ ${savedCount} score(s) saved successfully`)
+        if (errorCount > 0) {
+          toast.warning(`⚠️ ${errorCount} student(s) had errors`)
+        }
+        
+        const newSavedStatus: Record<string, boolean> = { ...savedStatus }
+        students.forEach(student => {
+          const entry = scoreEntries[student.id]
+          if (entry && (parseInt(entry.ca1) || 0) + (parseInt(entry.ca2) || 0) + (parseInt(entry.exam) || 0) > 0) {
+            newSavedStatus[student.id] = true
+          }
+        })
+        setSavedStatus(newSavedStatus)
+        
+        if (skipExam || !selectedExamId) {
+          await loadStudentsWithoutExam()
+        } else {
+          await loadStudentsWithExam()
+        }
+      } else if (errorCount > 0) {
+        toast.error(`Failed to save ${errorCount} student(s)`)
+      } else {
+        toast.info('No new scores to save')
+      }
+    } catch (error: any) {
+      console.error('Save error:', error)
+      toast.error(`Failed to save: ${error.message}`)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const loadScoresForStudents = async (studentIds: string[]) => {
+    if (skipExam || !selectedExamId) {
+      await loadStudentsWithoutExam()
+    } else {
+      await loadStudentsWithExam()
+    }
   }
 
   const updateStatsFromEntries = () => {
@@ -504,165 +788,27 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     })
   }
 
+  // FIXED: handleScoreChange with is_saved check
   const handleScoreChange = (studentId: string, field: keyof ScoreEntry, value: string) => {
+    // Skip if field is 'is_saved' (not a score field)
+    if (field === 'is_saved') return;
+    
     const maxValues = { ca1: 20, ca2: 20, exam: 60 }
     const numValue = Math.min(maxValues[field], Math.max(0, parseFloat(value) || 0))
     setScoreEntries(prev => ({
       ...prev,
-      [studentId]: { ...prev[studentId], [field]: numValue.toString() }
+      [studentId]: { ...prev[studentId], [field]: numValue.toString(), is_saved: false }
     }))
     
+    setSavedStatus(prev => ({ ...prev, [studentId]: false }))
     setTimeout(() => updateStatsFromEntries(), 50)
   }
 
-  const loadScoresForStudents = async (studentIds: string[]) => {
-    if (!selectedExamId || !selectedSubject || studentIds.length === 0) return
-
-    try {
-      const { data, error } = await supabase
-        .from('ca_scores')
-        .select('*')
-        .in('student_id', studentIds)
-        .eq('exam_id', selectedExamId)
-        .eq('subject', selectedSubject)
-
-      if (error) throw error
-      
-      console.log('Refreshed scores:', data?.length)
-      setCAScores(data || [])
-      
-      // Update entries with existing scores
-      const entries: Record<string, ScoreEntry> = { ...scoreEntries }
-      
-      let totalScoreSum = 0
-      let gradedCount = 0
-      let highestScore = 0
-      let passCount = 0
-      let failCount = 0
-      
-      ;(data || []).forEach((score: any) => {
-        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-        const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
-        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-        const grade = getGrade(percentage)
-        
-        entries[score.student_id] = {
-          ca1: score.ca1_score?.toString() || '',
-          ca2: score.ca2_score?.toString() || '',
-          exam: examTotal > 0 ? examTotal.toString() : ''
-        }
-        
-        if (total > 0) {
-          totalScoreSum += total
-          gradedCount++
-          if (total > highestScore) highestScore = total
-          if (grade !== 'F9') passCount++
-          else failCount++
-        }
-      })
-      
-      setScoreEntries(entries)
-      setStats({
-        totalStudents: studentIds.length,
-        gradedStudents: gradedCount,
-        classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
-        highestScore: highestScore,
-        passCount: passCount,
-        failCount: failCount,
-        passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
-      })
-    } catch (error) {
-      console.error('Error loading scores:', error)
-      toast.error('Failed to load scores')
-    }
-  }
-
-  const handleSave = async () => {
-    if (!staffProfile?.id || !selectedExamId) {
-      toast.error('Missing required information')
+  const handleAutoFetchSingle = async (studentId: string) => {
+    if (!selectedExamId || skipExam) {
+      toast.info('No exam selected. Please select an exam or create one first.')
       return
     }
-
-    setSaving(true)
-
-    try {
-      let savedCount = 0
-
-      for (const student of students) {
-        const entry = scoreEntries[student.id]
-        if (!entry) continue
-
-        const ca1Score = parseInt(entry.ca1) || 0
-        const ca2Score = parseInt(entry.ca2) || 0
-        const examScore = parseInt(entry.exam) || 0
-
-        if (ca1Score === 0 && ca2Score === 0 && examScore === 0) continue
-
-        const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
-
-        const scoreData = {
-          student_id: student.id,
-          subject: selectedSubject,
-          term: selectedTerm,
-          academic_year: selectedYear,
-          ca1_score: ca1Score,
-          ca2_score: ca2Score,
-          exam_objective_score: Math.round(examScore * 0.6),
-          exam_theory_score: Math.round(examScore * 0.4),
-          total_score: total_score,
-          percentage: percentage,
-          grade: grade,
-          remark: remark,
-          exam_id: selectedExamId,
-          teacher_id: staffProfile.id,
-          teacher_name: staffProfile.full_name || staffProfile.display_name,
-          class: selectedClass,
-          status: 'approved',
-          updated_at: new Date().toISOString()
-        }
-
-        const { data: existing } = await supabase
-          .from('ca_scores')
-          .select('id')
-          .eq('student_id', student.id)
-          .eq('exam_id', selectedExamId)
-          .eq('subject', selectedSubject)
-          .maybeSingle()
-
-        if (existing) {
-          const { error } = await supabase
-            .from('ca_scores')
-            .update(scoreData)
-            .eq('id', existing.id)
-          if (!error) savedCount++
-        } else {
-          const { error } = await supabase
-            .from('ca_scores')
-            .insert([scoreData])
-          if (!error) savedCount++
-        }
-      }
-
-      if (savedCount > 0) {
-        toast.success(`✅ ${savedCount} score(s) saved and published`)
-        
-        // Reload scores to refresh the list
-        if (students.length > 0) {
-          await loadScoresForStudents(students.map(s => s.id))
-        }
-      } else {
-        toast.warning('No scores to save')
-      }
-    } catch (error: any) {
-      console.error('Save error:', error)
-      toast.error(`Failed to save: ${error.message}`)
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const handleAutoFetchSingle = async (studentId: string) => {
-    if (!selectedExamId) return
 
     const { data } = await supabase
       .from('exam_attempts')
@@ -685,17 +831,25 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         ...prev,
         [studentId]: {
           ...prev[studentId],
-          exam: examTotal > 0 ? String(Math.round(examTotal)) : ''
+          exam: examTotal > 0 ? String(Math.round(examTotal)) : '',
+          is_saved: false
         }
       }))
 
+      setSavedStatus(prev => ({ ...prev, [studentId]: false }))
       toast.success('Exam score loaded')
       setTimeout(() => updateStatsFromEntries(), 50)
+    } else {
+      toast.info('No exam attempt found for this student')
     }
   }
 
   const handleAutoFetchAll = async () => {
-    if (!selectedExamId) return
+    if (!selectedExamId || skipExam) {
+      toast.info('No exam selected. Please select an exam or create one first.')
+      return
+    }
+    
     setAutoFetching(true)
     let count = 0
 
@@ -721,10 +875,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           ...prev,
           [student.id]: {
             ...prev[student.id],
-            exam: examTotal > 0 ? String(Math.round(examTotal)) : ''
+            exam: examTotal > 0 ? String(Math.round(examTotal)) : '',
+            is_saved: false
           }
         }))
 
+        setSavedStatus(prev => ({ ...prev, [student.id]: false }))
         count++
       }
     }
@@ -744,15 +900,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return student?.admission_number || '—'
   }
 
-  // Manual refresh handler
   const handleRefresh = async () => {
-    if (students.length > 0) {
-      await loadScoresForStudents(students.map(s => s.id))
-      toast.success('Scores refreshed')
+    if (skipExam || !selectedExamId) {
+      await loadStudentsWithoutExam()
     } else {
-      // Reload everything
-      loadClasses()
+      await loadStudentsWithExam()
     }
+    toast.success('Data refreshed')
   }
 
   const groupedStudents = students.reduce((acc: Record<string, Student[]>, student) => {
@@ -846,7 +1000,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </div>
         <p className="text-xs text-emerald-700 mt-2 flex items-center gap-1">
           <Bell className="h-3 w-3" />
-          Scores are automatically published when saved
+          Scores are automatically published when saved • You can save CA scores even before an exam is created
         </p>
       </div>
 
@@ -889,17 +1043,54 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             
             <div>
               <Label className="text-xs font-medium text-slate-600">Examination</Label>
-              <Select value={selectedExamId} onValueChange={handleExamChange}>
+              <Select value={selectedExamId} onValueChange={handleExamChange} disabled={skipExam}>
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="Select exam" />
+                  <SelectValue placeholder={skipExam ? "Exam skipped" : "Select exam"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableExams.map(exam => <SelectItem key={exam.id} value={exam.id}>{exam.title}</SelectItem>)}
-                  {availableExams.length === 0 && (
+                  {availableExams.length === 0 ? (
                     <div className="px-2 py-1.5 text-sm text-slate-500">No exams available</div>
+                  ) : (
+                    availableExams.map(exam => (
+                      <SelectItem key={exam.id} value={exam.id}>
+                        {exam.title}
+                      </SelectItem>
+                    ))
                   )}
                 </SelectContent>
               </Select>
+              <div className="flex items-center gap-2 mt-1">
+                <Button
+                  type="button"
+                  variant={skipExam ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleSkipExam}
+                  className="h-6 text-xs"
+                >
+                  {skipExam ? "✓ Skip Exam (CA Only)" : "Skip Exam (CA Only)"}
+                </Button>
+                {skipExam && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSkipExam(false)
+                      if (availableExams.length > 0) {
+                        setSelectedExamId(availableExams[0].id)
+                      }
+                    }}
+                    className="h-6 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                )}
+              </div>
+              {availableExams.length === 0 && !skipExam && selectedSubject && (
+                <p className="text-xs text-amber-600 mt-1">
+                  No exams found. You can use "Skip Exam" to enter CA scores only.
+                </p>
+              )}
             </div>
             
             <div>
@@ -929,22 +1120,24 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
           <div className="flex flex-wrap gap-3 pt-2">
             <Button 
-              onClick={handleSave} 
-              disabled={saving || students.length === 0 || !selectedExamId} 
+              onClick={handleSaveAll} 
+              disabled={saving || students.length === 0} 
               className="bg-emerald-600 hover:bg-emerald-700"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
-              Save & Publish
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <SaveAll className="h-4 w-4 mr-2" />}
+              Save All Scores
             </Button>
             
-            <Button 
-              onClick={handleAutoFetchAll} 
-              disabled={autoFetching || students.length === 0 || !selectedExamId}
-              variant="outline"
-            >
-              <RefreshCw className={cn("h-4 w-4 mr-2", autoFetching && "animate-spin")} />
-              Auto-Fetch Exam Scores
-            </Button>
+            {!skipExam && selectedExamId && (
+              <Button 
+                onClick={handleAutoFetchAll} 
+                disabled={autoFetching || students.length === 0}
+                variant="outline"
+              >
+                <RefreshCw className={cn("h-4 w-4 mr-2", autoFetching && "animate-spin")} />
+                Auto-Fetch All Exam Scores
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -1060,8 +1253,10 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
                 toast.success('Score updated successfully')
                 setShowEditDialog(false)
-                if (students.length > 0) {
-                  await loadScoresForStudents(students.map(s => s.id))
+                if (skipExam || !selectedExamId) {
+                  await loadStudentsWithoutExam()
+                } else {
+                  await loadStudentsWithExam()
                 }
               }}
             >
@@ -1123,6 +1318,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                         <TableHead className="text-center w-28 font-semibold">Exam /60</TableHead>
                         <TableHead className="text-center w-20 font-semibold">Total</TableHead>
                         <TableHead className="text-center w-24 font-semibold">Grade</TableHead>
+                        <TableHead className="text-center w-24 font-semibold">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1132,6 +1328,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                         const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
                         const grade = total > 0 ? getGrade(percentage) : ''
                         const hasExamScore = entry.exam && parseInt(entry.exam) > 0
+                        const isSaved = savedStatus[student.id]
                         
                         return (
                           <TableRow key={student.id}>
@@ -1165,16 +1362,19 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                               {hasExamScore ? (
                                 <span className="font-medium text-emerald-600">{parseInt(entry.exam)}/60</span>
                               ) : (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleAutoFetchSingle(student.id)}
-                                  className="h-7 text-xs"
-                                  disabled={!selectedExamId}
-                                >
-                                  <RefreshCw className="h-3 w-3 mr-1" />
-                                  Load
-                                </Button>
+                                !skipExam && selectedExamId ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAutoFetchSingle(student.id)}
+                                    className="h-7 text-xs"
+                                  >
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                    Load
+                                  </Button>
+                                ) : (
+                                  <span className="text-slate-400 text-xs">-</span>
+                                )
                               )}
                             </TableCell>
                             <TableCell className="text-center font-bold">
@@ -1186,6 +1386,26 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                   {grade} - {getGradeRemark(grade)}
                                 </Badge>
                               )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSaveSingle(student.id)}
+                                disabled={saving}
+                                className="h-8 px-3"
+                              >
+                                {saving ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : isSaved ? (
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                ) : (
+                                  <Save className="h-4 w-4 text-slate-500" />
+                                )}
+                                <span className="ml-1 text-xs">
+                                  {isSaved ? 'Saved' : 'Save'}
+                                </span>
+                              </Button>
                             </TableCell>
                           </TableRow>
                         )
@@ -1229,8 +1449,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               ) : caScores.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">No scores have been published yet for this exam.</p>
-                  <p className="text-sm text-slate-400 mt-1">Select a different exam or enter scores in the Score Entry tab and click Save & Publish.</p>
+                  <p className="text-slate-500">No scores have been published yet.</p>
+                  <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save.</p>
                   <div className="mt-4 flex gap-2 justify-center">
                     <Button 
                       variant="outline" 
@@ -1300,8 +1520,10 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                     if (!confirm('Delete this score?')) return
                                     await supabase.from('ca_scores').delete().eq('id', score.id)
                                     toast.success('Score deleted')
-                                    if (students.length > 0) {
-                                      await loadScoresForStudents(students.map(s => s.id))
+                                    if (skipExam || !selectedExamId) {
+                                      await loadStudentsWithoutExam()
+                                    } else {
+                                      await loadStudentsWithExam()
                                     }
                                   }}
                                   className="text-red-500 hover:text-red-600"
