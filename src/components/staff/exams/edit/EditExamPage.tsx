@@ -42,7 +42,7 @@ const AVAILABLE_SESSIONS = ['2025/2026', '2026/2027']
 const JSS_SUBJECTS = [
   'Mathematics', 'English Studies', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Christian Religious Studies',
-  'Islamic Religious Studies', 'Business Studies', 'Home Economics',
+  'Islamic Religious Studies', 'Business Studies', 'Music','Home Economics',
   'Agricultural Science', 'Physical and Health Education',
   'Information Technology', 'Security Education', 'Yoruba', 'Cultural and Creative Arts', 'French'
 ]
