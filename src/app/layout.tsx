@@ -1,4 +1,4 @@
-// src/app/layout.tsx - UPDATED WITH VERSION BANNER
+// src/app/layout.tsx
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { ProgressBar } from '@/components/ProgressBar';
 import { ClientLayout } from '@/components/ClientLayout';
 import { VersionBanner } from '@/components/VersionBanner';
+import { SessionProvider } from '@/components/SessionProvider';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -164,7 +165,7 @@ const organizationSchema = {
   },
 };
 
-// ✅ Cache Control Headers Component
+// Cache Control Headers Component
 function CacheControlHeaders() {
   return (
     <>
@@ -190,7 +191,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        {/* ✅ Cache Control Meta Tags */}
         <CacheControlHeaders />
         
         <meta name="format-detection" content="telephone=no, email=no, address=no" />
@@ -218,11 +218,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         suppressHydrationWarning
       >
         <ProgressBar />
-        <ClientLayout>
-          {children}
-          {/* ✅ Version Banner - Shows when app updates */}
-          <VersionBanner />
-        </ClientLayout>
+        <SessionProvider>
+          <ClientLayout>
+            {children}
+            <VersionBanner />
+          </ClientLayout>
+        </SessionProvider>
       </body>
     </html>
   );

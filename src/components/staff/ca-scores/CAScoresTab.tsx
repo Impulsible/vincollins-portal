@@ -2,7 +2,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -98,6 +98,16 @@ interface Student {
   vin_id: string
 }
 
+// Storage keys for persistence
+const STORAGE_KEYS = {
+  SELECTED_CLASS: 'ca_scores_selected_class',
+  SELECTED_SUBJECT: 'ca_scores_selected_subject',
+  SELECTED_TERM: 'ca_scores_selected_term',
+  SELECTED_YEAR: 'ca_scores_selected_year',
+  SELECTED_EXAM: 'ca_scores_selected_exam',
+  ACTIVE_TAB: 'ca_scores_active_tab',
+}
+
 export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('entry')
@@ -106,6 +116,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [selectedTerm, setSelectedTerm] = useState(termInfo?.termCode || 'third')
   const [selectedYear, setSelectedYear] = useState(termInfo?.sessionYear || '2025/2026')
   const [selectedExamId, setSelectedExamId] = useState('')
+  
+  const [isRestoring, setIsRestoring] = useState(true)
 
   const [students, setStudents] = useState<Student[]>([])
   const [classes, setClasses] = useState<string[]>([])
@@ -131,35 +143,126 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     passRate: 0
   })
 
+  const isInitialMount = useRef(true)
+  const hasLoadedData = useRef(false)
+
+  // Load saved selections from localStorage on mount
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedClass = localStorage.getItem(STORAGE_KEYS.SELECTED_CLASS)
+      const savedSubject = localStorage.getItem(STORAGE_KEYS.SELECTED_SUBJECT)
+      const savedTerm = localStorage.getItem(STORAGE_KEYS.SELECTED_TERM)
+      const savedYear = localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR)
+      const savedExam = localStorage.getItem(STORAGE_KEYS.SELECTED_EXAM)
+      const savedTab = localStorage.getItem(STORAGE_KEYS.ACTIVE_TAB)
+      
+      console.log('Restoring saved selections:', { savedClass, savedSubject, savedTerm, savedYear, savedExam })
+      
+      if (savedClass) setSelectedClass(savedClass)
+      if (savedSubject) setSelectedSubject(savedSubject)
+      if (savedTerm) setSelectedTerm(savedTerm)
+      if (savedYear) setSelectedYear(savedYear)
+      if (savedExam) setSelectedExamId(savedExam)
+      if (savedTab) setActiveTab(savedTab)
+    }
+    setIsRestoring(false)
     setMounted(true)
-    loadClasses()
   }, [])
 
+  // Mark initial mount as complete after first render
   useEffect(() => {
-    if (selectedClass) {
-      const isJSS = selectedClass.toUpperCase().startsWith('JSS')
-      const list = isJSS ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
-      setSubjects(list)
-      if (!list.includes(selectedSubject)) {
-        setSelectedSubject(list[0])
-      }
+    if (isInitialMount.current) {
+      isInitialMount.current = false
     }
-  }, [selectedClass])
+  }, [])
 
+  // Save selections to localStorage whenever they change (after initial mount)
   useEffect(() => {
-    if (selectedSubject && selectedTerm && selectedYear) {
-      loadExams()
+    if (isInitialMount.current || isRestoring) return
+    if (typeof window !== 'undefined' && selectedClass) {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_CLASS, selectedClass)
     }
-  }, [selectedSubject, selectedTerm, selectedYear])
-
+  }, [selectedClass, isRestoring])
+  
   useEffect(() => {
-    if (selectedClass && selectedSubject && selectedTerm && selectedYear) {
-      loadStudents()
+    if (isInitialMount.current || isRestoring) return
+    if (typeof window !== 'undefined' && selectedSubject) {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_SUBJECT, selectedSubject)
     }
-  }, [selectedClass, selectedSubject, selectedTerm, selectedYear])
+  }, [selectedSubject, isRestoring])
+  
+  useEffect(() => {
+    if (isInitialMount.current || isRestoring) return
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_TERM, selectedTerm)
+    }
+  }, [selectedTerm, isRestoring])
+  
+  useEffect(() => {
+    if (isInitialMount.current || isRestoring) return
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_YEAR, selectedYear)
+    }
+  }, [selectedYear, isRestoring])
+  
+  useEffect(() => {
+    if (isInitialMount.current || isRestoring) return
+    if (typeof window !== 'undefined' && selectedExamId) {
+      localStorage.setItem(STORAGE_KEYS.SELECTED_EXAM, selectedExamId)
+    }
+  }, [selectedExamId, isRestoring])
+  
+  useEffect(() => {
+    if (isInitialMount.current || isRestoring) return
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEYS.ACTIVE_TAB, activeTab)
+    }
+  }, [activeTab, isRestoring])
 
-  const loadClasses = async () => {
+  // Handle tab change
+  const handleTabChange = (value: string) => {
+    setActiveTab(value)
+  }
+
+  // Handle class change
+  const handleClassChange = (value: string) => {
+    setSelectedClass(value)
+    setSelectedSubject('') // Reset subject when class changes
+    hasLoadedData.current = false // Reset data loaded flag
+  }
+
+  // Handle subject change
+  const handleSubjectChange = (value: string) => {
+    setSelectedSubject(value)
+    setSelectedExamId('') // Reset exam when subject changes
+    hasLoadedData.current = false
+  }
+
+  // Handle term change
+  const handleTermChange = (value: string) => {
+    setSelectedTerm(value)
+    setSelectedExamId('') // Reset exam when term changes
+    hasLoadedData.current = false
+  }
+
+  // Handle year change
+  const handleYearChange = (value: string) => {
+    setSelectedYear(value)
+    setSelectedExamId('') // Reset exam when year changes
+    hasLoadedData.current = false
+  }
+
+  // Handle exam change
+  const handleExamChange = (value: string) => {
+    setSelectedExamId(value)
+    // Reload scores when exam changes
+    if (students.length > 0 && value) {
+      loadScoresForStudents(students.map(s => s.id))
+    }
+  }
+
+  // Load classes
+  const loadClasses = useCallback(async () => {
     const { data } = await supabase
       .from('profiles')
       .select('class')
@@ -168,99 +271,248 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
     const uniqueClasses = [...new Set((data || []).map(d => d.class).filter(Boolean))] as string[]
     setClasses(uniqueClasses.sort())
-    if (uniqueClasses.length > 0 && !selectedClass) {
+    
+    // Only auto-select first class if no class is selected and not restoring
+    if (uniqueClasses.length > 0 && !selectedClass && !isRestoring) {
       setSelectedClass(uniqueClasses[0])
     }
-  }
+  }, [selectedClass, isRestoring])
 
-  const loadExams = async () => {
-    const { data } = await supabase
-      .from('exams')
-      .select('id, title')
-      .eq('subject', selectedSubject)
-      .eq('term', selectedTerm)
-      .eq('session_year', selectedYear)
-      .eq('status', 'published')
-      .order('created_at', { ascending: false })
-
-    setAvailableExams(data || [])
-    if (data && data.length > 0) {
-      setSelectedExamId(data[0].id)
-    } else {
-      setSelectedExamId('')
+  useEffect(() => {
+    if (mounted && !isRestoring) {
+      loadClasses()
     }
-  }
+  }, [mounted, isRestoring, loadClasses])
 
-  const loadStudents = async () => {
-    if (!selectedClass) return
-
-    setLoading(true)
+  // Update subjects based on selected class
+  useEffect(() => {
+    if (!selectedClass || isRestoring) return
     
-    try {
-      // Get all students in the selected class
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, full_name, display_name, class, admission_number, vin_id')
-        .eq('role', 'student')
-        .eq('class', selectedClass)
-        .order('display_name')
+    const isJSS = selectedClass.toUpperCase().startsWith('JSS')
+    const list = isJSS ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
+    setSubjects(list)
+    
+    // Only auto-select first subject if no subject is selected
+    if (!selectedSubject && list.length > 0) {
+      setSelectedSubject(list[0])
+    }
+  }, [selectedClass, selectedSubject, isRestoring])
 
-      if (profileError) throw profileError
+  // Load exams
+  useEffect(() => {
+    if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring) return
+    
+    const loadExams = async () => {
+      const { data } = await supabase
+        .from('exams')
+        .select('id, title')
+        .eq('subject', selectedSubject)
+        .eq('term', selectedTerm)
+        .eq('session_year', selectedYear)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
 
-      if (!profileData || profileData.length === 0) {
-        setStudents([])
-        setStats({
-          totalStudents: 0,
-          gradedStudents: 0,
-          classAverage: 0,
-          highestScore: 0,
-          passCount: 0,
-          failCount: 0,
-          passRate: 0
-        })
-        setLoading(false)
-        return
-      }
-
-      const formatted: Student[] = profileData.map(profile => ({
-        id: profile.id,
-        full_name: profile.display_name || profile.full_name || 'Unknown',
-        class: profile.class,
-        admission_number: profile.admission_number || '—',
-        vin_id: profile.vin_id || '—'
-      }))
-
-      setStudents(formatted)
+      console.log('Loaded exams:', data)
+      setAvailableExams(data || [])
       
-      // Initialize entries
-      const entries: Record<string, ScoreEntry> = {}
-      formatted.forEach(s => {
-        entries[s.id] = { ca1: '', ca2: '', exam: '' }
-      })
-      setScoreEntries(entries)
-      
-      // Load scores for these students
-      if (selectedExamId && selectedSubject) {
-        await loadScoresForStudents(formatted.map(s => s.id))
+      if (data && data.length > 0) {
+        // Only auto-select first exam if no exam is selected
+        if (!selectedExamId) {
+          setSelectedExamId(data[0].id)
+        } else {
+          // Check if saved exam exists in available exams
+          const examExists = data.some(exam => exam.id === selectedExamId)
+          if (!examExists && data.length > 0) {
+            setSelectedExamId(data[0].id)
+          }
+        }
       } else {
-        // No exam selected yet, just show students with empty stats
+        setSelectedExamId('')
+      }
+    }
+    
+    loadExams()
+  }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring])
+
+  // Load students and scores - THIS IS THE MAIN DATA LOADER
+  useEffect(() => {
+    // Don't load if we're restoring or missing required data
+    if (isRestoring) {
+      console.log('Skipping load - restoring')
+      return
+    }
+    
+    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) {
+      console.log('Skipping load - missing required fields')
+      return
+    }
+    
+    if (!selectedExamId) {
+      console.log('Skipping load - no exam selected')
+      return
+    }
+    
+    const loadData = async () => {
+      console.log('Loading data with:', { selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId })
+      setLoading(true)
+      
+      try {
+        // Get all students in the selected class
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, full_name, display_name, class, admission_number, vin_id')
+          .eq('role', 'student')
+          .eq('class', selectedClass)
+          .order('display_name')
+
+        if (profileError) throw profileError
+
+        if (!profileData || profileData.length === 0) {
+          console.log('No students found')
+          setStudents([])
+          setCAScores([])
+          setLoading(false)
+          return
+        }
+
+        const formatted: Student[] = profileData.map(profile => ({
+          id: profile.id,
+          full_name: profile.display_name || profile.full_name || 'Unknown',
+          class: profile.class,
+          admission_number: profile.admission_number || '—',
+          vin_id: profile.vin_id || '—'
+        }))
+
+        console.log(`Found ${formatted.length} students`)
+        setStudents(formatted)
+        
+        // Initialize entries
+        const entries: Record<string, ScoreEntry> = {}
+        formatted.forEach(s => {
+          entries[s.id] = { ca1: '', ca2: '', exam: '' }
+        })
+        
+        // Load scores for these students
+        console.log('Fetching scores for exam:', selectedExamId)
+        const { data: scoresData, error: scoresError } = await supabase
+          .from('ca_scores')
+          .select('*')
+          .in('student_id', formatted.map(s => s.id))
+          .eq('exam_id', selectedExamId)
+          .eq('subject', selectedSubject)
+
+        if (scoresError) throw scoresError
+        
+        console.log(`Found ${scoresData?.length || 0} scores`)
+        setCAScores(scoresData || [])
+        
+        // Update entries with existing scores
+        let totalScoreSum = 0
+        let gradedCount = 0
+        let highestScore = 0
+        let passCount = 0
+        let failCount = 0
+        
+        ;(scoresData || []).forEach((score: any) => {
+          const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+          const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
+          const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+          const grade = getGrade(percentage)
+          
+          entries[score.student_id] = {
+            ca1: score.ca1_score?.toString() || '',
+            ca2: score.ca2_score?.toString() || '',
+            exam: examTotal > 0 ? examTotal.toString() : ''
+          }
+          
+          if (total > 0) {
+            totalScoreSum += total
+            gradedCount++
+            if (total > highestScore) highestScore = total
+            if (grade !== 'F9') passCount++
+            else failCount++
+          }
+        })
+        
+        setScoreEntries(entries)
         setStats({
           totalStudents: formatted.length,
-          gradedStudents: 0,
-          classAverage: 0,
-          highestScore: 0,
-          passCount: 0,
-          failCount: 0,
-          passRate: 0
+          gradedStudents: gradedCount,
+          classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
+          highestScore: highestScore,
+          passCount: passCount,
+          failCount: failCount,
+          passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
         })
+        
+        hasLoadedData.current = true
+        
+      } catch (error) {
+        console.error('Error loading data:', error)
+        toast.error('Failed to load data')
+      } finally {
         setLoading(false)
       }
-      
-    } catch (error) {
-      console.error('Error loading students:', error)
-      toast.error('Failed to load students')
-      setLoading(false)
     }
+    
+    loadData()
+  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring])
+
+  const calculateSubjectScore = (ca1: number, ca2: number, exam: number) => {
+    const total = ca1 + ca2 + exam
+    const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+    const grade = getGrade(percentage)
+    const remark = getGradeRemark(grade)
+    return { total_score: total, percentage, grade, remark }
+  }
+
+  const updateStatsFromEntries = () => {
+    let totalScoreSum = 0
+    let gradedCount = 0
+    let highestScore = 0
+    let passCount = 0
+    let failCount = 0
+
+    students.forEach(student => {
+      const entry = scoreEntries[student.id]
+      if (!entry) return
+      
+      const ca1 = parseInt(entry.ca1) || 0
+      const ca2 = parseInt(entry.ca2) || 0
+      const exam = parseInt(entry.exam) || 0
+      const total = ca1 + ca2 + exam
+      
+      if (total > 0) {
+        totalScoreSum += total
+        gradedCount++
+        if (total > highestScore) highestScore = total
+        const percentage = Math.round((total / 100) * 100)
+        const grade = getGrade(percentage)
+        if (grade !== 'F9') passCount++
+        else failCount++
+      }
+    })
+
+    setStats({
+      totalStudents: students.length,
+      gradedStudents: gradedCount,
+      classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
+      highestScore: highestScore,
+      passCount: passCount,
+      failCount: failCount,
+      passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
+    })
+  }
+
+  const handleScoreChange = (studentId: string, field: keyof ScoreEntry, value: string) => {
+    const maxValues = { ca1: 20, ca2: 20, exam: 60 }
+    const numValue = Math.min(maxValues[field], Math.max(0, parseFloat(value) || 0))
+    setScoreEntries(prev => ({
+      ...prev,
+      [studentId]: { ...prev[studentId], [field]: numValue.toString() }
+    }))
+    
+    setTimeout(() => updateStatsFromEntries(), 50)
   }
 
   const loadScoresForStudents = async (studentIds: string[]) => {
@@ -276,6 +528,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
       if (error) throw error
       
+      console.log('Refreshed scores:', data?.length)
       setCAScores(data || [])
       
       // Update entries with existing scores
@@ -320,90 +573,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       })
     } catch (error) {
       console.error('Error loading scores:', error)
-    } finally {
-      setLoading(false)
+      toast.error('Failed to load scores')
     }
-  }
-
-  const calculateSubjectScore = (ca1: number, ca2: number, exam: number) => {
-    const total = ca1 + ca2 + exam
-    const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-    const grade = getGrade(percentage)
-    const remark = getGradeRemark(grade)
-    return { total_score: total, percentage, grade, remark }
-  }
-
-  const updateStatsFromEntries = () => {
-    let totalScoreSum = 0
-    let gradedCount = 0
-    let highestScore = 0
-    let passCount = 0
-    let failCount = 0
-
-    students.forEach(student => {
-      const entry = scoreEntries[student.id]
-      if (!entry) return
-      
-      const ca1 = parseInt(entry.ca1) || 0
-      const ca2 = parseInt(entry.ca2) || 0
-      const exam = parseInt(entry.exam) || 0
-      const total = ca1 + ca2 + exam
-      
-      if (total > 0) {
-        totalScoreSum += total
-        gradedCount++
-        if (total > highestScore) highestScore = total
-        const percentage = Math.round((total / 100) * 100)
-        const grade = getGrade(percentage)
-        if (grade !== 'F9') passCount++
-        else failCount++
-      }
-    })
-
-    // Also include saved scores that might not be in entries
-    caScores.forEach(score => {
-      const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-      const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
-      
-      if (total > 0) {
-        // Check if this student is already counted in entries
-        const entryTotal = (parseInt(scoreEntries[score.student_id]?.ca1) || 0) +
-                          (parseInt(scoreEntries[score.student_id]?.ca2) || 0) +
-                          (parseInt(scoreEntries[score.student_id]?.exam) || 0)
-        
-        if (entryTotal === 0) {
-          totalScoreSum += total
-          gradedCount++
-          if (total > highestScore) highestScore = total
-          const percentage = Math.round((total / 100) * 100)
-          const grade = getGrade(percentage)
-          if (grade !== 'F9') passCount++
-          else failCount++
-        }
-      }
-    })
-
-    setStats({
-      totalStudents: students.length,
-      gradedStudents: gradedCount,
-      classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
-      highestScore: highestScore,
-      passCount: passCount,
-      failCount: failCount,
-      passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
-    })
-  }
-
-  const handleScoreChange = (studentId: string, field: keyof ScoreEntry, value: string) => {
-    const maxValues = { ca1: 20, ca2: 20, exam: 60 }
-    const numValue = Math.min(maxValues[field], Math.max(0, parseFloat(value) || 0))
-    setScoreEntries(prev => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], [field]: numValue.toString() }
-    }))
-    
-    // Update stats after score change
-    setTimeout(() => updateStatsFromEntries(), 50)
   }
 
   const handleSave = async () => {
@@ -474,19 +645,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
       if (savedCount > 0) {
         toast.success(`✅ ${savedCount} score(s) saved and published`)
-        
-        if (typeof window !== 'undefined') {
-          const event = new CustomEvent('ca-scores-updated', {
-            detail: {
-              class: selectedClass,
-              subject: selectedSubject,
-              term: selectedTerm,
-              year: selectedYear,
-              teacher: staffProfile.full_name
-            }
-          })
-          window.dispatchEvent(event)
-        }
         
         // Reload scores to refresh the list
         if (students.length > 0) {
@@ -586,6 +744,17 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return student?.admission_number || '—'
   }
 
+  // Manual refresh handler
+  const handleRefresh = async () => {
+    if (students.length > 0) {
+      await loadScoresForStudents(students.map(s => s.id))
+      toast.success('Scores refreshed')
+    } else {
+      // Reload everything
+      loadClasses()
+    }
+  }
+
   const groupedStudents = students.reduce((acc: Record<string, Student[]>, student) => {
     const cls = student.class || 'Unknown'
     if (!acc[cls]) acc[cls] = []
@@ -599,7 +768,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return name.toLowerCase().includes(searchQuery.toLowerCase())
   })
 
-  if (!mounted) {
+  if (!mounted || isRestoring) {
     return (
       <div className="flex items-center justify-center h-96">
         <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
@@ -684,13 +853,19 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       {/* Configuration Card */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Assessment Configuration</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Assessment Configuration</CardTitle>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+              <RefreshCw className={cn("h-4 w-4 mr-2", loading && "animate-spin")} />
+              Refresh
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <Label className="text-xs font-medium text-slate-600">Class</Label>
-              <Select value={selectedClass} onValueChange={setSelectedClass}>
+              <Select value={selectedClass} onValueChange={handleClassChange}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
@@ -702,7 +877,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             
             <div>
               <Label className="text-xs font-medium text-slate-600">Subject</Label>
-              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+              <Select value={selectedSubject} onValueChange={handleSubjectChange}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Select subject" />
                 </SelectTrigger>
@@ -714,7 +889,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             
             <div>
               <Label className="text-xs font-medium text-slate-600">Examination</Label>
-              <Select value={selectedExamId} onValueChange={setSelectedExamId}>
+              <Select value={selectedExamId} onValueChange={handleExamChange}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="Select exam" />
                 </SelectTrigger>
@@ -729,7 +904,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             
             <div>
               <Label className="text-xs font-medium text-slate-600">Term</Label>
-              <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+              <Select value={selectedTerm} onValueChange={handleTermChange}>
                 <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
@@ -741,7 +916,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             
             <div>
               <Label className="text-xs font-medium text-slate-600">Session</Label>
-              <Select value={selectedYear} onValueChange={setSelectedYear}>
+              <Select value={selectedYear} onValueChange={handleYearChange}>
                 <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
@@ -897,7 +1072,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       </Dialog>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="entry" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
@@ -905,7 +1080,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           </TabsTrigger>
           <TabsTrigger value="view" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
-            View Scores
+            View Scores ({caScores.length})
           </TabsTrigger>
         </TabsList>
 
@@ -1029,23 +1204,50 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             <CardHeader>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <CardTitle>Published Scores</CardTitle>
-                <div className="relative w-full sm:w-72">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                  <Input 
-                    placeholder="Search students..." 
-                    value={searchQuery} 
-                    onChange={e => setSearchQuery(e.target.value)} 
-                    className="pl-9" 
-                  />
+                <div className="flex gap-2">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                      placeholder="Search students..." 
+                      value={searchQuery} 
+                      onChange={e => setSearchQuery(e.target.value)} 
+                      className="pl-9" 
+                    />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading}>
+                    <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                  </Button>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              {caScores.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+                  <p className="text-slate-500 mt-2">Loading scores...</p>
+                </div>
+              ) : caScores.length === 0 ? (
                 <div className="text-center py-12">
                   <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">No scores have been published yet.</p>
-                  <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save & Publish.</p>
+                  <p className="text-slate-500">No scores have been published yet for this exam.</p>
+                  <p className="text-sm text-slate-400 mt-1">Select a different exam or enter scores in the Score Entry tab and click Save & Publish.</p>
+                  <div className="mt-4 flex gap-2 justify-center">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setActiveTab('entry')
+                      }}
+                    >
+                      Go to Score Entry
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={handleRefresh}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

@@ -23,6 +23,32 @@ import {
   X, User, TrendingUp, CheckCircle2, Sparkles, ArrowLeft
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import html2canvas from 'html2canvas'
+import jsPDF from 'jspdf'
+
+// ============================================
+// WAEC/NECO STANDARD SUBJECT ORDERING
+// ============================================
+const SUBJECT_ORDER: Record<string, number> = {
+  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
+  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
+  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
+  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
+  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
+  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
+  'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
+  'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
+  'PHE': 27, 'Physical Education': 27, 'Security Education': 28
+}
+
+const sortSubjectsByOrder = (subjects: any[]) => {
+  if (!subjects || subjects.length === 0) return []
+  return [...subjects].sort((a, b) => {
+    const orderA = SUBJECT_ORDER[a.name] || 999
+    const orderB = SUBJECT_ORDER[b.name] || 999
+    return orderA - orderB
+  })
+}
 
 // ============================================
 // WAEC GRADING SYSTEM
@@ -49,27 +75,27 @@ const getOverallGrade = (percentage: number): string => {
 
 const getGradeStyle = (grade: string): string => {
   switch (grade) {
-    case 'A1': return 'bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
     case 'B2':
-    case 'B3': return 'bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
     case 'C4':
     case 'C5':
-    case 'C6': return 'bg-cyan-100 text-cyan-700 font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
     case 'D7':
-    case 'E8': return 'bg-amber-100 text-amber-700 font-bold px-2 py-0.5 rounded text-[10px]'
-    case 'F9': return 'bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded text-[10px]'
-    default: return 'bg-gray-100 text-gray-600 font-bold px-2 py-0.5 rounded text-[10px]'
+    case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
   }
 }
 
 const getOverallGradeColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'bg-emerald-100 text-emerald-700'
-    case 'B': return 'bg-blue-100 text-blue-700'
-    case 'C': return 'bg-cyan-100 text-cyan-700'
-    case 'P': return 'bg-amber-100 text-amber-700'
-    case 'F': return 'bg-red-100 text-red-700'
-    default: return 'bg-gray-100 text-gray-600'
+    case 'A': return 'text-emerald-700 font-bold'
+    case 'B': return 'text-blue-700 font-bold'
+    case 'C': return 'text-cyan-700 font-bold'
+    case 'P': return 'text-amber-700 font-bold'
+    case 'F': return 'text-red-700 font-bold'
+    default: return 'text-gray-700'
   }
 }
 
@@ -163,15 +189,6 @@ const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
   email: 'vincollinscollege@gmail.com',
   motto: 'Geared Towards Excellence',
 }
-
-const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="border border-gray-200 rounded-lg mb-3 overflow-hidden">
-    <div className="bg-gray-50 text-gray-700 text-[10px] font-semibold px-3 py-1.5 border-b border-gray-200">
-      {title}
-    </div>
-    <div className="p-2 text-[10px]">{children}</div>
-  </div>
-)
 
 // ============================================
 // MAIN COMPONENT
@@ -377,27 +394,16 @@ export default function StaffReportCardsPage() {
     toast.info('Generating PDF... Please wait.')
     
     try {
-      const html2canvasModule = await import('html2canvas')
-      const html2canvas = html2canvasModule.default
-      const { default: jsPDF } = await import('jspdf')
-      
       const element = printRef.current
-      const originalWidth = element.style.width
-      const originalOverflow = element.style.overflow
-      
-      element.style.width = '210mm'
-      element.style.overflow = 'visible'
       
       const canvas = await html2canvas(element, {
         scale: 3,
         backgroundColor: '#ffffff',
         logging: false,
         useCORS: true,
-        allowTaint: false,
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
       })
-      
-      element.style.width = originalWidth
-      element.style.overflow = originalOverflow
       
       const imgData = canvas.toDataURL('image/png')
       const pdf = new jsPDF({
@@ -407,24 +413,11 @@ export default function StaffReportCardsPage() {
       })
       
       const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pdfHeight = pdf.internal.pageSize.getHeight()
-      const imgWidth = pdfWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const imgHeight = (canvas.height * pdfWidth) / canvas.width
       
-      let heightLeft = imgHeight
-      let position = 0
-      
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-      heightLeft -= pdfHeight
-      
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight
-        pdf.addPage()
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight)
-        heightLeft -= pdfHeight
-      }
-      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight, undefined, 'FAST')
       pdf.save(`Report_Card_${selectedCard.student_name}_${getTermLabel(selectedCard.term)}_${selectedCard.academic_year.replace('/', '_')}.pdf`)
+      
       toast.success('PDF downloaded successfully!')
     } catch (error) {
       console.error('PDF generation error:', error)
@@ -473,19 +466,6 @@ export default function StaffReportCardsPage() {
       </div>
     )
   }
-
-  const displaySubjects = selectedCard?.subjects_data || []
-  const termDisplay = getTermLabel(selectedCard?.term || selectedTerm)
-  const formattedNextTermDate = selectedCard?.next_term_begins 
-    ? new Date(selectedCard.next_term_begins).toLocaleDateString('en-NG', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-      })
-    : 'To be announced'
-
-  const overallGrade = selectedCard?.overall_grade || 
-    (selectedCard?.average_score ? getOverallGrade(selectedCard.average_score) : '—')
 
   return (
     <div className="space-y-6">
@@ -678,7 +658,13 @@ export default function StaffReportCardsPage() {
                     <TableCell className="text-xs">{card.class}</TableCell>
                     <TableCell className="text-center font-semibold text-sm">{card.average_score}%</TableCell>
                     <TableCell className="text-center">
-                      <span className={cn("inline-block px-2 py-0.5 rounded text-xs font-bold", getOverallGradeColor(card.overall_grade))}>
+                      <span className={cn("inline-block px-2 py-0.5 rounded text-xs font-bold", 
+                        card.overall_grade === 'A' ? 'bg-emerald-100 text-emerald-700' :
+                        card.overall_grade === 'B' ? 'bg-blue-100 text-blue-700' :
+                        card.overall_grade === 'C' ? 'bg-cyan-100 text-cyan-700' :
+                        card.overall_grade === 'P' ? 'bg-amber-100 text-amber-700' :
+                        'bg-red-100 text-red-700'
+                      )}>
                         {card.overall_grade}
                       </span>
                     </TableCell>
@@ -747,11 +733,9 @@ export default function StaffReportCardsPage() {
                     Report Card - {selectedCard.student_name}
                   </DialogTitle>
                   <div className="flex gap-2">
-                    {/* Print Button */}
                     <Button variant="outline" size="sm" onClick={handlePrint}>
                       <Printer className="h-4 w-4 mr-2" /> Print
                     </Button>
-                    {/* Download PDF Button */}
                     <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading}>
                       {downloading ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -770,228 +754,184 @@ export default function StaffReportCardsPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="p-6">
-                {/* REPORT CARD - For Print and PDF capture */}
+              <div className="p-6 bg-gray-100">
+                {/* REPORT CARD - Professional styling matching view page */}
                 <div 
                   ref={printRef}
-                  className="bg-white w-full text-[11px] text-black border border-gray-200 rounded-lg p-4"
+                  className="bg-white mx-auto text-black w-[210mm] min-h-[297mm] p-6 shadow-lg"
+                  style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
                 >
-                  {/* HEADER */}
-                  <div className="border-b border-gray-200 pb-3 mb-3">
-                    <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
-                      <div className="w-16 mx-auto sm:mx-0">
+                  {/* Header Section */}
+                  <div className="border-b-2 border-gray-300 pb-6 mb-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="w-20 flex-shrink-0">
                         {schoolSettings.logo_url && (
-                          <img src={schoolSettings.logo_url} alt="logo" className="w-14 h-14 object-contain" />
+                          <img src={schoolSettings.logo_url} alt="logo" className="w-16 h-16 object-contain" />
                         )}
                       </div>
                       <div className="flex-1 text-center">
-                        <h1 className="text-[18px] font-bold uppercase text-gray-800">
-                          {schoolSettings.name}
-                        </h1>
-                        <p className="text-[10px] text-gray-500">{schoolSettings.address}</p>
-                        <p className="text-[10px] text-gray-500">Tel: {schoolSettings.phone} | Email: {schoolSettings.email}</p>
+                        <h1 className="text-xl font-bold uppercase text-blue-900 mb-1">{schoolSettings.name}</h1>
+                        <p className="text-[10px] text-gray-600">{schoolSettings.address}</p>
+                        <p className="text-[10px] text-gray-600">Tel: {schoolSettings.phone} | Email: {schoolSettings.email}</p>
                         <p className="text-[9px] italic text-amber-600 mt-1">"{schoolSettings.motto}"</p>
-                        <h2 className="font-bold mt-2 text-[14px] text-gray-700">
+                        <h2 className="font-bold text-base mt-3 text-blue-800">
                           {getTermLabel(selectedCard.term)} Student's Performance Report
                         </h2>
+                        <p className="text-[10px] mt-1 font-semibold">Academic Session: {selectedCard.academic_year}</p>
                       </div>
-                      <div className="w-20 h-24 border border-gray-200 rounded-md overflow-hidden mx-auto sm:mx-0">
+                      <div className="w-20 h-24 border border-gray-300 rounded overflow-hidden flex-shrink-0">
                         {selectedCard.student_photo_url ? (
                           <img src={selectedCard.student_photo_url} alt="student" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full bg-gray-50 flex items-center justify-center">
-                            <User className="h-8 w-8 text-gray-400" />
-                          </div>
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-[10px]">Photo</div>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* STUDENT INFO */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] mb-4">
-                    <div className="flex"><span className="font-semibold w-32">Name:</span><span>{selectedCard.student_name}</span></div>
-                    <div className="flex"><span className="font-semibold w-32">Admission No:</span><span>{selectedCard.student_admission_number || '—'}</span></div>
-                    <div className="flex"><span className="font-semibold w-32">Class:</span><span>{selectedCard.class}</span></div>
-                    <div className="flex"><span className="font-semibold w-32">Term:</span><span>{getTermLabel(selectedCard.term)}</span></div>
-                    <div className="flex"><span className="font-semibold w-32">Session:</span><span>{selectedCard.academic_year}</span></div>
-                    <div className="flex"><span className="font-semibold w-32">Next Term:</span><span>{formattedNextTermDate}</span></div>
+                  {/* Student Information */}
+                  <div className="bg-blue-50 p-3 rounded-md mb-5 text-[11px]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><span className="font-bold">Student Name:</span> {selectedCard.student_name}</div>
+                      <div><span className="font-bold">Admission No:</span> {selectedCard.student_admission_number || '—'}</div>
+                      <div><span className="font-bold">Class:</span> {selectedCard.class}</div>
+                      <div><span className="font-bold">Term:</span> {getTermLabel(selectedCard.term)}</div>
+                      <div><span className="font-bold">Session:</span> {selectedCard.academic_year}</div>
+                      <div><span className="font-bold">Next Term:</span> {selectedCard.next_term_begins ? new Date(selectedCard.next_term_begins).toLocaleDateString('en-NG') : 'To be announced'}</div>
+                    </div>
                   </div>
 
-                  {/* MAIN CONTENT */}
-                  <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-4">
-                    {/* LEFT COLUMN */}
-                    <div>
-                      <h3 className="text-sm font-bold text-gray-700 mb-2 border-l-3 border-emerald-500 pl-2">ACADEMIC PERFORMANCE</h3>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse border border-gray-200 text-[10px]">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="border border-gray-200 px-2 py-1.5 text-left font-semibold">Subjects</th>
-                              <th className="border border-gray-200 px-2 py-1.5 text-center w-16 font-semibold">CA</th>
-                              <th className="border border-gray-200 px-2 py-1.5 text-center w-16 font-semibold">Exam</th>
-                              <th className="border border-gray-200 px-2 py-1.5 text-center w-16 font-semibold">Total</th>
-                              <th className="border border-gray-200 px-2 py-1.5 text-center w-14 font-semibold">Grade</th>
-                              <th className="border border-gray-200 px-2 py-1.5 text-left font-semibold">Remarks</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {displaySubjects.map((subject, idx) => (
-                              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="border border-gray-200 px-2 py-1">{subject.name}</td>
-                                <td className="border border-gray-200 text-center">{subject.ca || '-'}</td>
-                                <td className="border border-gray-200 text-center">{subject.exam || '-'}</td>
-                                <td className="border border-gray-200 text-center font-semibold">{subject.total || '-'}</td>
-                                <td className="border border-gray-200 text-center">
-                                  <span className={getGradeStyle(subject.grade)}>{subject.grade || '-'}</span>
-                                </td>
-                                <td className="border border-gray-200 px-2 py-1">{subject.remark || '-'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-gray-50 font-semibold">
-                            <tr>
-                              <td colSpan={3} className="border border-gray-200 px-2 py-1 text-right">SUMMARY:</td>
-                              <td className="border border-gray-200 text-center">{selectedCard.total_score || 0}</td>
-                              <td className="border border-gray-200 text-center">
-                                <span className={cn("inline-block px-2 py-0.5 rounded text-[10px] font-bold", getOverallGradeColor(overallGrade))}>
-                                  {overallGrade}
-                                </span>
+                  {/* Main Content */}
+                  <div className="flex gap-5">
+                    {/* Left Column */}
+                    <div className="flex-1">
+                      <table className="w-full border-collapse border border-gray-300 text-[10px]">
+                        <thead>
+                          <tr className="bg-blue-600 text-white">
+                            <th className="border border-blue-500 px-2 py-1.5 text-left">Subjects</th>
+                            <th className="border border-blue-500 px-2 py-1.5 text-center w-12">CA</th>
+                            <th className="border border-blue-500 px-2 py-1.5 text-center w-12">Exam</th>
+                            <th className="border border-blue-500 px-2 py-1.5 text-center w-12">Total</th>
+                            <th className="border border-blue-500 px-2 py-1.5 text-center w-10">Grade</th>
+                            <th className="border border-blue-500 px-2 py-1.5 text-left">Remark</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sortSubjectsByOrder(selectedCard.subjects_data || []).map((subject, idx) => (
+                            <tr key={idx}>
+                              <td className="border border-gray-300 px-2 py-1.5">{subject.name}</td>
+                              <td className="border border-gray-300 text-center">{subject.ca || '-'}</td>
+                              <td className="border border-gray-300 text-center">{subject.exam || '-'}</td>
+                              <td className="border border-gray-300 text-center font-bold">{subject.total || '-'}</td>
+                              <td className="border border-gray-300 text-center">
+                                <span className={getGradeStyle(subject.grade)}>{subject.grade || '-'}</span>
                               </td>
-                              <td className="border border-gray-200 text-center">{selectedCard.average_score || 0}%</td>
+                              <td className="border border-gray-300 px-2 py-1.5">{subject.remark || '-'}</td>
                             </tr>
-                          </tfoot>
-                        </table>
-                      </div>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-100 font-bold">
+                          <tr>
+                            <td colSpan={3} className="border border-gray-300 px-2 py-1.5 text-right">TOTAL / AVERAGE:</td>
+                            <td className="border border-gray-300 text-center">{selectedCard.total_score || 0}</td>
+                            <td className="border border-gray-300 text-center">
+                              <span className={getOverallGradeColor(selectedCard.overall_grade)}>{selectedCard.overall_grade}</span>
+                            </td>
+                            <td className="border border-gray-300 text-center">{selectedCard.average_score?.toFixed(2) || '0'}%</td>
+                          </tr>
+                        </tfoot>
+                      </table>
 
-                      {/* TEACHER'S REMARK */}
-                      <div className="mt-3 border border-gray-200 rounded-lg overflow-hidden">
-                        <div className="bg-purple-50 text-purple-700 px-3 py-1.5 text-[10px] font-semibold flex items-center gap-1 border-b border-purple-100">
-                          <Sparkles className="h-3 w-3" />
-                          CLASS TEACHER'S REMARK
-                        </div>
-                        <div className="p-2 text-[10px] italic leading-relaxed bg-white">
-                          {selectedCard.teacher_comments || 'No comment available.'}
-                        </div>
-                      </div>
-
-                      {/* PRINCIPAL'S REMARK */}
-                      <div className="mt-2 border border-gray-200 rounded-lg overflow-hidden">
-                        <div className="bg-gray-50 text-gray-700 px-3 py-1.5 text-[10px] font-semibold border-b border-gray-200">
-                          PRINCIPAL'S REMARK
-                        </div>
-                        <div className="p-2 text-[10px] italic leading-relaxed bg-white">
-                          {selectedCard.principal_comments || 'No comment available.'}
-                        </div>
-                      </div>
-
-                      {/* GRADE SCALE */}
-                      <div className="mt-3">
-                        <div className="bg-gray-50 text-gray-700 text-[10px] px-3 py-1.5 font-semibold border border-gray-200 rounded-t-lg">Grade Scale (WAEC)</div>
-                        <div className="border border-t-0 border-gray-200 p-2 rounded-b-lg">
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[9px]">
-                            <div><span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded">A1</span> 75-100</div>
-                            <div><span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">B2</span> 70-74</div>
-                            <div><span className="bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">B3</span> 65-69</div>
-                            <div><span className="bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">C4</span> 60-64</div>
-                            <div><span className="bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">C5</span> 55-59</div>
-                            <div><span className="bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded">C6</span> 50-54</div>
-                            <div><span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">D7</span> 45-49</div>
-                            <div><span className="bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">E8</span> 40-44</div>
-                            <div><span className="bg-red-100 text-red-700 px-1.5 py-0.5 rounded">F9</span> 0-39</div>
+                      {/* Remarks */}
+                      <div className="mt-4 space-y-2">
+                        <div className="border-l-4 border-purple-500 bg-purple-50 p-2 text-[10px]">
+                          <div className="font-bold text-purple-700 mb-1 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3" /> CLASS TEACHER'S REMARK
                           </div>
+                          <p className="italic">{selectedCard.teacher_comments || 'No comment available.'}</p>
+                        </div>
+                        <div className="border-l-4 border-blue-500 bg-blue-50 p-2 text-[10px]">
+                          <div className="font-bold text-blue-700 mb-1">PRINCIPAL'S REMARK</div>
+                          <p className="italic">{selectedCard.principal_comments || 'No comment available.'}</p>
                         </div>
                       </div>
                     </div>
 
-                    {/* RIGHT COLUMN */}
-                    <div>
-                      {/* Performance Summary */}
-                      <div className="border border-gray-200 rounded-lg mb-3 overflow-hidden">
-                        <div className="bg-gray-50 text-gray-700 text-[10px] font-semibold px-3 py-1.5 border-b border-gray-200">
-                          Performance Summary
+                    {/* Right Column */}
+                    <div className="w-56 flex-shrink-0 space-y-3">
+                      <div className="border border-gray-300">
+                        <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 uppercase">Performance Summary</div>
+                        <div className="p-2 text-[10px] space-y-1">
+                          <div className="flex justify-between"><span>Total Score:</span><span className="font-bold">{selectedCard.total_score || 0}</span></div>
+                          <div className="flex justify-between"><span>Average:</span><span className="font-bold">{selectedCard.average_score?.toFixed(2) || '0'}%</span></div>
+                          <div className="flex justify-between"><span>Grade:</span><span className={getOverallGradeColor(selectedCard.overall_grade)}>{selectedCard.overall_grade}</span></div>
+                          <div className="flex justify-between"><span>Subjects:</span><span className="font-bold">{selectedCard.subjects_data?.length || 0}</span></div>
                         </div>
-                        <div className="p-2 space-y-1 text-[10px]">
-                          <div className="flex justify-between"><span>Total Score</span><span className="font-semibold">{selectedCard.total_score || 0}</span></div>
-                          <div className="flex justify-between"><span>Average</span><span className="font-semibold">{selectedCard.average_score || 0}%</span></div>
-                          <div className="flex justify-between">
-                            <span>Grade</span>
-                            <span className={cn("font-semibold px-2 py-0.5 rounded", getOverallGradeColor(overallGrade))}>{overallGrade}</span>
-                          </div>
+                      </div>
+
+                      <div className="border border-gray-300">
+                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Grade Scale</div>
+                        <div className="p-2 text-[8px] grid grid-cols-2 gap-x-2 gap-y-0.5">
+                          <div>A1: 75-100%</div><div>B2: 70-74%</div>
+                          <div>B3: 65-69%</div><div>C4: 60-64%</div>
+                          <div>C5: 55-59%</div><div>C6: 50-54%</div>
+                          <div>D7: 45-49%</div><div>E8: 40-44%</div>
+                          <div>F9: 0-39%</div>
                         </div>
                       </div>
 
                       {/* Affective Domain */}
-                      <div className="border border-gray-200 rounded-lg mb-3 overflow-hidden">
-                        <div className="bg-gray-50 text-gray-700 text-[10px] font-semibold px-3 py-1.5 border-b border-gray-200">
-                          Affective Domain
-                        </div>
-                        <div className="p-2">
-                          <table className="w-full border-collapse border border-gray-200 text-[10px]">
-                            <tbody>
-                              {(selectedCard.behavior_ratings || [
-                                { name: 'Honesty', rating: 4 },
-                                { name: 'Neatness', rating: 4 },
-                                { name: 'Obedience', rating: 4 },
-                                { name: 'Orderliness', rating: 3 },
-                                { name: 'Diligence', rating: 4 },
-                                { name: 'Punctuality', rating: 4 },
-                                { name: 'Leadership', rating: 3 },
-                                { name: 'Politeness', rating: 4 },
-                              ]).map((item) => (
-                                <tr key={item.name}>
-                                  <td className="border border-gray-200 px-2 py-1">{item.name}</td>
-                                  <td className="border border-gray-200 text-center w-12 font-semibold">{item.rating}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                      <div className="border border-gray-300">
+                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Affective Domain</div>
+                        <div className="p-2 text-[9px] space-y-0.5">
+                          {(selectedCard.behavior_ratings || [
+                            { name: 'Honesty', rating: 4 }, { name: 'Neatness', rating: 4 },
+                            { name: 'Obedience', rating: 4 }, { name: 'Orderliness', rating: 3 },
+                            { name: 'Diligence', rating: 4 }, { name: 'Punctuality', rating: 4 },
+                            { name: 'Leadership', rating: 3 }, { name: 'Politeness', rating: 4 },
+                          ]).map((item) => (
+                            <div key={item.name} className="flex justify-between items-center">
+                              <span>{item.name}</span>
+                              <span className="font-bold text-blue-600">{item.rating}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
                       {/* Psychomotor Skills */}
-                      <div className="border border-gray-200 rounded-lg mb-3 overflow-hidden">
-                        <div className="bg-gray-50 text-gray-700 text-[10px] font-semibold px-3 py-1.5 border-b border-gray-200">
-                          Psychomotor Skills
-                        </div>
-                        <div className="p-2">
-                          <table className="w-full border-collapse border border-gray-200 text-[10px]">
-                            <tbody>
-                              {(selectedCard.skill_ratings || [
-                                { name: 'Handwriting', rating: 4 },
-                                { name: 'Verbal Fluency', rating: 4 },
-                                { name: 'Sports', rating: 3 },
-                                { name: 'Handling Tools', rating: 3 },
-                                { name: 'Club Activities', rating: 4 },
-                              ]).map((item) => (
-                                <tr key={item.name}>
-                                  <td className="border border-gray-200 px-2 py-1">{item.name}</td>
-                                  <td className="border border-gray-200 text-center w-12 font-semibold">{item.rating}</td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
+                      <div className="border border-gray-300">
+                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Psychomotor Skills</div>
+                        <div className="p-2 text-[9px] space-y-0.5">
+                          {(selectedCard.skill_ratings || [
+                            { name: 'Handwriting', rating: 4 }, { name: 'Verbal Fluency', rating: 4 },
+                            { name: 'Sports', rating: 3 }, { name: 'Handling Tools', rating: 3 },
+                            { name: 'Club Activities', rating: 4 },
+                          ]).map((item) => (
+                            <div key={item.name} className="flex justify-between items-center">
+                              <span>{item.name}</span>
+                              <span className="font-bold text-green-600">{item.rating}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
                       {/* Rating Key */}
-                      <div className="border border-gray-200 rounded-lg overflow-hidden">
-                        <div className="bg-gray-50 text-gray-700 text-[10px] font-semibold px-3 py-1.5 border-b border-gray-200">
-                          Key To Ratings
-                        </div>
-                        <div className="p-2 space-y-0.5 text-[9px]">
-                          <div><span className="font-semibold">5</span> - Excellent</div>
-                          <div><span className="font-semibold">4</span> - Very Good</div>
-                          <div><span className="font-semibold">3</span> - Good</div>
-                          <div><span className="font-semibold">2</span> - Fair</div>
-                          <div><span className="font-semibold">1</span> - Poor</div>
+                      <div className="border border-gray-300">
+                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Rating Key</div>
+                        <div className="p-2 text-[8px] space-y-0.5">
+                          <div>5 - Excellent</div>
+                          <div>4 - Very Good</div>
+                          <div>3 - Good</div>
+                          <div>2 - Fair</div>
+                          <div>1 - Poor</div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* FOOTER */}
-                  <div className="border-t border-gray-200 mt-4 pt-2 text-center text-[9px] text-gray-400">
-                    Powered by Vincollins Portal | {schoolSettings.motto}
+                  {/* Footer */}
+                  <div className="border-t-2 border-gray-300 mt-5 pt-2 text-center text-[8px] text-gray-500">
+                    Powered by Vincollins School Management Portal | {schoolSettings.motto}
                   </div>
                 </div>
               </div>
@@ -1017,8 +957,8 @@ export default function StaffReportCardsPage() {
             size: A4 portrait; 
             margin: 0.5cm;
           }
-          .bg-gray-50, .bg-purple-50 {
-            background-color: #f3f4f6 !important;
+          .bg-blue-600, .bg-purple-600 {
+            background-color: #1e40af !important;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
           }
