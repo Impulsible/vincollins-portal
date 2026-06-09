@@ -1,4 +1,5 @@
-// src/components/staff/exams/edit/EditExamPage.tsx - COMPLETE FIXED VERSION
+// src/components/staff/exams/edit/EditExamPage.tsx - WITH BULK IMPORT SUPPORT
+
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -149,6 +150,65 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     toast.success(`Updated ${theoryQuestions.length} theory questions to ${theoryPointsPerQuestion} point(s) each`)
   }, [examId, theoryQuestions.length, theoryPointsPerQuestion])
 
+  // BULK IMPORT HANDLERS
+  const handleBulkAddMCQs = useCallback(async (newQuestions: Partial<Question>[]) => {
+    const questionsToAdd = newQuestions.map((q, index) => ({
+      exam_id: examId,
+      question_text: q.question_text,
+      type: 'objective' as const,
+      options: q.options || [],
+      correct_answer: q.correct_answer,
+      points: objectivePointsPerQuestion,
+      order_number: questions.length + index + 1
+    }))
+
+    const { data, error } = await supabase
+      .from('questions')
+      .insert(questionsToAdd)
+      .select()
+
+    if (error) {
+      console.error('Error bulk adding MCQs:', error)
+      toast.error('Failed to import questions')
+      return
+    }
+
+    const parsedQuestions = (data || []).map(q => ({
+      ...q,
+      options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || [])
+    }))
+
+    setQuestions(prev => [...prev, ...parsedQuestions as Question[]])
+    toast.success(`✅ Successfully imported ${newQuestions.length} MCQ(s)`)
+  }, [examId, objectivePointsPerQuestion, questions.length])
+
+  const handleBulkAddTheory = useCallback(async (newQuestions: Partial<TheoryQuestion>[]) => {
+    const questionsToAdd = newQuestions.map((q, index) => ({
+      exam_id: examId,
+      question_text: q.question_text,
+      type: 'theory' as const,
+      points: theoryPointsPerQuestion,
+      order_number: theoryQuestions.length + index + 1,
+      sub_questions: q.sub_questions || [],
+      keywords: q.keywords || [],
+      model_answer: q.model_answer || ''
+    }))
+
+    const { data, error } = await supabase
+      .from('questions')
+      .insert(questionsToAdd)
+      .select()
+
+    if (error) {
+      console.error('Error bulk adding theory questions:', error)
+      toast.error('Failed to import theory questions')
+      return
+    }
+
+    setTheoryQuestions(prev => [...prev, ...(data || []) as TheoryQuestion[]])
+    toast.success(`✅ Successfully imported ${newQuestions.length} theory question(s)`)
+  }, [examId, theoryPointsPerQuestion, theoryQuestions.length])
+
   // Load exam data
   const loadExamData = useCallback(async () => {
     try {
@@ -202,7 +262,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         }))
         setQuestions(parsedQuestions as Question[])
         
-        // Set points per question based on first question's points
         if (parsedQuestions[0]?.points) {
           setObjectivePointsPerQuestion(parsedQuestions[0].points)
         }
@@ -303,7 +362,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     }
   }
 
-  // Question handlers
+  // Individual question handlers
   const handleAddQuestion = async (data: Partial<Question>) => {
     try {
       const newQuestion = {
@@ -370,7 +429,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       if (error) throw error
 
       const updatedQuestions = questions.filter(q => q.id !== questionId)
-      // Reorder remaining questions
       for (let i = 0; i < updatedQuestions.length; i++) {
         await supabase
           .from('questions')
@@ -599,6 +657,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
                 setShowQuestionDialog(true)
               }}
               onDeleteQuestion={handleDeleteQuestion}
+              onBulkAdd={handleBulkAddMCQs}
+              isSaving={saving}
             />
           </TabsContent>
 
@@ -645,6 +705,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
                 setShowTheoryDialog(true)
               }}
               onDeleteQuestion={handleDeleteTheoryQuestion}
+              onBulkAdd={handleBulkAddTheory}
+              isSaving={saving}
             />
           </TabsContent>
 

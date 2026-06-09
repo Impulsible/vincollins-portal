@@ -1,4 +1,4 @@
-// components/staff/exams/ExamViewer.tsx - UPDATED WITH SUBMISSIONS BUTTON
+// components/staff/exams/ExamViewer.tsx - WITH ENHANCED THEORY RENDERING AND TAILWIND TABLES
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -13,11 +13,26 @@ import {
   ArrowLeft, Edit, Send, Calendar, Clock, 
   BookOpen, Award, CheckCircle, AlertCircle, 
   Eye, Loader2, Calculator, Shuffle, RotateCcw,
-  Users, FileText, Brain, HelpCircle
+  Users, FileText, Brain, HelpCircle, Flag, Layers, Image as ImageIcon
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
+
+interface TheorySubQuestion {
+  text: string
+  marks: number
+  sub_sub_questions?: TheorySubQuestion[]
+}
+
+interface TheoryQuestionData {
+  id: string
+  question: string
+  marks: number
+  sub_questions?: TheorySubQuestion[]
+  image_url?: string
+  image_caption?: string
+}
 
 interface Question {
   id: string
@@ -27,6 +42,9 @@ interface Question {
   correct_answer?: string
   marks: number
   order: number
+  sub_questions?: TheorySubQuestion[]
+  image_url?: string
+  image_caption?: string
 }
 
 interface Exam {
@@ -55,6 +73,333 @@ interface ExamViewerProps {
   onSubmitForApproval: (id: string) => Promise<void>
 }
 
+// ============ HELPER FUNCTIONS FOR RENDERING ============
+
+// Convert markdown table to HTML with Tailwind CSS classes
+const convertTableToHtml = (tableLines: string[]): string => {
+  let html = `
+    <div class="overflow-x-auto my-4 shadow-lg rounded-xl border border-gray-200">
+      <table class="min-w-full bg-white rounded-xl">
+  `
+  let isHeader = true
+  let hasSeparator = false
+  
+  for (const line of tableLines) {
+    // Skip separator lines but mark that we've seen one
+    if (line.includes('---') || line.includes('===')) {
+      isHeader = false
+      hasSeparator = true
+      continue
+    }
+    
+    if (line.startsWith('|')) {
+      const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
+      if (cells.length === 0) continue
+      
+      // Determine row styling
+      let rowClass = ''
+      if (isHeader && !hasSeparator) {
+        rowClass = 'bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-gray-300'
+      } else {
+        rowClass = 'bg-white hover:bg-gray-50 transition-colors duration-150 border-b border-gray-200'
+      }
+      
+      html += `<tr class="${rowClass}">`
+      
+      cells.forEach((cell: string, idx: number) => {
+        const tag = isHeader && !hasSeparator ? 'th' : 'td'
+        
+        // Header styling
+        if (isHeader && !hasSeparator) {
+          html += `<${tag} class="px-5 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300 last:border-r-0">${cell.trim()}</${tag}>`
+        } 
+        // Body cell styling
+        else {
+          html += `<${tag} class="px-5 py-3 text-sm text-gray-600 border-r border-gray-200 last:border-r-0">${cell.trim()}</${tag}>`
+        }
+      })
+      
+      html += '</tr>'
+      
+      // After first data row, header is no longer header if we had a separator
+      if (isHeader && hasSeparator) {
+        isHeader = false
+      }
+    }
+  }
+  
+  html += `
+      </table>
+    </div>
+  `
+  
+  return html
+}
+
+// Enhanced content renderer with proper table detection and Tailwind styling
+const renderContent = (text: string) => {
+  if (!text) return null
+  
+  // Handle markdown tables - improved detection
+  const lines = text.split('\n')
+  let tableLines: string[] = []
+  let inTable = false
+  let tableStartIndex = -1
+  let result: JSX.Element[] = []
+  let currentIndex = 0
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    
+    // Check if line looks like a table row (starts with | and contains |)
+    const isTableRow = line.startsWith('|') && line.includes('|') && line.split('|').length >= 3
+    
+    if (isTableRow) {
+      if (!inTable) {
+        inTable = true
+        tableStartIndex = i
+      }
+      tableLines.push(line)
+    } else if (inTable && !isTableRow) {
+      // End of table - process it
+      if (tableLines.length >= 2) {
+        const tableHtml = convertTableToHtml(tableLines)
+        
+        // Add text before table
+        if (tableStartIndex > currentIndex) {
+          const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
+          if (beforeText.trim()) {
+            result.push(
+              <div key={`text-before-${currentIndex}`} className="whitespace-pre-wrap mb-3">
+                {beforeText.split('\n').map((line, idx) => {
+                  if (line.match(/^\d+\./)) {
+                    return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+                  }
+                  if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+                    return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+                  }
+                  if (line.match(/^\(?[ivx]+\)?\./i)) {
+                    return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+                  }
+                  if (line === '') return <br key={idx} />
+                  return <p key={idx} className="mb-1">{line}</p>
+                })}
+              </div>
+            )
+          }
+        }
+        
+        // Add table
+        result.push(
+          <div key={`table-${currentIndex}`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
+        )
+        
+        currentIndex = i
+      }
+      inTable = false
+      tableLines = []
+    }
+  }
+  
+  // Handle remaining table at end of text
+  if (inTable && tableLines.length >= 2) {
+    const tableHtml = convertTableToHtml(tableLines)
+    
+    // Add text before table
+    if (tableStartIndex > currentIndex) {
+      const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
+      if (beforeText.trim()) {
+        result.push(
+          <div key={`text-before-final`} className="whitespace-pre-wrap mb-3">
+            {beforeText.split('\n').map((line, idx) => {
+              if (line.match(/^\d+\./)) {
+                return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+              }
+              if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+                return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+              }
+              if (line.match(/^\(?[ivx]+\)?\./i)) {
+                return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+              }
+              if (line === '') return <br key={idx} />
+              return <p key={idx} className="mb-1">{line}</p>
+            })}
+          </div>
+        )
+      }
+    }
+    
+    // Add table
+    result.push(
+      <div key={`table-final`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
+    )
+    
+    // Add text after table if any
+    if (currentIndex + tableLines.length < lines.length) {
+      const afterText = lines.slice(currentIndex + tableLines.length).join('\n')
+      if (afterText.trim()) {
+        result.push(
+          <div key={`text-after-final`} className="whitespace-pre-wrap mt-3">
+            {afterText.split('\n').map((line, idx) => {
+              if (line.match(/^\d+\./)) {
+                return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+              }
+              if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+                return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+              }
+              if (line.match(/^\(?[ivx]+\)?\./i)) {
+                return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+              }
+              if (line === '') return <br key={idx} />
+              return <p key={idx} className="mb-1">{line}</p>
+            })}
+          </div>
+        )
+      }
+    }
+    
+    return <>{result}</>
+  }
+  
+  // If we have accumulated results from table processing, return them
+  if (result.length > 0) {
+    return <>{result}</>
+  }
+  
+  // Handle markdown images
+  const imageMatch = text.match(/!\[(.*?)\]\((.*?)\)/)
+  if (imageMatch) {
+    return (
+      <div className="my-3">
+        <img src={imageMatch[2]} alt={imageMatch[1]} className="max-w-full rounded-lg border mx-auto max-h-[200px] object-contain" />
+        {imageMatch[1] && <p className="text-xs text-center text-muted-foreground mt-1">{imageMatch[1]}</p>}
+      </div>
+    )
+  }
+  
+  // Handle ASCII art charts
+  if (text.includes('█') || text.includes('▓') || text.includes('▒') || text.includes('░')) {
+    return <pre className="font-mono text-xs bg-gray-100 p-2 rounded my-2 whitespace-pre-wrap overflow-x-auto">{text}</pre>
+  }
+  
+  // Handle equations
+  const hasEquation = /[\d\+\-\*\/\(\)=]|x\^2|y\^2|√|∑|∫|π|θ|α|β|γ/.test(text)
+  if (hasEquation && !text.includes('<table')) {
+    return (
+      <span className="font-mono text-sm" dangerouslySetInnerHTML={{ 
+        __html: text
+          .replace(/x\^2/g, 'x²')
+          .replace(/y\^2/g, 'y²')
+          .replace(/\n/g, '<br/>')
+      }} />
+    )
+  }
+  
+  // Regular text - preserve line breaks
+  return (
+    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+      {text.split('\n').map((line, idx) => {
+        // Check for numbered questions
+        if (line.match(/^\d+\./)) {
+          return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+        }
+        // Check for sub-questions (a., b., c.)
+        if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+          return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+        }
+        // Check for roman numerals
+        if (line.match(/^\(?[ivx]+\)?\./i)) {
+          return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+        }
+        // Empty line
+        if (line === '') {
+          return <br key={idx} />
+        }
+        // Regular text
+        return <p key={idx} className="mb-1">{line}</p>
+      })}
+    </div>
+  )
+}
+
+// Render sub-questions recursively
+const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
+  if (!subQuestions || subQuestions.length === 0) return null
+  
+  const startCharCode = level === 0 ? 97 : 105 // 'a' or 'i'
+  
+  return (
+    <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
+      <p className="text-xs font-semibold text-purple-700">
+        {level === 0 ? 'Sub-questions:' : 'Parts:'}
+      </p>
+      {subQuestions.map((sq, idx) => (
+        <div key={idx} className="pl-3 border-l-2 border-purple-200">
+          <div className="font-medium">
+            <span className="text-sm">{String.fromCharCode(startCharCode + idx)}.</span>
+            <div className="inline ml-1 text-sm">{renderContent(sq.text)}</div>
+            {sq.marks > 0 && <span className="ml-2 text-xs text-muted-foreground">({sq.marks} marks)</span>}
+          </div>
+          {sq.sub_sub_questions && sq.sub_sub_questions.length > 0 && (
+            renderSubQuestions(sq.sub_sub_questions, level + 1)
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Theory Question Card Component
+function TheoryQuestionCard({ question, index, marks }: { question: TheoryQuestionData; index: number; marks: number }) {
+  return (
+    <div className="p-5 bg-white rounded-xl border shadow-sm hover:shadow-md transition-all duration-200">
+      <div className="flex justify-between items-start gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-0">
+            <Brain className="h-3.5 w-3.5 mr-1" /> Theory
+          </Badge>
+          <span className="text-xs text-muted-foreground font-medium">{marks} marks</span>
+        </div>
+        <Badge variant="outline" className="text-xs font-mono">
+          Q{index + 1}
+        </Badge>
+      </div>
+      
+      {/* Question Image if any */}
+      {question.image_url && (
+        <div className="mb-4">
+          <img 
+            src={question.image_url} 
+            alt={question.image_caption || 'Question diagram'} 
+            className="max-w-full max-h-[250px] rounded-lg border object-contain mx-auto shadow-sm" 
+          />
+          {question.image_caption && (
+            <p className="text-xs text-center text-muted-foreground mt-2 italic">{question.image_caption}</p>
+          )}
+        </div>
+      )}
+      
+      {/* Main Question Content */}
+      <div className="mb-4">
+        <div className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-2">
+          <span className="bg-blue-100 w-5 h-5 rounded-full flex items-center justify-center text-xs">?</span>
+          Question {index + 1}:
+        </div>
+        <div className="pl-2">
+          {renderContent(question.question)}
+        </div>
+      </div>
+      
+      {/* Sub-questions */}
+      {question.sub_questions && question.sub_questions.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          {renderSubQuestions(question.sub_questions, 0)}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: ExamViewerProps) {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -62,7 +407,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
   const [questions, setQuestions] = useState<Question[]>([])
   const [activeTab, setActiveTab] = useState('overview')
   const [submitting, setSubmitting] = useState(false)
-  const [submissionCount, setSubmissionCount] = useState(0) // ✅ NEW
+  const [submissionCount, setSubmissionCount] = useState(0)
 
   const loadExamDetails = useCallback(async () => {
     if (!examId) return
@@ -77,7 +422,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
 
       if (examError) throw examError
       
-      // Extract questions from JSONB
+      // Extract questions from JSONB - PRESERVE sub_questions structure
       let extractedQuestions: Question[] = []
       if (examData.questions && Array.isArray(examData.questions)) {
         extractedQuestions = examData.questions.map((q: any, idx: number) => ({
@@ -87,27 +432,24 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
           options: q.options,
           correct_answer: q.correct_answer,
           marks: q.marks || q.points || 0.5,
-          order: q.order || idx + 1
+          order: q.order || idx + 1,
+          // Preserve theory-specific fields
+          sub_questions: q.sub_questions || q.subQuestions,
+          image_url: q.image_url,
+          image_caption: q.image_caption
         }))
       }
       
       setExam(examData)
       setQuestions(extractedQuestions)
 
-      // ✅ Get submission count
+      // Get submission count
       const { count } = await supabase
         .from('exam_attempts')
         .select('*', { count: 'exact', head: true })
         .eq('exam_id', examId)
       
       setSubmissionCount(count || 0)
-      
-      console.log('📊 Exam loaded:', { 
-        title: examData.title, 
-        totalQuestions: extractedQuestions.length, 
-        totalMarks: extractedQuestions.reduce((sum: number, q: Question) => sum + q.marks, 0),
-        submissions: count
-      })
       
     } catch (error) {
       console.error('Error loading exam:', error)
@@ -169,11 +511,11 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
     })
   }
 
-  // ✅ Auto-calculate totals from questions array
+  // Calculate totals
   const objectiveQuestions = questions.filter(q => q.type === 'objective' || q.type === 'mcq')
-  const theoryQuestions = questions.filter(q => q.type === 'theory')
+  const theoryQuestionsData = questions.filter(q => q.type === 'theory')
   const objectiveCount = objectiveQuestions.length
-  const theoryCount = theoryQuestions.length
+  const theoryCount = theoryQuestionsData.length
   const totalQuestions = questions.length
   const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0)
   const passPercentage = exam?.pass_mark || 50
@@ -228,7 +570,6 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
         </div>
         
         <div className="flex flex-wrap gap-2">
-          {/* ✅ VIEW SUBMISSIONS BUTTON - ALWAYS VISIBLE */}
           {(exam.status === 'published' || exam.status === 'pending') && (
             <Button 
               size="sm" 
@@ -265,7 +606,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
         </div>
       </div>
 
-      {/* Stats Cards - Auto-calculated */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
         <Card>
           <CardContent className="p-2.5 sm:p-3 text-center">
@@ -315,12 +656,11 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
         {theoryCount > 0 && (
           <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1.5">
             <span className="text-[10px] sm:text-xs">
-              ✍️ Theory: {theoryCount} questions • {theoryQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
-              {theoryCount > 0 && ` (${(theoryQuestions.reduce((sum, q) => sum + q.marks, 0) / theoryCount).toFixed(1)} pts avg)`}
+              ✍️ Theory: {theoryCount} questions • {theoryQuestionsData.reduce((sum, q) => sum + q.marks, 0)} marks
+              {theoryCount > 0 && ` (${(theoryQuestionsData.reduce((sum, q) => sum + q.marks, 0) / theoryCount).toFixed(1)} pts avg)`}
             </span>
           </div>
         )}
-        {/* ✅ Show submission count */}
         {submissionCount > 0 && (
           <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5">
             <span className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-400">
@@ -367,7 +707,6 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
                   <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                   <div><p className="text-[10px] text-muted-foreground">Shuffle Options</p><p className="text-xs">{exam.shuffle_options ? 'Yes' : 'No'}</p></div>
                 </div>
-                {/* ✅ Show submissions count */}
                 <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
                   <Users className="h-3.5 w-3.5 text-blue-600" />
                   <div>
@@ -380,11 +719,10 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
               {exam.instructions && (
                 <div className="mt-2 p-3 bg-slate-50 rounded-lg">
                   <p className="text-[10px] text-muted-foreground mb-1">Instructions</p>
-                  <p className="text-xs">{exam.instructions}</p>
+                  <p className="text-xs whitespace-pre-wrap">{exam.instructions}</p>
                 </div>
               )}
 
-              {/* ✅ Quick link to submissions */}
               {submissionCount > 0 && (
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
                   <div>
@@ -405,8 +743,9 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
           </Card>
         </TabsContent>
 
-        {/* Questions Tab */}
+        {/* Questions Tab - WITH ENHANCED THEORY RENDERING AND TAILWIND TABLES */}
         <TabsContent value="questions" className="mt-4 space-y-4">
+          {/* Objective Questions Section */}
           {objectiveQuestions.length > 0 && (
             <Card>
               <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
@@ -444,28 +783,31 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
             </Card>
           )}
 
-          {theoryQuestions.length > 0 && (
+          {/* Theory Questions Section - WITH ENHANCED RENDERING AND TAILWIND TABLES */}
+          {theoryQuestionsData.length > 0 && (
             <Card>
               <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
                 <div className="flex justify-between items-center flex-wrap gap-2">
-                  <CardTitle className="text-sm sm:text-base">Theory Questions</CardTitle>
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <Brain className="h-4 w-4 text-purple-600" />
+                    Theory Questions
+                  </CardTitle>
                   <Badge variant="outline" className="text-[10px] sm:text-xs">
-                    {theoryQuestions.reduce((sum, q) => sum + q.marks, 0)} total marks
+                    {theoryQuestionsData.reduce((sum, q) => sum + q.marks, 0)} total marks
                   </Badge>
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {theoryQuestionsData.length} question{theoryQuestionsData.length !== 1 ? 's' : ''} • Essay type with sub-questions
+                </p>
               </CardHeader>
-              <CardContent className="px-3 sm:px-5 pb-4 space-y-3">
-                {theoryQuestions.map((q, idx) => (
-                  <div key={q.id} className="p-3 bg-slate-50 rounded-lg">
-                    <div className="flex justify-between items-start gap-2">
-                      <p className="text-xs sm:text-sm font-medium flex-1">
-                        {idx + 1}. {q.question}
-                      </p>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        {q.marks} pt{q.marks !== 1 ? 's' : ''}
-                      </Badge>
-                    </div>
-                  </div>
+              <CardContent className="px-3 sm:px-5 pb-4 space-y-4">
+                {theoryQuestionsData.map((q, idx) => (
+                  <TheoryQuestionCard
+                    key={q.id}
+                    question={q as TheoryQuestionData}
+                    index={idx}
+                    marks={q.marks}
+                  />
                 ))}
               </CardContent>
             </Card>

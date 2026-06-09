@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/types.ts - COMPLETE TYPES FILE
+// src/components/staff/exams/edit/types.ts - COMPLETE TYPES FILE WITH NESTED SUB-QUESTIONS
 
 export interface Exam {
   id: string
@@ -61,6 +61,7 @@ export interface TheorySubQuestion {
   points: number
   keywords?: string[]
   model_answer?: string
+  sub_sub_questions?: TheorySubQuestion[]  // ADD THIS for nested sub-questions (i, ii, iii, etc.)
 }
 
 export interface StaffProfile {

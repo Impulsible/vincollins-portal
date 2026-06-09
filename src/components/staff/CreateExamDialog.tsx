@@ -1,4 +1,3 @@
-// components/staff/CreateExamDialog.tsx - UPDATED WITH DEPARTMENT CLASSES
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
@@ -17,77 +16,54 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import {
   Plus, Trash2, Save, Send, Clock, Loader2, FileText, Brain,
-  Upload, FileUp, Download, AlertCircle, CheckCheck, Sparkles, Wand2,
+  Upload, FileUp, Download, AlertCircle, CheckCheck, Sparkles,
   ChevronLeft, ChevronRight, Eye, MonitorPlay, Shield, Flag, Award,
-  Shuffle, Calculator, GraduationCap, BookOpen, Users
+  Shuffle, Calculator, GraduationCap, BookOpen, Layers, Image as ImageIcon,
+  X
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-// ✅ FIX: PDF parser using PDF.js instead of pdf-parse (permanent fix)
+// PDF parser using PDF.js
 const parsePDFWithPDFJS = async (arrayBuffer: ArrayBuffer): Promise<string> => {
   try {
     const pdfjsLib = await import('pdfjs-dist')
-    
     if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
       pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || '3.11.174'}/pdf.worker.min.js`
     }
-    
     const loadingTask = pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) })
     const pdf = await loadingTask.promise
-    
     let fullText = ''
-    
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum)
       const textContent = await page.getTextContent()
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ')
+      const pageText = textContent.items.map((item: any) => item.str).join(' ')
       fullText += pageText + '\n'
     }
-    
     return fullText.trim()
   } catch (error) {
-    console.error('PDF.js parse error:', error)
-    throw new Error('Failed to parse PDF document. Please ensure the file is not corrupted or password protected.')
+    throw new Error('Failed to parse PDF document.')
   }
 }
 
 // Document parser
 const parseDocument = async (file: File): Promise<string> => {
   const fileExt = file.name.split('.').pop()?.toLowerCase()
-  
-  if (fileExt === 'txt' || fileExt === 'md') {
-    return await file.text()
-  }
-  
+  if (fileExt === 'txt' || fileExt === 'md') return await file.text()
   if (fileExt === 'docx' || fileExt === 'doc') {
-    try {
-      const mammoth = (await import('mammoth')).default
-      const arrayBuffer = await file.arrayBuffer()
-      const result = await mammoth.extractRawText({ arrayBuffer })
-      return result.value
-    } catch (error) {
-      throw new Error('Failed to parse Word document. Please ensure the file is not corrupted.')
-    }
+    const mammoth = (await import('mammoth')).default
+    const arrayBuffer = await file.arrayBuffer()
+    const result = await mammoth.extractRawText({ arrayBuffer })
+    return result.value
   }
-  
   if (fileExt === 'pdf') {
-    try {
-      const arrayBuffer = await file.arrayBuffer()
-      return await parsePDFWithPDFJS(arrayBuffer)
-    } catch (error: any) {
-      console.error('PDF parse error:', error)
-      throw new Error(error.message || 'Failed to parse PDF document')
-    }
+    const arrayBuffer = await file.arrayBuffer()
+    return await parsePDFWithPDFJS(arrayBuffer)
   }
-  
-  throw new Error('Unsupported file format. Please upload .txt, .md, .doc, .docx, or .pdf files.')
+  throw new Error('Unsupported file format.')
 }
 
 interface Question {
@@ -99,10 +75,19 @@ interface Question {
   marks: number
 }
 
+interface TheorySubQuestion {
+  text: string
+  marks: number
+  sub_sub_questions?: TheorySubQuestion[]
+}
+
 interface TheoryQuestion {
   id: string
   question: string
   marks: number
+  sub_questions?: TheorySubQuestion[]
+  image_url?: string
+  image_caption?: string
 }
 
 interface CreateExamDialogProps {
@@ -112,7 +97,7 @@ interface CreateExamDialogProps {
   teacherProfile: any
 }
 
-// ✅ UPDATED: Department-specific class options for Senior Secondary
+// Class options
 const CLASS_OPTIONS = {
   jss: [
     { value: 'JSS 1', label: 'JSS 1' },
@@ -120,35 +105,33 @@ const CLASS_OPTIONS = {
     { value: 'JSS 3', label: 'JSS 3' }
   ],
   general: [
-    { value: 'SS1', label: 'SS1 (All Departments)', description: 'All SS1 students - Science, Arts, Commercial' },
-    { value: 'SS2', label: 'SS2 (All Departments)', description: 'All SS2 students - Science, Arts, Commercial' },
-    { value: 'SS3', label: 'SS3 (All Departments)', description: 'All SS3 students - Science, Arts, Commercial' }
+    { value: 'SS1', label: 'SS1 (All Departments)' },
+    { value: 'SS2', label: 'SS2 (All Departments)' },
+    { value: 'SS3', label: 'SS3 (All Departments)' }
   ],
   science: [
-    { value: 'SS1 Science', label: 'SS1 Science', description: 'Science department only' },
-    { value: 'SS2 Science', label: 'SS2 Science', description: 'Science department only' },
-    { value: 'SS3 Science', label: 'SS3 Science', description: 'Science department only' }
+    { value: 'SS1 Science', label: 'SS1 Science' },
+    { value: 'SS2 Science', label: 'SS2 Science' },
+    { value: 'SS3 Science', label: 'SS3 Science' }
   ],
   arts: [
-    { value: 'SS1 Arts', label: 'SS1 Arts', description: 'Arts department only' },
-    { value: 'SS2 Arts', label: 'SS2 Arts', description: 'Arts department only' },
-    { value: 'SS3 Arts', label: 'SS3 Arts', description: 'Arts department only' }
+    { value: 'SS1 Arts', label: 'SS1 Arts' },
+    { value: 'SS2 Arts', label: 'SS2 Arts' },
+    { value: 'SS3 Arts', label: 'SS3 Arts' }
   ],
   commercial: [
-    { value: 'SS1 Commercial', label: 'SS1 Commercial', description: 'Commercial department only' },
-    { value: 'SS2 Commercial', label: 'SS2 Commercial', description: 'Commercial department only' },
-    { value: 'SS3 Commercial', label: 'SS3 Commercial', description: 'Commercial department only' }
+    { value: 'SS1 Commercial', label: 'SS1 Commercial' },
+    { value: 'SS2 Commercial', label: 'SS2 Commercial' },
+    { value: 'SS3 Commercial', label: 'SS3 Commercial' }
   ]
 }
 
-// ✅ UPDATED: Changed Computer Studies to Information Technology
 const jssSubjects = [
   'Mathematics', 'English Studies', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Christian Religious Studies',
   'Islamic Religious Studies', 'Business Studies', 'Home Economics',
-  'Agricultural Science', 'Physical and Health Education',
-  'Information Technology', 'Cultural and Creative Arts', 'French',
-  'Hausa', 'Igbo', 'Yoruba'
+  'Agricultural Science', 'Physical and Health Education', 'Music',
+  'Information Technology', 'Cultural and Creative Arts', 'French'
 ]
 
 const ssSubjects = [
@@ -157,14 +140,253 @@ const ssSubjects = [
   'Commerce', 'Financial Accounting', 'Agricultural Science', 'Information Technology', 'Data Processing'
 ]
 
+// Convert markdown table to HTML with proper styling
+const convertTableToHtml = (tableLines: string[]): string => {
+  let html = '<div class="overflow-x-auto my-4 shadow-md rounded-lg"><table class="min-w-full bg-white border border-gray-300 rounded-lg">'
+  let isHeader = true
+  let hasSeparator = false
+  
+  for (const line of tableLines) {
+    if (line.includes('---') || line.includes('===')) {
+      isHeader = false
+      hasSeparator = true
+      continue
+    }
+    if (line.startsWith('|')) {
+      const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
+      if (cells.length === 0) continue
+      html += '<tr class="' + (isHeader && !hasSeparator ? 'bg-gray-100' : 'bg-white hover:bg-gray-50') + ' border-b border-gray-300">'
+      cells.forEach((cell: string, idx: number) => {
+        const tag = isHeader && !hasSeparator ? 'th' : 'td'
+        const classes = (isHeader && !hasSeparator)
+          ? 'px-4 py-2 text-left text-sm font-semibold text-gray-700 border-r border-gray-300 last:border-r-0'
+          : 'px-4 py-2 text-sm text-gray-600 border-r border-gray-300 last:border-r-0'
+        html += `<${tag} class="${classes}">${cell.trim()}</${tag}>`
+      })
+      html += '</tr>'
+      if (isHeader && hasSeparator) isHeader = false
+    }
+  }
+  html += '</table></div>'
+  return html
+}
+
+// Enhanced content renderer with proper table and text preservation
+const renderContent = (text: string) => {
+  if (!text) return null
+  
+  let processedText = text
+  
+  // Handle markdown tables - this is the key fix for your table display issue
+  if (processedText.includes('|') && processedText.includes('---')) {
+    const lines = processedText.split('\n')
+    const tableLines: string[] = []
+    let inTable = false
+    
+    for (const line of lines) {
+      if (line.includes('|') && (line.includes('---') || line.match(/\|.+\|/))) {
+        inTable = true
+        tableLines.push(line)
+      } else if (inTable && line.trim() === '') {
+        break
+      } else if (inTable && !line.includes('|')) {
+        break
+      }
+    }
+    
+    if (tableLines.length > 0) {
+      const tableHtml = convertTableToHtml(tableLines)
+      const nonTableText = processedText.replace(tableLines.join('\n'), '').trim()
+      return (
+        <div className="space-y-4">
+          {nonTableText && (
+            <div className="whitespace-pre-wrap font-medium">
+              {nonTableText.split('\n').map((line, i) => (
+                <p key={i} className="mb-1">{line}</p>
+              ))}
+            </div>
+          )}
+          <div dangerouslySetInnerHTML={{ __html: tableHtml }} />
+        </div>
+      )
+    }
+  }
+  
+  // Handle regular text - preserve ALL line breaks and formatting
+  return (
+    <div className="whitespace-pre-wrap font-medium leading-relaxed">
+      {processedText.split('\n').map((line, idx) => {
+        // Check for numbered questions
+        if (line.match(/^\d+\./)) {
+          return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+        }
+        // Check for sub-questions (a., b., c.)
+        if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+          return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+        }
+        // Check for roman numerals
+        if (line.match(/^\(?[ivx]+\)?\./i)) {
+          return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+        }
+        // Empty line
+        if (line === '') {
+          return <br key={idx} />
+        }
+        // Regular text
+        return <p key={idx} className="mb-1">{line}</p>
+      })}
+    </div>
+  )
+}
+
+// Enhanced theory parser that preserves ALL text
+const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
+  const questionsList: TheoryQuestion[] = []
+  const seenQuestions = new Set<string>()
+  
+  // Normalize line endings
+  let normalizedText = text.replace(/\r\n/g, '\n')
+  
+  // First, extract and preserve ALL tables
+  const tableMap = new Map<string, string>()
+  let tableCounter = 0
+  
+  // Capture markdown tables
+  const tableRegex = /(\n\|[^\n]+\|\n\|[-:\s|]+\|\n(?:\|[^\n]+\|\n?)+)/g
+  normalizedText = normalizedText.replace(tableRegex, (match) => {
+    const placeholder = `__TABLE_${tableCounter}__`
+    tableMap.set(placeholder, match)
+    tableCounter++
+    return `\n${placeholder}\n`
+  })
+  
+  // Split into questions by looking for numbered patterns
+  const lines = normalizedText.split('\n')
+  let currentQuestion: TheoryQuestion | null = null
+  let currentContent: string[] = []
+  let currentSubQuestions: string[] = []
+  let inSubQuestion = false
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (!line && !currentQuestion) continue
+    
+    // Check for new question start (number followed by dot)
+    const questionMatch = line.match(/^(\d+)\.\s+(.*)/)
+    
+    if (questionMatch) {
+      // Save previous question
+      if (currentQuestion && currentContent.length > 0) {
+        let questionText = currentContent.join('\n').trim()
+        
+        // Restore tables in question text
+        for (const [placeholder, tableHtml] of tableMap.entries()) {
+          if (questionText.includes(placeholder)) {
+            questionText = questionText.replace(new RegExp(placeholder, 'g'), tableHtml)
+          }
+        }
+        
+        currentQuestion.question = questionText
+        if (currentSubQuestions.length > 0) {
+          currentQuestion.sub_questions = currentSubQuestions.map(sq => ({
+            text: sq,
+            marks: Math.floor(10 / currentSubQuestions.length)
+          }))
+        }
+        
+        const questionKey = currentQuestion.question.substring(0, 100)
+        if (!seenQuestions.has(questionKey)) {
+          seenQuestions.add(questionKey)
+          questionsList.push(currentQuestion)
+        }
+      }
+      
+      // Start new question
+      currentQuestion = {
+        id: crypto.randomUUID(),
+        question: '',
+        marks: 10,
+        sub_questions: undefined
+      }
+      currentContent = [questionMatch[2]]
+      currentSubQuestions = []
+      inSubQuestion = false
+    } 
+    else if (currentQuestion) {
+      // Check for sub-question marker
+      const subMatch = line.match(/^([a-z])\.\s+(.*)/i)
+      if (subMatch) {
+        inSubQuestion = true
+        currentSubQuestions.push(subMatch[2])
+      } 
+      else if (inSubQuestion && line.match(/^[ivx]+\./i)) {
+        // Roman numeral sub-sub question
+        if (currentSubQuestions.length > 0) {
+          const lastIndex = currentSubQuestions.length - 1
+          currentSubQuestions[lastIndex] = currentSubQuestions[lastIndex] + '\n  ' + line
+        }
+      }
+      else {
+        currentContent.push(line)
+      }
+    }
+  }
+  
+  // Save last question
+  if (currentQuestion && currentContent.length > 0) {
+    let questionText = currentContent.join('\n').trim()
+    
+    // Restore tables
+    for (const [placeholder, tableHtml] of tableMap.entries()) {
+      if (questionText.includes(placeholder)) {
+        questionText = questionText.replace(new RegExp(placeholder, 'g'), tableHtml)
+      }
+    }
+    
+    currentQuestion.question = questionText
+    if (currentSubQuestions.length > 0) {
+      currentQuestion.sub_questions = currentSubQuestions.map(sq => ({
+        text: sq,
+        marks: Math.floor(10 / currentSubQuestions.length)
+      }))
+    }
+    
+    const questionKey = currentQuestion.question.substring(0, 100)
+    if (!seenQuestions.has(questionKey)) {
+      seenQuestions.add(questionKey)
+      questionsList.push(currentQuestion)
+    }
+  }
+  
+  return questionsList
+}
+
+// Image upload function
+const uploadImage = async (file: File, path: string): Promise<string | null> => {
+  try {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${crypto.randomUUID()}.${fileExt}`
+    const filePath = `${path}/${fileName}`
+    
+    const { error: uploadError } = await supabase.storage
+      .from('exam-assets')
+      .upload(filePath, file)
+    
+    if (uploadError) throw uploadError
+    
+    const { data: { publicUrl } } = supabase.storage
+      .from('exam-assets')
+      .getPublicUrl(filePath)
+    
+    return publicUrl
+  } catch (error) {
+    console.error('Image upload error:', error)
+    return null
+  }
+}
+
 // CBT Preview Component
-function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaultMark }: {
-  examDetails: any
-  questions: Question[]
-  theoryQuestions: TheoryQuestion[]
-  hasTheory: boolean
-  defaultMark: number
-}) {
+function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory }: any) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [selectedAnswers, setSelectedAnswers] = useState<Record<string, string>>({})
   const [theoryAnswers, setTheoryAnswers] = useState<Record<string, string>>({})
@@ -174,8 +396,8 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   
   const allQuestions = useMemo(() => {
-    const objQuestions = questions.map(q => ({ ...q, type: 'objective' as const }))
-    const thQuestions = hasTheory ? theoryQuestions.map(q => ({ ...q, type: 'theory' as const })) : []
+    const objQuestions = questions.map((q: Question) => ({ ...q, type: 'objective' as const }))
+    const thQuestions = hasTheory ? theoryQuestions.map((q: TheoryQuestion) => ({ ...q, type: 'theory' as const })) : []
     return [...objQuestions, ...thQuestions]
   }, [questions, theoryQuestions, hasTheory])
   
@@ -187,7 +409,7 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
   useEffect(() => {
     if (isTimerRunning && timeRemaining > 0) {
       timerRef.current = setInterval(() => {
-        setTimeRemaining(prev => {
+        setTimeRemaining((prev: number) => {
           if (prev <= 1) {
             setIsTimerRunning(false)
             if (timerRef.current) clearInterval(timerRef.current)
@@ -198,26 +420,16 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
       }, 1000)
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [isTimerRunning])
+  }, [isTimerRunning, timeRemaining])
 
   const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
+    const minutes = Math.floor(seconds / 60)
     const secs = seconds % 60
-    if (hours > 0) return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
     return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
   }
 
-  const getTimerColor = () => {
-    const totalSeconds = (examDetails.duration || 60) * 60
-    const percentLeft = (timeRemaining / totalSeconds) * 100
-    if (percentLeft <= 10) return 'text-red-600 bg-red-100'
-    if (percentLeft <= 25) return 'text-orange-600 bg-orange-100'
-    return 'text-blue-600 bg-blue-100'
-  }
-
   const toggleFlag = (id: string) => {
-    setFlaggedQuestions(prev => {
+    setFlaggedQuestions((prev: Set<string>) => {
       const newSet = new Set(prev)
       if (newSet.has(id)) newSet.delete(id)
       else newSet.add(id)
@@ -225,115 +437,136 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
     })
   }
 
-  const handleAnswerSelect = (questionId: string, answer: string) => {
-    setSelectedAnswers(prev => ({ ...prev, [questionId]: answer }))
-  }
-
-  const handleTheoryAnswerChange = (questionId: string, answer: string) => {
-    setTheoryAnswers(prev => ({ ...prev, [questionId]: answer }))
-  }
-
   const navigateToQuestion = (index: number) => {
     if (index >= 0 && index < totalQuestions) setCurrentIndex(index)
   }
 
-  useEffect(() => {
-    setTimeRemaining((examDetails.duration || 60) * 60)
-    setIsTimerRunning(true)
-  }, [examDetails.duration])
+  const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
+    if (!subQuestions || subQuestions.length === 0) return null
+    
+    const startCharCode = level === 0 ? 97 : 105
+    
+    return (
+      <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
+        <p className="text-sm font-semibold text-purple-700">
+          {level === 0 ? 'Sub-questions:' : 'Parts:'}
+        </p>
+        {subQuestions.map((sq, idx) => (
+          <div key={idx} className="pl-3 border-l-2 border-purple-200">
+            <div className="font-medium">
+              {String.fromCharCode(startCharCode + idx)}. {renderContent(sq.text)}
+              {sq.marks > 0 && <span className="ml-2 text-xs text-muted-foreground">({sq.marks} marks)</span>}
+            </div>
+            {sq.sub_sub_questions && sq.sub_sub_questions.length > 0 && (
+              renderSubQuestions(sq.sub_sub_questions, level + 1)
+            )}
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   return (
-    <div className="min-h-[400px] sm:min-h-[500px] lg:min-h-[600px] bg-gray-50 rounded-lg overflow-hidden flex flex-col">
-      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-3 sm:p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-base sm:text-lg lg:text-xl font-bold truncate">{examDetails.title || 'Untitled Exam'}</h3>
-            <p className="text-xs sm:text-sm text-blue-100 truncate">{examDetails.subject} • {examDetails.class}</p>
+    <div className="min-h-[400px] bg-gray-50 rounded-lg overflow-hidden flex flex-col">
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+        <div className="flex justify-between items-center">
+          <div>
+            <h3 className="font-bold truncate">{examDetails.title || 'Untitled Exam'}</h3>
+            <p className="text-xs text-blue-100">{examDetails.subject} • {examDetails.class}</p>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-            <div className={cn("flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 rounded-full font-mono text-xs sm:text-sm lg:text-lg font-bold", getTimerColor())}>
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 px-3 py-1 rounded-full bg-white/20 font-mono text-sm font-bold">
+              <Clock className="h-3 w-3" />
               {formatTime(timeRemaining)}
             </div>
-            <Badge className="bg-white/20 text-white text-[10px] sm:text-xs"><Award className="h-3 w-3 mr-1" /> Pass: {examDetails.pass_mark || 50}%</Badge>
           </div>
         </div>
-        <div className="mt-2 sm:mt-3">
-          <div className="flex justify-between text-[10px] sm:text-xs text-blue-100 mb-1">
-            <span>Question {currentIndex + 1} of {totalQuestions}</span>
-            <span>{answeredCount} of {totalQuestions} answered</span>
-          </div>
-          <Progress value={progress} className="h-1.5 sm:h-2 bg-blue-800" />
+        <Progress value={progress} className="h-1 mt-2 bg-blue-800" />
+        <div className="flex justify-between text-xs text-blue-100 mt-1">
+          <span>Question {currentIndex + 1} of {totalQuestions}</span>
+          <span>{answeredCount} answered</span>
         </div>
       </div>
 
-      <div className="bg-white border-b p-2 sm:p-3 overflow-x-auto">
-        <div className="flex gap-1 sm:gap-1.5 min-w-max pb-1">
-          {allQuestions.map((q, idx) => {
-            const questionId = q.id
-            const isAnswered = q.type === 'theory' ? !!theoryAnswers[questionId] : !!selectedAnswers[questionId]
-            const isFlagged = flaggedQuestions.has(questionId)
+      <div className="bg-white border-b p-3 overflow-x-auto">
+        <div className="flex gap-1 min-w-max">
+          {allQuestions.map((q: any, idx: number) => {
+            const isAnswered = q.type === 'theory' ? !!theoryAnswers[q.id] : !!selectedAnswers[q.id]
             const isCurrent = idx === currentIndex
             return (
-              <button key={questionId} onClick={() => navigateToQuestion(idx)} className={cn(
-                "w-6 h-6 sm:w-7 sm:h-7 lg:w-8 lg:h-8 rounded-lg text-[10px] sm:text-xs font-medium transition-all flex-shrink-0",
-                isCurrent ? "ring-2 ring-blue-500 ring-offset-1" : "",
-                q.type === 'theory' ? (isAnswered ? "bg-purple-500 text-white" : "bg-purple-100 text-purple-700 border border-purple-300")
-                  : (isAnswered ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 border border-gray-300"),
-                isFlagged && "ring-2 ring-amber-400"
-              )}>{idx + 1}</button>
+              <button
+                key={q.id}
+                onClick={() => navigateToQuestion(idx)}
+                className={cn(
+                  "w-8 h-8 rounded-lg text-xs font-medium transition-all",
+                  isCurrent ? "ring-2 ring-blue-500 ring-offset-1" : "",
+                  q.type === 'theory' 
+                    ? (isAnswered ? "bg-purple-500 text-white" : "bg-purple-100 text-purple-700 border border-purple-300")
+                    : (isAnswered ? "bg-green-500 text-white" : "bg-gray-100 text-gray-600 border border-gray-300")
+                )}
+              >
+                {idx + 1}
+              </button>
             )
           })}
         </div>
-        <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 sm:mt-3 text-[10px] sm:text-xs">
-          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-green-500" /> Answered</span>
-          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-gray-100 border border-gray-300" /> Not Answered</span>
-          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded bg-purple-500" /> Theory</span>
-          <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded ring-2 ring-amber-400" /> Flagged</span>
-        </div>
       </div>
 
-      <div className="flex-1 p-3 sm:p-4 lg:p-6 overflow-y-auto">
+      <div className="flex-1 p-6 overflow-y-auto">
         {currentQuestion && (
-          <div className="max-w-3xl mx-auto">
-            <div className="flex flex-wrap items-start justify-between gap-2 mb-3 sm:mb-4">
-              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'} className="text-[10px] sm:text-xs">
-                  {currentQuestion.type === 'theory' ? <><Brain className="h-3 w-3 mr-1" /> Theory</> : <>Objective</>}
-                </Badge>
-                <Badge variant="outline" className="text-[10px] sm:text-xs">{currentQuestion.marks || defaultMark} mark(s)</Badge>
-              </div>
-              <button onClick={() => toggleFlag(currentQuestion.id)} className={cn("p-1 rounded-lg transition", flaggedQuestions.has(currentQuestion.id) ? "bg-amber-100 text-amber-700" : "hover:bg-gray-100 text-gray-400")}>
-                <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
+          <div className="max-w-4xl mx-auto">
+            <div className="flex justify-between items-center mb-4">
+              <Badge variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'}>
+                {currentQuestion.type === 'theory' ? 'Theory' : 'Objective'}
+              </Badge>
+              <button onClick={() => toggleFlag(currentQuestion.id)} className="p-1">
+                <Flag className={cn("h-4 w-4", flaggedQuestions.has(currentQuestion.id) ? "text-amber-500 fill-amber-500" : "text-gray-400")} />
               </button>
             </div>
-            <h4 className="text-sm sm:text-base lg:text-lg font-medium mb-3 sm:mb-4 lg:mb-6">{currentIndex + 1}. {currentQuestion.type === 'theory' ? (currentQuestion as TheoryQuestion).question : (currentQuestion as Question).question}</h4>
-            {currentQuestion.type === 'theory' ? (
-              <div>
-                <Alert className="mb-3 sm:mb-4 bg-amber-50 border-amber-200">
-                  <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-700 text-[11px] sm:text-sm">This question will be graded by your teacher. Be detailed in your answer.</AlertDescription>
-                </Alert>
-                <Textarea value={theoryAnswers[currentQuestion.id] || ''} onChange={(e) => handleTheoryAnswerChange(currentQuestion.id, e.target.value)} placeholder="Type your answer here..." rows={4} className="w-full text-sm" />
+            
+            {currentQuestion.image_url && (
+              <div className="mb-4">
+                <img src={currentQuestion.image_url} alt="Question diagram" className="max-w-full rounded-lg border mx-auto" />
+                {currentQuestion.image_caption && (
+                  <p className="text-sm text-center text-muted-foreground mt-1">{currentQuestion.image_caption}</p>
+                )}
               </div>
+            )}
+            
+            <div className="font-medium mb-4 bg-white p-6 rounded-lg border shadow-sm">
+              <div className="text-lg font-semibold mb-3 text-blue-600">Question {currentIndex + 1}:</div>
+              {renderContent(currentQuestion.question)}
+            </div>
+            
+            {currentQuestion.type === 'theory' ? (
+              <>
+                {currentQuestion.sub_questions && currentQuestion.sub_questions.length > 0 && (
+                  renderSubQuestions(currentQuestion.sub_questions, 0)
+                )}
+                <Alert className="mt-4 bg-amber-50 border-amber-200">
+                  <AlertCircle className="h-4 w-4 text-amber-600" />
+                  <AlertDescription className="text-amber-700">This question will be graded by your teacher. Be detailed in your answer.</AlertDescription>
+                </Alert>
+                <Textarea 
+                  placeholder="Type your answer here..." 
+                  rows={6} 
+                  className="w-full mt-4"
+                  value={theoryAnswers[currentQuestion.id] || ''}
+                  onChange={(e) => setTheoryAnswers({...theoryAnswers, [currentQuestion.id]: e.target.value})}
+                />
+              </>
             ) : (
-              <div className="space-y-2 sm:space-y-3">
-                {(currentQuestion as Question).options?.map((option, idx) => (
-                  <label key={idx} className={cn(
-                    "flex items-start gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-all",
-                    selectedAnswers[currentQuestion.id] === option ? "border-blue-500 bg-blue-50" : "hover:bg-gray-50"
-                  )}>
-                    <input
-                      type="radio"
-                      name={`question-${currentQuestion.id}`}
-                      value={option}
+              <div className="space-y-3 mt-4">
+                {currentQuestion.options?.map((option: string, idx: number) => (
+                  <label key={idx} className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50">
+                    <input 
+                      type="radio" 
+                      name={`q-${currentQuestion.id}`} 
+                      className="h-4 w-4"
                       checked={selectedAnswers[currentQuestion.id] === option}
-                      onChange={() => handleAnswerSelect(currentQuestion.id, option)}
-                      className="mt-0.5 h-3.5 w-3.5 sm:h-4 sm:w-4"
+                      onChange={() => setSelectedAnswers({...selectedAnswers, [currentQuestion.id]: option})}
                     />
-                    <span className="text-xs sm:text-sm flex-1">
-                      <span className="font-medium mr-1 sm:mr-2">{String.fromCharCode(65 + idx)}.</span> {option}
-                    </span>
+                    <span className="text-sm">{String.fromCharCode(65 + idx)}. {option}</span>
                   </label>
                 ))}
               </div>
@@ -342,23 +575,20 @@ function CBTPreview({ examDetails, questions, theoryQuestions, hasTheory, defaul
         )}
       </div>
 
-      <div className="bg-white border-t p-3 sm:p-4 flex justify-between items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex - 1)} disabled={currentIndex === 0} className="h-8 sm:h-9 text-xs sm:text-sm">
-          <ChevronLeft className="mr-1 h-3 w-3 sm:h-4 sm:w-4" /> Prev
+      <div className="bg-white border-t p-4 flex justify-between">
+        <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex - 1)} disabled={currentIndex === 0}>
+          <ChevronLeft className="h-4 w-4 mr-1" /> Previous
         </Button>
-        <div className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1"><Shield className="h-3 w-3 hidden sm:block" /> Secure Mode</div>
         {currentIndex === totalQuestions - 1 ? (
-          <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white h-8 sm:h-9 text-xs sm:text-sm"><CheckCheck className="mr-1 h-3 w-3" /> Submit</Button>
+          <Button className="bg-green-600 hover:bg-green-700">
+            Submit <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
         ) : (
-          <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex + 1)} className="h-8 sm:h-9 text-xs sm:text-sm">Next <ChevronRight className="ml-1 h-3 w-3" /></Button>
+          <Button variant="outline" size="sm" onClick={() => navigateToQuestion(currentIndex + 1)}>
+            Next <ChevronRight className="h-4 w-4 ml-1" />
+          </Button>
         )}
       </div>
-      {examDetails.instructions && (
-        <div className="bg-blue-50 p-3 sm:p-4 border-t border-blue-200">
-          <p className="text-[11px] sm:text-sm text-blue-800 font-medium mb-1">Instructions:</p>
-          <p className="text-[10px] sm:text-xs text-blue-700 whitespace-pre-line">{examDetails.instructions}</p>
-        </div>
-      )}
     </div>
   )
 }
@@ -367,18 +597,29 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState('details')
   const [hasTheory, setHasTheory] = useState(false)
-  const [uploadMode, setUploadMode] = useState<'manual' | 'bulk'>('bulk')
-  const [theoryUploadMode, setTheoryUploadMode] = useState<'manual' | 'bulk'>('bulk')
-  const [bulkQuestionsText, setBulkQuestionsText] = useState('')
-  const [bulkTheoryText, setBulkTheoryText] = useState('')
-  const [parseError, setParseError] = useState<string | null>(null)
-  const [theoryParseError, setTheoryParseError] = useState<string | null>(null)
-  const [defaultMark, setDefaultMark] = useState<number>(0.5)
-  const [isParsingFile, setIsParsingFile] = useState(false)
-  const [isParsingTheoryFile, setIsParsingTheoryFile] = useState(false)
   
+  // Objective tab states
+  const [objectiveUploadMode, setObjectiveUploadMode] = useState<'manual' | 'bulk'>('bulk')
+  const [bulkQuestionsText, setBulkQuestionsText] = useState('')
+  const [parseError, setParseError] = useState<string | null>(null)
+  const [isParsingFile, setIsParsingFile] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Theory tab states
+  const [theoryUploadMode, setTheoryUploadMode] = useState<'manual' | 'smart'>('smart')
+  const [bulkTheoryText, setBulkTheoryText] = useState('')
+  const [theoryParseError, setTheoryParseError] = useState<string | null>(null)
+  const [isParsingTheoryFile, setIsParsingTheoryFile] = useState(false)
+  const [parsedTheoryQuestions, setParsedTheoryQuestions] = useState<TheoryQuestion[]>([])
+  const [showTheoryPreview, setShowTheoryPreview] = useState(false)
   const theoryFileInputRef = useRef<HTMLInputElement>(null)
+  
+  // Image upload states
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [currentImageUrl, setCurrentImageUrl] = useState('')
+  const [currentImageCaption, setCurrentImageCaption] = useState('')
+  
+  const [defaultMark, setDefaultMark] = useState<number>(0.5)
   
   const [examDetails, setExamDetails] = useState({
     title: '',
@@ -404,113 +645,146 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
 
   const [currentTheoryQuestion, setCurrentTheoryQuestion] = useState<Partial<TheoryQuestion>>({
     question: '',
-    marks: 5
+    marks: 10,
+    image_url: '',
+    image_caption: ''
   })
 
-  // AUTO-CALCULATION
-  const totalObjectiveMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0)
-  const totalTheoryMarks = hasTheory ? theoryQuestions.reduce((sum, q) => sum + (q.marks || 0), 0) : 0
+  const totalObjectiveMarks = questions.reduce((sum: number, q: Question) => sum + (q.marks || 0), 0)
+  const totalTheoryMarks = hasTheory ? theoryQuestions.reduce((sum: number, q: TheoryQuestion) => sum + (q.marks || 0), 0) : 0
   const totalMarks = totalObjectiveMarks + totalTheoryMarks
-  const totalQuestionsCount = questions.length + (hasTheory ? theoryQuestions.length : 0)
 
   const availableSubjects = useMemo(() => {
     if (!examDetails.class) return []
     return examDetails.class.startsWith('JSS') ? jssSubjects : ssSubjects
   }, [examDetails.class])
 
-  const handleOpenChange = (open: boolean) => {
-    if (!open) {
-      setTimeout(() => {
-        setExamDetails({ 
-          title: '', subject: '', class: '', duration: 60, instructions: '', pass_mark: 50,
-          randomize_questions: true, randomize_options: true
-        })
-        setQuestions([])
-        setTheoryQuestions([])
-        setHasTheory(false)
-        setActiveTab('details')
-        setBulkQuestionsText('')
-        setBulkTheoryText('')
-        setParseError(null)
-        setTheoryParseError(null)
-        setDefaultMark(0.5)
-      }, 300)
+  // Image upload handler
+  const handleImageUpload = async (file: File) => {
+    setIsUploadingImage(true)
+    try {
+      const publicUrl = await uploadImage(file, `exam-images/temp`)
+      if (publicUrl) {
+        setCurrentImageUrl(publicUrl)
+        setCurrentTheoryQuestion(prev => ({ ...prev, image_url: publicUrl }))
+        toast.success('Image uploaded successfully')
+      } else {
+        toast.error('Failed to upload image')
+      }
+    } catch (error) {
+      toast.error('Failed to upload image')
+    } finally {
+      setIsUploadingImage(false)
     }
-    onOpenChange(open)
   }
 
+  const removeImage = () => {
+    setCurrentImageUrl('')
+    setCurrentTheoryQuestion(prev => ({ ...prev, image_url: '', image_caption: '' }))
+    setCurrentImageCaption('')
+    toast.success('Image removed')
+  }
+
+  // Objective Parser
   const parseObjectiveQuestions = (text: string): Question[] => {
     const parsedQuestions: Question[] = []
-    const blocks = text.split(/(?=\d+\.\s+)/g).filter(b => b.trim())
-    for (const block of blocks) {
-      const qMatch = block.match(/^(\d+)\.\s*([\s\S]*?)(?=\n\s*[A-D][).\s])/i)
-      if (!qMatch) continue
-      const questionText = qMatch[2].trim()
-      const options: string[] = []
-      const optMatches = block.matchAll(/^([A-D])[).\s]+([^\n]+)/gm)
-      for (const m of optMatches) {
-        const idx = m[1].charCodeAt(0) - 65
-        options[idx] = m[2].trim()
+    const lines = text.split(/\r?\n/)
+    let currentQ: Partial<Question> | null = null
+    let currentOptions: string[] = []
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim()
+      if (!line) continue
+      
+      const qMatch = line.match(/^(\d+)[\.\)]\s+(.*)/i)
+      if (qMatch && !line.match(/^[A-D][\.\)]/i)) {
+        if (currentQ && currentOptions.length > 0 && currentQ.correct_answer) {
+          parsedQuestions.push({
+            id: crypto.randomUUID(),
+            type: 'mcq',
+            question: currentQ.question || '',
+            options: currentOptions,
+            correct_answer: currentQ.correct_answer,
+            marks: currentQ.marks || defaultMark
+          })
+        }
+        currentQ = { question: qMatch[2], marks: defaultMark }
+        currentOptions = []
+        continue
       }
-      const validOptions = options.filter(o => o)
-      if (validOptions.length === 0) continue
-      const correctMatch = block.match(/(?:Correct Answer|Ans(?:wer)?)[:\s]*([A-D])\b/i)
-      if (!correctMatch) continue
-      const correctLetter = correctMatch[1].toUpperCase()
-      const correctIdx = correctLetter.charCodeAt(0) - 65
-      const correctAnswer = validOptions[correctIdx] || correctLetter
-      const marksMatch = block.match(/Marks?[:\s]*([\d.]+)/i)
-      const marks = marksMatch ? parseFloat(marksMatch[1]) : defaultMark
-      parsedQuestions.push({ id: crypto.randomUUID(), type: 'mcq', question: questionText, options: validOptions, correct_answer: correctAnswer, marks })
+      
+      const optMatch = line.match(/^([A-D])[\.\)]\s+(.*)/i)
+      if (optMatch && currentQ) {
+        const idx = optMatch[1].charCodeAt(0) - 65
+        currentOptions[idx] = optMatch[2]
+        continue
+      }
+      
+      const ansMatch = line.match(/answer:\s*([A-D])/i)
+      if (ansMatch && currentQ) {
+        const correctLetter = ansMatch[1].toUpperCase()
+        const correctIdx = correctLetter.charCodeAt(0) - 65
+        currentQ.correct_answer = currentOptions[correctIdx] || correctLetter
+        continue
+      }
+      
+      const marksMatch = line.match(/marks?:\s*([\d.]+)/i)
+      if (marksMatch && currentQ) {
+        currentQ.marks = parseFloat(marksMatch[1])
+      }
+      
+      if (currentQ && !optMatch && !ansMatch && !qMatch) {
+        currentQ.question += ' ' + line
+      }
     }
+    
+    if (currentQ && currentOptions.length > 0 && currentQ.correct_answer) {
+      parsedQuestions.push({
+        id: crypto.randomUUID(),
+        type: 'mcq',
+        question: currentQ.question || '',
+        options: currentOptions,
+        correct_answer: currentQ.correct_answer,
+        marks: currentQ.marks || defaultMark
+      })
+    }
+    
     return parsedQuestions
   }
 
-  const parseTheoryQuestions = (text: string): TheoryQuestion[] => {
-    const parsed: TheoryQuestion[] = []
-    const blocks = text.split(/(?=\d+\.\s+)/g).filter(b => b.trim())
-    for (const block of blocks) {
-      let questionText = block.replace(/^\d+\.\s*/, '').trim()
-      const marksMatch = questionText.match(/\n*Marks?[:\s]*(\d+)\s*$/i)
-      let marks = 5
-      if (marksMatch) {
-        marks = parseInt(marksMatch[1])
-        questionText = questionText.replace(/\n*Marks?[:\s]*\d+\s*$/i, '').trim()
-      }
-      if (questionText) parsed.push({ id: crypto.randomUUID(), question: questionText, marks })
+  const handleBulkObjectiveParse = () => {
+    if (!bulkQuestionsText.trim()) {
+      toast.error('Please paste some questions')
+      return
     }
-    return parsed
-  }
-
-  const parseBulkQuestions = () => {
-    if (!bulkQuestionsText.trim()) { toast.error('Please paste some questions'); return }
     setParseError(null)
     const parsed = parseObjectiveQuestions(bulkQuestionsText)
-    if (parsed.length === 0) { setParseError('No valid questions found.'); return }
+    if (parsed.length === 0) {
+      setParseError('No valid questions found.')
+      return
+    }
     setQuestions([...questions, ...parsed])
     setBulkQuestionsText('')
     toast.success(`Added ${parsed.length} questions!`)
   }
 
-  const parseBulkTheory = () => {
-    if (!bulkTheoryText.trim()) { toast.error('Please paste some theory questions'); return }
-    setTheoryParseError(null)
-    const parsed = parseTheoryQuestions(bulkTheoryText)
-    if (parsed.length === 0) { setTheoryParseError('No valid theory questions found.'); return }
-    setTheoryQuestions([...theoryQuestions, ...parsed])
-    setBulkTheoryText('')
-    toast.success(`Added ${parsed.length} theory questions!`)
-  }
-
   const insertObjectiveExample = () => {
-    setBulkQuestionsText(`1. What is the capital of Nigeria?\n\nA. Lagos\nB. Abuja\nC. Kano\nD. Ibadan\n\nAnswer: B\nMarks: 0.5\n\n2. Who is the current President of Nigeria?\n\nA. Muhammadu Buhari\nB. Bola Ahmed Tinubu\nC. Goodluck Jonathan\nD. Olusegun Obasanjo\n\nAnswer: B\nMarks: 0.5`)
+    setBulkQuestionsText(`1. What is the capital of Nigeria?\nA. Lagos\nB. Abuja\nC. Kano\nD. Ibadan\nAnswer: B\nMarks: 0.5\n\n2. What is 2 + 2?\nA. 3\nB. 4\nC. 5\nD. 6\nAnswer: B\nMarks: 0.5`)
   }
 
-  const insertTheoryExample = () => {
-    setBulkTheoryText(`1. Explain the importance of education in national development.\nMarks: 10\n\n2. Discuss the causes and effects of climate change.\nMarks: 15`)
+  const downloadObjectiveTemplate = () => {
+    const template = `1. What is the capital of Nigeria?\nA. Lagos\nB. Abuja\nC. Kano\nD. Ibadan\nAnswer: B\nMarks: 0.5`
+    const blob = new Blob([template], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'objective_questions.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Template downloaded!')
   }
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleObjectiveFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     setIsParsingFile(true)
@@ -525,7 +799,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
           setBulkQuestionsText('')
           toast.success(`Added ${parsed.length} questions from ${file.name}!`)
         } else {
-          toast.warning('No questions found in file. You can edit and parse manually.')
+          toast.warning('No questions found in file.')
         }
       }, 100)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -537,48 +811,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
     }
   }
 
-  const handleTheoryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setIsParsingTheoryFile(true)
-    setTheoryParseError(null)
-    try {
-      const text = await parseDocument(file)
-      setBulkTheoryText(text)
-      setTimeout(() => {
-        const parsed = parseTheoryQuestions(text)
-        if (parsed.length > 0) {
-          setTheoryQuestions([...theoryQuestions, ...parsed])
-          setBulkTheoryText('')
-          toast.success(`Added ${parsed.length} theory questions from ${file.name}!`)
-        } else {
-          toast.warning('No theory questions found. You can edit and parse manually.')
-        }
-      }, 100)
-      if (theoryFileInputRef.current) theoryFileInputRef.current.value = ''
-    } catch (error: any) {
-      setTheoryParseError(error.message || 'Failed to parse file')
-      toast.error(error.message || 'Failed to parse file')
-    } finally {
-      setIsParsingTheoryFile(false)
-    }
-  }
-
-  const downloadTemplate = (type: 'objective' | 'theory') => {
-    const template = type === 'objective' 
-      ? `1. What is the capital of Nigeria?\n\nA. Lagos\nB. Abuja\nC. Kano\nD. Ibadan\n\nAnswer: B\nMarks: 0.5\n\n2. Who is the current President of Nigeria?\n\nA. Muhammadu Buhari\nB. Bola Ahmed Tinubu\nC. Goodluck Jonathan\nD. Olusegun Obasanjo\n\nAnswer: B\nMarks: 0.5`
-      : `1. Explain the importance of education in national development.\nMarks: 10\n\n2. Discuss the causes and effects of climate change.\nMarks: 15`
-    const blob = new Blob([template], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = type === 'objective' ? 'objective_questions.txt' : 'theory_questions.txt'
-    a.click()
-    URL.revokeObjectURL(url)
-    toast.success('Template downloaded!')
-  }
-
-  const addQuestion = () => {
+  const addManualQuestion = () => {
     if (!currentQuestion.question || !currentQuestion.correct_answer) {
       toast.error('Please fill in all required fields')
       return
@@ -596,18 +829,201 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
     toast.success('Question added')
   }
 
-  const addTheoryQuestion = () => {
-    if (!currentTheoryQuestion.question) { toast.error('Please enter a question'); return }
-    const newQuestion: TheoryQuestion = { id: crypto.randomUUID(), question: currentTheoryQuestion.question, marks: currentTheoryQuestion.marks || 5 }
+  const removeQuestion = (id: string) => setQuestions(questions.filter((q: Question) => q.id !== id))
+
+  // Smart Theory Parser Handlers
+  const handleSmartPaste = () => {
+    if (!bulkTheoryText.trim()) {
+      toast.error('Please paste your theory questions')
+      return
+    }
+    setTheoryParseError(null)
+    const parsed = smartParseTheoryQuestions(bulkTheoryText)
+    if (parsed.length === 0) {
+      setTheoryParseError('No valid questions found. Please check the format.')
+      return
+    }
+    setParsedTheoryQuestions(parsed)
+    setShowTheoryPreview(true)
+    toast.success(`Detected ${parsed.length} question(s)`)
+  }
+
+  const handleImportTheory = () => {
+    if (parsedTheoryQuestions.length === 0) return
+    setTheoryQuestions([...theoryQuestions, ...parsedTheoryQuestions])
+    setBulkTheoryText('')
+    setParsedTheoryQuestions([])
+    setShowTheoryPreview(false)
+    toast.success(`Added ${parsedTheoryQuestions.length} theory questions`)
+  }
+
+  const insertTheoryExample = () => {
+    setBulkTheoryText(`1. A trader bought 200 textbooks at ₦750 each. He sold 120 of them at ₦950 each and the remaining ones at ₦850 each.
+
+Sub-questions:
+a. Calculate the total cost price of all the textbooks.
+b. Calculate the total selling price of all the textbooks.
+c. Express the profit as a percentage of the cost price, correct to 1 decimal place.
+
+10 marks
+
+2. Complete the frequency distribution table below for the following scores of 30 students in a Mathematics test:
+8, 5, 7, 6, 9, 4, 7, 8, 6, 5, 10, 7, 6, 8, 9, 5, 7, 6, 10, 8, 7, 5, 9, 6, 7, 4, 8, 6, 9, 7
+
+| Score | Tally | Frequency |
+|-------|-------|-----------|
+| 4     |       |           |
+| 5     |       |           |
+| 6     |       |           |
+| 7     |       |           |
+| 8     |       |           |
+| 9     |       |           |
+| 10    |       |           |
+
+Sub-questions:
+a. From your table, state the modal score.
+b. Calculate the mean score, correct to 2 decimal places.
+c. What is the median score?
+
+10 marks
+
+3. Solve the following equations:
+(i) 3x + 7 = 22
+(ii) 5y - 8 = 17
+(iii) 2a + 3b = 19 when a = 5
+(iv) 4(2x - 3) = 20
+
+10 marks
+
+4. In a class of 50 students, 30 study Mathematics, 25 study English, and 8 study neither subject. Using this information:
+
+Sub-questions:
+a. Represent the information on a well-labelled Venn diagram.
+b. Find the number of students who study both Mathematics and English.
+c. Find the number of students who study Mathematics only.
+d. Find the number of students who study English only.
+
+10 marks
+
+5. Define and explain the following terms with one example each:
+
+Sub-questions:
+a. Rational numbers
+b. Irrational numbers
+c. Prime numbers
+d. Composite numbers
+e. Integers
+
+10 marks
+
+6. Using the equation y = 2x + 1:
+
+Sub-questions:
+a. Copy and complete the table below:
+
+| x | -2 | -1 | 0 | 1 | 2 | 3 |
+|---|---|---|---|---|---|---|
+| y |   |   |   |   |   |   |
+
+b. Using a scale of 2 cm to 1 unit on both axes, draw the graph of y = 2x + 1 for -2 ≤ x ≤ 3.
+c. From your graph, find the value of y when x = 1.5.
+d. From your graph, find the value of x when y = 0.
+
+10 marks`)
+  }
+
+  const downloadTheoryTemplate = () => {
+    const template = `1. Your question here...
+
+Sub-questions:
+a. First sub-question
+   i. Sub-sub-question
+   ii. Another sub-sub-question
+b. Second sub-question
+
+10 marks`
+    const blob = new Blob([template], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'theory_questions_template.txt'
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Template downloaded!')
+  }
+
+  const handleTheoryFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsParsingTheoryFile(true)
+    setTheoryParseError(null)
+    try {
+      const text = await parseDocument(file)
+      setBulkTheoryText(text)
+      const parsed = smartParseTheoryQuestions(text)
+      if (parsed.length > 0) {
+        setParsedTheoryQuestions(parsed)
+        setShowTheoryPreview(true)
+        toast.success(`Detected ${parsed.length} questions from file`)
+      } else {
+        toast.warning('No questions found in file. Please check the format.')
+      }
+      if (theoryFileInputRef.current) theoryFileInputRef.current.value = ''
+    } catch (error: any) {
+      setTheoryParseError(error.message || 'Failed to parse file')
+      toast.error(error.message || 'Failed to parse file')
+    } finally {
+      setIsParsingTheoryFile(false)
+    }
+  }
+
+  const addManualTheoryQuestion = () => {
+    if (!currentTheoryQuestion.question) {
+      toast.error('Please enter a question')
+      return
+    }
+    const newQuestion: TheoryQuestion = {
+      id: crypto.randomUUID(),
+      question: currentTheoryQuestion.question,
+      marks: currentTheoryQuestion.marks || 10,
+      image_url: currentTheoryQuestion.image_url,
+      image_caption: currentTheoryQuestion.image_caption
+    }
     setTheoryQuestions([...theoryQuestions, newQuestion])
-    setCurrentTheoryQuestion({ question: '', marks: 5 })
+    setCurrentTheoryQuestion({ question: '', marks: 10, image_url: '', image_caption: '' })
+    setCurrentImageUrl('')
+    setCurrentImageCaption('')
     toast.success('Theory question added')
   }
 
-  const removeQuestion = (id: string) => setQuestions(questions.filter(q => q.id !== id))
-  const removeTheoryQuestion = (id: string) => setTheoryQuestions(theoryQuestions.filter(q => q.id !== id))
+  const removeTheoryQuestion = (id: string) => setTheoryQuestions(theoryQuestions.filter((q: TheoryQuestion) => q.id !== id))
 
-  const handleSubmit = async (submitForApproval = false) => {
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setTimeout(() => {
+        setExamDetails({ 
+          title: '', subject: '', class: '', duration: 60, instructions: '', pass_mark: 50,
+          randomize_questions: true, randomize_options: true
+        })
+        setQuestions([])
+        setTheoryQuestions([])
+        setHasTheory(false)
+        setActiveTab('details')
+        setBulkQuestionsText('')
+        setBulkTheoryText('')
+        setParseError(null)
+        setTheoryParseError(null)
+        setParsedTheoryQuestions([])
+        setShowTheoryPreview(false)
+        setDefaultMark(0.5)
+        setCurrentImageUrl('')
+        setCurrentImageCaption('')
+      }, 300)
+    }
+    onOpenChange(open)
+  }
+
+  const handleSubmit = async (submitForApproval: boolean = false) => {
     if (!examDetails.title || !examDetails.subject || !examDetails.class) {
       toast.error('Please fill in all exam details')
       setActiveTab('details')
@@ -629,7 +1045,6 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      
       if (!session?.user?.email) {
         toast.error('User not authenticated')
         return
@@ -647,7 +1062,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
 
       let objectiveCount = 0
       let objectiveMarks = 0
-      questions.forEach(q => {
+      questions.forEach((q: Question) => {
         objectiveCount++
         objectiveMarks += q.marks || 0
       })
@@ -655,9 +1070,9 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
       let theoryCount = 0
       let theoryMarks = 0
       if (hasTheory) {
-        theoryQuestions.forEach(q => {
+        theoryQuestions.forEach((q: TheoryQuestion) => {
           theoryCount++
-          theoryMarks += q.marks || 0
+          theoryMarks += q.marks || 10
         })
       }
 
@@ -666,7 +1081,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
 
       const questionsArray: any[] = []
       
-      questions.forEach((q, idx) => {
+      questions.forEach((q: Question, idx: number) => {
         questionsArray.push({
           id: crypto.randomUUID(),
           type: 'mcq',
@@ -679,12 +1094,15 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
       })
       
       if (hasTheory) {
-        theoryQuestions.forEach((q, idx) => {
+        theoryQuestions.forEach((q: TheoryQuestion, idx: number) => {
           questionsArray.push({
             id: crypto.randomUUID(),
             type: 'theory',
             question: q.question,
-            marks: q.marks,
+            marks: q.marks || 10,
+            sub_questions: q.sub_questions || [],
+            image_url: q.image_url || null,
+            image_caption: q.image_caption || null,
             order: objectiveCount + idx + 1
           })
         })
@@ -742,7 +1160,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
             await supabase.from('notifications').insert(notifications)
           }
         } catch (e) {
-          console.log('Notification error (non-critical):', e)
+          console.log('Notification error:', e)
         }
         
         toast.success(`Exam submitted for approval! Total: ${totalMarksSum} marks from ${totalQuestionsCount} questions.`)
@@ -763,211 +1181,183 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="w-[95vw] max-w-[1200px] h-[90vh] flex flex-col p-0 overflow-hidden">
-        <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 flex-shrink-0">
-          <DialogTitle className="flex items-center gap-2 text-lg sm:text-xl">
+        <DialogHeader className="px-6 pt-6 pb-2 flex-shrink-0">
+          <DialogTitle className="flex items-center gap-2 text-xl">
             <GraduationCap className="h-5 w-5 text-emerald-600" />
             Create New Exam
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
+          <DialogDescription>
             Create a CBT exam with objective and optional theory questions
           </DialogDescription>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col flex-1 min-h-0">
-          <div className="px-4 sm:px-6 flex-shrink-0 overflow-x-auto">
-            <TabsList className="grid w-full min-w-[500px] sm:min-w-0 grid-cols-5">
-              <TabsTrigger value="details" className="text-xs sm:text-sm px-2">Details</TabsTrigger>
-              <TabsTrigger value="questions" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">
-                Objective ({questions.length})
-              </TabsTrigger>
-              <TabsTrigger value="theory" disabled={!examDetails.title} className="text-xs sm:text-sm px-2">
-                Theory ({theoryQuestions.length})
-              </TabsTrigger>
-              <TabsTrigger value="preview" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">
-                Preview
-              </TabsTrigger>
-              <TabsTrigger value="summary" disabled={questions.length === 0 && theoryQuestions.length === 0} className="text-xs sm:text-sm px-2">
-                Summary
-              </TabsTrigger>
+          <div className="px-6 flex-shrink-0">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="questions" disabled={!examDetails.title}>Objective ({questions.length})</TabsTrigger>
+              <TabsTrigger value="theory" disabled={!examDetails.title}>Theory ({theoryQuestions.length})</TabsTrigger>
+              <TabsTrigger value="preview" disabled={questions.length === 0 && theoryQuestions.length === 0}>Preview</TabsTrigger>
             </TabsList>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-4">
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
             {/* Details Tab */}
             <TabsContent value="details" className="space-y-4 mt-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="sm:col-span-2">
-                  <Label className="text-sm font-medium">Exam Title *</Label>
-                  <Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" className="mt-1.5" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <Label>Exam Title *</Label>
+                  <Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" />
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Class *</Label>
+                  <Label>Class *</Label>
                   <Select value={examDetails.class} onValueChange={(v) => setExamDetails({ ...examDetails, class: v, subject: '' })}>
-                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="Select class" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
                     <SelectContent className="max-h-[400px]">
-                      {/* Junior Secondary */}
-                      <div className="px-2 py-1.5 text-xs font-semibold text-slate-600 bg-slate-50 sticky top-0">
-                        📖 Junior Secondary School
-                      </div>
-                      {CLASS_OPTIONS.jss.map(c => (
-                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
-                      ))}
-                      
-                      {/* All Students (General) */}
-                      <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 mt-2">
-                        📚 All Students (General Subjects)
-                      </div>
-                      {CLASS_OPTIONS.general.map(c => (
-                        <SelectItem key={c.value} value={c.value}>
-                          <div>
-                            <div>{c.label}</div>
-                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                      
-                      {/* Science Department */}
-                      <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
-                        🔬 Science Department
-                      </div>
-                      {CLASS_OPTIONS.science.map(c => (
-                        <SelectItem key={c.value} value={c.value}>
-                          <div>
-                            <div>{c.label}</div>
-                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                      
-                      {/* Arts Department */}
-                      <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 mt-2">
-                        🎨 Arts Department
-                      </div>
-                      {CLASS_OPTIONS.arts.map(c => (
-                        <SelectItem key={c.value} value={c.value}>
-                          <div>
-                            <div>{c.label}</div>
-                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
-                          </div>
-                        </SelectItem>
-                      ))}
-                      
-                      {/* Commercial Department */}
-                      <div className="px-2 py-1.5 text-xs font-semibold text-amber-600 bg-amber-50 mt-2">
-                        💼 Commercial Department
-                      </div>
-                      {CLASS_OPTIONS.commercial.map(c => (
-                        <SelectItem key={c.value} value={c.value}>
-                          <div>
-                            <div>{c.label}</div>
-                            <div className="text-[10px] text-muted-foreground">{c.description}</div>
-                          </div>
-                        </SelectItem>
-                      ))}
+                      <div className="px-2 py-1 text-xs font-semibold bg-slate-50">📖 Junior Secondary</div>
+                      {CLASS_OPTIONS.jss.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      <div className="px-2 py-1 text-xs font-semibold bg-emerald-50 mt-1">📚 All Students</div>
+                      {CLASS_OPTIONS.general.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      <div className="px-2 py-1 text-xs font-semibold bg-blue-50 mt-1">🔬 Science</div>
+                      {CLASS_OPTIONS.science.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      <div className="px-2 py-1 text-xs font-semibold bg-purple-50 mt-1">🎨 Arts</div>
+                      {CLASS_OPTIONS.arts.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
+                      <div className="px-2 py-1 text-xs font-semibold bg-amber-50 mt-1">💼 Commercial</div>
+                      {CLASS_OPTIONS.commercial.map(c => <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Subject *</Label>
+                  <Label>Subject *</Label>
                   <Select value={examDetails.subject} onValueChange={(v) => setExamDetails({ ...examDetails, subject: v })} disabled={!examDetails.class}>
-                    <SelectTrigger className="mt-1.5"><SelectValue placeholder={examDetails.class ? "Select subject" : "Select class first"} /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="Select subject" /></SelectTrigger>
                     <SelectContent>
                       {availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Duration (minutes) *</Label>
-                  <Input type="number" min="1" max="240" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} className="mt-1.5" />
+                  <Label>Duration (minutes)</Label>
+                  <Input type="number" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} />
                 </div>
                 <div>
-                  <Label className="text-sm font-medium">Pass Mark (%)</Label>
-                  <Input type="number" min="0" max="100" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} className="mt-1.5" />
+                  <Label>Pass Mark (%)</Label>
+                  <Input type="number" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} />
                 </div>
               </div>
 
               <div className="p-4 bg-muted/30 rounded-lg">
-                <Label className="text-sm font-medium mb-2 block">Default Mark per Objective Question</Label>
-                <RadioGroup value={defaultMark.toString()} onValueChange={(v) => { setDefaultMark(parseFloat(v)); setCurrentQuestion({ ...currentQuestion, marks: parseFloat(v) }) }} className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="1" id="mark1" /><Label htmlFor="mark1">1 Mark each</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="0.5" id="mark05" /><Label htmlFor="mark05">0.5 Mark each</Label></div>
-                  <div className="flex items-center space-x-2"><RadioGroupItem value="2" id="mark2" /><Label htmlFor="mark2">2 Marks each</Label></div>
+                <Label className="mb-2 block">Default Mark per Objective Question</Label>
+                <RadioGroup value={defaultMark.toString()} onValueChange={(v) => setDefaultMark(parseFloat(v))} className="flex gap-4">
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="1" id="mark1" /><Label htmlFor="mark1">1 Mark</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="0.5" id="mark05" /><Label htmlFor="mark05">0.5 Mark</Label></div>
+                  <div className="flex items-center space-x-2"><RadioGroupItem value="2" id="mark2" /><Label htmlFor="mark2">2 Marks</Label></div>
                 </RadioGroup>
-                <p className="text-xs text-muted-foreground mt-2">
-                  {questions.length} objective questions × {defaultMark} = {questions.length * defaultMark} marks
-                </p>
               </div>
 
-              <div className="p-4 bg-blue-50/50 rounded-lg border border-blue-200 space-y-3">
-                <Label className="text-sm font-semibold flex items-center gap-2"><Shuffle className="h-4 w-4 text-blue-600" /> Anti-Cheating Settings</Label>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div><Label className="text-sm">Randomize Question Order</Label><p className="text-xs text-muted-foreground">Each student gets questions in random order</p></div>
+              <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                <Label className="flex items-center gap-2"><Shuffle className="h-4 w-4" /> Anti-Cheating</Label>
+                <div className="flex justify-between items-center">
+                  <div><Label>Randomize Questions</Label><p className="text-xs text-muted-foreground">Each student gets random order</p></div>
                   <Switch checked={examDetails.randomize_questions} onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_questions: v })} />
                 </div>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div><Label className="text-sm">Randomize Options</Label><p className="text-xs text-muted-foreground">Shuffles A,B,C,D options for each student</p></div>
+                <div className="flex justify-between items-center">
+                  <div><Label>Randomize Options</Label><p className="text-xs text-muted-foreground">Shuffle A,B,C,D options</p></div>
                   <Switch checked={examDetails.randomize_options} onCheckedChange={(v) => setExamDetails({ ...examDetails, randomize_options: v })} />
                 </div>
               </div>
 
-              <div><Label className="text-sm font-medium">Instructions</Label><Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} placeholder="Enter exam instructions..." rows={3} className="mt-1.5" /></div>
+              <div>
+                <Label>Instructions</Label>
+                <Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} rows={3} />
+              </div>
               
               <div className="flex justify-end">
-                <Button onClick={() => setActiveTab('questions')} disabled={!examDetails.title || !examDetails.class || !examDetails.subject}>Next: Add Questions <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                <Button onClick={() => setActiveTab('questions')}>Next: Add Questions</Button>
               </div>
             </TabsContent>
 
             {/* Objective Questions Tab */}
             <TabsContent value="questions" className="space-y-4 mt-0">
               <div className="flex gap-2 border-b pb-3">
-                <Button variant={uploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('bulk')}><Sparkles className="mr-1 h-3 w-3" />Bulk</Button>
-                <Button variant={uploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setUploadMode('manual')}><Plus className="mr-1 h-3 w-3" />Manual</Button>
+                <Button variant={objectiveUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setObjectiveUploadMode('bulk')}>
+                  <Sparkles className="mr-1 h-3 w-3" /> Bulk Import
+                </Button>
+                <Button variant={objectiveUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setObjectiveUploadMode('manual')}>
+                  <Plus className="mr-1 h-3 w-3" /> Manual Add
+                </Button>
               </div>
 
-              {uploadMode === 'bulk' ? (
+              {objectiveUploadMode === 'bulk' ? (
                 <div className="space-y-4">
-                  <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                    <span>Upload or paste objective questions</span>
-                    <div className="flex gap-2"><Button variant="outline" size="sm" onClick={insertObjectiveExample}>Example</Button><Button variant="outline" size="sm" onClick={() => downloadTemplate('objective')}>Template</Button></div>
-                  </AlertDescription></Alert>
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <span>Paste objective questions with options and answers</span>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={insertObjectiveExample}>Example</Button>
+                        <Button variant="outline" size="sm" onClick={downloadObjectiveTemplate}>Template</Button>
+                      </div>
+                    </AlertDescription>
+                  </Alert>
+                  
                   <div onClick={() => fileInputRef.current?.click()} className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary">
-                    {isParsingFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload (.doc, .docx, .pdf, .txt)</p></>}
+                    {isParsingFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Upload .doc, .docx, .pdf, or .txt file</p></>}
                   </div>
-                  <input ref={fileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleFileUpload} className="hidden" />
-                  <Textarea value={bulkQuestionsText} onChange={(e) => setBulkQuestionsText(e.target.value)} placeholder="1. Question\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: 0.5" rows={8} className="font-mono text-sm" />
-                  <Button onClick={parseBulkQuestions} className="w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
-                  {parseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{parseError}</AlertDescription></Alert>}
+                  <input ref={fileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleObjectiveFileUpload} className="hidden" />
+                  
+                  <Textarea 
+                    value={bulkQuestionsText} 
+                    onChange={(e) => setBulkQuestionsText(e.target.value)} 
+                    placeholder="1. Question text here...\nA. Option 1\nB. Option 2\nC. Option 3\nD. Option 4\nAnswer: B\nMarks: 0.5" 
+                    rows={8} 
+                    className="font-mono text-sm"
+                  />
+                  
+                  <Button onClick={handleBulkObjectiveParse} className="w-full">
+                    <CheckCheck className="mr-2 h-4 w-4" /> Parse & Add Questions
+                  </Button>
+                  
+                  {parseError && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>{parseError}</AlertDescription>
+                    </Alert>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-4">
-                  <div className="flex gap-2">
-                    <Badge className={cn("cursor-pointer", currentQuestion.type === 'mcq' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'mcq', options: ['', '', '', ''], marks: defaultMark })}>MCQ</Badge>
-                    <Badge className={cn("cursor-pointer", currentQuestion.type === 'true_false' ? "bg-primary" : "bg-muted")} onClick={() => setCurrentQuestion({ ...currentQuestion, type: 'true_false', options: ['True', 'False'], marks: defaultMark })}>True/False</Badge>
+                  <div>
+                    <Label>Question</Label>
+                    <Textarea value={currentQuestion.question} onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })} rows={3} />
                   </div>
-                  <div><Label>Question</Label><Textarea value={currentQuestion.question} onChange={(e) => setCurrentQuestion({ ...currentQuestion, question: e.target.value })} rows={3} /></div>
-                  {currentQuestion.type === 'mcq' && (
-                    <div className="space-y-2">
-                      <Label>Options</Label>
-                      {currentQuestion.options?.map((option, index) => (
-                        <div key={index} className="flex items-center gap-2"><span className="w-6">{String.fromCharCode(65 + index)}.</span><Input value={option} onChange={(e) => { const newOpts = [...(currentQuestion.options || [])]; newOpts[index] = e.target.value; setCurrentQuestion({ ...currentQuestion, options: newOpts }) }} /></div>
-                      ))}
-                    </div>
-                  )}
-                  <div><Label>Correct Answer</Label>
-                    {currentQuestion.type === 'mcq' ? (
-                      <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
-                        <SelectTrigger><SelectValue placeholder="Select correct option" /></SelectTrigger>
-                        <SelectContent>{currentQuestion.options?.map((opt, i) => opt ? <SelectItem key={i} value={opt}>{String.fromCharCode(65 + i)}. {opt}</SelectItem> : null)}</SelectContent>
-                      </Select>
-                    ) : (
-                      <Select value={currentQuestion.correct_answer || undefined} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
-                        <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                        <SelectContent><SelectItem value="True">True</SelectItem><SelectItem value="False">False</SelectItem></SelectContent>
-                      </Select>
-                    )}
+                  <div className="space-y-2">
+                    <Label>Options</Label>
+                    {currentQuestion.options?.map((opt: string, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <span className="w-8 font-medium">{String.fromCharCode(65 + idx)}.</span>
+                        <Input value={opt} onChange={(e) => {
+                          const newOpts = [...(currentQuestion.options || [])]
+                          newOpts[idx] = e.target.value
+                          setCurrentQuestion({ ...currentQuestion, options: newOpts })
+                        }} />
+                      </div>
+                    ))}
                   </div>
-                  <div><Label>Marks</Label><Input type="number" step="0.5" min="0.5" value={currentQuestion.marks} onChange={(e) => setCurrentQuestion({ ...currentQuestion, marks: parseFloat(e.target.value) || defaultMark })} /></div>
-                  <Button onClick={addQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Question</Button>
+                  <div>
+                    <Label>Correct Answer</Label>
+                    <Select value={currentQuestion.correct_answer} onValueChange={(v) => setCurrentQuestion({ ...currentQuestion, correct_answer: v })}>
+                      <SelectTrigger><SelectValue placeholder="Select correct answer" /></SelectTrigger>
+                      <SelectContent>
+                        {currentQuestion.options?.map((opt: string, idx: number) => opt && <SelectItem key={idx} value={opt}>{String.fromCharCode(65 + idx)}. {opt}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Marks</Label>
+                    <Input type="number" step="0.5" value={currentQuestion.marks} onChange={(e) => setCurrentQuestion({ ...currentQuestion, marks: parseFloat(e.target.value) || defaultMark })} />
+                  </div>
+                  <Button onClick={addManualQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" /> Add Question</Button>
                 </div>
               )}
 
@@ -975,20 +1365,20 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
                 <div className="space-y-2 mt-4">
                   <Label>Added Questions ({questions.length})</Label>
                   <div className="max-h-[200px] overflow-y-auto space-y-2">
-                    {questions.map((q, i) => (
+                    {questions.map((q: Question, i: number) => (
                       <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
-                        <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs text-muted-foreground">{q.marks} mark(s)</p></div>
-                        <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{i + 1}. {q.question}</p>
+                          <p className="text-xs text-muted-foreground">{q.marks} marks</p>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => removeQuestion(q.id)}>
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
-
-              <div className="flex flex-col sm:flex-row justify-between gap-2 pt-4">
-                <Button variant="outline" onClick={() => setActiveTab('details')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                <Button onClick={() => setActiveTab('theory')}>Next: Theory <ChevronRight className="ml-2 h-4 w-4" /></Button>
-              </div>
             </TabsContent>
 
             {/* Theory Tab */}
@@ -996,36 +1386,194 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
               {!hasTheory ? (
                 <div className="text-center py-8 space-y-4">
                   <Brain className="h-16 w-16 mx-auto text-muted-foreground" />
-                  <div><h3 className="text-lg font-semibold">Theory Questions Disabled</h3><p className="text-sm text-muted-foreground">Enable theory questions to add essay-type questions</p></div>
-                  <div className="flex items-center justify-center gap-3 p-4 bg-muted rounded-lg"><span>Include Theory Questions</span><Switch checked={hasTheory} onCheckedChange={setHasTheory} /></div>
-                  <div className="flex justify-between pt-4"><Button variant="outline" onClick={() => setActiveTab('questions')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button><Button onClick={() => setActiveTab('preview')} disabled={questions.length === 0}>Skip to Preview <ChevronRight className="ml-2 h-4 w-4" /></Button></div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Theory Questions Disabled</h3>
+                    <p className="text-sm text-muted-foreground">Enable theory questions to add essay-type questions</p>
+                  </div>
+                  <div className="flex items-center justify-center gap-3 p-4 bg-muted rounded-lg">
+                    <span>Include Theory Questions</span>
+                    <Switch checked={hasTheory} onCheckedChange={setHasTheory} />
+                  </div>
                 </div>
               ) : (
                 <>
                   <div className="flex gap-2 border-b pb-3">
-                    <Button variant={theoryUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('bulk')}><Sparkles className="mr-1 h-3 w-3" />Bulk</Button>
-                    <Button variant={theoryUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('manual')}><Plus className="mr-1 h-3 w-3" />Manual</Button>
+                    <Button variant={theoryUploadMode === 'smart' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('smart')}>
+                      <Sparkles className="mr-1 h-3 w-3" /> Smart Paste
+                    </Button>
+                    <Button variant={theoryUploadMode === 'manual' ? 'default' : 'outline'} size="sm" onClick={() => setTheoryUploadMode('manual')}>
+                      <Plus className="mr-1 h-3 w-3" /> Manual Add
+                    </Button>
                   </div>
 
-                  {theoryUploadMode === 'bulk' ? (
+                  {theoryUploadMode === 'smart' ? (
                     <div className="space-y-4">
-                      <Alert><AlertCircle className="h-4 w-4" /><AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-sm">
-                        <span>Upload or paste theory questions</span>
-                        <div className="flex gap-2"><Button variant="outline" size="sm" onClick={insertTheoryExample}>Example</Button><Button variant="outline" size="sm" onClick={() => downloadTemplate('theory')}>Template</Button></div>
-                      </AlertDescription></Alert>
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertDescription className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                          <span>Paste your questions with sub-questions (a, b, c). Tables, charts, and formatting are preserved.</span>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" onClick={insertTheoryExample}>Example</Button>
+                            <Button variant="outline" size="sm" onClick={downloadTheoryTemplate}>Template</Button>
+                          </div>
+                        </AlertDescription>
+                      </Alert>
+                      
                       <div onClick={() => theoryFileInputRef.current?.click()} className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-primary">
-                        {isParsingTheoryFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Click to upload (.doc, .docx, .pdf, .txt)</p></>}
+                        {isParsingTheoryFile ? <Loader2 className="h-8 w-8 mx-auto animate-spin" /> : <><FileUp className="h-8 w-8 mx-auto mb-2" /><p className="text-sm">Upload .doc, .docx, .pdf, or .txt file</p></>}
                       </div>
                       <input ref={theoryFileInputRef} type="file" accept=".txt,.md,.doc,.docx,.pdf" onChange={handleTheoryFileUpload} className="hidden" />
-                      <Textarea value={bulkTheoryText} onChange={(e) => setBulkTheoryText(e.target.value)} placeholder="1. Explain the importance of education.\nMarks: 10" rows={8} className="font-mono text-sm" />
-                      <Button onClick={parseBulkTheory} className="w-full"><CheckCheck className="mr-2 h-4 w-4" />Parse & Add</Button>
-                      {theoryParseError && <Alert variant="destructive"><AlertCircle className="h-4 w-4" /><AlertDescription>{theoryParseError}</AlertDescription></Alert>}
+                      
+                      <Textarea 
+                        value={bulkTheoryText} 
+                        onChange={(e) => setBulkTheoryText(e.target.value)} 
+                        placeholder="1. Your question here...\n\nSub-questions:\na. Sub-question 1\n   i. Sub-sub-question\n   ii. Another sub-sub\nb. Sub-question 2\n\n10 marks" 
+                        rows={12} 
+                        className="font-mono text-sm"
+                      />
+                      
+                      <div className="flex gap-2">
+                        <Button onClick={handleSmartPaste} className="flex-1">
+                          <Sparkles className="mr-2 h-4 w-4" /> Smart Parse
+                        </Button>
+                      </div>
+                      
+                      {theoryParseError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{theoryParseError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {showTheoryPreview && parsedTheoryQuestions.length > 0 && (
+                        <div className="border rounded-lg p-4 bg-slate-50 max-h-[500px] overflow-y-auto">
+                          <h4 className="font-semibold mb-3 flex items-center gap-2 sticky top-0 bg-slate-50 py-2">
+                            <Layers className="h-4 w-4 text-purple-600" />
+                            Preview ({parsedTheoryQuestions.length} questions detected)
+                          </h4>
+                          <div className="space-y-4">
+                            {parsedTheoryQuestions.map((q: TheoryQuestion, idx: number) => (
+                              <div key={idx} className="p-4 bg-white rounded-lg border shadow-sm">
+                                <div className="font-medium">
+                                  <span className="text-purple-600 font-bold">{idx + 1}.</span>
+                                  <div className="inline ml-1">{renderContent(q.question)}</div>
+                                </div>
+                                {q.sub_questions && q.sub_questions.length > 0 && (
+                                  <div className="ml-6 mt-3 space-y-2">
+                                    <p className="text-xs text-purple-600 font-semibold">Sub-questions:</p>
+                                    {q.sub_questions.map((sq: TheorySubQuestion, sIdx: number) => (
+                                      <div key={sIdx} className="pl-3 border-l-2 border-purple-200">
+                                        <div className="text-sm">
+                                          <span className="font-medium text-purple-600">{String.fromCharCode(97 + sIdx)}.</span>
+                                          <div className="inline ml-1 whitespace-pre-wrap">{renderContent(sq.text)}</div>
+                                        </div>
+                                        {sq.sub_sub_questions && sq.sub_sub_questions.length > 0 && (
+                                          <div className="ml-6 mt-2 space-y-1">
+                                            {sq.sub_sub_questions.map((ssq: TheorySubQuestion, ssIdx: number) => (
+                                              <div key={ssIdx} className="text-sm text-purple-600">
+                                                {String.fromCharCode(105 + ssIdx)}. {renderContent(ssq.text)}
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="flex gap-2 mt-3">
+                                  <Badge variant="outline">{q.marks} marks</Badge>
+                                  {q.sub_questions && q.sub_questions.length > 0 && (
+                                    <Badge variant="outline">{q.sub_questions.length} part(s)</Badge>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="flex gap-2 mt-4 sticky bottom-0 bg-slate-50 pt-3">
+                            <Button variant="outline" onClick={() => setShowTheoryPreview(false)}>Cancel</Button>
+                            <Button onClick={handleImportTheory} className="bg-emerald-600 hover:bg-emerald-700">
+                              Import {parsedTheoryQuestions.length} Question{parsedTheoryQuestions.length !== 1 ? 's' : ''}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div><Label>Theory Question</Label><Textarea value={currentTheoryQuestion.question} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, question: e.target.value })} rows={4} /></div>
-                      <div><Label>Marks</Label><Input type="number" min="1" max="100" value={currentTheoryQuestion.marks} onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, marks: parseInt(e.target.value) || 5 })} /></div>
-                      <Button onClick={addTheoryQuestion} className="w-full"><Plus className="mr-2 h-4 w-4" />Add Theory Question</Button>
+                      <div>
+                        <Label>Theory Question</Label>
+                        <Textarea 
+                          value={currentTheoryQuestion.question} 
+                          onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, question: e.target.value })} 
+                          rows={4} 
+                        />
+                      </div>
+                      
+                      <div className="border rounded-lg p-4">
+                        <Label className="mb-2 block">Upload Diagram/Chart (Optional)</Label>
+                        <div className="mt-2">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            id="theory-image-upload"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0]
+                              if (file) handleImageUpload(file)
+                            }}
+                          />
+                          <label htmlFor="theory-image-upload" className="cursor-pointer">
+                            <div className="border-2 border-dashed rounded-lg p-6 text-center hover:border-primary transition-colors">
+                              {isUploadingImage ? (
+                                <Loader2 className="h-8 w-8 mx-auto animate-spin text-muted-foreground" />
+                              ) : (
+                                <>
+                                  <ImageIcon className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                                  <p className="text-sm">Click to upload chart, graph, or diagram</p>
+                                  <p className="text-xs text-muted-foreground mt-1">Supports PNG, JPG, SVG, GIF (max 5MB)</p>
+                                </>
+                              )}
+                            </div>
+                          </label>
+                        </div>
+                        
+                        {currentTheoryQuestion.image_url && (
+                          <div className="mt-4">
+                            <div className="relative inline-block">
+                              <img 
+                                src={currentTheoryQuestion.image_url} 
+                                alt="Uploaded diagram" 
+                                className="max-w-full max-h-[200px] rounded-lg border object-contain" 
+                              />
+                              <button
+                                onClick={removeImage}
+                                className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <Input
+                              type="text"
+                              placeholder="Image caption (optional)"
+                              value={currentTheoryQuestion.image_caption || ''}
+                              onChange={(e) => setCurrentTheoryQuestion(prev => ({ ...prev, image_caption: e.target.value }))}
+                              className="mt-2 text-sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div>
+                        <Label>Marks</Label>
+                        <Input 
+                          type="number" 
+                          value={currentTheoryQuestion.marks} 
+                          onChange={(e) => setCurrentTheoryQuestion({ ...currentTheoryQuestion, marks: parseInt(e.target.value) || 10 })} 
+                        />
+                      </div>
+                      <Button onClick={addManualTheoryQuestion} className="w-full">
+                        <Plus className="mr-2 h-4 w-4" /> Add Theory Question
+                      </Button>
                     </div>
                   )}
 
@@ -1033,85 +1581,44 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
                     <div className="space-y-2 mt-4">
                       <Label>Theory Questions ({theoryQuestions.length})</Label>
                       <div className="max-h-[200px] overflow-y-auto space-y-2">
-                        {theoryQuestions.map((q, i) => (
+                        {theoryQuestions.map((q: TheoryQuestion, i: number) => (
                           <div key={q.id} className="flex justify-between p-3 bg-muted rounded-lg">
-                            <div className="flex-1 min-w-0"><p className="text-sm font-medium truncate">{i + 1}. {q.question}</p><p className="text-xs text-muted-foreground">{q.marks} marks</p></div>
-                            <Button variant="ghost" size="icon" onClick={() => removeTheoryQuestion(q.id)}><Trash2 className="h-4 w-4 text-red-500" /></Button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{i + 1}. {q.question.substring(0, 100)}...</p>
+                              {q.sub_questions && q.sub_questions.length > 0 && (
+                                <p className="text-xs text-purple-600">{q.sub_questions.length} sub-question(s)</p>
+                              )}
+                              {q.image_url && (
+                                <p className="text-xs text-blue-600 flex items-center gap-1 mt-1">
+                                  <ImageIcon className="h-3 w-3" /> Has image
+                                </p>
+                              )}
+                              <p className="text-xs text-muted-foreground">{q.marks} marks</p>
+                            </div>
+                            <Button variant="ghost" size="icon" onClick={() => removeTheoryQuestion(q.id)}>
+                              <Trash2 className="h-4 w-4 text-red-500" />
+                            </Button>
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
-
-                  <div className="flex justify-between pt-4">
-                    <Button variant="outline" onClick={() => setActiveTab('questions')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-                    <Button onClick={() => setActiveTab('preview')}>Next: Preview <ChevronRight className="ml-2 h-4 w-4" /></Button>
-                  </div>
                 </>
               )}
             </TabsContent>
 
             {/* Preview Tab */}
             <TabsContent value="preview" className="mt-0">
-              <div className="mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                <div><h3 className="text-lg font-semibold flex items-center gap-2"><MonitorPlay className="h-5 w-5 text-primary" />Student CBT Preview</h3><p className="text-sm text-muted-foreground">How students will see this exam</p></div>
-                <Button variant="outline" onClick={() => setActiveTab('summary')}>Next: Summary <ChevronRight className="ml-2 h-4 w-4" /></Button>
-              </div>
-              <CBTPreview examDetails={examDetails} questions={questions} theoryQuestions={theoryQuestions} hasTheory={hasTheory} defaultMark={defaultMark} />
-            </TabsContent>
-
-            {/* Summary Tab */}
-            <TabsContent value="summary" className="space-y-4 mt-0">
-              <Card>
-                <CardHeader><CardTitle className="flex items-center gap-2"><Calculator className="h-5 w-5 text-emerald-600" />Exam Summary</CardTitle></CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div><p className="text-sm text-muted-foreground">Title</p><p className="font-medium">{examDetails.title || 'Untitled'}</p></div>
-                    <div><p className="text-sm text-muted-foreground">Class</p><p className="font-medium">{examDetails.class}</p></div>
-                    <div><p className="text-sm text-muted-foreground">Subject</p><p className="font-medium">{examDetails.subject}</p></div>
-                    <div><p className="text-sm text-muted-foreground">Duration</p><p className="font-medium">{examDetails.duration} minutes</p></div>
-                    <div><p className="text-sm text-muted-foreground">Pass Mark</p><p className="font-medium">{examDetails.pass_mark}%</p></div>
-                    <div className="bg-emerald-50 p-3 rounded-lg"><p className="text-sm text-emerald-700 font-semibold">Total Marks</p><p className="text-2xl font-bold text-emerald-700">{totalMarks}</p></div>
-                  </div>
-                  
-                  <div className="border-t pt-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium">Objective Questions</span>
-                      <span className="text-sm font-bold">{questions.length} questions • {totalObjectiveMarks} marks</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div className="bg-blue-600 h-2 rounded-full" style={{ width: totalMarks > 0 ? (totalObjectiveMarks / totalMarks) * 100 : 0 }} />
-                    </div>
-                  </div>
-                  
-                  {hasTheory && (
-                    <div>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm font-medium">Theory Questions</span>
-                        <span className="text-sm font-bold">{theoryQuestions.length} questions • {totalTheoryMarks} marks</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div className="bg-purple-600 h-2 rounded-full" style={{ width: totalMarks > 0 ? (totalTheoryMarks / totalMarks) * 100 : 0 }} />
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div className="bg-slate-50 p-4 rounded-lg mt-2">
-                    <h4 className="font-semibold text-sm mb-2">Settings</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <span>Randomize Questions:</span><Badge variant={examDetails.randomize_questions ? 'default' : 'outline'}>{examDetails.randomize_questions ? 'Yes' : 'No'}</Badge>
-                      <span>Randomize Options:</span><Badge variant={examDetails.randomize_options ? 'default' : 'outline'}>{examDetails.randomize_options ? 'Yes' : 'No'}</Badge>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <div className="flex justify-between pt-4">
-                <Button variant="outline" onClick={() => setActiveTab('preview')}><ChevronLeft className="mr-2 h-4 w-4" />Back</Button>
-              </div>
+              <CBTPreview 
+                examDetails={examDetails} 
+                questions={questions} 
+                theoryQuestions={theoryQuestions} 
+                hasTheory={hasTheory} 
+              />
             </TabsContent>
           </div>
 
-          <DialogFooter className="flex-shrink-0 p-4 sm:p-6 border-t flex flex-col sm:flex-row gap-2">
+          <DialogFooter className="flex-shrink-0 p-6 border-t flex gap-2">
             <Button variant="outline" onClick={() => handleOpenChange(false)}>Cancel</Button>
             <Button variant="outline" onClick={() => handleSubmit(false)} disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}Save Draft

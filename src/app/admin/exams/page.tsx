@@ -1,4 +1,4 @@
-// app/admin/exams/page.tsx - UPDATED WITH DEPARTMENT SUPPORT
+// app/admin/exams/page.tsx - COMPLETE WITH ENHANCED THEORY RENDERING
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -27,10 +27,27 @@ import {
   Loader2, RefreshCw, Eye, CheckCircle, XCircle, FileText,
   Users, ChevronDown, ChevronRight, Brain, AlertCircle,
   Search, Filter, Clock, Award, BookOpen, MonitorPlay,
-  ArrowUpDown, LayoutGrid, List, CheckCircle2, GraduationCap
+  ArrowUpDown, LayoutGrid, List, CheckCircle2, GraduationCap,
+  Image as ImageIcon, Flag, Layers
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────
+interface TheorySubQuestion {
+  text: string
+  marks: number
+  sub_sub_questions?: TheorySubQuestion[]
+}
+
+interface TheoryQuestion {
+  id: string
+  question: string
+  marks: number
+  sub_questions?: TheorySubQuestion[]
+  image_url?: string
+  image_caption?: string
+  type?: string
+}
+
 interface Exam {
   id: string
   title: string
@@ -53,12 +70,322 @@ interface Exam {
   randomize_questions?: boolean
   randomize_options?: boolean
   questions?: any[]
-  theory_questions?: any[]
+  theory_questions?: TheoryQuestion[]
   target_audience?: string
 }
 
+// ─── Helper Functions for Theory Rendering ─────────────────────────────────
+
+// Convert markdown table to HTML with Tailwind CSS classes
+const convertTableToHtml = (tableLines: string[]): string => {
+  let html = `
+    <div class="overflow-x-auto my-4 shadow-lg rounded-xl border border-gray-200">
+      <table class="min-w-full bg-white rounded-xl">
+  `
+  let isHeader = true
+  let hasSeparator = false
+  
+  for (const line of tableLines) {
+    if (line.includes('---') || line.includes('===')) {
+      isHeader = false
+      hasSeparator = true
+      continue
+    }
+    
+    if (line.startsWith('|')) {
+      const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
+      if (cells.length === 0) continue
+      
+      let rowClass = ''
+      if (isHeader && !hasSeparator) {
+        rowClass = 'bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-gray-300'
+      } else {
+        rowClass = 'bg-white hover:bg-gray-50 transition-colors duration-150 border-b border-gray-200'
+      }
+      
+      html += `<tr class="${rowClass}">`
+      
+      cells.forEach((cell: string, idx: number) => {
+        const tag = isHeader && !hasSeparator ? 'th' : 'td'
+        
+        if (isHeader && !hasSeparator) {
+          html += `<${tag} class="px-5 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300 last:border-r-0">${cell.trim()}</${tag}>`
+        } else {
+          html += `<${tag} class="px-5 py-3 text-sm text-gray-600 border-r border-gray-200 last:border-r-0">${cell.trim()}</${tag}>`
+        }
+      })
+      
+      html += '</tr>'
+      
+      if (isHeader && hasSeparator) {
+        isHeader = false
+      }
+    }
+  }
+  
+  html += `
+      </table>
+    </div>
+  `
+  
+  return html
+}
+
+// Enhanced content renderer with proper table detection
+const renderContent = (text: string) => {
+  if (!text) return null
+  
+  const lines = text.split('\n')
+  let tableLines: string[] = []
+  let inTable = false
+  let tableStartIndex = -1
+  let result: JSX.Element[] = []
+  let currentIndex = 0
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    const isTableRow = line.startsWith('|') && line.includes('|') && line.split('|').length >= 3
+    
+    if (isTableRow) {
+      if (!inTable) {
+        inTable = true
+        tableStartIndex = i
+      }
+      tableLines.push(line)
+    } else if (inTable && !isTableRow) {
+      if (tableLines.length >= 2) {
+        const tableHtml = convertTableToHtml(tableLines)
+        
+        if (tableStartIndex > currentIndex) {
+          const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
+          if (beforeText.trim()) {
+            result.push(
+              <div key={`text-before-${currentIndex}`} className="whitespace-pre-wrap mb-3">
+                {beforeText.split('\n').map((line, idx) => {
+                  if (line.match(/^\d+\./)) {
+                    return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+                  }
+                  if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+                    return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+                  }
+                  if (line.match(/^\(?[ivx]+\)?\./i)) {
+                    return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+                  }
+                  if (line === '') return <br key={idx} />
+                  return <p key={idx} className="mb-1">{line}</p>
+                })}
+              </div>
+            )
+          }
+        }
+        
+        result.push(
+          <div key={`table-${currentIndex}`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
+        )
+        
+        currentIndex = i
+      }
+      inTable = false
+      tableLines = []
+    }
+  }
+  
+  if (inTable && tableLines.length >= 2) {
+    const tableHtml = convertTableToHtml(tableLines)
+    
+    if (tableStartIndex > currentIndex) {
+      const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
+      if (beforeText.trim()) {
+        result.push(
+          <div key={`text-before-final`} className="whitespace-pre-wrap mb-3">
+            {beforeText.split('\n').map((line, idx) => {
+              if (line.match(/^\d+\./)) {
+                return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+              }
+              if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+                return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+              }
+              if (line.match(/^\(?[ivx]+\)?\./i)) {
+                return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+              }
+              if (line === '') return <br key={idx} />
+              return <p key={idx} className="mb-1">{line}</p>
+            })}
+          </div>
+        )
+      }
+    }
+    
+    result.push(
+      <div key={`table-final`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
+    )
+    
+    if (currentIndex + tableLines.length < lines.length) {
+      const afterText = lines.slice(currentIndex + tableLines.length).join('\n')
+      if (afterText.trim()) {
+        result.push(
+          <div key={`text-after-final`} className="whitespace-pre-wrap mt-3">
+            {afterText.split('\n').map((line, idx) => {
+              if (line.match(/^\d+\./)) {
+                return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+              }
+              if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+                return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+              }
+              if (line.match(/^\(?[ivx]+\)?\./i)) {
+                return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+              }
+              if (line === '') return <br key={idx} />
+              return <p key={idx} className="mb-1">{line}</p>
+            })}
+          </div>
+        )
+      }
+    }
+    
+    return <>{result}</>
+  }
+  
+  if (result.length > 0) {
+    return <>{result}</>
+  }
+  
+  const imageMatch = text.match(/!\[(.*?)\]\((.*?)\)/)
+  if (imageMatch) {
+    return (
+      <div className="my-3">
+        <img src={imageMatch[2]} alt={imageMatch[1]} className="max-w-full rounded-lg border mx-auto max-h-[200px] object-contain" />
+        {imageMatch[1] && <p className="text-xs text-center text-muted-foreground mt-1">{imageMatch[1]}</p>}
+      </div>
+    )
+  }
+  
+  if (text.includes('█') || text.includes('▓') || text.includes('▒') || text.includes('░')) {
+    return <pre className="font-mono text-xs bg-gray-100 p-2 rounded my-2 whitespace-pre-wrap overflow-x-auto">{text}</pre>
+  }
+  
+  const hasEquation = /[\d\+\-\*\/\(\)=]|x\^2|y\^2|√|∑|∫|π|θ|α|β|γ/.test(text)
+  if (hasEquation && !text.includes('<table')) {
+    return (
+      <span className="font-mono text-sm" dangerouslySetInnerHTML={{ 
+        __html: text
+          .replace(/x\^2/g, 'x²')
+          .replace(/y\^2/g, 'y²')
+          .replace(/\n/g, '<br/>')
+      }} />
+    )
+  }
+  
+  return (
+    <div className="whitespace-pre-wrap text-sm leading-relaxed">
+      {text.split('\n').map((line, idx) => {
+        if (line.match(/^\d+\./)) {
+          return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
+        }
+        if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
+          return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
+        }
+        if (line.match(/^\(?[ivx]+\)?\./i)) {
+          return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
+        }
+        if (line === '') return <br key={idx} />
+        return <p key={idx} className="mb-1">{line}</p>
+      })}
+    </div>
+  )
+}
+
+// Render sub-questions recursively
+const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
+  if (!subQuestions || subQuestions.length === 0) return null
+  
+  const startCharCode = level === 0 ? 97 : 105
+  
+  return (
+    <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
+      <p className="text-xs font-semibold text-purple-700">
+        {level === 0 ? 'Sub-questions:' : 'Parts:'}
+      </p>
+      {subQuestions.map((sq, idx) => (
+        <div key={idx} className="pl-3 border-l-2 border-purple-200">
+          <div className="font-medium">
+            <span className="text-sm">{String.fromCharCode(startCharCode + idx)}.</span>
+            <div className="inline ml-1 text-sm">{renderContent(sq.text)}</div>
+            {sq.marks > 0 && <span className="ml-2 text-xs text-muted-foreground">({sq.marks} marks)</span>}
+          </div>
+          {sq.sub_sub_questions && sq.sub_sub_questions.length > 0 && (
+            renderSubQuestions(sq.sub_sub_questions, level + 1)
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// Detect if a question is a theory question
+const isTheoryQuestion = (question: any): boolean => {
+  return question.type === 'theory' || 
+    question.sub_questions || 
+    (question.sub_questions && question.sub_questions.length > 0) ||
+    (question.question && (question.question.includes('Sub-questions') || question.question.includes('Sub-questions:'))) ||
+    (question.question && question.question.includes('|') && question.question.includes('---'))
+}
+
+// Theory Question Card Component
+function TheoryQuestionCard({ question, index, marks }: { question: TheoryQuestion; index: number; marks: number }) {
+  return (
+    <div className="p-5 bg-white rounded-xl border shadow-sm">
+      <div className="flex justify-between items-start gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Badge className="bg-purple-100 text-purple-700 border-0">
+            <Brain className="h-3.5 w-3.5 mr-1" /> Theory
+          </Badge>
+          <span className="text-xs text-muted-foreground font-medium">{marks} marks</span>
+        </div>
+        <Badge variant="outline" className="text-xs font-mono">Q{index + 1}</Badge>
+      </div>
+      
+      {question.image_url && (
+        <div className="mb-4">
+          <img 
+            src={question.image_url} 
+            alt={question.image_caption || 'Question diagram'} 
+            className="max-w-full max-h-[250px] rounded-lg border object-contain mx-auto shadow-sm" 
+          />
+          {question.image_caption && (
+            <p className="text-xs text-center text-muted-foreground mt-2 italic">{question.image_caption}</p>
+          )}
+        </div>
+      )}
+      
+      <div className="mb-4">
+        <div className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-2">
+          <span className="bg-blue-100 w-5 h-5 rounded-full flex items-center justify-center text-xs">?</span>
+          Question {index + 1}:
+        </div>
+        <div className="pl-2">
+          {renderContent(question.question)}
+        </div>
+      </div>
+      
+      {question.sub_questions && question.sub_questions.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          {renderSubQuestions(question.sub_questions, 0)}
+        </div>
+      )}
+      
+      {/* Student answer area */}
+      <div className="mt-4 pt-4 border-t border-gray-200">
+        <p className="text-xs text-slate-500 mb-2">Student's Answer:</p>
+        <div className="h-24 bg-slate-100 rounded-lg border border-dashed border-slate-300 flex items-center justify-center">
+          <span className="text-xs text-slate-400">Answer area (hidden in preview)</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Helper Functions ─────────────────────────────────
-// ✅ Extract year from class name (e.g., "SS1 Arts" → "SS1")
 const extractYear = (className: string): string => {
   if (!className) return ''
   const normalized = className.trim().toUpperCase().replace(/\s/g, '')
@@ -71,7 +398,6 @@ const extractYear = (className: string): string => {
   return className
 }
 
-// ✅ Get department from class or target_audience
 const getExamDepartment = (exam: Exam): string => {
   if (exam.target_audience && exam.target_audience !== 'all') {
     return exam.target_audience
@@ -90,14 +416,6 @@ const DEPARTMENT_OPTIONS = [
   { value: 'Science', label: '🔬 Science' },
   { value: 'Arts', label: '🎨 Arts' },
   { value: 'Commercial', label: '💼 Commercial' },
-]
-
-const STATUS_OPTIONS = [
-  { value: 'all', label: 'All Status' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'published', label: 'Published' },
-  { value: 'draft', label: 'Draft' },
-  { value: 'rejected', label: 'Rejected' },
 ]
 
 const formatDate = (date: string) => {
@@ -181,7 +499,7 @@ export default function AdminExamsPage() {
   
   // Question preview
   const [examQuestions, setExamQuestions] = useState<any[]>([])
-  const [examTheoryQuestions, setExamTheoryQuestions] = useState<any[]>([])
+  const [examTheoryQuestions, setExamTheoryQuestions] = useState<TheoryQuestion[]>([])
   const [loadingQuestions, setLoadingQuestions] = useState(false)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
 
@@ -237,23 +555,19 @@ export default function AdminExamsPage() {
 
   // ─── Filtered Exams ─────────────────────────────────
   const filteredExams = exams.filter(exam => {
-    // Tab filter
     if (activeTab === 'pending' && !['pending', 'draft', 'submitted'].includes(exam.status)) return false
     if (activeTab === 'published' && exam.status !== 'published') return false
     
-    // Class filter - ✅ FIXED: Match by year pattern
     if (selectedClass !== 'all') {
       const examYear = extractYear(exam.class)
       if (examYear !== selectedClass) return false
     }
     
-    // Department filter - ✅ NEW
     if (selectedDepartment !== 'all') {
       const examDept = getExamDepartment(exam)
       if (examDept !== selectedDepartment) return false
     }
     
-    // Search
     if (searchQuery) {
       const q = searchQuery.toLowerCase()
       return (
@@ -267,7 +581,6 @@ export default function AdminExamsPage() {
     return true
   })
 
-  // Group by class year (SS1 groups SS1 Arts, SS1 Science, etc.)
   const groupedExams = filteredExams.reduce((acc, exam) => {
     const yearGroup = extractYear(exam.class)
     if (!acc[yearGroup]) acc[yearGroup] = []
@@ -275,7 +588,6 @@ export default function AdminExamsPage() {
     return acc
   }, {} as Record<string, Exam[]>)
 
-  // Stats
   const pendingCount = exams.filter(e => ['pending', 'draft', 'submitted'].includes(e.status)).length
   const publishedCount = exams.filter(e => e.status === 'published').length
 
@@ -361,7 +673,7 @@ export default function AdminExamsPage() {
 
   // ─── All Questions for Preview ──────────────────────
   const allPreviewQuestions = [
-    ...examQuestions.map((q: any) => ({ ...q, type: 'objective' })),
+    ...examQuestions.map((q: any) => ({ ...q, type: q.type || 'objective' })),
     ...examTheoryQuestions.map((q: any) => ({ ...q, type: 'theory' }))
   ]
   const currentQuestion = allPreviewQuestions[currentQuestionIndex]
@@ -453,7 +765,7 @@ export default function AdminExamsPage() {
         </div>
       </div>
 
-      {/* Exam List */}
+      {/* Exam List - Grouped View */}
       {filteredExams.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="flex flex-col items-center py-16">
@@ -596,7 +908,7 @@ export default function AdminExamsPage() {
         </Card>
       )}
 
-      {/* Preview Dialog */}
+      {/* Preview Dialog - WITH ENHANCED THEORY RENDERING */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -623,42 +935,53 @@ export default function AdminExamsPage() {
                 <p className="text-center text-slate-400 py-8 text-sm">No questions found</p>
               ) : (
                 <div className="border rounded-lg overflow-hidden">
-                  <div className="bg-slate-50 p-3 flex flex-wrap gap-1.5 border-b">
-                    {allPreviewQuestions.map((q: any, i: number) => (
-                      <button key={i} onClick={() => setCurrentQuestionIndex(i)}
-                        className={cn("w-7 h-7 rounded text-[10px] font-medium transition-all",
-                          q.type === 'theory' 
-                            ? (i === currentQuestionIndex ? 'bg-purple-500 text-white' : 'bg-purple-100 text-purple-700')
-                            : (i === currentQuestionIndex ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600')
-                        )}>{i + 1}</button>
-                    ))}
+                  <div className="bg-slate-50 p-3 flex flex-wrap gap-1.5 border-b max-h-[200px] overflow-y-auto">
+                    {allPreviewQuestions.map((q: any, i: number) => {
+                      const isTheory = isTheoryQuestion(q)
+                      return (
+                        <button key={i} onClick={() => setCurrentQuestionIndex(i)}
+                          className={cn("w-7 h-7 rounded text-[10px] font-medium transition-all",
+                            isTheory 
+                              ? (i === currentQuestionIndex ? 'bg-purple-500 text-white' : 'bg-purple-100 text-purple-700 hover:bg-purple-200')
+                              : (i === currentQuestionIndex ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300')
+                          )}>{i + 1}</button>
+                      )
+                    })}
                   </div>
-                  <div className="p-4 min-h-[200px]">
-                    {currentQuestion && (
-                      <div>
-                        <div className="flex items-center gap-2 mb-3">
-                          <Badge className="text-[10px]" variant={currentQuestion.type === 'theory' ? 'secondary' : 'outline'}>
-                            {currentQuestion.type === 'theory' ? <><Brain className="h-3 w-3 mr-1" />Theory</> : 'Objective'}
-                          </Badge>
-                          <span className="text-[10px] text-slate-400">{currentQuestion.marks || 1} mark(s)</span>
-                        </div>
-                        <p className="text-sm font-medium mb-4">{currentQuestionIndex + 1}. {currentQuestion.question || currentQuestion.question_text}</p>
-                        {currentQuestion.type === 'theory' ? (
-                          <div className="h-24 bg-slate-100 rounded border border-dashed flex items-center justify-center">
-                            <span className="text-xs text-slate-400">Student answer area</span>
+                  <div className="p-4 min-h-[300px] max-h-[400px] overflow-y-auto">
+                    {currentQuestion && (() => {
+                      const isTheory = isTheoryQuestion(currentQuestion)
+                      return (
+                        <div>
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge className={cn("text-[10px]", isTheory ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700')}>
+                              {isTheory ? <><Brain className="h-3 w-3 mr-1" />Theory</> : 'Objective'}
+                            </Badge>
+                            <span className="text-[10px] text-slate-400">{currentQuestion.marks || 1} mark(s)</span>
                           </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {(currentQuestion.options || []).filter(Boolean).map((opt: string, i: number) => (
-                              <div key={i} className="flex items-center gap-2 p-2 rounded border text-xs">
-                                <span className="font-bold text-slate-400">{String.fromCharCode(65 + i)}.</span>
-                                <span>{opt}</span>
+                          
+                          {isTheory ? (
+                            <TheoryQuestionCard 
+                              question={currentQuestion as TheoryQuestion}
+                              index={currentQuestionIndex}
+                              marks={currentQuestion.marks || 10}
+                            />
+                          ) : (
+                            <>
+                              <p className="text-sm font-medium mb-4">{currentQuestionIndex + 1}. {currentQuestion.question || currentQuestion.question_text}</p>
+                              <div className="space-y-2">
+                                {(currentQuestion.options || []).filter(Boolean).map((opt: string, i: number) => (
+                                  <div key={i} className="flex items-center gap-2 p-2 rounded border text-xs">
+                                    <span className="font-bold text-slate-400">{String.fromCharCode(65 + i)}.</span>
+                                    <span>{opt}</span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
                   <div className="bg-slate-50 p-3 flex justify-between border-t">
                     <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setCurrentQuestionIndex(i => Math.max(0, i - 1))} disabled={currentQuestionIndex === 0}>← Prev</Button>
