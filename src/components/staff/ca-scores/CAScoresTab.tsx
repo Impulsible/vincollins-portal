@@ -1253,273 +1253,289 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           </TabsTrigger>
         </TabsList>
 
-        {/* Score Entry Tab */}
-        <TabsContent value="entry" className="mt-6">
-          {loading ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
-                <p className="text-slate-500">Loading students...</p>
-              </CardContent>
-            </Card>
-          ) : students.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">No students found in {selectedClass}</p>
-              </CardContent>
-            </Card>
-          ) : (
-            classOrder.map(cls => (
-              <div key={cls} className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5 text-emerald-600" />
-                    {cls}
-                    <Badge variant="secondary" className="ml-2">
-                      {groupedStudents[cls].length} students
-                    </Badge>
-                  </h3>
-                </div>
+       {/* Score Entry Tab */}
+<TabsContent value="entry" className="mt-6">
+  {loading ? (
+    <Card>
+      <CardContent className="text-center py-12">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
+        <p className="text-slate-500">Loading students...</p>
+      </CardContent>
+    </Card>
+  ) : students.length === 0 ? (
+    <Card>
+      <CardContent className="text-center py-12">
+        <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+        <p className="text-slate-500">No students found in {selectedClass}</p>
+      </CardContent>
+    </Card>
+  ) : (
+    classOrder.map(cls => (
+      <div key={cls} className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+            <GraduationCap className="h-5 w-5 text-emerald-600" />
+            {cls}
+            <Badge variant="secondary" className="ml-2">
+              {groupedStudents[cls].length} students
+            </Badge>
+          </h3>
+        </div>
+        
+        <div className="border rounded-lg overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50">
+              <TableRow>
+                <TableHead className="font-semibold min-w-[180px]">Student</TableHead>
+                <TableHead className="text-center w-24 font-semibold">CA1</TableHead>
+                <TableHead className="text-center w-24 font-semibold">CA2</TableHead>
+                <TableHead className="text-center w-28 font-semibold">Exam</TableHead>
+                <TableHead className="text-center w-20 font-semibold">Total</TableHead>
+                <TableHead className="text-center w-24 font-semibold">Grade</TableHead>
+                <TableHead className="text-center w-24 font-semibold">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {groupedStudents[cls].map(student => {
+                const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '' }
+                const ca1Score = parseInt(entry.ca1) || 0
+                const ca2Score = parseInt(entry.ca2) || 0
+                const examScore = parseInt(entry.exam) || 0
+                const total = ca1Score + ca2Score + examScore
+                const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+                const grade = total > 0 ? getGrade(percentage) : ''
+                const hasExamScore = entry.exam && parseInt(entry.exam) > 0
+                const isSaved = savedStatus[student.id]
                 
-                <div className="border rounded-lg overflow-x-auto">
-                  <Table>
-                    <TableHeader className="bg-slate-50">
-                      <TableRow>
-                        <TableHead className="font-semibold min-w-[180px]">Student</TableHead>
-                        <TableHead className="text-center w-24 font-semibold">CA1 /20</TableHead>
-                        <TableHead className="text-center w-24 font-semibold">CA2 /20</TableHead>
-                        <TableHead className="text-center w-28 font-semibold">Exam /60</TableHead>
-                        <TableHead className="text-center w-20 font-semibold">Total</TableHead>
-                        <TableHead className="text-center w-24 font-semibold">Grade</TableHead>
-                        <TableHead className="text-center w-24 font-semibold">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {groupedStudents[cls].map(student => {
-                        const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '' }
-                        const total = (parseInt(entry.ca1) || 0) + (parseInt(entry.ca2) || 0) + (parseInt(entry.exam) || 0)
-                        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-                        const grade = total > 0 ? getGrade(percentage) : ''
-                        const hasExamScore = entry.exam && parseInt(entry.exam) > 0
-                        const isSaved = savedStatus[student.id]
-                        
-                        return (
-                          <TableRow key={student.id}>
-                            <TableCell className="font-medium">
-                              {student.full_name}
-                              <p className="text-xs text-slate-400 font-mono">{student.admission_number}</p>
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                max="20" 
-                                value={entry.ca1}
-                                onChange={e => handleScoreChange(student.id, 'ca1', e.target.value)}
-                                className="w-20 text-center mx-auto" 
-                                placeholder="0"
-                              />
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                max="20" 
-                                value={entry.ca2}
-                                onChange={e => handleScoreChange(student.id, 'ca2', e.target.value)}
-                                className="w-20 text-center mx-auto" 
-                                placeholder="0"
-                              />
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {hasExamScore ? (
-                                <span className="font-medium text-emerald-600">{parseInt(entry.exam)}/60</span>
-                              ) : (
-                                !skipExam && selectedExamId ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleAutoFetchSingle(student.id)}
-                                    className="h-7 text-xs"
-                                  >
-                                    <RefreshCw className="h-3 w-3 mr-1" />
-                                    Load
-                                  </Button>
-                                ) : (
-                                  <span className="text-slate-400 text-xs">-</span>
-                                )
-                              )}
-                            </TableCell>
-                            <TableCell className="text-center font-bold">
-                              {total > 0 ? `${total}/100` : '—'}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {grade && (
-                                <Badge className={getGradeColor(grade)}>
-                                  {grade} - {getGradeRemark(grade)}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSaveSingle(student.id)}
-                                disabled={saving}
-                                className="h-8 px-3"
-                              >
-                                {saving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : isSaved ? (
-                                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                ) : (
-                                  <Save className="h-4 w-4 text-slate-500" />
-                                )}
-                                <span className="ml-1 text-xs">
-                                  {isSaved ? 'Saved' : 'Save'}
-                                </span>
-                              </Button>
-                            </TableCell>
-                          </TableRow>
+                return (
+                  <TableRow key={student.id}>
+                    <TableCell className="font-medium">
+                      {student.full_name}
+                      <p className="text-xs text-slate-400 font-mono">{student.admission_number}</p>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="20" 
+                        value={entry.ca1}
+                        onChange={e => handleScoreChange(student.id, 'ca1', e.target.value)}
+                        className="w-20 text-center mx-auto" 
+                        placeholder="0"
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Input 
+                        type="number" 
+                        min="0" 
+                        max="20" 
+                        value={entry.ca2}
+                        onChange={e => handleScoreChange(student.id, 'ca2', e.target.value)}
+                        className="w-20 text-center mx-auto" 
+                        placeholder="0"
+                      />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {hasExamScore ? (
+                        <span className="font-medium text-emerald-600">{parseInt(entry.exam)}</span>
+                      ) : (
+                        !skipExam && selectedExamId ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleAutoFetchSingle(student.id)}
+                            className="h-7 text-xs"
+                          >
+                            <RefreshCw className="h-3 w-3 mr-1" />
+                            Load
+                          </Button>
+                        ) : (
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            max="60" 
+                            value={entry.exam}
+                            onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
+                            className="w-20 text-center mx-auto" 
+                            placeholder="0"
+                          />
                         )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            ))
-          )}
-        </TabsContent>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center font-bold">
+                      {total > 0 ? total : '—'}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {grade && (
+                        <Badge className={getGradeColor(grade)}>
+                          {grade}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleSaveSingle(student.id)}
+                        disabled={saving}
+                        className="h-8 px-3"
+                      >
+                        {saving ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : isSaved ? (
+                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Save className="h-4 w-4 text-slate-500" />
+                        )}
+                        <span className="ml-1 text-xs">
+                          {isSaved ? 'Saved' : 'Save'}
+                        </span>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+    ))
+  )}
+</TabsContent>
 
-        {/* View Scores Tab */}
-        <TabsContent value="view" className="mt-6">
-          <Card>
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <CardTitle>Published Scores</CardTitle>
-                <div className="flex gap-2">
-                  <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                      placeholder="Search students..." 
-                      value={searchQuery} 
-                      onChange={e => setSearchQuery(e.target.value)} 
-                      className="pl-9" 
-                    />
-                  </div>
-                  <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading}>
-                    <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-                  </Button>
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                Showing {caScores.length} score(s) for {selectedClass} - {selectedSubject} - {selectedTerm} {selectedYear}
-              </p>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="text-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-                  <p className="text-slate-500 mt-2">Loading scores...</p>
-                </div>
-              ) : caScores.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">No scores have been published yet.</p>
-                  <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save.</p>
-                  <div className="mt-4 flex gap-2 justify-center">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setActiveTab('entry')}
-                    >
-                      Go to Score Entry
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={loadScoresForViewTab}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Student</TableHead>
-                        <TableHead className="text-center">Admission No</TableHead>
-                        <TableHead className="text-center">CA1 /20</TableHead>
-                        <TableHead className="text-center">CA2 /20</TableHead>
-                        <TableHead className="text-center">Total /40</TableHead>
-                        <TableHead className="text-center">Percentage</TableHead>
-                        <TableHead className="text-center">Grade</TableHead>
-                        <TableHead className="text-center">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredScores.map(score => {
-                        const total = (score.ca1_score || 0) + (score.ca2_score || 0)
-                        const percentage = total > 0 ? Math.round((total / 40) * 100) : 0
-                        const grade = getGrade(percentage)
-                        const studentName = score.student?.full_name || getStudentName(score.student_id)
-                        const admissionNumber = score.student?.admission_number || getStudentAdmission(score.student_id)
-                        
-                        return (
-                          <TableRow key={score.id}>
-                            <TableCell className="font-medium">{studentName}</TableCell>
-                            <TableCell className="text-center font-mono text-xs">{admissionNumber}</TableCell>
-                            <TableCell className="text-center font-medium">{score.ca1_score || '—'}</TableCell>
-                            <TableCell className="text-center font-medium">{score.ca2_score || '—'}</TableCell>
-                            <TableCell className="text-center font-bold">{total}/40</TableCell>
-                            <TableCell className="text-center">{percentage}%</TableCell>
-                            <TableCell className="text-center">
-                              {grade && <Badge className={getGradeColor(grade)}>{grade}</Badge>}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <div className="flex justify-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingScore(score)
-                                    setShowEditDialog(true)
-                                  }}
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={async () => {
-                                    if (!confirm('Delete this score?')) return
-                                    const { error } = await supabase.from('ca_scores').delete().eq('id', score.id)
-                                    if (error) {
-                                      toast.error('Failed to delete score')
-                                    } else {
-                                      toast.success('Score deleted')
-                                      await loadAllData()
-                                      await loadScoresForViewTab()
-                                    }
-                                  }}
-                                  className="text-red-500 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+       {/* View Scores Tab */}
+<TabsContent value="view" className="mt-6">
+  <Card>
+    <CardHeader>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <CardTitle>Published Scores</CardTitle>
+        <div className="flex gap-2">
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input 
+              placeholder="Search students..." 
+              value={searchQuery} 
+              onChange={e => setSearchQuery(e.target.value)} 
+              className="pl-9" 
+            />
+          </div>
+          <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading}>
+            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+          </Button>
+        </div>
+      </div>
+      <p className="text-xs text-slate-500 mt-2">
+        Showing {caScores.length} score(s) for {selectedClass} - {selectedSubject} - {selectedTerm} {selectedYear}
+      </p>
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="text-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+          <p className="text-slate-500 mt-2">Loading scores...</p>
+        </div>
+      ) : caScores.length === 0 ? (
+        <div className="text-center py-12">
+          <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500">No scores have been published yet.</p>
+          <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save.</p>
+          <div className="mt-4 flex gap-2 justify-center">
+            <Button 
+              variant="outline" 
+              onClick={() => setActiveTab('entry')}
+            >
+              Go to Score Entry
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={loadScoresForViewTab}
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="min-w-[180px]">Student</TableHead>
+                <TableHead className="text-center">Admission No</TableHead>
+                <TableHead className="text-center">CA1</TableHead>
+                <TableHead className="text-center">CA2</TableHead>
+                <TableHead className="text-center">Exam</TableHead>
+                <TableHead className="text-center">Total</TableHead>
+                <TableHead className="text-center">Percentage</TableHead>
+                <TableHead className="text-center">Grade</TableHead>
+                <TableHead className="text-center">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredScores.map(score => {
+                const ca1 = score.ca1_score || 0
+                const ca2 = score.ca2_score || 0
+                const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+                const total = ca1 + ca2 + examTotal
+                const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+                const grade = getGrade(percentage)
+                const studentName = score.student?.full_name || getStudentName(score.student_id)
+                const admissionNumber = score.student?.admission_number || getStudentAdmission(score.student_id)
+                
+                return (
+                  <TableRow key={score.id}>
+                    <TableCell className="font-medium">{studentName}</TableCell>
+                    <TableCell className="text-center font-mono text-xs">{admissionNumber}</TableCell>
+                    <TableCell className="text-center font-medium">{ca1 || '—'}</TableCell>
+                    <TableCell className="text-center font-medium">{ca2 || '—'}</TableCell>
+                    <TableCell className="text-center font-medium">{examTotal || '—'}</TableCell>
+                    <TableCell className="text-center font-bold">{total || '—'}</TableCell>
+                    <TableCell className="text-center">{percentage > 0 ? `${percentage}%` : '—'}</TableCell>
+                    <TableCell className="text-center">
+                      {grade && <Badge className={getGradeColor(grade)}>{grade}</Badge>}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setEditingScore(score)
+                            setShowEditDialog(true)
+                          }}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={async () => {
+                            if (!confirm('Delete this score?')) return
+                            const { error } = await supabase.from('ca_scores').delete().eq('id', score.id)
+                            if (error) {
+                              toast.error('Failed to delete score')
+                            } else {
+                              toast.success('Score deleted')
+                              await loadAllData()
+                              await loadScoresForViewTab()
+                            }
+                          }}
+                          className="text-red-500 hover:text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </CardContent>
+  </Card>
+</TabsContent>
       </Tabs>
     </div>
   )
