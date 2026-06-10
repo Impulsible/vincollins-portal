@@ -59,7 +59,7 @@ export default function TakeExamPage() {
     () => handleSubmit(true, 'Time expired')
   )
 
-  // ✅ FIXED: Pass initial violations and attemptId for persistence
+  // ✅ Fixed: Pass initial violations and attemptId for persistence
   const { tabSwitches, fullscreenExits, fullscreen, setFullscreen, showFullscreenPrompt, setShowFullscreenPrompt, enterFullscreen } = useExamSecurity(
     examState.examStarted,
     examEndedRef,
@@ -243,15 +243,17 @@ export default function TakeExamPage() {
     )
   }
 
+  // ✅ FIXED: ResumeDialog with correct props (no onNewAttempt or onDiscard)
   if (showResumeDialog) {
     return (
       <ResumeDialog
-        resumeData={resumeData} totalQuestions={allQuestions.length}
+        resumeData={resumeData}
+        totalQuestions={allQuestions.length}
         onResume={onResumeExam}
-        onNewAttempt={() => { setShowResumeDialog(false); startExam() }}
-        onDiscard={() => { setShowResumeDialog(false); setExamState(prev => ({ ...prev, showInstructions: true })) }}
-        maxAttempts={exam?.max_attempts || 1} attemptsUsed={attemptsUsed}
+        maxAttempts={exam?.max_attempts || 1}
+        attemptsUsed={attemptsUsed}
         unloadCount={resumeData?.unloadCount || 0}
+        examTerminated={examTerminated}
       />
     )
   }
