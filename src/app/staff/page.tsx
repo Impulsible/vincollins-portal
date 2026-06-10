@@ -1,4 +1,4 @@
-// app/staff/page.tsx - COMPLETE UPDATED VERSION
+// app/staff/page.tsx - COMPLETE UPDATED VERSION WITH TEACHER-SPECIFIC SUBMISSIONS
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -174,7 +174,6 @@ function StaffDashboardContent() {
       dataFetchedRef.current = true
       setRefreshing(true)
       
-      // Set timeout for loading
       loadingTimeoutRef.current = setTimeout(() => {
         if (loading) setLoadingTimeout(true)
       }, 10000)
@@ -182,7 +181,7 @@ function StaffDashboardContent() {
       try {
         const userId = contextUser.id
 
-        // Fetch exams
+        // Fetch exams created by this teacher
         const { data: examData, error: examError } = await supabase
           .from('exams')
           .select('id, title, subject, class, status, created_at')
@@ -190,50 +189,55 @@ function StaffDashboardContent() {
           .order('created_at', { ascending: false })
           .limit(10)
 
-        // ✅ FIXED: Fetch assignments with direct subject and class columns
+        // Fetch assignments created by this teacher
         const { data: assignmentData, error: assignmentError } = await supabase
           .from('assignments')
           .select('id, title, subject, class, classes, status, due_date, total_points, created_at')
+          .eq('created_by', userId)
           .order('created_at', { ascending: false })
           .limit(5)
 
-        // Fetch notes
+        // Fetch notes created by this teacher
         const { data: notesData, error: notesError } = await supabase
           .from('notes')
           .select('id, title, created_at')
+          .eq('created_by', userId)
           .order('created_at', { ascending: false })
           .limit(4)
 
-        // Fetch students
+        // Fetch students (all students for stats)
         const { data: studentsData, error: studentsError } = await supabase
           .from('profiles')
           .select('class, is_active')
           .eq('role', 'student')
 
-        // Fetch pending theory submissions
-        const { data: submissionsData, error: submissionsError } = await supabase
-          .from('exam_attempts')
-          .select('exam_id, student_name, submitted_at, id, status, total_score, percentage')
-          .eq('status', 'pending_theory')
-          .order('submitted_at', { ascending: false })
-          .limit(20)
+        // ✅ FIXED: Only fetch pending theory submissions for exams created by this teacher
+        const teacherExamIds = examData?.map(e => e.id) || []
+        
+        let submissions: any[] = []
+        let examTitleMap: Record<string, any> = {}
 
-        // Handle potential errors but don't crash
-        const exams = examError ? [] : examData || []
-        const assignments = assignmentError ? [] : assignmentData || []
-        const notes = notesError ? [] : notesData || []
-        const students = studentsError ? [] : studentsData || []
-        const submissions = submissionsError ? [] : submissionsData || []
+        if (teacherExamIds.length > 0) {
+          const { data: submissionsData, error: submissionsError } = await supabase
+            .from('exam_attempts')
+            .select('exam_id, student_name, submitted_at, id, status, total_score, percentage')
+            .eq('status', 'pending_theory')
+            .in('exam_id', teacherExamIds)
+            .order('submitted_at', { ascending: false })
+            .limit(20)
 
-        // Enrich submissions with exam details
-        const submissionExamIds = [...new Set(submissions.map((s: any) => s.exam_id))]
-        const examTitleMap: Record<string, any> = {}
-        if (submissionExamIds.length > 0) {
-          const { data: details } = await supabase
-            .from('exams')
-            .select('id, title, subject, class')
-            .in('id', submissionExamIds)
-          details?.forEach((e: any) => { examTitleMap[e.id] = e })
+          if (!submissionsError && submissionsData) {
+            submissions = submissionsData
+            
+            const submissionExamIds = [...new Set(submissions.map((s: any) => s.exam_id))]
+            if (submissionExamIds.length > 0) {
+              const { data: examDetails } = await supabase
+                .from('exams')
+                .select('id, title, subject, class')
+                .in('id', submissionExamIds)
+              examDetails?.forEach((e: any) => { examTitleMap[e.id] = e })
+            }
+          }
         }
 
         const enrichedSubmissions = submissions.map((s: any) => ({
@@ -243,16 +247,20 @@ function StaffDashboardContent() {
           exam_class: examTitleMap[s.exam_id]?.class || ''
         }))
 
+        // Handle potential errors but don't crash
+        const exams = examError ? [] : examData || []
+        const assignments = assignmentError ? [] : assignmentData || []
+        const notes = notesError ? [] : notesData || []
+        const students = studentsError ? [] : studentsData || []
+
         // Calculate class breakdown
         const classMap = new Map<string, number>()
         students.forEach((s: any) => { 
           if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1) 
         })
 
-        // Calculate average performance
-        const teacherExamIds = exams.map((e: any) => e.id)
+        // Calculate average performance from this teacher's graded exams
         let averagePerformance = 0
-
         if (teacherExamIds.length > 0) {
           const { data: scoredAttempts } = await supabase
             .from('exam_attempts')
@@ -293,7 +301,7 @@ function StaffDashboardContent() {
           recentSubmissions: enrichedSubmissions
         }
 
-        // ✅ Enrich assignments with display values (using direct columns)
+        // Enrich assignments
         const enrichedAssignments = assignments.map((a: any) => ({
           ...a,
           displaySubject: a.subject || 'No Subject',
@@ -310,7 +318,7 @@ function StaffDashboardContent() {
         setDashboardData(newData)
         setLoading(false)
         
-        // ✅ Cache for instant loading next time
+        // Cache for instant loading next time
         localStorage.setItem('staff_dashboard_cache', JSON.stringify(newData))
       } catch (error) {
         console.error('Error fetching dashboard:', error)
@@ -340,61 +348,91 @@ function StaffDashboardContent() {
     try {
       const userId = contextUser.id
 
-      const results = await Promise.all([
-        supabase.from('exams')
-          .select('id, title, subject, class, status, created_at')
-          .eq('created_by', userId)
-          .order('created_at', { ascending: false })
-          .limit(10),
-        supabase.from('assignments')
-          .select('id, title, subject, class, classes, status, due_date, total_points, created_at')
-          .order('created_at', { ascending: false })
-          .limit(5),
-        supabase.from('notes')
-          .select('id, title, created_at')
-          .order('created_at', { ascending: false })
-          .limit(4),
-        supabase.from('profiles')
-          .select('class, is_active')
-          .eq('role', 'student'),
-        supabase.from('exam_attempts')
+      // Get teacher's exams first
+      const { data: teacherExams } = await supabase
+        .from('exams')
+        .select('id')
+        .eq('created_by', userId)
+      
+      const teacherExamIds = teacherExams?.map(e => e.id) || []
+
+      // Fetch exams
+      const { data: examData } = await supabase
+        .from('exams')
+        .select('id, title, subject, class, status, created_at')
+        .eq('created_by', userId)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      // Fetch assignments
+      const { data: assignmentData } = await supabase
+        .from('assignments')
+        .select('id, title, subject, class, classes, status, due_date, total_points, created_at')
+        .eq('created_by', userId)
+        .order('created_at', { ascending: false })
+        .limit(5)
+
+      // Fetch notes
+      const { data: notesData } = await supabase
+        .from('notes')
+        .select('id, title, created_at')
+        .eq('created_by', userId)
+        .order('created_at', { ascending: false })
+        .limit(4)
+
+      // Fetch students
+      const { data: studentsData } = await supabase
+        .from('profiles')
+        .select('class, is_active')
+        .eq('role', 'student')
+
+      // ✅ FIXED: Only fetch submissions for teacher's exams
+      let submissions: any[] = []
+      let examTitleMap: Record<string, any> = {}
+
+      if (teacherExamIds.length > 0) {
+        const { data: submissionsData } = await supabase
+          .from('exam_attempts')
           .select('exam_id, student_name, submitted_at, id, status, total_score, percentage')
           .eq('status', 'pending_theory')
+          .in('exam_id', teacherExamIds)
           .order('submitted_at', { ascending: false })
           .limit(20)
-      ])
 
-      const examData = results[0].error ? [] : results[0].data || []
-      const assignmentData = results[1].error ? [] : results[1].data || []
-      const notesData = results[2].error ? [] : results[2].data || []
-      const studentsData = results[3].error ? [] : results[3].data || []
-      const recentSubmissions = results[4].error ? [] : results[4].data || []
-
-      const submissionExamIds = [...new Set(recentSubmissions.map((s: any) => s.exam_id))]
-      const examTitleMap: Record<string, any> = {}
-      if (submissionExamIds.length > 0) {
-        const { data: details } = await supabase
-          .from('exams')
-          .select('id, title, subject, class')
-          .in('id', submissionExamIds)
-        details?.forEach((e: any) => { examTitleMap[e.id] = e })
+        if (submissionsData) {
+          submissions = submissionsData
+          
+          const submissionExamIds = [...new Set(submissions.map((s: any) => s.exam_id))]
+          if (submissionExamIds.length > 0) {
+            const { data: examDetails } = await supabase
+              .from('exams')
+              .select('id, title, subject, class')
+              .in('id', submissionExamIds)
+            examDetails?.forEach((e: any) => { examTitleMap[e.id] = e })
+          }
+        }
       }
 
-      const enrichedSubmissions = recentSubmissions.map((s: any) => ({
+      const enrichedSubmissions = submissions.map((s: any) => ({
         ...s,
         exam_title: examTitleMap[s.exam_id]?.title || 'Unknown Exam',
         exam_subject: examTitleMap[s.exam_id]?.subject || '',
         exam_class: examTitleMap[s.exam_id]?.class || ''
       }))
 
+      const exams = examData || []
+      const assignments = assignmentData || []
+      const notes = notesData || []
+      const students = studentsData || []
+
+      // Calculate class breakdown
       const classMap = new Map<string, number>()
-      studentsData.forEach((s: any) => { 
+      students.forEach((s: any) => { 
         if (s.class) classMap.set(s.class, (classMap.get(s.class) || 0) + 1) 
       })
 
-      const teacherExamIds = examData.map((e: any) => e.id)
+      // Calculate average performance
       let averagePerformance = 0
-
       if (teacherExamIds.length > 0) {
         const { data: scoredAttempts } = await supabase
           .from('exam_attempts')
@@ -417,14 +455,14 @@ function StaffDashboardContent() {
       }
 
       const stats: DashboardStats = {
-        totalStudents: studentsData.length,
-        activeStudents: studentsData.filter((s: any) => s.is_active !== false).length,
+        totalStudents: students.length,
+        activeStudents: students.filter((s: any) => s.is_active !== false).length,
         activeClasses: classMap.size,
         pendingCAScores: enrichedSubmissions.length,
-        publishedExams: examData.filter((e: any) => e.status === 'published').length,
-        totalExams: examData.length,
-        totalAssignments: assignmentData.length,
-        totalNotes: notesData.length,
+        publishedExams: exams.filter((e: any) => e.status === 'published').length,
+        totalExams: exams.length,
+        totalAssignments: assignments.length,
+        totalNotes: notes.length,
         reportCardsGenerated: 0,
         averagePerformance,
         classBreakdown: Array.from(classMap.entries())
@@ -435,13 +473,13 @@ function StaffDashboardContent() {
         recentSubmissions: enrichedSubmissions
       }
 
-      const enrichedAssignments = assignmentData.map((a: any) => ({
+      const enrichedAssignments = assignments.map((a: any) => ({
         ...a,
         displaySubject: a.subject || 'No Subject',
         displayClass: a.class || (a.classes && a.classes[0]) || 'No Class'
       }))
 
-      const newData = { exams: examData, assignments: enrichedAssignments, notes: notesData, stats }
+      const newData = { exams, assignments: enrichedAssignments, notes, stats }
       setDashboardData(newData)
       localStorage.setItem('staff_dashboard_cache', JSON.stringify(newData))
       toast.success('Dashboard refreshed')
@@ -463,7 +501,7 @@ function StaffDashboardContent() {
 
   const profile = contextUser
 
-  // ✅ Handle auth redirects
+  // Handle auth redirects
   if (!authLoading && (!isAuthenticated || !contextUser)) {
     return null
   }
@@ -473,7 +511,7 @@ function StaffDashboardContent() {
     return null
   }
 
-  // ✅ Show loading only on first visit (no cache)
+  // Show loading only on first visit (no cache)
   if (loading && !dashboardData && !loadingTimeout) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center">
@@ -495,7 +533,7 @@ function StaffDashboardContent() {
     return <LoadingTimeoutError onRetry={() => window.location.reload()} />
   }
 
-  // ✅ RENDER INSTANTLY - with cached or fresh data
+  // RENDER INSTANTLY - with cached or fresh data
   return (
     <div className="min-h-screen bg-slate-50/50">
       <StaffWelcomeBanner
@@ -542,7 +580,7 @@ function StaffDashboardContent() {
           </Button>
         </div>
 
-        {/* Pending Submissions */}
+        {/* Pending Submissions - Only shows teacher's own submissions */}
         {stats.recentSubmissions.length > 0 && (
           <div className="mt-4 p-4 bg-white border rounded-lg">
             <div className="flex items-center justify-between mb-3">
@@ -572,7 +610,7 @@ function StaffDashboardContent() {
           </div>
         )}
 
-        {/* All caught up */}
+        {/* All caught up - Only shows when teacher has no pending submissions */}
         {stats.recentSubmissions.length === 0 && stats.totalExams > 0 && (
           <div className="mt-4 p-6 bg-emerald-50 border border-emerald-200 rounded-lg text-center">
             <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
@@ -618,7 +656,7 @@ function StaffDashboardContent() {
               </CardContent>
             </Card>
 
-            {/* Recent Assignments - FIXED DISPLAY */}
+            {/* Recent Assignments */}
             <Card>
               <CardHeader className="flex-row items-center justify-between py-3 px-4">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -640,7 +678,6 @@ function StaffDashboardContent() {
                         <div className="p-1.5 bg-emerald-50 rounded"><FileText className="h-4 w-4 text-emerald-600" /></div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium truncate">{item.title}</p>
-                          {/* ✅ FIXED: Use displaySubject and displayClass from enriched data */}
                           <p className="text-xs text-muted-foreground">
                             {item.displaySubject || item.subject || 'No Subject'} · {item.displayClass || item.class || (item.classes?.[0]) || 'No Class'}
                           </p>

@@ -177,7 +177,7 @@ const renderContent = (text: string) => {
   
   let processedText = text
   
-  // Handle markdown tables - this is the key fix for your table display issue
+  // Handle markdown tables
   if (processedText.includes('|') && processedText.includes('---')) {
     const lines = processedText.split('\n')
     const tableLines: string[] = []
@@ -212,27 +212,21 @@ const renderContent = (text: string) => {
     }
   }
   
-  // Handle regular text - preserve ALL line breaks and formatting
   return (
     <div className="whitespace-pre-wrap font-medium leading-relaxed">
       {processedText.split('\n').map((line, idx) => {
-        // Check for numbered questions
         if (line.match(/^\d+\./)) {
           return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
         }
-        // Check for sub-questions (a., b., c.)
         if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
           return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
         }
-        // Check for roman numerals
         if (line.match(/^\(?[ivx]+\)?\./i)) {
           return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
         }
-        // Empty line
         if (line === '') {
           return <br key={idx} />
         }
-        // Regular text
         return <p key={idx} className="mb-1">{line}</p>
       })}
     </div>
@@ -244,14 +238,11 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
   const questionsList: TheoryQuestion[] = []
   const seenQuestions = new Set<string>()
   
-  // Normalize line endings
   let normalizedText = text.replace(/\r\n/g, '\n')
   
-  // First, extract and preserve ALL tables
+  // Extract and preserve ALL tables
   const tableMap = new Map<string, string>()
   let tableCounter = 0
-  
-  // Capture markdown tables
   const tableRegex = /(\n\|[^\n]+\|\n\|[-:\s|]+\|\n(?:\|[^\n]+\|\n?)+)/g
   normalizedText = normalizedText.replace(tableRegex, (match) => {
     const placeholder = `__TABLE_${tableCounter}__`
@@ -260,7 +251,6 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
     return `\n${placeholder}\n`
   })
   
-  // Split into questions by looking for numbered patterns
   const lines = normalizedText.split('\n')
   let currentQuestion: TheoryQuestion | null = null
   let currentContent: string[] = []
@@ -271,21 +261,16 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
     const line = lines[i].trim()
     if (!line && !currentQuestion) continue
     
-    // Check for new question start (number followed by dot)
     const questionMatch = line.match(/^(\d+)\.\s+(.*)/)
     
     if (questionMatch) {
-      // Save previous question
       if (currentQuestion && currentContent.length > 0) {
         let questionText = currentContent.join('\n').trim()
-        
-        // Restore tables in question text
         for (const [placeholder, tableHtml] of tableMap.entries()) {
           if (questionText.includes(placeholder)) {
             questionText = questionText.replace(new RegExp(placeholder, 'g'), tableHtml)
           }
         }
-        
         currentQuestion.question = questionText
         if (currentSubQuestions.length > 0) {
           currentQuestion.sub_questions = currentSubQuestions.map(sq => ({
@@ -293,7 +278,6 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
             marks: Math.floor(10 / currentSubQuestions.length)
           }))
         }
-        
         const questionKey = currentQuestion.question.substring(0, 100)
         if (!seenQuestions.has(questionKey)) {
           seenQuestions.add(questionKey)
@@ -301,7 +285,6 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
         }
       }
       
-      // Start new question
       currentQuestion = {
         id: crypto.randomUUID(),
         question: '',
@@ -313,14 +296,12 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
       inSubQuestion = false
     } 
     else if (currentQuestion) {
-      // Check for sub-question marker
       const subMatch = line.match(/^([a-z])\.\s+(.*)/i)
       if (subMatch) {
         inSubQuestion = true
         currentSubQuestions.push(subMatch[2])
       } 
       else if (inSubQuestion && line.match(/^[ivx]+\./i)) {
-        // Roman numeral sub-sub question
         if (currentSubQuestions.length > 0) {
           const lastIndex = currentSubQuestions.length - 1
           currentSubQuestions[lastIndex] = currentSubQuestions[lastIndex] + '\n  ' + line
@@ -332,17 +313,13 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
     }
   }
   
-  // Save last question
   if (currentQuestion && currentContent.length > 0) {
     let questionText = currentContent.join('\n').trim()
-    
-    // Restore tables
     for (const [placeholder, tableHtml] of tableMap.entries()) {
       if (questionText.includes(placeholder)) {
         questionText = questionText.replace(new RegExp(placeholder, 'g'), tableHtml)
       }
     }
-    
     currentQuestion.question = questionText
     if (currentSubQuestions.length > 0) {
       currentQuestion.sub_questions = currentSubQuestions.map(sq => ({
@@ -350,7 +327,6 @@ const smartParseTheoryQuestions = (text: string): TheoryQuestion[] => {
         marks: Math.floor(10 / currentSubQuestions.length)
       }))
     }
-    
     const questionKey = currentQuestion.question.substring(0, 100)
     if (!seenQuestions.has(questionKey)) {
       seenQuestions.add(questionKey)
@@ -620,6 +596,14 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
   const [currentImageCaption, setCurrentImageCaption] = useState('')
   
   const [defaultMark, setDefaultMark] = useState<number>(0.5)
+  
+  // ✅ Flexible scoring states
+  const [objectiveMax, setObjectiveMax] = useState(20)
+  const [theoryMax, setTheoryMax] = useState(40)
+  const [theoryQuestionsTotal, setTheoryQuestionsTotal] = useState(0)
+  const [theoryQuestionsToAnswer, setTheoryQuestionsToAnswer] = useState<number | null>(null)
+  const [theoryMarksPerQuestion, setTheoryMarksPerQuestion] = useState(10)
+  const [scoringRule, setScoringRule] = useState<'standard' | 'best_of' | 'choose_any'>('standard')
   
   const [examDetails, setExamDetails] = useState({
     title: '',
@@ -1018,6 +1002,12 @@ b. Second sub-question
         setDefaultMark(0.5)
         setCurrentImageUrl('')
         setCurrentImageCaption('')
+        setObjectiveMax(20)
+        setTheoryMax(40)
+        setTheoryQuestionsTotal(0)
+        setTheoryQuestionsToAnswer(null)
+        setTheoryMarksPerQuestion(10)
+        setScoringRule('standard')
       }, 300)
     }
     onOpenChange(open)
@@ -1125,6 +1115,13 @@ b. Second sub-question
         created_by: createdBy,
         teacher_name: teacherName,
         department: department,
+        // ✅ Flexible scoring fields
+        objective_max: objectiveMax,
+        theory_max: hasTheory ? (scoringRule !== 'standard' && theoryQuestionsToAnswer ? theoryQuestionsToAnswer * theoryMarksPerQuestion : theoryQuestionsTotal * theoryMarksPerQuestion) : 0,
+        theory_questions_total: theoryQuestionsTotal,
+        theory_questions_to_answer: theoryQuestionsToAnswer,
+        theory_marks_per_question: theoryMarksPerQuestion,
+        scoring_rule: scoringRule,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -1246,6 +1243,184 @@ b. Second sub-question
                 </div>
               </div>
 
+              {/* ✅ Flexible Scoring Section */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
+                <div>
+                  <Label>Objective Questions Total Marks</Label>
+                  <Input 
+                    type="number" 
+                    min="0"
+                    max="60"
+                    value={objectiveMax} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 20
+                      setObjectiveMax(Math.min(60, Math.max(0, val)))
+                    }} 
+                    placeholder="e.g., 20 or 30"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Total marks for objective section</p>
+                </div>
+                <div>
+                  <Label>Theory Questions Total Marks</Label>
+                  <Input 
+                    type="number" 
+                    min="0"
+                    max="60"
+                    value={theoryMax} 
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value) || 40
+                      setTheoryMax(Math.min(60, Math.max(0, val)))
+                    }} 
+                    placeholder="e.g., 40 or 30"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Total marks for theory section</p>
+                </div>
+              </div>
+
+              {/* Show exam total calculation */}
+              <div className="bg-blue-50 rounded-lg p-3 text-center">
+                <p className="text-sm text-blue-700">
+                  📊 Exam Total: {objectiveMax + theoryMax} marks
+                  {objectiveMax + theoryMax !== 60 && (
+                    <span className="text-amber-600 ml-2">(Recommended: 60 marks)</span>
+                  )}
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  CA (40) + Exam ({objectiveMax + theoryMax}) = {40 + objectiveMax + theoryMax} Grand Total
+                </p>
+              </div>
+
+              {/* ✅ Theory Configuration (only if hasTheory) */}
+              {hasTheory && (
+                <div className="space-y-4 p-4 bg-purple-50 rounded-lg border">
+                  <h4 className="font-semibold text-sm text-purple-800">📝 Theory Scoring Configuration</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Number of Theory Questions</Label>
+                      <Input 
+                        type="number" 
+                        value={theoryQuestionsTotal} 
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 0
+                          setTheoryQuestionsTotal(val)
+                          if (scoringRule === 'standard') {
+                            setTheoryMax(val * theoryMarksPerQuestion)
+                          } else if (theoryQuestionsToAnswer) {
+                            setTheoryMax(theoryQuestionsToAnswer * theoryMarksPerQuestion)
+                          }
+                        }} 
+                        min={0}
+                        max={20}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Total number of theory questions</p>
+                    </div>
+                    
+                    <div>
+                      <Label>Marks per Question</Label>
+                      <Input 
+                        type="number" 
+                        value={theoryMarksPerQuestion} 
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || 10
+                          setTheoryMarksPerQuestion(val)
+                          if (scoringRule === 'standard') {
+                            setTheoryMax(theoryQuestionsTotal * val)
+                          } else if (theoryQuestionsToAnswer) {
+                            setTheoryMax(theoryQuestionsToAnswer * val)
+                          }
+                        }} 
+                        min={1}
+                        max={20}
+                        step={1}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">Marks for each theory question</p>
+                    </div>
+                  </div>
+
+                  {/* Scoring Rule Selection */}
+                  <div>
+                    <Label className="mb-2 block">Scoring Rule</Label>
+                    <RadioGroup 
+                      value={scoringRule} 
+                      onValueChange={(v) => {
+                        setScoringRule(v as any)
+                        if (v === 'standard') {
+                          setTheoryQuestionsToAnswer(null)
+                          setTheoryMax(theoryQuestionsTotal * theoryMarksPerQuestion)
+                        }
+                      }}
+                      className="flex flex-wrap gap-4"
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="standard" id="standard" />
+                        <Label htmlFor="standard">Answer All Questions</Label>
+                        <span className="text-xs text-muted-foreground">(Student answers every question)</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="best_of" id="best_of" />
+                        <Label htmlFor="best_of">Best N Questions Count</Label>
+                        <span className="text-xs text-muted-foreground">(Student answers all, highest N count)</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="choose_any" id="choose_any" />
+                        <Label htmlFor="choose_any">Choose Any N Questions</Label>
+                        <span className="text-xs text-muted-foreground">(Student selects which to answer)</span>
+                      </div>
+                    </RadioGroup>
+                  </div>
+
+                  {/* Questions to Answer (for best_of or choose_any) */}
+                  {(scoringRule === 'best_of' || scoringRule === 'choose_any') && (
+                    <div>
+                      <Label>Questions to Answer/Count</Label>
+                      <Input 
+                        type="number" 
+                        value={theoryQuestionsToAnswer || ''} 
+                        onChange={(e) => {
+                          const val = parseInt(e.target.value) || null
+                          setTheoryQuestionsToAnswer(val)
+                          if (val && theoryMarksPerQuestion) {
+                            setTheoryMax(val * theoryMarksPerQuestion)
+                          }
+                        }} 
+                        min={1}
+                        max={theoryQuestionsTotal || 20}
+                        placeholder="e.g., 4"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {scoringRule === 'best_of' 
+                          ? "Number of highest-scoring questions to count" 
+                          : "Number of questions student must choose to answer"}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Theory Scoring Summary */}
+                  <div className="bg-purple-100 rounded-lg p-3 mt-2">
+                    <p className="text-sm font-medium text-purple-800">Theory Scoring Summary:</p>
+                    <ul className="text-xs text-purple-700 mt-1 space-y-1">
+                      <li>• Theory Questions: {theoryQuestionsTotal}</li>
+                      <li>• Marks per Question: {theoryMarksPerQuestion}</li>
+                      {scoringRule === 'standard' && (
+                        <li>• Student must answer all {theoryQuestionsTotal} questions</li>
+                      )}
+                      {scoringRule === 'best_of' && theoryQuestionsToAnswer && (
+                        <li>• Student answers all {theoryQuestionsTotal}, best {theoryQuestionsToAnswer} count</li>
+                      )}
+                      {scoringRule === 'choose_any' && theoryQuestionsToAnswer && (
+                        <li>• Student chooses any {theoryQuestionsToAnswer} out of {theoryQuestionsTotal}</li>
+                      )}
+                      <li className="font-semibold text-purple-900 mt-1">
+                        📊 Theory Max: {scoringRule !== 'standard' && theoryQuestionsToAnswer 
+                          ? theoryQuestionsToAnswer * theoryMarksPerQuestion 
+                          : theoryQuestionsTotal * theoryMarksPerQuestion} marks
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+
               <div className="p-4 bg-muted/30 rounded-lg">
                 <Label className="mb-2 block">Default Mark per Objective Question</Label>
                 <RadioGroup value={defaultMark.toString()} onValueChange={(v) => setDefaultMark(parseFloat(v))} className="flex gap-4">
@@ -1277,8 +1452,9 @@ b. Second sub-question
               </div>
             </TabsContent>
 
-            {/* Objective Questions Tab */}
+            {/* Objective Questions Tab (same as before) */}
             <TabsContent value="questions" className="space-y-4 mt-0">
+              {/* ... keep existing objective questions code ... */}
               <div className="flex gap-2 border-b pb-3">
                 <Button variant={objectiveUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setObjectiveUploadMode('bulk')}>
                   <Sparkles className="mr-1 h-3 w-3" /> Bulk Import

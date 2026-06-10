@@ -1,4 +1,4 @@
-// src/app/student/exams/hooks/useExamsData.ts - COMPLETE FIXED VERSION
+// src/app/student/exams/hooks/useExamsData.ts
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -6,34 +6,71 @@ import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { toast } from "sonner"
 import type { Exam, StudentProfile, ExamAttempt, TermOption, TermSession, StatsState } from "../types"
-import { getSubjectCountForClass, calculateGrade, getTermLabel } from "../utils"
+import { getSubjectCountForClass, getTermLabel } from "../utils"
 import { TERM_NAMES } from "../constants"
 
 type LocalStatsState = StatsState & { pendingTheoryCount: number }
 
-// ✅ Extract year from class name - Prevents JSS1 from matching SS1
+// Extract year from class name
 const extractYear = (className: string): string => {
   if (!className) return ''
-  
-  // Remove spaces and convert to uppercase
   const normalized = className.trim().toUpperCase().replace(/\s/g, '')
   
-  // JSS Classes - check these FIRST (before SS)
   if (normalized === 'JSS1') return 'JSS1'
   if (normalized === 'JSS2') return 'JSS2'
   if (normalized === 'JSS3') return 'JSS3'
-  
-  // SS Classes - exact match
   if (normalized === 'SS1') return 'SS1'
   if (normalized === 'SS2') return 'SS2'
   if (normalized === 'SS3') return 'SS3'
   
-  // Handle subject-specific SS classes (SS1SCIENCE -> SS1)
   if (normalized.startsWith('SS1') && !normalized.startsWith('JSS')) return 'SS1'
   if (normalized.startsWith('SS2') && !normalized.startsWith('JSS')) return 'SS2'
   if (normalized.startsWith('SS3') && !normalized.startsWith('JSS')) return 'SS3'
   
   return className
+}
+
+// Grade calculation: A=80+, B=70-79, C=60-69, P=50-59, F=below 50
+const calculateLetterGrade = (percentage: number): { grade: string; color: string } => {
+  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-purple-500' }
+  return { grade: 'F', color: 'text-red-600' }
+}
+
+// ✅ Calculate score including CA for ALL statuses
+const calculateSubjectPercentage = (attempt: any, caScores: any): number => {
+  // CA scores (added before exam, max 40)
+  const ca1 = caScores?.ca1_score || 0
+  const ca2 = caScores?.ca2_score || 0
+  const caTotal = ca1 + ca2  // Max 40
+  
+  // Objective score (max 20)
+  const objectiveScore = attempt.objective_score || 0
+  
+  // For pending theory: CA + Objective only (theory not graded yet)
+  if (attempt.status === 'pending_theory') {
+    const totalScore = caTotal + objectiveScore
+    const totalMarks = 60  // CA (40) + Objective (20)
+    return totalMarks > 0 ? (totalScore / totalMarks) * 100 : 0
+  }
+  
+  // For completed/graded: Full score including theory
+  if (attempt.status === 'completed' || attempt.status === 'graded') {
+    let theoryScore = 0
+    if (attempt.theory_feedback) {
+      try {
+        const feedback = typeof attempt.theory_feedback === 'string' ? JSON.parse(attempt.theory_feedback) : attempt.theory_feedback
+        if (feedback?.total?.score !== undefined) theoryScore = Number(feedback.total.score)
+      } catch {}
+    }
+    const totalScore = caTotal + objectiveScore + theoryScore
+    const totalMarks = 100  // CA (40) + Objective (20) + Theory (40)
+    return totalMarks > 0 ? (totalScore / totalMarks) * 100 : 0
+  }
+  
+  return 0
 }
 
 export function useExamsData(router: ReturnType<typeof useRouter>) {
@@ -51,11 +88,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
   })
   
   const hasLoaded = useRef(false)
-
-  // Helper to ensure consistent term/session for exams
-  const getCurrentTermSession = (): { term: string; session_year: string } => {
-    return { term: "third", session_year: "2025/2026" }
-  }
+  const currentTerm = { term: "third", session_year: "2025/2026" }
 
   const loadData = useCallback(async (term?: string, session?: string) => {
     setLoading(true)
@@ -124,7 +157,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
             .from("exams")
             .select("term, session_year")
             .eq("status", "published")
-            // Include exams with null session_year
             .or(`session_year.not.is.null,session_year.is.null`)
           
           if (examTerms) {
@@ -142,13 +174,12 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
             })
           }
           
-          // Ensure "Third Term 2025/2026" is always available
-          const currentKey = "third|2025/2026"
+          const currentKey = `${currentTerm.term}|${currentTerm.session_year}`
           if (!termsMap.has(currentKey)) {
             termsMap.set(currentKey, {
-              term: "third",
-              session_year: "2025/2026",
-              label: getTermLabel("third", "2025/2026")
+              term: currentTerm.term,
+              session_year: currentTerm.session_year,
+              label: getTermLabel(currentTerm.term, currentTerm.session_year)
             })
           }
           
@@ -163,12 +194,10 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           
           setAvailableTerms(terms)
           
-          // Default to Third Term 2025/2026 if no selection exists
           if (terms.length > 0 && !selectedTermSession) {
-            // Try to find Third Term 2025/2026 first
-            const currentTerm = terms.find(t => t.term === "third" && t.session_year === "2025/2026")
-            if (currentTerm) {
-              setSelectedTermSession({ term: currentTerm.term, session_year: currentTerm.session_year })
+            const currentTermObj = terms.find(t => t.term === currentTerm.term && t.session_year === currentTerm.session_year)
+            if (currentTermObj) {
+              setSelectedTermSession({ term: currentTermObj.term, session_year: currentTermObj.session_year })
             } else {
               const defaultTerm = terms[0]
               setSelectedTermSession({ term: defaultTerm.term, session_year: defaultTerm.session_year })
@@ -179,20 +208,15 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         }
       }
 
-      // Use current term/session if not provided
-      const current = getCurrentTermSession()
-      const targetTerm = term || selectedTermSession?.term || current.term
-      const targetSession = session || selectedTermSession?.session_year || current.session_year
+      const targetTerm = term || selectedTermSession?.term || currentTerm.term
+      const targetSession = session || selectedTermSession?.session_year || currentTerm.session_year
 
-      console.log(`🔍 Fetching exams for: ${targetTerm} ${targetSession}`)
-
-      // ✅ FIXED: Fetch exams with flexible session_year matching
+      // Fetch exams
       const { data: examsData, error: examsError } = await supabase
         .from("exams")
         .select("*")
         .eq("status", "published")
         .eq("term", targetTerm)
-        // Allow exams with null session_year OR matching the target session
         .or(`session_year.eq.${targetSession},session_year.is.null`)
         .order("created_at", { ascending: false })
 
@@ -200,46 +224,33 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         console.error("Error fetching exams:", examsError)
       }
 
-      console.log(`📚 Raw exams from DB: ${examsData?.length || 0}`)
-
-      // Extract year from student's class
+      // Filter exams by class year
       const studentYear = extractYear(sp.class)
       const isJSS = studentYear?.startsWith('JSS') || false
       const isSS = studentYear?.startsWith('SS') || false
       
-      // Filter exams by YEAR using exact matching
       const filteredExams = (examsData || []).filter((exam: any) => {
-        // If no class assigned to exam, skip
         if (!exam.class) return false
-        
-        // Extract year from exam class
         const examYear = extractYear(exam.class)
         
-        // For JSS students, only match exact JSS level
         if (isJSS) {
           const examIsJSS = examYear?.startsWith('JSS') || false
           if (!examIsJSS) return false
           return studentYear === examYear
         }
         
-        // For SS students, match by year (SS1 matches SS1 across departments)
         if (isSS) {
           const examIsSS = examYear?.startsWith('SS') || false
           if (!examIsSS) return false
           return studentYear === examYear
         }
         
-        // Fallback: exact match
         return studentYear === examYear
       })
       
-      console.log(`📚 Student: ${sp.class} (year: ${studentYear}, type: ${isJSS ? 'JSS' : isSS ? 'SS' : 'Other'})`)
-      console.log(`📚 Found ${filteredExams.length} exams after filtering`)
-      console.log(`📚 Exam details:`, filteredExams.map(e => ({ title: e.title, class: e.class, term: e.term, session: e.session_year })))
-      
       setExams(filteredExams)
 
-      // Fetch exam attempts for this student
+      // Fetch exam attempts
       const { data: attemptsData } = await supabase
         .from("exam_attempts")
         .select("*")
@@ -256,12 +267,14 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           percentage: a.percentage, 
           total_score: a.total_score, 
           total_marks: a.total_marks,
-          objective_score: a.objective_score, 
+          objective_score: a.objective_score || 0,
           theory_feedback: a.theory_feedback,
+          term: a.term,
+          session_year: a.session_year,
         }
       })
 
-      // Load CA scores and enrich attempts
+      // Load CA scores
       const { data: caScoresData } = await supabase
         .from("ca_scores")
         .select("*")
@@ -280,6 +293,9 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         const ca = caMap[examId]
         enrichedAm[examId] = {
           ...attempt,
+          objective_total: 20,
+          ca1_score: ca?.ca1_score || null,
+          ca2_score: ca?.ca2_score || null,
           ca_total_score: ca?.total_score || undefined,
           ca_percentage: ca?.total_score || undefined
         }
@@ -295,35 +311,41 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         .eq("session_year", targetSession)
         .maybeSingle()
 
-      const completedAttempts = Object.values(enrichedAm).filter(a => ['completed', 'graded'].includes(a.status))
+      // ✅ ALL attempts that count toward completion (including pending_theory)
+      const allCompletedAttempts = Object.values(enrichedAm).filter(a => 
+        ['completed', 'graded', 'pending_theory'].includes(a.status)
+      )
       const pendingTheoryAttempts = Object.values(enrichedAm).filter(a => a.status === 'pending_theory')
+      const hasPendingTheory = pendingTheoryAttempts.length > 0
 
-      // Calculate average using CA scores when available
-      const avgScore = completedAttempts.length > 0 
-        ? Math.round(completedAttempts.reduce((s, a) => {
-            if (a.ca_total_score) return s + Number(a.ca_total_score)
-            let totalScore = a.total_score || 0
-            if (a.theory_feedback) {
-              try {
-                const feedback = typeof a.theory_feedback === 'string' ? JSON.parse(a.theory_feedback) : a.theory_feedback
-                if (feedback?.total?.score !== undefined) totalScore = (a.objective_score || 0) + Number(feedback.total.score)
-              } catch {}
-            }
-            const marks = a.total_marks || 60
-            return s + (marks > 0 ? (totalScore / marks) * 100 : (a.percentage || 0))
-          }, 0) / completedAttempts.length) : 0
+      // ✅ Calculate average score INCLUDING CA for pending theory
+      let avgScore = 0
+      if (allCompletedAttempts.length > 0) {
+        let totalPercentage = 0
+        allCompletedAttempts.forEach((attempt) => {
+          const ca = {
+            ca1_score: attempt.ca1_score,
+            ca2_score: attempt.ca2_score
+          }
+          const percentage = calculateSubjectPercentage(attempt, ca)
+          totalPercentage += percentage
+        })
+        avgScore = Math.round(totalPercentage / allCompletedAttempts.length)
+      }
 
-      const gi = calculateGrade(avgScore)
-      const actualCompleted = termProgressData?.completed_exams || completedAttempts.length
+      // ✅ Calculate grade based on ALL completed attempts (including pending theory)
+      const gradeInfo = calculateLetterGrade(avgScore)
+      
+      // ✅ Completed count includes pending_theory
+      const actualCompleted = termProgressData?.completed_exams || allCompletedAttempts.length
       const actualTotalSubjects = termProgressData?.total_subjects || totalSubjects
-      const actualAverageScore = termProgressData?.average_score || avgScore
-      const actualGrade = termProgressData?.grade || (completedAttempts.length > 0 ? gi.grade : "N/A")
+      const displayAverageScore = termProgressData?.average_score || avgScore
 
-      // Count available exams (not completed)
+      // ✅ Available exams: exams with no attempt OR in_progress only
       const availableCount = filteredExams.filter((e: Exam) => {
         const a = enrichedAm[e.id]
         if (!a) return true
-        return !['completed', 'graded'].includes(a.status)
+        return a.status === 'in_progress'
       }).length
 
       const upcomingCount = filteredExams.filter((e: Exam) => 
@@ -334,9 +356,9 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         available: availableCount,
         completed: actualCompleted,
         upcoming: upcomingCount,
-        averageScore: actualAverageScore,
-        currentGrade: actualGrade,
-        gradeColor: completedAttempts.length > 0 ? gi.color : "text-gray-400",
+        averageScore: displayAverageScore,
+        currentGrade: gradeInfo.grade,
+        gradeColor: gradeInfo.color,
         totalSubjects: actualTotalSubjects,
         termName: TERM_NAMES[targetTerm] || targetTerm,
         sessionYear: targetSession,

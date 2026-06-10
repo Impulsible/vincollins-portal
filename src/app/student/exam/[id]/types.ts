@@ -1,3 +1,10 @@
+// app/student/exam/[id]/types.ts
+export interface TheorySubQuestion {
+  text: string
+  marks: number
+  sub_sub_questions?: TheorySubQuestion[]
+}
+
 export interface Question {
   id: string
   question_text?: string
@@ -9,6 +16,10 @@ export interface Question {
   points?: number
   marks?: number
   order_number?: number
+  // Theory-specific fields
+  sub_questions?: TheorySubQuestion[]
+  image_url?: string
+  image_caption?: string
 }
 
 export interface Exam {

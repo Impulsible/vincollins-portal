@@ -1234,3 +1234,25 @@ html {
 .radix-scroll-area-viewport {
   position: relative !important;
 }
+
+/* Markdown content styles */
+.markdown-content table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid #e5e7eb;
+  padding: 12px;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: #f3f4f6;
+  font-weight: 600;
+}
+
+.markdown-content tr:hover {
+  background-color: #f9fafb;
+}

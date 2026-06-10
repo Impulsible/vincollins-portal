@@ -1,4 +1,4 @@
-// app/staff/exams/[id]/submissions/page.tsx - SIMPLIFIED WORKING VERSION (NO REALTIME)
+// app/staff/exams/[id]/submissions/page.tsx - SIMPLIFIED SCORE DISPLAY
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -62,7 +62,6 @@ export default function ExamSubmissionsPage() {
   const [exam, setExam] = useState<any>(null)
   const [submissions, setSubmissions] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [totalMarks, setTotalMarks] = useState(0)
 
   const loadData = useCallback(async (showToast = false) => {
     if (!examId) return
@@ -71,16 +70,13 @@ export default function ExamSubmissionsPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/portal'); return }
 
-      // Get exam details with total marks
+      // Get exam details
       const { data: examData } = await supabase
         .from('exams')
-        .select('id, title, subject, class, total_marks, total_questions')
+        .select('id, title, subject, class, total_marks, total_questions, objective_max, theory_max')
         .eq('id', examId)
         .single()
       setExam(examData)
-      
-      const examTotalMarks = examData?.total_marks || 100
-      setTotalMarks(examTotalMarks)
 
       // Get ALL submissions
       const { data: subs } = await supabase
@@ -97,8 +93,14 @@ export default function ExamSubmissionsPage() {
           .eq('id', sub.student_id)
           .single()
 
-        const totalScore = (sub.objective_score || 0) + (sub.theory_score || 0)
-        const percentage = examTotalMarks > 0 ? Math.round((totalScore / examTotalMarks) * 100) : 0
+        const objectiveMax = sub.objective_max || examData?.objective_max || 20
+        const theoryMax = sub.theory_max || examData?.theory_max || 40
+        const examTotal = objectiveMax + theoryMax
+        
+        const objScore = sub.objective_score || 0
+        const theoryScore = sub.theory_score || 0
+        const totalScore = objScore + theoryScore
+        const percentage = examTotal > 0 ? Math.round((totalScore / examTotal) * 100) : 0
         
         return {
           ...sub,
@@ -106,7 +108,7 @@ export default function ExamSubmissionsPage() {
           student_email: student?.email || sub.student_email || '',
           photo_url: student?.photo_url || null,
           student_class: student?.class || sub.student_class || '—',
-          display_total_score: totalScore,
+          display_score: totalScore,
           display_percentage: percentage,
           display_grade: getWAECGrade(percentage),
         }
@@ -264,7 +266,7 @@ export default function ExamSubmissionsPage() {
                 </TableHeader>
                 <TableBody>
                   {filtered.map(submission => {
-                    const totalScore = submission.display_total_score
+                    const score = submission.display_score
                     const percentage = submission.display_percentage
                     const grade = submission.display_grade
                     
@@ -285,7 +287,7 @@ export default function ExamSubmissionsPage() {
                         <TableCell className="text-center">
                           <span className={cn("font-semibold text-xs sm:text-sm", 
                             percentage >= 50 ? 'text-emerald-600' : 'text-red-600')}>
-                            {totalScore}/{totalMarks}
+                            {score}
                           </span>
                         </TableCell>
                         <TableCell className="text-center text-xs sm:text-sm">

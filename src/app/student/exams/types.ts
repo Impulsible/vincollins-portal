@@ -38,11 +38,14 @@ export interface ExamAttempt {
   total_score?: number
   total_marks?: number
   objective_score?: number
+   objective_total?: number
   theory_feedback?: any
   term?: string
   session_year?: string
   ca_total_score?: number
   ca_percentage?: number
+  ca1_score?: number 
+  ca2_score?: number
 }
 
 export interface TermProgress {

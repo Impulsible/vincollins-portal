@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/student/StudentWelcomeBanner.tsx - WITH REAL-TIME UPDATES
+// components/student/StudentWelcomeBanner.tsx - SIMPLIFIED VERSION
 
 'use client'
 
@@ -80,7 +80,7 @@ const quotes = {
   ],
 }
 
-// ✅ Helper to get first name from "Surname FirstName Other" format
+// Helper to get first name from "Surname FirstName Other" format
 const getFirstName = (fullName: string): string => {
   if (!fullName) return 'Student'
   const parts = fullName.trim().split(/\s+/)
@@ -88,7 +88,7 @@ const getFirstName = (fullName: string): string => {
   return parts[0] || 'Student'
 }
 
-// ✅ Fixed quote personalization - only replaces {name}
+// Fixed quote personalization - only replaces {name}
 const getPersonalizedQuote = (hour: number, firstName: string) => {
   let quoteSet = quotes.morning
   if (hour >= 12 && hour < 17) quoteSet = quotes.afternoon
@@ -108,7 +108,7 @@ const calculateGrade = (percentage: number): { grade: string; color: string; des
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
   if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
   if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
-  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600', description: 'Pass' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-purple-600', description: 'Pass' }
   return { grade: 'F', color: 'text-red-600', description: 'Fail' }
 }
 
@@ -140,7 +140,6 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
 
     console.log('📡 Setting up real-time subscriptions for student stats...')
 
-    // Subscribe to exam_attempts changes
     const attemptsChannel = supabase
       .channel(`student-stats-attempts-${profile.id}`)
       .on(
@@ -158,7 +157,6 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
       )
       .subscribe()
 
-    // Subscribe to ca_scores changes
     const caScoresChannel = supabase
       .channel(`student-stats-ca-${profile.id}`)
       .on(
@@ -399,11 +397,17 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
       </div>
       
       {pendingTheoryCount > 0 && (
-        <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3 flex items-center gap-3">
-          <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
-          <div>
-            <p className="text-sm text-amber-200 font-medium">{pendingTheoryCount} exam{pendingTheoryCount !== 1 ? 's' : ''} pending theory grading</p>
-            <p className="text-xs text-amber-300/80">Objective scores are ready. Theory answers will be graded by your teacher soon.</p>
+        <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-amber-200 font-medium">
+                {pendingTheoryCount} exam{pendingTheoryCount !== 1 ? 's' : ''} pending theory grading
+              </p>
+              <p className="text-xs text-amber-300/80">
+                Your current score includes CA and objective marks. Theory answers will increase your final score.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -427,7 +431,9 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
           </div>
           <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">{averageScore.toFixed(1)}%</p>
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+                {averageScore.toFixed(2)}%
+              </p>
               <TrendingUp className="h-5 w-5 text-amber-300 opacity-60" />
             </div>
             <p className="text-xs md:text-sm text-gray-300">Average Score</p>
@@ -440,7 +446,9 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
                     <TooltipTrigger asChild>
                       <span className="inline-flex"><p className={cn("text-2xl md:text-3xl font-bold", gradeInfo.color)}>{gradeInfo.grade}</p></span>
                     </TooltipTrigger>
-                    <TooltipContent><p>{averageScore}% average - {gradeInfo.description}</p></TooltipContent>
+                    <TooltipContent>
+                      <p>{averageScore.toFixed(2)}% average - {gradeInfo.description}</p>
+                    </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               ) : (

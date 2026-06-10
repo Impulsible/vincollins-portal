@@ -14,9 +14,72 @@ import { cn } from '@/lib/utils'
 import {
   ArrowLeft, Save, CheckCircle, Clock, AlertCircle,
   Loader2, Award, Target, PenTool, ChevronDown, ChevronUp,
-  FileText, Eye
+  FileText, Eye, Brain, Table as TableIcon
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
+// ============ TABLE CONVERSION WITH TAILWIND CSS ============
+const convertTableToHtml = (tableLines: string[]): string => {
+  let html = '<div class="overflow-x-auto my-4 shadow-md rounded-lg border border-gray-200"><table class="min-w-full bg-white rounded-lg">'
+  let isHeader = true
+  let hasSeparator = false
+  
+  for (const line of tableLines) {
+    if (line.includes('---') || line.includes('===')) {
+      isHeader = false
+      hasSeparator = true
+      continue
+    }
+    if (line.startsWith('|')) {
+      const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
+      if (cells.length === 0) continue
+      html += '<tr class="' + (isHeader && !hasSeparator ? 'bg-gray-100' : 'bg-white hover:bg-gray-50') + ' border-b border-gray-200">'
+      cells.forEach((cell: string, idx: number) => {
+        const tag = isHeader && !hasSeparator ? 'th' : 'td'
+        const classes = (isHeader && !hasSeparator)
+          ? 'px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0'
+          : 'px-4 py-3 text-sm text-gray-600 border-r border-gray-200 last:border-r-0'
+        html += `<${tag} class="${classes}">${cell.trim()}</${tag}>`
+      })
+      html += '</tr>'
+      if (isHeader && hasSeparator) isHeader = false
+    }
+  }
+  html += '</table></div>'
+  return html
+}
+
+// Render content with tables and formatting
+const renderContent = (text: string) => {
+  if (!text) return null
+  
+  // Check for markdown tables
+  const tableRegex = /(\n?\|[^\n]+\|\n\|[-:\s|]+\|\n(?:\|[^\n]+\|\n?)+)/g
+  const match = tableRegex.exec(text)
+  
+  if (match) {
+    const tableLines = match[0].split('\n').filter(line => line.trim())
+    const tableHtml = convertTableToHtml(tableLines)
+    const remainingText = text.replace(match[0], '')
+    
+    return (
+      <div className="space-y-4">
+        {remainingText && (
+          <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+            {remainingText}
+          </div>
+        )}
+        <div dangerouslySetInnerHTML={{ __html: tableHtml }} />
+      </div>
+    )
+  }
+  
+  return (
+    <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+      {text}
+    </div>
+  )
+}
 
 export default function GradeSubmissionPage() {
   const router = useRouter()
@@ -30,14 +93,17 @@ export default function GradeSubmissionPage() {
   const [exam, setExam] = useState<any>(null)
   const [examTitle, setExamTitle] = useState('')
   const [subjectName, setSubjectName] = useState('')
-  const [theoryScore, setTheoryScore] = useState('')
+  const [theoryScore, setTheoryScore] = useState<string>('')
   const [feedback, setFeedback] = useState('')
   const [theoryQuestions, setTheoryQuestions] = useState<any[]>([])
   const [expandedQuestions, setExpandedQuestions] = useState<Record<string, boolean>>({})
-  const [theoryMax, setTheoryMax] = useState(40)
-  const [objTotal, setObjTotal] = useState(20)
-  const [hasTheory, setHasTheory] = useState(false)
   const [studentAnswers, setStudentAnswers] = useState<Record<string, any>>({})
+
+  // Scoring values
+  const [objectiveMax, setObjectiveMax] = useState(20)
+  const [theoryMax, setTheoryMax] = useState(40)
+  const [examTotal, setExamTotal] = useState(60)
+  const [hasTheory, setHasTheory] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -45,7 +111,6 @@ export default function GradeSubmissionPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/portal'); return }
 
-      // Load attempt
       const { data: att, error: attError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -58,7 +123,14 @@ export default function GradeSubmissionPage() {
         return
       }
 
-      // Load exam
+      const objMax = att.objective_max || 20
+      const thMax = att.theory_max || 40
+      const examMax = objMax + thMax
+
+      setObjectiveMax(objMax)
+      setTheoryMax(thMax)
+      setExamTotal(examMax)
+
       const { data: examData } = await supabase
         .from('exams')
         .select('*')
@@ -69,21 +141,12 @@ export default function GradeSubmissionPage() {
       setExamTitle(examData?.title || 'Untitled Exam')
       setSubjectName(examData?.subject || '')
       
-      // Check if exam has theory (from column or from theory_questions)
       const examHasTheory = examData?.has_theory || 
                            (examData?.theory_questions && 
                             Array.isArray(examData.theory_questions) && 
                             examData.theory_questions.length > 0)
       setHasTheory(examHasTheory)
 
-      // Dynamic theory max
-      const examTheoryMax = examData?.theory_total || Number(att.theory_total) || 40
-      setTheoryMax(examTheoryMax)
-
-      // Dynamic objective total
-      setObjTotal(Number(att.objective_total) || examData?.total_marks || 30)
-
-      // Process theory questions
       if (examData?.theory_questions) {
         const tq = typeof examData.theory_questions === 'string'
           ? JSON.parse(examData.theory_questions)
@@ -93,11 +156,13 @@ export default function GradeSubmissionPage() {
           id: q.id || `q-${i}`,
           question: q.question || 'No question text',
           points: Number(q.marks || q.points || 10),
-          order_number: i + 1
+          order_number: i + 1,
+          sub_questions: q.sub_questions || [],
+          image_url: q.image_url,
+          image_caption: q.image_caption
         })) : [])
       }
 
-      // Process student answers
       if (att.theory_answers) {
         const answers = typeof att.theory_answers === 'string'
           ? JSON.parse(att.theory_answers)
@@ -105,24 +170,19 @@ export default function GradeSubmissionPage() {
         setStudentAnswers(answers || {})
       }
 
-      // Load student profile
       const { data: student } = await supabase
         .from('profiles')
         .select('photo_url, class, full_name, email')
         .eq('id', att.student_id)
         .single()
 
-      // Get existing theory score from various possible locations
-      let existingScore = ''
-      if (att.theory_feedback?.total?.score !== undefined) {
-        existingScore = String(att.theory_feedback.total.score)
-      } else if (att.theory_score !== undefined && att.theory_score > 0) {
-        existingScore = String(att.theory_score)
-      } else if (att.theory_feedback?.score !== undefined) {
-        existingScore = String(att.theory_feedback.score)
+      let existingTheoryScore = ''
+      if (att.theory_score !== undefined && att.theory_score > 0) {
+        existingTheoryScore = String(att.theory_score)
+      } else if (att.theory_feedback?.total?.score !== undefined) {
+        existingTheoryScore = String(att.theory_feedback.total.score)
       }
 
-      // Get existing feedback
       let existingFeedback = ''
       if (att.theory_feedback?.total?.feedback) {
         existingFeedback = att.theory_feedback.total.feedback
@@ -137,7 +197,7 @@ export default function GradeSubmissionPage() {
         photo_url: student?.photo_url || null,
         student_class: student?.class || att.student_class || '—'
       })
-      setTheoryScore(existingScore)
+      setTheoryScore(existingTheoryScore)
       setFeedback(existingFeedback)
 
     } catch (error) {
@@ -154,7 +214,6 @@ export default function GradeSubmissionPage() {
     setExpandedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }))
   }
 
-  // Update term progress
   const updateTermProgress = async (studentId: string, studentClass: string) => {
     try {
       const term = exam?.term || attempt?.term || 'third'
@@ -207,7 +266,6 @@ export default function GradeSubmissionPage() {
     }
   }
 
-  // WAEC Grade
   const getWAECGrade = (pct: number): string => {
     if (pct >= 75) return 'A1'
     if (pct >= 70) return 'B2'
@@ -226,17 +284,11 @@ export default function GradeSubmissionPage() {
       return
     }
 
-    console.log('=== STARTING SAVE ===')
-    console.log('Current attempt status:', attempt.status)
-    console.log('Submission ID:', submissionId)
-    console.log('Has theory:', hasTheory)
-
-    // Only validate theory score if exam has theory
     let tScore = 0
     if (hasTheory) {
       tScore = parseFloat(theoryScore)
-      if (isNaN(tScore) || tScore < 0 || tScore > theoryMax) {
-        toast.error(`Theory score must be between 0 and ${theoryMax}`)
+      if (isNaN(tScore) || tScore < 0) {
+        toast.error('Please enter a valid theory score')
         return
       }
       tScore = Math.round(tScore)
@@ -245,34 +297,27 @@ export default function GradeSubmissionPage() {
     setSaving(true)
 
     const objScore = Math.round(Number(attempt.objective_score) || 0)
-    const theoryTotal = hasTheory ? theoryMax : 0
-    const totalScore = objScore + tScore
-    const totalMarks = hasTheory ? (objTotal + theoryTotal) : objTotal
-    const percentage = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0
-    const isPassed = percentage >= 50
+    const examScore = objScore + tScore
+    const percentage = Math.round((examScore / examTotal) * 100)
+    const isPassed = percentage >= 40
     const grade = getWAECGrade(percentage)
 
-    console.log('Calculated values:', {
-      objScore,
-      tScore,
-      totalScore,
-      totalMarks,
-      percentage,
-      grade
-    })
-
     try {
-      // Build update data dynamically based on what columns exist
       const updateData: any = {
         status: 'graded',
-        total_score: totalScore,
-        total_marks: totalMarks,
+        objective_score: objScore,
+        objective_total: objectiveMax,
+        theory_score: tScore,
+        theory_total: theoryMax,
+        exam_score: examScore,
+        exam_total: examTotal,
+        total_score: examScore,
+        total_marks: examTotal,
         percentage: percentage,
         is_passed: isPassed,
         updated_at: new Date().toISOString()
       }
 
-      // Add grade if column exists (check first)
       try {
         const { data: columnCheck } = await supabase
           .from('exam_attempts')
@@ -285,24 +330,16 @@ export default function GradeSubmissionPage() {
         // Column doesn't exist, skip
       }
 
-      // Add objective fields
-      updateData.objective_score = objScore
-      updateData.objective_total = objTotal
-
-      // Add theory data if has theory
       if (hasTheory) {
-        updateData.theory_score = tScore
-        updateData.theory_total = theoryTotal
         updateData.theory_feedback = {
           total: {
             score: tScore,
-            max: theoryTotal,
-            feedback: feedback || `Theory: ${tScore}/${theoryTotal}`
+            max: theoryMax,
+            feedback: feedback || `Theory: ${tScore}/${theoryMax}`
           }
         }
       }
 
-      // Try to add feedback if column exists (check by attempting to insert)
       if (feedback) {
         try {
           const { error: testError } = await supabase
@@ -311,114 +348,23 @@ export default function GradeSubmissionPage() {
             .limit(1)
           if (!testError) {
             updateData.feedback = feedback
-          } else {
-            console.log('Feedback column not found, skipping...')
           }
         } catch {
-          console.log('Feedback column not found, skipping...')
+          // Column doesn't exist, skip
         }
       }
 
-      console.log('Updating with data:', updateData)
-
-      // Perform the update
       const { error: updateError } = await supabase
         .from('exam_attempts')
         .update(updateData)
         .eq('id', submissionId)
 
-      if (updateError) {
-        console.error('Update error:', updateError)
-        
-        // If error is about missing column, try without that column
-        if (updateError.message.includes('column')) {
-          console.log('Retrying without problematic columns...')
-          const cleanData: any = {
-            status: 'graded',
-            total_score: totalScore,
-            total_marks: totalMarks,
-            percentage: percentage,
-            is_passed: isPassed,
-            objective_score: objScore,
-            objective_total: objTotal,
-            updated_at: new Date().toISOString()
-          }
-          
-          if (hasTheory) {
-            cleanData.theory_score = tScore
-            cleanData.theory_total = theoryTotal
-            cleanData.theory_feedback = {
-              total: {
-                score: tScore,
-                max: theoryTotal,
-                feedback: feedback || `Theory: ${tScore}/${theoryTotal}`
-              }
-            }
-          }
-          
-          const { error: retryError } = await supabase
-            .from('exam_attempts')
-            .update(cleanData)
-            .eq('id', submissionId)
-            
-          if (retryError) throw retryError
-        } else {
-          throw updateError
-        }
-      }
+      if (updateError) throw updateError
 
-      console.log('✅ Update completed successfully')
+      toast.success(`✅ Grade saved! Score: ${examScore}/${examTotal} (${percentage}%) | Grade: ${grade}`)
 
-      // Wait a moment for triggers to execute
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      // Verify the update
-      const { data: verifiedAttempt, error: verifyError } = await supabase
-        .from('exam_attempts')
-        .select('status, total_score, percentage')
-        .eq('id', submissionId)
-        .single()
-
-      if (!verifyError && verifiedAttempt) {
-        console.log('Verified after update:', verifiedAttempt)
-        
-        if (verifiedAttempt.status === 'graded') {
-          toast.success(`✅ Grade saved! Status: GRADED | Score: ${totalScore}/${totalMarks} (${percentage}%) | Grade: ${grade}`)
-        } else {
-          toast.warning(`Scores saved but status is ${verifiedAttempt.status}`)
-        }
-      } else {
-        toast.success(`✅ Grade saved! Score: ${totalScore}/${totalMarks} (${percentage}%) - Grade: ${grade}`)
-      }
-
-      // Try to update CA scores if table exists
-      try {
-        const { data: existingCA } = await supabase
-          .from('ca_scores')
-          .select('*')
-          .eq('student_id', attempt.student_id)
-          .eq('exam_id', attempt.exam_id)
-          .maybeSingle()
-
-        if (existingCA) {
-          await supabase
-            .from('ca_scores')
-            .update({
-              exam_score: totalScore,
-              total_score: (existingCA.ca1_score || 0) + (existingCA.ca2_score || 0) + totalScore,
-              grade: grade,
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', existingCA.id)
-        }
-      } catch (caError) {
-        console.log('CA scores table not found or error updating:', caError)
-      }
-
-      // Update term progress
       await updateTermProgress(attempt.student_id, attempt.student_class)
 
-      // Navigate back after delay
       setTimeout(() => {
         router.push(`/staff/exams/${examId}/submissions`)
         router.refresh()
@@ -479,13 +425,12 @@ export default function GradeSubmissionPage() {
 
   const objScore = Math.round(Number(attempt.objective_score) || 0)
   const tScore = hasTheory ? Math.round(parseFloat(theoryScore) || 0) : 0
-  const total = objScore + tScore
-  const totalMax = hasTheory ? (objTotal + theoryMax) : objTotal
-  const pct = totalMax > 0 ? Math.round((total / totalMax) * 100) : 0
+  const examScore = objScore + tScore
+  const pct = examTotal > 0 ? Math.round((examScore / examTotal) * 100) : 0
   const grade = getWAECGrade(pct)
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 p-4 sm:p-6">
+    <div className="max-w-4xl mx-auto space-y-6 p-4 sm:p-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -521,47 +466,59 @@ export default function GradeSubmissionPage() {
         </CardContent>
       </Card>
 
-      {/* Theory Questions & Answers - Only if has theory */}
+      {/* Theory Questions - Full Display with Tailwind Styling */}
       {hasTheory && theoryQuestions.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-            <PenTool className="h-4 w-4 text-purple-500" /> Theory Questions & Answers
-          </h3>
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+            <Brain className="h-5 w-5 text-purple-600" />
+            <h2 className="text-lg font-semibold text-slate-800">Theory Questions</h2>
+            <Badge className="bg-purple-100 text-purple-700 ml-2">{theoryQuestions.length} Questions</Badge>
+          </div>
+          <p className="text-sm text-slate-500 -mt-2">Review student answers below. Enter total theory score in the scoring section.</p>
+          
           {theoryQuestions.map((q, idx) => {
             const answer = studentAnswers[q.id] || attempt.theory_answers?.[q.id] || 'No answer provided.'
-            const isExpanded = expandedQuestions[q.id] || false
+            const isExpanded = expandedQuestions[q.id] || true // Default expanded for better visibility
+            
             return (
-              <Card key={q.id} className="border-0 shadow-sm overflow-hidden">
-                <button
+              <Card key={q.id} className="border border-slate-200 shadow-sm rounded-xl overflow-hidden hover:shadow-md transition-shadow">
+                {/* Question Header */}
+                <div 
+                  className="bg-gradient-to-r from-slate-50 to-white px-5 py-4 border-b border-slate-200 cursor-pointer hover:bg-slate-100 transition-colors"
                   onClick={() => toggleQuestion(q.id)}
-                  className="w-full p-4 flex items-start justify-between gap-3 text-left hover:bg-slate-50 transition-colors"
                 >
-                  <div className="flex-1 min-w-0">
-                    <Badge className="bg-purple-100 text-purple-700 text-[10px] mb-1">
-                      Q{idx + 1} • {q.points} marks
-                    </Badge>
-                    <p className="text-sm font-medium text-slate-800 line-clamp-2">{q.question}</p>
-                    {!isExpanded && (
-                      <p className="text-xs text-slate-400 mt-1 truncate">
-                        Answer: {typeof answer === 'string' ? answer.substring(0, 80) : 'See answer...'}
-                        {typeof answer === 'string' && answer.length > 80 ? '...' : ''}
-                      </p>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge className="bg-purple-100 text-purple-700 text-xs">
+                          Question {idx + 1}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {q.points} marks
+                        </Badge>
+                      </div>
+                      <div className="text-sm font-medium text-slate-800 leading-relaxed">
+                        {renderContent(q.question)}
+                      </div>
+                    </div>
+                    {isExpanded ? (
+                      <ChevronUp className="h-5 w-5 text-slate-400 shrink-0 mt-1" />
+                    ) : (
+                      <ChevronDown className="h-5 w-5 text-slate-400 shrink-0 mt-1" />
                     )}
                   </div>
-                  {isExpanded ? (
-                    <ChevronUp className="h-5 w-5 text-slate-400 shrink-0" />
-                  ) : (
-                    <ChevronDown className="h-5 w-5 text-slate-400 shrink-0" />
-                  )}
-                </button>
+                </div>
+                
+                {/* Student Answer (Expanded) */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t bg-slate-50/50">
-                    <div className="pt-3">
-                      <p className="text-xs font-medium text-slate-500 mb-1">Student Answer:</p>
-                      <div className="bg-white rounded-lg p-3 border">
-                        <p className="text-sm text-slate-800 whitespace-pre-wrap">
-                          {typeof answer === 'string' ? answer : JSON.stringify(answer, null, 2)}
-                        </p>
+                  <div className="px-5 py-4 bg-slate-50/30">
+                    <div className="flex items-start gap-2 mb-3">
+                      <FileText className="h-4 w-4 text-slate-400 mt-0.5" />
+                      <p className="text-sm font-medium text-slate-700">Student's Answer:</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-4 border border-slate-200 shadow-sm">
+                      <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                        {typeof answer === 'string' ? renderContent(answer) : JSON.stringify(answer, null, 2)}
                       </div>
                     </div>
                   </div>
@@ -584,114 +541,121 @@ export default function GradeSubmissionPage() {
       )}
 
       {/* Scoring Section */}
-      <Card className="border-0 shadow-sm">
-        <CardContent className="p-5 sm:p-6 space-y-5">
-          {/* Objective Score */}
-          <div className="bg-blue-50 rounded-xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-blue-500 flex items-center justify-center">
-                <Target className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-blue-900">Objective Score (MCQ)</p>
-                <p className="text-xs text-blue-600">Auto-graded</p>
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+          <Award className="h-5 w-5 text-emerald-600" />
+          <h2 className="text-lg font-semibold text-slate-800">Grading</h2>
+        </div>
+
+        <Card className="border-0 shadow-sm rounded-xl">
+          <CardContent className="p-5 sm:p-6 space-y-5">
+            {/* Objective Score - Auto */}
+            <div className="bg-gradient-to-r from-blue-50 to-white rounded-xl p-4 border border-blue-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-blue-500 flex items-center justify-center shadow-sm">
+                    <Target className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-blue-900">Objective Score (MCQ)</p>
+                    <p className="text-xs text-blue-600">Auto-graded from student's answers</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-3xl font-bold text-blue-700">{objScore}</span>
+                  <span className="text-lg text-blue-500">/{objectiveMax}</span>
+                </div>
               </div>
             </div>
-            <span className="text-2xl font-bold text-blue-700">{objScore}/{objTotal}</span>
-          </div>
 
-          {/* Theory Score - Only if has theory */}
-          {hasTheory && (
-            <div className="bg-purple-50 rounded-xl p-4">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="h-10 w-10 rounded-lg bg-purple-500 flex items-center justify-center">
-                  <PenTool className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold text-purple-900">Theory Score</p>
-                  <p className="text-xs text-purple-600">
-                    Enter score out of {theoryMax} (rounded to whole number)
-                  </p>
+            {/* Theory Score - Simple Input */}
+            {hasTheory && (
+              <div className="bg-gradient-to-r from-purple-50 to-white rounded-xl p-4 border border-purple-100">
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-xl bg-purple-500 flex items-center justify-center shadow-sm">
+                      <PenTool className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-purple-900">Theory Score</p>
+                      <p className="text-xs text-purple-600">Enter the student's total theory score</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={theoryScore}
+                      onChange={(e) => setTheoryScore(e.target.value)}
+                      placeholder="Score"
+                      className="h-12 w-28 text-center text-lg font-bold bg-white border-purple-200 focus:border-purple-400"
+                    />
+                    <span className="text-sm text-purple-500 font-medium">/ {theoryMax}</span>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Input
-                  type="number"
-                  min="0"
-                  max={theoryMax}
-                  step="0.5"
-                  value={theoryScore}
-                  onChange={(e) => setTheoryScore(e.target.value)}
-                  placeholder={`0-${theoryMax}`}
-                  className="h-12 text-lg font-bold text-center w-32 bg-white"
+            )}
+
+            {/* Feedback */}
+            {hasTheory && (
+              <div>
+                <Label className="text-sm font-medium text-slate-700">Feedback (optional)</Label>
+                <Textarea
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="Provide overall feedback to the student..."
+                  className="mt-2 rounded-xl border-slate-200 focus:border-purple-300"
+                  rows={3}
                 />
-                <span className="text-lg text-purple-600 font-semibold">/ {theoryMax}</span>
-                {theoryScore && (
-                  <Badge className="bg-purple-100 text-purple-700">
-                    Rounded: {Math.round(parseFloat(theoryScore) || 0)}
-                  </Badge>
-                )}
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Feedback - Only show if exam has theory */}
-          {hasTheory && (
-            <div>
-              <Label className="text-sm font-medium">Feedback (optional)</Label>
-              <Textarea
-                value={feedback}
-                onChange={(e) => setFeedback(e.target.value)}
-                placeholder="Overall feedback for the student..."
-                className="mt-1.5"
-                rows={3}
-              />
+            {/* Final Score */}
+            <div className="bg-gradient-to-r from-emerald-50 to-white rounded-xl p-4 border border-emerald-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-xl bg-emerald-500 flex items-center justify-center shadow-sm">
+                    <Award className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-semibold text-emerald-900">Exam Total</p>
+                    <p className="text-xs text-emerald-600">Objective + Theory = {examTotal} marks</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-emerald-700">{examScore}</span>
+                    <span className="text-lg text-emerald-500">/{examTotal}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1 justify-end">
+                    <span className="text-sm font-medium text-emerald-600">{pct}%</span>
+                    <Badge className={cn("text-xs", pct >= 40 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700')}>
+                      {grade}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
 
-          {/* Final Score */}
-          <div className="bg-emerald-50 rounded-xl p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-lg bg-emerald-500 flex items-center justify-center">
-                <Award className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <p className="font-semibold text-emerald-900">Final Score</p>
-                <p className="text-xs text-emerald-600">
-                  {hasTheory ? 'Objective + Theory' : 'Objective Score'}
-                </p>
-              </div>
+            {/* CA Note */}
+            <div className="bg-slate-50 rounded-xl p-3 text-center border border-slate-100">
+              <p className="text-xs text-slate-500">
+                💡 CA scores (40 marks) are managed separately in the CA Scores section
+              </p>
             </div>
-            <div className="text-right">
-              <span className="text-2xl font-bold text-emerald-700">{total}</span>
-              <span className="text-lg text-emerald-500">/{totalMax}</span>
-              <p className="text-sm font-medium text-emerald-600">{pct}%</p>
-              <Badge className={cn(
-                "mt-1 text-xs",
-                pct >= 50 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-              )}>
-                {grade}
-              </Badge>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Save Button */}
       <Button
         onClick={handleSave}
         disabled={saving || (hasTheory && !theoryScore)}
-        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base"
+        className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-base rounded-xl shadow-lg hover:shadow-xl transition-all"
       >
-        {saving ? (
-          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        ) : (
-          <Save className="mr-2 h-5 w-5" />
-        )}
-        {saving
-          ? 'Saving...'
-          : `Save Grade — ${total}/${totalMax} (${pct}%) — ${grade}`
-        }
+        {saving ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+        {saving ? 'Saving...' : `Save Grade — ${examScore}/${examTotal} (${pct}%) — ${grade}`}
       </Button>
     </div>
   )
