@@ -1,4 +1,5 @@
-// src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - FULLY FIXED
+// src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - FULLY UPDATED
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -13,10 +14,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { X, Plus, Layers } from 'lucide-react'
+import { Textarea } from '@/components/ui/textarea'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { X, Plus, Layers, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import { RichTextEditor } from '@/components/ui/rich-text-editor'
-import { SubQuestionItem } from './SubQuestionItem'
 import type { TheoryQuestion, TheorySubQuestion } from './types'
 
 interface TheoryQuestionFormDialogProps {
@@ -24,13 +25,15 @@ interface TheoryQuestionFormDialogProps {
   onOpenChange: (open: boolean) => void
   initialData?: Partial<TheoryQuestion>
   onSave: (data: Partial<TheoryQuestion>) => void
+  onCancel?: () => void
 }
 
 export function TheoryQuestionFormDialog({
   open,
   onOpenChange,
   initialData,
-  onSave
+  onSave,
+  onCancel
 }: TheoryQuestionFormDialogProps) {
   const [questionText, setQuestionText] = useState('')
   const [points, setPoints] = useState(10)
@@ -39,6 +42,7 @@ export function TheoryQuestionFormDialog({
   const [subQuestions, setSubQuestions] = useState<TheorySubQuestion[]>([])
   const [keywordInput, setKeywordInput] = useState('')
   const [useSubQuestions, setUseSubQuestions] = useState(false)
+  const [isDraft, setIsDraft] = useState(true)
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -49,9 +53,20 @@ export function TheoryQuestionFormDialog({
       setModelAnswer(initialData?.model_answer || '')
       setSubQuestions(initialData?.sub_questions || [])
       setUseSubQuestions(!!initialData?.sub_questions?.length)
+      setIsDraft(initialData?.is_draft !== undefined ? initialData.is_draft : true)
       setKeywordInput('')
     }
   }, [open, initialData])
+
+  // Check if question is complete
+  const isQuestionComplete = (): boolean => {
+    if (!questionText.trim()) return false
+    if (useSubQuestions) {
+      return subQuestions.length > 0 && 
+             subQuestions.every(sq => sq.text.trim() !== '' && sq.points > 0)
+    }
+    return points > 0
+  }
 
   const handleAddKeyword = () => {
     const keyword = keywordInput.trim().toLowerCase()
@@ -80,13 +95,10 @@ export function TheoryQuestionFormDialog({
   }
 
   const handleAddSubQuestion = () => {
-    const newId = Date.now().toString()
     setSubQuestions([...subQuestions, {
-      id: newId,
+      id: Date.now().toString(),
       text: '',
-      points: 5,
-      keywords: [],
-      model_answer: ''
+      points: 5
     }])
   }
 
@@ -100,14 +112,42 @@ export function TheoryQuestionFormDialog({
     setSubQuestions(subQuestions.filter((_, i) => i !== index))
   }
 
-  const handleSubmit = () => {
+  const handleClose = () => {
+    onOpenChange(false)
+    if (onCancel) onCancel()
+  }
+
+  const handleSubmit = (saveAsDraft: boolean = false) => {
+    // If saving as draft, only require question text
+    if (saveAsDraft) {
+      if (!questionText.trim()) {
+        toast.error('Please enter a question text')
+        return
+      }
+      
+      onSave({
+        question_text: questionText,
+        points: points,
+        sub_questions: subQuestions,
+        keywords: keywords.length > 0 ? keywords : undefined,
+        model_answer: modelAnswer.trim() || undefined,
+        is_draft: true
+      })
+      return
+    }
+
+    // Full validation for complete question
     if (!questionText.trim()) {
       toast.error('Please enter a question')
       return
     }
     
     if (useSubQuestions) {
-      // Validate sub-questions
+      if (subQuestions.length === 0) {
+        toast.error('Please add at least one sub-question')
+        return
+      }
+      
       for (let i = 0; i < subQuestions.length; i++) {
         const sq = subQuestions[i]
         if (!sq.text.trim()) {
@@ -120,7 +160,6 @@ export function TheoryQuestionFormDialog({
         }
       }
       
-      // Calculate total points from sub-questions
       const totalPoints = subQuestions.reduce((sum, sq) => sum + sq.points, 0)
       
       onSave({
@@ -128,7 +167,8 @@ export function TheoryQuestionFormDialog({
         points: totalPoints,
         sub_questions: subQuestions,
         keywords: keywords.length > 0 ? keywords : undefined,
-        model_answer: modelAnswer.trim() || undefined
+        model_answer: modelAnswer.trim() || undefined,
+        is_draft: false
       })
     } else {
       if (points < 1) {
@@ -144,28 +184,50 @@ export function TheoryQuestionFormDialog({
         question_text: questionText,
         points,
         keywords: keywords.length > 0 ? keywords : undefined,
-        model_answer: modelAnswer.trim() || undefined
+        model_answer: modelAnswer.trim() || undefined,
+        is_draft: false
       })
     }
-    
-    // Reset form
-    setQuestionText('')
-    setPoints(10)
-    setKeywords([])
-    setModelAnswer('')
-    setSubQuestions([])
-    setUseSubQuestions(false)
-    setKeywordInput('')
   }
 
+  const complete = isQuestionComplete()
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData?.id ? 'Edit Theory Question' : 'Add Theory Question'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {initialData?.id ? 'Edit Theory Question' : 'Add Theory Question'}
+            {initialData?.is_draft && (
+              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                Draft
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-5 py-4">
+          {/* Status Alert */}
+          {!complete && (
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700 text-sm">
+                {useSubQuestions 
+                  ? 'Add sub-questions and points to mark as complete.'
+                  : 'Add points to mark as complete.'}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {complete && (
+            <Alert className="bg-emerald-50 border-emerald-200">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <AlertDescription className="text-emerald-700 text-sm">
+                ✓ Question is complete and ready for the exam.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Question Type Toggle */}
           <div className="flex gap-2 p-1 bg-slate-100 rounded-lg w-fit">
             <Button
@@ -192,20 +254,16 @@ export function TheoryQuestionFormDialog({
           {/* Question Text */}
           <div>
             <Label className="text-sm font-semibold">Question Text *</Label>
-            <p className="text-xs text-slate-400 mb-2">
-              Supports: Bold, Italic, Lists, Images, Tables, and mathematical formulas
-            </p>
-            <RichTextEditor
-              content={questionText}
-              onChange={setQuestionText}
+            <Textarea
+              value={questionText}
+              onChange={(e) => setQuestionText(e.target.value)}
               placeholder="Enter your question here..."
-              minHeight="150px"
+              className="min-h-[120px] mt-1.5"
             />
           </div>
 
           {!useSubQuestions ? (
             <>
-              {/* Points for single question */}
               <div>
                 <Label className="text-sm font-semibold">Points</Label>
                 <Input 
@@ -258,20 +316,19 @@ export function TheoryQuestionFormDialog({
               {/* Model Answer */}
               <div>
                 <Label className="text-sm font-semibold">Model Answer (Optional)</Label>
-                <RichTextEditor
-                  content={modelAnswer}
-                  onChange={setModelAnswer}
+                <Textarea
+                  value={modelAnswer}
+                  onChange={(e) => setModelAnswer(e.target.value)}
                   placeholder="Enter a model answer or grading rubric..."
-                  minHeight="100px"
+                  className="min-h-[100px] mt-1.5"
                 />
               </div>
             </>
           ) : (
             <>
-              {/* Sub-questions Section */}
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <Label className="text-sm font-semibold">Sub-questions</Label>
+                  <Label className="text-sm font-semibold">Sub-questions *</Label>
                   <Button type="button" size="sm" variant="outline" onClick={handleAddSubQuestion}>
                     <Plus className="h-3 w-3 mr-1" /> Add Sub-question
                   </Button>
@@ -290,14 +347,40 @@ export function TheoryQuestionFormDialog({
                 ) : (
                   <div className="space-y-4">
                     {subQuestions.map((sq, idx) => (
-                      <SubQuestionItem
-                        key={sq.id}
-                        subQuestion={sq}
-                        index={idx + 1}
-                        onUpdate={(data: Partial<TheorySubQuestion>) => handleUpdateSubQuestion(idx, data)}
-                        onDelete={() => handleDeleteSubQuestion(idx)}
-                      />
+                      <div key={sq.id} className="p-4 border rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <Label className="font-medium">
+                            Sub-question {String.fromCharCode(97 + idx)}
+                          </Label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteSubQuestion(idx)}
+                            className="text-red-500"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <Textarea
+                          value={sq.text}
+                          onChange={(e) => handleUpdateSubQuestion(idx, { text: e.target.value })}
+                          placeholder={`Enter sub-question ${String.fromCharCode(97 + idx)}`}
+                          className="min-h-[60px]"
+                        />
+                        <div className="mt-2">
+                          <Label className="text-xs">Points</Label>
+                          <Input
+                            type="number"
+                            value={sq.points}
+                            onChange={(e) => handleUpdateSubQuestion(idx, { points: parseInt(e.target.value) || 1 })}
+                            min={1}
+                            className="w-24 mt-1"
+                          />
+                        </div>
+                      </div>
                     ))}
+                    
                     <div className="p-3 bg-slate-50 rounded-lg mt-3">
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">Total Points:</span>
@@ -313,10 +396,23 @@ export function TheoryQuestionFormDialog({
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700">
-            {initialData?.id ? 'Update' : 'Add'} Question
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          
+          <Button 
+            variant="secondary" 
+            onClick={() => handleSubmit(true)}
+            disabled={!questionText.trim()}
+          >
+            Save as Draft
+          </Button>
+          
+          <Button 
+            onClick={() => handleSubmit(false)} 
+            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={!complete}
+          >
+            {initialData?.id ? 'Update' : 'Add'} Complete Question
           </Button>
         </DialogFooter>
       </DialogContent>

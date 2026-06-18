@@ -37,6 +37,7 @@ export interface Question {
   correct_answer: string
   points: number
   order_number: number
+  is_draft?: boolean  // ✅ ADDED: Track draft status
   created_at?: string
   updated_at?: string
 }
@@ -48,6 +49,7 @@ export interface TheoryQuestion {
   type: 'theory'
   points: number
   order_number: number
+  is_draft?: boolean  // ✅ ADDED: Track draft status
   created_at?: string
   updated_at?: string
   sub_questions?: TheorySubQuestion[]

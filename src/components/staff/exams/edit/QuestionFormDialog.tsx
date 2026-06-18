@@ -1,4 +1,5 @@
-// src/components/staff/exams/edit/QuestionFormDialog.tsx - FIXED
+// src/components/staff/exams/edit/QuestionFormDialog.tsx - FULLY UPDATED
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -14,27 +15,31 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { X, Plus } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { X, Plus, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { toast } from 'sonner'
-import type { Question } from './types'  // ✅ Make sure Question is exported from types
+import type { Question } from './types'
 
 interface QuestionFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   initialData?: Partial<Question>
   onSave: (data: Partial<Question>) => void
+  onCancel?: () => void
 }
 
 export function QuestionFormDialog({
   open,
   onOpenChange,
   initialData,
-  onSave
+  onSave,
+  onCancel
 }: QuestionFormDialogProps) {
   const [questionText, setQuestionText] = useState('')
   const [options, setOptions] = useState<string[]>(['', '', '', ''])
   const [correctAnswer, setCorrectAnswer] = useState('')
-  const [points, setPoints] = useState(1)
+  const [points, setPoints] = useState<number>(1)
+  const [isDraft, setIsDraft] = useState(true)
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -43,8 +48,16 @@ export function QuestionFormDialog({
       setOptions(initialData?.options || ['', '', '', ''])
       setCorrectAnswer(initialData?.correct_answer || '')
       setPoints(initialData?.points || 1)
+      setIsDraft(initialData?.is_draft !== undefined ? initialData.is_draft : true)
     }
   }, [open, initialData])
+
+  // Check if question is complete
+  const isQuestionComplete = (): boolean => {
+    return questionText.trim() !== '' && 
+           options.some(opt => opt.trim() !== '') &&
+           correctAnswer.trim() !== ''
+  }
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options]
@@ -67,13 +80,30 @@ export function QuestionFormDialog({
     }
     const newOptions = options.filter((_, i) => i !== index)
     setOptions(newOptions)
-    // If correct answer was removed, clear it
     if (correctAnswer === options[index]) {
       setCorrectAnswer('')
     }
   }
 
-  const handleSubmit = () => {
+  const handleSubmit = (saveAsDraft: boolean = false) => {
+    // If saving as draft, only require question text
+    if (saveAsDraft) {
+      if (!questionText.trim()) {
+        toast.error('Please enter a question text')
+        return
+      }
+      
+      onSave({
+        question_text: questionText.trim(),
+        options: options.filter(opt => opt.trim()),
+        correct_answer: correctAnswer || '',
+        points: points,
+        is_draft: true
+      })
+      return
+    }
+
+    // Full validation for complete question
     if (!questionText.trim()) {
       toast.error('Please enter a question')
       return
@@ -99,22 +129,59 @@ export function QuestionFormDialog({
       question_text: questionText.trim(),
       options: validOptions,
       correct_answer: correctAnswer,
-      points
+      points: points,
+      is_draft: false
     })
   }
 
+  const handleClose = () => {
+    onOpenChange(false)
+    if (onCancel) onCancel()
+  }
+
+  const complete = isQuestionComplete()
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData?.id ? 'Edit Question' : 'Add Question'}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            {initialData?.id ? 'Edit Objective Question' : 'Add Objective Question'}
+            {initialData?.is_draft && (
+              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                Draft
+              </Badge>
+            )}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-5 py-4">
+          {/* Status Alert */}
+          {!complete && (
+            <Alert className="bg-amber-50 border-amber-200">
+              <AlertCircle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700 text-sm">
+                This question is incomplete. Add options and correct answer to mark as complete.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {complete && (
+            <Alert className="bg-emerald-50 border-emerald-200">
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <AlertDescription className="text-emerald-700 text-sm">
+                ✓ Question is complete and ready for the exam.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Question Text */}
           <div>
-            <Label className="text-sm font-semibold">Question Text *</Label>
+            <Label htmlFor="question-text" className="text-sm font-semibold">
+              Question Text <span className="text-red-500">*</span>
+            </Label>
             <Textarea
+              id="question-text"
               value={questionText}
               onChange={(e) => setQuestionText(e.target.value)}
               placeholder="Enter your question here..."
@@ -124,7 +191,9 @@ export function QuestionFormDialog({
 
           {/* Options */}
           <div>
-            <Label className="text-sm font-semibold">Options *</Label>
+            <Label className="text-sm font-semibold">
+              Options <span className="text-red-500">*</span>
+            </Label>
             <p className="text-xs text-slate-400 mb-2">
               Enter the possible answers. Minimum 2 options, maximum 6.
             </p>
@@ -169,7 +238,7 @@ export function QuestionFormDialog({
 
           {/* Correct Answer */}
           <div>
-            <Label className="text-sm font-semibold">Correct Answer *</Label>
+            <Label className="text-sm font-semibold">Correct Answer</Label>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1.5">
               {options.map((opt, idx) => (
                 opt.trim() && (
@@ -201,19 +270,34 @@ export function QuestionFormDialog({
             <Input
               type="number"
               value={points}
-              onChange={(e) => setPoints(parseInt(e.target.value) || 1)}
-              min={1}
-              max={10}
+              onChange={(e) => setPoints(parseFloat(e.target.value) || 1)}
+              min={0.5}
+              step={0.5}
               className="mt-1.5 w-32"
             />
             <p className="text-xs text-slate-400 mt-1">Recommended: 1 point per question</p>
           </div>
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={handleSubmit} className="bg-emerald-600 hover:bg-emerald-700">
-            {initialData?.id ? 'Update' : 'Add'} Question
+        <DialogFooter className="gap-2">
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          
+          {/* Save as Draft button */}
+          <Button 
+            variant="secondary" 
+            onClick={() => handleSubmit(true)}
+            disabled={!questionText.trim()}
+          >
+            Save as Draft
+          </Button>
+          
+          {/* Save Complete button */}
+          <Button 
+            onClick={() => handleSubmit(false)} 
+            className="bg-emerald-600 hover:bg-emerald-700"
+            disabled={!complete}
+          >
+            {initialData?.id ? 'Update' : 'Add'} Complete Question
           </Button>
         </DialogFooter>
       </DialogContent>

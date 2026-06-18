@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/EditExamPage.tsx - WITH BULK IMPORT SUPPORT
+// src/components/staff/exams/edit/EditExamPage.tsx - COMPLETE WORKING VERSION
 
 'use client'
 
@@ -8,20 +8,28 @@ import { supabase } from '@/lib/supabase'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from 'sonner'
-import { Eye, Calculator } from 'lucide-react'
+import { Eye, Calculator, AlertCircle, Plus, Edit, Trash2, RefreshCw, FileQuestion } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { ExamHeader } from './ExamHeader'
 import { ExamDetailsTab } from './ExamDetailsTab'
-import { ObjectiveQuestionsTab } from './ObjectiveQuestionsTab'
-import { TheoryQuestionsTab } from './TheoryQuestionsTab'
 import { PreviewTab } from './PreviewTab'
 import { QuestionFormDialog } from './QuestionFormDialog'
 import { TheoryQuestionFormDialog } from './TheoryQuestionFormDialog'
 import type { Exam, Question, TheoryQuestion, ExamDetailsForm } from './types'
-import { cn } from '@/lib/utils'
 
 // Constants
 const CURRENT_TERM = 'third'
@@ -63,14 +71,15 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('details')
+  const [activeTab, setActiveTab] = useState('questions')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
   
   const [exam, setExam] = useState<Exam | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([])
   const [hasTheory, setHasTheory] = useState(false)
   
-  // Default points values
   const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] = useState<number>(1)
   const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] = useState<number>(5)
   
@@ -94,14 +103,14 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const [showTheoryDialog, setShowTheoryDialog] = useState(false)
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
   const [editingTheoryQuestion, setEditingTheoryQuestion] = useState<TheoryQuestion | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [questionToDelete, setQuestionToDelete] = useState<{ id: string; type: 'objective' | 'theory' } | null>(null)
 
-  // Computed values
   const availableSubjects = useMemo(() => {
     if (!examDetails.class) return []
     return examDetails.class.startsWith('JSS') ? JSS_SUBJECTS : SS_SUBJECTS
   }, [examDetails.class])
 
-  // DYNAMIC CALCULATIONS
   const objectiveCount = questions.length
   const theoryCount = theoryQuestions.length
   const totalQuestions = objectiveCount + theoryCount
@@ -111,114 +120,91 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const totalExamPoints = totalObjectivePoints + totalTheoryPoints
   const passMarkPercentage = totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0
 
-  // Update all existing questions when points per question changes
-  const updateAllObjectivePoints = useCallback(async () => {
-    if (questions.length === 0) return
-    
-    const { error } = await supabase
-      .from('questions')
-      .update({ points: objectivePointsPerQuestion })
-      .eq('exam_id', examId)
-      .eq('type', 'objective')
+  // Load questions
+  const loadQuestions = useCallback(async () => {
+    try {
+      console.log('Loading questions...')
+      
+      const { data: allQuestions, error } = await supabase
+        .from('questions')
+        .select('*')
+        .eq('exam_id', examId)
+        .order('order_number', { ascending: true })
 
-    if (error) {
-      console.error('Error updating question points:', error)
-      toast.error('Failed to update question points')
-      return
+      if (error) {
+        console.error('Error loading questions:', error)
+        return
+      }
+
+      console.log(`Loaded ${allQuestions?.length || 0} questions`)
+
+      if (allQuestions && allQuestions.length > 0) {
+        const objectiveQs = allQuestions.filter(q => q.type === 'objective')
+        const theoryQs = allQuestions.filter(q => q.type === 'theory')
+        
+        if (objectiveQs.length > 0) {
+          const parsed = objectiveQs.map(q => ({
+            ...q,
+            options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || []),
+            points: typeof q.points === 'string' ? parseFloat(q.points) : (q.points || 1)
+          }))
+          setQuestions(parsed as Question[])
+          if (parsed[0]?.points) {
+            setObjectivePointsPerQuestion(parsed[0].points)
+          }
+        } else {
+          setQuestions([])
+        }
+        
+        if (theoryQs.length > 0) {
+          const parsed = theoryQs.map(q => ({
+            ...q,
+            points: typeof q.points === 'string' ? parseFloat(q.points) : (q.points || 5)
+          }))
+          setTheoryQuestions(parsed as TheoryQuestion[])
+          if (parsed[0]?.points) {
+            setTheoryPointsPerQuestion(parsed[0].points)
+          }
+        } else {
+          setTheoryQuestions([])
+        }
+      } else {
+        setQuestions([])
+        setTheoryQuestions([])
+      }
+    } catch (error) {
+      console.error('Error loading questions:', error)
     }
-    
-    setQuestions(prev => prev.map(q => ({ ...q, points: objectivePointsPerQuestion })))
-    toast.success(`Updated ${questions.length} objective questions to ${objectivePointsPerQuestion} point(s) each`)
-  }, [examId, questions.length, objectivePointsPerQuestion])
-
-  const updateAllTheoryPoints = useCallback(async () => {
-    if (theoryQuestions.length === 0) return
-    
-    const { error } = await supabase
-      .from('questions')
-      .update({ points: theoryPointsPerQuestion })
-      .eq('exam_id', examId)
-      .eq('type', 'theory')
-
-    if (error) {
-      console.error('Error updating theory points:', error)
-      toast.error('Failed to update theory points')
-      return
-    }
-    
-    setTheoryQuestions(prev => prev.map(q => ({ ...q, points: theoryPointsPerQuestion })))
-    toast.success(`Updated ${theoryQuestions.length} theory questions to ${theoryPointsPerQuestion} point(s) each`)
-  }, [examId, theoryQuestions.length, theoryPointsPerQuestion])
-
-  // BULK IMPORT HANDLERS
-  const handleBulkAddMCQs = useCallback(async (newQuestions: Partial<Question>[]) => {
-    const questionsToAdd = newQuestions.map((q, index) => ({
-      exam_id: examId,
-      question_text: q.question_text,
-      type: 'objective' as const,
-      options: q.options || [],
-      correct_answer: q.correct_answer,
-      points: objectivePointsPerQuestion,
-      order_number: questions.length + index + 1
-    }))
-
-    const { data, error } = await supabase
-      .from('questions')
-      .insert(questionsToAdd)
-      .select()
-
-    if (error) {
-      console.error('Error bulk adding MCQs:', error)
-      toast.error('Failed to import questions')
-      return
-    }
-
-    const parsedQuestions = (data || []).map(q => ({
-      ...q,
-      options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || [])
-    }))
-
-    setQuestions(prev => [...prev, ...parsedQuestions as Question[]])
-    toast.success(`✅ Successfully imported ${newQuestions.length} MCQ(s)`)
-  }, [examId, objectivePointsPerQuestion, questions.length])
-
-  const handleBulkAddTheory = useCallback(async (newQuestions: Partial<TheoryQuestion>[]) => {
-    const questionsToAdd = newQuestions.map((q, index) => ({
-      exam_id: examId,
-      question_text: q.question_text,
-      type: 'theory' as const,
-      points: theoryPointsPerQuestion,
-      order_number: theoryQuestions.length + index + 1,
-      sub_questions: q.sub_questions || [],
-      keywords: q.keywords || [],
-      model_answer: q.model_answer || ''
-    }))
-
-    const { data, error } = await supabase
-      .from('questions')
-      .insert(questionsToAdd)
-      .select()
-
-    if (error) {
-      console.error('Error bulk adding theory questions:', error)
-      toast.error('Failed to import theory questions')
-      return
-    }
-
-    setTheoryQuestions(prev => [...prev, ...(data || []) as TheoryQuestion[]])
-    toast.success(`✅ Successfully imported ${newQuestions.length} theory question(s)`)
-  }, [examId, theoryPointsPerQuestion, theoryQuestions.length])
+  }, [examId])
 
   // Load exam data
   const loadExamData = useCallback(async () => {
     try {
+      setLoading(true)
+      setLoadError(null)
+      
+      console.log('Loading exam with ID:', examId)
+      
       const { data: examData, error: examError } = await supabase
         .from('exams')
         .select('*')
         .eq('id', examId)
         .single()
 
-      if (examError) throw examError
+      if (examError) {
+        console.error('Exam load error:', examError)
+        setLoadError(`Failed to load exam: ${examError.message}`)
+        throw examError
+      }
+      
+      if (!examData) {
+        setLoadError('Exam not found')
+        throw new Error('Exam not found')
+      }
+      
+      console.log('Exam data loaded:', examData)
+      console.log('📝 Term from DB:', examData.term)
+      console.log('📝 Session from DB:', examData.session_year)
       
       const examWithDefaults = {
         ...examData,
@@ -231,6 +217,13 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       
       setExam(examWithDefaults as Exam)
       setHasTheory(examData.has_theory || false)
+      
+      const examTerm = examData.term || CURRENT_TERM
+      const examSession = examData.session_year || CURRENT_SESSION
+      
+      console.log('📝 Using term:', examTerm, '→', TERM_NAMES[examTerm])
+      console.log('📝 Using session:', examSession)
+      
       setExamDetails({
         title: examData.title || '',
         subject: examData.subject || '',
@@ -242,63 +235,30 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         shuffle_options: examWithDefaults.shuffle_options,
         negative_marking: examWithDefaults.negative_marking,
         negative_marking_value: examWithDefaults.negative_marking_value,
-        term: examData.term || CURRENT_TERM,
-        session_year: examData.session_year || CURRENT_SESSION,
+        term: examTerm,
+        session_year: examSession,
         target_audience: examData.target_audience || 'all'
       })
 
-      // Load objective questions
-      const { data: questionsData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('exam_id', examId)
-        .eq('type', 'objective')
-        .order('order_number', { ascending: true })
-
-      if (questionsData && questionsData.length > 0) {
-        const parsedQuestions = questionsData.map(q => ({
-          ...q,
-          options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || [])
-        }))
-        setQuestions(parsedQuestions as Question[])
-        
-        if (parsedQuestions[0]?.points) {
-          setObjectivePointsPerQuestion(parsedQuestions[0].points)
-        }
-      }
-
-      // Load theory questions if enabled
-      if (examData.has_theory) {
-        const { data: theoryData } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('exam_id', examId)
-          .eq('type', 'theory')
-          .order('order_number', { ascending: true })
-
-        if (theoryData && theoryData.length > 0) {
-          setTheoryQuestions(theoryData as TheoryQuestion[])
-          if (theoryData[0]?.points) {
-            setTheoryPointsPerQuestion(theoryData[0].points)
-          }
-        }
-      }
+      await loadQuestions()
 
     } catch (error) {
       console.error('Error loading exam:', error)
-      toast.error('Failed to load exam')
+      toast.error('Failed to load exam data. Please refresh and try again.')
     } finally {
       setLoading(false)
     }
-  }, [examId])
+  }, [examId, loadQuestions])
 
   useEffect(() => {
-    loadExamData()
-  }, [loadExamData])
+    if (examId) {
+      loadExamData()
+    }
+  }, [examId, loadExamData])
 
-  // Update exam totals in database
+  // Update exam totals
   const updateExamTotals = useCallback(async () => {
-    if (!examId) return
+    if (!examId || loading) return
     
     try {
       const { error } = await supabase
@@ -314,14 +274,21 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     } catch (error) {
       console.error('Error updating exam totals:', error)
     }
-  }, [examId, totalQuestions, totalExamPoints])
+  }, [examId, totalQuestions, totalExamPoints, loading])
 
-  // Auto-save totals when questions or points change
   useEffect(() => {
     if (!loading && examId) {
       updateExamTotals()
     }
   }, [totalQuestions, totalExamPoints, objectivePointsPerQuestion, theoryPointsPerQuestion, loading, examId, updateExamTotals])
+
+  // Refresh questions
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true)
+    await loadQuestions()
+    setRefreshing(false)
+    toast.success('Questions refreshed')
+  }, [loadQuestions])
 
   // Save exam
   const handleSaveExam = async () => {
@@ -362,17 +329,25 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     }
   }
 
-  // Individual question handlers
+  // ===== QUESTION CRUD OPERATIONS =====
+  
+  // Add Objective Question
   const handleAddQuestion = async (data: Partial<Question>) => {
     try {
+      const isDraft = data.is_draft !== undefined ? data.is_draft : true
+      
       const newQuestion = {
         exam_id: examId,
-        question_text: data.question_text,
-        type: 'objective' as const,
-        options: data.options,
-        correct_answer: data.correct_answer,
+        question_text: data.question_text || '',
+        type: 'objective',
+        options: data.options || [],
+        correct_answer: data.correct_answer || '',
         points: objectivePointsPerQuestion,
-        order_number: questions.length + 1
+        order_number: questions.length + 1,
+        is_draft: isDraft,
+        sub_questions: [],
+        keywords: [],
+        model_answer: ''
       }
 
       const { data: result, error } = await supabase
@@ -383,76 +358,100 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
       if (error) throw error
 
-      setQuestions([...questions, { ...result, points: objectivePointsPerQuestion } as Question])
-      toast.success(`Question added (${objectivePointsPerQuestion} point${objectivePointsPerQuestion !== 1 ? 's' : ''})`)
+      const parsedResult = {
+        ...result,
+        options: typeof result.options === 'string' ? JSON.parse(result.options) : (result.options || [])
+      }
+
+      setQuestions([...questions, { ...parsedResult, points: objectivePointsPerQuestion } as Question])
+      
+      toast.success(isDraft ? 'Question saved as draft' : 'Question added successfully')
       setShowQuestionDialog(false)
       setEditingQuestion(null)
+      await loadQuestions()
     } catch (error) {
       console.error('Error adding question:', error)
       toast.error('Failed to add question')
     }
   }
 
+  // Update Objective Question
   const handleUpdateQuestion = async (questionId: string, data: Partial<Question>) => {
     try {
+      const isDraft = data.is_draft !== undefined ? data.is_draft : false
+      
       const { error } = await supabase
         .from('questions')
         .update({
           question_text: data.question_text,
           options: data.options,
           correct_answer: data.correct_answer,
-          points: data.points || objectivePointsPerQuestion
+          points: data.points || objectivePointsPerQuestion,
+          is_draft: isDraft
         })
         .eq('id', questionId)
 
       if (error) throw error
 
       setQuestions(questions.map(q => q.id === questionId ? { ...q, ...data, points: data.points || objectivePointsPerQuestion } : q))
-      toast.success('Question updated')
+      toast.success('Question updated successfully')
       setShowQuestionDialog(false)
       setEditingQuestion(null)
+      await loadQuestions()
     } catch (error) {
       console.error('Error updating question:', error)
       toast.error('Failed to update question')
     }
   }
 
-  const handleDeleteQuestion = async (questionId: string) => {
-    if (!confirm('Are you sure you want to delete this question?')) return
+  // Delete Question
+  const handleDeleteQuestion = async () => {
+    if (!questionToDelete) return
 
     try {
       const { error } = await supabase
         .from('questions')
         .delete()
-        .eq('id', questionId)
+        .eq('id', questionToDelete.id)
 
       if (error) throw error
 
-      const updatedQuestions = questions.filter(q => q.id !== questionId)
-      for (let i = 0; i < updatedQuestions.length; i++) {
-        await supabase
-          .from('questions')
-          .update({ order_number: i + 1 })
-          .eq('id', updatedQuestions[i].id)
+      if (questionToDelete.type === 'objective') {
+        setQuestions(questions.filter(q => q.id !== questionToDelete.id))
+        toast.success('Question deleted successfully')
+      } else {
+        setTheoryQuestions(theoryQuestions.filter(q => q.id !== questionToDelete.id))
+        toast.success('Theory question deleted successfully')
       }
       
-      setQuestions(updatedQuestions)
-      toast.success('Question deleted')
+      setDeleteDialogOpen(false)
+      setQuestionToDelete(null)
+      await loadQuestions()
     } catch (error) {
       console.error('Error deleting question:', error)
       toast.error('Failed to delete question')
     }
   }
 
-  // Theory question handlers
+  // ===== THEORY QUESTION CRUD OPERATIONS =====
+
+  // Add Theory Question
   const handleAddTheoryQuestion = async (data: Partial<TheoryQuestion>) => {
     try {
+      const isDraft = data.is_draft !== undefined ? data.is_draft : true
+      
       const newQuestion = {
         exam_id: examId,
-        question_text: data.question_text,
-        type: 'theory' as const,
+        question_text: data.question_text || '',
+        type: 'theory',
         points: theoryPointsPerQuestion,
-        order_number: theoryQuestions.length + 1
+        order_number: theoryQuestions.length + 1,
+        sub_questions: data.sub_questions || [],
+        keywords: data.keywords || [],
+        model_answer: data.model_answer || '',
+        is_draft: isDraft,
+        options: [],
+        correct_answer: ''
       }
 
       const { data: result, error } = await supabase
@@ -464,61 +463,43 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       if (error) throw error
 
       setTheoryQuestions([...theoryQuestions, { ...result, points: theoryPointsPerQuestion } as TheoryQuestion])
-      toast.success(`Theory question added (${theoryPointsPerQuestion} point${theoryPointsPerQuestion !== 1 ? 's' : ''})`)
+      toast.success(isDraft ? 'Theory question saved as draft' : 'Theory question added successfully')
       setShowTheoryDialog(false)
       setEditingTheoryQuestion(null)
+      await loadQuestions()
     } catch (error) {
       console.error('Error adding theory question:', error)
       toast.error('Failed to add theory question')
     }
   }
 
+  // Update Theory Question
   const handleUpdateTheoryQuestion = async (questionId: string, data: Partial<TheoryQuestion>) => {
     try {
+      const isDraft = data.is_draft !== undefined ? data.is_draft : false
+      
       const { error } = await supabase
         .from('questions')
         .update({
           question_text: data.question_text,
-          points: data.points || theoryPointsPerQuestion
+          points: data.points || theoryPointsPerQuestion,
+          sub_questions: data.sub_questions || [],
+          keywords: data.keywords || [],
+          model_answer: data.model_answer || '',
+          is_draft: isDraft
         })
         .eq('id', questionId)
 
       if (error) throw error
 
       setTheoryQuestions(theoryQuestions.map(q => q.id === questionId ? { ...q, ...data, points: data.points || theoryPointsPerQuestion } : q))
-      toast.success('Theory question updated')
+      toast.success('Theory question updated successfully')
       setShowTheoryDialog(false)
       setEditingTheoryQuestion(null)
+      await loadQuestions()
     } catch (error) {
       console.error('Error updating theory question:', error)
       toast.error('Failed to update theory question')
-    }
-  }
-
-  const handleDeleteTheoryQuestion = async (questionId: string) => {
-    if (!confirm('Are you sure you want to delete this theory question?')) return
-
-    try {
-      const { error } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', questionId)
-
-      if (error) throw error
-
-      const updatedTheory = theoryQuestions.filter(q => q.id !== questionId)
-      for (let i = 0; i < updatedTheory.length; i++) {
-        await supabase
-          .from('questions')
-          .update({ order_number: i + 1 })
-          .eq('id', updatedTheory[i].id)
-      }
-      
-      setTheoryQuestions(updatedTheory)
-      toast.success('Theory question deleted')
-    } catch (error) {
-      console.error('Error deleting theory question:', error)
-      toast.error('Failed to delete theory question')
     }
   }
 
@@ -529,6 +510,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         <div className="flex items-center gap-2 mb-2 sm:mb-3">
           <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
           <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-300">Exam Points Summary</h3>
+          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={refreshing} className="ml-auto">
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </Button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <div className="text-center">
@@ -556,11 +540,149 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         </div>
         <div className="flex justify-between items-center text-xs sm:text-sm">
           <span className="text-muted-foreground">Pass Mark:</span>
-          <span className="font-medium">{examDetails.pass_mark} / {totalExamPoints} ({Math.round(passMarkPercentage)}%)</span>
+          <span className="font-medium">{examDetails.pass_mark} / {totalExamPoints} ({totalExamPoints > 0 ? Math.round(passMarkPercentage) : 0}%)</span>
         </div>
       </CardContent>
     </Card>
   )
+
+  // Question Card Component
+  const QuestionCard = ({ 
+    question, 
+    index, 
+    type, 
+    onEdit, 
+    onDelete 
+  }: { 
+    question: any, 
+    index: number, 
+    type: 'objective' | 'theory', 
+    onEdit: () => void, 
+    onDelete: () => void 
+  }) => (
+    <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border hover:shadow-md transition-shadow group">
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-muted-foreground">#{index}</span>
+            <Badge variant={type === 'objective' ? 'default' : 'secondary'}>
+              {type === 'objective' ? 'Objective' : 'Theory'}
+            </Badge>
+            {question.is_draft && (
+              <Badge variant="outline" className="text-amber-600 border-amber-300">
+                Draft
+              </Badge>
+            )}
+            {!question.is_draft && (
+              <Badge className="bg-emerald-100 text-emerald-700">
+                Complete
+              </Badge>
+            )}
+            <Badge variant="outline">{question.points} pts</Badge>
+          </div>
+          
+          <p className="mt-2 font-medium line-clamp-2">{question.question_text}</p>
+          
+          {type === 'objective' && question.options && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {question.options.map((opt: string, idx: number) => (
+                <span key={idx} className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
+                  {String.fromCharCode(65 + idx)}. {opt}
+                </span>
+              ))}
+            </div>
+          )}
+          
+          {type === 'objective' && question.correct_answer && (
+            <p className="mt-1 text-sm text-emerald-600">✓ Answer: {question.correct_answer}</p>
+          )}
+          
+          {type === 'theory' && question.sub_questions?.length > 0 && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {question.sub_questions.length} sub-question(s)
+            </p>
+          )}
+        </div>
+        
+        <div className="flex gap-1 ml-4">
+          <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0">
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onDelete} className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50">
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+
+  // Questions List Component
+  const QuestionsList = () => {
+    const allQuestions = [...questions, ...theoryQuestions.map(q => ({ ...q, type: 'theory' as const }))]
+
+    if (allQuestions.length === 0) {
+      return (
+        <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
+          <FileQuestion className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <p className="text-lg font-medium text-muted-foreground">No questions yet</p>
+          <p className="text-sm text-muted-foreground mt-1">Start by adding your first question</p>
+          <div className="flex gap-3 justify-center mt-4">
+            <Button onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }}>
+              <Plus className="h-4 w-4 mr-2" /> Add Objective Question
+            </Button>
+            {hasTheory && (
+              <Button variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }}>
+                <Plus className="h-4 w-4 mr-2" /> Add Theory Question
+              </Button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="flex justify-between items-center">
+          <h3 className="font-semibold text-lg">All Questions ({allQuestions.length})</h3>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }}>
+              <Plus className="h-4 w-4 mr-1" /> Add Objective
+            </Button>
+            {hasTheory && (
+              <Button size="sm" variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }}>
+                <Plus className="h-4 w-4 mr-1" /> Add Theory
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <ScrollArea className="h-[500px] pr-4">
+          <div className="space-y-3">
+            {questions.map((q, idx) => (
+              <QuestionCard
+                key={q.id}
+                index={idx + 1}
+                question={q}
+                type="objective"
+                onEdit={() => { setEditingQuestion(q); setShowQuestionDialog(true); }}
+                onDelete={() => { setQuestionToDelete({ id: q.id, type: 'objective' }); setDeleteDialogOpen(true); }}
+              />
+            ))}
+            {theoryQuestions.map((q, idx) => (
+              <QuestionCard
+                key={q.id}
+                index={questions.length + idx + 1}
+                question={q}
+                type="theory"
+                onEdit={() => { setEditingTheoryQuestion(q); setShowTheoryDialog(true); }}
+                onDelete={() => { setQuestionToDelete({ id: q.id, type: 'theory' }); setDeleteDialogOpen(true); }}
+              />
+            ))}
+          </div>
+        </ScrollArea>
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -573,6 +695,42 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     )
   }
 
+  if (loadError) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {loadError}
+            <div className="mt-4">
+              <Button onClick={() => router.push('/staff/exams')}>
+                Back to Exams
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
+  if (!exam) {
+    return (
+      <div className="p-4 sm:p-6 lg:p-8">
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            Exam not found
+            <div className="mt-4">
+              <Button onClick={() => router.push('/staff/exams')}>
+                Back to Exams
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      </div>
+    )
+  }
+
   return (
     <div className="relative w-full h-full overflow-y-auto">
       <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
@@ -580,7 +738,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           examId={examId}
           examTitle={exam?.title}
           term={examDetails.term}
-          termName={TERM_NAMES[examDetails.term]}
+          termName={TERM_NAMES[examDetails.term] || 'Third Term'}
           sessionYear={examDetails.session_year}
           saving={saving}
           onSave={handleSaveExam}
@@ -589,18 +747,19 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         <PointsSummary />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto sm:h-10">
-            <TabsTrigger value="details" className="text-xs sm:text-sm py-1.5 sm:py-2">Details</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto sm:h-10">
             <TabsTrigger value="questions" className="text-xs sm:text-sm py-1.5 sm:py-2">
-              Objective ({questions.length})
+              Questions ({totalQuestions})
             </TabsTrigger>
-            <TabsTrigger value="theory" className="text-xs sm:text-sm py-1.5 sm:py-2">
-              Theory ({theoryQuestions.length})
-            </TabsTrigger>
+            <TabsTrigger value="details" className="text-xs sm:text-sm py-1.5 sm:py-2">Exam Details</TabsTrigger>
             <TabsTrigger value="preview" className="text-xs sm:text-sm py-1.5 sm:py-2">
               <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Preview
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="questions">
+            <QuestionsList />
+          </TabsContent>
 
           <TabsContent value="details">
             <ExamDetailsTab
@@ -615,101 +774,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             />
           </TabsContent>
 
-          <TabsContent value="questions">
-            <div className="mb-4">
-              <div className="bg-green-50 dark:bg-green-950/30 p-3 rounded-lg border border-green-200 dark:border-green-800">
-                <Label className="text-green-800 dark:text-green-300 font-medium text-sm">Objective Questions Points</Label>
-                <div className="flex flex-wrap items-center gap-3 mt-2">
-                  <Input
-                    type="number"
-                    step="0.5"
-                    min="0.5"
-                    value={objectivePointsPerQuestion}
-                    onChange={(e) => setObjectivePointsPerQuestion(parseFloat(e.target.value) || 1)}
-                    className="w-24 bg-white h-8 sm:h-9 text-sm"
-                  />
-                  <span className="text-xs sm:text-sm text-muted-foreground">point(s) per question</span>
-                  {questions.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={updateAllObjectivePoints}
-                      className="text-green-700 border-green-300 text-xs sm:text-sm"
-                    >
-                      Apply to all {questions.length} questions
-                    </Button>
-                  )}
-                </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-                  Total: {objectiveCount} × {objectivePointsPerQuestion} = {totalObjectivePoints} points
-                </p>
-              </div>
-            </div>
-            
-            <ObjectiveQuestionsTab
-              questions={questions}
-              onAddQuestion={() => {
-                setEditingQuestion(null)
-                setShowQuestionDialog(true)
-              }}
-              onEditQuestion={(q) => {
-                setEditingQuestion(q)
-                setShowQuestionDialog(true)
-              }}
-              onDeleteQuestion={handleDeleteQuestion}
-              onBulkAdd={handleBulkAddMCQs}
-              isSaving={saving}
-            />
-          </TabsContent>
-
-          <TabsContent value="theory">
-            <div className="mb-4">
-              <div className="bg-purple-50 dark:bg-purple-950/30 p-3 rounded-lg border border-purple-200 dark:border-purple-800">
-                <Label className="text-purple-800 dark:text-purple-300 font-medium text-sm">Theory Questions Points</Label>
-                <div className="flex flex-wrap items-center gap-3 mt-2">
-                  <Input
-                    type="number"
-                    step="1"
-                    min="1"
-                    value={theoryPointsPerQuestion}
-                    onChange={(e) => setTheoryPointsPerQuestion(parseInt(e.target.value) || 5)}
-                    className="w-24 bg-white h-8 sm:h-9 text-sm"
-                  />
-                  <span className="text-xs sm:text-sm text-muted-foreground">point(s) per question</span>
-                  {theoryQuestions.length > 0 && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={updateAllTheoryPoints}
-                      className="text-purple-700 border-purple-300 text-xs sm:text-sm"
-                    >
-                      Apply to all {theoryQuestions.length} questions
-                    </Button>
-                  )}
-                </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-                  Total: {theoryCount} × {theoryPointsPerQuestion} = {totalTheoryPoints} points
-                </p>
-              </div>
-            </div>
-            
-            <TheoryQuestionsTab
-              questions={theoryQuestions}
-              hasTheory={hasTheory}
-              onAddQuestion={() => {
-                setEditingTheoryQuestion(null)
-                setShowTheoryDialog(true)
-              }}
-              onEditQuestion={(q) => {
-                setEditingTheoryQuestion(q)
-                setShowTheoryDialog(true)
-              }}
-              onDeleteQuestion={handleDeleteTheoryQuestion}
-              onBulkAdd={handleBulkAddTheory}
-              isSaving={saving}
-            />
-          </TabsContent>
-
           <TabsContent value="preview">
             <PreviewTab
               examDetails={examDetails}
@@ -720,9 +784,13 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
         </Tabs>
 
+        {/* Question Form Dialog */}
         <QuestionFormDialog
           open={showQuestionDialog}
-          onOpenChange={setShowQuestionDialog}
+          onOpenChange={(open) => {
+            setShowQuestionDialog(open)
+            if (!open) setEditingQuestion(null)
+          }}
           initialData={editingQuestion || undefined}
           onSave={(data) => {
             if (editingQuestion) {
@@ -731,11 +799,19 @@ export function EditExamPage({ examId }: EditExamPageProps) {
               handleAddQuestion(data)
             }
           }}
+          onCancel={() => {
+            setShowQuestionDialog(false)
+            setEditingQuestion(null)
+          }}
         />
 
+        {/* Theory Question Form Dialog */}
         <TheoryQuestionFormDialog
           open={showTheoryDialog}
-          onOpenChange={setShowTheoryDialog}
+          onOpenChange={(open) => {
+            setShowTheoryDialog(open)
+            if (!open) setEditingTheoryQuestion(null)
+          }}
           initialData={editingTheoryQuestion || undefined}
           onSave={(data) => {
             if (editingTheoryQuestion) {
@@ -744,7 +820,31 @@ export function EditExamPage({ examId }: EditExamPageProps) {
               handleAddTheoryQuestion(data)
             }
           }}
+          onCancel={() => {
+            setShowTheoryDialog(false)
+            setEditingTheoryQuestion(null)
+          }}
         />
+
+        {/* Delete Confirmation Dialog */}
+        <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete Question</DialogTitle>
+              <DialogDescription>
+                Are you sure you want to delete this question? This action cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={handleDeleteQuestion}>
+                Delete Question
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

@@ -97,7 +97,6 @@ interface Student {
   vin_id: string
 }
 
-// Storage keys for persistence
 const STORAGE_KEYS = {
   SELECTED_CLASS: 'ca_scores_selected_class',
   SELECTED_SUBJECT: 'ca_scores_selected_subject',
@@ -147,7 +146,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
   const isInitialMount = useRef(true)
 
-  // Load saved selections from localStorage on mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedClass = localStorage.getItem(STORAGE_KEYS.SELECTED_CLASS)
@@ -170,14 +168,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setMounted(true)
   }, [])
 
-  // Mark initial mount as complete
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
     }
   }, [])
 
-  // Save selections to localStorage
   useEffect(() => {
     if (isInitialMount.current || isRestoring) return
     if (typeof window !== 'undefined' && selectedClass) {
@@ -301,7 +297,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }, [selectedClass, selectedSubject, isRestoring])
 
-  // Load exams (optional)
   useEffect(() => {
     if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring || skipExam) return
     
@@ -325,14 +320,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     loadExams()
   }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring, skipExam])
 
-  // Load students and their scores
   const loadAllData = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
     
     setLoading(true)
     
     try {
-      // Load students
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, display_name, class, admission_number, vin_id')
@@ -359,7 +352,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
       setStudents(formatted)
       
-      // Load scores based on exam mode
       let scoresQuery = supabase
         .from('ca_scores')
         .select('*')
@@ -379,9 +371,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
       if (scoresError) throw scoresError
       
-      setCAScores(scoresData || [])
-      
-      // Initialize entries
       const entries: Record<string, ScoreEntry> = {}
       const savedMap: Record<string, boolean> = {}
       
@@ -439,41 +428,51 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }, [selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId, skipExam])
 
-  // Load scores for View Tab
+  // ✅ FIXED: Load ALL scores for View Tab - ONLY class and subject filters
   const loadScoresForViewTab = useCallback(async () => {
-    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return;
+    if (!selectedClass || !selectedSubject) return;
     
     setLoading(true);
     try {
+      console.log('Fetching scores for:', selectedSubject, 'in', selectedClass);
+      
+      // ONLY filter by class and subject - NO term or year!
       const { data: scoresData, error: scoresError } = await supabase
         .from('ca_scores')
         .select('*')
         .eq('subject', selectedSubject)
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-        .eq('class', selectedClass)
-        .order('created_at', { ascending: false });
+        .eq('class', selectedClass);
 
       if (scoresError) throw scoresError;
       
+      console.log(`Found ${scoresData?.length || 0} scores`);
+      
       if (scoresData && scoresData.length > 0) {
         const studentIds = [...new Set(scoresData.map(s => s.student_id))];
-        const { data: studentsData } = await supabase
+        
+        const { data: studentsData, error: studentsError } = await supabase
           .from('profiles')
           .select('id, full_name, display_name, admission_number')
           .in('id', studentIds);
         
+        if (studentsError) {
+          console.error('Error fetching students:', studentsError);
+        }
+        
         const studentMap = new Map();
         studentsData?.forEach(s => {
           studentMap.set(s.id, {
-            full_name: s.display_name || s.full_name,
-            admission_number: s.admission_number
+            full_name: s.display_name || s.full_name || 'Unknown',
+            admission_number: s.admission_number || '—'
           });
         });
         
         const enrichedScores = scoresData.map(score => ({
           ...score,
-          student: studentMap.get(score.student_id)
+          student: studentMap.get(score.student_id) || {
+            full_name: 'Unknown Student',
+            admission_number: '—'
+          }
         }));
         
         setCAScores(enrichedScores);
@@ -486,9 +485,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     } finally {
       setLoading(false);
     }
-  }, [selectedClass, selectedSubject, selectedTerm, selectedYear]);
+  }, [selectedClass, selectedSubject]);
 
-  // Main data loading effect
   useEffect(() => {
     if (isRestoring) return
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
@@ -496,12 +494,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     loadAllData()
   }, [loadAllData, isRestoring])
 
-  // Load scores when View Tab is active
+  // Load scores when View Tab is active OR when class/subject changes
   useEffect(() => {
-    if (activeTab === 'view') {
+    if (activeTab === 'view' && selectedClass && selectedSubject) {
       loadScoresForViewTab()
     }
-  }, [activeTab, loadScoresForViewTab])
+  }, [activeTab, selectedClass, selectedSubject, loadScoresForViewTab])
 
   const updateStatsFromEntries = () => {
     let totalScoreSum = 0
@@ -565,7 +563,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return { total_score: total, percentage, grade, remark }
   }
 
-  // ✅ FIXED: Save single score
   const handleSaveSingle = async (studentId: string) => {
     if (!staffProfile?.id) {
       toast.error('Missing teacher information')
@@ -590,7 +587,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
       const now = new Date().toISOString()
 
-      // Prepare the data object - only include exam_id if we're in exam mode
       const dataToSave: any = {
         student_id: studentId,
         subject: selectedSubject,
@@ -612,12 +608,10 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         updated_at: now
       }
 
-      // Only add exam_id if we have one and not skipping exam
       if (selectedExamId && !skipExam) {
         dataToSave.exam_id = selectedExamId
       }
 
-      // Check if record exists
       let query = supabase
         .from('ca_scores')
         .select('id')
@@ -637,7 +631,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
       let result
       if (existing) {
-        // Update existing
         const updateData = { ...dataToSave }
         if (!selectedExamId || skipExam) {
           delete updateData.exam_id
@@ -647,7 +640,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           .update(updateData)
           .eq('id', existing.id)
       } else {
-        // Insert new
         result = await supabase
           .from('ca_scores')
           .insert([dataToSave])
@@ -663,7 +655,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       
       toast.success(`Scores saved for ${getStudentName(studentId)}`)
       
-      // Refresh data
       await loadAllData()
       if (activeTab === 'view') {
         await loadScoresForViewTab()
@@ -677,7 +668,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
-  // ✅ FIXED: Save all scores
   const handleSaveAll = async () => {
     if (!staffProfile?.id) {
       toast.error('Missing teacher information')
@@ -703,7 +693,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
         const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
 
-        // Prepare the data object
         const dataToSave: any = {
           student_id: student.id,
           subject: selectedSubject,
@@ -729,7 +718,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           dataToSave.exam_id = selectedExamId
         }
 
-        // Check if exists
         let query = supabase
           .from('ca_scores')
           .select('id')
@@ -777,7 +765,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           toast.warning(`⚠️ ${errorCount} student(s) had errors`)
         }
         
-        // Update saved status
         const newSavedStatus: Record<string, boolean> = { ...savedStatus }
         students.forEach(student => {
           const entry = scoreEntries[student.id]
@@ -787,7 +774,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         })
         setSavedStatus(newSavedStatus)
         
-        // Refresh data
         await loadAllData()
         if (activeTab === 'view') {
           await loadScoresForViewTab()
@@ -936,7 +922,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
   return (
     <div className="space-y-6">
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-emerald-500 shadow-sm">
           <CardContent className="p-4">
@@ -987,7 +972,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </Card>
       </div>
 
-      {/* Grading Banner */}
       <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-lg p-4 border border-emerald-200">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
@@ -1008,7 +992,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </p>
       </div>
 
-      {/* Configuration Card */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -1141,7 +1124,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </CardContent>
       </Card>
 
-      {/* Edit Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -1240,7 +1222,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </DialogContent>
       </Dialog>
 
-      {/* Tabs */}
       <Tabs value={activeTab} onValueChange={handleTabChange}>
         <TabsList className="grid w-full max-w-md grid-cols-2">
           <TabsTrigger value="entry" className="flex items-center gap-2">
@@ -1253,289 +1234,283 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           </TabsTrigger>
         </TabsList>
 
-       {/* Score Entry Tab */}
-<TabsContent value="entry" className="mt-6">
-  {loading ? (
-    <Card>
-      <CardContent className="text-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
-        <p className="text-slate-500">Loading students...</p>
-      </CardContent>
-    </Card>
-  ) : students.length === 0 ? (
-    <Card>
-      <CardContent className="text-center py-12">
-        <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-        <p className="text-slate-500">No students found in {selectedClass}</p>
-      </CardContent>
-    </Card>
-  ) : (
-    classOrder.map(cls => (
-      <div key={cls} className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-            <GraduationCap className="h-5 w-5 text-emerald-600" />
-            {cls}
-            <Badge variant="secondary" className="ml-2">
-              {groupedStudents[cls].length} students
-            </Badge>
-          </h3>
-        </div>
-        
-        <div className="border rounded-lg overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-slate-50">
-              <TableRow>
-                <TableHead className="font-semibold min-w-[180px]">Student</TableHead>
-                <TableHead className="text-center w-24 font-semibold">CA1</TableHead>
-                <TableHead className="text-center w-24 font-semibold">CA2</TableHead>
-                <TableHead className="text-center w-28 font-semibold">Exam</TableHead>
-                <TableHead className="text-center w-20 font-semibold">Total</TableHead>
-                <TableHead className="text-center w-24 font-semibold">Grade</TableHead>
-                <TableHead className="text-center w-24 font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groupedStudents[cls].map(student => {
-                const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '' }
-                const ca1Score = parseInt(entry.ca1) || 0
-                const ca2Score = parseInt(entry.ca2) || 0
-                const examScore = parseInt(entry.exam) || 0
-                const total = ca1Score + ca2Score + examScore
-                const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-                const grade = total > 0 ? getGrade(percentage) : ''
-                const hasExamScore = entry.exam && parseInt(entry.exam) > 0
-                const isSaved = savedStatus[student.id]
+        <TabsContent value="entry" className="mt-6">
+          {loading ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
+                <p className="text-slate-500">Loading students...</p>
+              </CardContent>
+            </Card>
+          ) : students.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-12">
+                <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-500">No students found in {selectedClass}</p>
+              </CardContent>
+            </Card>
+          ) : (
+            classOrder.map(cls => (
+              <div key={cls} className="mb-8">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
+                    <GraduationCap className="h-5 w-5 text-emerald-600" />
+                    {cls}
+                    <Badge variant="secondary" className="ml-2">
+                      {groupedStudents[cls].length} students
+                    </Badge>
+                  </h3>
+                </div>
                 
-                return (
-                  <TableRow key={student.id}>
-                    <TableCell className="font-medium">
-                      {student.full_name}
-                      <p className="text-xs text-slate-400 font-mono">{student.admission_number}</p>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max="20" 
-                        value={entry.ca1}
-                        onChange={e => handleScoreChange(student.id, 'ca1', e.target.value)}
-                        className="w-20 text-center mx-auto" 
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Input 
-                        type="number" 
-                        min="0" 
-                        max="20" 
-                        value={entry.ca2}
-                        onChange={e => handleScoreChange(student.id, 'ca2', e.target.value)}
-                        className="w-20 text-center mx-auto" 
-                        placeholder="0"
-                      />
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {hasExamScore ? (
-                        <span className="font-medium text-emerald-600">{parseInt(entry.exam)}</span>
-                      ) : (
-                        !skipExam && selectedExamId ? (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAutoFetchSingle(student.id)}
-                            className="h-7 text-xs"
-                          >
-                            <RefreshCw className="h-3 w-3 mr-1" />
-                            Load
-                          </Button>
-                        ) : (
-                          <Input 
-                            type="number" 
-                            min="0" 
-                            max="60" 
-                            value={entry.exam}
-                            onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
-                            className="w-20 text-center mx-auto" 
-                            placeholder="0"
-                          />
+                <div className="border rounded-lg overflow-x-auto">
+                  <Table>
+                    <TableHeader className="bg-slate-50">
+                      <TableRow>
+                        <TableHead className="font-semibold min-w-[180px]">Student</TableHead>
+                        <TableHead className="text-center w-24 font-semibold">CA1</TableHead>
+                        <TableHead className="text-center w-24 font-semibold">CA2</TableHead>
+                        <TableHead className="text-center w-28 font-semibold">Exam</TableHead>
+                        <TableHead className="text-center w-20 font-semibold">Total</TableHead>
+                        <TableHead className="text-center w-24 font-semibold">Grade</TableHead>
+                        <TableHead className="text-center w-24 font-semibold">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {groupedStudents[cls].map(student => {
+                        const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '' }
+                        const total = (parseInt(entry.ca1) || 0) + (parseInt(entry.ca2) || 0) + (parseInt(entry.exam) || 0)
+                        const grade = total > 0 ? getGrade(Math.round((total / 100) * 100)) : ''
+                        const hasExamScore = entry.exam && parseInt(entry.exam) > 0
+                        const isSaved = savedStatus[student.id]
+                        
+                        return (
+                          <TableRow key={student.id}>
+                            <TableCell className="font-medium">
+                              {student.full_name}
+                              <p className="text-xs text-slate-400 font-mono">{student.admission_number}</p>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                max="20" 
+                                value={entry.ca1}
+                                onChange={e => handleScoreChange(student.id, 'ca1', e.target.value)}
+                                className="w-20 text-center mx-auto" 
+                                placeholder="0"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Input 
+                                type="number" 
+                                min="0" 
+                                max="20" 
+                                value={entry.ca2}
+                                onChange={e => handleScoreChange(student.id, 'ca2', e.target.value)}
+                                className="w-20 text-center mx-auto" 
+                                placeholder="0"
+                              />
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {hasExamScore ? (
+                                <span className="font-medium text-emerald-600">{parseInt(entry.exam)}</span>
+                              ) : (
+                                !skipExam && selectedExamId ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleAutoFetchSingle(student.id)}
+                                    className="h-7 text-xs"
+                                  >
+                                    <RefreshCw className="h-3 w-3 mr-1" />
+                                    Load
+                                  </Button>
+                                ) : (
+                                  <Input 
+                                    type="number" 
+                                    min="0" 
+                                    max="60" 
+                                    value={entry.exam}
+                                    onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
+                                    className="w-20 text-center mx-auto" 
+                                    placeholder="0"
+                                  />
+                                )
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center font-bold">
+                              {total > 0 ? total : '—'}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              {grade && (
+                                <Badge className={getGradeColor(grade)}>
+                                  {grade}
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSaveSingle(student.id)}
+                                disabled={saving}
+                                className="h-8 px-3"
+                              >
+                                {saving ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : isSaved ? (
+                                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                                ) : (
+                                  <Save className="h-4 w-4 text-slate-500" />
+                                )}
+                                <span className="ml-1 text-xs">
+                                  {isSaved ? 'Saved' : 'Save'}
+                                </span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
                         )
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center font-bold">
-                      {total > 0 ? total : '—'}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {grade && (
-                        <Badge className={getGradeColor(grade)}>
-                          {grade}
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleSaveSingle(student.id)}
-                        disabled={saving}
-                        className="h-8 px-3"
-                      >
-                        {saving ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : isSaved ? (
-                          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                        ) : (
-                          <Save className="h-4 w-4 text-slate-500" />
-                        )}
-                        <span className="ml-1 text-xs">
-                          {isSaved ? 'Saved' : 'Save'}
-                        </span>
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      </div>
-    ))
-  )}
-</TabsContent>
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            ))
+          )}
+        </TabsContent>
 
-       {/* View Scores Tab */}
-<TabsContent value="view" className="mt-6">
-  <Card>
-    <CardHeader>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <CardTitle>Published Scores</CardTitle>
-        <div className="flex gap-2">
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input 
-              placeholder="Search students..." 
-              value={searchQuery} 
-              onChange={e => setSearchQuery(e.target.value)} 
-              className="pl-9" 
-            />
-          </div>
-          <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading}>
-            <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
-          </Button>
-        </div>
-      </div>
-      <p className="text-xs text-slate-500 mt-2">
-        Showing {caScores.length} score(s) for {selectedClass} - {selectedSubject} - {selectedTerm} {selectedYear}
-      </p>
-    </CardHeader>
-    <CardContent>
-      {loading ? (
-        <div className="text-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-          <p className="text-slate-500 mt-2">Loading scores...</p>
-        </div>
-      ) : caScores.length === 0 ? (
-        <div className="text-center py-12">
-          <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-          <p className="text-slate-500">No scores have been published yet.</p>
-          <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save.</p>
-          <div className="mt-4 flex gap-2 justify-center">
-            <Button 
-              variant="outline" 
-              onClick={() => setActiveTab('entry')}
-            >
-              Go to Score Entry
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={loadScoresForViewTab}
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="min-w-[180px]">Student</TableHead>
-                <TableHead className="text-center">Admission No</TableHead>
-                <TableHead className="text-center">CA1</TableHead>
-                <TableHead className="text-center">CA2</TableHead>
-                <TableHead className="text-center">Exam</TableHead>
-                <TableHead className="text-center">Total</TableHead>
-                <TableHead className="text-center">Percentage</TableHead>
-                <TableHead className="text-center">Grade</TableHead>
-                <TableHead className="text-center">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredScores.map(score => {
-                const ca1 = score.ca1_score || 0
-                const ca2 = score.ca2_score || 0
-                const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-                const total = ca1 + ca2 + examTotal
-                const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-                const grade = getGrade(percentage)
-                const studentName = score.student?.full_name || getStudentName(score.student_id)
-                const admissionNumber = score.student?.admission_number || getStudentAdmission(score.student_id)
-                
-                return (
-                  <TableRow key={score.id}>
-                    <TableCell className="font-medium">{studentName}</TableCell>
-                    <TableCell className="text-center font-mono text-xs">{admissionNumber}</TableCell>
-                    <TableCell className="text-center font-medium">{ca1 || '—'}</TableCell>
-                    <TableCell className="text-center font-medium">{ca2 || '—'}</TableCell>
-                    <TableCell className="text-center font-medium">{examTotal || '—'}</TableCell>
-                    <TableCell className="text-center font-bold">{total || '—'}</TableCell>
-                    <TableCell className="text-center">{percentage > 0 ? `${percentage}%` : '—'}</TableCell>
-                    <TableCell className="text-center">
-                      {grade && <Badge className={getGradeColor(grade)}>{grade}</Badge>}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex justify-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setEditingScore(score)
-                            setShowEditDialog(true)
-                          }}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={async () => {
-                            if (!confirm('Delete this score?')) return
-                            const { error } = await supabase.from('ca_scores').delete().eq('id', score.id)
-                            if (error) {
-                              toast.error('Failed to delete score')
-                            } else {
-                              toast.success('Score deleted')
-                              await loadAllData()
-                              await loadScoresForViewTab()
-                            }
-                          }}
-                          className="text-red-500 hover:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-    </CardContent>
-  </Card>
-</TabsContent>
+        <TabsContent value="view" className="mt-6">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <CardTitle>Published Scores</CardTitle>
+                <div className="flex gap-2">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input 
+                      placeholder="Search students..." 
+                      value={searchQuery} 
+                      onChange={e => setSearchQuery(e.target.value)} 
+                      className="pl-9" 
+                    />
+                  </div>
+                  <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading}>
+                    <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-slate-500 mt-2">
+                Showing {caScores.length} score(s) for {selectedClass} - {selectedSubject}
+              </p>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+                  <p className="text-slate-500 mt-2">Loading scores...</p>
+                </div>
+              ) : caScores.length === 0 ? (
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                  <p className="text-slate-500">No scores have been published yet for {selectedSubject} in {selectedClass}.</p>
+                  <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save.</p>
+                  <div className="mt-4 flex gap-2 justify-center">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setActiveTab('entry')}
+                    >
+                      Go to Score Entry
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={loadScoresForViewTab}
+                    >
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Refresh
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="min-w-[180px]">Student</TableHead>
+                        <TableHead className="text-center">Admission No</TableHead>
+                        <TableHead className="text-center">CA1</TableHead>
+                        <TableHead className="text-center">CA2</TableHead>
+                        <TableHead className="text-center">Exam</TableHead>
+                        <TableHead className="text-center">Total</TableHead>
+                        <TableHead className="text-center">Percentage</TableHead>
+                        <TableHead className="text-center">Grade</TableHead>
+                        <TableHead className="text-center">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredScores.map(score => {
+                        const ca1 = score.ca1_score || 0
+                        const ca2 = score.ca2_score || 0
+                        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+                        const total = ca1 + ca2 + examTotal
+                        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
+                        const grade = getGrade(percentage)
+                        const studentName = score.student?.full_name || getStudentName(score.student_id)
+                        const admissionNumber = score.student?.admission_number || getStudentAdmission(score.student_id)
+                        
+                        return (
+                          <TableRow key={score.id}>
+                            <TableCell className="font-medium">{studentName}</TableCell>
+                            <TableCell className="text-center font-mono text-xs">{admissionNumber}</TableCell>
+                            <TableCell className="text-center font-medium">{ca1 || '—'}</TableCell>
+                            <TableCell className="text-center font-medium">{ca2 || '—'}</TableCell>
+                            <TableCell className="text-center font-medium">{examTotal || '—'}</TableCell>
+                            <TableCell className="text-center font-bold">{total || '—'}</TableCell>
+                            <TableCell className="text-center">{percentage > 0 ? `${percentage}%` : '—'}</TableCell>
+                            <TableCell className="text-center">
+                              {grade && <Badge className={getGradeColor(grade)}>{grade}</Badge>}
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <div className="flex justify-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingScore(score)
+                                    setShowEditDialog(true)
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={async () => {
+                                    if (!confirm('Delete this score?')) return
+                                    const { error } = await supabase.from('ca_scores').delete().eq('id', score.id)
+                                    if (error) {
+                                      toast.error('Failed to delete score')
+                                    } else {
+                                      toast.success('Score deleted')
+                                      await loadAllData()
+                                      await loadScoresForViewTab()
+                                    }
+                                  }}
+                                  className="text-red-500 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
     </div>
   )

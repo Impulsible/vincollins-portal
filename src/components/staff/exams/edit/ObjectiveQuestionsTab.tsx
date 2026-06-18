@@ -1,5 +1,4 @@
-// src/components/staff/exams/edit/ObjectiveQuestionsTab.tsx
-
+// src/components/staff/exams/edit/ObjectiveQuestionsTab.tsx - FIXED
 'use client'
 
 import { useState, useCallback, useMemo } from 'react'
