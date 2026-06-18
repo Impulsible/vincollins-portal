@@ -1,4 +1,5 @@
-// components/staff/exams/ExamViewer.tsx - WITH ENHANCED THEORY RENDERING AND TAILWIND TABLES
+// components/staff/exams/ExamViewer.tsx - COMPLETE UPDATED WITH BOTH LOADING METHODS
+
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -13,7 +14,8 @@ import {
   ArrowLeft, Edit, Send, Calendar, Clock, 
   BookOpen, Award, CheckCircle, AlertCircle, 
   Eye, Loader2, Calculator, Shuffle, RotateCcw,
-  Users, FileText, Brain, HelpCircle, Flag, Layers, Image as ImageIcon
+  Users, FileText, Brain, HelpCircle, Flag, Layers, Image as ImageIcon,
+  Database, RefreshCw
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -45,6 +47,7 @@ interface Question {
   sub_questions?: TheorySubQuestion[]
   image_url?: string
   image_caption?: string
+  is_draft?: boolean
 }
 
 interface Exam {
@@ -85,7 +88,6 @@ const convertTableToHtml = (tableLines: string[]): string => {
   let hasSeparator = false
   
   for (const line of tableLines) {
-    // Skip separator lines but mark that we've seen one
     if (line.includes('---') || line.includes('===')) {
       isHeader = false
       hasSeparator = true
@@ -96,7 +98,6 @@ const convertTableToHtml = (tableLines: string[]): string => {
       const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
       if (cells.length === 0) continue
       
-      // Determine row styling
       let rowClass = ''
       if (isHeader && !hasSeparator) {
         rowClass = 'bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-gray-300'
@@ -109,19 +110,15 @@ const convertTableToHtml = (tableLines: string[]): string => {
       cells.forEach((cell: string, idx: number) => {
         const tag = isHeader && !hasSeparator ? 'th' : 'td'
         
-        // Header styling
         if (isHeader && !hasSeparator) {
           html += `<${tag} class="px-5 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300 last:border-r-0">${cell.trim()}</${tag}>`
-        } 
-        // Body cell styling
-        else {
+        } else {
           html += `<${tag} class="px-5 py-3 text-sm text-gray-600 border-r border-gray-200 last:border-r-0">${cell.trim()}</${tag}>`
         }
       })
       
       html += '</tr>'
       
-      // After first data row, header is no longer header if we had a separator
       if (isHeader && hasSeparator) {
         isHeader = false
       }
@@ -140,7 +137,6 @@ const convertTableToHtml = (tableLines: string[]): string => {
 const renderContent = (text: string) => {
   if (!text) return null
   
-  // Handle markdown tables - improved detection
   const lines = text.split('\n')
   let tableLines: string[] = []
   let inTable = false
@@ -150,8 +146,6 @@ const renderContent = (text: string) => {
   
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
-    
-    // Check if line looks like a table row (starts with | and contains |)
     const isTableRow = line.startsWith('|') && line.includes('|') && line.split('|').length >= 3
     
     if (isTableRow) {
@@ -161,11 +155,9 @@ const renderContent = (text: string) => {
       }
       tableLines.push(line)
     } else if (inTable && !isTableRow) {
-      // End of table - process it
       if (tableLines.length >= 2) {
         const tableHtml = convertTableToHtml(tableLines)
         
-        // Add text before table
         if (tableStartIndex > currentIndex) {
           const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
           if (beforeText.trim()) {
@@ -189,7 +181,6 @@ const renderContent = (text: string) => {
           }
         }
         
-        // Add table
         result.push(
           <div key={`table-${currentIndex}`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
         )
@@ -201,11 +192,9 @@ const renderContent = (text: string) => {
     }
   }
   
-  // Handle remaining table at end of text
   if (inTable && tableLines.length >= 2) {
     const tableHtml = convertTableToHtml(tableLines)
     
-    // Add text before table
     if (tableStartIndex > currentIndex) {
       const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
       if (beforeText.trim()) {
@@ -229,12 +218,10 @@ const renderContent = (text: string) => {
       }
     }
     
-    // Add table
     result.push(
       <div key={`table-final`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
     )
     
-    // Add text after table if any
     if (currentIndex + tableLines.length < lines.length) {
       const afterText = lines.slice(currentIndex + tableLines.length).join('\n')
       if (afterText.trim()) {
@@ -261,12 +248,10 @@ const renderContent = (text: string) => {
     return <>{result}</>
   }
   
-  // If we have accumulated results from table processing, return them
   if (result.length > 0) {
     return <>{result}</>
   }
   
-  // Handle markdown images
   const imageMatch = text.match(/!\[(.*?)\]\((.*?)\)/)
   if (imageMatch) {
     return (
@@ -277,12 +262,10 @@ const renderContent = (text: string) => {
     )
   }
   
-  // Handle ASCII art charts
   if (text.includes('█') || text.includes('▓') || text.includes('▒') || text.includes('░')) {
     return <pre className="font-mono text-xs bg-gray-100 p-2 rounded my-2 whitespace-pre-wrap overflow-x-auto">{text}</pre>
   }
   
-  // Handle equations
   const hasEquation = /[\d\+\-\*\/\(\)=]|x\^2|y\^2|√|∑|∫|π|θ|α|β|γ/.test(text)
   if (hasEquation && !text.includes('<table')) {
     return (
@@ -295,27 +278,21 @@ const renderContent = (text: string) => {
     )
   }
   
-  // Regular text - preserve line breaks
   return (
     <div className="whitespace-pre-wrap text-sm leading-relaxed">
       {text.split('\n').map((line, idx) => {
-        // Check for numbered questions
         if (line.match(/^\d+\./)) {
           return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
         }
-        // Check for sub-questions (a., b., c.)
         if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
           return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
         }
-        // Check for roman numerals
         if (line.match(/^\(?[ivx]+\)?\./i)) {
           return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
         }
-        // Empty line
         if (line === '') {
           return <br key={idx} />
         }
-        // Regular text
         return <p key={idx} className="mb-1">{line}</p>
       })}
     </div>
@@ -326,7 +303,7 @@ const renderContent = (text: string) => {
 const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
   if (!subQuestions || subQuestions.length === 0) return null
   
-  const startCharCode = level === 0 ? 97 : 105 // 'a' or 'i'
+  const startCharCode = level === 0 ? 97 : 105
   
   return (
     <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
@@ -365,7 +342,6 @@ function TheoryQuestionCard({ question, index, marks }: { question: TheoryQuesti
         </Badge>
       </div>
       
-      {/* Question Image if any */}
       {question.image_url && (
         <div className="mb-4">
           <img 
@@ -379,7 +355,6 @@ function TheoryQuestionCard({ question, index, marks }: { question: TheoryQuesti
         </div>
       )}
       
-      {/* Main Question Content */}
       <div className="mb-4">
         <div className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-2">
           <span className="bg-blue-100 w-5 h-5 rounded-full flex items-center justify-center text-xs">?</span>
@@ -390,7 +365,6 @@ function TheoryQuestionCard({ question, index, marks }: { question: TheoryQuesti
         </div>
       </div>
       
-      {/* Sub-questions */}
       {question.sub_questions && question.sub_questions.length > 0 && (
         <div className="mt-4 pt-3 border-t border-gray-100">
           {renderSubQuestions(question.sub_questions, 0)}
@@ -408,12 +382,15 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
   const [activeTab, setActiveTab] = useState('overview')
   const [submitting, setSubmitting] = useState(false)
   const [submissionCount, setSubmissionCount] = useState(0)
+  const [loadSource, setLoadSource] = useState<'table' | 'jsonb' | 'none'>('none')
 
+  // ============ LOAD EXAM DETAILS - LOADS FROM BOTH SOURCES ============
   const loadExamDetails = useCallback(async () => {
     if (!examId) return
     
     setLoading(true)
     try {
+      // Load exam data
       const { data: examData, error: examError } = await supabase
         .from('exams')
         .select('*')
@@ -422,26 +399,63 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
 
       if (examError) throw examError
       
-      // Extract questions from JSONB - PRESERVE sub_questions structure
-      let extractedQuestions: Question[] = []
-      if (examData.questions && Array.isArray(examData.questions)) {
-        extractedQuestions = examData.questions.map((q: any, idx: number) => ({
+      setExam(examData)
+
+      // ✅ FIRST: Try to load questions from the questions table
+      let loadedQuestions: Question[] = []
+      let source: 'table' | 'jsonb' | 'none' = 'none'
+      
+      try {
+        const { data: questionsData, error: questionsError } = await supabase
+          .from('questions')
+          .select('*')
+          .eq('exam_id', examId)
+          .is('deleted_at', null)
+          .order('order_number', { ascending: true })
+
+        if (!questionsError && questionsData && questionsData.length > 0) {
+          // ✅ Loaded from questions table
+          loadedQuestions = questionsData.map((q: any) => ({
+            id: q.id,
+            type: q.type || 'objective',
+            question: q.question_text,
+            options: q.options || [],
+            correct_answer: q.correct_answer || '',
+            marks: q.points || 1,
+            order: q.order_number || 0,
+            sub_questions: q.sub_questions || [],
+            image_url: q.image_url,
+            image_caption: q.image_caption,
+            is_draft: q.is_draft || false
+          }))
+          source = 'table'
+          console.log(`✅ Loaded ${loadedQuestions.length} questions from questions table`)
+        }
+      } catch (tableError) {
+        console.warn('⚠️ Could not load from questions table:', tableError)
+      }
+
+      // ✅ SECOND: If no questions from table, try loading from exam.questions JSONB
+      if (loadedQuestions.length === 0 && examData.questions && Array.isArray(examData.questions) && examData.questions.length > 0) {
+        loadedQuestions = examData.questions.map((q: any, idx: number) => ({
           id: q.id || crypto.randomUUID(),
           type: q.type || 'objective',
-          question: q.question || q.question_text,
-          options: q.options,
-          correct_answer: q.correct_answer,
-          marks: q.marks || q.points || 0.5,
+          question: q.question || q.question_text || '',
+          options: q.options || [],
+          correct_answer: q.correct_answer || '',
+          marks: q.marks || q.points || 1,
           order: q.order || idx + 1,
-          // Preserve theory-specific fields
-          sub_questions: q.sub_questions || q.subQuestions,
+          sub_questions: q.sub_questions || [],
           image_url: q.image_url,
-          image_caption: q.image_caption
+          image_caption: q.image_caption,
+          is_draft: q.is_draft || false
         }))
+        source = 'jsonb'
+        console.log(`✅ Loaded ${loadedQuestions.length} questions from exam.questions JSONB`)
       }
-      
-      setExam(examData)
-      setQuestions(extractedQuestions)
+
+      setQuestions(loadedQuestions)
+      setLoadSource(source)
 
       // Get submission count
       const { count } = await supabase
@@ -458,6 +472,12 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
       setLoading(false)
     }
   }, [examId])
+
+  // ============ REFRESH ============
+  const handleRefresh = () => {
+    loadExamDetails()
+    toast.success('Refreshed exam data')
+  }
 
   useEffect(() => {
     loadExamDetails()
@@ -570,6 +590,18 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
         </div>
         
         <div className="flex flex-wrap gap-2">
+          {/* Load Source Indicator */}
+          {loadSource !== 'none' && (
+            <Badge variant="outline" className="text-[10px] bg-blue-50 border-blue-200 text-blue-700 hidden sm:flex items-center gap-1">
+              <Database className="h-3 w-3" />
+              {loadSource === 'table' ? 'From Table' : 'From JSONB'}
+            </Badge>
+          )}
+          
+          <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-8 sm:h-9 text-xs">
+            <RefreshCw className="h-3.5 w-3.5" />
+          </Button>
+          
           {(exam.status === 'published' || exam.status === 'pending') && (
             <Button 
               size="sm" 
@@ -668,6 +700,13 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
             </span>
           </div>
         )}
+        {loadSource !== 'none' && (
+          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 sm:hidden">
+            <span className="text-[10px] text-blue-700 dark:text-blue-400">
+              📊 {loadSource === 'table' ? 'From Table' : 'From JSONB'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -743,7 +782,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
           </Card>
         </TabsContent>
 
-        {/* Questions Tab - WITH ENHANCED THEORY RENDERING AND TAILWIND TABLES */}
+        {/* Questions Tab */}
         <TabsContent value="questions" className="mt-4 space-y-4">
           {/* Objective Questions Section */}
           {objectiveQuestions.length > 0 && (
@@ -777,13 +816,18 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
                         ))}
                       </div>
                     )}
+                    {q.is_draft && (
+                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 mt-1">
+                        📝 Draft
+                      </Badge>
+                    )}
                   </div>
                 ))}
               </CardContent>
             </Card>
           )}
 
-          {/* Theory Questions Section - WITH ENHANCED RENDERING AND TAILWIND TABLES */}
+          {/* Theory Questions Section */}
           {theoryQuestionsData.length > 0 && (
             <Card>
               <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
@@ -817,6 +861,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
             <div className="text-center py-8">
               <HelpCircle className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
               <p className="text-muted-foreground">No questions added to this exam yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Questions can be stored in the questions table or as JSONB</p>
             </div>
           )}
         </TabsContent>

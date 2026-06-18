@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/QuestionFormDialog.tsx - FULLY UPDATED
+// src/components/staff/exams/edit/QuestionFormDialog.tsx - FIXED
 
 'use client'
 
@@ -86,6 +86,8 @@ export function QuestionFormDialog({
   }
 
   const handleSubmit = (saveAsDraft: boolean = false) => {
+    console.log('🔵 QuestionFormDialog: Submitting with saveAsDraft:', saveAsDraft)
+    
     // If saving as draft, only require question text
     if (saveAsDraft) {
       if (!questionText.trim()) {
@@ -93,13 +95,15 @@ export function QuestionFormDialog({
         return
       }
       
-      onSave({
+      const data = {
         question_text: questionText.trim(),
         options: options.filter(opt => opt.trim()),
         correct_answer: correctAnswer || '',
         points: points,
-        is_draft: true
-      })
+        is_draft: true  // ✅ Explicitly set is_draft to true
+      }
+      console.log('🔵 QuestionFormDialog: Saving as draft:', data)
+      onSave(data)
       return
     }
 
@@ -125,13 +129,15 @@ export function QuestionFormDialog({
       return
     }
 
-    onSave({
+    const data = {
       question_text: questionText.trim(),
       options: validOptions,
       correct_answer: correctAnswer,
       points: points,
-      is_draft: false
-    })
+      is_draft: false  // ✅ Explicitly set is_draft to false
+    }
+    console.log('🔵 QuestionFormDialog: Saving as complete:', data)
+    onSave(data)
   }
 
   const handleClose = () => {

@@ -1,11 +1,10 @@
-// src/components/staff/exams/edit/ExamHeader.tsx
+// src/components/staff/exams/edit/ExamHeader.tsx - SIMPLE FIX
+
 'use client'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, Save, Eye, Loader2, Calendar } from 'lucide-react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 
 interface ExamHeaderProps {
@@ -27,7 +26,12 @@ export function ExamHeader({
   saving,
   onSave
 }: ExamHeaderProps) {
-  const router = useRouter()
+
+  const handleBack = () => {
+    console.log('🔙 Navigating back to exams list...')
+    // ✅ Use window.location for reliable navigation
+    window.location.href = '/staff/exams'
+  }
 
   return (
     <motion.div
@@ -36,26 +40,30 @@ export function ExamHeader({
       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
     >
       <div className="flex items-center gap-4">
-        <Link href="/staff/exams">
-          <Button variant="ghost" size="icon" className="rounded-full shrink-0">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="rounded-full shrink-0 hover:bg-slate-100"
+          onClick={handleBack}
+          aria-label="Go back to exams"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </Button>
         <div className="min-w-0">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white truncate">
             Edit Exam
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
+          <div className="text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-2 flex-wrap">
             <span className="truncate">{examTitle || 'Untitled Exam'}</span>
             <Badge variant="outline" className="shrink-0">
               <Calendar className="h-3 w-3 mr-1" />
               {termName} {sessionYear}
             </Badge>
-          </p>
+          </div>
         </div>
       </div>
       <div className="flex gap-2 shrink-0">
-        <Button variant="outline" onClick={() => router.push(`/staff/exams/${examId}`)}>
+        <Button variant="outline" onClick={() => window.location.href = `/staff/exams/${examId}`}>
           <Eye className="mr-2 h-4 w-4" />
           View
         </Button>

@@ -1,21 +1,30 @@
-// src/components/staff/exams/edit/EditExamPage.tsx - COMPLETE WORKING VERSION
+// src/components/staff/exams/edit/EditExamPage.tsx - COMPLETE FIXED VERSION
 
-'use client'
+"use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Skeleton } from '@/components/ui/skeleton'
-import { toast } from 'sonner'
-import { Eye, Calculator, AlertCircle, Plus, Edit, Trash2, RefreshCw, FileQuestion } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Label } from '@/components/ui/label'
-import { Input } from '@/components/ui/input'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
+import {
+  Eye,
+  Calculator,
+  AlertCircle,
+  Plus,
+  Edit,
+  Trash2,
+  RefreshCw,
+  FileQuestion,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
   DialogContent,
@@ -23,72 +32,108 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { ExamHeader } from './ExamHeader'
-import { ExamDetailsTab } from './ExamDetailsTab'
-import { PreviewTab } from './PreviewTab'
-import { QuestionFormDialog } from './QuestionFormDialog'
-import { TheoryQuestionFormDialog } from './TheoryQuestionFormDialog'
-import type { Exam, Question, TheoryQuestion, ExamDetailsForm } from './types'
+} from "@/components/ui/dialog";
+import { ExamHeader } from "./ExamHeader";
+import { ExamDetailsTab } from "./ExamDetailsTab";
+import { PreviewTab } from "./PreviewTab";
+import { QuestionFormDialog } from "./QuestionFormDialog";
+import { TheoryQuestionFormDialog } from "./TheoryQuestionFormDialog";
+import type { Exam, Question, TheoryQuestion, ExamDetailsForm } from "./types";
 
 // Constants
-const CURRENT_TERM = 'third'
-const CURRENT_SESSION = '2025/2026'
+const CURRENT_TERM = "third";
+const CURRENT_SESSION = "2025/2026";
 const TERM_NAMES: Record<string, string> = {
-  first: 'First Term',
-  second: 'Second Term',
-  third: 'Third Term'
-}
+  first: "First Term",
+  second: "Second Term",
+  third: "Third Term",
+};
 
 const CLASSES = [
-  'JSS 1', 'JSS 2', 'JSS 3',
-  'SS1 Science', 'SS1 Arts', 'SS1 Commercial',
-  'SS2 Science', 'SS2 Arts', 'SS2 Commercial',
-  'SS3 Science', 'SS3 Arts', 'SS3 Commercial'
-]
-const AVAILABLE_SESSIONS = ['2025/2026', '2026/2027']
+  "JSS 1",
+  "JSS 2",
+  "JSS 3",
+  "SS1 Science",
+  "SS1 Arts",
+  "SS1 Commercial",
+  "SS2 Science",
+  "SS2 Arts",
+  "SS2 Commercial",
+  "SS3 Science",
+  "SS3 Arts",
+  "SS3 Commercial",
+];
+const AVAILABLE_SESSIONS = ["2025/2026", "2026/2027"];
 
 const JSS_SUBJECTS = [
-  'Mathematics', 'English Studies', 'Basic Science', 'Basic Technology',
-  'Social Studies', 'Civic Education', 'Christian Religious Studies',
-  'Islamic Religious Studies', 'Business Studies', 'Music','Home Economics',
-  'Agricultural Science', 'Physical and Health Education',
-  'Information Technology', 'Security Education', 'Yoruba', 'Cultural and Creative Arts', 'French'
-]
+  "Mathematics",
+  "English Studies",
+  "Basic Science",
+  "Basic Technology",
+  "Social Studies",
+  "Civic Education",
+  "Christian Religious Studies",
+  "Islamic Religious Studies",
+  "Business Studies",
+  "Music",
+  "Home Economics",
+  "Agricultural Science",
+  "Physical and Health Education",
+  "Information Technology",
+  "Security Education",
+  "Yoruba",
+  "Cultural and Creative Arts",
+  "French",
+];
 
 const SS_SUBJECTS = [
-  'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
-  'Economics', 'Government', 'Literature in English', 'Geography',
-  'Commerce', 'Data Processing', 'Further Mathematics', 'Civic Education', 'CRS', 'Financial Accounting', 'Agricultural Science'
-]
+  "Mathematics",
+  "English Language",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "Economics",
+  "Government",
+  "Literature in English",
+  "Geography",
+  "Commerce",
+  "Data Processing",
+  "Further Mathematics",
+  "Civic Education",
+  "CRS",
+  "Financial Accounting",
+  "Agricultural Science",
+];
 
 interface EditExamPageProps {
-  examId: string
+  examId: string;
 }
 
 export function EditExamPage({ examId }: EditExamPageProps) {
-  const router = useRouter()
-  
-  const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState('questions')
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [refreshing, setRefreshing] = useState(false)
-  
-  const [exam, setExam] = useState<Exam | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([])
-  const [hasTheory, setHasTheory] = useState(false)
-  
-  const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] = useState<number>(1)
-  const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] = useState<number>(5)
-  
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [activeTab, setActiveTab] = useState("questions");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const [exam, setExam] = useState<Exam | null>(null);
+  const [questions, setQuestions] = useState<Question[]>([]);
+  const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
+  const [hasTheory, setHasTheory] = useState(false);
+
+  const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] =
+    useState<number>(1);
+  const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] =
+    useState<number>(5);
+
   const [examDetails, setExamDetails] = useState<ExamDetailsForm>({
-    title: '',
-    subject: '',
-    class: '',
+    title: "",
+    subject: "",
+    class: "",
     duration: 60,
-    instructions: '',
+    instructions: "",
     pass_mark: 50,
     shuffle_questions: true,
     shuffle_options: true,
@@ -96,140 +141,164 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     negative_marking_value: 0.5,
     term: CURRENT_TERM,
     session_year: CURRENT_SESSION,
-    target_audience: 'all'
-  })
-  
-  const [showQuestionDialog, setShowQuestionDialog] = useState(false)
-  const [showTheoryDialog, setShowTheoryDialog] = useState(false)
-  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null)
-  const [editingTheoryQuestion, setEditingTheoryQuestion] = useState<TheoryQuestion | null>(null)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [questionToDelete, setQuestionToDelete] = useState<{ id: string; type: 'objective' | 'theory' } | null>(null)
+    target_audience: "all",
+  });
+
+  const [showQuestionDialog, setShowQuestionDialog] = useState(false);
+  const [showTheoryDialog, setShowTheoryDialog] = useState(false);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [editingTheoryQuestion, setEditingTheoryQuestion] =
+    useState<TheoryQuestion | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [questionToDelete, setQuestionToDelete] = useState<{
+    id: string;
+    type: "objective" | "theory";
+  } | null>(null);
 
   const availableSubjects = useMemo(() => {
-    if (!examDetails.class) return []
-    return examDetails.class.startsWith('JSS') ? JSS_SUBJECTS : SS_SUBJECTS
-  }, [examDetails.class])
+    if (!examDetails.class) return [];
+    return examDetails.class.startsWith("JSS") ? JSS_SUBJECTS : SS_SUBJECTS;
+  }, [examDetails.class]);
 
-  const objectiveCount = questions.length
-  const theoryCount = theoryQuestions.length
-  const totalQuestions = objectiveCount + theoryCount
-  
-  const totalObjectivePoints = objectiveCount * objectivePointsPerQuestion
-  const totalTheoryPoints = theoryCount * theoryPointsPerQuestion
-  const totalExamPoints = totalObjectivePoints + totalTheoryPoints
-  const passMarkPercentage = totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0
+  const objectiveCount = questions.length;
+  const theoryCount = theoryQuestions.length;
+  const totalQuestions = objectiveCount + theoryCount;
 
-  // Load questions
+  const totalObjectivePoints = objectiveCount * objectivePointsPerQuestion;
+  const totalTheoryPoints = theoryCount * theoryPointsPerQuestion;
+  const totalExamPoints = totalObjectivePoints + totalTheoryPoints;
+  const passMarkPercentage =
+    totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0;
+
+  // ============================================
+  // LOAD FUNCTIONS
+  // ============================================
+
+  // ✅ Load questions - filters by 'type' column
   const loadQuestions = useCallback(async () => {
     try {
-      console.log('Loading questions...')
-      
+      console.log("🔵 Loading questions for exam:", examId);
+
       const { data: allQuestions, error } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('exam_id', examId)
-        .order('order_number', { ascending: true })
+        .from("questions")
+        .select("*")
+        .eq("exam_id", examId)
+        .is("deleted_at", null)
+        .order("order_number", { ascending: true });
 
       if (error) {
-        console.error('Error loading questions:', error)
-        return
+        console.error("❌ Error loading questions:", error);
+        return;
       }
 
-      console.log(`Loaded ${allQuestions?.length || 0} questions`)
+      console.log(`✅ Loaded ${allQuestions?.length || 0} active questions`);
 
       if (allQuestions && allQuestions.length > 0) {
-        const objectiveQs = allQuestions.filter(q => q.type === 'objective')
-        const theoryQs = allQuestions.filter(q => q.type === 'theory')
-        
+        // ✅ Filter by 'type' column (set to 'objective' or 'theory')
+        const objectiveQs = allQuestions.filter((q) => q.type === "objective");
+        const theoryQs = allQuestions.filter((q) => q.type === "theory");
+
+        console.log(
+          `📊 Objective: ${objectiveQs.length}, Theory: ${theoryQs.length}`,
+        );
+
         if (objectiveQs.length > 0) {
-          const parsed = objectiveQs.map(q => ({
+          const parsed = objectiveQs.map((q) => ({
             ...q,
-            options: typeof q.options === 'string' ? JSON.parse(q.options) : (q.options || []),
-            points: typeof q.points === 'string' ? parseFloat(q.points) : (q.points || 1)
-          }))
-          setQuestions(parsed as Question[])
+            options:
+              typeof q.options === "string"
+                ? JSON.parse(q.options)
+                : q.options || [],
+            points:
+              typeof q.points === "string"
+                ? parseFloat(q.points)
+                : q.points || 1,
+          }));
+          setQuestions(parsed as Question[]);
           if (parsed[0]?.points) {
-            setObjectivePointsPerQuestion(parsed[0].points)
+            setObjectivePointsPerQuestion(parsed[0].points);
           }
         } else {
-          setQuestions([])
+          setQuestions([]);
         }
-        
+
         if (theoryQs.length > 0) {
-          const parsed = theoryQs.map(q => ({
+          const parsed = theoryQs.map((q) => ({
             ...q,
-            points: typeof q.points === 'string' ? parseFloat(q.points) : (q.points || 5)
-          }))
-          setTheoryQuestions(parsed as TheoryQuestion[])
+            points:
+              typeof q.points === "string"
+                ? parseFloat(q.points)
+                : q.points || 5,
+          }));
+          setTheoryQuestions(parsed as TheoryQuestion[]);
           if (parsed[0]?.points) {
-            setTheoryPointsPerQuestion(parsed[0].points)
+            setTheoryPointsPerQuestion(parsed[0].points);
           }
         } else {
-          setTheoryQuestions([])
+          setTheoryQuestions([]);
         }
       } else {
-        setQuestions([])
-        setTheoryQuestions([])
+        setQuestions([]);
+        setTheoryQuestions([]);
       }
     } catch (error) {
-      console.error('Error loading questions:', error)
+      console.error("🔥 Error loading questions:", error);
     }
-  }, [examId])
+  }, [examId]);
 
-  // Load exam data
+  // ✅ Load exam data
   const loadExamData = useCallback(async () => {
     try {
-      setLoading(true)
-      setLoadError(null)
-      
-      console.log('Loading exam with ID:', examId)
-      
+      setLoading(true);
+      setLoadError(null);
+
+      console.log("🔵 Loading exam with ID:", examId);
+
       const { data: examData, error: examError } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('id', examId)
-        .single()
+        .from("exams")
+        .select("*")
+        .eq("id", examId)
+        .single();
 
       if (examError) {
-        console.error('Exam load error:', examError)
-        setLoadError(`Failed to load exam: ${examError.message}`)
-        throw examError
+        console.error("❌ Exam load error:", examError);
+        setLoadError(`Failed to load exam: ${examError.message}`);
+        throw examError;
       }
-      
+
       if (!examData) {
-        setLoadError('Exam not found')
-        throw new Error('Exam not found')
+        setLoadError("Exam not found");
+        throw new Error("Exam not found");
       }
-      
-      console.log('Exam data loaded:', examData)
-      console.log('📝 Term from DB:', examData.term)
-      console.log('📝 Session from DB:', examData.session_year)
-      
+
+      console.log("✅ Exam data loaded:", examData);
+      console.log("📝 Term from DB:", examData.term);
+      console.log("📝 Session from DB:", examData.session_year);
+
       const examWithDefaults = {
         ...examData,
         shuffle_questions: examData.shuffle_questions ?? true,
         shuffle_options: examData.shuffle_options ?? true,
         negative_marking: examData.negative_marking ?? false,
         negative_marking_value: examData.negative_marking_value ?? 0.5,
-        pass_mark: examData.pass_mark ?? 50
-      }
-      
-      setExam(examWithDefaults as Exam)
-      setHasTheory(examData.has_theory || false)
-      
-      const examTerm = examData.term || CURRENT_TERM
-      const examSession = examData.session_year || CURRENT_SESSION
-      
-      console.log('📝 Using term:', examTerm, '→', TERM_NAMES[examTerm])
-      console.log('📝 Using session:', examSession)
-      
+        pass_mark: examData.pass_mark ?? 50,
+      };
+
+      setExam(examWithDefaults as Exam);
+      setHasTheory(examData.has_theory || false);
+
+      const examTerm = examData.term || CURRENT_TERM;
+      const examSession = examData.session_year || CURRENT_SESSION;
+
+      console.log("📝 Using term:", examTerm, "→", TERM_NAMES[examTerm]);
+      console.log("📝 Using session:", examSession);
+
       setExamDetails({
-        title: examData.title || '',
-        subject: examData.subject || '',
-        class: examData.class || '',
+        title: examData.title || "",
+        subject: examData.subject || "",
+        class: examData.class || "",
         duration: examData.duration || 60,
-        instructions: examData.description || examData.instructions || '',
+        instructions: examData.description || examData.instructions || "",
         pass_mark: examData.pass_mark || 50,
         shuffle_questions: examWithDefaults.shuffle_questions,
         shuffle_options: examWithDefaults.shuffle_options,
@@ -237,65 +306,75 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         negative_marking_value: examWithDefaults.negative_marking_value,
         term: examTerm,
         session_year: examSession,
-        target_audience: examData.target_audience || 'all'
-      })
+        target_audience: examData.target_audience || "all",
+      });
 
-      await loadQuestions()
-
+      await loadQuestions();
     } catch (error) {
-      console.error('Error loading exam:', error)
-      toast.error('Failed to load exam data. Please refresh and try again.')
+      console.error("🔥 Error loading exam:", error);
+      toast.error("Failed to load exam data. Please refresh and try again.");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [examId, loadQuestions])
+  }, [examId, loadQuestions]);
 
   useEffect(() => {
     if (examId) {
-      loadExamData()
+      loadExamData();
     }
-  }, [examId, loadExamData])
+  }, [examId, loadExamData]);
 
-  // Update exam totals
+  // ============================================
+  // UPDATE EXAM TOTALS
+  // ============================================
   const updateExamTotals = useCallback(async () => {
-    if (!examId || loading) return
-    
+    if (!examId || loading) return;
+
     try {
       const { error } = await supabase
-        .from('exams')
+        .from("exams")
         .update({
           total_questions: totalQuestions,
           total_marks: totalExamPoints,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', examId)
+        .eq("id", examId);
 
-      if (error) throw error
+      if (error) throw error;
     } catch (error) {
-      console.error('Error updating exam totals:', error)
+      console.error("Error updating exam totals:", error);
     }
-  }, [examId, totalQuestions, totalExamPoints, loading])
+  }, [examId, totalQuestions, totalExamPoints, loading]);
 
   useEffect(() => {
     if (!loading && examId) {
-      updateExamTotals()
+      updateExamTotals();
     }
-  }, [totalQuestions, totalExamPoints, objectivePointsPerQuestion, theoryPointsPerQuestion, loading, examId, updateExamTotals])
+  }, [
+    totalQuestions,
+    totalExamPoints,
+    objectivePointsPerQuestion,
+    theoryPointsPerQuestion,
+    loading,
+    examId,
+    updateExamTotals,
+  ]);
 
-  // Refresh questions
+  // ============================================
+  // REFRESH & SAVE
+  // ============================================
   const handleRefresh = useCallback(async () => {
-    setRefreshing(true)
-    await loadQuestions()
-    setRefreshing(false)
-    toast.success('Questions refreshed')
-  }, [loadQuestions])
+    setRefreshing(true);
+    await loadQuestions();
+    setRefreshing(false);
+    toast.success("Questions refreshed");
+  }, [loadQuestions]);
 
-  // Save exam
   const handleSaveExam = async () => {
-    setSaving(true)
+    setSaving(true);
     try {
       const { error } = await supabase
-        .from('exams')
+        .from("exams")
         .update({
           title: examDetails.title,
           subject: examDetails.subject,
@@ -313,343 +392,591 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           target_audience: examDetails.target_audience,
           total_questions: totalQuestions,
           total_marks: totalExamPoints,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', examId)
+        .eq("id", examId);
 
-      if (error) throw error
+      if (error) throw error;
 
-      toast.success('Exam updated successfully!')
-      router.push('/staff/exams')
+      toast.success("Exam updated successfully!");
+      router.push("/staff/exams");
     } catch (error) {
-      console.error('Error updating exam:', error)
-      toast.error('Failed to update exam')
+      console.error("Error updating exam:", error);
+      toast.error("Failed to update exam");
     } finally {
-      setSaving(false)
+      setSaving(false);
     }
-  }
+  };
 
-  // ===== QUESTION CRUD OPERATIONS =====
-  
-  // Add Objective Question
+  // ============================================
+  // QUESTION CRUD OPERATIONS
+  // ============================================
+
+  // ✅ Add Objective Question - with both type AND question_type
   const handleAddQuestion = async (data: Partial<Question>) => {
     try {
-      const isDraft = data.is_draft !== undefined ? data.is_draft : true
-      
+      console.log("🔵 handleAddQuestion called with data:", data);
+
+      const isDraft = data.is_draft !== undefined ? data.is_draft : true;
+
       const newQuestion = {
         exam_id: examId,
-        question_text: data.question_text || '',
-        type: 'objective',
+        question_text: data.question_text || "",
+        question_type: "mcq", // ✅ For check constraint
+        type: "objective", // ✅ For filtering
         options: data.options || [],
-        correct_answer: data.correct_answer || '',
+        correct_answer: data.correct_answer || "",
         points: objectivePointsPerQuestion,
         order_number: questions.length + 1,
         is_draft: isDraft,
         sub_questions: [],
         keywords: [],
-        model_answer: ''
-      }
+        model_answer: "",
+        deleted_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("🔵 Inserting question:", newQuestion);
 
       const { data: result, error } = await supabase
-        .from('questions')
+        .from("questions")
         .insert([newQuestion])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
+      if (error) {
+        console.error("❌ Supabase error:", error);
+        toast.error(`Failed to add question: ${error.message}`);
+        return;
+      }
+
+      console.log("✅ Question added successfully:", result);
 
       const parsedResult = {
         ...result,
-        options: typeof result.options === 'string' ? JSON.parse(result.options) : (result.options || [])
-      }
+        options:
+          typeof result.options === "string"
+            ? JSON.parse(result.options)
+            : result.options || [],
+      };
 
-      setQuestions([...questions, { ...parsedResult, points: objectivePointsPerQuestion } as Question])
-      
-      toast.success(isDraft ? 'Question saved as draft' : 'Question added successfully')
-      setShowQuestionDialog(false)
-      setEditingQuestion(null)
-      await loadQuestions()
-    } catch (error) {
-      console.error('Error adding question:', error)
-      toast.error('Failed to add question')
-    }
-  }
+      setQuestions((prev) => [
+        ...prev,
+        { ...parsedResult, points: objectivePointsPerQuestion } as Question,
+      ]);
 
-  // Update Objective Question
-  const handleUpdateQuestion = async (questionId: string, data: Partial<Question>) => {
-    try {
-      const isDraft = data.is_draft !== undefined ? data.is_draft : false
-      
-      const { error } = await supabase
-        .from('questions')
-        .update({
-          question_text: data.question_text,
-          options: data.options,
-          correct_answer: data.correct_answer,
-          points: data.points || objectivePointsPerQuestion,
-          is_draft: isDraft
-        })
-        .eq('id', questionId)
+      await loadQuestions();
 
-      if (error) throw error
-
-      setQuestions(questions.map(q => q.id === questionId ? { ...q, ...data, points: data.points || objectivePointsPerQuestion } : q))
-      toast.success('Question updated successfully')
-      setShowQuestionDialog(false)
-      setEditingQuestion(null)
-      await loadQuestions()
-    } catch (error) {
-      console.error('Error updating question:', error)
-      toast.error('Failed to update question')
-    }
-  }
-
-  // Delete Question
-  const handleDeleteQuestion = async () => {
-    if (!questionToDelete) return
-
-    try {
-      const { error } = await supabase
-        .from('questions')
-        .delete()
-        .eq('id', questionToDelete.id)
-
-      if (error) throw error
-
-      if (questionToDelete.type === 'objective') {
-        setQuestions(questions.filter(q => q.id !== questionToDelete.id))
-        toast.success('Question deleted successfully')
+      if (isDraft) {
+        toast.success("📝 Question saved as draft!");
       } else {
-        setTheoryQuestions(theoryQuestions.filter(q => q.id !== questionToDelete.id))
-        toast.success('Theory question deleted successfully')
+        toast.success(
+          `✅ Question added (${objectivePointsPerQuestion} point${objectivePointsPerQuestion !== 1 ? "s" : ""})`,
+        );
       }
-      
-      setDeleteDialogOpen(false)
-      setQuestionToDelete(null)
-      await loadQuestions()
+
+      setShowQuestionDialog(false);
+      setEditingQuestion(null);
     } catch (error) {
-      console.error('Error deleting question:', error)
-      toast.error('Failed to delete question')
+      console.error("🔥 Error adding question:", error);
+      toast.error("Failed to add question");
     }
-  }
+  };
 
-  // ===== THEORY QUESTION CRUD OPERATIONS =====
+  // ✅ Update Objective Question
+  const handleUpdateQuestion = async (
+    questionId: string,
+    data: Partial<Question>,
+  ) => {
+    try {
+      console.log("🔵 handleUpdateQuestion called with data:", data);
 
-  // Add Theory Question
+      const isDraft = data.is_draft !== undefined ? data.is_draft : false;
+
+      const updateData = {
+        question_text: data.question_text,
+        options: data.options,
+        correct_answer: data.correct_answer,
+        points: data.points || objectivePointsPerQuestion,
+        is_draft: isDraft,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("🔵 Updating question:", updateData);
+
+      const { error } = await supabase
+        .from("questions")
+        .update(updateData)
+        .eq("id", questionId);
+
+      if (error) {
+        console.error("❌ Update error:", error);
+        toast.error(`Failed to update question: ${error.message}`);
+        return;
+      }
+
+      setQuestions(
+        questions.map((q) =>
+          q.id === questionId
+            ? {
+                ...q,
+                ...data,
+                points: data.points || objectivePointsPerQuestion,
+              }
+            : q,
+        ),
+      );
+
+      await loadQuestions();
+
+      if (isDraft) {
+        toast.success("📝 Question saved as draft");
+      } else {
+        toast.success("✅ Question updated and marked as complete!");
+      }
+
+      setShowQuestionDialog(false);
+      setEditingQuestion(null);
+    } catch (error) {
+      console.error("🔥 Error updating question:", error);
+      toast.error("Failed to update question");
+    }
+  };
+
+  // ✅ Delete Question - Hard Delete
+  const handleDeleteQuestion = async () => {
+    if (!questionToDelete) return;
+
+    try {
+      const { error } = await supabase
+        .from("questions")
+        .delete()
+        .eq("id", questionToDelete.id);
+
+      if (error) throw error;
+
+      if (questionToDelete.type === "objective") {
+        setQuestions(questions.filter((q) => q.id !== questionToDelete.id));
+        toast.success("Question deleted successfully");
+      } else {
+        setTheoryQuestions(
+          theoryQuestions.filter((q) => q.id !== questionToDelete.id),
+        );
+        toast.success("Theory question deleted successfully");
+      }
+
+      setDeleteDialogOpen(false);
+      setQuestionToDelete(null);
+      await loadQuestions();
+    } catch (error) {
+      console.error("Error deleting question:", error);
+      toast.error("Failed to delete question");
+    }
+  };
+
+  // ============================================
+  // THEORY QUESTION CRUD OPERATIONS
+  // ============================================
+
+  // ✅ Add Theory Question
   const handleAddTheoryQuestion = async (data: Partial<TheoryQuestion>) => {
     try {
-      const isDraft = data.is_draft !== undefined ? data.is_draft : true
-      
+      console.log("🔵 handleAddTheoryQuestion called with data:", data);
+
+      const isDraft = data.is_draft !== undefined ? data.is_draft : true;
+
       const newQuestion = {
         exam_id: examId,
-        question_text: data.question_text || '',
-        type: 'theory',
+        question_text: data.question_text || "",
+        question_type: "theory", // ✅ For check constraint
+        type: "theory", // ✅ For filtering
         points: theoryPointsPerQuestion,
         order_number: theoryQuestions.length + 1,
         sub_questions: data.sub_questions || [],
         keywords: data.keywords || [],
-        model_answer: data.model_answer || '',
+        model_answer: data.model_answer || "",
         is_draft: isDraft,
         options: [],
-        correct_answer: ''
-      }
+        correct_answer: "",
+        image_url: (data as any).image_url || null,
+        image_caption: (data as any).image_caption || null,
+        deleted_at: null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("🔵 Inserting theory question:", newQuestion);
 
       const { data: result, error } = await supabase
-        .from('questions')
+        .from("questions")
         .insert([newQuestion])
         .select()
-        .single()
+        .single();
 
-      if (error) throw error
+      if (error) {
+        console.error("❌ Supabase error:", error);
+        toast.error(`Failed to add theory question: ${error.message}`);
+        return;
+      }
 
-      setTheoryQuestions([...theoryQuestions, { ...result, points: theoryPointsPerQuestion } as TheoryQuestion])
-      toast.success(isDraft ? 'Theory question saved as draft' : 'Theory question added successfully')
-      setShowTheoryDialog(false)
-      setEditingTheoryQuestion(null)
-      await loadQuestions()
+      console.log("✅ Theory question added successfully:", result);
+
+      setTheoryQuestions([
+        ...theoryQuestions,
+        { ...result, points: theoryPointsPerQuestion } as TheoryQuestion,
+      ]);
+
+      await loadQuestions();
+
+      if (isDraft) {
+        toast.success("📝 Theory question saved as draft");
+      } else {
+        toast.success(
+          `✅ Theory question added (${theoryPointsPerQuestion} point${theoryPointsPerQuestion !== 1 ? "s" : ""})`,
+        );
+      }
+
+      setShowTheoryDialog(false);
+      setEditingTheoryQuestion(null);
     } catch (error) {
-      console.error('Error adding theory question:', error)
-      toast.error('Failed to add theory question')
+      console.error("🔥 Error adding theory question:", error);
+      toast.error("Failed to add theory question");
     }
-  }
+  };
 
-  // Update Theory Question
-  const handleUpdateTheoryQuestion = async (questionId: string, data: Partial<TheoryQuestion>) => {
+  // ✅ Update Theory Question
+  const handleUpdateTheoryQuestion = async (
+    questionId: string,
+    data: Partial<TheoryQuestion>,
+  ) => {
     try {
-      const isDraft = data.is_draft !== undefined ? data.is_draft : false
-      
+      console.log("🔵 handleUpdateTheoryQuestion called with data:", data);
+
+      const isDraft = data.is_draft !== undefined ? data.is_draft : false;
+
+      const updateData = {
+        question_text: data.question_text,
+        points: data.points || theoryPointsPerQuestion,
+        sub_questions: data.sub_questions || [],
+        keywords: data.keywords || [],
+        model_answer: data.model_answer || "",
+        is_draft: isDraft,
+        image_url: (data as any).image_url || null,
+        image_caption: (data as any).image_caption || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("🔵 Updating theory question:", updateData);
+
       const { error } = await supabase
-        .from('questions')
-        .update({
-          question_text: data.question_text,
-          points: data.points || theoryPointsPerQuestion,
-          sub_questions: data.sub_questions || [],
-          keywords: data.keywords || [],
-          model_answer: data.model_answer || '',
-          is_draft: isDraft
-        })
-        .eq('id', questionId)
+        .from("questions")
+        .update(updateData)
+        .eq("id", questionId);
 
-      if (error) throw error
+      if (error) {
+        console.error("❌ Update error:", error);
+        toast.error(`Failed to update theory question: ${error.message}`);
+        return;
+      }
 
-      setTheoryQuestions(theoryQuestions.map(q => q.id === questionId ? { ...q, ...data, points: data.points || theoryPointsPerQuestion } : q))
-      toast.success('Theory question updated successfully')
-      setShowTheoryDialog(false)
-      setEditingTheoryQuestion(null)
-      await loadQuestions()
+      setTheoryQuestions(
+        theoryQuestions.map((q) =>
+          q.id === questionId
+            ? { ...q, ...data, points: data.points || theoryPointsPerQuestion }
+            : q,
+        ),
+      );
+
+      await loadQuestions();
+
+      if (isDraft) {
+        toast.success("📝 Theory question saved as draft");
+      } else {
+        toast.success("✅ Theory question updated and marked as complete!");
+      }
+
+      setShowTheoryDialog(false);
+      setEditingTheoryQuestion(null);
     } catch (error) {
-      console.error('Error updating theory question:', error)
-      toast.error('Failed to update theory question')
+      console.error("🔥 Error updating theory question:", error);
+      toast.error("Failed to update theory question");
     }
-  }
+  };
 
-  // Points Summary Component
+  // ============================================
+  // POINTS SUMMARY
+  // ============================================
   const PointsSummary = () => (
     <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
       <CardContent className="p-3 sm:p-4">
         <div className="flex items-center gap-2 mb-2 sm:mb-3">
           <Calculator className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
-          <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-300">Exam Points Summary</h3>
-          <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={refreshing} className="ml-auto">
-            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+          <h3 className="font-semibold text-sm sm:text-base text-blue-800 dark:text-blue-300">
+            Exam Points Summary
+          </h3>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="ml-auto"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
+            />
           </Button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
           <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-blue-700">{objectiveCount}</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">Objective Qs</p>
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">
+              {objectiveCount}
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Objective Qs
+            </p>
           </div>
           <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-blue-700">{totalObjectivePoints}</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">Obj Points</p>
-            <p className="text-[8px] sm:text-[10px] text-muted-foreground">({objectivePointsPerQuestion} pts each)</p>
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">
+              {totalObjectivePoints}
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Obj Points
+            </p>
+            <p className="text-[8px] sm:text-[10px] text-muted-foreground">
+              ({objectivePointsPerQuestion} pts each)
+            </p>
           </div>
           <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-blue-700">{theoryCount}</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">Theory Qs</p>
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">
+              {theoryCount}
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Theory Qs
+            </p>
           </div>
           <div className="text-center">
-            <p className="text-xl sm:text-2xl font-bold text-blue-700">{totalTheoryPoints}</p>
-            <p className="text-[10px] sm:text-xs text-muted-foreground">Theory Points</p>
-            <p className="text-[8px] sm:text-[10px] text-muted-foreground">({theoryPointsPerQuestion} pts each)</p>
+            <p className="text-xl sm:text-2xl font-bold text-blue-700">
+              {totalTheoryPoints}
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
+              Theory Points
+            </p>
+            <p className="text-[8px] sm:text-[10px] text-muted-foreground">
+              ({theoryPointsPerQuestion} pts each)
+            </p>
           </div>
         </div>
         <div className="mt-2 sm:mt-3 pt-2 border-t border-blue-200 dark:border-blue-800 flex justify-between items-center">
-          <span className="text-xs sm:text-sm font-medium">Total Exam Points:</span>
-          <span className="text-base sm:text-lg font-bold text-blue-700">{totalExamPoints}</span>
+          <span className="text-xs sm:text-sm font-medium">
+            Total Exam Points:
+          </span>
+          <span className="text-base sm:text-lg font-bold text-blue-700">
+            {totalExamPoints}
+          </span>
         </div>
         <div className="flex justify-between items-center text-xs sm:text-sm">
           <span className="text-muted-foreground">Pass Mark:</span>
-          <span className="font-medium">{examDetails.pass_mark} / {totalExamPoints} ({totalExamPoints > 0 ? Math.round(passMarkPercentage) : 0}%)</span>
+          <span className="font-medium">
+            {examDetails.pass_mark} / {totalExamPoints} (
+            {totalExamPoints > 0 ? Math.round(passMarkPercentage) : 0}%)
+          </span>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 
-  // Question Card Component
-  const QuestionCard = ({ 
-    question, 
-    index, 
-    type, 
-    onEdit, 
-    onDelete 
-  }: { 
-    question: any, 
-    index: number, 
-    type: 'objective' | 'theory', 
-    onEdit: () => void, 
-    onDelete: () => void 
-  }) => (
-    <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border hover:shadow-md transition-shadow group">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-muted-foreground">#{index}</span>
-            <Badge variant={type === 'objective' ? 'default' : 'secondary'}>
-              {type === 'objective' ? 'Objective' : 'Theory'}
-            </Badge>
-            {question.is_draft && (
-              <Badge variant="outline" className="text-amber-600 border-amber-300">
-                Draft
+  // ============================================
+  // QUESTION CARD
+  // ============================================
+  const QuestionCard = ({
+    question,
+    index,
+    type,
+    onEdit,
+    onDelete,
+  }: {
+    question: any;
+    index: number;
+    type: "objective" | "theory";
+    onEdit: () => void;
+    onDelete: () => void;
+  }) => {
+    const isComplete =
+      type === "objective"
+        ? question.correct_answer &&
+          question.options?.some((opt: string) => opt.trim())
+        : true;
+
+    return (
+      <div
+        className={`p-4 rounded-xl group transition-all ${
+          question.is_draft
+            ? "bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800"
+            : isComplete
+              ? "bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800"
+              : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+        }`}
+      >
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-sm font-medium text-muted-foreground">
+                #{index}
+              </span>
+              <Badge variant={type === "objective" ? "default" : "secondary"}>
+                {type === "objective" ? "Objective" : "Theory"}
               </Badge>
-            )}
-            {!question.is_draft && (
-              <Badge className="bg-emerald-100 text-emerald-700">
-                Complete
-              </Badge>
-            )}
-            <Badge variant="outline">{question.points} pts</Badge>
-          </div>
-          
-          <p className="mt-2 font-medium line-clamp-2">{question.question_text}</p>
-          
-          {type === 'objective' && question.options && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {question.options.map((opt: string, idx: number) => (
-                <span key={idx} className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
-                  {String.fromCharCode(65 + idx)}. {opt}
-                </span>
-              ))}
+              {question.is_draft ? (
+                <Badge
+                  variant="outline"
+                  className="text-amber-600 border-amber-300 bg-amber-100 dark:bg-amber-900/30"
+                >
+                  📝 Draft
+                </Badge>
+              ) : isComplete ? (
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                  ✅ Complete
+                </Badge>
+              ) : (
+                <Badge
+                  variant="outline"
+                  className="text-amber-500 border-amber-300"
+                >
+                  ⚠️ Incomplete
+                </Badge>
+              )}
+              <Badge variant="outline">{question.points} pts</Badge>
             </div>
-          )}
-          
-          {type === 'objective' && question.correct_answer && (
-            <p className="mt-1 text-sm text-emerald-600">✓ Answer: {question.correct_answer}</p>
-          )}
-          
-          {type === 'theory' && question.sub_questions?.length > 0 && (
-            <p className="mt-1 text-sm text-muted-foreground">
-              {question.sub_questions.length} sub-question(s)
-            </p>
-          )}
-        </div>
-        
-        <div className="flex gap-1 ml-4">
-          <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0">
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onDelete} className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+
+            <p className="mt-2 font-medium">{question.question_text}</p>
+
+            {type === "objective" && question.options && (
+              <div className="ml-6 mt-2 space-y-1">
+                {question.options.map((opt: string, idx: number) => (
+                  <p key={idx} className="text-sm">
+                    <span className="font-medium">
+                      {String.fromCharCode(65 + idx)}.
+                    </span>{" "}
+                    {opt}
+                  </p>
+                ))}
+              </div>
+            )}
+
+            {type === "objective" && question.correct_answer && (
+              <div className="flex items-center gap-3 mt-2">
+                <Badge className="bg-green-100 text-green-700">
+                  Answer: {question.correct_answer}
+                </Badge>
+              </div>
+            )}
+
+            {type === "theory" && question.sub_questions?.length > 0 && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {question.sub_questions.length} sub-question(s)
+              </p>
+            )}
+
+            {question.is_draft && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
+                ⚠️ This question is a draft. Complete it before publishing.
+              </p>
+            )}
+          </div>
+
+          <div className="flex gap-1 ml-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onEdit}
+              className="h-8 w-8 p-0"
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onDelete}
+              className="h-8 w-8 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
-    </div>
-  )
+    );
+  };
 
-  // Questions List Component
+  // ============================================
+  // QUESTIONS LIST
+  // ============================================
   const QuestionsList = () => {
-    const allQuestions = [...questions, ...theoryQuestions.map(q => ({ ...q, type: 'theory' as const }))]
+    const allQuestions = [
+      ...questions,
+      ...theoryQuestions.map((q) => ({ ...q, type: "theory" as const })),
+    ];
 
     if (allQuestions.length === 0) {
       return (
         <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
           <FileQuestion className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <p className="text-lg font-medium text-muted-foreground">No questions yet</p>
-          <p className="text-sm text-muted-foreground mt-1">Start by adding your first question</p>
+          <p className="text-lg font-medium text-muted-foreground">
+            No questions yet
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Start by adding your first question
+          </p>
           <div className="flex gap-3 justify-center mt-4">
-            <Button onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }}>
+            <Button
+              onClick={() => {
+                setEditingQuestion(null);
+                setShowQuestionDialog(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-2" /> Add Objective Question
             </Button>
             {hasTheory && (
-              <Button variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setEditingTheoryQuestion(null);
+                  setShowTheoryDialog(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-2" /> Add Theory Question
               </Button>
             )}
           </div>
         </div>
-      )
+      );
     }
 
     return (
       <div className="space-y-4">
         <div className="flex justify-between items-center">
-          <h3 className="font-semibold text-lg">All Questions ({allQuestions.length})</h3>
+          <h3 className="font-semibold text-lg">
+            All Questions ({allQuestions.length})
+          </h3>
           <div className="flex gap-2">
-            <Button size="sm" onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }}>
+            <Button
+              size="sm"
+              onClick={() => {
+                setEditingQuestion(null);
+                setShowQuestionDialog(true);
+              }}
+            >
               <Plus className="h-4 w-4 mr-1" /> Add Objective
             </Button>
             {hasTheory && (
-              <Button size="sm" variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }}>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setEditingTheoryQuestion(null);
+                  setShowTheoryDialog(true);
+                }}
+              >
                 <Plus className="h-4 w-4 mr-1" /> Add Theory
               </Button>
             )}
@@ -664,8 +991,14 @@ export function EditExamPage({ examId }: EditExamPageProps) {
                 index={idx + 1}
                 question={q}
                 type="objective"
-                onEdit={() => { setEditingQuestion(q); setShowQuestionDialog(true); }}
-                onDelete={() => { setQuestionToDelete({ id: q.id, type: 'objective' }); setDeleteDialogOpen(true); }}
+                onEdit={() => {
+                  setEditingQuestion(q);
+                  setShowQuestionDialog(true);
+                }}
+                onDelete={() => {
+                  setQuestionToDelete({ id: q.id, type: "objective" });
+                  setDeleteDialogOpen(true);
+                }}
               />
             ))}
             {theoryQuestions.map((q, idx) => (
@@ -674,16 +1007,25 @@ export function EditExamPage({ examId }: EditExamPageProps) {
                 index={questions.length + idx + 1}
                 question={q}
                 type="theory"
-                onEdit={() => { setEditingTheoryQuestion(q); setShowTheoryDialog(true); }}
-                onDelete={() => { setQuestionToDelete({ id: q.id, type: 'theory' }); setDeleteDialogOpen(true); }}
+                onEdit={() => {
+                  setEditingTheoryQuestion(q);
+                  setShowTheoryDialog(true);
+                }}
+                onDelete={() => {
+                  setQuestionToDelete({ id: q.id, type: "theory" });
+                  setDeleteDialogOpen(true);
+                }}
               />
             ))}
           </div>
         </ScrollArea>
       </div>
-    )
-  }
+    );
+  };
 
+  // ============================================
+  // LOADING & ERROR STATES
+  // ============================================
   if (loading) {
     return (
       <div className="p-4 sm:p-6 lg:p-8">
@@ -692,7 +1034,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           <Skeleton className="h-96 w-full rounded-xl" />
         </div>
       </div>
-    )
+    );
   }
 
   if (loadError) {
@@ -703,14 +1045,14 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           <AlertDescription>
             {loadError}
             <div className="mt-4">
-              <Button onClick={() => router.push('/staff/exams')}>
+              <Button onClick={() => router.push("/staff/exams")}>
                 Back to Exams
               </Button>
             </div>
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
   if (!exam) {
@@ -721,16 +1063,19 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           <AlertDescription>
             Exam not found
             <div className="mt-4">
-              <Button onClick={() => router.push('/staff/exams')}>
+              <Button onClick={() => router.push("/staff/exams")}>
                 Back to Exams
               </Button>
             </div>
           </AlertDescription>
         </Alert>
       </div>
-    )
+    );
   }
 
+  // ============================================
+  // MAIN RENDER
+  // ============================================
   return (
     <div className="relative w-full h-full overflow-y-auto">
       <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
@@ -738,7 +1083,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           examId={examId}
           examTitle={exam?.title}
           term={examDetails.term}
-          termName={TERM_NAMES[examDetails.term] || 'Third Term'}
+          termName={TERM_NAMES[examDetails.term] || "Third Term"}
           sessionYear={examDetails.session_year}
           saving={saving}
           onSave={handleSaveExam}
@@ -748,11 +1093,22 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3 gap-1 sm:gap-2 mb-4 sm:mb-6 h-auto sm:h-10">
-            <TabsTrigger value="questions" className="text-xs sm:text-sm py-1.5 sm:py-2">
+            <TabsTrigger
+              value="questions"
+              className="text-xs sm:text-sm py-1.5 sm:py-2"
+            >
               Questions ({totalQuestions})
             </TabsTrigger>
-            <TabsTrigger value="details" className="text-xs sm:text-sm py-1.5 sm:py-2">Exam Details</TabsTrigger>
-            <TabsTrigger value="preview" className="text-xs sm:text-sm py-1.5 sm:py-2">
+            <TabsTrigger
+              value="details"
+              className="text-xs sm:text-sm py-1.5 sm:py-2"
+            >
+              Exam Details
+            </TabsTrigger>
+            <TabsTrigger
+              value="preview"
+              className="text-xs sm:text-sm py-1.5 sm:py-2"
+            >
               <Eye className="h-3 w-3 sm:h-4 sm:w-4 mr-1" /> Preview
             </TabsTrigger>
           </TabsList>
@@ -788,20 +1144,20 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         <QuestionFormDialog
           open={showQuestionDialog}
           onOpenChange={(open) => {
-            setShowQuestionDialog(open)
-            if (!open) setEditingQuestion(null)
+            setShowQuestionDialog(open);
+            if (!open) setEditingQuestion(null);
           }}
           initialData={editingQuestion || undefined}
           onSave={(data) => {
             if (editingQuestion) {
-              handleUpdateQuestion(editingQuestion.id, data)
+              handleUpdateQuestion(editingQuestion.id, data);
             } else {
-              handleAddQuestion(data)
+              handleAddQuestion(data);
             }
           }}
           onCancel={() => {
-            setShowQuestionDialog(false)
-            setEditingQuestion(null)
+            setShowQuestionDialog(false);
+            setEditingQuestion(null);
           }}
         />
 
@@ -809,20 +1165,20 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         <TheoryQuestionFormDialog
           open={showTheoryDialog}
           onOpenChange={(open) => {
-            setShowTheoryDialog(open)
-            if (!open) setEditingTheoryQuestion(null)
+            setShowTheoryDialog(open);
+            if (!open) setEditingTheoryQuestion(null);
           }}
           initialData={editingTheoryQuestion || undefined}
           onSave={(data) => {
             if (editingTheoryQuestion) {
-              handleUpdateTheoryQuestion(editingTheoryQuestion.id, data)
+              handleUpdateTheoryQuestion(editingTheoryQuestion.id, data);
             } else {
-              handleAddTheoryQuestion(data)
+              handleAddTheoryQuestion(data);
             }
           }}
           onCancel={() => {
-            setShowTheoryDialog(false)
-            setEditingTheoryQuestion(null)
+            setShowTheoryDialog(false);
+            setEditingTheoryQuestion(null);
           }}
         />
 
@@ -832,11 +1188,15 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             <DialogHeader>
               <DialogTitle>Delete Question</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete this question? This action cannot be undone.
+                Are you sure you want to delete this question? This action
+                cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              <Button
+                variant="outline"
+                onClick={() => setDeleteDialogOpen(false)}
+              >
                 Cancel
               </Button>
               <Button variant="destructive" onClick={handleDeleteQuestion}>
@@ -847,5 +1207,5 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         </Dialog>
       </div>
     </div>
-  )
+  );
 }

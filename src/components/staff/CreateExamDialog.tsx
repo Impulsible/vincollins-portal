@@ -1,3 +1,5 @@
+// src/components/staff/exams/CreateExamDialog.tsx - COMPLETE WITH BOTH SOURCES SAVING
+
 'use client'
 
 import { useState, useRef, useMemo, useEffect } from 'react'
@@ -22,7 +24,7 @@ import {
   Upload, FileUp, Download, AlertCircle, CheckCheck, Sparkles,
   ChevronLeft, ChevronRight, Eye, MonitorPlay, Shield, Flag, Award,
   Shuffle, Calculator, GraduationCap, BookOpen, Layers, Image as ImageIcon,
-  X
+  X, Database
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -597,7 +599,7 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
   
   const [defaultMark, setDefaultMark] = useState<number>(0.5)
   
-  // ✅ Flexible scoring states
+  // Flexible scoring states
   const [objectiveMax, setObjectiveMax] = useState(20)
   const [theoryMax, setTheoryMax] = useState(40)
   const [theoryQuestionsTotal, setTheoryQuestionsTotal] = useState(0)
@@ -613,7 +615,9 @@ export function CreateExamDialog({ open, onOpenChange, onSuccess, teacherProfile
     instructions: '',
     pass_mark: 50,
     randomize_questions: true,
-    randomize_options: true
+    randomize_options: true,
+    term: 'third',
+    session_year: '2025/2026'
   })
   
   const [questions, setQuestions] = useState<Question[]>([])
@@ -987,7 +991,9 @@ b. Second sub-question
       setTimeout(() => {
         setExamDetails({ 
           title: '', subject: '', class: '', duration: 60, instructions: '', pass_mark: 50,
-          randomize_questions: true, randomize_options: true
+          randomize_questions: true, randomize_options: true,
+          term: 'third',
+          session_year: '2025/2026'
         })
         setQuestions([])
         setTheoryQuestions([])
@@ -1013,6 +1019,7 @@ b. Second sub-question
     onOpenChange(open)
   }
 
+  // ✅ UPDATED: handleSubmit - Saves to BOTH questions table AND exam.questions JSONB
   const handleSubmit = async (submitForApproval: boolean = false) => {
     if (!examDetails.title || !examDetails.subject || !examDetails.class) {
       toast.error('Please fill in all exam details')
@@ -1050,78 +1057,31 @@ b. Second sub-question
       const teacherName = profileData?.full_name || teacherProfile?.full_name || session.user.email?.split('@')[0] || 'Teacher'
       const department = profileData?.department || teacherProfile?.department || 'General'
 
-      let objectiveCount = 0
-      let objectiveMarks = 0
-      questions.forEach((q: Question) => {
-        objectiveCount++
-        objectiveMarks += q.marks || 0
-      })
-
-      let theoryCount = 0
-      let theoryMarks = 0
-      if (hasTheory) {
-        theoryQuestions.forEach((q: TheoryQuestion) => {
-          theoryCount++
-          theoryMarks += q.marks || 10
-        })
-      }
-
-      const totalQuestionsCount = objectiveCount + theoryCount
-      const totalMarksSum = objectiveMarks + theoryMarks
-
-      const questionsArray: any[] = []
-      
-      questions.forEach((q: Question, idx: number) => {
-        questionsArray.push({
-          id: crypto.randomUUID(),
-          type: 'mcq',
-          question: q.question,
-          options: q.options,
-          correct_answer: q.correct_answer,
-          marks: q.marks,
-          order: idx + 1
-        })
-      })
-      
-      if (hasTheory) {
-        theoryQuestions.forEach((q: TheoryQuestion, idx: number) => {
-          questionsArray.push({
-            id: crypto.randomUUID(),
-            type: 'theory',
-            question: q.question,
-            marks: q.marks || 10,
-            sub_questions: q.sub_questions || [],
-            image_url: q.image_url || null,
-            image_caption: q.image_caption || null,
-            order: objectiveCount + idx + 1
-          })
-        })
-      }
-
+      // ✅ Step 1: Create the exam
       const examData = {
         title: examDetails.title,
         duration: examDetails.duration,
         subject: examDetails.subject,
         class: examDetails.class,
-        total_questions: totalQuestionsCount,
-        total_marks: totalMarksSum,
         pass_mark: examDetails.pass_mark,
         instructions: examDetails.instructions,
         randomize_questions: examDetails.randomize_questions,
         randomize_options: examDetails.randomize_options,
         has_theory: hasTheory,
         status: submitForApproval ? 'pending' : 'draft',
-        questions: questionsArray,
         created_by: createdBy,
         teacher_name: teacherName,
         department: department,
-        // ✅ Flexible scoring fields
+        term: examDetails.term || 'third',
+        session_year: examDetails.session_year || '2025/2026',
         objective_max: objectiveMax,
         theory_max: hasTheory ? (scoringRule !== 'standard' && theoryQuestionsToAnswer ? theoryQuestionsToAnswer * theoryMarksPerQuestion : theoryQuestionsTotal * theoryMarksPerQuestion) : 0,
         theory_questions_total: theoryQuestionsTotal,
         theory_questions_to_answer: theoryQuestionsToAnswer,
         theory_marks_per_question: theoryMarksPerQuestion,
         scoring_rule: scoringRule,
+        total_questions: 0,
+        total_marks: 0,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }
@@ -1134,41 +1094,159 @@ b. Second sub-question
 
       if (examError) throw examError
 
-      if (submitForApproval) {
-        try {
-          const { data: admins } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('role', 'admin')
+      const examId = examResult.id
+      console.log('✅ Exam created:', examId)
 
-          if (admins && admins.length > 0) {
-            const notifications = admins.map((admin: any) => ({
-              title: '📝 New Exam Pending Approval',
-              message: `${examDetails.title} (${examDetails.subject} - ${examDetails.class}) by ${teacherName} is pending approval.`,
-              type: 'exam_approval',
-              user_id: admin.id,
-              exam_id: examResult.id,
-              class: examDetails.class,
-              subject: examDetails.subject,
-              read: false,
-              action_url: `/admin?tab=exams`,
-              created_at: new Date().toISOString()
-            }))
-            await supabase.from('notifications').insert(notifications)
-          }
-        } catch (e) {
-          console.log('Notification error:', e)
-        }
-        
-        toast.success(`Exam submitted for approval! Total: ${totalMarksSum} marks from ${totalQuestionsCount} questions.`)
-      } else {
-        toast.success('Exam saved as draft!')
+      // ✅ Step 2: Prepare questions for BOTH storage methods
+      let questionsForJsonb: any[] = []
+
+      // Format objective questions for JSONB
+      if (questions.length > 0) {
+        questionsForJsonb = questions.map((q, idx) => ({
+          id: q.id || crypto.randomUUID(),
+          type: 'objective',
+          question: q.question,
+          options: q.options || [],
+          correct_answer: q.correct_answer || '',
+          marks: q.marks || 1,
+          order: idx + 1,
+          is_draft: true
+        }))
       }
+
+      // Format theory questions for JSONB
+      if (hasTheory && theoryQuestions.length > 0) {
+        const theoryForJsonb = theoryQuestions.map((q, idx) => ({
+          id: q.id || crypto.randomUUID(),
+          type: 'theory',
+          question: q.question,
+          marks: q.marks || 10,
+          order: questions.length + idx + 1,
+          sub_questions: q.sub_questions || [],
+          image_url: q.image_url || null,
+          image_caption: q.image_caption || null,
+          is_draft: true
+        }))
+        questionsForJsonb = [...questionsForJsonb, ...theoryForJsonb]
+      }
+
+      // ✅ Step 3: Save to questions TABLE
+      let tableSavedQuestions: any[] = []
+      if (questions.length > 0) {
+        console.log(`📝 Saving ${questions.length} objective questions to table...`)
+        
+        const questionsToInsert = questions.map((q, idx) => ({
+          exam_id: examId,
+          question_text: q.question,
+          question_type: 'mcq',
+          type: 'objective',
+          options: q.options || [],
+          correct_answer: q.correct_answer || '',
+          points: q.marks || 1,
+          order_number: idx + 1,
+          is_draft: true,
+          sub_questions: [],
+          keywords: [],
+          model_answer: '',
+          deleted_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }))
+
+        const { data: inserted, error: qError } = await supabase
+          .from('questions')
+          .insert(questionsToInsert)
+          .select()
+
+        if (qError) {
+          console.error('❌ Error saving questions to table:', qError)
+          toast.error('Exam created but questions failed to save to table.')
+        } else {
+          tableSavedQuestions = inserted || []
+          console.log(`✅ Saved ${tableSavedQuestions.length} objective questions to table`)
+        }
+      }
+
+      // Save theory questions to table
+      let tableSavedTheoryQuestions: any[] = []
+      if (hasTheory && theoryQuestions.length > 0) {
+        console.log(`📝 Saving ${theoryQuestions.length} theory questions to table...`)
+        
+        const theoryToInsert = theoryQuestions.map((q, idx) => ({
+          exam_id: examId,
+          question_text: q.question,
+          question_type: 'theory',
+          type: 'theory',
+          points: q.marks || 10,
+          order_number: questions.length + idx + 1,
+          is_draft: true,
+          sub_questions: q.sub_questions || [],
+          keywords: [],
+          model_answer: '',
+          image_url: q.image_url || null,
+          image_caption: q.image_caption || null,
+          deleted_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }))
+
+        const { data: inserted, error: tError } = await supabase
+          .from('questions')
+          .insert(theoryToInsert)
+          .select()
+
+        if (tError) {
+          console.error('❌ Error saving theory questions to table:', tError)
+        } else {
+          tableSavedTheoryQuestions = inserted || []
+          console.log(`✅ Saved ${tableSavedTheoryQuestions.length} theory questions to table`)
+        }
+      }
+
+      // ✅ Step 4: Save to exam.questions JSONB array
+      const allSavedQuestions = [...tableSavedQuestions, ...tableSavedTheoryQuestions]
+      const totalQCount = allSavedQuestions.length
+      const totalMarksSum = allSavedQuestions.reduce((sum, q) => sum + (q.points || 0), 0)
+
+      // Update the exam with JSONB questions
+      const { error: jsonbError } = await supabase
+        .from('exams')
+        .update({
+          questions: questionsForJsonb,
+          total_questions: totalQCount,
+          total_marks: totalMarksSum,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', examId)
+
+      if (jsonbError) {
+        console.error('❌ Error saving questions to JSONB:', jsonbError)
+        toast.warning('Questions saved to table but JSONB update failed. View might not show all questions.')
+      } else {
+        console.log(`✅ Saved ${questionsForJsonb.length} questions to exam.questions JSONB`)
+      }
+
+      // ✅ Step 5: Also update the table totals (as fallback)
+      await supabase
+        .from('exams')
+        .update({
+          total_questions: totalQCount,
+          total_marks: totalMarksSum,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', examId)
+
+      // ✅ Success!
+      const saveMessage = submitForApproval 
+        ? `✅ Exam submitted for approval! ${totalQCount} questions saved (Table + JSONB).`
+        : `✅ Exam saved as draft! ${totalQCount} questions saved (Table + JSONB).`
+      
+      toast.success(saveMessage)
       
       onSuccess()
       handleOpenChange(false)
     } catch (error: any) {
-      console.error('Error creating exam:', error)
+      console.error('❌ Error creating exam:', error)
       toast.error(error.message || 'Failed to create exam')
     } finally {
       setLoading(false)
@@ -1204,7 +1282,11 @@ b. Second sub-question
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
                   <Label>Exam Title *</Label>
-                  <Input value={examDetails.title} onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} placeholder="e.g., First Term Examination" />
+                  <Input 
+                    value={examDetails.title} 
+                    onChange={(e) => setExamDetails({ ...examDetails, title: e.target.value })} 
+                    placeholder="e.g., Third Term Examination" 
+                  />
                 </div>
                 <div>
                   <Label>Class *</Label>
@@ -1235,15 +1317,68 @@ b. Second sub-question
                 </div>
                 <div>
                   <Label>Duration (minutes)</Label>
-                  <Input type="number" value={examDetails.duration} onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 60 })} />
+                  <Input 
+                    type="number" 
+                    value={examDetails.duration} 
+                    onChange={(e) => setExamDetails({ ...examDetails, duration: parseInt(e.target.value) || 0 })} 
+                    onFocus={(e) => e.target.select()}
+                    placeholder="e.g., 60"
+                    min={1}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Enter the exam duration in minutes</p>
                 </div>
                 <div>
                   <Label>Pass Mark (%)</Label>
-                  <Input type="number" value={examDetails.pass_mark} onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 50 })} />
+                  <Input 
+                    type="number" 
+                    value={examDetails.pass_mark} 
+                    onChange={(e) => setExamDetails({ ...examDetails, pass_mark: parseInt(e.target.value) || 0 })} 
+                    onFocus={(e) => e.target.select()}
+                    placeholder="e.g., 50"
+                    min={1}
+                    max={100}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Students need this percentage to pass</p>
                 </div>
               </div>
 
-              {/* ✅ Flexible Scoring Section */}
+              {/* Term and Session */}
+              <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                <div>
+                  <Label>Term *</Label>
+                  <Select 
+                    value={examDetails.term} 
+                    onValueChange={(v) => setExamDetails({ ...examDetails, term: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select term" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="first">First Term</SelectItem>
+                      <SelectItem value="second">Second Term</SelectItem>
+                      <SelectItem value="third">Third Term</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Session Year *</Label>
+                  <Select 
+                    value={examDetails.session_year} 
+                    onValueChange={(v) => setExamDetails({ ...examDetails, session_year: v })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select session" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="2024/2025">2024/2025</SelectItem>
+                      <SelectItem value="2025/2026">2025/2026</SelectItem>
+                      <SelectItem value="2026/2027">2026/2027</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Flexible Scoring */}
               <div className="grid grid-cols-2 gap-4 p-4 bg-muted/30 rounded-lg">
                 <div>
                   <Label>Objective Questions Total Marks</Label>
@@ -1258,7 +1393,6 @@ b. Second sub-question
                     }} 
                     placeholder="e.g., 20 or 30"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Total marks for objective section</p>
                 </div>
                 <div>
                   <Label>Theory Questions Total Marks</Label>
@@ -1273,11 +1407,9 @@ b. Second sub-question
                     }} 
                     placeholder="e.g., 40 or 30"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Total marks for theory section</p>
                 </div>
               </div>
 
-              {/* Show exam total calculation */}
               <div className="bg-blue-50 rounded-lg p-3 text-center">
                 <p className="text-sm text-blue-700">
                   📊 Exam Total: {objectiveMax + theoryMax} marks
@@ -1285,12 +1417,8 @@ b. Second sub-question
                     <span className="text-amber-600 ml-2">(Recommended: 60 marks)</span>
                   )}
                 </p>
-                <p className="text-xs text-blue-600 mt-1">
-                  CA (40) + Exam ({objectiveMax + theoryMax}) = {40 + objectiveMax + theoryMax} Grand Total
-                </p>
               </div>
 
-              {/* ✅ Theory Configuration (only if hasTheory) */}
               {hasTheory && (
                 <div className="space-y-4 p-4 bg-purple-50 rounded-lg border">
                   <h4 className="font-semibold text-sm text-purple-800">📝 Theory Scoring Configuration</h4>
@@ -1313,7 +1441,6 @@ b. Second sub-question
                         min={0}
                         max={20}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Total number of theory questions</p>
                     </div>
                     
                     <div>
@@ -1334,11 +1461,9 @@ b. Second sub-question
                         max={20}
                         step={1}
                       />
-                      <p className="text-xs text-muted-foreground mt-1">Marks for each theory question</p>
                     </div>
                   </div>
 
-                  {/* Scoring Rule Selection */}
                   <div>
                     <Label className="mb-2 block">Scoring Rule</Label>
                     <RadioGroup 
@@ -1370,7 +1495,6 @@ b. Second sub-question
                     </RadioGroup>
                   </div>
 
-                  {/* Questions to Answer (for best_of or choose_any) */}
                   {(scoringRule === 'best_of' || scoringRule === 'choose_any') && (
                     <div>
                       <Label>Questions to Answer/Count</Label>
@@ -1388,15 +1512,9 @@ b. Second sub-question
                         max={theoryQuestionsTotal || 20}
                         placeholder="e.g., 4"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {scoringRule === 'best_of' 
-                          ? "Number of highest-scoring questions to count" 
-                          : "Number of questions student must choose to answer"}
-                      </p>
                     </div>
                   )}
 
-                  {/* Theory Scoring Summary */}
                   <div className="bg-purple-100 rounded-lg p-3 mt-2">
                     <p className="text-sm font-medium text-purple-800">Theory Scoring Summary:</p>
                     <ul className="text-xs text-purple-700 mt-1 space-y-1">
@@ -1444,7 +1562,12 @@ b. Second sub-question
 
               <div>
                 <Label>Instructions</Label>
-                <Textarea value={examDetails.instructions} onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} rows={3} />
+                <Textarea 
+                  value={examDetails.instructions} 
+                  onChange={(e) => setExamDetails({ ...examDetails, instructions: e.target.value })} 
+                  rows={3} 
+                  placeholder="Enter exam instructions for students..."
+                />
               </div>
               
               <div className="flex justify-end">
@@ -1452,9 +1575,8 @@ b. Second sub-question
               </div>
             </TabsContent>
 
-            {/* Objective Questions Tab (same as before) */}
+            {/* Questions Tab */}
             <TabsContent value="questions" className="space-y-4 mt-0">
-              {/* ... keep existing objective questions code ... */}
               <div className="flex gap-2 border-b pb-3">
                 <Button variant={objectiveUploadMode === 'bulk' ? 'default' : 'outline'} size="sm" onClick={() => setObjectiveUploadMode('bulk')}>
                   <Sparkles className="mr-1 h-3 w-3" /> Bulk Import
