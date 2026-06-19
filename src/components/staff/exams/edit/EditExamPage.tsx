@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,8 +20,6 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -155,6 +153,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     type: "objective" | "theory";
   } | null>(null);
 
+  const isUpdatingRef = useRef(false);
+  const initialLoadDoneRef = useRef(false);
+
   const availableSubjects = useMemo(() => {
     if (!examDetails.class) return [];
     return examDetails.class.startsWith("JSS") ? JSS_SUBJECTS : SS_SUBJECTS;
@@ -174,10 +175,14 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   // LOAD FUNCTIONS
   // ============================================
 
-  // ✅ Load questions - filters by 'type' column
-  const loadQuestions = useCallback(async () => {
+  const loadQuestions = useCallback(async (caller?: string) => {
+    if (isUpdatingRef.current) {
+      console.log("⏭️ Skipping loadQuestions - update in progress");
+      return;
+    }
+
     try {
-      console.log("🔵 Loading questions for exam:", examId);
+      console.log(`🔵 Loading questions for exam: ${examId} (called by: ${caller || 'unknown'})`);
 
       const { data: allQuestions, error } = await supabase
         .from("questions")
@@ -194,25 +199,22 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       console.log(`✅ Loaded ${allQuestions?.length || 0} active questions`);
 
       if (allQuestions && allQuestions.length > 0) {
-        // ✅ Filter by 'type' column (set to 'objective' or 'theory')
         const objectiveQs = allQuestions.filter((q) => q.type === "objective");
         const theoryQs = allQuestions.filter((q) => q.type === "theory");
 
         console.log(
-          `📊 Objective: ${objectiveQs.length}, Theory: ${theoryQs.length}`,
+          `📊 Objective: ${objectiveQs.length}, Theory: ${theoryQs.length}`
         );
 
         if (objectiveQs.length > 0) {
           const parsed = objectiveQs.map((q) => ({
             ...q,
-            options:
-              typeof q.options === "string"
-                ? JSON.parse(q.options)
-                : q.options || [],
+            question_text: q.question_text || "",
+            options: q.options || [],
             points:
-              typeof q.points === "string"
-                ? parseFloat(q.points)
-                : q.points || 1,
+              typeof q.points === "string" ? parseFloat(q.points) : q.points || 1,
+            type: "objective" as const,
+            question_type: q.question_type || "mcq",
           }));
           setQuestions(parsed as Question[]);
           if (parsed[0]?.points) {
@@ -225,10 +227,13 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         if (theoryQs.length > 0) {
           const parsed = theoryQs.map((q) => ({
             ...q,
+            question_text: q.question_text || "",
             points:
-              typeof q.points === "string"
-                ? parseFloat(q.points)
-                : q.points || 5,
+              typeof q.points === "string" ? parseFloat(q.points) : q.points || 5,
+            sub_questions: q.sub_questions || [],
+            keywords: q.keywords || [],
+            type: "theory" as const,
+            question_type: "theory" as const,
           }));
           setTheoryQuestions(parsed as TheoryQuestion[]);
           if (parsed[0]?.points) {
@@ -246,13 +251,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     }
   }, [examId]);
 
-  // ✅ Load exam data
   const loadExamData = useCallback(async () => {
     try {
       setLoading(true);
       setLoadError(null);
-
-      console.log("🔵 Loading exam with ID:", examId);
 
       const { data: examData, error: examError } = await supabase
         .from("exams")
@@ -272,8 +274,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       }
 
       console.log("✅ Exam data loaded:", examData);
-      console.log("📝 Term from DB:", examData.term);
-      console.log("📝 Session from DB:", examData.session_year);
 
       const examWithDefaults = {
         ...examData,
@@ -289,9 +289,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
       const examTerm = examData.term || CURRENT_TERM;
       const examSession = examData.session_year || CURRENT_SESSION;
-
-      console.log("📝 Using term:", examTerm, "→", TERM_NAMES[examTerm]);
-      console.log("📝 Using session:", examSession);
 
       setExamDetails({
         title: examData.title || "",
@@ -309,7 +306,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         target_audience: examData.target_audience || "all",
       });
 
-      await loadQuestions();
+      await loadQuestions('loadExamData');
+      initialLoadDoneRef.current = true;
     } catch (error) {
       console.error("🔥 Error loading exam:", error);
       toast.error("Failed to load exam data. Please refresh and try again.");
@@ -329,8 +327,13 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   // ============================================
   const updateExamTotals = useCallback(async () => {
     if (!examId || loading) return;
+    if (isUpdatingRef.current) {
+      console.log("⏭️ Skipping updateExamTotals - update in progress");
+      return;
+    }
 
     try {
+      console.log("📊 Updating exam totals:", { totalQuestions, totalExamPoints });
       const { error } = await supabase
         .from("exams")
         .update({
@@ -347,7 +350,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   }, [examId, totalQuestions, totalExamPoints, loading]);
 
   useEffect(() => {
-    if (!loading && examId) {
+    if (!loading && examId && !isUpdatingRef.current && initialLoadDoneRef.current) {
       updateExamTotals();
     }
   }, [
@@ -361,11 +364,15 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   ]);
 
   // ============================================
-  // REFRESH & SAVE
+  // REFRESH
   // ============================================
   const handleRefresh = useCallback(async () => {
+    if (isUpdatingRef.current) {
+      toast.info("Please wait for the current operation to complete");
+      return;
+    }
     setRefreshing(true);
-    await loadQuestions();
+    await loadQuestions('manual refresh');
     setRefreshing(false);
     toast.success("Questions refreshed");
   }, [loadQuestions]);
@@ -409,35 +416,53 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   };
 
   // ============================================
-  // QUESTION CRUD OPERATIONS
+  // OBJECTIVE QUESTION CRUD OPERATIONS
   // ============================================
 
-  // ✅ Add Objective Question - with both type AND question_type
   const handleAddQuestion = async (data: Partial<Question>) => {
+    isUpdatingRef.current = true;
+    
     try {
       console.log("🔵 handleAddQuestion called with data:", data);
+
+      if (!data.question_text || data.question_text.trim() === "") {
+        toast.error("Question text is required");
+        isUpdatingRef.current = false;
+        return;
+      }
+
+      const validOptions = (data.options || []).filter(
+        (opt) => opt.trim() !== ""
+      );
+      if (validOptions.length < 2 && data.is_draft !== true) {
+        toast.error("Please add at least 2 options");
+        isUpdatingRef.current = false;
+        return;
+      }
 
       const isDraft = data.is_draft !== undefined ? data.is_draft : true;
 
       const newQuestion = {
         exam_id: examId,
-        question_text: data.question_text || "",
-        question_type: "mcq", // ✅ For check constraint
-        type: "objective", // ✅ For filtering
-        options: data.options || [],
-        correct_answer: data.correct_answer || "",
+        question_text: data.question_text.trim(),
+        question_type: "mcq",
+        type: "objective",
+        options: validOptions.length > 0 ? validOptions : ["", "", "", ""],
+        correct_answer: data.correct_answer?.trim() || "",
         points: objectivePointsPerQuestion,
         order_number: questions.length + 1,
         is_draft: isDraft,
         sub_questions: [],
         keywords: [],
         model_answer: "",
+        image_url: null,
+        image_caption: null,
         deleted_at: null,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      console.log("🔵 Inserting question:", newQuestion);
+      console.log("🔵 Inserting objective question:", newQuestion);
 
       const { data: result, error } = await supabase
         .from("questions")
@@ -448,130 +473,145 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       if (error) {
         console.error("❌ Supabase error:", error);
         toast.error(`Failed to add question: ${error.message}`);
+        isUpdatingRef.current = false;
         return;
       }
 
-      console.log("✅ Question added successfully:", result);
+      console.log("✅ Objective question added successfully:", result);
 
-      const parsedResult = {
-        ...result,
-        options:
-          typeof result.options === "string"
-            ? JSON.parse(result.options)
-            : result.options || [],
-      };
+      await loadQuestions('after add');
 
-      setQuestions((prev) => [
-        ...prev,
-        { ...parsedResult, points: objectivePointsPerQuestion } as Question,
-      ]);
-
-      await loadQuestions();
-
-      if (isDraft) {
-        toast.success("📝 Question saved as draft!");
-      } else {
-        toast.success(
-          `✅ Question added (${objectivePointsPerQuestion} point${objectivePointsPerQuestion !== 1 ? "s" : ""})`,
-        );
-      }
+      toast.success(
+        isDraft
+          ? "📝 Question saved as draft!"
+          : `✅ Question added (${objectivePointsPerQuestion} point${
+              objectivePointsPerQuestion !== 1 ? "s" : ""
+            })`
+      );
 
       setShowQuestionDialog(false);
       setEditingQuestion(null);
+      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error adding question:", error);
       toast.error("Failed to add question");
+      isUpdatingRef.current = false;
     }
   };
 
-  // ✅ Update Objective Question
+  // ✅ FIXED: Update Objective Question - removed as const, added select and reload
   const handleUpdateQuestion = async (
     questionId: string,
-    data: Partial<Question>,
+    data: Partial<Question>
   ) => {
+    isUpdatingRef.current = true;
+    
     try {
-      console.log("🔵 handleUpdateQuestion called with data:", data);
+      console.log("🔵 handleUpdateQuestion called with data:", JSON.stringify(data, null, 2));
+      console.log("🔵 Question ID:", questionId);
 
-      const isDraft = data.is_draft !== undefined ? data.is_draft : false;
-
-      const updateData = {
-        question_text: data.question_text,
-        options: data.options,
-        correct_answer: data.correct_answer,
-        points: data.points || objectivePointsPerQuestion,
-        is_draft: isDraft,
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("🔵 Updating question:", updateData);
-
-      const { error } = await supabase
-        .from("questions")
-        .update(updateData)
-        .eq("id", questionId);
-
-      if (error) {
-        console.error("❌ Update error:", error);
-        toast.error(`Failed to update question: ${error.message}`);
+      if (!data.question_text || data.question_text.trim() === "") {
+        toast.error("Question text is required");
+        isUpdatingRef.current = false;
         return;
       }
 
-      setQuestions(
-        questions.map((q) =>
-          q.id === questionId
-            ? {
-                ...q,
-                ...data,
-                points: data.points || objectivePointsPerQuestion,
-              }
-            : q,
-        ),
+      const validOptions = (data.options || []).filter(
+        (opt) => opt.trim() !== ""
       );
 
-      await loadQuestions();
+      const isDraft = data.is_draft !== undefined ? data.is_draft : false;
 
-      if (isDraft) {
-        toast.success("📝 Question saved as draft");
-      } else {
-        toast.success("✅ Question updated and marked as complete!");
+      // ✅ REMOVED as const - using regular strings
+      const updateData = {
+        question_text: data.question_text.trim(),
+        options: validOptions.length > 0 ? validOptions : ["", "", "", ""],
+        correct_answer: data.correct_answer?.trim() || "",
+        points: data.points || objectivePointsPerQuestion,
+        is_draft: isDraft,
+        question_type: "mcq",
+        type: "objective",
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("🔵 Updating objective question with data:", JSON.stringify(updateData, null, 2));
+
+      // ✅ REMOVED .is("deleted_at", null) - RLS policy handles this
+      const { data: updatedResult, error: updateError } = await supabase
+        .from("questions")
+        .update(updateData)
+        .eq("id", questionId)
+        .select();
+
+      if (updateError) {
+        console.error("❌ Update error:", updateError);
+        toast.error(`Failed to update question: ${updateError.message}`);
+        isUpdatingRef.current = false;
+        return;
       }
+
+      console.log("✅ Question updated successfully in database");
+      console.log("📝 Updated result:", JSON.stringify(updatedResult, null, 2));
+
+      if (updatedResult && updatedResult.length > 0) {
+        console.log(`📝 is_draft now: ${updatedResult[0].is_draft}`);
+      }
+
+      // ✅ Reload to get fresh data
+      await loadQuestions('after update');
+
+      toast.success(
+        isDraft
+          ? "📝 Question saved as draft"
+          : "✅ Question updated and marked as complete!"
+      );
 
       setShowQuestionDialog(false);
       setEditingQuestion(null);
+      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error updating question:", error);
-      toast.error("Failed to update question");
+      toast.error("Failed to update question. Please try again.");
+      isUpdatingRef.current = false;
     }
   };
 
-  // ✅ Delete Question - Hard Delete
+  // ✅ FIXED: Delete Question with soft delete
   const handleDeleteQuestion = async () => {
     if (!questionToDelete) return;
+    isUpdatingRef.current = true;
 
     try {
+      console.log(`🔵 Soft-deleting question: ${questionToDelete.id}`);
+
       const { error } = await supabase
         .from("questions")
-        .delete()
+        .update({ 
+          deleted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
         .eq("id", questionToDelete.id);
 
-      if (error) throw error;
-
-      if (questionToDelete.type === "objective") {
-        setQuestions(questions.filter((q) => q.id !== questionToDelete.id));
-        toast.success("Question deleted successfully");
-      } else {
-        setTheoryQuestions(
-          theoryQuestions.filter((q) => q.id !== questionToDelete.id),
-        );
-        toast.success("Theory question deleted successfully");
+      if (error) {
+        console.error("❌ Delete error:", error);
+        toast.error(`Failed to delete question: ${error.message}`);
+        isUpdatingRef.current = false;
+        return;
       }
+
+      console.log("✅ Question soft-deleted successfully");
+
+      await loadQuestions('after delete');
+
+      toast.success("Question deleted successfully");
 
       setDeleteDialogOpen(false);
       setQuestionToDelete(null);
-      await loadQuestions();
+      isUpdatingRef.current = false;
     } catch (error) {
-      console.error("Error deleting question:", error);
+      console.error("🔥 Error deleting question:", error);
       toast.error("Failed to delete question");
+      isUpdatingRef.current = false;
     }
   };
 
@@ -579,18 +619,25 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   // THEORY QUESTION CRUD OPERATIONS
   // ============================================
 
-  // ✅ Add Theory Question
   const handleAddTheoryQuestion = async (data: Partial<TheoryQuestion>) => {
+    isUpdatingRef.current = true;
+    
     try {
       console.log("🔵 handleAddTheoryQuestion called with data:", data);
+
+      if (!data.question_text || data.question_text.trim() === "") {
+        toast.error("Question text is required");
+        isUpdatingRef.current = false;
+        return;
+      }
 
       const isDraft = data.is_draft !== undefined ? data.is_draft : true;
 
       const newQuestion = {
         exam_id: examId,
-        question_text: data.question_text || "",
-        question_type: "theory", // ✅ For check constraint
-        type: "theory", // ✅ For filtering
+        question_text: data.question_text.trim(),
+        question_type: "theory",
+        type: "theory",
         points: theoryPointsPerQuestion,
         order_number: theoryQuestions.length + 1,
         sub_questions: data.sub_questions || [],
@@ -617,90 +664,104 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       if (error) {
         console.error("❌ Supabase error:", error);
         toast.error(`Failed to add theory question: ${error.message}`);
+        isUpdatingRef.current = false;
         return;
       }
 
       console.log("✅ Theory question added successfully:", result);
 
-      setTheoryQuestions([
-        ...theoryQuestions,
-        { ...result, points: theoryPointsPerQuestion } as TheoryQuestion,
-      ]);
+      await loadQuestions('after theory add');
 
-      await loadQuestions();
-
-      if (isDraft) {
-        toast.success("📝 Theory question saved as draft");
-      } else {
-        toast.success(
-          `✅ Theory question added (${theoryPointsPerQuestion} point${theoryPointsPerQuestion !== 1 ? "s" : ""})`,
-        );
-      }
+      toast.success(
+        isDraft
+          ? "📝 Theory question saved as draft"
+          : `✅ Theory question added (${theoryPointsPerQuestion} point${
+              theoryPointsPerQuestion !== 1 ? "s" : ""
+            })`
+      );
 
       setShowTheoryDialog(false);
       setEditingTheoryQuestion(null);
+      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error adding theory question:", error);
       toast.error("Failed to add theory question");
+      isUpdatingRef.current = false;
     }
   };
 
-  // ✅ Update Theory Question
+  // ✅ FIXED: Update Theory Question - removed as const, added select and reload
   const handleUpdateTheoryQuestion = async (
     questionId: string,
-    data: Partial<TheoryQuestion>,
+    data: Partial<TheoryQuestion>
   ) => {
+    isUpdatingRef.current = true;
+    
     try {
-      console.log("🔵 handleUpdateTheoryQuestion called with data:", data);
+      console.log("🔵 handleUpdateTheoryQuestion called with data:", JSON.stringify(data, null, 2));
+      console.log("🔵 Theory Question ID:", questionId);
+
+      if (!data.question_text || data.question_text.trim() === "") {
+        toast.error("Question text is required");
+        isUpdatingRef.current = false;
+        return;
+      }
 
       const isDraft = data.is_draft !== undefined ? data.is_draft : false;
 
+      // ✅ REMOVED as const - using regular strings
       const updateData = {
-        question_text: data.question_text,
+        question_text: data.question_text.trim(),
         points: data.points || theoryPointsPerQuestion,
         sub_questions: data.sub_questions || [],
         keywords: data.keywords || [],
         model_answer: data.model_answer || "",
         is_draft: isDraft,
+        question_type: "theory",
+        type: "theory",
         image_url: (data as any).image_url || null,
         image_caption: (data as any).image_caption || null,
         updated_at: new Date().toISOString(),
       };
 
-      console.log("🔵 Updating theory question:", updateData);
+      console.log("🔵 Updating theory question with data:", JSON.stringify(updateData, null, 2));
 
-      const { error } = await supabase
+      // ✅ REMOVED .is("deleted_at", null) - RLS policy handles this
+      const { data: updatedResult, error: updateError } = await supabase
         .from("questions")
         .update(updateData)
-        .eq("id", questionId);
+        .eq("id", questionId)
+        .select();
 
-      if (error) {
-        console.error("❌ Update error:", error);
-        toast.error(`Failed to update theory question: ${error.message}`);
+      if (updateError) {
+        console.error("❌ Update error:", updateError);
+        toast.error(`Failed to update theory question: ${updateError.message}`);
+        isUpdatingRef.current = false;
         return;
       }
 
-      setTheoryQuestions(
-        theoryQuestions.map((q) =>
-          q.id === questionId
-            ? { ...q, ...data, points: data.points || theoryPointsPerQuestion }
-            : q,
-        ),
-      );
+      console.log("✅ Theory question updated successfully in database");
+      console.log("📝 Updated result:", JSON.stringify(updatedResult, null, 2));
 
-      await loadQuestions();
-
-      if (isDraft) {
-        toast.success("📝 Theory question saved as draft");
-      } else {
-        toast.success("✅ Theory question updated and marked as complete!");
+      if (updatedResult && updatedResult.length > 0) {
+        console.log(`📝 is_draft now: ${updatedResult[0].is_draft}`);
       }
+
+      await loadQuestions('after theory update');
+
+      toast.success(
+        isDraft
+          ? "📝 Theory question saved as draft"
+          : "✅ Theory question updated and marked as complete!"
+      );
 
       setShowTheoryDialog(false);
       setEditingTheoryQuestion(null);
+      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error updating theory question:", error);
-      toast.error("Failed to update theory question");
+      toast.error("Failed to update theory question. Please try again.");
+      isUpdatingRef.current = false;
     }
   };
 
@@ -719,7 +780,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             variant="ghost"
             size="sm"
             onClick={handleRefresh}
-            disabled={refreshing}
+            disabled={refreshing || isUpdatingRef.current}
             className="ml-auto"
           >
             <RefreshCw
@@ -814,8 +875,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           question.is_draft
             ? "bg-amber-50 dark:bg-amber-950/20 border-2 border-amber-200 dark:border-amber-800"
             : isComplete
-              ? "bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800"
-              : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
+            ? "bg-emerald-50 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800"
+            : "bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700"
         }`}
       >
         <div className="flex items-start justify-between">
@@ -1140,7 +1201,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           </TabsContent>
         </Tabs>
 
-        {/* Question Form Dialog */}
         <QuestionFormDialog
           open={showQuestionDialog}
           onOpenChange={(open) => {
@@ -1161,7 +1221,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           }}
         />
 
-        {/* Theory Question Form Dialog */}
         <TheoryQuestionFormDialog
           open={showTheoryDialog}
           onOpenChange={(open) => {
@@ -1182,7 +1241,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           }}
         />
 
-        {/* Delete Confirmation Dialog */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent>
             <DialogHeader>

@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/QuestionFormDialog.tsx - FIXED
+// src/components/staff/exams/edit/QuestionFormDialog.tsx - COMPLETE FIXED VERSION
 
 'use client'
 
@@ -16,7 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { X, Plus, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { X, Plus, AlertCircle, CheckCircle2, Save, FileCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import type { Question } from './types'
 
@@ -40,29 +40,50 @@ export function QuestionFormDialog({
   const [correctAnswer, setCorrectAnswer] = useState('')
   const [points, setPoints] = useState<number>(1)
   const [isDraft, setIsDraft] = useState(true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
+      console.log('🔵 QuestionFormDialog: Opening with initialData:', initialData)
+      
+      // ✅ Preserve the is_draft value from initialData
+      const draftStatus = initialData?.is_draft !== undefined ? initialData.is_draft : true
+      
       setQuestionText(initialData?.question_text || '')
-      setOptions(initialData?.options || ['', '', '', ''])
+      setOptions(initialData?.options && initialData.options.length > 0 
+        ? initialData.options 
+        : ['', '', '', '']
+      )
       setCorrectAnswer(initialData?.correct_answer || '')
       setPoints(initialData?.points || 1)
-      setIsDraft(initialData?.is_draft !== undefined ? initialData.is_draft : true)
+      setIsDraft(draftStatus) // ✅ Use the preserved draft status
+      
+      console.log('🔵 QuestionFormDialog: isDraft set to:', draftStatus)
     }
   }, [open, initialData])
 
   // Check if question is complete
   const isQuestionComplete = (): boolean => {
+    const validOptions = options.filter(opt => opt.trim() !== '')
     return questionText.trim() !== '' && 
-           options.some(opt => opt.trim() !== '') &&
-           correctAnswer.trim() !== ''
+           validOptions.length >= 2 &&
+           correctAnswer.trim() !== '' &&
+           validOptions.includes(correctAnswer)
+  }
+
+  const getValidOptions = (): string[] => {
+    return options.filter(opt => opt.trim() !== '')
   }
 
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...options]
     newOptions[index] = value
     setOptions(newOptions)
+    
+    if (correctAnswer === options[index] && value.trim() === '') {
+      setCorrectAnswer('')
+    }
   }
 
   const handleAddOption = () => {
@@ -74,12 +95,14 @@ export function QuestionFormDialog({
   }
 
   const handleRemoveOption = (index: number) => {
-    if (options.length <= 2) {
+    const validOptions = getValidOptions()
+    if (validOptions.length <= 2) {
       toast.error('Minimum 2 options required')
       return
     }
     const newOptions = options.filter((_, i) => i !== index)
     setOptions(newOptions)
+    
     if (correctAnswer === options[index]) {
       setCorrectAnswer('')
     }
@@ -87,33 +110,33 @@ export function QuestionFormDialog({
 
   const handleSubmit = (saveAsDraft: boolean = false) => {
     console.log('🔵 QuestionFormDialog: Submitting with saveAsDraft:', saveAsDraft)
+    console.log('🔵 QuestionFormDialog: Current isDraft:', isDraft)
+    
+    // Validate question text
+    if (!questionText.trim()) {
+      toast.error('Please enter a question text')
+      return
+    }
+
+    const validOptions = getValidOptions()
     
     // If saving as draft, only require question text
     if (saveAsDraft) {
-      if (!questionText.trim()) {
-        toast.error('Please enter a question text')
-        return
-      }
-      
       const data = {
         question_text: questionText.trim(),
-        options: options.filter(opt => opt.trim()),
+        options: validOptions.length > 0 ? validOptions : ['', '', '', ''],
         correct_answer: correctAnswer || '',
         points: points,
-        is_draft: true  // ✅ Explicitly set is_draft to true
+        is_draft: true // ✅ Always set to true for draft
       }
       console.log('🔵 QuestionFormDialog: Saving as draft:', data)
+      setIsSubmitting(true)
       onSave(data)
+      setTimeout(() => setIsSubmitting(false), 500)
       return
     }
 
     // Full validation for complete question
-    if (!questionText.trim()) {
-      toast.error('Please enter a question')
-      return
-    }
-
-    const validOptions = options.filter(opt => opt.trim())
     if (validOptions.length < 2) {
       toast.error('Please enter at least 2 options')
       return
@@ -134,28 +157,39 @@ export function QuestionFormDialog({
       options: validOptions,
       correct_answer: correctAnswer,
       points: points,
-      is_draft: false  // ✅ Explicitly set is_draft to false
+      is_draft: false // ✅ Explicitly set to false for complete
     }
     console.log('🔵 QuestionFormDialog: Saving as complete:', data)
+    setIsSubmitting(true)
     onSave(data)
+    setTimeout(() => setIsSubmitting(false), 500)
   }
 
   const handleClose = () => {
-    onOpenChange(false)
-    if (onCancel) onCancel()
+    if (!isSubmitting) {
+      onOpenChange(false)
+      if (onCancel) onCancel()
+    }
   }
 
   const complete = isQuestionComplete()
+  const validOptions = getValidOptions()
+  const isEditing = !!initialData?.id
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {initialData?.id ? 'Edit Objective Question' : 'Add Objective Question'}
-            {initialData?.is_draft && (
+            {isEditing ? 'Edit Objective Question' : 'Add Objective Question'}
+            {isDraft && !complete && (
               <Badge variant="outline" className="text-amber-600 border-amber-300">
                 Draft
+              </Badge>
+            )}
+            {complete && !isDraft && (
+              <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
+                Complete
               </Badge>
             )}
           </DialogTitle>
@@ -166,8 +200,10 @@ export function QuestionFormDialog({
           {!complete && (
             <Alert className="bg-amber-50 border-amber-200">
               <AlertCircle className="h-4 w-4 text-amber-600" />
-              <AlertDescription className="text-amber-700 text-sm">
-                This question is incomplete. Add options and correct answer to mark as complete.
+              <AlertDescription className="text-amber-700 text-sm whitespace-pre-line">
+                {!questionText.trim() && '• Question text is required\n'}
+                {validOptions.length < 2 && '• At least 2 options are required\n'}
+                {!correctAnswer && '• Please select the correct answer'}
               </AlertDescription>
             </Alert>
           )}
@@ -175,8 +211,9 @@ export function QuestionFormDialog({
           {complete && (
             <Alert className="bg-emerald-50 border-emerald-200">
               <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-              <AlertDescription className="text-emerald-700 text-sm">
-                ✓ Question is complete and ready for the exam.
+              <AlertDescription className="text-emerald-700 text-sm flex items-center gap-2">
+                <FileCheck className="h-4 w-4" />
+                Question is complete and ready for the exam.
               </AlertDescription>
             </Alert>
           )}
@@ -192,6 +229,7 @@ export function QuestionFormDialog({
               onChange={(e) => setQuestionText(e.target.value)}
               placeholder="Enter your question here..."
               className="min-h-[80px] mt-1.5"
+              disabled={isSubmitting}
             />
           </div>
 
@@ -199,21 +237,31 @@ export function QuestionFormDialog({
           <div>
             <Label className="text-sm font-semibold">
               Options <span className="text-red-500">*</span>
+              <span className="text-xs font-normal text-slate-400 ml-2">
+                ({validOptions.length} of minimum 2)
+              </span>
             </Label>
             <p className="text-xs text-slate-400 mb-2">
               Enter the possible answers. Minimum 2 options, maximum 6.
             </p>
             <div className="space-y-2">
               {options.map((opt, idx) => (
-                <div key={idx} className="flex gap-2">
-                  <div className="flex items-center justify-center w-8 h-9 bg-slate-100 rounded-md text-sm font-medium">
+                <div key={idx} className="flex gap-2 items-center">
+                  <div className={`flex items-center justify-center w-8 h-9 rounded-md text-sm font-medium ${
+                    opt.trim() && correctAnswer === opt 
+                      ? 'bg-emerald-100 text-emerald-700 border border-emerald-300' 
+                      : opt.trim() 
+                        ? 'bg-slate-100 text-slate-700' 
+                        : 'bg-slate-50 text-slate-400'
+                  }`}>
                     {String.fromCharCode(65 + idx)}
                   </div>
                   <Input
                     value={opt}
                     onChange={(e) => handleOptionChange(idx, e.target.value)}
                     placeholder={`Option ${String.fromCharCode(65 + idx)}`}
-                    className="flex-1"
+                    className={`flex-1 ${correctAnswer === opt && opt.trim() ? 'border-emerald-300 bg-emerald-50' : ''}`}
+                    disabled={isSubmitting}
                   />
                   {options.length > 2 && (
                     <Button
@@ -221,10 +269,16 @@ export function QuestionFormDialog({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveOption(idx)}
-                      className="h-9 w-9 p-0 text-red-500"
+                      className="h-9 w-9 p-0 text-red-500 hover:text-red-600 hover:bg-red-50"
+                      disabled={isSubmitting}
                     >
                       <X className="h-4 w-4" />
                     </Button>
+                  )}
+                  {opt.trim() && correctAnswer === opt && (
+                    <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300 whitespace-nowrap">
+                      ✓ Correct
+                    </Badge>
                   )}
                 </div>
               ))}
@@ -236,6 +290,7 @@ export function QuestionFormDialog({
                 size="sm"
                 onClick={handleAddOption}
                 className="mt-2"
+                disabled={isSubmitting}
               >
                 <Plus className="h-3 w-3 mr-1" /> Add Option
               </Button>
@@ -244,66 +299,90 @@ export function QuestionFormDialog({
 
           {/* Correct Answer */}
           <div>
-            <Label className="text-sm font-semibold">Correct Answer</Label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1.5">
-              {options.map((opt, idx) => (
-                opt.trim() && (
-                  <Button
-                    key={idx}
-                    type="button"
-                    variant={correctAnswer === opt ? "default" : "outline"}
-                    onClick={() => setCorrectAnswer(opt)}
-                    className={correctAnswer === opt 
-                      ? "bg-emerald-600 hover:bg-emerald-700" 
-                      : "border-gray-200 hover:border-emerald-300"
-                    }
-                  >
-                    {String.fromCharCode(65 + idx)}. {opt.length > 30 ? opt.substring(0, 30) + '...' : opt}
-                  </Button>
-                )
-              ))}
-            </div>
+            <Label className="text-sm font-semibold">
+              Correct Answer {validOptions.length >= 2 && <span className="text-red-500">*</span>}
+            </Label>
+            {validOptions.length >= 2 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-1.5">
+                {validOptions.map((opt) => {
+                  const idx = validOptions.indexOf(opt)
+                  return (
+                    <Button
+                      key={idx}
+                      type="button"
+                      variant={correctAnswer === opt ? "default" : "outline"}
+                      onClick={() => setCorrectAnswer(opt)}
+                      className={`${
+                        correctAnswer === opt 
+                          ? "bg-emerald-600 hover:bg-emerald-700" 
+                          : "border-gray-200 hover:border-emerald-300"
+                      } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      disabled={isSubmitting}
+                    >
+                      {String.fromCharCode(65 + idx)}. {opt.length > 25 ? opt.substring(0, 25) + '...' : opt}
+                    </Button>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-amber-600 mt-1.5">
+                Please add at least 2 options to select the correct answer.
+              </p>
+            )}
             {correctAnswer && (
-              <p className="text-xs text-emerald-600 mt-2">
-                ✓ Selected: {correctAnswer}
+              <p className="text-xs text-emerald-600 mt-2 flex items-center gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Selected: {correctAnswer}
               </p>
             )}
           </div>
 
           {/* Points */}
           <div>
-            <Label className="text-sm font-semibold">Points</Label>
-            <Input
-              type="number"
-              value={points}
-              onChange={(e) => setPoints(parseFloat(e.target.value) || 1)}
-              min={0.5}
-              step={0.5}
-              className="mt-1.5 w-32"
-            />
-            <p className="text-xs text-slate-400 mt-1">Recommended: 1 point per question</p>
+            <Label className="text-sm font-semibold">Points per Question</Label>
+            <div className="flex items-center gap-4 mt-1.5">
+              <Input
+                type="number"
+                value={points}
+                onChange={(e) => setPoints(parseFloat(e.target.value) || 1)}
+                min={0.5}
+                step={0.5}
+                className="w-32"
+                disabled={isSubmitting}
+              />
+              <span className="text-sm text-slate-500">Recommended: 1 point</span>
+            </div>
           </div>
         </div>
 
-        <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+        <DialogFooter className="gap-2 flex-wrap">
+          <Button 
+            variant="outline" 
+            onClick={handleClose}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
           
           {/* Save as Draft button */}
           <Button 
             variant="secondary" 
             onClick={() => handleSubmit(true)}
-            disabled={!questionText.trim()}
+            disabled={!questionText.trim() || isSubmitting}
+            className="gap-2"
           >
-            Save as Draft
+            <Save className="h-4 w-4" />
+            {isEditing ? 'Save as Draft' : 'Save as Draft'}
           </Button>
           
           {/* Save Complete button */}
           <Button 
             onClick={() => handleSubmit(false)} 
-            className="bg-emerald-600 hover:bg-emerald-700"
-            disabled={!complete}
+            className="bg-emerald-600 hover:bg-emerald-700 gap-2"
+            disabled={!complete || isSubmitting}
           >
-            {initialData?.id ? 'Update' : 'Add'} Complete Question
+            <FileCheck className="h-4 w-4" />
+            {isEditing ? 'Update Complete' : 'Add Complete Question'}
           </Button>
         </DialogFooter>
       </DialogContent>
