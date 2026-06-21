@@ -139,7 +139,7 @@ const jssSubjects = [
 const ssSubjects = [
   'Mathematics', 'English Language', 'Physics', 'Chemistry', 'Biology',
   'Economics', 'Government', 'Literature in English', 'Geography',
-  'Commerce', 'Financial Accounting', 'Agricultural Science', 'Information Technology', 'Data Processing'
+  'Commerce', 'Financial Accounting', 'Yoruba','Agricultural Science', 'Data Processing'
 ]
 
 // Convert markdown table to HTML with proper styling
