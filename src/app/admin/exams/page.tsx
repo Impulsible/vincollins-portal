@@ -632,7 +632,11 @@ export default function AdminExamsPage() {
     try {
       const { error } = await supabase
         .from('exams')
-        .update({ status: 'published', approved_at: new Date().toISOString(), approved_by: profile?.id })
+        .update({ 
+          status: 'published', 
+          approved_at: new Date().toISOString(), 
+          approved_by: profile?.id 
+        })
         .eq('id', selectedExam.id)
       if (error) throw error
       toast.success('✅ Exam published successfully!')
@@ -651,7 +655,12 @@ export default function AdminExamsPage() {
     try {
       const { error } = await supabase
         .from('exams')
-        .update({ status: 'draft', rejection_reason: rejectionReason, rejected_at: new Date().toISOString(), rejected_by: profile?.id })
+        .update({ 
+          status: 'draft', 
+          review_notes: rejectionReason,
+          reviewed_at: new Date().toISOString(),
+          approved_by: profile?.id
+        })
         .eq('id', selectedExam.id)
       if (error) throw error
       toast.success('Exam sent back for revision')

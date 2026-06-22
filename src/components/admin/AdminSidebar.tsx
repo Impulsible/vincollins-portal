@@ -1,5 +1,4 @@
-// components/admin/AdminSidebar.tsx - WITH ANNOUNCEMENTS
-
+// components/admin/AdminSidebar.tsx - WITH NOTIFICATIONS
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -10,7 +9,7 @@ import {
   LayoutDashboard, Users, MonitorPlay, FileCheck, Activity,
   LogOut, ChevronLeft, ChevronRight, Shield, Sparkles,
   Settings, HelpCircle, GraduationCap, Briefcase,
-  MessageSquare, BookOpen, Megaphone
+  MessageSquare, BookOpen, Megaphone, Bell
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -34,6 +33,7 @@ interface AdminSidebarProps {
   pendingExams?: number
   pendingReports?: number
   pendingInquiries?: number
+  unreadNotifications?: number
 }
 
 interface NavigationItem {
@@ -47,7 +47,8 @@ interface NavigationItem {
 
 export function AdminSidebar({ 
   profile, onLogout, collapsed, onToggle, activeTab, setActiveTab,
-  pendingExams = 0, pendingReports = 0, pendingInquiries = 0
+  pendingExams = 0, pendingReports = 0, pendingInquiries = 0,
+  unreadNotifications = 0
 }: AdminSidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -61,6 +62,7 @@ export function AdminSidebar({
     if (path === '/admin') return 'overview'
     if (path === '/admin/settings') return 'settings'
     if (path === '/admin/help') return 'help'
+    if (path.startsWith('/admin/notifications')) return 'notifications'
     if (path.startsWith('/admin/announcements')) return 'announcements'
     if (path.startsWith('/admin/broad-sheet')) return 'broad-sheet'
     if (path.startsWith('/admin/students')) return 'students'
@@ -72,7 +74,6 @@ export function AdminSidebar({
     return 'overview'
   }
 
-  // Set initial tab from URL on first load only
   useEffect(() => {
     const tab = getTabFromPathname(pathname || '/admin')
     setActiveTab(tab)
@@ -80,6 +81,7 @@ export function AdminSidebar({
 
   const primaryNavigation: NavigationItem[] = [
     { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', routePatterns: ['/admin'] },
+    { id: 'notifications', name: 'Notifications', icon: Bell, description: 'View Updates', badge: unreadNotifications || undefined, routePatterns: ['/admin/notifications'] },
     { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'Send Updates', routePatterns: ['/admin/announcements'] },
     { id: 'broad-sheet', name: 'Broad Sheet', icon: BookOpen, description: 'Generate Report Cards', routePatterns: ['/admin/broad-sheet'] },
     { id: 'students', name: 'Students', icon: GraduationCap, description: 'Manage Students', routePatterns: ['/admin/students'] },

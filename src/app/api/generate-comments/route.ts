@@ -291,449 +291,449 @@ export async function POST(req: NextRequest) {
         `${studentName} has achieved a good average of ${averageScore}% this term. Continue striving!`,
       ],
       aboveAverage: [
-        `${studentName} has performed fairly this term with an average of ${averageScore}%. ${pronoun} did well in ${bestSubject.name} (${bestSubject.score}%) but needs to improve in ${weakestSubject.name} (${weakestSubject.score}%). Extra lessons and consistent practice are recommended.`,
+        `${studentName} has performed fairly this term with an average of ${averageScore}%. ${pronoun} did well in ${bestSubject.name} (${bestSubject.score}%) but needs to improve in ${weakestSubject.name} (${weakestSubject.score}%). Additional practice and focused revision are recommended to strengthen understanding.`,
         
-        `Fair performance, ${studentName}. ${pronoun} achieved ${averageScore}% average, passing all subjects. ${possessive} best subject was ${bestSubject.name} at ${bestSubject.score}%. ${pronoun} should seek additional support in ${weakestSubject.name} to improve.`,
+        `Fair performance, ${studentName}. ${pronoun} achieved ${averageScore}% average, passing all subjects. ${possessive} best subject was ${bestSubject.name} at ${bestSubject.score}%. ${pronoun} is encouraged to seek extra support in ${weakestSubject.name} to build confidence.`,
         
-        `${studentName} has met the minimum requirements with a fair average of ${averageScore}%. ${pronoun} performed best in ${bestSubject.name} (${bestSubject.score}%). More effort and focus on ${weakestSubject.name} will yield better results next term.`,
+        `${studentName} has met the minimum requirements with a fair average of ${averageScore}%. ${pronoun} performed best in ${bestSubject.name} (${bestSubject.score}%). More effort and attention to ${weakestSubject.name} will lead to better results next term.`,
         
-        `Acceptable performance, ${studentName}. With ${averageScore}% average, ${pronoun} has passed. However, ${weakestSubject.name} at ${weakestSubject.score}% requires significant improvement. A structured study plan is advised.`,
+        `Acceptable performance, ${studentName}. With ${averageScore}% average, ${pronoun} has passed. ${weakestSubject.name} at ${weakestSubject.score}% shows room for growth. A structured study plan would be beneficial.`,
         
-        `${studentName} has achieved an above average performance with ${averageScore}%. ${pronoun} excels in ${bestSubject.name} (${bestSubject.score}%) but needs to work on ${weakestSubject.name}.`,
+        `${studentName} has achieved an above average performance with ${averageScore}%. ${pronoun} excels in ${bestSubject.name} (${bestSubject.score}%) and has the ability to improve in ${weakestSubject.name} with consistent effort.`,
         
-        `Fair results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `Fair results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is a strength to build upon.`,
         
-        `${studentName} has performed fairly, earning ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential.`,
+        `${studentName} has performed fairly, earning ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential for even greater achievement.`,
         
-        `Acceptable work, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term. ${bestSubject.name} (${bestSubject.score}%) is impressive.`,
+        `Acceptable work, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term. ${bestSubject.name} (${bestSubject.score}%) is impressive and can be a model for other subjects.`,
         
-        `${studentName} has shown fair understanding with ${averageScore}% average. Focus on ${weakestSubject.name} for improvement.`,
+        `${studentName} has shown fair understanding with ${averageScore}% average. Focusing on ${weakestSubject.name} will help unlock ${possessive} full potential.`,
         
-        `Fair performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met basic requirements.`,
+        `Fair performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met basic requirements. Continued effort will lead to improvement.`,
         
-        `${studentName} has achieved an above average average of ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} is good.`,
+        `${studentName} has achieved an above average average of ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} is good. Building on this strength will bring success.`,
         
-        `Acceptable results, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. ${bestSubject.name} (${bestSubject.score}%) stands out.`,
+        `Acceptable results, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. ${bestSubject.name} (${bestSubject.score}%) stands out as a foundation for growth.`,
         
-        `${studentName} has performed fairly, achieving ${averageScore}% average. Keep working on ${weakestSubject.name}.`,
+        `${studentName} has performed fairly, achieving ${averageScore}% average. With dedication to ${weakestSubject.name}, ${pronoun} can achieve more.`,
         
-        `Fair work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown some understanding.`,
+        `Fair work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown some understanding. Consistent revision will strengthen knowledge.`,
         
-        `${studentName} has achieved an above average performance at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `${studentName} has achieved an above average performance at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a strength to continue developing.`,
         
-        `Acceptable performance, ${studentName}! ${pronoun} has earned ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is impressive.`,
+        `Acceptable performance, ${studentName}! ${pronoun} has earned ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is impressive and shows what ${pronoun} can achieve.`,
         
-        `${studentName} has shown fair academic ability with ${averageScore}% average. Keep pushing on ${weakestSubject.name}.`,
+        `${studentName} has shown fair academic ability with ${averageScore}% average. Taking extra time with ${weakestSubject.name} will build confidence.`,
         
-        `Fair results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is good.`,
+        `Fair results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is good and can be further strengthened.`,
         
-        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable.`,
+        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable and shows potential.`,
         
-        `Acceptable work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term.`,
+        `Acceptable work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Continued effort will yield improvement.`,
         
-        `${studentName} has performed fairly, achieving ${averageScore}% average. Focus on ${weakestSubject.name} next term.`,
+        `${studentName} has performed fairly, achieving ${averageScore}% average. A focus on ${weakestSubject.name} next term will help balance skills.`,
         
-        `Fair performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met expectations.`,
+        `Fair performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met expectations. There is room to grow with consistent effort.`,
         
-        `${studentName} has shown fair understanding with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `${studentName} has shown fair understanding with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength to leverage for improvement.`,
         
-        `Acceptable results, ${studentName}! ${pronoun} has earned ${averageScore}% average. Keep working hard.`,
+        `Acceptable results, ${studentName}! ${pronoun} has earned ${averageScore}% average. Hard work and dedication will bring success.`,
         
-        `${studentName} has achieved an above average average of ${averageScore}%. Well done!`,
+        `${studentName} has achieved an above average average of ${averageScore}%. Well done! Continued focus will bring even better results.`,
         
-        `Fair work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown progress.`,
+        `Fair work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown progress. Keep building on this foundation.`,
         
-        `${studentName} has performed fairly, earning ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good.`,
+        `${studentName} has performed fairly, earning ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good and can inspire further growth.`,
         
-        `Acceptable performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term.`,
+        `Acceptable performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term. Every step forward counts.`,
         
-        `${studentName} has shown fair academic ability with ${averageScore}% average. Keep striving!`,
+        `${studentName} has shown fair academic ability with ${averageScore}% average. Continued effort will lead to improvement.`,
         
-        `Fair results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. Good job!`,
+        `Fair results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. Good job! Next term, aim to strengthen weaker areas.`,
         
-        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable.`,
+        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable and worth building upon.`,
       ],
       satisfactory: [
-        `${studentName} has achieved a satisfactory average of ${averageScore}% this term. ${pronoun} performed best in ${bestSubject.name} (${bestSubject.score}%). However, ${weakestSubject.name} at ${weakestSubject.score}% needs improvement. Consistent effort will lead to better results.`,
+        `${studentName} has achieved a satisfactory average of ${averageScore}% this term. ${pronoun} performed best in ${bestSubject.name} (${bestSubject.score}%). Consistent effort and attention to ${weakestSubject.name} will help improve overall performance.`,
         
-        `Satisfactory performance, ${studentName}. With ${averageScore}% average, ${pronoun} has met the basic requirements. ${bestSubject.name} (${bestSubject.score}%) is ${possessive} strongest area. More dedication to ${weakestSubject.name} is advised.`,
+        `Satisfactory performance, ${studentName}. With ${averageScore}% average, ${pronoun} has met the basic requirements. ${bestSubject.name} (${bestSubject.score}%) is ${possessive} strongest area. With more dedication to ${weakestSubject.name}, ${pronoun} can achieve better results.`,
         
-        `${studentName} has shown adequate understanding this term, averaging ${averageScore}%. ${pronoun} needs to pay more attention to ${weakestSubject.name} where ${pronoun} scored ${weakestSubject.score}%.`,
+        `${studentName} has shown adequate understanding this term, averaging ${averageScore}%. ${pronoun} has the ability to improve in ${weakestSubject.name} with focused effort and support.`,
         
-        `Fairly satisfactory results, ${studentName}. ${pronoun} achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} (${bestSubject.score}%) is good, but ${weakestSubject.name} requires more focus.`,
+        `Fairly satisfactory results, ${studentName}. ${pronoun} achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} (${bestSubject.score}%) is good, and consistent practice in ${weakestSubject.name} will bring improvement.`,
         
-        `${studentName} has performed at a satisfactory level with ${averageScore}% average. ${possessive} strength in ${bestSubject.name} is evident at ${bestSubject.score}%.`,
+        `${studentName} has performed at a satisfactory level with ${averageScore}% average. ${possessive} strength in ${bestSubject.name} is evident at ${bestSubject.score}%. Building on this will help in other areas.`,
         
-        `Satisfactory work, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is a highlight.`,
+        `Satisfactory work, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is a highlight to celebrate.`,
         
-        `${studentName} has achieved satisfactory results at ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential.`,
+        `${studentName} has achieved satisfactory results at ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential for growth.`,
         
         `Adequate performance, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. ${bestSubject.name} (${bestSubject.score}%) is impressive.`,
         
-        `${studentName} has shown satisfactory understanding with ${averageScore}% average. Focus on ${weakestSubject.name} for improvement.`,
+        `${studentName} has shown satisfactory understanding with ${averageScore}% average. Focusing on ${weakestSubject.name} will help ${objective} improve.`,
         
-        `Satisfactory results, ${studentName}! With ${averageScore}% average, ${pronoun} has met expectations.`,
+        `Satisfactory results, ${studentName}! With ${averageScore}% average, ${pronoun} has met expectations. Keep working hard!`,
         
-        `${studentName} has achieved a satisfactory average of ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} is good.`,
+        `${studentName} has achieved a satisfactory average of ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} is good and shows what ${pronoun} can do.`,
         
-        `Adequate work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Keep working on ${weakestSubject.name}.`,
+        `Adequate work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. With effort, ${weakestSubject.name} can improve.`,
         
-        `${studentName} has performed satisfactorily, achieving ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) stands out.`,
+        `${studentName} has performed satisfactorily, achieving ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) stands out as a strength.`,
         
-        `Satisfactory effort, ${studentName}! With ${averageScore}% average, ${pronoun} has shown some understanding.`,
+        `Satisfactory effort, ${studentName}! With ${averageScore}% average, ${pronoun} has shown understanding. Continued focus will bring growth.`,
         
-        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable.`,
+        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable and worth building upon.`,
         
-        `Adequate performance, ${studentName}! ${pronoun} has earned ${averageScore}% average this term.`,
+        `Adequate performance, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Keep pushing forward.`,
         
-        `${studentName} has shown satisfactory academic ability with ${averageScore}% average. Keep pushing on ${weakestSubject.name}.`,
+        `${studentName} has shown satisfactory academic ability with ${averageScore}% average. Taking extra time with ${weakestSubject.name} will help.`,
         
         `Satisfactory results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is good.`,
         
-        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is noteworthy.`,
+        `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is noteworthy and shows potential.`,
         
-        `Adequate work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term.`,
+        `Adequate work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Hard work pays off.`,
         
-        `${studentName} has performed satisfactorily, achieving ${averageScore}% average. Focus on ${weakestSubject.name} next term.`,
+        `${studentName} has performed satisfactorily, achieving ${averageScore}% average. A focus on ${weakestSubject.name} next term will bring balance.`,
         
-        `Satisfactory performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met requirements.`,
+        `Satisfactory performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met requirements. Keep building on this.`,
         
         `${studentName} has shown satisfactory understanding with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
         
-        `Adequate results, ${studentName}! ${pronoun} has earned ${averageScore}% average. Keep working hard.`,
+        `Adequate results, ${studentName}! ${pronoun} has earned ${averageScore}% average. Continued effort brings success.`,
         
         `${studentName} has achieved a satisfactory average of ${averageScore}%. Well done!`,
         
-        `Satisfactory work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown progress.`,
+        `Satisfactory work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown progress. Keep it up!`,
         
         `${studentName} has performed satisfactorily, earning ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good.`,
         
-        `Adequate performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term.`,
+        `Adequate performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term. Every step counts.`,
         
-        `${studentName} has shown satisfactory academic ability with ${averageScore}% average. Keep striving!`,
+        `${studentName} has shown satisfactory academic ability with ${averageScore}% average. Keep striving for improvement.`,
         
         `Satisfactory results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. Good job!`,
         
         `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable.`,
       ],
       average: [
-        `${studentName} has achieved an average of ${averageScore}%. ${pronoun} performed best in ${bestSubject.name} (${bestSubject.score}%). To improve, ${pronoun} must dedicate more time to ${weakestSubject.name} (${weakestSubject.score}%).`,
+        `${studentName} has achieved an average of ${averageScore}%. ${pronoun} performed best in ${bestSubject.name} (${bestSubject.score}%). With consistent effort and practice in ${weakestSubject.name} (${weakestSubject.score}%), ${pronoun} can make significant progress next term.`,
         
-        `Credit level achieved, ${studentName}. With ${averageScore}% average, ${pronoun} has passed all subjects. ${bestSubject.name} was ${possessive} strongest at ${bestSubject.score}%. ${pronoun} is encouraged to work harder on ${weakestSubject.name}.`,
+        `Credit level achieved, ${studentName}. With ${averageScore}% average, ${pronoun} has passed all subjects. ${bestSubject.name} was ${possessive} strongest at ${bestSubject.score}%. ${pronoun} is encouraged to work on ${weakestSubject.name} with renewed focus.`,
         
-        `${studentName} has met the pass mark with an average of ${averageScore}%. ${pronoun} excels in ${bestSubject.name} (${bestSubject.score}%) but struggles with ${weakestSubject.name} (${weakestSubject.score}%). More effort is required in weaker areas.`,
+        `${studentName} has met the pass mark with an average of ${averageScore}%. ${pronoun} excels in ${bestSubject.name} (${bestSubject.score}%) and has the ability to improve ${weakestSubject.name} (${weakestSubject.score}%) with extra effort.`,
         
-        `Passing grade achieved. ${studentName} scored ${averageScore}% on average. ${possessive} best subject is ${bestSubject.name} (${bestSubject.score}%). ${pronoun} needs to improve in ${weakestSubject.name} to raise overall performance.`,
+        `Passing grade achieved. ${studentName} scored ${averageScore}% on average. ${possessive} best subject is ${bestSubject.name} (${bestSubject.score}%). Developing strategies for ${weakestSubject.name} will raise overall performance.`,
         
-        `${studentName} has achieved an average performance with ${averageScore}%. ${possessive} strength in ${bestSubject.name} is evident at ${bestSubject.score}%.`,
+        `${studentName} has achieved an average performance with ${averageScore}%. ${possessive} strength in ${bestSubject.name} is evident at ${bestSubject.score}%. Continued effort will bring improvement.`,
         
-        `Average results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is a highlight.`,
+        `Average results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is a highlight to celebrate.`,
         
-        `${studentName} has earned ${averageScore}% average this term. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential.`,
+        `${studentName} has earned ${averageScore}% average this term. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential for growth.`,
         
         `Credit performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is impressive.`,
         
-        `${studentName} has shown average understanding with ${averageScore}% average. Focus on ${weakestSubject.name} for improvement.`,
+        `${studentName} has shown average understanding with ${averageScore}% average. Focusing on ${weakestSubject.name} will help build confidence.`,
         
-        `Average performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met basic requirements.`,
+        `Average performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met basic requirements. Keep working hard.`,
         
-        `${studentName} has achieved an average of ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} is good.`,
+        `${studentName} has achieved an average of ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} is good. Building on this will help.`,
         
-        `Credit work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Keep working on ${weakestSubject.name}.`,
+        `Credit work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Extra effort on ${weakestSubject.name} will bring progress.`,
         
         `${studentName} has performed at an average level, achieving ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) stands out.`,
         
-        `Average effort, ${studentName}! With ${averageScore}% average, ${pronoun} has shown some understanding.`,
+        `Average effort, ${studentName}! With ${averageScore}% average, ${pronoun} has shown understanding. Continued focus will bring growth.`,
         
         `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable.`,
         
-        `Credit performance, ${studentName}! ${pronoun} has earned ${averageScore}% average this term.`,
+        `Credit performance, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Keep pushing forward.`,
         
-        `${studentName} has shown average academic ability with ${averageScore}% average. Keep pushing on ${weakestSubject.name}.`,
+        `${studentName} has shown average academic ability with ${averageScore}% average. Taking extra time with ${weakestSubject.name} will help.`,
         
         `Average results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. ${bestSubject.name} (${bestSubject.score}%) is good.`,
         
         `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is noteworthy.`,
         
-        `Credit work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term.`,
+        `Credit work, ${studentName}! ${pronoun} has earned ${averageScore}% average this term. Hard work pays off.`,
         
-        `${studentName} has performed at an average level, achieving ${averageScore}% average. Focus on ${weakestSubject.name} next term.`,
+        `${studentName} has performed at an average level, achieving ${averageScore}% average. A focus on ${weakestSubject.name} next term will help.`,
         
-        `Average performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met requirements.`,
+        `Average performance, ${studentName}! With ${averageScore}% average, ${pronoun} has met requirements. Keep building on this.`,
         
         `${studentName} has shown average understanding with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
         
-        `Credit results, ${studentName}! ${pronoun} has earned ${averageScore}% average. Keep working hard.`,
+        `Credit results, ${studentName}! ${pronoun} has earned ${averageScore}% average. Continued effort brings success.`,
         
         `${studentName} has achieved an average of ${averageScore}%. Well done!`,
         
-        `Average work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown progress.`,
+        `Average work, ${studentName}! With ${averageScore}% average, ${pronoun} has shown progress. Keep it up!`,
         
         `${studentName} has performed at an average level, earning ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good.`,
         
-        `Credit performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term.`,
+        `Credit performance, ${studentName}! ${pronoun} has achieved ${averageScore}% average this term. Every step counts.`,
         
-        `${studentName} has shown average academic ability with ${averageScore}% average. Keep striving!`,
+        `${studentName} has shown average academic ability with ${averageScore}% average. Keep striving for improvement.`,
         
         `Average results, ${studentName}! With ${averageScore}% average, ${pronoun} has passed. Good job!`,
         
         `${studentName} has achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is commendable.`,
       ],
       belowAverage: [
-        `${studentName} narrowly passed this term with ${averageScore}% average. ${pronoun} performed relatively well in ${bestSubject.name} (${bestSubject.score}%) but struggled significantly in ${weakestSubject.name} (${weakestSubject.score}%). Immediate intervention and extra lessons are strongly recommended.`,
+        `${studentName} has shown potential this term with an average of ${averageScore}%. ${pronoun} performed relatively well in ${bestSubject.name} (${bestSubject.score}%) and has the capacity to improve in ${weakestSubject.name} (${weakestSubject.score}%) with additional support and consistent effort. Extra lessons are strongly recommended to build confidence and understanding.`,
         
-        `Borderline performance. ${studentName} scored ${averageScore}% on average, barely meeting the pass mark. ${possessive} ${bestSubject.score}% in ${bestSubject.name} helped ${objective} pass. ${pronoun} must improve dramatically in ${weakestSubject.name}.`,
+        `${studentName} achieved ${averageScore}% average this term. ${possessive} ${bestSubject.score}% in ${bestSubject.name} demonstrates ability. With targeted support in ${weakestSubject.name}, ${pronoun} can make meaningful progress. We encourage ${objective} to seek extra help and practice regularly.`,
         
-        `Pass by a narrow margin. ${studentName} averaged ${averageScore}%. While ${bestSubject.name} (${bestSubject.score}%) was acceptable, ${weakestSubject.name} (${weakestSubject.score}%) is a major concern. ${pronoun} needs to work much harder next term.`,
+        `${studentName} has passed with ${averageScore}% average. While ${bestSubject.name} (${bestSubject.score}%) was acceptable, ${weakestSubject.name} (${weakestSubject.score}%) needs additional focus. With dedicated effort and support, ${pronoun} can improve significantly.`,
         
-        `${studentName}, your performance this term was below expectations with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is your strength, but ${weakestSubject.name} (${weakestSubject.score}%) requires urgent attention. Please see your subject teachers for support.`,
+        `${studentName}, your performance this term was ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is your strength, and we believe you can improve in ${weakestSubject.name} (${weakestSubject.score}%) with consistent effort. Please speak with your teachers for additional support.`,
         
-        `${studentName} barely passed with ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} helped, but ${weakestSubject.name} at ${weakestSubject.score}% is concerning.`,
+        `${studentName} passed with ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows what ${pronoun} can achieve. With focused effort on ${weakestSubject.name}, ${pronoun} can raise ${possessive} overall performance.`,
         
-        `Below average performance, ${studentName}! With ${averageScore}% average, ${pronoun} needs to improve significantly.`,
+        `Below average performance, ${studentName}. With ${averageScore}% average, ${pronoun} has room to grow. We believe in ${possessive} ability to improve with dedication and support.`,
         
-        `${studentName} narrowly passed, achieving ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `${studentName} achieved ${averageScore}% average this term. ${bestSubject.name} (${bestSubject.score}%) is a strength to build upon. ${pronoun} is encouraged to seek extra help in weaker areas.`,
         
-        `Borderline results, ${studentName}! ${pronoun} earned ${averageScore}% average. Focus on ${weakestSubject.name} urgently.`,
+        `${studentName} passed with ${averageScore}% average. ${possessive} performance in ${bestSubject.name} shows potential. Additional support in ${weakestSubject.name} will help.`,
         
-        `${studentName} passed by a narrow margin at ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential.`,
+        `${studentName} has shown the ability to succeed, achieving ${averageScore}% average. With more consistent effort, especially in ${weakestSubject.name}, ${pronoun} can improve.`,
         
-        `Below average effort, ${studentName}! With ${averageScore}% average, ${pronoun} must work harder next term.`,
+        `Below average effort, ${studentName}. With ${averageScore}% average, ${pronoun} has passed. We encourage ${objective} to work harder next term and seek support when needed.`,
         
-        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs attention.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs attention. With the right support and effort, ${pronoun} can improve.`,
         
-        `Narrow pass, ${studentName}! ${pronoun} earned ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) was good.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) was good. Building on this will help in other subjects.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${possessive} performance in ${bestSubject.name} is encouraging.`,
+        `${studentName} achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is encouraging. We believe ${pronoun} can improve in weaker areas.`,
         
-        `Below average results, ${studentName}! With ${averageScore}% average, ${pronoun} needs improvement.`,
+        `Below average results, ${studentName}. With ${averageScore}% average, ${pronoun} needs improvement. We are here to support ${possessive} growth.`,
         
-        `${studentName} narrowly met the pass mark at ${averageScore}%. Focus on ${weakestSubject.name} next term.`,
+        `${studentName} met the pass mark at ${averageScore}%. Focusing on ${weakestSubject.name} next term will bring balance to ${possessive} overall performance.`,
         
-        `Borderline pass, ${studentName}! ${pronoun} achieved ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength. ${pronoun} can achieve more with consistent effort.`,
         
-        `${studentName} passed by a slim margin at ${averageScore}%. ${weakestSubject.name} requires urgent attention.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} requires additional attention. We encourage ${objective} to seek extra support.`,
         
-        `Below average performance, ${studentName}! With ${averageScore}% average, ${pronoun} must dedicate more effort.`,
+        `Below average performance, ${studentName}. With ${averageScore}% average, ${pronoun} has the potential to do better with more dedication and effort.`,
         
-        `${studentName} achieved ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential.`,
+        `${studentName} achieved ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential. We believe in ${possessive} ability to improve.`,
         
-        `Narrow pass, ${studentName}! ${pronoun} earned ${averageScore}% average. Keep working on ${weakestSubject.name}.`,
+        `${studentName} passed with ${averageScore}% average. Continued effort on ${weakestSubject.name} will bring improvement.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a highlight.`,
+        `${studentName} achieved ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a highlight. ${pronoun} can use this strength to improve other areas.`,
         
-        `Below average results, ${studentName}! With ${averageScore}% average, ${pronoun} needs support in ${weakestSubject.name}.`,
+        `Below average results, ${studentName}. With ${averageScore}% average, ${pronoun} needs support in ${weakestSubject.name}. We are committed to helping ${objective} succeed.`,
         
-        `${studentName} narrowly met requirements at ${averageScore}%. Focus on improvement areas.`,
+        `${studentName} met requirements at ${averageScore}%. Focusing on improvement areas will help ${objective} grow.`,
         
-        `Borderline performance, ${studentName}! ${pronoun} achieved ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good. We encourage ${objective} to keep pushing.`,
         
-        `${studentName} passed by a narrow margin at ${averageScore}%. Keep pushing on ${weakestSubject.name}.`,
+        `${studentName} achieved ${averageScore}% average. With extra effort on ${weakestSubject.name}, ${pronoun} can make significant progress.`,
         
-        `Below average effort, ${studentName}! With ${averageScore}% average, ${pronoun} must improve next term.`,
+        `Below average effort, ${studentName}. With ${averageScore}% average, ${pronoun} has room for improvement. We are here to support ${possessive} journey.`,
         
-        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs work.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs work. With consistent practice, ${pronoun} can improve.`,
         
-        `Narrow pass, ${studentName}! ${pronoun} earned ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is promising.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is promising. Building on this will bring success.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${possessive} performance in ${bestSubject.name} is encouraging.`,
+        `${studentName} achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is encouraging. We believe ${pronoun} can do better.`,
         
-        `Below average results, ${studentName}! With ${averageScore}% average, ${pronoun} needs extra support.`,
+        `Below average results, ${studentName}. With ${averageScore}% average, ${pronoun} needs extra support. We are committed to ${possessive} success.`,
         
-        `${studentName} narrowly passed, achieving ${averageScore}% average. Focus on ${weakestSubject.name} next term.`,
+        `${studentName} passed with ${averageScore}% average. A focus on ${weakestSubject.name} next term will help ${objective} improve overall.`,
       ],
       marginal: [
-        `${studentName} barely passed with ${averageScore}% average. ${possessive} performance in ${bestSubject.name} (${bestSubject.score}%) was satisfactory, but ${weakestSubject.name} (${weakestSubject.score}%) is a serious concern. ${pronoun} must show significant improvement next term.`,
+        `${studentName} passed this term with ${averageScore}% average. ${possessive} performance in ${bestSubject.name} (${bestSubject.score}%) was satisfactory, and we believe ${pronoun} can improve in ${weakestSubject.name} (${weakestSubject.score}%) with additional support and consistent study habits. We encourage ${objective} to seek extra help and practice regularly.`,
         
-        `Close call, ${studentName}. Scoring ${averageScore}% on average, ${pronoun} narrowly avoided failure. ${bestSubject.name} (${bestSubject.score}%) was ${possessive} saving grace. ${pronoun} needs to double efforts, especially in ${weakestSubject.name}.`,
+        `${studentName} achieved ${averageScore}% average, meeting the minimum requirements. ${bestSubject.name} (${bestSubject.score}%) was ${possessive} strongest area. With focused effort and support, especially in ${weakestSubject.name}, ${pronoun} can make meaningful progress next term.`,
         
-        `Marginal pass. ${studentName} achieved ${averageScore}% average, just above the minimum. ${weakestSubject.name} at ${weakestSubject.score}% is particularly concerning. A parent-teacher meeting is advised to discuss ${possessive} progress.`,
+        `Marginal pass. ${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs attention. We recommend additional academic support and regular practice to build understanding and confidence.`,
         
-        `${studentName} passed by a slim margin. ${possessive} average of ${averageScore}% indicates serious gaps in understanding, especially in ${weakestSubject.name} (${weakestSubject.score}%). Extra tutoring is strongly recommended.`,
+        `${studentName} passed by a slim margin. ${possessive} average of ${averageScore}% indicates areas that need strengthening, especially ${weakestSubject.name} (${weakestSubject.score}%). Extra tutoring is strongly recommended to help ${objective} succeed.`,
         
-        `${studentName} barely scraped through with ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} saved ${objective}.`,
+        `${studentName} achieved ${averageScore}% average this term. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows ${possessive} potential. With extra effort and support in ${weakestSubject.name}, ${pronoun} can improve.`,
         
-        `Marginal results, ${studentName}! With ${averageScore}% average, ${pronoun} needs urgent improvement.`,
+        `Marginal results, ${studentName}. With ${averageScore}% average, ${pronoun} needs to focus on improvement. We believe in ${possessive} ability to succeed with consistent effort.`,
         
-        `${studentName} narrowly passed at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) was good, but ${weakestSubject.name} needs work.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) was good, but ${weakestSubject.name} needs attention. We encourage ${objective} to seek extra help.`,
         
-        `Close call, ${studentName}! ${pronoun} earned ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% is concerning.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs work. With support and dedication, ${pronoun} can improve.`,
         
-        `${studentName} barely met requirements at ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} helped.`,
+        `${studentName} met requirements at ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} helped. Strengthening ${weakestSubject.name} will bring balance.`,
         
-        `Marginal pass, ${studentName}! With ${averageScore}% average, ${pronoun} must improve significantly.`,
+        `Marginal pass, ${studentName}. With ${averageScore}% average, ${pronoun} must improve next term. We are here to support ${possessive} growth.`,
         
-        `${studentName} narrowly passed at ${averageScore}%. ${weakestSubject.name} requires urgent attention.`,
+        `${studentName} passed with ${averageScore}% average. ${weakestSubject.name} requires urgent attention. We recommend extra practice and support.`,
         
-        `Close results, ${studentName}! ${pronoun} achieved ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `${studentName} achieved ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is a strength. Using this to build confidence in other subjects will help.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${possessive} performance in ${bestSubject.name} is encouraging.`,
+        `${studentName} passed at ${averageScore}%. ${possessive} performance in ${bestSubject.name} is encouraging. With effort, ${pronoun} can improve overall.`,
         
-        `Marginal performance, ${studentName}! With ${averageScore}% average, ${pronoun} needs extra support.`,
+        `Marginal performance, ${studentName}. With ${averageScore}% average, ${pronoun} needs extra support. We are committed to ${possessive} success.`,
         
-        `${studentName} narrowly met expectations at ${averageScore}%. Focus on ${weakestSubject.name} next term.`,
+        `${studentName} met expectations at ${averageScore}%. Focusing on ${weakestSubject.name} next term will bring improvement.`,
         
-        `Close call, ${studentName}! ${pronoun} earned ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) was good.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) was good. Building on this will help in other subjects.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${weakestSubject.name} at ${weakestSubject.score}% needs work.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% needs work. With consistent effort, ${pronoun} can improve.`,
         
-        `Marginal results, ${studentName}! With ${averageScore}% average, ${pronoun} must work harder.`,
+        `Marginal results, ${studentName}. With ${averageScore}% average, ${pronoun} must work harder. We believe in ${possessive} potential.`,
         
-        `${studentName} narrowly passed at ${averageScore}%. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential.`,
+        `${studentName} passed with ${averageScore}% average. ${possessive} ${bestSubject.score}% in ${bestSubject.name} shows potential. Keep pushing!`,
         
-        `Close pass, ${studentName}! ${pronoun} achieved ${averageScore}% average. Keep working on ${weakestSubject.name}.`,
+        `${studentName} achieved ${averageScore}% average. Continued effort on ${weakestSubject.name} will bring improvement.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a highlight.`,
+        `${studentName} passed at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a highlight. We encourage ${objective} to use this as motivation.`,
         
-        `Marginal performance, ${studentName}! With ${averageScore}% average, ${pronoun} needs improvement.`,
+        `Marginal performance, ${studentName}. With ${averageScore}% average, ${pronoun} needs improvement. We are here to help ${objective} succeed.`,
         
-        `${studentName} narrowly met requirements at ${averageScore}%. Focus on ${weakestSubject.name} urgently.`,
+        `${studentName} met requirements at ${averageScore}%. Focusing on ${weakestSubject.name} urgently will help ${objective} improve.`,
         
-        `Close results, ${studentName}! ${pronoun} earned ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good.`,
+        `${studentName} passed with ${averageScore}% average. ${bestSubject.name} (${bestSubject.score}%) is good. Keep working hard!`,
         
-        `${studentName} barely passed at ${averageScore}%. ${weakestSubject.name} requires significant effort.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} requires significant effort. With support, ${pronoun} can improve.`,
         
-        `Marginal pass, ${studentName}! With ${averageScore}% average, ${pronoun} must improve next term.`,
+        `Marginal pass, ${studentName}. With ${averageScore}% average, ${pronoun} must improve next term. We believe in ${possessive} ability.`,
         
-        `${studentName} narrowly achieved ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is promising.`,
+        `${studentName} passed with ${averageScore}% average. ${possessive} performance in ${bestSubject.name} is promising. Building on this will help.`,
         
-        `Close call, ${studentName}! ${pronoun} earned ${averageScore}% average. Keep pushing on ${weakestSubject.name}.`,
+        `${studentName} achieved ${averageScore}% average. Continued effort on ${weakestSubject.name} will bring success.`,
         
-        `${studentName} barely passed at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a strength.`,
+        `${studentName} passed at ${averageScore}%. ${bestSubject.name} (${bestSubject.score}%) is a strength to build upon.`,
         
-        `Marginal results, ${studentName}! With ${averageScore}% average, ${pronoun} needs extra support.`,
+        `Marginal results, ${studentName}. With ${averageScore}% average, ${pronoun} needs extra support. We are committed to ${possessive} growth.`,
         
-        `${studentName} narrowly passed, achieving ${averageScore}% average. Focus on improvement areas.`,
+        `${studentName} passed with ${averageScore}% average. Focusing on improvement areas will help ${objective} next term.`,
       ],
       poor: [
-        `${studentName} performed poorly this term with an average of ${averageScore}%, which is below the expected standard. ${weakestSubject.name} (${weakestSubject.score}%) is a major area of concern. ${pronoun} is required to attend extra lessons and a parent-teacher meeting is mandatory.`,
+        `${studentName} has faced challenges this term, achieving ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) is an area that needs attention. With additional academic support, consistent effort, and a structured study plan, ${pronoun} can work toward improvement next term. We encourage parents to partner with the school to support ${possessive} progress.`,
         
-        `Unsatisfactory performance. ${studentName} scored ${averageScore}% on average, failing to meet the minimum requirements. ${weakestSubject.name} at ${weakestSubject.score}% is unacceptable. Immediate academic intervention is required.`,
+        `${studentName} scored ${averageScore}% average this term. ${weakestSubject.name} at ${weakestSubject.score}% shows room for growth. Extra lessons and regular practice are strongly recommended to help ${objective} build understanding and confidence. A parent-teacher meeting is encouraged to discuss ${possessive} progress.`,
         
-        `Poor results, ${studentName}. With ${averageScore}% average, ${pronoun} has not met the expected learning outcomes. ${weakestSubject.name} (${weakestSubject.score}%) needs urgent improvement. ${pronoun} is placed on academic probation.`,
+        `Performance this term was below expectations. ${studentName} achieved ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) requires significant attention. We recommend additional academic support and a personalized learning plan to help ${objective} succeed.`,
         
-        `${studentName} has underperformed this term, achieving only ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) is critically low. ${pronoun} must attend mandatory remedial classes next term.`,
+        `${studentName} has underperformed this term, achieving ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) is critically low. We strongly recommend extra tutoring and regular practice. Parents are encouraged to work closely with the school to support improvement.`,
         
-        `${studentName} performed below standard with ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% is concerning.`,
+        `${studentName} achieved ${averageScore}% average this term. ${weakestSubject.name} at ${weakestSubject.score}% is concerning. With focused intervention and consistent effort, ${pronoun} can make progress. Additional academic support is strongly recommended.`,
         
-        `Poor results, ${studentName}! With ${averageScore}% average, ${pronoun} needs significant improvement.`,
+        `Poor results, ${studentName}. With ${averageScore}% average, ${pronoun} needs significant improvement. We are committed to providing the support needed for ${possessive} success.`,
         
-        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} (${weakestSubject.score}%) requires urgent attention.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) requires urgent attention. Extra lessons and consistent practice are recommended.`,
         
-        `Unsatisfactory performance, ${studentName}! ${pronoun} earned ${averageScore}% average. Extra lessons required.`,
+        `${studentName} has shown potential but needs to improve, achieving ${averageScore}% average. We recommend additional support and a structured study plan.`,
         
-        `${studentName} scored below expectations at ${averageScore}%. ${weakestSubject.name} needs immediate support.`,
+        `${studentName} scored below expectations at ${averageScore}%. ${weakestSubject.name} needs immediate support. We encourage parents to work with the school.`,
         
-        `Poor achievement, ${studentName}! With ${averageScore}% average, ${pronoun} must improve dramatically.`,
+        `Poor achievement, ${studentName}. With ${averageScore}% average, ${pronoun} must improve dramatically. We believe in ${possessive} ability with the right support.`,
         
-        `${studentName} performed below standard at ${averageScore}%. Parent-teacher meeting required.`,
+        `${studentName} performed below standard at ${averageScore}%. A parent-teacher meeting is encouraged to discuss ${possessive} progress.`,
         
-        `Unsatisfactory results, ${studentName}! ${pronoun} achieved ${averageScore}% average. ${weakestSubject.name} is a concern.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} is a concern. We recommend extra support and regular practice.`,
         
-        `${studentName} underperformed at ${averageScore}%. Immediate academic intervention needed.`,
+        `${studentName} has underperformed at ${averageScore}%. Academic intervention is recommended to help ${objective} improve.`,
         
-        `Poor performance, ${studentName}! With ${averageScore}% average, ${pronoun} requires extra support.`,
+        `Poor performance, ${studentName}. With ${averageScore}% average, ${pronoun} requires extra support. We are here to help.`,
         
-        `${studentName} scored below expectations at ${averageScore}%. ${weakestSubject.name} needs urgent work.`,
+        `${studentName} scored below expectations at ${averageScore}%. ${weakestSubject.name} needs urgent work. We recommend additional tutoring.`,
         
-        `Unsatisfactory effort, ${studentName}! ${pronoun} earned ${averageScore}% average. Remedial classes required.`,
+        `${studentName} achieved ${averageScore}% average. Extra lessons are strongly recommended. Parents are encouraged to support ${possessive} learning journey.`,
         
-        `${studentName} performed poorly at ${averageScore}%. ${weakestSubject.name} at ${weakestSubject.score}% is concerning.`,
+        `${studentName} performed poorly at ${averageScore}%. ${weakestSubject.name} at ${weakestSubject.score}% is concerning. With support, ${pronoun} can improve.`,
         
-        `Below standard results, ${studentName}! With ${averageScore}% average, ${pronoun} needs improvement.`,
+        `Below standard results, ${studentName}. With ${averageScore}% average, ${pronoun} needs improvement. We are committed to ${possessive} success.`,
         
-        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} requires attention.`,
+        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} requires attention. Additional academic support is recommended.`,
         
-        `Poor achievement, ${studentName}! ${pronoun} achieved ${averageScore}% average. Extra lessons mandatory.`,
+        `Poor achievement, ${studentName}. ${pronoun} achieved ${averageScore}% average. Extra lessons are strongly recommended.`,
         
-        `${studentName} scored below expectations at ${averageScore}%. Immediate action required.`,
+        `${studentName} scored below expectations at ${averageScore}%. Immediate action is encouraged to support ${possessive} learning.`,
         
-        `Unsatisfactory performance, ${studentName}! With ${averageScore}% average, ${pronoun} must work harder.`,
+        `${studentName} has faced challenges, achieving ${averageScore}% average. With extra effort and support, ${pronoun} can improve.`,
         
-        `${studentName} performed below standard at ${averageScore}%. ${weakestSubject.name} needs urgent support.`,
+        `${studentName} performed below standard at ${averageScore}%. ${weakestSubject.name} needs urgent support. We encourage parents to partner with the school.`,
         
-        `Poor results, ${studentName}! ${pronoun} earned ${averageScore}% average. Academic probation advised.`,
+        `Poor results, ${studentName}. ${pronoun} earned ${averageScore}% average. Academic support is strongly recommended.`,
         
-        `${studentName} underperformed at ${averageScore}%. Parent-teacher meeting strongly recommended.`,
+        `${studentName} underperformed at ${averageScore}%. A parent-teacher meeting is encouraged to discuss ${possessive} progress.`,
         
-        `Unsatisfactory achievement, ${studentName}! With ${averageScore}% average, ${pronoun} needs help.`,
+        `${studentName} achieved ${averageScore}% average. With additional support and consistent effort, ${pronoun} can improve.`,
         
-        `${studentName} performed poorly at ${averageScore}%. ${weakestSubject.name} is a major concern.`,
+        `${studentName} performed poorly at ${averageScore}%. ${weakestSubject.name} is a major concern. Extra tutoring is strongly recommended.`,
         
-        `Below standard results, ${studentName}! ${pronoun} achieved ${averageScore}% average. Extra tutoring required.`,
+        `Below standard results, ${studentName}. ${pronoun} achieved ${averageScore}% average. We recommend extra support and practice.`,
         
-        `${studentName} scored below expectations at ${averageScore}%. Immediate improvement needed.`,
+        `${studentName} scored below expectations at ${averageScore}%. Immediate improvement is needed. We are here to help.`,
         
-        `Poor performance, ${studentName}! With ${averageScore}% average, ${pronoun} requires intervention.`,
+        `Poor performance, ${studentName}. With ${averageScore}% average, ${pronoun} requires intervention. We believe in ${possessive} potential.`,
         
-        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} needs urgent work.`,
+        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} needs urgent work. Additional academic support is recommended.`,
       ],
       veryPoor: [
-        `${studentName} has performed very poorly this term with an average of ${averageScore}%, far below the expected standard. ${weakestSubject.name} (${weakestSubject.score}%) is critically low. Mandatory extra lessons and parent-teacher conference are required.`,
+        `${studentName} has faced significant challenges this term, achieving ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) shows critical gaps in understanding. We strongly recommend intensive academic support, extra tutoring, and a structured learning plan. Parents are encouraged to work closely with the school to help ${objective} succeed next term.`,
         
-        `Critical academic concern. ${studentName} scored ${averageScore}% on average, which is significantly below passing standard. ${weakestSubject.name} at ${weakestSubject.score}% indicates major learning gaps. Intensive intervention is required.`,
+        `${studentName} scored ${averageScore}% average, which is below expectations. ${weakestSubject.name} at ${weakestSubject.score}% indicates major learning gaps. We recommend comprehensive academic intervention, extra lessons, and a parent-teacher conference to discuss strategies for improvement.`,
         
-        `Very poor results, ${studentName}. With only ${averageScore}% average, ${pronoun} has not met the minimum requirements. ${weakestSubject.name} (${weakestSubject.score}%) is a serious concern. Urgent action needed.`,
+        `Performance this term requires urgent attention. ${studentName} achieved ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) is a critical concern. We strongly recommend intensive tutoring, regular practice, and a collaborative approach between school and home to support ${possessive} learning.`,
         
-        `${studentName} has severely underperformed this term, achieving only ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) is critically low. Immediate remedial action is required.`,
+        `${studentName} has underperformed significantly this term, achieving ${averageScore}% average. ${weakestSubject.name} (${weakestSubject.score}%) requires immediate intervention. We recommend extra lessons, additional academic support, and a parent-teacher meeting to discuss ${possessive} progress.`,
         
-        `${studentName} performed very poorly with ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% is unacceptable.`,
+        `${studentName} performed very poorly with ${averageScore}% average. ${weakestSubject.name} at ${weakestSubject.score}% is critically low. Intensive academic support and consistent practice are strongly recommended. Parents are encouraged to partner with the school.`,
         
-        `Critical results, ${studentName}! With ${averageScore}% average, ${pronoun} needs urgent intervention.`,
+        `Critical results, ${studentName}. With ${averageScore}% average, ${pronoun} needs urgent intervention. We are committed to helping ${objective} succeed.`,
         
-        `${studentName} severely underperformed at ${averageScore}%. ${weakestSubject.name} requires immediate support.`,
+        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} requires immediate support. Extra lessons and regular practice are recommended.`,
         
-        `Very poor performance, ${studentName}! ${pronoun} earned ${averageScore}% average. Mandatory extra lessons.`,
+        `Very poor performance, ${studentName}. ${pronoun} earned ${averageScore}% average. We strongly recommend extra lessons and academic support.`,
         
-        `${studentName} scored far below expectations at ${averageScore}%. ${weakestSubject.name} is a major concern.`,
+        `${studentName} scored far below expectations at ${averageScore}%. ${weakestSubject.name} is a major concern. Intensive support is recommended.`,
         
-        `Critical achievement level, ${studentName}! With ${averageScore}% average, ${pronoun} requires intensive help.`,
+        `Critical achievement level, ${studentName}. With ${averageScore}% average, ${pronoun} requires intensive help. We are here to support ${possessive} growth.`,
         
-        `${studentName} performed very poorly at ${averageScore}%. Parent-teacher meeting mandatory.`,
+        `${studentName} performed very poorly at ${averageScore}%. A parent-teacher meeting is strongly recommended to discuss ${possessive} progress.`,
         
-        `Unacceptable results, ${studentName}! ${pronoun} achieved ${averageScore}% average. ${weakestSubject.name} is critical.`,
+        `${studentName} achieved ${averageScore}% average. ${weakestSubject.name} is critical. We recommend comprehensive academic intervention.`,
         
-        `${studentName} severely underperformed at ${averageScore}%. Urgent academic intervention needed.`,
+        `${studentName} underperformed at ${averageScore}%. Urgent academic intervention is needed. We are committed to helping ${objective}.`,
         
-        `Very poor performance, ${studentName}! With ${averageScore}% average, ${pronoun} requires immediate support.`,
+        `Very poor performance, ${studentName}. With ${averageScore}% average, ${pronoun} requires immediate support. Extra tutoring is strongly recommended.`,
         
-        `${studentName} scored far below standard at ${averageScore}%. ${weakestSubject.name} needs urgent work.`,
+        `${studentName} scored far below standard at ${averageScore}%. ${weakestSubject.name} needs urgent work. We encourage parents to seek additional support.`,
         
-        `Critical effort level, ${studentName}! ${pronoun} earned ${averageScore}% average. Remedial classes mandatory.`,
+        `Critical effort level, ${studentName}. ${pronoun} earned ${averageScore}% average. Remedial classes are strongly recommended.`,
         
-        `${studentName} performed very poorly at ${averageScore}%. ${weakestSubject.name} at ${weakestSubject.score}% is critical.`,
+        `${studentName} performed very poorly at ${averageScore}%. ${weakestSubject.name} at ${weakestSubject.score}% is critical. Intensive support is needed.`,
         
-        `Unacceptable performance, ${studentName}! With ${averageScore}% average, ${pronoun} needs major improvement.`,
+        `${studentName} has faced challenges, achieving ${averageScore}% average. We recommend comprehensive intervention and extra support.`,
         
-        `${studentName} severely underperformed at ${averageScore}%. ${weakestSubject.name} requires urgent attention.`,
+        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} requires urgent attention. We are here to help.`,
         
-        `Very poor achievement, ${studentName}! ${pronoun} achieved ${averageScore}% average. Extra lessons required.`,
+        `Very poor achievement, ${studentName}. ${pronoun} achieved ${averageScore}% average. Extra lessons are strongly recommended.`,
         
-        `${studentName} scored far below expectations at ${averageScore}%. Immediate action mandatory.`,
+        `${studentName} scored far below expectations at ${averageScore}%. Immediate action is encouraged to support ${possessive} learning.`,
         
-        `Critical results, ${studentName}! With ${averageScore}% average, ${pronoun} must improve dramatically.`,
+        `Critical results, ${studentName}. With ${averageScore}% average, ${pronoun} must improve dramatically. We believe in ${possessive} potential.`,
         
-        `${studentName} performed very poorly at ${averageScore}%. ${weakestSubject.name} needs urgent support.`,
+        `${studentName} performed very poorly at ${averageScore}%. ${weakestSubject.name} needs urgent support. Parents are encouraged to work with the school.`,
         
-        `Unacceptable performance, ${studentName}! ${pronoun} earned ${averageScore}% average. Intensive intervention needed.`,
+        `${studentName} achieved ${averageScore}% average. Intensive intervention is recommended to help ${objective} improve.`,
         
-        `${studentName} severely underperformed at ${averageScore}%. Parent-teacher conference required.`,
+        `${studentName} underperformed at ${averageScore}%. A parent-teacher conference is strongly recommended.`,
         
-        `Very poor achievement, ${studentName}! With ${averageScore}% average, ${pronoun} needs immediate help.`,
+        `Very poor achievement, ${studentName}. With ${averageScore}% average, ${pronoun} needs immediate help. We are committed to ${possessive} success.`,
         
-        `${studentName} performed very poorly at ${averageScore}%. ${weakestSubject.name} is a serious concern.`,
+        `${studentName} performed very poorly at ${averageScore}%. ${weakestSubject.name} is a serious concern. Extra support is recommended.`,
         
-        `Critical academic concern, ${studentName}! ${pronoun} achieved ${averageScore}% average. Urgent action needed.`,
+        `Critical academic concern, ${studentName}. ${pronoun} achieved ${averageScore}% average. Urgent action is needed. We are here to help.`,
         
-        `${studentName} scored far below standard at ${averageScore}%. Immediate improvement required.`,
+        `${studentName} scored far below standard at ${averageScore}%. Immediate improvement is needed with additional support.`,
         
-        `Very poor performance, ${studentName}! With ${averageScore}% average, ${pronoun} requires major intervention.`,
+        `Very poor performance, ${studentName}. With ${averageScore}% average, ${pronoun} requires major intervention. We believe improvement is possible.`,
         
-        `${studentName} severely underperformed at ${averageScore}%. ${weakestSubject.name} needs urgent work.`,
+        `${studentName} underperformed at ${averageScore}%. ${weakestSubject.name} needs urgent work. Parents are encouraged to seek extra support.`,
       ],
     }
 
-    // PRINCIPAL COMMENT TEMPLATES (30+ per level)
+    // PRINCIPAL COMMENT TEMPLATES - ALL SUPPORTIVE, NO REPEATING CLASS
     const principalTemplates: Record<string, string[]> = {
       outstanding: [
         `The Management commends ${studentName} for an outstanding academic performance with ${averageScore}% average. ${pronoun} has demonstrated excellence, discipline, and intellectual prowess. ${pronoun} is hereby PROMOTED to the next class with HIGH DISTINCTION. We encourage ${possessive} parents to continue supporting this exceptional child.`,
@@ -988,445 +988,445 @@ export async function POST(req: NextRequest) {
         `Good effort, ${studentName}! PROMOTED. Continue this momentum.`,
       ],
       aboveAverage: [
-        `${studentName} achieved a fair average of ${averageScore}%. ${pronoun} passed but can do better. ${pronoun} is PROMOTED conditionally. More dedication and focus are required next term.`,
+        `${studentName} achieved a fair average of ${averageScore}%. ${pronoun} passed and has areas for growth. ${pronoun} is PROMOTED with encouragement to focus more on weaker areas next term. Additional dedication and practice will lead to improved results.`,
         
-        `Average performance. ${studentName} scored ${averageScore}% on average, meeting the minimum standard. ${pronoun} is PROMOTED. Aim higher next term for better outcomes.`,
+        `Average performance. ${studentName} scored ${averageScore}% on average, meeting the minimum standard. ${pronoun} is PROMOTED. Aiming higher next term will bring even better outcomes.`,
         
-        `Satisfactory but not impressive. ${studentName} is PROMOTED with ${averageScore}% average. ${pronoun} needs to work harder next term to achieve better results.`,
+        `Satisfactory progress. ${studentName} is PROMOTED with ${averageScore}% average. ${pronoun} is encouraged to work on ${weakestSubject.name} to achieve better results next term.`,
         
-        `Fair performance, ${studentName}! PROMOTED conditionally. More effort needed.`,
+        `Fair performance, ${studentName}! PROMOTED. More effort in weaker areas will bring improvement.`,
         
         `Average results! ${studentName} is PROMOTED. Aim higher next term.`,
         
         `Satisfactory work, ${studentName}! PROMOTED. Room for improvement.`,
         
-        `Fair achievement! ${studentName} earns PROMOTION conditionally. Work harder.`,
+        `Fair achievement! ${studentName} earns PROMOTION. Working on weaker areas will help.`,
         
-        `Average effort! ${studentName} is PROMOTED. Keep striving.`,
+        `Average effort! ${studentName} is PROMOTED. Keep striving for growth.`,
         
-        `Satisfactory results! ${studentName} earns PROMOTION. Focus more.`,
+        `Satisfactory results! ${studentName} earns PROMOTION. Focus more on challenging subjects.`,
         
-        `Fair work, ${studentName}! PROMOTED conditionally. Dedication needed.`,
+        `Fair work, ${studentName}! PROMOTED. Dedication to weaker areas will bring progress.`,
         
         `Average performance! ${studentName} is PROMOTED. Aim for excellence.`,
         
-        `Satisfactory progress! ${studentName} earns PROMOTION. More effort required.`,
+        `Satisfactory progress! ${studentName} earns PROMOTION. More effort will bring results.`,
         
-        `Fair results! ${studentName} is PROMOTED conditionally. Keep pushing.`,
+        `Fair results! ${studentName} is PROMOTED. Keep pushing forward.`,
         
         `Average work! ${studentName} earns PROMOTION. Strive for better.`,
         
         `Satisfactory achievement! ${studentName} is PROMOTED. Room to grow.`,
         
-        `Fair effort, ${studentName}! PROMOTED conditionally. Work harder.`,
+        `Fair effort, ${studentName}! PROMOTED. Consistent effort will bring success.`,
         
         `Average results! ${studentName} is PROMOTED. Aim higher.`,
         
-        `Satisfactory work! ${studentName} earns PROMOTION. Focus more.`,
+        `Satisfactory work! ${studentName} earns PROMOTION. Focus more on learning.`,
         
-        `Fair performance! ${studentName} is PROMOTED conditionally. Dedication needed.`,
+        `Fair performance! ${studentName} is PROMOTED. Dedication will bring improvement.`,
         
-        `Average progress! ${studentName} earns PROMOTION. Keep striving.`,
+        `Average progress! ${studentName} earns PROMOTION. Keep striving for better.`,
         
-        `Satisfactory results! ${studentName} is PROMOTED. More effort.`,
+        `Satisfactory results! ${studentName} is PROMOTED. More effort in weaker areas.`,
         
-        `Fair work! ${studentName} earns PROMOTION conditionally. Work harder.`,
+        `Fair work! ${studentName} earns PROMOTION. Hard work will pay off.`,
         
-        `Average achievement! ${studentName} is PROMOTED. Aim for better.`,
+        `Average achievement! ${studentName} is PROMOTED. Aim for better results.`,
         
         `Satisfactory effort! ${studentName} earns PROMOTION. Room for growth.`,
         
-        `Fair results! ${studentName} is PROMOTED conditionally. Stay focused.`,
+        `Fair results! ${studentName} is PROMOTED. Stay focused on improvement.`,
         
-        `Average work! ${studentName} earns PROMOTION. Keep pushing.`,
+        `Average work! ${studentName} earns PROMOTION. Keep pushing forward.`,
         
-        `Satisfactory performance! ${studentName} is PROMOTED. More dedication.`,
+        `Satisfactory performance! ${studentName} is PROMOTED. More dedication needed.`,
         
-        `Fair progress! ${studentName} earns PROMOTION conditionally. Work harder.`,
+        `Fair progress! ${studentName} earns PROMOTION. Consistent effort will help.`,
         
         `Average results! ${studentName} is PROMOTED. Aim higher next term.`,
         
         `Satisfactory work! ${studentName} earns PROMOTION. Focus required.`,
         
-        `Fair achievement! ${studentName} is PROMOTED conditionally. Keep striving.`,
+        `Fair achievement! ${studentName} is PROMOTED. Keep striving for growth.`,
       ],
       satisfactory: [
-        `${studentName} achieved a satisfactory average of ${averageScore}%. ${pronoun} has met the basic requirements. ${pronoun} is PROMOTED. More effort will lead to better results.`,
+        `${studentName} achieved a satisfactory average of ${averageScore}%. ${pronoun} has met the basic requirements. ${pronoun} is PROMOTED. More effort and consistency will lead to better results next term.`,
         
-        `Satisfactory performance, ${studentName}. ${pronoun} is PROMOTED to the next class. Keep working hard.`,
+        `Satisfactory performance, ${studentName}. ${pronoun} is PROMOTED to the next class. Continued hard work and focus will bring improvement.`,
         
-        `Adequate results. ${studentName} scored ${averageScore}% average. ${pronoun} is PROMOTED. Aim for improvement next term.`,
+        `Adequate results. ${studentName} scored ${averageScore}% average. ${pronoun} is PROMOTED. Aiming for improvement next term will help ${objective} succeed.`,
         
-        `Satisfactory work, ${studentName}! PROMOTED. More dedication needed.`,
+        `Satisfactory work, ${studentName}! PROMOTED. More dedication to learning will help.`,
         
-        `Adequate performance! ${studentName} is PROMOTED. Keep striving.`,
+        `Adequate performance! ${studentName} is PROMOTED. Keep striving for better.`,
         
         `Satisfactory progress! ${studentName} earns PROMOTION. Room for growth.`,
         
         `Adequate results! ${studentName} is PROMOTED. Aim higher.`,
         
-        `Satisfactory effort! ${studentName} earns PROMOTION. Work harder.`,
+        `Satisfactory effort! ${studentName} earns PROMOTION. Work harder on weaker areas.`,
         
-        `Adequate work, ${studentName}! PROMOTED. Focus more next term.`,
+        `Adequate work, ${studentName}! PROMOTED. Focus more on challenging subjects.`,
         
-        `Satisfactory achievement! ${studentName} is PROMOTED. Keep pushing.`,
+        `Satisfactory achievement! ${studentName} is PROMOTED. Keep pushing forward.`,
         
-        `Adequate performance! ${studentName} earns PROMOTION. More effort.`,
+        `Adequate performance! ${studentName} earns PROMOTION. More effort will bring results.`,
         
         `Satisfactory results! ${studentName} is PROMOTED. Strive for better.`,
         
-        `Adequate work! ${studentName} earns PROMOTION. Dedication needed.`,
+        `Adequate work! ${studentName} earns PROMOTION. Dedication to learning will help.`,
         
-        `Satisfactory progress! ${studentName} is PROMOTED. Aim higher.`,
+        `Satisfactory progress! ${studentName} is PROMOTED. Aim higher next term.`,
         
-        `Adequate results! ${studentName} earns PROMOTION. Keep working.`,
+        `Adequate results! ${studentName} earns PROMOTION. Keep working hard.`,
         
-        `Satisfactory effort! ${studentName} is PROMOTED. More focus.`,
+        `Satisfactory effort! ${studentName} is PROMOTED. More focus on learning.`,
         
         `Adequate performance! ${studentName} earns PROMOTION. Room to improve.`,
         
         `Satisfactory work! ${studentName} is PROMOTED. Strive for excellence.`,
         
-        `Adequate results! ${studentName} earns PROMOTION. Keep pushing.`,
+        `Adequate results! ${studentName} earns PROMOTION. Keep pushing forward.`,
         
-        `Satisfactory progress! ${studentName} is PROMOTED. Work harder.`,
+        `Satisfactory progress! ${studentName} is PROMOTED. Work harder on weaknesses.`,
         
         `Adequate effort! ${studentName} earns PROMOTION. Aim for growth.`,
         
-        `Satisfactory performance! ${studentName} is PROMOTED. More dedication.`,
+        `Satisfactory performance! ${studentName} is PROMOTED. More dedication needed.`,
         
-        `Adequate work! ${studentName} earns PROMOTION. Stay focused.`,
+        `Adequate work! ${studentName} earns PROMOTION. Stay focused on learning.`,
         
-        `Satisfactory results! ${studentName} is PROMOTED. Keep striving.`,
+        `Satisfactory results! ${studentName} is PROMOTED. Keep striving for better.`,
         
         `Adequate achievement! ${studentName} earns PROMOTION. Room for improvement.`,
         
-        `Satisfactory effort! ${studentName} is PROMOTED. Work harder.`,
+        `Satisfactory effort! ${studentName} is PROMOTED. Work harder next term.`,
         
         `Adequate performance! ${studentName} earns PROMOTION. Aim higher.`,
         
         `Satisfactory work! ${studentName} is PROMOTED. More effort needed.`,
         
-        `Adequate results! ${studentName} earns PROMOTION. Keep building.`,
+        `Adequate results! ${studentName} earns PROMOTION. Keep building on this.`,
         
         `Satisfactory progress! ${studentName} is PROMOTED. Strive for better.`,
         
         `Adequate effort! ${studentName} earns PROMOTION. Stay focused.`,
       ],
       average: [
-        `${studentName} achieved a credit pass with ${averageScore}% average. ${pronoun} is PROMOTED conditionally. More focused study habits and parental support are recommended.`,
+        `${studentName} achieved a credit pass with ${averageScore}% average. ${pronoun} is PROMOTED with encouragement to develop stronger study habits. Parental support and additional practice in weaker areas are recommended.`,
         
-        `Credit performance. ${studentName} scored ${averageScore}% on average. ${pronoun} is PROMOTED conditionally. Harder work is required next term.`,
+        `Credit performance. ${studentName} scored ${averageScore}% on average. ${pronoun} is PROMOTED. Harder work and consistent effort will bring improvement next term.`,
         
-        `Barely passed. ${studentName} is PROMOTED conditionally with ${averageScore}% average. ${pronoun} needs to put in more effort next term.`,
+        `${studentName} passed with ${averageScore}% average. ${pronoun} is PROMOTED. ${pronoun} is encouraged to put in more effort and seek support in weaker areas next term.`,
         
-        `Credit pass, ${studentName}! PROMOTED conditionally. More effort needed.`,
+        `Credit pass, ${studentName}! PROMOTED. More effort and focus needed for even better results.`,
         
-        `Average performance! ${studentName} is PROMOTED conditionally. Work harder.`,
+        `Average performance! ${studentName} is PROMOTED. Hard work will bring improvement.`,
         
-        `Credit results! ${studentName} earns conditional promotion. Focus more.`,
+        `Credit results! ${studentName} earns PROMOTION. Focus more on learning strategies.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally. Dedication required.`,
+        `${studentName} passed! ${pronoun} is PROMOTED. Dedication to studies will help ${objective} improve.`,
         
-        `Credit work, ${studentName}! PROMOTED conditionally. Aim higher.`,
+        `Credit work, ${studentName}! PROMOTED. Aim higher next term with consistent effort.`,
         
-        `Average achievement! ${studentName} is PROMOTED conditionally. Keep striving.`,
+        `Average achievement! ${studentName} is PROMOTED. Keep striving for better results.`,
         
-        `Credit effort! ${studentName} earns conditional promotion. More focus.`,
+        `Credit effort! ${studentName} earns PROMOTION. More focus on challenging subjects will help.`,
         
-        `Barely made it! ${studentName} is PROMOTED conditionally. Work harder.`,
+        `${studentName} passed with credit. ${pronoun} is PROMOTED. Working harder next term will bring success.`,
         
-        `Credit results! ${studentName} earns conditional promotion. Study more.`,
+        `Credit results! ${studentName} earns PROMOTION. Consistent study habits will help ${objective} improve.`,
         
-        `Average performance! ${studentName} is PROMOTED conditionally. Stay focused.`,
+        `Average performance! ${studentName} is PROMOTED. Stay focused on learning goals.`,
         
-        `Credit pass! ${studentName} earns conditional promotion. More dedication.`,
+        `Credit pass! ${studentName} earns PROMOTION. More dedication to studies is encouraged.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally. Aim for improvement.`,
+        `${studentName} passed! ${pronoun} is PROMOTED. Aim for improvement in weaker areas.`,
         
-        `Credit work! ${studentName} earns conditional promotion. Keep pushing.`,
+        `Credit work! ${studentName} earns PROMOTION. Keep pushing forward with determination.`,
         
-        `Average effort! ${studentName} is PROMOTED conditionally. Work harder.`,
+        `Average effort! ${studentName} is PROMOTED. Working harder next term will pay off.`,
         
-        `Credit results! ${studentName} earns conditional promotion. Focus required.`,
+        `Credit results! ${studentName} earns PROMOTION. Focus on building stronger foundations.`,
         
-        `Barely achieved! ${studentName} is PROMOTED conditionally. More study needed.`,
+        `${studentName} achieved credit. ${pronoun} is PROMOTED. More consistent study is recommended.`,
         
-        `Credit performance! ${studentName} earns conditional promotion. Strive for better.`,
+        `Credit performance! ${studentName} earns PROMOTION. Strive for better understanding.`,
         
-        `Average work! ${studentName} is PROMOTED conditionally. Dedication needed.`,
+        `Average work! ${studentName} is PROMOTED. Dedication to learning will bring progress.`,
         
-        `Credit pass! ${studentName} earns conditional promotion. Aim higher.`,
+        `Credit pass! ${studentName} earns PROMOTION. Aim higher with focused effort.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally. Keep working.`,
+        `${studentName} passed! ${pronoun} is PROMOTED. Keep working hard on all subjects.`,
         
-        `Credit results! ${studentName} earns conditional promotion. More effort.`,
+        `Credit results! ${studentName} earns PROMOTION. More effort in weaker areas is encouraged.`,
         
-        `Average achievement! ${studentName} is PROMOTED conditionally. Stay focused.`,
+        `Average achievement! ${studentName} is PROMOTED. Stay focused on continuous improvement.`,
         
-        `Credit work! ${studentName} earns conditional promotion. Work harder.`,
+        `Credit work! ${studentName} earns PROMOTION. Work harder on challenging concepts.`,
         
-        `Barely made it! ${studentName} is PROMOTED conditionally. Focus more.`,
+        `${studentName} passed with credit. ${pronoun} is PROMOTED. Focus on developing stronger study skills.`,
         
-        `Credit effort! ${studentName} earns conditional promotion. Aim for growth.`,
+        `Credit effort! ${studentName} earns PROMOTION. Aim for growth in all subjects.`,
         
-        `Average performance! ${studentName} is PROMOTED conditionally. Keep striving.`,
+        `Average performance! ${studentName} is PROMOTED. Keep striving for academic growth.`,
         
-        `Credit results! ${studentName} earns conditional promotion. More dedication.`,
+        `Credit results! ${studentName} earns PROMOTION. More dedication to learning is recommended.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally. Study harder.`,
+        `${studentName} passed! ${pronoun} is PROMOTED. Studying with greater focus will help next term.`,
       ],
       belowAverage: [
-        `${studentName} passed with ${averageScore}% average. ${pronoun} is PROMOTED conditionally. Significant improvement is required next term. Parents are advised to monitor progress closely.`,
+        `${studentName} passed with ${averageScore}% average. ${pronoun} is PROMOTED with encouragement to focus on improvement next term. Parents are encouraged to work with the school to support ${possessive} learning journey.`,
         
-        `Borderline performance. ${studentName} is PROMOTED conditionally with ${averageScore}% average. ${pronoun} must work much harder next term to avoid retention.`,
+        `${studentName} achieved ${averageScore}% average. ${pronoun} is PROMOTED. ${pronoun} is encouraged to work much harder next term and seek extra support in weaker subjects to build confidence and understanding.`,
         
-        `Passed by a narrow margin. ${studentName} is PROMOTED conditionally. Immediate improvement is required, especially in weaker subjects.`,
+        `Passed by a narrow margin. ${studentName} is PROMOTED. We encourage ${objective} to focus on improvement areas and seek extra support. Parents are encouraged to partner with the school.`,
         
-        `Below average, ${studentName}! PROMOTED conditionally. Significant effort needed.`,
+        `Below average, ${studentName}! PROMOTED. Significant effort and focus needed next term. We believe in ${possessive} potential!`,
         
-        `Borderline pass! ${studentName} is PROMOTED conditionally. Work much harder.`,
+        `${studentName} passed! ${pronoun} is PROMOTED. Working harder with determination will bring success.`,
         
-        `Narrow margin! ${studentName} earns conditional promotion. Immediate focus required.`,
+        `Narrow margin! ${studentName} earns PROMOTION. Immediate focus on weaker areas is encouraged.`,
         
-        `Below standard! ${studentName} is PROMOTED conditionally. Parents must monitor.`,
+        `Below standard! ${studentName} is PROMOTED. Parents are encouraged to monitor progress and support learning.`,
         
-        `Close call! ${studentName} earns conditional promotion. Urgent improvement needed.`,
+        `Close call! ${studentName} earns PROMOTION. Urgent improvement needed in key subjects. We are here to help!`,
         
-        `Borderline results! ${studentName} is PROMOTED conditionally. Work harder.`,
+        `${studentName} passed! ${pronoun} is PROMOTED. Hard work on weak areas will bring improvement.`,
         
-        `Narrow pass! ${studentName} earns conditional promotion. Focus on weak areas.`,
+        `Narrow pass! ${studentName} earns PROMOTION. Focus on building stronger foundations.`,
         
-        `Below average performance! ${studentName} is PROMOTED conditionally. More effort.`,
+        `Below average performance! ${studentName} is PROMOTED. More effort and dedication will help.`,
         
-        `Close call, ${studentName}! PROMOTED conditionally. Immediate action needed.`,
+        `Close call, ${studentName}! PROMOTED. Immediate action and support are recommended.`,
         
-        `Borderline achievement! ${studentName} earns conditional promotion. Work much harder.`,
+        `${studentName} achieved a pass! ${pronoun} earns PROMOTION. Working much harder next term is encouraged.`,
         
-        `Narrow margin pass! ${studentName} is PROMOTED conditionally. Focus required.`,
+        `Narrow margin pass! ${studentName} is PROMOTED. Focus on developing better study habits.`,
         
-        `Below standard results! ${studentName} earns conditional promotion. Parents advised.`,
+        `Below standard results! ${studentName} earns PROMOTION. Parents are advised to support learning at home.`,
         
-        `Close pass! ${studentName} is PROMOTED conditionally. Urgent improvement.`,
+        `Close pass! ${studentName} is PROMOTED. Urgent improvement in weaker areas is recommended.`,
         
-        `Borderline work! ${studentName} earns conditional promotion. More dedication.`,
+        `${studentName} passed! ${pronoun} earns PROMOTION. More dedication to learning will help.`,
         
-        `Narrow achievement! ${studentName} is PROMOTED conditionally. Study harder.`,
+        `Narrow achievement! ${studentName} is PROMOTED. Studying harder next term will bring success.`,
         
-        `Below average effort! ${studentName} earns conditional promotion. Focus more.`,
+        `Below average effort! ${studentName} earns PROMOTION. Focus more on understanding key concepts.`,
         
-        `Close results! ${studentName} is PROMOTED conditionally. Work required.`,
+        `Close results! ${studentName} is PROMOTED. Work required on weak areas with teacher support.`,
         
-        `Borderline pass! ${studentName} earns conditional promotion. Immediate focus.`,
+        `${studentName} passed with a narrow margin! ${pronoun} earns PROMOTION. Immediate focus on improvement is needed.`,
         
-        `Narrow margin! ${studentName} is PROMOTED conditionally. Parents must monitor.`,
+        `Narrow margin! ${studentName} is PROMOTED. Parents are encouraged to support learning at home.`,
         
-        `Below standard! ${studentName} earns conditional promotion. Urgent effort needed.`,
+        `Below standard! ${studentName} earns PROMOTION. Urgent effort and focus are needed next term.`,
         
-        `Close call! ${studentName} is PROMOTED conditionally. Work much harder.`,
+        `Close call! ${studentName} is PROMOTED. Working much harder next term is encouraged.`,
         
-        `Borderline results! ${studentName} earns conditional promotion. Focus on weak areas.`,
+        `${studentName} passed! ${pronoun} earns PROMOTION. Focus on building skills in weak areas.`,
         
-        `Narrow pass! ${studentName} is PROMOTED conditionally. More study needed.`,
+        `Narrow pass! ${studentName} is PROMOTED. More consistent study habits are recommended.`,
         
-        `Below average performance! ${studentName} earns conditional promotion. Dedication required.`,
+        `Below average performance! ${studentName} earns PROMOTION. Dedication and hard work will bring improvement.`,
         
-        `Close achievement! ${studentName} is PROMOTED conditionally. Immediate action.`,
+        `Close achievement! ${studentName} is PROMOTED. Immediate action and support are recommended.`,
         
-        `Borderline effort! ${studentName} earns conditional promotion. Work harder.`,
+        `${studentName} passed! ${pronoun} earns PROMOTION. Working harder on challenges will help.`,
         
-        `Narrow results! ${studentName} is PROMOTED conditionally. Focus required.`,
+        `Narrow results! ${studentName} is PROMOTED. Focus on continuous improvement.`,
         
-        `Below standard pass! ${studentName} earns conditional promotion. Parents advised.`,
+        `Below standard pass! ${studentName} earns PROMOTION. Parents are encouraged to provide extra support.`,
       ],
       marginal: [
-        `${studentName} barely passed with ${averageScore}% average. ${pronoun} is PROMOTED conditionally on probation. Serious improvement is required next term.`,
+        `${studentName} passed with ${averageScore}% average. ${pronoun} is PROMOTED with a strong recommendation to focus on improvement next term. Parents are encouraged to work closely with the school to support ${possessive} progress.`,
         
-        `Marginal pass. ${studentName} is PROMOTED conditionally. ${pronoun} must improve significantly to avoid retention.`,
+        `Marginal pass. ${studentName} is PROMOTED. ${pronoun} must improve significantly next term with additional support and consistent effort. We believe in ${possessive} ability to succeed.`,
         
-        `Close call. ${studentName} is PROMOTED conditionally. ${pronoun} needs to double efforts next term. Parental support is urgently needed.`,
+        `Close call. ${studentName} is PROMOTED. ${pronoun} needs to double efforts next term. Parental support and partnership with the school are encouraged.`,
         
-        `Barely passed, ${studentName}! PROMOTED conditionally on probation. Major effort needed.`,
+        `Barely passed, ${studentName}! PROMOTED. Major effort and support needed next term. We believe in you!`,
         
-        `Marginal results! ${studentName} is PROMOTED conditionally. Significant improvement required.`,
+        `Marginal results! ${studentName} is PROMOTED. Significant improvement required with extra support.`,
         
-        `Close call! ${studentName} earns conditional promotion. Double efforts needed.`,
+        `Close call! ${studentName} earns PROMOTION. Double efforts and seek help when needed.`,
         
-        `Barely made it! ${studentName} is PROMOTED conditionally on probation. Work much harder.`,
+        `Barely made it! ${studentName} is PROMOTED. Working much harder next term is essential.`,
         
-        `Marginal pass! ${studentName} earns conditional promotion. Urgent improvement.`,
+        `Marginal pass! ${studentName} earns PROMOTION. Urgent improvement needed with teacher support.`,
         
-        `Close results! ${studentName} is PROMOTED conditionally. Parental support needed.`,
+        `Close results! ${studentName} is PROMOTED. Parental support is encouraged to help ${objective} succeed.`,
         
-        `Barely achieved! ${studentName} earns conditional promotion on probation. Focus required.`,
+        `Barely achieved! ${studentName} earns PROMOTION. Focus on building stronger foundations.`,
         
-        `Marginal effort! ${studentName} is PROMOTED conditionally. Significant work needed.`,
+        `Marginal effort! ${studentName} is PROMOTED. Significant work needed in weaker areas.`,
         
-        `Close call pass! ${studentName} earns conditional promotion. Double dedication.`,
+        `Close call pass! ${studentName} earns PROMOTION. Double dedication to studies is recommended.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally on probation. Major improvement.`,
+        `Barely passed! ${studentName} is PROMOTED. Major improvement needed with extra support.`,
         
-        `Marginal results! ${studentName} earns conditional promotion. Urgent focus required.`,
+        `Marginal results! ${studentName} earns PROMOTION. Urgent focus required on key subjects.`,
         
-        `Close achievement! ${studentName} is PROMOTED conditionally. Parents must support.`,
+        `Close achievement! ${studentName} is PROMOTED. Parents are encouraged to support learning at home.`,
         
-        `Barely made it! ${studentName} earns conditional promotion on probation. Work harder.`,
+        `Barely made it! ${studentName} earns PROMOTION. Working harder will bring success.`,
         
-        `Marginal pass! ${studentName} is PROMOTED conditionally. Significant effort.`,
+        `Marginal pass! ${studentName} is PROMOTED. Significant effort needed next term.`,
         
-        `Close call! ${studentName} earns conditional promotion. Double effort needed.`,
+        `Close call! ${studentName} earns PROMOTION. Double effort and focus on weak areas needed.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally on probation. Major focus.`,
+        `Barely passed! ${studentName} is PROMOTED. Major focus on improvement is recommended.`,
         
-        `Marginal results! ${studentName} earns conditional promotion. Urgent dedication.`,
+        `Marginal results! ${studentName} earns PROMOTION. Urgent dedication to studies is needed.`,
         
-        `Close achievement! ${studentName} is PROMOTED conditionally. Parental support.`,
+        `Close achievement! ${studentName} is PROMOTED. Parental support is encouraged.`,
         
-        `Barely made it! ${studentName} earns conditional promotion on probation. Work much harder.`,
+        `Barely made it! ${studentName} earns PROMOTION. Working much harder is essential.`,
         
-        `Marginal pass! ${studentName} is PROMOTED conditionally. Significant improvement.`,
+        `Marginal pass! ${studentName} is PROMOTED. Significant improvement needed next term.`,
         
-        `Close call! ${studentName} earns conditional promotion. Double efforts.`,
+        `Close call! ${studentName} earns PROMOTION. Double efforts and seek support.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally on probation. Major work needed.`,
+        `Barely passed! ${studentName} is PROMOTED. Major work needed with teacher guidance.`,
         
-        `Marginal results! ${studentName} earns conditional promotion. Urgent focus.`,
+        `Marginal results! ${studentName} earns PROMOTION. Urgent focus on learning is required.`,
         
-        `Close achievement! ${studentName} is PROMOTED conditionally. Parents must monitor.`,
+        `Close achievement! ${studentName} is PROMOTED. Parents are encouraged to monitor progress.`,
         
-        `Barely made it! ${studentName} earns conditional promotion on probation. Work harder.`,
+        `Barely made it! ${studentName} earns PROMOTION. Working harder next term is essential.`,
         
-        `Marginal pass! ${studentName} is PROMOTED conditionally. Significant dedication.`,
+        `Marginal pass! ${studentName} is PROMOTED. Significant dedication to studies is needed.`,
         
-        `Close call! ${studentName} earns conditional promotion. Double effort required.`,
+        `Close call! ${studentName} earns PROMOTION. Double effort required next term.`,
         
-        `Barely passed! ${studentName} is PROMOTED conditionally on probation. Major focus needed.`,
+        `Barely passed! ${studentName} is PROMOTED. Major focus on improvement is recommended.`,
       ],
       poor: [
-        `${studentName} performed poorly with ${averageScore}% average. ${pronoun} is NOT PROMOTED and must repeat the class. Immediate academic intervention is required. A mandatory parent-teacher meeting is scheduled.`,
+        `${studentName} has faced challenges this term, achieving ${averageScore}% average. ${pronoun} is PROMOTED with a strong recommendation for intensive academic support and a structured learning plan. Parents are encouraged to work closely with the school to help ${objective} succeed next term.`,
         
-        `Unsatisfactory results. ${studentName} scored ${averageScore}% on average, failing to meet standards. ${pronoun} must repeat the class. Intensive support and extra lessons are mandatory.`,
+        `${studentName} scored ${averageScore}% average, which is below expectations. ${pronoun} is PROMOTED with extra support. Extra lessons, consistent practice, and a parent-teacher conference are strongly recommended.`,
         
-        `${studentName} has failed to meet the required standard. ${pronoun} is RETAINED in the same class. Parents must meet with the school to discuss a recovery plan.`,
+        `${studentName} has not met the expected standard this term. ${pronoun} is PROMOTED with comprehensive support. A personalized learning plan and regular parent-teacher collaboration are recommended to help ${objective} succeed.`,
         
-        `Poor performance, ${studentName}! NOT PROMOTED. Must repeat class. Parent meeting required.`,
+        `Poor performance, ${studentName}! ${pronoun} is PROMOTED with intensive support. Parent meeting and extra tutoring are encouraged.`,
         
-        `Unsatisfactory results! ${studentName} is RETAINED. Immediate intervention needed.`,
+        `${studentName} achieved below expectations. ${pronoun} is PROMOTED with immediate intervention and support. We believe in ${possessive} potential!`,
         
-        `Failed to meet standards! ${studentName} must repeat the class. Extra lessons mandatory.`,
+        `Below standard performance! ${studentName} is PROMOTED. Extra lessons and support are strongly recommended.`,
         
-        `Poor achievement! ${studentName} is NOT PROMOTED. Parent meeting scheduled.`,
+        `Poor achievement! ${studentName} is PROMOTED. Parent meeting is encouraged to discuss support strategies.`,
         
-        `Unsatisfactory work! ${studentName} is RETAINED. Intensive support required.`,
+        `${studentName} has faced challenges. ${pronoun} is PROMOTED with intensive support and encouragement.`,
         
-        `Failed requirements! ${studentName} must repeat class. Mandatory extra lessons.`,
+        `Below requirements! ${studentName} is PROMOTED. Extra lessons and support are recommended.`,
         
-        `Poor results! ${studentName} is NOT PROMOTED. Immediate action required.`,
+        `Poor results! ${studentName} is PROMOTED. Immediate action and support needed. We are here to help!`,
         
-        `Unsatisfactory performance! ${studentName} is RETAINED. Parent meeting mandatory.`,
+        `${studentName} scored below standard. ${pronoun} is PROMOTED. Parent meeting is encouraged to plan for improvement.`,
         
-        `Failed to pass! ${studentName} must repeat the class. Urgent intervention needed.`,
+        `Below pass! ${studentName} is PROMOTED. Urgent intervention and support needed. We believe in you!`,
         
-        `Poor effort! ${studentName} is NOT PROMOTED. Extra lessons required.`,
+        `Poor effort! ${studentName} is PROMOTED. Extra lessons are strongly recommended.`,
         
-        `Unsatisfactory achievement! ${studentName} is RETAINED. Parent conference scheduled.`,
+        `${studentName} has not met expectations. ${pronoun} is PROMOTED with extra support. Parent conference is encouraged.`,
         
-        `Failed standards! ${studentName} must repeat class. Immediate support needed.`,
+        `Below standards! ${studentName} is PROMOTED. Immediate support and guidance are recommended.`,
         
-        `Poor results! ${studentName} is NOT PROMOTED. Mandatory parent meeting.`,
+        `Poor results! ${studentName} is PROMOTED. Parent meeting is encouraged to support learning.`,
         
-        `Unsatisfactory work! ${studentName} is RETAINED. Intensive intervention required.`,
+        `${studentName} achieved below requirements. ${pronoun} is PROMOTED. Intensive intervention and support are recommended.`,
         
-        `Failed requirements! ${studentName} must repeat the class. Extra lessons mandatory.`,
+        `Below requirements! ${studentName} is PROMOTED. Extra lessons and support strongly recommended.`,
         
-        `Poor performance! ${studentName} is NOT PROMOTED. Parent meeting required.`,
+        `Poor performance! ${studentName} is PROMOTED. Parent meeting and extra support are encouraged.`,
         
-        `Unsatisfactory results! ${studentName} is RETAINED. Urgent action needed.`,
+        `${studentName} scored below standard. ${pronoun} is PROMOTED. Urgent action and support needed.`,
         
-        `Failed to meet standards! ${studentName} must repeat class. Immediate support.`,
+        `Below standards! ${studentName} is PROMOTED. Immediate support is recommended for success.`,
         
-        `Poor achievement! ${studentName} is NOT PROMOTED. Extra lessons required.`,
+        `Poor achievement! ${studentName} is PROMOTED. Extra lessons are strongly recommended.`,
         
-        `Unsatisfactory effort! ${studentName} is RETAINED. Parent conference mandatory.`,
+        `${studentName} has faced challenges. ${pronoun} is PROMOTED. Parent conference is encouraged.`,
         
-        `Failed pass! ${studentName} must repeat the class. Urgent intervention.`,
+        `Below requirements! ${studentName} is PROMOTED. Urgent intervention and support are recommended.`,
         
-        `Poor work! ${studentName} is NOT PROMOTED. Intensive support needed.`,
+        `Poor work! ${studentName} is PROMOTED. Intensive support is recommended for improvement.`,
         
-        `Unsatisfactory results! ${studentName} is RETAINED. Parent meeting required.`,
+        `${studentName} achieved below expectations. ${pronoun} is PROMOTED. Parent meeting is encouraged to plan for success.`,
         
-        `Failed requirements! ${studentName} must repeat class. Extra lessons mandatory.`,
+        `Below requirements! ${studentName} is PROMOTED. Extra lessons and support are recommended.`,
         
-        `Poor performance! ${studentName} is NOT PROMOTED. Immediate action needed.`,
+        `Poor performance! ${studentName} is PROMOTED. Immediate action and encouragement needed.`,
         
-        `Unsatisfactory achievement! ${studentName} is RETAINED. Mandatory intervention.`,
+        `${studentName} has not met standards. ${pronoun} is PROMOTED with comprehensive support.`,
         
-        `Failed standards! ${studentName} must repeat class. Parent conference scheduled.`,
+        `Below standards! ${studentName} is PROMOTED. Parent conference and support are encouraged.`,
         
-        `Poor results! ${studentName} is NOT PROMOTED. Extra lessons required.`,
+        `Poor results! ${studentName} is PROMOTED. Extra lessons are strongly recommended for growth.`,
       ],
       veryPoor: [
-        `FAILED. ${studentName} scored ${averageScore}% on average, which is below the passing standard. ${pronoun} must repeat the class. Mandatory remedial classes and parent-teacher conferences are required.`,
+        `${studentName} has faced significant academic challenges this term, achieving ${averageScore}% average. ${pronoun} is PROMOTED with comprehensive support and encouragement. We strongly recommend intensive tutoring, a structured learning plan, and regular parent-teacher collaboration to help ${objective} succeed next term. We believe in ${possessive} potential!`,
         
-        `Academic failure. ${studentName} has not met the minimum requirements with ${averageScore}% average. ${pronoun} will repeat the class. Intensive intervention is necessary.`,
+        `${studentName} scored ${averageScore}% average, which is significantly below expectations. ${pronoun} is PROMOTED with extra support. Immediate intervention, extra lessons, and a parent-teacher conference are strongly recommended.`,
         
-        `${studentName} has failed this term. ${pronoun} will repeat the class. A comprehensive academic recovery plan is required. Parents must attend a meeting with the school administration.`,
+        `${studentName} has not met the required standard this term. ${pronoun} is PROMOTED with intensive academic support. A comprehensive learning plan and strong home-school partnership are recommended. We are committed to ${possessive} success.`,
         
-        `FAILED, ${studentName}! Must repeat class. Parent conference mandatory.`,
+        `Critical academic concern, ${studentName}! ${pronoun} is PROMOTED with intensive intervention. Extra tutoring, consistent practice, and parent collaboration are strongly encouraged.`,
         
-        `Academic failure! ${studentName} will repeat the class. Intensive intervention needed.`,
+        `${studentName} achieved far below expectations. ${pronoun} is PROMOTED with comprehensive support. We recommend extra lessons, academic intervention, and a parent meeting to discuss strategies for improvement.`,
         
-        `Failed requirements! ${studentName} must repeat. Mandatory remedial classes.`,
+        `Critical results, ${studentName}. ${pronoun} is PROMOTED with urgent intervention. We are committed to providing the support needed for ${possessive} success.`,
         
-        `FAILED performance! ${studentName} is retained. Parent meeting required.`,
+        `${studentName} underperformed significantly. ${pronoun} is PROMOTED with immediate support. Extra lessons and regular practice are strongly recommended.`,
         
-        `Academic failure! ${studentName} must repeat class. Urgent intervention needed.`,
+        `Very poor performance, ${studentName}. ${pronoun} is PROMOTED with intensive academic support. We believe improvement is possible with the right help.`,
         
-        `Failed standards! ${studentName} will repeat. Mandatory extra lessons.`,
+        `${studentName} scored far below expectations. ${pronoun} is PROMOTED with comprehensive intervention. Parental support is encouraged.`,
         
-        `FAILED results! ${studentName} is retained. Parent conference mandatory.`,
+        `Critical achievement level, ${studentName}. ${pronoun} is PROMOTED with intensive help. We are here to support ${possessive} growth.`,
         
-        `Academic failure! ${studentName} must repeat class. Intensive support required.`,
+        `${studentName} performed very poorly. ${pronoun} is PROMOTED with extra support. A parent-teacher meeting is strongly recommended.`,
         
-        `Failed to pass! ${studentName} will repeat. Immediate action needed.`,
+        `${studentName} achieved critical results. ${pronoun} is PROMOTED with comprehensive intervention. We are committed to helping ${objective}.`,
         
-        `FAILED effort! ${studentName} is retained. Mandatory remedial classes.`,
+        `${studentName} underperformed significantly. ${pronoun} is PROMOTED with urgent academic support. We believe in ${possessive} ability to improve.`,
         
-        `Academic failure! ${studentName} must repeat class. Parent meeting required.`,
+        `Very poor performance, ${studentName}. ${pronoun} is PROMOTED with immediate intervention. Extra tutoring is strongly recommended.`,
         
-        `Failed requirements! ${studentName} will repeat. Urgent intervention.`,
+        `${studentName} scored far below standard. ${pronoun} is PROMOTED with extra support. Parents are encouraged to seek additional help.`,
         
-        `FAILED performance! ${studentName} is retained. Extra lessons mandatory.`,
+        `Critical effort level, ${studentName}. ${pronoun} is PROMOTED with comprehensive support. Remedial classes are strongly recommended.`,
         
-        `Academic failure! ${studentName} must repeat class. Intensive support.`,
+        `${studentName} performed very poorly. ${pronoun} is PROMOTED with intensive intervention. We believe in ${possessive} potential.`,
         
-        `Failed standards! ${studentName} will repeat. Parent conference required.`,
+        `${studentName} has faced challenges. ${pronoun} is PROMOTED with comprehensive support. We are here to help ${objective} succeed.`,
         
-        `FAILED results! ${studentName} is retained. Mandatory intervention.`,
+        `${studentName} underperformed significantly. ${pronoun} is PROMOTED with urgent intervention. Extra support is recommended.`,
         
-        `Academic failure! ${studentName} must repeat class. Urgent action.`,
+        `Very poor achievement, ${studentName}. ${pronoun} is PROMOTED with extra lessons. We are committed to ${possessive} success.`,
         
-        `Failed to meet standards! ${studentName} will repeat. Extra lessons.`,
+        `${studentName} scored far below expectations. ${pronoun} is PROMOTED with immediate support. Parent collaboration is encouraged.`,
         
-        `FAILED work! ${studentName} is retained. Parent meeting mandatory.`,
+        `Critical results, ${studentName}. ${pronoun} is PROMOTED with intensive intervention. We believe in ${possessive} ability to improve.`,
         
-        `Academic failure! ${studentName} must repeat class. Intensive support.`,
+        `${studentName} performed very poorly. ${pronoun} is PROMOTED with urgent support. Parents are encouraged to work with the school.`,
         
-        `Failed requirements! ${studentName} will repeat. Urgent intervention.`,
+        `${studentName} achieved critical results. ${pronoun} is PROMOTED with comprehensive intervention. We are here to help.`,
         
-        `FAILED performance! ${studentName} is retained. Mandatory classes.`,
+        `${studentName} underperformed significantly. ${pronoun} is PROMOTED with immediate support. Extra lessons are recommended.`,
         
-        `Academic failure! ${studentName} must repeat class. Parent conference.`,
+        `Very poor achievement, ${studentName}. ${pronoun} is PROMOTED with intensive help. We are committed to ${possessive} success.`,
         
-        `Failed standards! ${studentName} will repeat. Extra lessons required.`,
+        `${studentName} performed very poorly. ${pronoun} is PROMOTED with comprehensive support. Extra tutoring is strongly recommended.`,
         
-        `FAILED results! ${studentName} is retained. Immediate action needed.`,
+        `Critical academic concern, ${studentName}. ${pronoun} is PROMOTED with urgent intervention. We believe improvement is possible.`,
         
-        `Academic failure! ${studentName} must repeat class. Intensive help.`,
+        `${studentName} scored far below standard. ${pronoun} is PROMOTED with extra support. Parental involvement is encouraged.`,
         
-        `Failed to pass! ${studentName} will repeat. Parent meeting required.`,
+        `Very poor performance, ${studentName}. ${pronoun} is PROMOTED with major intervention. We are committed to helping ${objective} succeed.`,
         
-        `FAILED effort! ${studentName} is retained. Mandatory remedial classes.`,
+        `${studentName} underperformed significantly. ${pronoun} is PROMOTED with extra support. Parents are encouraged to seek additional help.`,
       ],
     }
 

@@ -303,7 +303,8 @@ export default function ViewReportCardPage() {
       const gender = studentData?.gender || 'male'
       const className = studentData?.class || '—'
       
-      await generateCommentsFromAPI(firstName, avg, processedSubjects, className, gender)
+      // ✅ Send rounded average to API for teacher comment
+      await generateCommentsFromAPI(firstName, Math.round(avg), processedSubjects, className, gender)
 
     } catch (error) {
       console.error(error)
@@ -331,7 +332,9 @@ export default function ViewReportCardPage() {
       const gender = student?.gender || 'male'
       const className = student?.class || '—'
       const subjectsForAPI = subjects.map(s => ({ name: s.subject, score: s.total }))
-      const success = await generateCommentsFromAPI(firstName, averageScore, subjectsForAPI, className, gender)
+      
+      // ✅ Send rounded average to API for teacher comment
+      const success = await generateCommentsFromAPI(firstName, Math.round(averageScore), subjectsForAPI, className, gender)
       
       if (success) {
         toast.success('Comments regenerated!')
