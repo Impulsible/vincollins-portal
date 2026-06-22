@@ -5,12 +5,14 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { useReactToPrint } from 'react-to-print'
 import {
   ArrowLeft,
   Printer,
   RefreshCw,
   Loader2,
   Sparkles,
+  Download,
 } from 'lucide-react'
 
 // ============================================
@@ -76,16 +78,16 @@ const getGradeRemark = (grade: string): string => {
 
 const getGradeStyle = (grade: string): string => {
   switch (grade) {
-    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[9px]'
     case 'B2':
-    case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[9px]'
     case 'C4':
     case 'C5':
-    case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[9px]'
     case 'D7':
-    case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[9px]'
+    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[9px]'
+    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[9px]'
   }
 }
 
@@ -122,13 +124,6 @@ interface SchoolSettings {
   motto?: string
 }
 
-const Panel = ({ title, children }: { title: string; children: React.ReactNode }) => (
-  <div className="border border-gray-300 mb-2">
-    <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 uppercase">{title}</div>
-    <div className="p-2 text-[10px]">{children}</div>
-  </div>
-)
-
 const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
   name: 'VINCOLLINS COLLEGE',
   address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
@@ -143,6 +138,7 @@ const DEFAULT_SCHOOL_SETTINGS: SchoolSettings = {
 export default function ViewReportCardPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const reportRef = useRef<HTMLDivElement>(null)
 
   const studentId = searchParams.get('student')
   const term = searchParams.get('term') || 'third'
@@ -160,6 +156,29 @@ export default function ViewReportCardPage() {
   const [teacherComment, setTeacherComment] = useState('')
   const [principalComment, setPrincipalComment] = useState('')
 
+  const handleDownloadPDF = useReactToPrint({
+    contentRef: reportRef,
+    documentTitle: `${student?.display_name || student?.full_name || 'Student'}_Report_Card_${term}_${year}`,
+    pageStyle: `
+      @page {
+        size: A4;
+        margin: 10mm;
+      }
+      @media print {
+        body {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          color-adjust: exact;
+        }
+        * {
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+          color-adjust: exact;
+        }
+      }
+    `,
+  })
+
   const loadNextTermDate = useCallback(async () => {
     try {
       const { data, error } = await supabase
@@ -176,7 +195,6 @@ export default function ViewReportCardPage() {
     }
   }, [])
 
-  // Call API to generate comments
   const generateCommentsFromAPI = useCallback(async (firstName: string, avgScore: number, subjectsList: any[], className: string, gender: string) => {
     try {
       const response = await fetch('/api/generate-comments', {
@@ -204,7 +222,6 @@ export default function ViewReportCardPage() {
     }
   }, [])
 
-  // Load scores directly from ca_scores table
   const loadScores = useCallback(async () => {
     if (!studentId) {
       toast.error('No student selected')
@@ -215,7 +232,6 @@ export default function ViewReportCardPage() {
     setLoading(true)
 
     try {
-      // Get student profile
       const { data: studentData, error: studentError } = await supabase
         .from('profiles')
         .select('*')
@@ -225,7 +241,6 @@ export default function ViewReportCardPage() {
       if (studentError) throw studentError
       setStudent(studentData)
 
-      // Get all scores for this student from ca_scores
       const { data: scoresData, error: scoresError } = await supabase
         .from('ca_scores')
         .select('*')
@@ -236,7 +251,6 @@ export default function ViewReportCardPage() {
 
       if (scoresError) throw scoresError
 
-      // Process scores into subjects
       let processedSubjects: SubjectScore[] = (scoresData || []).map((score: any) => {
         const combinedCA = (score.ca1_score || 0) + (score.ca2_score || 0)
         const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
@@ -256,12 +270,18 @@ export default function ViewReportCardPage() {
         }
       })
 
-      // Sort subjects by WAEC/NECO standard order
+      const subjectMap = new Map<string, SubjectScore>()
+      processedSubjects.forEach(s => {
+        const existing = subjectMap.get(s.subject)
+        if (!existing || s.total > existing.total) {
+          subjectMap.set(s.subject, s)
+        }
+      })
+      processedSubjects = Array.from(subjectMap.values())
       processedSubjects = sortSubjectsByOrder(processedSubjects)
       
       setSubjects(processedSubjects)
 
-      // Calculate totals
       const total = processedSubjects.reduce((sum, s) => sum + s.total, 0)
       const avg = processedSubjects.length > 0 ? total / processedSubjects.length : 0
       
@@ -269,14 +289,11 @@ export default function ViewReportCardPage() {
       setAverageScore(avg)
       setOverallGrade(getOverallGrade(avg))
 
-      // Get proper first name
       let firstName = studentData?.first_name || ''
-      
       if (!firstName) {
         const nameToSplit = studentData?.display_name || studentData?.full_name || 'Student'
         firstName = nameToSplit.split(' ')[0]
       }
-      
       if (firstName) {
         firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
       } else {
@@ -286,7 +303,6 @@ export default function ViewReportCardPage() {
       const gender = studentData?.gender || 'male'
       const className = studentData?.class || '—'
       
-      // Generate comments via API
       await generateCommentsFromAPI(firstName, avg, processedSubjects, className, gender)
 
     } catch (error) {
@@ -297,19 +313,15 @@ export default function ViewReportCardPage() {
     }
   }, [studentId, term, year, generateCommentsFromAPI, router])
 
-  // Regenerate comments via API
   const handleRegenerateComments = useCallback(async () => {
     if (!student) return
-    
     setRegenerating(true)
     try {
       let firstName = student?.first_name || ''
-      
       if (!firstName) {
         const nameToSplit = student?.display_name || student?.full_name || 'Student'
         firstName = nameToSplit.split(' ')[0]
       }
-      
       if (firstName) {
         firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
       } else {
@@ -318,13 +330,11 @@ export default function ViewReportCardPage() {
       
       const gender = student?.gender || 'male'
       const className = student?.class || '—'
-      
       const subjectsForAPI = subjects.map(s => ({ name: s.subject, score: s.total }))
-      
       const success = await generateCommentsFromAPI(firstName, averageScore, subjectsForAPI, className, gender)
       
       if (success) {
-        toast.success('Comments regenerated successfully!')
+        toast.success('Comments regenerated!')
       } else {
         toast.error('Failed to regenerate comments')
       }
@@ -403,7 +413,6 @@ export default function ViewReportCardPage() {
     init()
   }, [studentId, term, year, router, loadNextTermDate, loadScores])
 
-  // Handle back button
   const handleBack = () => {
     router.back()
   }
@@ -435,13 +444,10 @@ export default function ViewReportCardPage() {
   const behaviorSkillRatings = generateRatings()
   const formattedNextTermDate = nextTermDate 
     ? new Date(nextTermDate).toLocaleDateString('en-NG', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
+        day: 'numeric', month: 'long', year: 'numeric'
       })
     : 'To be announced'
 
-  // Find best and worst subjects
   const bestSubject = subjects.length > 0 
     ? subjects.reduce((a, b) => a.total > b.total ? a : b) 
     : null
@@ -455,7 +461,7 @@ export default function ViewReportCardPage() {
 
   return (
     <div className="bg-gray-100 min-h-screen py-4">
-      {/* TOPBAR - Hidden in print */}
+      {/* TOPBAR */}
       <div className="no-print max-w-full lg:max-w-[210mm] mx-auto mb-4 px-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Button variant="outline" size="sm" onClick={handleBack}>
@@ -466,51 +472,49 @@ export default function ViewReportCardPage() {
             <Button variant="outline" size="sm" onClick={loadScores}>
               <RefreshCw className="h-4 w-4 mr-2" /> Refresh
             </Button>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={handleRegenerateComments}
-              disabled={regenerating}
-            >
+            <Button variant="outline" size="sm" onClick={handleRegenerateComments} disabled={regenerating}>
               {regenerating ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
                 <Sparkles className="h-4 w-4 mr-2" />
               )}
-              <span className="hidden sm:inline">Regenerate Comments</span>
-              <span className="sm:hidden">Comments</span>
+              Regen Comments
             </Button>
             <Button variant="outline" size="sm" onClick={() => window.print()}>
               <Printer className="h-4 w-4 mr-2" /> Print
+            </Button>
+            <Button variant="default" size="sm" onClick={() => handleDownloadPDF()} className="bg-blue-600 hover:bg-blue-700">
+              <Download className="h-4 w-4 mr-2" /> Download PDF
             </Button>
           </div>
         </div>
       </div>
 
       {/* REPORT CARD */}
-      <div className="bg-white w-full max-w-[210mm] mx-auto text-black border border-gray-300 print:border-none print:max-w-full print:mx-0">
-        <div className="p-4 print:p-4">
+      <div ref={reportRef}>
+        <div className="bg-white w-full max-w-[210mm] mx-auto text-black border-2 border-blue-900 print:border-2 print:border-blue-900 print:max-w-full print:mx-0 p-4 print:p-3">
+          
           {/* HEADER */}
-          <div className="border-b border-gray-300 pb-4 print:pb-2">
+          <div className="border-b-2 border-blue-900 pb-3 mb-3 print:pb-2 print:mb-2">
             <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-3">
-              <div className="w-16 print:w-12 hidden sm:block">
+              <div className="w-16 print:w-14 hidden sm:block">
                 {schoolSettings.logo_url && (
-                  <img src={schoolSettings.logo_url} alt="logo" className="w-14 h-14 object-contain print:w-10 print:h-10" />
+                  <img src={schoolSettings.logo_url} alt="logo" className="w-14 h-14 object-contain print:w-12 print:h-12" />
                 )}
               </div>
               <div className="flex-1 text-center">
-                <h1 className="text-[18px] font-bold uppercase text-blue-900 print:text-[14px]">
+                <h1 className="text-[18px] font-bold uppercase text-blue-900 print:text-[15px] tracking-wide">
                   {schoolSettings.name}
                 </h1>
-                <p className="text-[10px] print:text-[8px]">{schoolSettings.address}</p>
-                <p className="text-[10px] print:text-[8px]">Tel: {schoolSettings.phone} | Email: {schoolSettings.email}</p>
-                <p className="text-[9px] italic text-amber-600 mt-1 print:text-[7px]">"{schoolSettings.motto}"</p>
-                <h2 className="font-bold mt-2 text-[14px] print:text-[11px]">
+                <p className="text-[10px] print:text-[9px] text-gray-800">{schoolSettings.address}</p>
+                <p className="text-[10px] print:text-[9px] text-gray-800">Tel: {schoolSettings.phone} | Email: {schoolSettings.email}</p>
+                <p className="text-[9px] italic text-amber-700 mt-1 print:text-[8px] font-medium">"{schoolSettings.motto}"</p>
+                <h2 className="font-bold mt-2 text-[14px] print:text-[12px] text-blue-900">
                   {termDisplay} Student's Performance Report
                 </h2>
-                <p className="text-[10px] mt-1 font-semibold print:text-[8px]">Academic Session: {year}</p>
+                <p className="text-[10px] mt-1 font-semibold print:text-[9px] text-gray-800">Academic Session: {year}</p>
               </div>
-              <div className="w-16 h-20 sm:w-20 sm:h-24 border border-gray-300 rounded overflow-hidden print:w-16 print:h-20">
+              <div className="w-16 h-20 sm:w-20 sm:h-24 border-2 border-blue-900 rounded overflow-hidden print:w-16 print:h-20">
                 {student.photo_url ? (
                   <img src={student.photo_url} alt="student" className="w-full h-full object-cover" />
                 ) : (
@@ -521,102 +525,102 @@ export default function ViewReportCardPage() {
           </div>
 
           {/* STUDENT INFO */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 text-[11px] mt-3 mb-4 print:mt-2 print:mb-3 print:text-[9px]">
-            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32">Name:</span><span className="break-words">{fullName}</span></div>
-            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32">Admission No:</span><span>{student.admission_number || '—'}</span></div>
-            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32">Class:</span><span>{student.class || '—'}</span></div>
-            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32">Term:</span><span>{termDisplay}</span></div>
-            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32">Session:</span><span>{year}</span></div>
-            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32">Next Term:</span><span className="break-words">{formattedNextTermDate}</span></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[11px] mb-4 print:mb-3 print:text-[10px]">
+            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Name:</span><span className="break-words text-black">{fullName}</span></div>
+            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Admission No:</span><span className="text-black">{student.admission_number || '—'}</span></div>
+            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Class:</span><span className="text-black">{student.class || '—'}</span></div>
+            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Term:</span><span className="text-black">{termDisplay}</span></div>
+            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Session:</span><span className="text-black">{year}</span></div>
+            <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Next Term:</span><span className="break-words text-black">{formattedNextTermDate}</span></div>
           </div>
 
-          {/* MAIN CONTENT - KEEP HORIZONTAL LAYOUT IN PRINT */}
-          <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-4 print:grid-cols-[70%_30%]">
+          {/* MAIN CONTENT */}
+          <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-4 print:grid-cols-[70%_30%] print:gap-3">
             {/* LEFT COLUMN */}
             <div className="min-w-0">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[500px] border-collapse border border-gray-300 text-[10px] print:text-[8px]">
-                  <thead className="bg-blue-600 text-white">
+              <div className="print:overflow-visible">
+                <table className="w-full border-collapse border-2 border-blue-900 text-[10px] print:text-[9px] print:w-full">
+                  <thead className="bg-blue-700 text-white">
                     <tr>
-                      <th className="border border-blue-500 px-2 py-1.5 text-left">Subjects</th>
-                      <th className="border border-blue-500 px-2 py-1.5 text-center w-12">CA</th>
-                      <th className="border border-blue-500 px-2 py-1.5 text-center w-12">Exam</th>
-                      <th className="border border-blue-500 px-2 py-1.5 text-center w-12">Total</th>
-                      <th className="border border-blue-500 px-2 py-1.5 text-center w-10">Grade</th>
-                      <th className="border border-blue-500 px-2 py-1.5 text-left">Remark</th>
+                      <th className="border border-blue-500 px-2 py-2 text-left print:text-[9px] print:py-1.5 print:px-1.5">Subjects</th>
+                      <th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">CA</th>
+                      <th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">Exam</th>
+                      <th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">Total</th>
+                      <th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">Grade</th>
+                      <th className="border border-blue-500 px-2 py-2 text-left print:text-[9px] print:py-1.5 print:px-1.5">Remark</th>
                     </tr>
                   </thead>
                   <tbody>
                     {subjects.length === 0 ? (
                       <tr><td colSpan={6} className="text-center py-4 text-gray-500">No scores available</td></tr>
                     ) : (
-                      subjects.map((subject) => (
-                        <tr key={subject.subject} className="hover:bg-gray-50">
-                          <td className="border border-gray-300 px-2 py-1.5 break-words">{subject.subject}</td>
-                          <td className="border border-gray-300 text-center">{subject.ca}</td>
-                          <td className="border border-gray-300 text-center">{subject.exam_obj + subject.exam_theory}</td>
-                          <td className="border border-gray-300 text-center font-bold">{subject.total}</td>
-                          <td className="border border-gray-300 text-center"><span className={getGradeStyle(subject.grade)}>{subject.grade}</span></td>
-                          <td className="border border-gray-300 px-2 py-1.5">{subject.remark}</td>
+                      subjects.map((subject, index) => (
+                        <tr key={`${subject.subject}-${index}`} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="border border-gray-400 px-2 py-1.5 break-words print:text-[9px] print:py-1 print:px-1.5 text-black font-medium">{subject.subject}</td>
+                          <td className="border border-gray-400 text-center print:text-[9px] print:py-1 print:px-1 text-black">{subject.ca}</td>
+                          <td className="border border-gray-400 text-center print:text-[9px] print:py-1 print:px-1 text-black">{subject.exam_obj + subject.exam_theory}</td>
+                          <td className="border border-gray-400 text-center font-bold print:text-[9px] print:py-1 print:px-1 text-black">{subject.total}</td>
+                          <td className="border border-gray-400 text-center print:py-1"><span className={getGradeStyle(subject.grade)}>{subject.grade}</span></td>
+                          <td className="border border-gray-400 px-2 py-1.5 print:text-[9px] print:py-1 print:px-1.5 text-black">{subject.remark}</td>
                         </tr>
                       ))
                     )}
                   </tbody>
-                  <tfoot className="bg-gray-100 font-bold">
+                  <tfoot className="bg-blue-50 font-bold">
                     <tr>
-                      <td colSpan={3} className="border border-gray-300 px-2 py-1.5 text-right">TOTAL / AVERAGE:</td>
-                      <td className="border border-gray-300 text-center">{totalScore}</td>
-                      <td className="border border-gray-300 text-center"><span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span></td>
-                      <td className="border border-gray-300 text-center">{formattedAvg}%</td>
+                      <td colSpan={3} className="border border-gray-400 px-2 py-2 text-right print:text-[10px] print:py-1.5 text-black">TOTAL / AVERAGE:</td>
+                      <td className="border border-gray-400 text-center print:text-[10px] print:py-1.5 text-black">{totalScore}</td>
+                      <td className="border border-gray-400 text-center print:py-1.5"><span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span></td>
+                      <td className="border border-gray-400 text-center print:text-[10px] print:py-1.5 text-black">{formattedAvg}%</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
 
               {/* REMARKS */}
-              <div className="mt-4 space-y-2">
-                <div className="border-l-4 border-purple-500 bg-purple-50 p-2 text-[10px]">
-                  <div className="font-bold text-purple-700 mb-1 flex items-center gap-1">
+              <div className="mt-4 space-y-2 print:mt-3">
+                <div className="border-l-4 border-purple-600 bg-purple-50 p-3 text-[10px] print:text-[9px] print:p-2 rounded-r">
+                  <div className="font-bold text-purple-800 mb-1 flex items-center gap-1">
                     <Sparkles className="h-3 w-3" /> CLASS TEACHER'S REMARK
                   </div>
-                  <p className="italic break-words">{teacherComment || 'Generating comment...'}</p>
+                  <p className="italic text-gray-800 leading-relaxed">{teacherComment || 'Generating comment...'}</p>
                 </div>
-                <div className="border-l-4 border-blue-500 bg-blue-50 p-2 text-[10px]">
-                  <div className="font-bold text-blue-700 mb-1">PRINCIPAL'S REMARK</div>
-                  <p className="italic break-words">{principalComment || 'Generating comment...'}</p>
+                <div className="border-l-4 border-blue-600 bg-blue-50 p-3 text-[10px] print:text-[9px] print:p-2 rounded-r">
+                  <div className="font-bold text-blue-800 mb-1">PRINCIPAL'S REMARK</div>
+                  <p className="italic text-gray-800 leading-relaxed">{principalComment || 'Generating comment...'}</p>
                 </div>
               </div>
 
               {/* GRADE SCALE */}
-              <div className="mt-3">
-                <div className="bg-blue-600 text-white text-[10px] px-2 py-1 font-bold rounded-t">Grade Scale</div>
-                <div className="border border-gray-300 p-2 rounded-b">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[9px]">
-                    <div><span className={getGradeStyle('A1')}>A1</span> 75-100</div>
-                    <div><span className={getGradeStyle('B2')}>B2</span> 70-74</div>
-                    <div><span className={getGradeStyle('B3')}>B3</span> 65-69</div>
-                    <div><span className={getGradeStyle('C4')}>C4</span> 60-64</div>
-                    <div><span className={getGradeStyle('C5')}>C5</span> 55-59</div>
-                    <div><span className={getGradeStyle('C6')}>C6</span> 50-54</div>
-                    <div><span className={getGradeStyle('D7')}>D7</span> 45-49</div>
-                    <div><span className={getGradeStyle('E8')}>E8</span> 40-44</div>
-                    <div><span className={getGradeStyle('F9')}>F9</span> 0-39</div>
+              <div className="mt-3 print:mt-2">
+                <div className="bg-blue-700 text-white text-[10px] px-3 py-1.5 font-bold rounded-t print:text-[9px]">Grade Scale</div>
+                <div className="border-2 border-t-0 border-blue-900 p-2 rounded-b">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[9px] print:text-[8px]">
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('A1')}>A1</span> <span className="text-gray-800">75-100</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('B2')}>B2</span> <span className="text-gray-800">70-74</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('B3')}>B3</span> <span className="text-gray-800">65-69</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('C4')}>C4</span> <span className="text-gray-800">60-64</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('C5')}>C5</span> <span className="text-gray-800">55-59</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('C6')}>C6</span> <span className="text-gray-800">50-54</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('D7')}>D7</span> <span className="text-gray-800">45-49</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('E8')}>E8</span> <span className="text-gray-800">40-44</span></div>
+                    <div className="flex items-center gap-1"><span className={getGradeStyle('F9')}>F9</span> <span className="text-gray-800">0-39</span></div>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* RIGHT COLUMN */}
-            <div className="space-y-3">
-              <div className="border border-gray-300">
-                <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 uppercase">Performance Summary</div>
-                <div className="p-2 text-[10px] space-y-1">
-                  <div className="flex justify-between flex-wrap"><span>Total Score:</span><span className="font-bold">{totalScore}</span></div>
-                  <div className="flex justify-between flex-wrap"><span>Average:</span><span className="font-bold">{formattedAvg}%</span></div>
-                  <div className="flex justify-between flex-wrap"><span>Grade:</span><span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span></div>
-                  <div className="flex justify-between flex-wrap"><span>Subjects:</span><span className="font-bold">{subjects.length}</span></div>
+            <div className="space-y-3 print:space-y-2">
+              <div className="border-2 border-blue-900">
+                <div className="bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 uppercase print:text-[9px] print:py-1">Performance Summary</div>
+                <div className="p-3 text-[10px] space-y-1.5 print:text-[9px] print:p-2 print:space-y-1">
+                  <div className="flex justify-between flex-wrap"><span className="text-gray-800">Total Score:</span><span className="font-bold text-black">{totalScore}</span></div>
+                  <div className="flex justify-between flex-wrap"><span className="text-gray-800">Average:</span><span className="font-bold text-black">{formattedAvg}%</span></div>
+                  <div className="flex justify-between flex-wrap"><span className="text-gray-800">Grade:</span><span className={getOverallGradeColor(overallGrade)}>{overallGrade}</span></div>
+                  <div className="flex justify-between flex-wrap"><span className="text-gray-800">Subjects:</span><span className="font-bold text-black">{subjects.length}</span></div>
                   {bestSubject && (
-                    <div className="flex justify-between text-emerald-600 pt-1 border-t flex-wrap">
+                    <div className="flex justify-between text-emerald-700 pt-1 border-t border-gray-300 flex-wrap">
                       <span>Best:</span><span className="font-bold text-right break-words max-w-[140px]">{bestSubject.subject} ({bestSubject.total})</span>
                     </div>
                   )}
@@ -628,69 +632,90 @@ export default function ViewReportCardPage() {
                 </div>
               </div>
 
-              <div className="border border-gray-300">
-                <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Affective Domain</div>
-                <div className="p-2 text-[9px] space-y-0.5">
+              <div className="border-2 border-blue-900">
+                <div className="bg-blue-700 text-white text-[9px] font-bold px-3 py-1.5 uppercase print:text-[8px] print:py-1">Affective Domain</div>
+                <div className="p-2 text-[9px] space-y-1 print:text-[8px] print:space-y-0.5">
                   {behaviorSkillRatings.behaviorRatings.map((item) => (
                     <div key={item.name} className="flex justify-between items-center">
-                      <span className="text-[8px] sm:text-[9px]">{item.name}</span>
-                      <span className="font-bold text-blue-600 text-[9px] sm:text-[10px]">{item.rating}</span>
+                      <span className="text-gray-800">{item.name}</span>
+                      <span className="font-bold text-blue-700">{item.rating}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="border border-gray-300">
-                <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Psychomotor Skills</div>
-                <div className="p-2 text-[9px] space-y-0.5">
+              <div className="border-2 border-blue-900">
+                <div className="bg-blue-700 text-white text-[9px] font-bold px-3 py-1.5 uppercase print:text-[8px] print:py-1">Psychomotor Skills</div>
+                <div className="p-2 text-[9px] space-y-1 print:text-[8px] print:space-y-0.5">
                   {behaviorSkillRatings.skillRatings.map((item) => (
                     <div key={item.name} className="flex justify-between items-center">
-                      <span className="text-[8px] sm:text-[9px]">{item.name}</span>
-                      <span className="font-bold text-green-600 text-[9px] sm:text-[10px]">{item.rating}</span>
+                      <span className="text-gray-800">{item.name}</span>
+                      <span className="font-bold text-green-700">{item.rating}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="border border-gray-300">
-                <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Rating Key</div>
-                <div className="p-2 text-[7px] sm:text-[8px] space-y-0.5">
-                  <div>5 - Excellent</div>
-                  <div>4 - Very Good</div>
-                  <div>3 - Good</div>
-                  <div>2 - Fair</div>
-                  <div>1 - Poor</div>
+              <div className="border-2 border-blue-900">
+                <div className="bg-blue-700 text-white text-[9px] font-bold px-3 py-1.5 uppercase print:text-[8px] print:py-1">Rating Key</div>
+                <div className="p-2 text-[8px] space-y-0.5 print:text-[7px] print:space-y-0">
+                  <div className="text-gray-800">5 - Excellent</div>
+                  <div className="text-gray-800">4 - Very Good</div>
+                  <div className="text-gray-800">3 - Good</div>
+                  <div className="text-gray-800">2 - Fair</div>
+                  <div className="text-gray-800">1 - Poor</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* FOOTER */}
-          <div className="border-t border-gray-300 mt-4 pt-2 text-center text-[9px] text-gray-500 print:mt-2 print:pt-1 print:text-[7px]">
+          <div className="border-t-2 border-blue-900 mt-4 pt-2 text-center text-[9px] text-gray-600 print:mt-3 print:pt-2 print:text-[8px]">
             Powered by Vincollins Portal | {schoolSettings.motto}
           </div>
         </div>
       </div>
 
-       {/* Print CSS */}
       <style jsx global>{`
         @media print {
           body {
-            background: white;
-            margin: 0;
-            padding: 0;
+            background: white !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
           }
           .no-print {
             display: none !important;
           }
-          .bg-blue-600, .bg-purple-600, .bg-emerald-600, .bg-cyan-600, .bg-amber-600, .bg-red-600, 
-          .bg-blue-50, .bg-purple-50, .bg-gray-100 {
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
           @page {
             size: A4;
-            margin: 0;
+            margin: 8mm;
+          }
+          table {
+            border-collapse: collapse !important;
+            width: 100% !important;
+            min-width: 0 !important;
+            max-width: 100% !important;
+            table-layout: auto !important;
+          }
+          th, td {
+            border-color: #000 !important;
+            word-break: break-word !important;
+          }
+          .overflow-x-auto {
+            overflow: visible !important;
+          }
+          [class*="overflow"] {
+            overflow: visible !important;
+          }
+          img {
+            max-width: 100% !important;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
         }
       `}</style>

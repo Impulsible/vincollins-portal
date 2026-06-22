@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx - COMPLETE FIXED VERSION FOR JSS CLASSES
+// app/admin/broad-sheet/page.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -58,7 +58,7 @@ const SS_SUBJECTS_SCIENCE = [
 
 const SS_SUBJECTS_ARTS = [
   'English Language', 'Mathematics', 'Literature in English', 'Government',
-  'CRS', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology'
+  'CRS', 'Economics', 'Information Technology', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology'
 ]
 
 const SS_SUBJECTS_COMMERCIAL = [
@@ -76,17 +76,15 @@ const sortSubjectsByOrder = (subjects: string[]): string[] => {
   })
 }
 
-// ✅ FIXED: Extract year from class name - preserves spaces for JSS
+// Extract year from class name
 const extractYear = (className: string): string => {
   if (!className) return ''
   const normalized = className.trim()
   
-  // JSS Classes - preserve space format
   if (normalized === 'JSS 1' || normalized === 'JSS1') return 'JSS 1'
   if (normalized === 'JSS 2' || normalized === 'JSS2') return 'JSS 2'
   if (normalized === 'JSS 3' || normalized === 'JSS3') return 'JSS 3'
   
-  // SS Classes - extract level
   if (normalized.includes('SS1')) return 'SS1'
   if (normalized.includes('SS2')) return 'SS2'
   if (normalized.includes('SS3')) return 'SS3'
@@ -94,18 +92,16 @@ const extractYear = (className: string): string => {
   return className
 }
 
-// ✅ FIXED: Get subjects for student based on their actual class and department
+// Get subjects for student based on their actual class and department
 const getSubjectsForStudent = (studentClass: string, department?: string | null): string[] => {
   if (!studentClass) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
   
   const year = extractYear(studentClass)
   
-  // JSS Classes
   if (year.startsWith('JSS')) {
     return sortSubjectsByOrder(JSS_SUBJECTS)
   }
   
-  // SS Classes - determine by department
   const dept = department?.toLowerCase() || ''
   
   if (dept.includes('science')) {
@@ -116,7 +112,6 @@ const getSubjectsForStudent = (studentClass: string, department?: string | null)
     return sortSubjectsByOrder(SS_SUBJECTS_COMMERCIAL)
   }
   
-  // Also check class name for department
   const classLower = studentClass.toLowerCase()
   if (classLower.includes('science')) {
     return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
@@ -126,11 +121,10 @@ const getSubjectsForStudent = (studentClass: string, department?: string | null)
     return sortSubjectsByOrder(SS_SUBJECTS_COMMERCIAL)
   }
   
-  // Default to Science
   return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
 }
 
-// ✅ FIXED: Get all subjects for a class (for header)
+// Get all subjects for a class (for header)
 const getAllSubjectsForClass = (className: string): string[] => {
   if (!className) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
   
@@ -158,9 +152,11 @@ const meetsMinimumSubjects = (className: string, completedSubjects: number): boo
 }
 
 // ============================================
-// WAEC GRADING SYSTEM
+// GRADING SYSTEMS
 // ============================================
-const getGrade = (score: number): string => {
+
+// WAEC grading for individual subjects
+const getSubjectGrade = (score: number): string => {
   if (score >= 75) return 'A1'
   if (score >= 70) return 'B2'
   if (score >= 65) return 'B3'
@@ -172,7 +168,7 @@ const getGrade = (score: number): string => {
   return 'F9'
 }
 
-const getGradeColor = (grade: string): string => {
+const getSubjectGradeColor = (grade: string): string => {
   const colors: Record<string, string> = {
     'A1': 'bg-emerald-100 text-emerald-700 border-emerald-200',
     'B2': 'bg-blue-100 text-blue-700 border-blue-200',
@@ -187,11 +183,39 @@ const getGradeColor = (grade: string): string => {
   return colors[grade] || 'bg-slate-100 text-slate-600'
 }
 
-const getGradeRemark = (grade: string): string => {
+// Simple A/B/C/P/F grading for overall average
+const getOverallGrade = (percentage: number): string => {
+  if (percentage >= 80) return 'A'
+  if (percentage >= 70) return 'B'
+  if (percentage >= 60) return 'C'
+  if (percentage >= 50) return 'P'
+  return 'F'
+}
+
+const getOverallGradeColor = (grade: string): string => {
+  const colors: Record<string, string> = {
+    'A': 'bg-emerald-100 text-emerald-700 border-emerald-200',
+    'B': 'bg-blue-100 text-blue-700 border-blue-200',
+    'C': 'bg-cyan-100 text-cyan-700 border-cyan-200',
+    'P': 'bg-amber-100 text-amber-700 border-amber-200',
+    'F': 'bg-red-100 text-red-700 border-red-200'
+  }
+  return colors[grade] || 'bg-slate-100 text-slate-600'
+}
+
+const getSubjectGradeRemark = (grade: string): string => {
   const remarks: Record<string, string> = {
     'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
     'C4': 'Credit', 'C5': 'Credit', 'C6': 'Credit',
     'D7': 'Pass', 'E8': 'Pass', 'F9': 'Fail'
+  }
+  return remarks[grade] || ''
+}
+
+const getOverallGradeRemark = (grade: string): string => {
+  const remarks: Record<string, string> = {
+    'A': 'Excellent', 'B': 'Very Good', 'C': 'Good',
+    'P': 'Pass', 'F': 'Fail'
   }
   return remarks[grade] || ''
 }
@@ -304,7 +328,6 @@ const DEPARTMENTS = [
   { value: 'Commercial', label: 'Commercial', icon: '💼' },
 ]
 
-// All possible classes - JSS with spaces, SS with departments
 const ALL_CLASSES = [
   'JSS 1', 'JSS 2', 'JSS 3',
   'SS1 Science', 'SS1 Arts', 'SS1 Commercial',
@@ -363,7 +386,6 @@ export default function BroadSheetPage() {
           .from('profiles').select('*').eq('id', session.user.id).single()
         if (profileData) setProfile(profileData)
 
-        // Set default selected class to first available
         if (ALL_CLASSES.length > 0 && !selectedClass) {
           setSelectedClass(ALL_CLASSES[0])
           setExpectedSubjects(getAllSubjectsForClass(ALL_CLASSES[0]))
@@ -453,7 +475,7 @@ export default function BroadSheetPage() {
     }
   }, [newScoreAlert])
 
-  // Load broadsheet data - FIXED FOR JSS
+  // Load broadsheet data
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
     
@@ -463,7 +485,6 @@ export default function BroadSheetPage() {
       const isJSS = selectedClass?.toUpperCase().includes('JSS')
       const isSS = selectedClass?.toUpperCase().includes('SS')
       
-      // Build query based on class type
       let query = supabase
         .from('profiles')
         .select('id, full_name, display_name, admission_number, vin_id, class, department, gender')
@@ -472,14 +493,10 @@ export default function BroadSheetPage() {
         .limit(500)
       
       if (isJSS) {
-        // JSS: Exact match (e.g., "JSS 1" matches exactly "JSS 1")
         query = query.eq('class', selectedClass)
-        console.log('Fetching JSS students with exact class:', selectedClass)
       } else if (isSS) {
-        // SS: Extract year and match by pattern
         const yearPattern = extractYear(selectedClass)
         query = query.ilike('class', `%${yearPattern}%`)
-        console.log('Fetching SS students with pattern:', `%${yearPattern}%`)
       } else {
         query = query.eq('class', selectedClass)
       }
@@ -488,13 +505,10 @@ export default function BroadSheetPage() {
 
       if (studentError) throw studentError
       if (!classStudents || classStudents.length === 0) {
-        console.log('No students found for class:', selectedClass)
         setStudents([])
         setLoading(false)
         return
       }
-
-      console.log(`Found ${classStudents.length} students for ${selectedClass}`)
 
       const studentIds = classStudents.map(s => s.id)
 
@@ -527,7 +541,7 @@ export default function BroadSheetPage() {
             exam_obj: s.exam_objective_score || 0,
             exam_theory: s.exam_theory_score || 0,
             total: totalScore,
-            grade: getGrade(percentage),
+            grade: getSubjectGrade(percentage),
             status: s.status || 'approved',
             teacher_name: s.teacher_name || ''
           }
@@ -536,7 +550,7 @@ export default function BroadSheetPage() {
         const scoredSubjects = Object.keys(subjectMap).length
         const totalScore = Object.values(subjectMap).reduce((sum, s) => sum + s.total, 0)
         const averageScore = scoredSubjects > 0 ? Math.round(totalScore / scoredSubjects) : 0
-        const grade = scoredSubjects > 0 ? getGrade(averageScore) : '—'
+        const grade = scoredSubjects > 0 ? getOverallGrade(averageScore) : '—'
 
         const meetsMinimum = meetsMinimumSubjects(student.class, scoredSubjects)
         const allSubmitted = meetsMinimum
@@ -602,7 +616,7 @@ export default function BroadSheetPage() {
             exam: score.exam_obj + score.exam_theory,
             total: score.total,
             grade: score.grade,
-            remark: getGradeRemark(score.grade)
+            remark: getSubjectGradeRemark(score.grade)
           }
         }).filter(Boolean)
 
@@ -883,7 +897,7 @@ export default function BroadSheetPage() {
               Class performance overview and report card generation
             </p>
             <p className="text-xs text-slate-400">
-              {displayClass} • {displayTermLabel} • {displayYear} • Minimum {minRequired} subjects required
+              {displayClass} • {displayTermLabel} • {displayYear} • Min {minRequired} subjects for report
             </p>
           </div>
           
@@ -1156,6 +1170,11 @@ export default function BroadSheetPage() {
                                   Ready
                                 </Badge>
                               )}
+                              {!student.meetsMinimum && (
+                                <Badge className="text-[9px] bg-amber-100 text-amber-700 px-1.5 py-0">
+                                  {student.completedSubjects}/{minRequired} min
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-[10px] text-slate-400 font-mono mt-1">{student.vin_id}</p>
                           </div>
@@ -1171,7 +1190,7 @@ export default function BroadSheetPage() {
                               {score && isExpected ? (
                                 <div className="flex flex-col items-center gap-0.5">
                                   <span className="font-semibold text-xs">{score.total}</span>
-                                  <Badge className={cn("text-[8px] px-1 py-0", getGradeColor(score.grade))}>
+                                  <Badge className={cn("text-[8px] px-1 py-0", getSubjectGradeColor(score.grade))}>
                                     {score.grade}
                                   </Badge>
                                 </div>
@@ -1190,7 +1209,7 @@ export default function BroadSheetPage() {
                           {student.averageScore}%
                         </td>
                         <td className="px-2 py-2 text-center">
-                          <Badge className={cn("text-xs font-bold px-2 py-0.5", getGradeColor(student.grade))}>
+                          <Badge className={cn("text-xs font-bold px-2 py-0.5", getOverallGradeColor(student.grade))}>
                             {student.grade}
                           </Badge>
                         </td>

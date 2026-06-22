@@ -192,15 +192,21 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         if (latest.status === "terminated") setExamTerminated(true)
         const ts = (latest.objective_score || 0) + (latest.theory_score || 0)
         const tp = (latest.objective_total || 0) + (latest.theory_total || 0)
+        // ✅ FIXED: Calculate percentage from stored scores
+        const calcPct = tp > 0 ? Math.round((ts / tp) * 100) : 0
         setExamResult({
           score: ts, total: tp,
-          percentage: tp > 0 ? Math.round((ts / tp) * 100) : 0,
+          percentage: calcPct || latest.percentage || 0,
           correct: latest.correct_count || 0,
           incorrect: latest.incorrect_count || 0,
           unanswered: latest.unanswered_count || 0,
           is_passed: latest.is_passed || false,
           passing_percentage: ed.passing_percentage || 50,
           status: latest.status,
+          objective_score: latest.objective_score,
+          objective_total: latest.objective_total,
+          theory_score: latest.theory_score,
+          theory_total: latest.theory_total,
           attempts_used: completedCount, max_attempts: maxAttempts,
           submitted_at: latest.submitted_at,
         })
@@ -217,15 +223,20 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           setExamTerminated(true)
           const ts = (latest.objective_score || 0) + (latest.theory_score || 0)
           const tp = (latest.objective_total || 0) + (latest.theory_total || 0)
+          const calcPct = tp > 0 ? Math.round((ts / tp) * 100) : 0
           setExamResult({
             score: ts, total: tp,
-            percentage: tp > 0 ? Math.round((ts / tp) * 100) : 0,
+            percentage: calcPct || latest.percentage || 0,
             correct: latest.correct_count || 0,
             incorrect: latest.incorrect_count || 0,
             unanswered: latest.unanswered_count || 0,
             is_passed: latest.is_passed || false,
             passing_percentage: ed.passing_percentage || 50,
             status: latest.status,
+            objective_score: latest.objective_score,
+            objective_total: latest.objective_total,
+            theory_score: latest.theory_score,
+            theory_total: latest.theory_total,
             attempts_used: completedCount, max_attempts: maxAttempts,
             submitted_at: latest.submitted_at,
           })
@@ -244,28 +255,18 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
               const theoryAnswersData = latest.theory_answers || {}
               
               if (scoringRule === 'best_of' && theoryQuestionsToAnswer) {
-                const scores = theoryList.map(q => {
-                  const answer = theoryAnswersData[q.id]
-                  // In auto-submit, we don't have graded scores, so use 0
-                  return { score: 0, max: theoryMarksPerQuestion }
-                })
-                const topScores = [...scores].sort((a, b) => b.score - a.score).slice(0, theoryQuestionsToAnswer)
-                theoryScore = topScores.reduce((sum, s) => sum + s.score, 0)
                 theoryTotal = theoryQuestionsToAnswer * theoryMarksPerQuestion
               } else if (scoringRule === 'choose_any' && theoryQuestionsToAnswer) {
-                const answeredScores = theoryList.map(q => {
-                  const answer = theoryAnswersData[q.id]
-                  return { score: answer ? 0 : 0, max: theoryMarksPerQuestion }
-                })
-                theoryScore = answeredScores.reduce((sum, s) => sum + s.score, 0)
                 theoryTotal = theoryQuestionsToAnswer * theoryMarksPerQuestion
               } else {
                 theoryTotal = theoryList.length * theoryMarksPerQuestion
               }
             }
             
+            // ✅ FIXED: Calculate percentage based on objective score / objective max
+            const objectivePct = objectiveMax > 0 ? Math.round((result.score / objectiveMax) * 100) : 0
             const passingScore = ed.passing_percentage || 50
-            const isPassed = result.percentage >= passingScore
+            const isPassed = objectivePct >= passingScore
 
             const objectiveAnswers: Record<string, string> = {}
             const theoryAnswers: Record<string, string> = {}
@@ -288,7 +289,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
               theory_total: theoryTotal,
               total_score: result.score + theoryScore,
               total_marks: objectiveMax + theoryTotal,
-              percentage: result.percentage,
+              percentage: objectivePct, // ✅ FIXED: Use objective percentage
               is_passed: isPassed,
               correct_count: result.correct,
               incorrect_count: result.incorrect,
@@ -299,12 +300,16 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             setAttemptsUsed(completedCount + 1)
             setExamResult({
               score: result.score + theoryScore, total: objectiveMax + theoryTotal,
-              percentage: result.percentage,
+              percentage: objectivePct, // ✅ FIXED
               correct: result.correct, incorrect: result.incorrect,
               unanswered: result.unanswered,
               is_passed: isPassed,
               passing_percentage: passingScore,
               status: ed.has_theory ? 'pending_theory' : 'completed',
+              objective_score: result.score,
+              objective_total: objectiveMax,
+              theory_score: theoryScore,
+              theory_total: theoryTotal,
               attempts_used: completedCount + 1, max_attempts: maxAttempts,
               submitted_at: new Date().toISOString(),
             })
@@ -328,26 +333,30 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           setHasCompletedAttempt(true)
           const ts = (latest.objective_score || 0) + (latest.theory_score || 0)
           const tp = (latest.objective_total || 0) + (latest.theory_total || 0)
+          const calcPct = tp > 0 ? Math.round((ts / tp) * 100) : 0
           setExamResult({
             score: ts, total: tp,
-            percentage: tp > 0 ? Math.round((ts / tp) * 100) : 0,
+            percentage: calcPct || latest.percentage || 0, // ✅ FIXED
             correct: latest.correct_count || 0,
             incorrect: latest.incorrect_count || 0,
             unanswered: latest.unanswered_count || 0,
             is_passed: latest.is_passed || false,
             passing_percentage: ed.passing_percentage || 50,
             status: latest.status,
+            objective_score: latest.objective_score,
+            objective_total: latest.objective_total,
+            theory_score: latest.theory_score,
+            theory_total: latest.theory_total,
             attempts_used: completedCount, max_attempts: maxAttempts,
             graded_by: latest.graded_by, graded_at: latest.graded_at,
             submitted_at: latest.submitted_at,
           })
         }
       } else {
-        // ✅ NO EXISTING ATTEMPT - CREATE NEW ONE WITH FLEXIBLE SCORING
+        // ✅ NO EXISTING ATTEMPT - CREATE NEW ONE
         setAttemptsUsed(0)
         setHasCompletedAttempt(false)
         
-        // Create a new attempt with the flexible scoring values
         const { error: createError } = await supabase
           .from('exam_attempts')
           .insert({
@@ -359,7 +368,6 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             exam_max: examMax,
             ca_max: caMax,
             grand_max: grandMax,
-            theory_questions_total: theoryQuestionsTotal,
             theory_questions_to_answer: theoryQuestionsToAnswer,
             theory_marks_per_question: theoryMarksPerQuestion,
             scoring_rule: scoringRule,
@@ -377,14 +385,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           console.error('Error creating attempt:', createError)
           toast.error('Failed to start exam')
         } else {
-          console.log('✅ Created new attempt with flexible scoring:', {
-            objective_max: objectiveMax,
-            theory_max: theoryMax,
-            exam_max: examMax,
-            theory_questions_to_answer: theoryQuestionsToAnswer,
-            theory_marks_per_question: theoryMarksPerQuestion,
-            scoring_rule: scoringRule
-          })
+          console.log('✅ Created new attempt with flexible scoring')
         }
       }
     } catch (error) {

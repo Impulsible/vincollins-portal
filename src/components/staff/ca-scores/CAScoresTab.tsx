@@ -71,7 +71,7 @@ const SENIOR_SUBJECTS = [
   'English Language', 'Mathematics', 'Civic Education',
   'Physics', 'Chemistry', 'Biology', 'Agricultural Science',
   'Economics', 'Geography', 'Government', 'Literature in English',
-  'CRS', 'Yoruba', 'Commerce', 'Financial Accounting',
+  'CRS', 'Yoruba', 'Commerce', 'Financial Accounting', 'Information Technology',
   'Data Processing', 'Further Mathematics'
 ]
 
@@ -244,7 +244,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     const allSubjects = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
     const classVariations = getClassVariations(selectedClass)
 
-    // Query ALL scores for this class + term + year using class variations
     let query = supabase
       .from('ca_scores')
       .select('subject, teacher_id, teacher_name, student_id, class')
@@ -314,7 +313,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setMounted(true)
   }, [])
 
-  // Skip first render for localStorage saving
   useEffect(() => {
     if (isInitialMount.current) {
       isInitialMount.current = false
@@ -438,7 +436,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
     const uniqueClasses = [...new Set((data || []).map(d => d.class).filter(Boolean))] as string[]
     
-    // Add general classes
     const generalClasses = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3']
     const allClasses = [...new Set([...generalClasses, ...uniqueClasses])].sort()
     
@@ -497,16 +494,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setLoading(true)
     
     try {
-      // Get all class variations for the selected class
       const classVariations = getClassVariations(selectedClass)
       
-      // Build query for students - use OR condition for multiple classes
       let query = supabase
         .from('profiles')
         .select('id, full_name, display_name, class, admission_number, vin_id')
         .eq('role', 'student')
 
-      // If general class, get all variations
       if (classVariations.length > 1) {
         query = query.in('class', classVariations)
       } else {
@@ -534,7 +528,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
       setStudents(formatted)
       
-      // Get scores for these students
       let scoresQuery = supabase
         .from('ca_scores')
         .select('*')
@@ -543,7 +536,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         .eq('term', selectedTerm)
         .eq('academic_year', selectedYear)
 
-      // For class, use IN if multiple variations
       if (classVariations.length > 1) {
         scoresQuery = scoresQuery.in('class', classVariations)
       } else {
@@ -839,7 +831,15 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           .insert([dataToSave])
       }
 
-      if (result.error) throw result.error
+      if (result.error) {
+        console.error('❌ Save error:', {
+          message: result.error.message,
+          code: result.error.code,
+          details: result.error.details,
+          hint: result.error.hint
+        })
+        throw result.error
+      }
 
       setSavedStatus(prev => ({ ...prev, [studentId]: true }))
       setScoreEntries(prev => ({
@@ -950,6 +950,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         }
 
         if (result.error) {
+          console.error('❌ Save error:', {
+            student: getStudentName(student.id),
+            message: result.error.message,
+            code: result.error.code,
+            details: result.error.details,
+            hint: result.error.hint
+          })
           errorCount++
         } else {
           savedCount++
@@ -995,7 +1002,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       return
     }
 
-    // Prevent deletion if subject is locked by another teacher
     if (isLocked) {
       toast.error(`Cannot delete. Scores are locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}.`)
       return
@@ -1088,6 +1094,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
+  // ✅ FIXED: .single() → .maybeSingle() to avoid 406 errors
   const handleAutoFetchSingle = async (studentId: string) => {
     if (!selectedExamId || skipExam) {
       toast.info('No exam selected. Please select an exam or create one first.')
@@ -1099,9 +1106,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       .select('objective_score, theory_feedback')
       .eq('exam_id', selectedExamId)
       .eq('student_id', studentId)
-      .single()
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
 
     if (error) {
+      console.error('❌ Auto-fetch error:', error)
       toast.info('No exam attempt found for this student')
       return
     }
@@ -1131,6 +1141,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
+  // ✅ FIXED: .single() → .maybeSingle() to avoid 406 errors
   const handleAutoFetchAll = async () => {
     if (!selectedExamId || skipExam) {
       toast.info('No exam selected. Please select an exam or create one first.')
@@ -1146,7 +1157,9 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         .select('objective_score, theory_feedback')
         .eq('exam_id', selectedExamId)
         .eq('student_id', student.id)
-        .single()
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
 
       if (!error && data) {
         const objectiveScore = Number(data.objective_score) || 0
@@ -1970,7 +1983,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                   </Button>
                 </div>
               </div>
-              {/* FIXED: Changed <p> to <div> to avoid hydration error */}
               <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                 Showing {caScores.length} score(s) for {selectedClass} - {selectedSubject}
                 {isLocked && (

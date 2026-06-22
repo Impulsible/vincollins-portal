@@ -10,14 +10,16 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
+import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import {
   Clock, CheckCircle, XCircle, BookOpen,
   GraduationCap, Calendar, ArrowLeft,
   Home, ChevronRight, AlertCircle, FileText,
-  Trophy, Target, BarChart3, Award, Brain,
-  CheckCheck, X, HelpCircle, User, Mail, MapPin
+  Trophy, Target, BarChart3, Award,
+  CheckCheck, X, HelpCircle, Loader2,
+  Minus, Printer, Download
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -61,13 +63,9 @@ const fmtDate = (date?: string) => {
   if (!date) return '—'
   try {
     return new Date(date).toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric', 
-      year: 'numeric' 
+      month: 'long', day: 'numeric', year: 'numeric' 
     })
-  } catch { 
-    return '—' 
-  }
+  } catch { return '—' }
 }
 
 // ─── Component ────────────────────────────────────────
@@ -164,7 +162,7 @@ export default function StudentResultDetailPage() {
       const examScore = objectiveScore + theoryScoreValue
       const grandTotal = caTotal + examScore
       const percentage = Math.round((grandTotal / 100) * 100)
-      const isPassed = percentage >= 40
+      const isPassed = percentage >= (exam?.passing_percentage || 50)
 
       setResult({
         id: att.id,
@@ -207,6 +205,7 @@ export default function StudentResultDetailPage() {
     router.push('/portal')
   }
 
+  // ─── Loading State ────────────────────────────────
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -217,13 +216,9 @@ export default function StudentResultDetailPage() {
           </div>
           <div className={cn("flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
             <div className="text-center">
-              <div className="relative mx-auto mb-6 h-20 w-20">
-                <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
-                <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-500 animate-spin" />
-                <FileText className="absolute inset-0 m-auto h-8 w-8 text-blue-500" />
-              </div>
+              <Loader2 className="h-10 w-10 animate-spin text-blue-500 mx-auto mb-4" />
               <h2 className="text-xl font-semibold text-slate-700 mb-2">Loading Your Result</h2>
-              <p className="text-sm text-slate-400">Please wait while we fetch your exam details...</p>
+              <p className="text-sm text-slate-400">Fetching your exam details...</p>
             </div>
           </div>
         </div>
@@ -231,6 +226,7 @@ export default function StudentResultDetailPage() {
     )
   }
 
+  // ─── Error State ──────────────────────────────────
   if (error || !result) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
@@ -262,6 +258,8 @@ export default function StudentResultDetailPage() {
   const GradeIcon = gradeConfig.icon
   const theoryPending = result.status === 'pending_theory'
   const hasCA = result.ca1_score !== null && result.ca2_score !== null
+  const caTotal = (result.ca1_score || 0) + (result.ca2_score || 0)
+  const theoryScore = result.theory_score || 0
   const totalQuestions = result.correct_count + result.incorrect_count + result.unanswered_count
   const passMark = result.passing_percentage || 50
 
@@ -280,32 +278,26 @@ export default function StudentResultDetailPage() {
       <div className="flex w-full">
         <StudentSidebar profile={profile} onLogout={handleLogout} collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="results" setActiveTab={() => {}} />
 
-        <main className={cn(
-          "flex-1 transition-all duration-300 w-full",
-          sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
-        )}>
+        <main className={cn("flex-1 transition-all duration-300 w-full", sidebarCollapsed ? "lg:ml-20" : "lg:ml-72")}>
           <div className="pt-20 lg:pt-24 pb-12 px-4 sm:px-6 lg:px-8">
             <div className="max-w-4xl mx-auto">
               
               {/* Breadcrumb */}
               <nav className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-                <Link href="/student" className="hover:text-slate-700 transition-colors flex items-center gap-1">
-                  <Home className="h-4 w-4" />
-                </Link>
+                <Link href="/student" className="hover:text-slate-700 transition-colors flex items-center gap-1"><Home className="h-4 w-4" /></Link>
                 <ChevronRight className="h-4 w-4" />
                 <Link href="/student/exams" className="hover:text-slate-700 transition-colors">Exams</Link>
                 <ChevronRight className="h-4 w-4" />
                 <span className="text-slate-800 font-medium truncate">{result.exam_title}</span>
               </nav>
 
-              {/* Hero Section */}
+              {/* ─── HERO CARD ─── */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden mb-6">
                 <div className="bg-gradient-to-r from-slate-800 to-slate-900 px-6 py-5">
                   <div className="flex items-center justify-between flex-wrap gap-4">
                     <div>
-                      <Badge className={cn("mb-2", gradeConfig.bg, gradeConfig.text, "border-0")}>
-                        <GradeIcon className="h-3 w-3 mr-1" />
-                        {gradeConfig.label}
+                      <Badge className={cn("mb-2 border-0", gradeConfig.bg, gradeConfig.text)}>
+                        <GradeIcon className="h-3 w-3 mr-1" />{result.is_passed ? 'Passed' : 'Failed'}
                       </Badge>
                       <h1 className="text-xl font-bold text-white">{result.exam_title}</h1>
                       <div className="flex items-center gap-3 mt-2 text-sm text-slate-300">
@@ -315,17 +307,17 @@ export default function StudentResultDetailPage() {
                       </div>
                     </div>
                     <div className="text-center">
-                      <div className={cn("text-5xl font-bold text-white", result.is_passed ? "text-emerald-400" : "text-red-400")}>
+                      <div className={cn("text-5xl font-bold", result.is_passed ? "text-emerald-400" : "text-red-400")}>
                         {result.percentage}%
                       </div>
                       <div className={cn("text-sm mt-1", result.is_passed ? "text-emerald-300" : "text-red-300")}>
-                        {result.is_passed ? 'Passed' : 'Failed'}
+                        {result.total_score}/100 pts
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Score Overview Cards */}
+                {/* Quick Stats */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-6 bg-slate-50/50">
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-800">{result.total_score}</p>
@@ -334,118 +326,146 @@ export default function StudentResultDetailPage() {
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-800">{result.correct_count}</p>
-                    <p className="text-xs text-slate-500 mt-1">Correct Answers</p>
-                    <p className="text-[10px] text-slate-400">out of {totalQuestions} questions</p>
+                    <p className="text-xs text-slate-500 mt-1">Correct</p>
+                    <p className="text-[10px] text-slate-400">of {totalQuestions} questions</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-800">{fmtTime(result.time_spent)}</p>
                     <p className="text-xs text-slate-500 mt-1">Time Spent</p>
-                    <p className="text-[10px] text-slate-400">total duration</p>
+                    <p className="text-[10px] text-slate-400">duration</p>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-bold text-slate-800">{result.percentage}%</p>
-                    <p className="text-xs text-slate-500 mt-1">Score</p>
-                    <p className="text-[10px] text-slate-400">pass mark {passMark}%</p>
+                    <p className={cn("text-2xl font-bold", result.is_passed ? "text-emerald-600" : "text-red-500")}>
+                      {gradeConfig.grade}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-1">Grade</p>
+                    <p className="text-[10px] text-slate-400">pass: {passMark}%</p>
                   </div>
                 </div>
               </div>
 
-              {/* Grade Card */}
-              <div className={cn("rounded-2xl border p-6 mb-6", gradeConfig.border, gradeConfig.bg)}>
+              {/* ─── GRADE CARD ─── */}
+              <div className={cn("rounded-2xl border p-5 mb-6", gradeConfig.border, gradeConfig.bg)}>
                 <div className="flex items-center gap-4">
-                  <div className={cn("h-16 w-16 rounded-full flex items-center justify-center bg-white", gradeConfig.text)}>
+                  <div className={cn("h-14 w-14 rounded-full flex items-center justify-center bg-white shadow-sm", gradeConfig.text)}>
                     <span className="text-2xl font-bold">{gradeConfig.grade}</span>
                   </div>
                   <div>
-                    <h3 className={cn("text-lg font-semibold", gradeConfig.text)}>Grade {gradeConfig.grade} - {gradeConfig.label}</h3>
+                    <h3 className={cn("text-lg font-semibold", gradeConfig.text)}>Grade {gradeConfig.grade} — {gradeConfig.label}</h3>
                     <p className="text-sm text-slate-600 mt-0.5">
                       {result.is_passed 
-                        ? `Congratulations! You've passed the ${result.exam_subject} examination.`
-                        : `You did not meet the passing requirement of ${passMark}%. Keep working hard!`}
+                        ? `Congratulations! You passed with ${result.percentage}%.`
+                        : `You scored ${result.percentage}%. Pass mark is ${passMark}%. Keep trying!`}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Score Breakdown */}
+              {/* ─── SCORE BREAKDOWN ─── */}
               <Card className="border-0 shadow-sm rounded-2xl mb-6 overflow-hidden">
                 <div className="border-b border-slate-100 px-6 py-4">
                   <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-slate-400" />
-                    Score Breakdown
+                    <BarChart3 className="h-5 w-5 text-slate-400" />Score Breakdown
                   </h2>
                 </div>
-                <div className="p-6 space-y-4">
-                  {hasCA && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600">Continuous Assessment (40%)</span>
-                        <span className="font-medium text-slate-800">{result.ca1_score! + result.ca2_score!}/40</span>
-                      </div>
-                      <Progress value={((result.ca1_score! + result.ca2_score!) / 40) * 100} className="h-2" />
-                      <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
-                        <div>CA 1: {result.ca1_score}/20</div>
-                        <div>CA 2: {result.ca2_score}/20</div>
-                      </div>
-                    </div>
-                  )}
-
+                <div className="p-6 space-y-5">
+                  
+                  {/* CA Section */}
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-slate-600">Examination (60%)</span>
-                      <span className="font-medium text-slate-800">{result.objective_score + (result.theory_score || 0)}/60</span>
+                      <span className="text-slate-600 font-medium">Continuous Assessment (40%)</span>
+                      {hasCA ? (
+                        <span className="font-semibold text-slate-800">{caTotal}/40</span>
+                      ) : (
+                        <Badge className="bg-slate-100 text-slate-500 border-0 text-xs">Not yet entered</Badge>
+                      )}
                     </div>
-                    <Progress value={((result.objective_score + (result.theory_score || 0)) / 60) * 100} className="h-2" />
+                    <Progress value={hasCA ? (caTotal / 40) * 100 : 0} className="h-2 bg-slate-100 [&>div]:bg-blue-500" />
+                    {hasCA ? (
+                      <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
+                        <div className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-emerald-500" />CA 1: {result.ca1_score}/20</div>
+                        <div className="flex items-center gap-1"><CheckCircle className="h-3 w-3 text-emerald-500" />CA 2: {result.ca2_score}/20</div>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-400 italic">Your teacher will add CA scores soon.</p>
+                    )}
+                  </div>
+
+                  <Separator />
+
+                  {/* Exam Section */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-600 font-medium">Examination (60%)</span>
+                      <span className="font-semibold text-slate-800">{result.objective_score + theoryScore}/{result.objective_total + result.theory_total}</span>
+                    </div>
+                    <Progress 
+                      value={((result.objective_score + theoryScore) / (result.objective_total + result.theory_total)) * 100} 
+                      className="h-2 bg-slate-100 [&>div]:bg-violet-500" 
+                    />
                     <div className="grid grid-cols-2 gap-4 text-xs text-slate-500">
-                      <div>Objective: {result.objective_score}/{result.objective_total}</div>
-                      <div>Theory: {result.theory_score !== null ? `${result.theory_score}/${result.theory_total}` : 'Pending'}</div>
+                      <div>
+                        <div className="flex items-center gap-1">
+                          <CheckCircle className="h-3 w-3 text-emerald-500" />
+                          Objective: {result.objective_score}/{result.objective_total}
+                        </div>
+                      </div>
+                      <div>
+                        {theoryPending ? (
+                          <div className="flex items-center gap-1 text-amber-600">
+                            <Clock className="h-3 w-3" />
+                            Theory: Pending grading
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="h-3 w-3 text-emerald-500" />
+                            Theory: {result.theory_score}/{result.theory_total}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
-                  <div className="pt-4 border-t border-slate-100">
-                    <div className="flex justify-between text-base font-semibold">
-                      <span className="text-slate-800">Grand Total</span>
+                  <Separator />
+
+                  {/* Grand Total */}
+                  <div className="flex justify-between text-base font-bold">
+                    <span className="text-slate-800">Grand Total</span>
+                    <div className="text-right">
                       <span className="text-slate-800">{result.total_score}/100</span>
+                      {theoryPending && (
+                        <p className="text-[10px] text-amber-600 font-normal">*Score may increase after theory grading</p>
+                      )}
                     </div>
                   </div>
                 </div>
               </Card>
 
-              {/* Question Performance */}
+              {/* ─── QUESTION PERFORMANCE ─── */}
               {totalQuestions > 0 && (
                 <Card className="border-0 shadow-sm rounded-2xl mb-6 overflow-hidden">
                   <div className="border-b border-slate-100 px-6 py-4">
                     <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                      <Target className="h-5 w-5 text-slate-400" />
-                      Question Performance
+                      <Target className="h-5 w-5 text-slate-400" />Question Performance
                     </h2>
                   </div>
                   <div className="p-6">
                     <div className="flex h-3 rounded-full overflow-hidden mb-4">
-                      <div className="bg-emerald-500" style={{ width: `${(result.correct_count / totalQuestions) * 100}%` }} />
-                      <div className="bg-red-400" style={{ width: `${(result.incorrect_count / totalQuestions) * 100}%` }} />
-                      <div className="bg-slate-300" style={{ width: `${(result.unanswered_count / totalQuestions) * 100}%` }} />
+                      <div className="bg-emerald-500" style={{ width: `${totalQuestions > 0 ? (result.correct_count / totalQuestions) * 100 : 0}%` }} />
+                      <div className="bg-red-400" style={{ width: `${totalQuestions > 0 ? (result.incorrect_count / totalQuestions) * 100 : 0}%` }} />
+                      <div className="bg-slate-300" style={{ width: `${totalQuestions > 0 ? (result.unanswered_count / totalQuestions) * 100 : 0}%` }} />
                     </div>
                     <div className="grid grid-cols-3 gap-4 text-center text-sm">
                       <div>
-                        <div className="flex items-center justify-center gap-1 text-emerald-600">
-                          <CheckCircle className="h-4 w-4" />
-                          <span className="font-semibold">{result.correct_count}</span>
-                        </div>
+                        <div className="flex items-center justify-center gap-1 text-emerald-600"><CheckCircle className="h-4 w-4" /><span className="font-semibold">{result.correct_count}</span></div>
                         <p className="text-xs text-slate-500 mt-1">Correct</p>
                       </div>
                       <div>
-                        <div className="flex items-center justify-center gap-1 text-red-500">
-                          <XCircle className="h-4 w-4" />
-                          <span className="font-semibold">{result.incorrect_count}</span>
-                        </div>
+                        <div className="flex items-center justify-center gap-1 text-red-500"><XCircle className="h-4 w-4" /><span className="font-semibold">{result.incorrect_count}</span></div>
                         <p className="text-xs text-slate-500 mt-1">Wrong</p>
                       </div>
                       <div>
-                        <div className="flex items-center justify-center gap-1 text-slate-400">
-                          <HelpCircle className="h-4 w-4" />
-                          <span className="font-semibold">{result.unanswered_count}</span>
-                        </div>
+                        <div className="flex items-center justify-center gap-1 text-slate-400"><Minus className="h-4 w-4" /><span className="font-semibold">{result.unanswered_count}</span></div>
                         <p className="text-xs text-slate-500 mt-1">Skipped</p>
                       </div>
                     </div>
@@ -453,7 +473,7 @@ export default function StudentResultDetailPage() {
                 </Card>
               )}
 
-              {/* Theory Pending Notice */}
+              {/* ─── THEORY PENDING NOTICE ─── */}
               {theoryPending && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6">
                   <div className="flex items-start gap-3">
@@ -461,21 +481,21 @@ export default function StudentResultDetailPage() {
                     <div>
                       <h3 className="text-sm font-semibold text-amber-800">Theory Grading Pending</h3>
                       <p className="text-sm text-amber-700 mt-1">
-                        Your theory answers are currently being reviewed by your teacher. 
-                        The final score will be updated once grading is complete.
+                        Your theory answers are being reviewed. The current score ({result.percentage}%) 
+                        reflects only the objective section{hasCA ? ' and CA scores' : ''}.
+                        Final score will update once theory grading is complete.
                       </p>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Teacher Feedback */}
+              {/* ─── TEACHER FEEDBACK ─── */}
               {result.teacher_feedback && (
                 <Card className="border-0 shadow-sm rounded-2xl mb-6 overflow-hidden">
                   <div className="border-b border-slate-100 px-6 py-4">
                     <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-slate-400" />
-                      Teacher's Feedback
+                      <FileText className="h-5 w-5 text-slate-400" />Teacher's Feedback
                     </h2>
                   </div>
                   <div className="p-6">
@@ -486,20 +506,13 @@ export default function StudentResultDetailPage() {
                 </Card>
               )}
 
-              {/* Action Buttons */}
+              {/* ─── ACTIONS ─── */}
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button 
-                  onClick={() => router.push('/student/exams')} 
-                  variant="outline"
-                  className="flex-1 h-11 rounded-xl border-slate-200 hover:bg-slate-50"
-                >
+                <Button onClick={() => router.push('/student/exams')} variant="outline" className="flex-1 h-11 rounded-xl border-slate-200 hover:bg-slate-50">
                   <ArrowLeft className="h-4 w-4 mr-2" /> Back to Exams
                 </Button>
-                <Button 
-                  onClick={() => window.print()} 
-                  className="flex-1 h-11 rounded-xl bg-slate-800 hover:bg-slate-900"
-                >
-                  <FileText className="h-4 w-4 mr-2" /> Download Result
+                <Button onClick={() => window.print()} className="flex-1 h-11 rounded-xl bg-slate-800 hover:bg-slate-900">
+                  <Printer className="h-4 w-4 mr-2" /> Print Result
                 </Button>
               </div>
 
