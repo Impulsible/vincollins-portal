@@ -172,7 +172,7 @@ const jssSubjects = [
   "Social Studies",
   "Civic Education",
   "Christian Religious Studies",
-  "Islamic Religious Studies",
+  "Yoruba",
   "Business Studies",
   "Home Economics",
   "Agricultural Science",
@@ -194,10 +194,12 @@ const ssSubjects = [
   "Literature in English",
   "Geography",
   "Commerce",
+  "Yoruba",
   "Financial Accounting",
   "Agricultural Science",
-  "Information Technology",
+  "Civic Education",
   "Data Processing",
+  "Furthermathematics"
 ];
 
 // Convert markdown table to HTML with proper styling

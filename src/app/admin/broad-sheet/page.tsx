@@ -38,12 +38,32 @@ const SUBJECT_ORDER: Record<string, number> = {
   'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
   'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
   'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
-  'PHE': 27, 'Physical Education': 27, 'Security Education': 28
+  'PHE': 27, 'Security Education': 28
 }
 
-// ============================================
-// STANDARD SUBJECT LISTS BY DEPARTMENT
-// ============================================
+const sortSubjectsByOrder = (subjects: string[]): string[] => {
+  return [...subjects].sort((a, b) => {
+    const orderA = SUBJECT_ORDER[a] || 999
+    const orderB = SUBJECT_ORDER[b] || 999
+    return orderA - orderB
+  })
+}
+
+const extractYear = (className: string): string => {
+  if (!className) return ''
+  const normalized = className.trim()
+  
+  if (normalized === 'JSS 1' || normalized === 'JSS1') return 'JSS 1'
+  if (normalized === 'JSS 2' || normalized === 'JSS2') return 'JSS 2'
+  if (normalized === 'JSS 3' || normalized === 'JSS3') return 'JSS 3'
+  
+  if (normalized.includes('SS1')) return 'SS1'
+  if (normalized.includes('SS2')) return 'SS2'
+  if (normalized.includes('SS3')) return 'SS3'
+  
+  return className
+}
+
 const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
@@ -67,32 +87,6 @@ const SS_SUBJECTS_COMMERCIAL = [
   'Geography', 'Literature in English'
 ]
 
-// Sort subjects according to WAEC/NECO order
-const sortSubjectsByOrder = (subjects: string[]): string[] => {
-  return [...subjects].sort((a, b) => {
-    const orderA = SUBJECT_ORDER[a] || 999
-    const orderB = SUBJECT_ORDER[b] || 999
-    return orderA - orderB
-  })
-}
-
-// Extract year from class name
-const extractYear = (className: string): string => {
-  if (!className) return ''
-  const normalized = className.trim()
-  
-  if (normalized === 'JSS 1' || normalized === 'JSS1') return 'JSS 1'
-  if (normalized === 'JSS 2' || normalized === 'JSS2') return 'JSS 2'
-  if (normalized === 'JSS 3' || normalized === 'JSS3') return 'JSS 3'
-  
-  if (normalized.includes('SS1')) return 'SS1'
-  if (normalized.includes('SS2')) return 'SS2'
-  if (normalized.includes('SS3')) return 'SS3'
-  
-  return className
-}
-
-// Get subjects for student based on their actual class and department
 const getSubjectsForStudent = (studentClass: string, department?: string | null): string[] => {
   if (!studentClass) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
   
@@ -124,7 +118,6 @@ const getSubjectsForStudent = (studentClass: string, department?: string | null)
   return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
 }
 
-// Get all subjects for a class (for header)
 const getAllSubjectsForClass = (className: string): string[] => {
   if (!className) return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
   
@@ -154,8 +147,6 @@ const meetsMinimumSubjects = (className: string, completedSubjects: number): boo
 // ============================================
 // GRADING SYSTEMS
 // ============================================
-
-// WAEC grading for individual subjects
 const getSubjectGrade = (score: number): string => {
   if (score >= 75) return 'A1'
   if (score >= 70) return 'B2'
@@ -183,7 +174,6 @@ const getSubjectGradeColor = (grade: string): string => {
   return colors[grade] || 'bg-slate-100 text-slate-600'
 }
 
-// Simple A/B/C/P/F grading for overall average
 const getOverallGrade = (percentage: number): string => {
   if (percentage >= 80) return 'A'
   if (percentage >= 70) return 'B'
@@ -208,14 +198,6 @@ const getSubjectGradeRemark = (grade: string): string => {
     'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
     'C4': 'Credit', 'C5': 'Credit', 'C6': 'Credit',
     'D7': 'Pass', 'E8': 'Pass', 'F9': 'Fail'
-  }
-  return remarks[grade] || ''
-}
-
-const getOverallGradeRemark = (grade: string): string => {
-  const remarks: Record<string, string> = {
-    'A': 'Excellent', 'B': 'Very Good', 'C': 'Good',
-    'P': 'Pass', 'F': 'Fail'
   }
   return remarks[grade] || ''
 }
@@ -319,7 +301,7 @@ const TERMS = [
   { value: 'third', label: 'Third Term' },
 ]
 
-const YEARS = ['2025/2026', '2026/2027', '2027/2028']
+const YEARS = ['2024/2025', '2025/2026', '2026/2027']
 
 const DEPARTMENTS = [
   { value: 'all', label: 'All Departments', icon: '📊' },
@@ -368,7 +350,6 @@ export default function BroadSheetPage() {
 
   useEffect(() => { setIsMounted(true) }, [])
 
-  // Initialization
   useEffect(() => {
     const init = async () => {
       try {
@@ -399,7 +380,6 @@ export default function BroadSheetPage() {
     init()
   }, [])
 
-  // Update subjects when class changes
   useEffect(() => {
     if (selectedClass) {
       setExpectedSubjects(getAllSubjectsForClass(selectedClass))
@@ -409,7 +389,6 @@ export default function BroadSheetPage() {
     }
   }, [selectedClass, selectedTerm, selectedYear, isMounted])
 
-  // Auto-refresh timer
   useEffect(() => {
     if (!autoRefreshEnabled || loading || students.length === 0) return
     
@@ -437,7 +416,6 @@ export default function BroadSheetPage() {
     }
   }, [autoRefreshEnabled, selectedClass, selectedTerm, selectedYear, loading, students.length])
 
-  // Real-time subscription
   useEffect(() => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
 
@@ -467,7 +445,6 @@ export default function BroadSheetPage() {
     }
   }, [selectedClass, selectedTerm, selectedYear])
 
-  // Clear alert after 5 seconds
   useEffect(() => {
     if (newScoreAlert) {
       const timer = setTimeout(() => setNewScoreAlert(null), 5000)
@@ -475,7 +452,6 @@ export default function BroadSheetPage() {
     }
   }, [newScoreAlert])
 
-  // Load broadsheet data
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
     
@@ -590,7 +566,6 @@ export default function BroadSheetPage() {
     }
   }, [selectedClass, selectedTerm, selectedYear, selectedDepartment])
 
-  // Generate report cards with AI comments
   const handleGenerateReportCards = async () => {
     const completeStudents = students.filter(s => s.meetsMinimum && s.allSubmitted)
     
@@ -672,10 +647,19 @@ export default function BroadSheetPage() {
           principalComment = getFallbackPrincipalComment(avgScore, firstName, gender)
         }
 
+        // Log to verify comments are generated
+        console.log(`Generated comments for ${student.name}:`, {
+          teacherComment: teacherComment,
+          principalComment: principalComment,
+          avgScore: avgScore
+        })
+
         const reportCardData = {
           student_id: student.id,
           student_name: student.name,
+          student_display_name: student.name,
           student_vin: student.vin_id,
+          student_admission_number: student.admission_number,
           term: selectedTerm,
           academic_year: selectedYear,
           class: selectedClass,
@@ -691,13 +675,15 @@ export default function BroadSheetPage() {
           total_students: students.length,
           subjects_data: formattedSubjects,
           teacher_comments: teacherComment,
-          principal_comments: principalComment,
+          principal_comments: principalComment, // THIS IS THE FIX - explicitly save principal comments
           status: 'generated',
           generated_by: profile?.id,
           generated_at: new Date().toISOString(),
-          session_year: selectedYear
+          session_year: selectedYear,
+          submitted_at: new Date().toISOString()
         }
 
+        // Delete existing report card
         await supabase
           .from('report_cards')
           .delete()
@@ -705,20 +691,46 @@ export default function BroadSheetPage() {
           .eq('term', selectedTerm)
           .eq('academic_year', selectedYear)
 
-        const { error } = await supabase
+        const { error, data } = await supabase
           .from('report_cards')
           .insert(reportCardData)
+          .select()
 
         if (error) {
           console.error('Insert error:', error)
           throw error
         }
+
+        // Log the saved data to verify
+        console.log(`Saved report card for ${student.name}:`, data)
         
         count++
         setGenProgress({ current: count, total: completeStudents.length })
       }
 
-      toast.success(`✅ Generated ${count} report cards for ${selectedClass}!`)
+      toast.success(
+        <div className="flex flex-col gap-2">
+          <div>✅ Generated {count} report cards for {selectedClass}!</div>
+          <Button 
+            variant="link" 
+            className="text-blue-600 p-0 h-auto font-semibold text-sm"
+            onClick={() => {
+              const params = new URLSearchParams({
+                class: selectedClass,
+                term: selectedTerm,
+                year: selectedYear,
+                status: 'generated'
+              })
+              router.push(`/admin/report-cards?${params.toString()}`)
+            }}
+          >
+            <FileText className="h-4 w-4 mr-1" />
+            View Generated Report Cards →
+          </Button>
+        </div>,
+        { duration: 8000 }
+      )
+      
       await loadBroadSheet()
       
     } catch (error) {
@@ -903,6 +915,24 @@ export default function BroadSheetPage() {
           
           {/* Action Buttons Row */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Report Cards Button */}
+            <Button 
+              variant="default" 
+              size="sm" 
+              onClick={() => {
+                const params = new URLSearchParams({
+                  class: selectedClass,
+                  term: selectedTerm,
+                  year: selectedYear
+                })
+                router.push(`/admin/report-cards?${params.toString()}`)
+              }}
+              className="bg-blue-600 hover:bg-blue-700 h-9 text-sm"
+            >
+              <FileText className="h-3.5 w-3.5 mr-1.5" />
+              Report Cards
+            </Button>
+            
             <Button 
               variant={autoRefreshEnabled ? "default" : "outline"} 
               size="sm" 
@@ -1199,7 +1229,7 @@ export default function BroadSheetPage() {
                               ) : (
                                 <span className="text-slate-200 text-[8px]">—</span>
                               )}
-                             </td>
+                            </td>
                           )
                         })}
                         <td className="px-2 py-2 text-center font-bold text-sm text-slate-800">
