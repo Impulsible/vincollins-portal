@@ -1,4 +1,4 @@
-// components/staff/report-cards/ReportCardsTab.tsx - COMPLETE
+// components/staff/report-cards/ReportCardsTab.tsx
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -14,10 +14,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useReactToPrint } from 'react-to-print'
-import { 
+import {
   FileCheck, Search, Eye, Printer, CheckCircle2, Clock,
   Loader2, FileText, Send, RefreshCw, Sparkles,
-  ChevronRight, Brain, Download, ArrowLeft
+  ChevronRight, Brain, Download, School, Mail, Phone, User,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -32,7 +32,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 
 // ============================================
-// WAEC GRADING SYSTEM
+// GRADING
 // ============================================
 const getWAECGrade = (score: number): string => {
   if (score >= 75) return 'A1'
@@ -54,27 +54,33 @@ const getOverallGrade = (score: number): string => {
   return 'F'
 }
 
-const getGradeRemark = (grade: string): string => {
-  const remarks: Record<string, string> = {
-    'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
-    'C4': 'Credit', 'C5': 'Credit', 'C6': 'Credit',
-    'D7': 'Pass', 'E8': 'Pass', 'F9': 'Fail',
-  }
-  return remarks[grade] || ''
-}
+const getGradeRemark = (grade: string): string =>
+  ({ 'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good', 'C4': 'Credit', 'C5': 'Credit', 'C6': 'Credit', 'D7': 'Pass', 'E8': 'Pass', 'F9': 'Fail' }[grade] || '')
 
 const getGradeStyle = (grade: string): string => {
+  const base = 'text-white font-bold px-1.5 py-0.5 rounded text-[9px] inline-block'
   switch (grade) {
-    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    case 'B2': case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    case 'C4': case 'C5': case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    case 'D7': case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'A1': return `bg-emerald-600 ${base}`
+    case 'B2': case 'B3': return `bg-blue-600 ${base}`
+    case 'C4': case 'C5': case 'C6': return `bg-cyan-600 ${base}`
+    case 'D7': case 'E8': return `bg-amber-600 ${base}`
+    case 'F9': return `bg-red-600 ${base}`
+    default: return `bg-gray-500 ${base}`
   }
 }
 
 const getOverallGradeColor = (grade: string): string => {
+  switch (grade) {
+    case 'A': return 'bg-emerald-100 text-emerald-700'
+    case 'B': return 'bg-blue-100 text-blue-700'
+    case 'C': return 'bg-cyan-100 text-cyan-700'
+    case 'P': return 'bg-amber-100 text-amber-700'
+    case 'F': return 'bg-red-100 text-red-700'
+    default: return 'bg-gray-100 text-gray-600'
+  }
+}
+
+const getOverallGradeTextColor = (grade: string): string => {
   switch (grade) {
     case 'A': return 'text-emerald-700 font-bold'
     case 'B': return 'text-blue-700 font-bold'
@@ -119,7 +125,10 @@ interface ReportCard {
   attendance_summary: { total_days: number; present: number; absent: number }
   affective_traits: Record<string, string>
   psychomotor_skills: Record<string, string>
-  student?: { full_name: string; vin_id: string; gender?: string; admission_number?: string; photo_url?: string; class?: string }
+  student?: {
+    full_name: string; vin_id: string; gender?: string
+    admission_number?: string; photo_url?: string; class?: string
+  }
 }
 
 interface ReportCardsTabProps {
@@ -135,40 +144,332 @@ const TERM_OPTIONS = [
   { value: 'second', label: 'Second Term' },
   { value: 'third', label: 'Third Term' },
 ]
-
 const YEARS = ['2025/2026', '2026/2027', '2027/2028', '2028/2029']
-
 const CLASSES = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3']
 
-const getTermLabel = (term?: string): string => {
-  if (!term) return 'Third Term'
-  const terms: Record<string, string> = { first: 'First Term', second: 'Second Term', third: 'Third Term' }
-  return terms[term] || term
+const getTermLabel = (term?: string): string =>
+  ({ first: 'First Term', second: 'Second Term', third: 'Third Term' }[term || ''] || 'Third Term')
+
+// ============================================
+// AI COMMENT GENERATION
+// ============================================
+const generateAIComments = async (
+  studentName: string, averageScore: number,
+  subjects: { name: string; score: number }[], className: string, gender?: string
+) => {
+  const res = await fetch('/api/generate-comments', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ studentName, averageScore, subjects, className, gender })
+  })
+  if (!res.ok) throw new Error('Failed to generate comments')
+  const data = await res.json()
+  return { teacher_comment: data.teacher_comment, principal_comment: data.principal_comment }
 }
 
 // ============================================
-// AI COMMENT GENERATION FUNCTION
+// REPORT CARD PREVIEW — reusable, responsive
 // ============================================
-const generateAIComments = async (
-  studentName: string,
-  averageScore: number,
-  subjects: { name: string; score: number }[],
-  className: string,
-  gender?: string
-) => {
-  try {
-    const response = await fetch('/api/generate-comments', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ studentName, averageScore, subjects, className, gender })
-    })
-    if (!response.ok) throw new Error('Failed to generate comments')
-    const data = await response.json()
-    return { teacher_comment: data.teacher_comment, principal_comment: data.principal_comment }
-  } catch (error) {
-    console.error('Error generating AI comments:', error)
-    throw error
-  }
+interface PreviewProps {
+  card: ReportCard
+  schoolName?: string
+}
+
+function ReportCardPreview({ card, schoolName = 'Vincollins College' }: PreviewProps) {
+  const overallGrade = getOverallGrade(card.average_score)
+  const termDisplay = getTermLabel(card.term)
+
+  return (
+    <div className="bg-white w-full text-black border border-gray-200 md:border-2 md:border-blue-900 rounded-lg md:rounded-none p-3 sm:p-5 print:p-3 print:border-2 print:border-blue-900 print:rounded-none">
+
+      {/* ── HEADER ─────────────────────────────────── */}
+      <div className="border-b-2 border-blue-900 pb-3 mb-3">
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-4 print:flex-row">
+
+          {/* Logo placeholder */}
+          <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center border-2 border-blue-900 rounded bg-blue-50">
+            <School className="h-8 w-8 sm:h-12 sm:w-12 text-blue-900" />
+          </div>
+
+          {/* School info */}
+          <div className="flex-1 text-center min-w-0">
+            <h1 className="text-base sm:text-xl font-bold uppercase text-blue-900 tracking-wide leading-tight">
+              {schoolName}
+            </h1>
+            <p className="text-[10px] sm:text-xs text-gray-700 mt-0.5">
+              7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 mt-0.5">
+              <span className="text-[9px] sm:text-[11px] text-gray-600 flex items-center gap-0.5">
+                <Mail className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" /> vincollinscollege@gmail.com
+              </span>
+              <span className="text-gray-400 hidden sm:inline">|</span>
+              <span className="text-[9px] sm:text-[11px] text-gray-600 flex items-center gap-0.5">
+                <Phone className="h-2.5 w-2.5 sm:h-3 sm:w-3 shrink-0" /> +234 912 1155 554
+              </span>
+            </div>
+            <p className="text-[9px] sm:text-[11px] italic text-amber-700 mt-1 font-medium">
+              "Geared Towards Excellence"
+            </p>
+            <div className="mt-2 pt-2 border-t border-blue-200">
+              <h2 className="font-bold text-xs sm:text-base text-blue-900 leading-tight">
+                {termDisplay} Student&apos;s Performance Report
+              </h2>
+              <p className="text-[10px] sm:text-xs font-semibold text-gray-700 mt-0.5">
+                Academic Session: {card.academic_year}
+              </p>
+            </div>
+          </div>
+
+          {/* Photo — hidden on mobile */}
+          <div className="w-16 h-20 sm:w-24 sm:h-28 border-2 border-blue-900 rounded overflow-hidden shrink-0 bg-gray-50 hidden sm:block">
+            {card.student?.photo_url ? (
+              <img src={card.student.photo_url} alt="student" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <User className="h-8 w-8 sm:h-10 sm:w-10" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── STUDENT INFO ───────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 sm:gap-y-1.5 text-[10px] sm:text-[13px] mb-3 sm:mb-4 print:grid-cols-2 print:text-[10px]">
+        {([
+          ['Name', card.student?.full_name || '—'],
+          ['Admission No', card.student?.admission_number || '—'],
+          ['Class', card.class || '—'],
+          ['Term', termDisplay],
+          ['Session', card.academic_year],
+          ['Next Term', 'To be announced'],
+        ] as [string, string][]).map(([label, value]) => (
+          <div key={label} className="flex items-baseline gap-1 py-0.5">
+            <span className="font-bold text-gray-700 shrink-0 w-24 sm:w-36">{label}:</span>
+            <span className="font-medium break-words">{value}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* ── MAIN CONTENT ───────────────────────────── */}
+      {/*
+        Mobile:  flex-col — everything stacks
+        md+:     70 / 30 side-by-side
+        Print:   always 70 / 30
+      */}
+      <div className="flex flex-col md:grid md:grid-cols-[2.2fr_1.2fr] gap-3 sm:gap-4 print:grid print:grid-cols-[2.2fr_1.2fr] print:gap-3">
+
+        {/* LEFT */}
+        <div className="min-w-0 space-y-3">
+
+          {/* Results table */}
+          <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-[9px] sm:text-[11px] table-fixed min-w-[380px] print:min-w-0 print:text-[9px]">
+                <thead className="bg-blue-700 text-white">
+                  <tr>
+                    <th className="border border-blue-500 px-1.5 py-1 text-left w-[32%]">Subject</th>
+                    <th className="border border-blue-500 px-1 py-1 text-center w-[10%]">CA</th>
+                    <th className="border border-blue-500 px-1 py-1 text-center w-[11%]">Exam</th>
+                    <th className="border border-blue-500 px-1 py-1 text-center w-[11%]">Total</th>
+                    <th className="border border-blue-500 px-1 py-1 text-center w-[12%]">Grade</th>
+                    <th className="border border-blue-500 px-1.5 py-1 text-left w-[24%]">Remark</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(card.subject_scores || []).length === 0 ? (
+                    <tr><td colSpan={6} className="text-center py-6 text-gray-500">No scores available</td></tr>
+                  ) : (card.subject_scores || []).map((s, i) => (
+                    <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="border border-gray-400 px-1.5 py-0.5 font-medium break-words">{s.subject}</td>
+                      <td className="border border-gray-400 text-center font-mono py-0.5">{s.ca1 + s.ca2}</td>
+                      <td className="border border-gray-400 text-center font-mono py-0.5">{s.exam}</td>
+                      <td className="border border-gray-400 text-center font-bold font-mono py-0.5">{s.total}</td>
+                      <td className="border border-gray-400 text-center py-0.5">
+                        <span className={getGradeStyle(s.grade)}>{s.grade}</span>
+                      </td>
+                      <td className="border border-gray-400 px-1.5 py-0.5 text-[8px] sm:text-[10px] break-words">{s.remark}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot className="bg-blue-50 font-bold">
+                  <tr>
+                    <td colSpan={3} className="border border-gray-400 px-1.5 py-1 text-right text-[9px] sm:text-[11px]">
+                      TOTAL / AVERAGE:
+                    </td>
+                    <td className="border border-gray-400 text-center py-1">{card.total_score}</td>
+                    <td className="border border-gray-400 text-center py-1">
+                      <span className={cn('px-1.5 py-0.5 rounded text-[9px] font-bold', getOverallGradeColor(overallGrade))}>
+                        {overallGrade}
+                      </span>
+                    </td>
+                    <td className="border border-gray-400 text-center py-1">{card.average_score?.toFixed(2)}%</td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+
+          {/* Teacher remark */}
+          <div className="border border-gray-300 rounded-sm overflow-hidden">
+            <div className="bg-purple-600 text-white px-2 py-1 text-[9px] sm:text-[11px] font-bold flex items-center gap-1">
+              <Sparkles className="h-3 w-3 shrink-0" /> CLASS TEACHER&apos;S REMARK
+            </div>
+            <div className="p-2 sm:p-2.5 text-[9px] sm:text-[11px] italic leading-relaxed bg-purple-50 break-words">
+              {card.teacher_comments || 'No comment available.'}
+            </div>
+          </div>
+
+          {/* Principal remark */}
+          <div className="border border-gray-300 rounded-sm overflow-hidden">
+            <div className="bg-blue-600 text-white px-2 py-1 text-[9px] sm:text-[11px] font-bold flex items-center gap-1">
+              PRINCIPAL&apos;S REMARK
+            </div>
+            <div className="p-2 sm:p-2.5 text-[9px] sm:text-[11px] italic leading-relaxed break-words">
+              {card.principal_comments || 'No comment available.'}
+            </div>
+          </div>
+
+          {/* Grade scale — desktop/print only */}
+          <div className="hidden md:block print:block">
+            <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] px-2 py-1 font-bold rounded-t-sm">
+              Grade Scale
+            </div>
+            <div className="border-2 border-blue-900 p-2 rounded-b-sm">
+              <div className="grid grid-cols-3 gap-1 text-[8px] sm:text-[9px]">
+                {([['A1','75-100'],['B2','70-74'],['B3','65-69'],['C4','60-64'],['C5','55-59'],['C6','50-54'],['D7','45-49'],['E8','40-44'],['F9','0-39']] as [string,string][]).map(([g,r]) => (
+                  <div key={g} className="flex items-center gap-1">
+                    <span className={getGradeStyle(g)}>{g}</span>
+                    <span className="text-gray-600">{r}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1.5 pt-1.5 border-t border-blue-300 grid grid-cols-5 gap-1 text-[8px] sm:text-[9px]">
+                {([['A','80-100'],['B','70-79'],['C','60-69'],['P','50-59'],['F','0-49']] as [string,string][]).map(([g,r]) => (
+                  <div key={g} className="flex items-center gap-0.5">
+                    <span className={cn('px-1 py-0.5 rounded font-bold text-[8px]', getOverallGradeColor(g))}>{g}</span>
+                    <span className="text-gray-600">{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* RIGHT */}
+        <div className="space-y-3">
+
+          {/* Performance summary */}
+          <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+            <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 uppercase">
+              Performance Summary
+            </div>
+            <div className="p-2 sm:p-2.5 text-[10px] sm:text-[11px] space-y-1">
+              <div className="flex justify-between">
+                <span className="text-gray-700">Total Score</span>
+                <span className="font-bold">{card.total_score}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Average</span>
+                <span className="font-bold">{card.average_score?.toFixed(2)}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Grade</span>
+                <span className={getOverallGradeTextColor(overallGrade)}>
+                  {overallGrade} – {{ A: 'Excellent', B: 'Very Good', C: 'Good', P: 'Pass', F: 'Fail' }[overallGrade] || ''}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-700">Subjects</span>
+                <span className="font-bold">{(card.subject_scores || []).length}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Affective + Psychomotor — 2-col on mobile, 1-col on md+ */}
+          <div className="grid grid-cols-2 md:grid-cols-1 gap-3 print:grid-cols-1">
+
+            {/* Affective */}
+            <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+              <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">
+                Affective Domain
+              </div>
+              <div className="p-1.5 sm:p-2">
+                <table className="w-full border-collapse border border-gray-300 text-[8px] sm:text-[10px]">
+                  <tbody>
+                    {Object.entries(card.affective_traits || {}).map(([key, value]) => (
+                      <tr key={key}>
+                        <td className="border px-1 py-0.5 font-medium capitalize">{key.replace(/_/g, ' ')}</td>
+                        <td className="border text-center w-auto px-1 font-bold text-blue-700 text-[8px]">{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Psychomotor */}
+            <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+              <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">
+                Psychomotor
+              </div>
+              <div className="p-1.5 sm:p-2">
+                <table className="w-full border-collapse border border-gray-300 text-[8px] sm:text-[10px]">
+                  <tbody>
+                    {Object.entries(card.psychomotor_skills || {}).map(([key, value]) => (
+                      <tr key={key}>
+                        <td className="border px-1 py-0.5 font-medium capitalize">{key.replace(/_/g, ' ')}</td>
+                        <td className="border text-center w-auto px-1 font-bold text-green-700 text-[8px]">{value}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Rating key */}
+          <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+            <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">
+              Rating Key
+            </div>
+            <div className="p-2 text-[8px] sm:text-[10px] grid grid-cols-5 md:grid-cols-1 gap-0.5 print:grid-cols-1">
+              {['5 – Excellent','4 – Very Good','3 – Good','2 – Fair','1 – Poor'].map(r => (
+                <div key={r} className="font-medium text-gray-800">{r}</div>
+              ))}
+            </div>
+          </div>
+
+          {/* Grade scale — mobile only */}
+          <div className="md:hidden print:hidden">
+            <div className="bg-blue-700 text-white text-[9px] px-2 py-1 font-bold rounded-t-sm">Grade Scale</div>
+            <div className="border-2 border-blue-900 p-2 rounded-b-sm">
+              <div className="grid grid-cols-3 gap-1 text-[8px]">
+                {([['A1','75-100'],['B2','70-74'],['B3','65-69'],['C4','60-64'],['C5','55-59'],['C6','50-54'],['D7','45-49'],['E8','40-44'],['F9','0-39']] as [string,string][]).map(([g,r]) => (
+                  <div key={g} className="flex items-center gap-0.5">
+                    <span className={getGradeStyle(g)}>{g}</span>
+                    <span className="text-gray-600">{r}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 pt-1 border-t border-blue-300 grid grid-cols-5 gap-0.5 text-[7px]">
+                {([['A','80-100'],['B','70-79'],['C','60-69'],['P','50-59'],['F','0-49']] as [string,string][]).map(([g,r]) => (
+                  <div key={g} className="flex items-center gap-0.5">
+                    <span className={cn('px-1 py-0.5 rounded font-bold text-[7px]', getOverallGradeColor(g))}>{g}</span>
+                    <span className="text-gray-600">{r}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t-2 border-blue-900 mt-3 sm:mt-4 pt-1.5 text-center text-[7px] sm:text-[9px] text-gray-500">
+        Powered by Vincollins Portal | Geared Towards Excellence
+      </div>
+    </div>
+  )
 }
 
 // ============================================
@@ -177,19 +478,19 @@ const generateAIComments = async (
 export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('generate')
-  const [selectedClass, setSelectedClass] = useState<string>('')
-  const [selectedStudent, setSelectedStudent] = useState<string>('')
+  const [selectedClass, setSelectedClass] = useState('')
+  const [selectedStudent, setSelectedStudent] = useState('')
   const [selectedTerm, setSelectedTerm] = useState(termInfo?.termCode || 'third')
   const [selectedYear, setSelectedYear] = useState(termInfo?.sessionYear || '2025/2026')
   const [searchQuery, setSearchQuery] = useState('')
   const reportRef = useRef<HTMLDivElement>(null)
-  
+
   const [students, setStudents] = useState<any[]>([])
   const [reportCards, setReportCards] = useState<ReportCard[]>([])
   const [selectedReportCard, setSelectedReportCard] = useState<ReportCard | null>(null)
   const [showPreviewDialog, setShowPreviewDialog] = useState(false)
   const [showGenerateDialog, setShowGenerateDialog] = useState(false)
-  
+
   const [teacherComments, setTeacherComments] = useState('')
   const [principalComments, setPrincipalComments] = useState('')
   const [generatingAI, setGeneratingAI] = useState(false)
@@ -198,9 +499,7 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
   const [refreshing, setRefreshing] = useState(false)
   const [selectedStudentData, setSelectedStudentData] = useState<any>(null)
 
-  const [stats, setStats] = useState({
-    total: 0, draft: 0, pending: 0, approved: 0, published: 0
-  })
+  const [stats, setStats] = useState({ total: 0, draft: 0, pending: 0, approved: 0, published: 0 })
 
   const handleDownloadPDF = useReactToPrint({
     contentRef: reportRef,
@@ -208,8 +507,18 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
     pageStyle: `
       @page { size: A4; margin: 8mm; }
       @media print {
-        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
-        * { -webkit-print-color-adjust: exact; print-color-adjust: exact; color-adjust: exact; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        body { background: white !important; margin: 0 !important; }
+        .no-print { display: none !important; }
+        .bg-blue-700 { background-color: #1d4ed8 !important; }
+        .bg-purple-600 { background-color: #9333ea !important; }
+        .bg-blue-600 { background-color: #2563eb !important; }
+        .bg-emerald-600 { background-color: #059669 !important; }
+        .bg-cyan-600 { background-color: #0891b2 !important; }
+        .bg-amber-600 { background-color: #d97706 !important; }
+        .bg-red-600 { background-color: #dc2626 !important; }
+        table { border-collapse: collapse !important; width: 100% !important; }
+        th, td { border-color: #000 !important; }
       }
     `,
   })
@@ -224,7 +533,7 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
       const { data } = await supabase.from('profiles').select('id, full_name, class, vin_id, gender, admission_number, photo_url')
         .eq('role', 'student').eq('class', selectedClass).order('full_name', { ascending: true })
       setStudents(data || [])
-    } catch (error) { console.error('Error loading students:', error) }
+    } catch (e) { console.error(e) }
   }
 
   const loadReportCards = async () => {
@@ -233,45 +542,40 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
       let query = supabase.from('report_cards').select('*').eq('term', selectedTerm).eq('academic_year', selectedYear).order('generated_at', { ascending: false })
       if (selectedClass) query = query.eq('class', selectedClass)
       const { data } = await query
-      const reportCardsWithStudents = await Promise.all((data || []).map(async (card: any) => {
-        const { data: studentData } = await supabase.from('profiles').select('full_name, vin_id, gender, admission_number, photo_url, class').eq('id', card.student_id).single()
-        return { ...card, student: studentData || { full_name: 'Unknown', vin_id: '' } }
+      const withStudents = await Promise.all((data || []).map(async (card: any) => {
+        const { data: sd } = await supabase.from('profiles').select('full_name, vin_id, gender, admission_number, photo_url, class').eq('id', card.student_id).single()
+        return { ...card, student: sd || { full_name: 'Unknown', vin_id: '' } }
       }))
-      setReportCards(reportCardsWithStudents)
+      setReportCards(withStudents)
       setStats({
-        total: reportCardsWithStudents.length,
-        draft: reportCardsWithStudents.filter((r: ReportCard) => r.status === 'draft').length,
-        pending: reportCardsWithStudents.filter((r: ReportCard) => r.status === 'pending').length,
-        approved: reportCardsWithStudents.filter((r: ReportCard) => r.status === 'approved').length,
-        published: reportCardsWithStudents.filter((r: ReportCard) => r.status === 'published').length
+        total: withStudents.length,
+        draft: withStudents.filter((r: ReportCard) => r.status === 'draft').length,
+        pending: withStudents.filter((r: ReportCard) => r.status === 'pending').length,
+        approved: withStudents.filter((r: ReportCard) => r.status === 'approved').length,
+        published: withStudents.filter((r: ReportCard) => r.status === 'published').length,
       })
-    } catch (error) { console.error('Error loading report cards:', error) }
+    } catch (e) { console.error(e) }
     finally { setLoading(false); setRefreshing(false) }
   }
 
   const handleGenerateAIComments = async () => {
     if (!selectedStudentData) { toast.error('Please select a student first'); return }
     setGeneratingAI(true)
-    let averageScore = 0
     try {
       const { data: caScores } = await supabase.from('ca_scores').select('*').eq('student_id', selectedStudent).eq('term', selectedTerm).eq('academic_year', selectedYear)
       let totalScore = 0
       const subjects: { name: string; score: number }[] = []
-      if (caScores && caScores.length > 0) {
-        caScores.forEach((score: any) => {
-          const subjectTotal = (score.ca1_score || 0) + (score.ca2_score || 0) + (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-          subjects.push({ name: score.subject, score: subjectTotal })
-          totalScore += subjectTotal
-        })
-      }
-      averageScore = subjects.length > 0 ? Math.round(totalScore / subjects.length) : 0
-      const comments = await generateAIComments(selectedStudentData.full_name, averageScore, subjects, selectedClass, selectedStudentData.gender)
+      ;(caScores || []).forEach((s: any) => {
+        const t = (s.ca1_score || 0) + (s.ca2_score || 0) + (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
+        subjects.push({ name: s.subject, score: t }); totalScore += t
+      })
+      const avg = subjects.length > 0 ? Math.round(totalScore / subjects.length) : 0
+      const comments = await generateAIComments(selectedStudentData.full_name, avg, subjects, selectedClass, selectedStudentData.gender)
       setTeacherComments(comments.teacher_comment)
       setPrincipalComments(comments.principal_comment)
-      toast.success('AI comments generated successfully!')
-    } catch (error) {
-      const studentName = selectedStudentData?.full_name || 'Student'
-      setTeacherComments(`${studentName} has shown satisfactory performance this term with an average of ${averageScore}%. Continue to work hard and strive for excellence.`)
+      toast.success('AI comments generated!')
+    } catch (e) {
+      setTeacherComments(`${selectedStudentData?.full_name || 'Student'} has shown satisfactory performance this term.`)
       setPrincipalComments('Keep up the good work and maintain your focus on academic excellence.')
     } finally { setGeneratingAI(false) }
   }
@@ -283,39 +587,40 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
       const { data: caScores } = await supabase.from('ca_scores').select('*').eq('student_id', selectedStudent).eq('term', selectedTerm).eq('academic_year', selectedYear)
       const subjectScores: SubjectScore[] = []
       let totalScore = 0
-      if (caScores && caScores.length > 0) {
-        caScores.forEach((score: any) => {
-          const ca1 = score.ca1_score || 0; const ca2 = score.ca2_score || 0
-          const exam = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
-          const subjectTotal = ca1 + ca2 + exam
-          const percentage = subjectTotal > 0 ? Math.round((subjectTotal / 100) * 100) : 0
-          subjectScores.push({ subject: score.subject, ca1, ca2, exam, total: subjectTotal, grade: getWAECGrade(percentage), remark: getGradeRemark(getWAECGrade(percentage)) })
-          totalScore += subjectTotal
-        })
-      }
-      const averageScore = subjectScores.length > 0 ? totalScore / subjectScores.length : 0
+      ;(caScores || []).forEach((s: any) => {
+        const ca1 = s.ca1_score || 0, ca2 = s.ca2_score || 0
+        const exam = (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
+        const total = ca1 + ca2 + exam
+        subjectScores.push({ subject: s.subject, ca1, ca2, exam, total, grade: getWAECGrade(total), remark: getGradeRemark(getWAECGrade(total)) })
+        totalScore += total
+      })
+      const avg = subjectScores.length > 0 ? totalScore / subjectScores.length : 0
       const { data: studentData } = await supabase.from('profiles').select('full_name, class, vin_id, gender, admission_number, photo_url').eq('id', selectedStudent).single()
-      const finalTeacherComments = teacherComments || `${studentData?.full_name || 'Student'} has shown satisfactory performance this term.`
-      const finalPrincipalComments = principalComments || 'Keep working hard and striving for excellence.'
-      const reportCardData = {
-        student_id: selectedStudent, class: studentData?.class || selectedClass, term: selectedTerm,
-        academic_year: selectedYear, session_year: selectedYear, subject_scores: subjectScores,
-        total_score: totalScore, average_score: averageScore, grade: getOverallGrade(averageScore),
-        teacher_comments: finalTeacherComments, principal_comments: finalPrincipalComments,
+
+      const { data, error } = await supabase.from('report_cards').insert([{
+        student_id: selectedStudent, class: studentData?.class || selectedClass,
+        term: selectedTerm, academic_year: selectedYear, session_year: selectedYear,
+        subject_scores: subjectScores, total_score: totalScore, average_score: avg,
+        grade: getOverallGrade(avg),
+        teacher_comments: teacherComments || `${studentData?.full_name || 'Student'} has shown satisfactory performance.`,
+        principal_comments: principalComments || 'Keep working hard.',
         admin_comments: '', status: 'draft', published_at: null,
         attendance_summary: { total_days: 90, present: 85, absent: 5 },
         affective_traits: { punctuality: 'Excellent', neatness: 'Very Good', politeness: 'Excellent', cooperation: 'Very Good', leadership: 'Good' },
         psychomotor_skills: { handwriting: 'Good', sports: 'Active', crafts: 'Good', fluency: 'Very Good' },
-        class_teacher: staffProfile?.full_name || 'Teacher', school_name: 'Vincollins College',
-        generated_by: staffProfile?.id, generated_at: new Date().toISOString()
-      }
-      const { data, error } = await supabase.from('report_cards').insert([reportCardData]).select().single()
+        class_teacher: staffProfile?.full_name || 'Teacher',
+        school_name: 'Vincollins College',
+        generated_by: staffProfile?.id,
+        generated_at: new Date().toISOString(),
+      }]).select().single()
+
       if (error) throw error
-      toast.success('Report card generated successfully!')
+      toast.success('Report card generated!')
       setSelectedReportCard({ ...data, student: studentData || { full_name: 'Unknown', vin_id: '' } })
-      setShowPreviewDialog(true); setShowGenerateDialog(false); setTeacherComments(''); setPrincipalComments('')
+      setShowPreviewDialog(true); setShowGenerateDialog(false)
+      setTeacherComments(''); setPrincipalComments('')
       loadReportCards()
-    } catch (error: any) { toast.error(error.message || 'Failed to generate report card') }
+    } catch (e: any) { toast.error(e.message || 'Failed to generate') }
     finally { setGenerating(false) }
   }
 
@@ -324,19 +629,20 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
       const updates: any = { status }
       if (status === 'published') updates.published_at = new Date().toISOString()
       await supabase.from('report_cards').update(updates).eq('id', id)
-      toast.success(`Report card ${status}`); loadReportCards()
-    } catch (error) { toast.error('Failed to update status') }
+      toast.success(`Report card ${status}`)
+      loadReportCards()
+    } catch (e) { toast.error('Failed to update status') }
   }
 
-  const handleRefresh = () => { setRefreshing(true); loadReportCards(); toast.success('Report cards refreshed') }
+  const handleRefresh = () => { setRefreshing(true); loadReportCards(); toast.success('Refreshed') }
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'draft': return <Badge variant="outline"><FileText className="h-3 w-3 mr-1" />Draft</Badge>
-      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
-      case 'approved': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>
-      case 'published': return <Badge className="bg-green-100 text-green-700"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
-      default: return <Badge variant="outline">{status}</Badge>
+      case 'draft': return <Badge variant="outline" className="text-xs"><FileText className="h-3 w-3 mr-1" />Draft</Badge>
+      case 'pending': return <Badge className="bg-yellow-100 text-yellow-700 text-xs"><Clock className="h-3 w-3 mr-1" />Pending</Badge>
+      case 'approved': return <Badge className="bg-blue-100 text-blue-700 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Approved</Badge>
+      case 'published': return <Badge className="bg-green-100 text-green-700 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Published</Badge>
+      default: return <Badge variant="outline" className="text-xs">{status}</Badge>
     }
   }
 
@@ -345,133 +651,239 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
     r.student?.vin_id?.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
-  const handleStudentSelect = (studentId: string) => {
-    setSelectedStudent(studentId)
-    const student = students.find(s => s.id === studentId)
-    setSelectedStudentData(student)
+  const handleStudentSelect = (id: string) => {
+    setSelectedStudent(id)
+    setSelectedStudentData(students.find(s => s.id === id))
     setTeacherComments(''); setPrincipalComments('')
   }
 
-  if (!mounted) return <div className="flex items-center justify-center h-96"><Loader2 className="h-8 w-8 animate-spin text-purple-600" /></div>
+  if (!mounted) return (
+    <div className="flex items-center justify-center h-96">
+      <Loader2 className="h-8 w-8 animate-spin text-purple-600" />
+    </div>
+  )
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 sm:space-y-6">
+
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <div>
           <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-white">Report Cards</h2>
           <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">Generate and manage student report cards</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
-            <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />Refresh
+            <RefreshCw className={cn('h-4 w-4 sm:mr-2', refreshing && 'animate-spin')} />
+            <span className="hidden sm:inline">Refresh</span>
           </Button>
-          <Button onClick={() => setShowGenerateDialog(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
-            <FileCheck className="h-4 w-4 mr-2" />Generate
+          <Button onClick={() => setShowGenerateDialog(true)} className="bg-purple-600 hover:bg-purple-700 text-white" size="sm">
+            <FileCheck className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Generate</span>
           </Button>
         </div>
       </div>
 
-      {/* Grade Scale */}
+      {/* Grade scale pill row */}
       <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 dark:from-purple-950/30 dark:to-pink-950/30 dark:border-purple-800">
         <CardContent className="p-3 sm:p-4">
-          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Grade Scale:</span>
-            <Badge className="bg-green-100 text-green-700 text-xs">A: 80-100</Badge>
-            <Badge className="bg-blue-100 text-blue-700 text-xs">B: 70-79</Badge>
-            <Badge className="bg-yellow-100 text-yellow-700 text-xs">C: 60-69</Badge>
-            <Badge className="bg-orange-100 text-orange-700 text-xs">P: 50-59</Badge>
-            <Badge className="bg-red-100 text-red-700 text-xs">F: 0-49</Badge>
+            {[['A: 80-100','green'],['B: 70-79','blue'],['C: 60-69','yellow'],['P: 50-59','orange'],['F: 0-49','red']].map(([label, color]) => (
+              <Badge key={label} className={`bg-${color}-100 text-${color}-700 text-xs`}>{label}</Badge>
+            ))}
           </div>
         </CardContent>
       </Card>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-        <Card className="border-0 shadow-sm"><CardContent className="p-3 text-center"><p className="text-xs text-gray-500">Total</p><p className="text-xl font-bold">{stats.total}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-gray-50"><CardContent className="p-3 text-center"><p className="text-xs text-gray-600">Draft</p><p className="text-xl font-bold">{stats.draft}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-yellow-50"><CardContent className="p-3 text-center"><p className="text-xs text-yellow-600">Pending</p><p className="text-xl font-bold text-yellow-700">{stats.pending}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-blue-50"><CardContent className="p-3 text-center"><p className="text-xs text-blue-600">Approved</p><p className="text-xl font-bold text-blue-700">{stats.approved}</p></CardContent></Card>
-        <Card className="border-0 shadow-sm bg-green-50"><CardContent className="p-3 text-center"><p className="text-xs text-green-600">Published</p><p className="text-xl font-bold text-green-700">{stats.published}</p></CardContent></Card>
+      <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+        {[
+          { label: 'Total', value: stats.total, cls: '' },
+          { label: 'Draft', value: stats.draft, cls: 'bg-gray-50' },
+          { label: 'Pending', value: stats.pending, cls: 'bg-yellow-50', textCls: 'text-yellow-600', valCls: 'text-yellow-700' },
+          { label: 'Approved', value: stats.approved, cls: 'bg-blue-50', textCls: 'text-blue-600', valCls: 'text-blue-700' },
+          { label: 'Published', value: stats.published, cls: 'bg-green-50', textCls: 'text-green-600', valCls: 'text-green-700' },
+        ].map(({ label, value, cls, textCls, valCls }) => (
+          <Card key={label} className={cn('border-0 shadow-sm', cls)}>
+            <CardContent className="p-2 sm:p-3 text-center">
+              <p className={cn('text-xs', textCls || 'text-gray-500')}>{label}</p>
+              <p className={cn('text-lg sm:text-xl font-bold', valCls || 'text-gray-800')}>{value}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Filters */}
-      <Card className="border-0 shadow-sm bg-white dark:bg-gray-900">
+      <Card className="border-0 shadow-sm">
         <CardContent className="p-3 sm:p-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div><Label className="text-xs mb-1 block">Class</Label><Select value={selectedClass} onValueChange={setSelectedClass}><SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger><SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label className="text-xs mb-1 block">Term</Label><Select value={selectedTerm} onValueChange={setSelectedTerm}><SelectTrigger><SelectValue placeholder="Select term" /></SelectTrigger><SelectContent>{TERM_OPTIONS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent></Select></div>
-            <div><Label className="text-xs mb-1 block">Academic Year</Label><Select value={selectedYear} onValueChange={setSelectedYear}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent></Select></div>
+            <div>
+              <Label className="text-xs mb-1 block">Class</Label>
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Select class" /></SelectTrigger>
+                <SelectContent>{CLASSES.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Term</Label>
+              <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>{TERM_OPTIONS.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-xs mb-1 block">Academic Year</Label>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>{YEARS.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-transparent border-b rounded-none h-auto p-0">
-          <TabsTrigger value="generate" className="data-[state=active]:border-purple-600 rounded-none px-4 py-2">Generate</TabsTrigger>
-          <TabsTrigger value="view" className="data-[state=active]:border-purple-600 rounded-none px-4 py-2">View All</TabsTrigger>
+        <TabsList className="bg-transparent border-b rounded-none h-auto p-0 w-full justify-start">
+          <TabsTrigger value="generate" className="data-[state=active]:border-b-2 data-[state=active]:border-purple-600 rounded-none px-3 sm:px-4 py-2 text-sm">
+            Generate
+          </TabsTrigger>
+          <TabsTrigger value="view" className="data-[state=active]:border-b-2 data-[state=active]:border-purple-600 rounded-none px-3 sm:px-4 py-2 text-sm">
+            View All
+          </TabsTrigger>
         </TabsList>
 
+        {/* Generate tab */}
         <TabsContent value="generate">
-          <Card className="border-0 shadow-sm bg-white dark:bg-gray-900">
-            <CardHeader><CardTitle>Generate New Report Card</CardTitle><CardDescription>Select a student to generate their report card</CardDescription></CardHeader>
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base sm:text-lg">Generate New Report Card</CardTitle>
+              <CardDescription className="text-xs sm:text-sm">Select a student to generate their report card</CardDescription>
+            </CardHeader>
             <CardContent>
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Student</Label>
+                  <Label className="text-sm">Student</Label>
                   <Select value={selectedStudent} onValueChange={handleStudentSelect} disabled={!selectedClass}>
-                    <SelectTrigger><SelectValue placeholder={selectedClass ? "Select student" : "Select a class first"} /></SelectTrigger>
-                    <SelectContent>{students.map(s => (<SelectItem key={s.id} value={s.id}>{s.full_name} {s.vin_id ? `(${s.vin_id})` : ''}</SelectItem>))}</SelectContent>
+                    <SelectTrigger className="mt-1 h-9 text-sm">
+                      <SelectValue placeholder={selectedClass ? 'Select student' : 'Select a class first'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.full_name}{s.vin_id ? ` (${s.vin_id})` : ''}</SelectItem>
+                      ))}
+                    </SelectContent>
                   </Select>
                 </div>
                 <div className="flex items-end">
-                  <Button onClick={() => setShowGenerateDialog(true)} disabled={!selectedStudent} className="w-full bg-purple-600 hover:bg-purple-700">Continue</Button>
+                  <Button
+                    onClick={() => setShowGenerateDialog(true)}
+                    disabled={!selectedStudent}
+                    className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    Continue
+                  </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* View all tab */}
         <TabsContent value="view">
-          <Card className="border-0 shadow-sm bg-white dark:bg-gray-900 overflow-hidden">
-            <CardHeader className="pb-3 border-b">
+          <Card className="border-0 shadow-sm overflow-hidden">
+            <CardHeader className="pb-3 border-b px-3 sm:px-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <CardTitle>All Report Cards</CardTitle>
+                <CardTitle className="text-base sm:text-lg">All Report Cards</CardTitle>
                 <div className="relative w-full sm:w-64">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input placeholder="Search student..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 h-9" />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+                  <Input
+                    placeholder="Search student…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-8 h-8 sm:h-9 text-xs sm:text-sm"
+                  />
                 </div>
               </div>
             </CardHeader>
             <CardContent className="p-0">
               {loading ? (
-                <div className="text-center py-12"><Loader2 className="h-8 w-8 animate-spin text-purple-600 mx-auto mb-3" /><p className="text-gray-500">Loading report cards...</p></div>
+                <div className="text-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-purple-600 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">Loading…</p>
+                </div>
               ) : filteredReportCards.length === 0 ? (
-                <div className="text-center py-12"><FileCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">No report cards found</p></div>
+                <div className="text-center py-12">
+                  <FileCheck className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">No report cards found</p>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader><TableRow><TableHead>Student</TableHead><TableHead>Class</TableHead><TableHead>Average</TableHead><TableHead>Grade</TableHead><TableHead>Status</TableHead><TableHead>Generated</TableHead><TableHead className="text-right">Actions</TableHead></TableRow></TableHeader>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Student</TableHead>
+                        <TableHead className="text-xs hidden sm:table-cell">Class</TableHead>
+                        <TableHead className="text-xs text-center">Avg</TableHead>
+                        <TableHead className="text-xs text-center hidden sm:table-cell">Grade</TableHead>
+                        <TableHead className="text-xs">Status</TableHead>
+                        <TableHead className="text-xs hidden md:table-cell">Generated</TableHead>
+                        <TableHead className="text-xs text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
                     <TableBody>
                       {filteredReportCards.map((r: ReportCard) => (
                         <TableRow key={r.id}>
-                          <TableCell><div><p className="font-medium">{r.student?.full_name}</p><p className="text-xs text-gray-500">{r.student?.vin_id}</p></div></TableCell>
-                          <TableCell>{r.class}</TableCell>
-                          <TableCell><span className="font-semibold">{r.average_score?.toFixed(1)}%</span></TableCell>
-                          <TableCell><Badge className={getOverallGradeColor(r.grade)}>{r.grade}</Badge></TableCell>
+                          <TableCell>
+                            <div>
+                              <p className="font-medium text-xs sm:text-sm">{r.student?.full_name}</p>
+                              <p className="text-[10px] text-gray-500">{r.student?.vin_id}</p>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs hidden sm:table-cell">{r.class}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="font-semibold text-xs sm:text-sm">{r.average_score?.toFixed(1)}%</span>
+                          </TableCell>
+                          <TableCell className="text-center hidden sm:table-cell">
+                            <Badge className={cn('text-xs font-bold', getOverallGradeColor(r.grade))}>{r.grade}</Badge>
+                          </TableCell>
                           <TableCell>{getStatusBadge(r.status)}</TableCell>
-                          <TableCell className="text-sm text-gray-500">{r.generated_at ? new Date(r.generated_at).toLocaleDateString() : '-'}</TableCell>
+                          <TableCell className="text-xs text-gray-500 hidden md:table-cell">
+                            {r.generated_at ? new Date(r.generated_at).toLocaleDateString() : '—'}
+                          </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="ghost" size="sm" onClick={() => { setSelectedReportCard(r); setShowPreviewDialog(true); }}><Eye className="h-4 w-4" /></Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="sm"><ChevronRight className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {r.status === 'draft' && <DropdownMenuItem onClick={() => updateReportCardStatus(r.id, 'pending')}><Send className="h-4 w-4 mr-2" />Submit for Approval</DropdownMenuItem>}
-                                {r.status === 'approved' && <DropdownMenuItem onClick={() => updateReportCardStatus(r.id, 'published')}><CheckCircle2 className="h-4 w-4 mr-2" />Publish</DropdownMenuItem>}
-                                <DropdownMenuItem onClick={() => { setSelectedReportCard(r); setShowPreviewDialog(true); }}><Printer className="h-4 w-4 mr-2" />View & Print</DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                variant="ghost" size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => { setSelectedReportCard(r); setShowPreviewDialog(true) }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                              </Button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  {r.status === 'draft' && (
+                                    <DropdownMenuItem onClick={() => updateReportCardStatus(r.id, 'pending')}>
+                                      <Send className="h-4 w-4 mr-2" /> Submit for Approval
+                                    </DropdownMenuItem>
+                                  )}
+                                  {r.status === 'approved' && (
+                                    <DropdownMenuItem onClick={() => updateReportCardStatus(r.id, 'published')}>
+                                      <CheckCircle2 className="h-4 w-4 mr-2" /> Publish
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem onClick={() => { setSelectedReportCard(r); setShowPreviewDialog(true) }}>
+                                    <Printer className="h-4 w-4 mr-2" /> View & Print
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -484,121 +896,129 @@ export function ReportCardsTab({ staffProfile, termInfo }: ReportCardsTabProps) 
         </TabsContent>
       </Tabs>
 
-      {/* Generate Dialog */}
+      {/* ═══════════════════════════════════════════
+          GENERATE DIALOG
+          ═══════════════════════════════════════════ */}
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader><DialogTitle className="flex items-center gap-2"><Brain className="h-5 w-5 text-purple-600" />Generate Report Card</DialogTitle><DialogDescription>Enter teacher comments or use AI to generate them automatically</DialogDescription></DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="flex items-center justify-between p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base">
+              <Brain className="h-5 w-5 text-purple-600 shrink-0" /> Generate Report Card
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Enter teacher comments or use AI to generate them automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-3">
+            {/* AI banner */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg border border-purple-200">
               <div className="flex items-center gap-2">
-                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center"><Sparkles className="h-4 w-4 text-purple-600" /></div>
-                <div><p className="text-sm font-medium">AI-Powered Comments</p><p className="text-xs text-muted-foreground">Generate personalized comments based on student performance</p></div>
+                <div className="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">AI-Powered Comments</p>
+                  <p className="text-xs text-muted-foreground">Generate personalised comments based on student performance</p>
+                </div>
               </div>
-              <Button variant="outline" size="sm" onClick={handleGenerateAIComments} disabled={generatingAI || !selectedStudentData} className="border-purple-300 hover:bg-purple-50">
-                {generatingAI ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : <><Brain className="h-4 w-4 mr-2" />Generate AI Comments</>}
+              <Button
+                variant="outline" size="sm"
+                onClick={handleGenerateAIComments}
+                disabled={generatingAI || !selectedStudentData}
+                className="border-purple-300 hover:bg-purple-50 shrink-0 w-full sm:w-auto"
+              >
+                {generatingAI
+                  ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</>
+                  : <><Brain className="h-4 w-4 mr-2" />Generate AI Comments</>
+                }
               </Button>
             </div>
-            <div><Label>Teacher Comments</Label><Textarea value={teacherComments} onChange={(e) => setTeacherComments(e.target.value)} placeholder="Enter your comments about the student's performance..." rows={4} className="mt-1" /></div>
-            <div><Label>Principal Comments</Label><Textarea value={principalComments} onChange={(e) => setPrincipalComments(e.target.value)} placeholder="Principal's remarks..." rows={3} className="mt-1" /></div>
+
+            <div>
+              <Label className="text-sm">Teacher Comments</Label>
+              <Textarea
+                value={teacherComments}
+                onChange={(e) => setTeacherComments(e.target.value)}
+                placeholder="Enter your comments about the student's performance…"
+                rows={4} className="mt-1 text-sm resize-none"
+              />
+            </div>
+            <div>
+              <Label className="text-sm">Principal Comments</Label>
+              <Textarea
+                value={principalComments}
+                onChange={(e) => setPrincipalComments(e.target.value)}
+                placeholder="Principal's remarks…"
+                rows={3} className="mt-1 text-sm resize-none"
+              />
+            </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>Cancel</Button>
-            <Button onClick={generateReportCard} disabled={generating} className="bg-purple-600 hover:bg-purple-700">
-              {generating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating...</> : 'Generate Report Card'}
+
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={() => setShowGenerateDialog(false)} className="text-sm">Cancel</Button>
+            <Button onClick={generateReportCard} disabled={generating} className="bg-purple-600 hover:bg-purple-700 text-white text-sm">
+              {generating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Generating…</> : 'Generate Report Card'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Preview Dialog - EXACT COPY OF ADMIN VIEW REPORT CARD */}
+      {/* ═══════════════════════════════════════════
+          PREVIEW DIALOG
+          ═══════════════════════════════════════════ */}
       <Dialog open={showPreviewDialog} onOpenChange={setShowPreviewDialog}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Report Card Preview</DialogTitle>
-            <DialogDescription>{selectedReportCard?.student?.full_name} - {getTermLabel(selectedReportCard?.term)} {selectedReportCard?.academic_year}</DialogDescription>
-          </DialogHeader>
+        {/*
+          KEY RESPONSIVE FIXES:
+          - w-[95vw] fills nearly the whole screen on mobile
+          - max-w-4xl caps it on desktop
+          - max-h-[92vh] + overflow-y-auto prevents taller-than-viewport overflow
+          - p-0 so inner padding is controlled per-section
+        */}
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] overflow-y-auto p-0">
           {selectedReportCard && (
-            <div className="py-2">
-              {/* Print/PDF Buttons */}
-              <div className="no-print flex justify-end gap-2 mb-3">
-                <Button variant="outline" size="sm" onClick={() => window.print()}><Printer className="h-4 w-4 mr-2" />Print</Button>
-                <Button variant="default" size="sm" onClick={() => handleDownloadPDF()} className="bg-blue-600 hover:bg-blue-700"><Download className="h-4 w-4 mr-2" />Download PDF</Button>
+            <div className="p-3 sm:p-5 space-y-4">
+
+              {/* Dialog header */}
+              <DialogHeader>
+                <DialogTitle className="text-sm sm:text-base truncate">
+                  Report Card — {selectedReportCard.student?.full_name}
+                </DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm">
+                  {getTermLabel(selectedReportCard.term)} · {selectedReportCard.academic_year} · {selectedReportCard.class}
+                </DialogDescription>
+              </DialogHeader>
+
+              {/* Download button row */}
+              <div className="flex justify-end gap-2 no-print">
+                <Button
+                  variant="outline" size="sm"
+                  onClick={() => handleDownloadPDF()}
+                  className="h-8 text-xs gap-1.5"
+                >
+                  <Download className="h-3.5 w-3.5" /> Download PDF
+                </Button>
               </div>
 
-              {/* REPORT CARD */}
+              {/* The report card itself — ref for printing */}
               <div ref={reportRef}>
-                <div className="bg-white w-full max-w-[210mm] mx-auto text-black border-2 border-blue-900 print:border-2 print:border-blue-900 print:max-w-full print:mx-0 p-4 print:p-3">
-                  <div className="border-b-2 border-blue-900 pb-3 mb-3 print:pb-2 print:mb-2">
-                    <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-3">
-                      <div className="w-16 print:w-14 hidden sm:block"><div className="w-14 h-14 border-2 border-blue-900 rounded flex items-center justify-center text-[8px]">LOGO</div></div>
-                      <div className="flex-1 text-center">
-                        <h1 className="text-[18px] font-bold uppercase text-blue-900 print:text-[15px] tracking-wide">Vincollins College</h1>
-                        <p className="text-[10px] print:text-[9px] text-gray-800">7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos</p>
-                        <p className="text-[10px] print:text-[9px] text-gray-800">Tel: +234 912 1155 554 | Email: vincollinscollege@gmail.com</p>
-                        <p className="text-[9px] italic text-amber-700 mt-1 print:text-[8px] font-medium">"Geared Towards Excellence"</p>
-                        <h2 className="font-bold mt-2 text-[14px] print:text-[12px] text-blue-900">{getTermLabel(selectedReportCard.term)} Student's Performance Report</h2>
-                        <p className="text-[10px] mt-1 font-semibold print:text-[9px] text-gray-800">Academic Session: {selectedReportCard.academic_year}</p>
-                      </div>
-                      <div className="w-16 h-20 sm:w-20 sm:h-24 border-2 border-blue-900 rounded overflow-hidden print:w-16 print:h-20">
-                        {selectedReportCard.student?.photo_url ? <img src={selectedReportCard.student.photo_url} alt="student" className="w-full h-full object-cover" /> : <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-[8px]">Photo</div>}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1.5 text-[11px] mb-4 print:mb-3 print:text-[10px]">
-                    <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Name:</span><span className="break-words text-black">{selectedReportCard.student?.full_name}</span></div>
-                    <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Admission No:</span><span className="text-black">{selectedReportCard.student?.admission_number || '—'}</span></div>
-                    <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Class:</span><span className="text-black">{selectedReportCard.class}</span></div>
-                    <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Term:</span><span className="text-black">{getTermLabel(selectedReportCard.term)}</span></div>
-                    <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Session:</span><span className="text-black">{selectedReportCard.academic_year}</span></div>
-                    <div className="flex flex-wrap"><span className="font-bold w-28 sm:w-32 text-gray-800">Next Term:</span><span className="break-words text-black">To be announced</span></div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-4 print:grid-cols-[70%_30%] print:gap-3">
-                    <div className="min-w-0">
-                      <div className="print:overflow-visible">
-                        <table className="w-full border-collapse border-2 border-blue-900 text-[10px] print:text-[9px] print:w-full">
-                          <thead className="bg-blue-700 text-white">
-                            <tr><th className="border border-blue-500 px-2 py-2 text-left print:text-[9px] print:py-1.5 print:px-1.5">Subjects</th><th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">CA</th><th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">Exam</th><th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">Total</th><th className="border border-blue-500 px-2 py-2 text-center w-10 print:text-[9px] print:py-1.5 print:px-1">Grade</th><th className="border border-blue-500 px-2 py-2 text-left print:text-[9px] print:py-1.5 print:px-1.5">Remark</th></tr>
-                          </thead>
-                          <tbody>
-                            {(selectedReportCard.subject_scores || []).map((subject, index) => (
-                              <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                <td className="border border-gray-400 px-2 py-1.5 break-words print:text-[9px] print:py-1 print:px-1.5 text-black font-medium">{subject.subject}</td>
-                                <td className="border border-gray-400 text-center print:text-[9px] print:py-1 print:px-1 text-black">{subject.ca1 + subject.ca2}</td>
-                                <td className="border border-gray-400 text-center print:text-[9px] print:py-1 print:px-1 text-black">{subject.exam}</td>
-                                <td className="border border-gray-400 text-center font-bold print:text-[9px] print:py-1 print:px-1 text-black">{subject.total}</td>
-                                <td className="border border-gray-400 text-center print:py-1"><span className={getGradeStyle(subject.grade)}>{subject.grade}</span></td>
-                                <td className="border border-gray-400 px-2 py-1.5 print:text-[9px] print:py-1 print:px-1.5 text-black">{subject.remark}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot className="bg-blue-50 font-bold">
-                            <tr><td colSpan={3} className="border border-gray-400 px-2 py-2 text-right print:text-[10px] print:py-1.5 text-black">TOTAL / AVERAGE:</td><td className="border border-gray-400 text-center print:text-[10px] print:py-1.5 text-black">{selectedReportCard.total_score}</td><td className="border border-gray-400 text-center print:py-1.5"><span className={getOverallGradeColor(selectedReportCard.grade)}>{selectedReportCard.grade}</span></td><td className="border border-gray-400 text-center print:text-[10px] print:py-1.5 text-black">{selectedReportCard.average_score?.toFixed(2)}%</td></tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                      <div className="mt-4 space-y-2 print:mt-3">
-                        <div className="border-l-4 border-purple-600 bg-purple-50 p-3 text-[10px] print:text-[9px] print:p-2 rounded-r"><div className="font-bold text-purple-800 mb-1">✨ CLASS TEACHER'S REMARK</div><p className="italic text-gray-800 leading-relaxed">{selectedReportCard.teacher_comments || 'No comment available.'}</p></div>
-                        <div className="border-l-4 border-blue-600 bg-blue-50 p-3 text-[10px] print:text-[9px] print:p-2 rounded-r"><div className="font-bold text-blue-800 mb-1">PRINCIPAL'S REMARK</div><p className="italic text-gray-800 leading-relaxed">{selectedReportCard.principal_comments || 'No comment available.'}</p></div>
-                      </div>
-                    </div>
-                    <div className="space-y-3 print:space-y-2">
-                      <div className="border-2 border-blue-900"><div className="bg-blue-700 text-white text-[10px] font-bold px-3 py-1.5 uppercase">Performance Summary</div><div className="p-3 text-[10px] space-y-1.5"><div className="flex justify-between"><span className="text-gray-800">Total Score:</span><span className="font-bold text-black">{selectedReportCard.total_score}</span></div><div className="flex justify-between"><span className="text-gray-800">Average:</span><span className="font-bold text-black">{selectedReportCard.average_score?.toFixed(2)}%</span></div><div className="flex justify-between"><span className="text-gray-800">Grade:</span><span className={getOverallGradeColor(selectedReportCard.grade)}>{selectedReportCard.grade}</span></div><div className="flex justify-between"><span className="text-gray-800">Subjects:</span><span className="font-bold text-black">{(selectedReportCard.subject_scores || []).length}</span></div></div></div>
-                      <div className="border-2 border-blue-900"><div className="bg-blue-700 text-white text-[9px] font-bold px-3 py-1.5 uppercase">Affective Domain</div><div className="p-2 text-[9px] space-y-1">{Object.entries(selectedReportCard.affective_traits || {}).map(([key, value]) => (<div key={key} className="flex justify-between items-center"><span className="text-gray-800 capitalize">{key.replace(/_/g, ' ')}</span><span className="font-bold text-blue-700">{value}</span></div>))}</div></div>
-                      <div className="border-2 border-blue-900"><div className="bg-blue-700 text-white text-[9px] font-bold px-3 py-1.5 uppercase">Psychomotor Skills</div><div className="p-2 text-[9px] space-y-1">{Object.entries(selectedReportCard.psychomotor_skills || {}).map(([key, value]) => (<div key={key} className="flex justify-between items-center"><span className="text-gray-800 capitalize">{key.replace(/_/g, ' ')}</span><span className="font-bold text-green-700">{value}</span></div>))}</div></div>
-                      <div className="border-2 border-blue-900"><div className="bg-blue-700 text-white text-[9px] font-bold px-3 py-1.5 uppercase">Rating Key</div><div className="p-2 text-[8px] space-y-0.5"><div className="text-gray-800">5 - Excellent</div><div className="text-gray-800">4 - Very Good</div><div className="text-gray-800">3 - Good</div><div className="text-gray-800">2 - Fair</div><div className="text-gray-800">1 - Poor</div></div></div>
-                    </div>
-                  </div>
-                  <div className="border-t-2 border-blue-900 mt-4 pt-2 text-center text-[9px] text-gray-600 print:mt-3 print:pt-2 print:text-[8px]">Powered by Vincollins Portal | Geared Towards Excellence</div>
-                </div>
+                <ReportCardPreview card={selectedReportCard} />
               </div>
+
+              {/* Footer actions */}
+              <DialogFooter className="flex-col sm:flex-row gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => setShowPreviewDialog(false)} className="text-xs sm:text-sm">
+                  Close
+                </Button>
+                <Button
+                  onClick={() => handleDownloadPDF()}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm"
+                >
+                  <Download className="h-3.5 w-3.5 mr-1.5" /> Download PDF
+                </Button>
+              </DialogFooter>
             </div>
           )}
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPreviewDialog(false)}>Close</Button>
-            <Button onClick={() => handleDownloadPDF()} className="bg-blue-600 hover:bg-blue-700"><Download className="h-4 w-4 mr-2" />Download PDF</Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </motion.div>

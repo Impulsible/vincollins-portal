@@ -1,5 +1,4 @@
-// app/staff/report-cards/page.tsx - WITH PRINT AND PDF DOWNLOAD
-
+// app/staff/report-cards/page.tsx - UPDATED WITH IMPROVED FONT VISIBILITY AND PRINT
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -20,7 +19,8 @@ import { toast } from 'sonner'
 import { 
   Loader2, Search, Eye, FileText, Printer, Download, 
   Users, GraduationCap, ChevronLeft, ChevronRight, 
-  X, User, TrendingUp, CheckCircle2, Sparkles, ArrowLeft
+  X, User, TrendingUp, CheckCircle2, Sparkles, ArrowLeft,
+  Calendar, Award, TrendingDown, School, Mail, Phone
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import html2canvas from 'html2canvas'
@@ -35,10 +35,9 @@ const SUBJECT_ORDER: Record<string, number> = {
   'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
   'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
   'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
-  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
-  'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
+  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
   'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
-  'PHE': 27, 'Physical Education': 27, 'Security Education': 28
+  'PHE': 27, 'Security Education': 28
 }
 
 const sortSubjectsByOrder = (subjects: any[]) => {
@@ -75,20 +74,31 @@ const getOverallGrade = (percentage: number): string => {
 
 const getGradeStyle = (grade: string): string => {
   switch (grade) {
-    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'A1': return 'bg-emerald-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[8px]'
     case 'B2':
-    case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'B3': return 'bg-blue-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[8px]'
     case 'C4':
     case 'C5':
-    case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'C6': return 'bg-cyan-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[8px]'
     case 'D7':
-    case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
-    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block'
+    case 'E8': return 'bg-amber-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[8px]'
+    case 'F9': return 'bg-red-600 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[8px]'
+    default: return 'bg-gray-500 text-white font-bold px-2 py-0.5 rounded text-[10px] inline-block print:text-[8px]'
   }
 }
 
 const getOverallGradeColor = (grade: string): string => {
+  switch (grade) {
+    case 'A': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
+    case 'B': return 'bg-blue-100 text-blue-700 border-blue-200'
+    case 'C': return 'bg-cyan-100 text-cyan-700 border-cyan-200'
+    case 'P': return 'bg-amber-100 text-amber-700 border-amber-200'
+    case 'F': return 'bg-red-100 text-red-700 border-red-200'
+    default: return 'bg-gray-100 text-gray-600 border-gray-200'
+  }
+}
+
+const getOverallGradeTextColor = (grade: string): string => {
   switch (grade) {
     case 'A': return 'text-emerald-700 font-bold'
     case 'B': return 'text-blue-700 font-bold'
@@ -97,6 +107,17 @@ const getOverallGradeColor = (grade: string): string => {
     case 'F': return 'text-red-700 font-bold'
     default: return 'text-gray-700'
   }
+}
+
+const getOverallGradeRemark = (grade: string): string => {
+  const remarks: Record<string, string> = {
+    'A': 'Excellent',
+    'B': 'Very Good',
+    'C': 'Good',
+    'P': 'Pass',
+    'F': 'Fail'
+  }
+  return remarks[grade] || ''
 }
 
 const getGradeRemark = (grade: string): string => {
@@ -378,12 +399,10 @@ export default function StaffReportCardsPage() {
 
   const totalPages = Math.ceil(filteredCards.length / PAGE_SIZE)
 
-  // Handle Print
   const handlePrint = () => {
     window.print()
   }
 
-  // Handle Download PDF
   const handleDownloadPDF = async () => {
     if (!printRef.current || !selectedCard) {
       toast.error('Report card not found')
@@ -547,7 +566,7 @@ export default function StaffReportCardsPage() {
         <CardContent className="p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
-              <Label className="text-xs text-slate-500">Class</Label>
+              <Label className="text-xs text-slate-500 font-medium">Class</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
                 <SelectTrigger className="h-9 text-sm mt-1">
                   <SelectValue placeholder="All Classes" />
@@ -563,7 +582,7 @@ export default function StaffReportCardsPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Term</Label>
+              <Label className="text-xs text-slate-500 font-medium">Term</Label>
               <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                 <SelectTrigger className="h-9 text-sm mt-1">
                   <SelectValue />
@@ -576,7 +595,7 @@ export default function StaffReportCardsPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-slate-500">Session</Label>
+              <Label className="text-xs text-slate-500 font-medium">Session</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
                 <SelectTrigger className="h-9 text-sm mt-1">
                   <SelectValue />
@@ -589,7 +608,7 @@ export default function StaffReportCardsPage() {
               </Select>
             </div>
             <div className="lg:col-span-2">
-              <Label className="text-xs text-slate-500">Search Student</Label>
+              <Label className="text-xs text-slate-500 font-medium">Search Student</Label>
               <div className="relative mt-1">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                 <Input
@@ -728,162 +747,266 @@ export default function StaffReportCardsPage() {
             <>
               <DialogHeader className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
                 <div className="flex items-center justify-between">
-                  <DialogTitle className="flex items-center gap-2">
+                  <DialogTitle className="flex items-center gap-2 text-base font-bold">
                     <FileText className="h-5 w-5 text-blue-600" />
                     Report Card - {selectedCard.student_name}
                   </DialogTitle>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handlePrint}>
-                      <Printer className="h-4 w-4 mr-2" /> Print
+                    <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 text-xs">
+                      <Printer className="h-3.5 w-3.5 mr-1.5" /> Print
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading}>
+                    <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={downloading} className="h-8 text-xs">
                       {downloading ? (
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
                       ) : (
-                        <Download className="h-4 w-4 mr-2" />
+                        <Download className="h-3.5 w-3.5 mr-1.5" />
                       )}
                       {downloading ? 'Generating...' : 'PDF'}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setShowViewDialog(false)}>
+                    <Button variant="ghost" size="sm" onClick={() => setShowViewDialog(false)} className="h-8 w-8 p-0">
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                <DialogDescription>
+                <DialogDescription className="text-sm">
                   {selectedCard.class} • {getTermLabel(selectedCard.term)} {selectedCard.academic_year}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="p-6 bg-gray-100">
-                {/* REPORT CARD - Professional styling matching view page */}
+                {/* REPORT CARD */}
                 <div 
                   ref={printRef}
-                  className="bg-white mx-auto text-black w-[210mm] min-h-[297mm] p-6 shadow-lg"
+                  className="print-report bg-white mx-auto text-black border-2 border-blue-900 print:border-2 print:border-blue-900 w-[210mm] min-h-[297mm] p-4 print:p-2 shadow-lg"
                   style={{ fontFamily: 'Arial, Helvetica, sans-serif' }}
                 >
                   {/* Header Section */}
-                  <div className="border-b-2 border-gray-300 pb-6 mb-5">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="w-20 flex-shrink-0">
-                        {schoolSettings.logo_url && (
-                          <img src={schoolSettings.logo_url} alt="logo" className="w-16 h-16 object-contain" />
+                  <div className="border-b-2 border-blue-900 pb-3 print:pb-1.5 mb-3 print:mb-2">
+                    <div className="flex items-start justify-between gap-3 print:gap-2">
+                      <div className="w-16 print:w-12 shrink-0">
+                        {schoolSettings.logo_url ? (
+                          <img src={schoolSettings.logo_url} alt="logo" className="w-14 h-14 object-contain print:w-10 print:h-10" />
+                        ) : (
+                          <div className="w-14 h-14 border-2 border-blue-900 rounded flex items-center justify-center text-[10px] bg-blue-50 print:w-10 print:h-10">
+                            <School className="h-8 w-8 text-blue-900 print:h-6 print:w-6" />
+                          </div>
                         )}
                       </div>
                       <div className="flex-1 text-center">
-                        <h1 className="text-xl font-bold uppercase text-blue-900 mb-1">{schoolSettings.name}</h1>
-                        <p className="text-[10px] text-gray-600">{schoolSettings.address}</p>
-                        <p className="text-[10px] text-gray-600">Tel: {schoolSettings.phone} | Email: {schoolSettings.email}</p>
-                        <p className="text-[9px] italic text-amber-600 mt-1">"{schoolSettings.motto}"</p>
-                        <h2 className="font-bold text-base mt-3 text-blue-800">
+                        <h1 className="text-[18px] font-bold uppercase text-blue-900 print:text-[14px] tracking-wide">
+                          {schoolSettings.name}
+                        </h1>
+                        <p className="text-[11px] print:text-[9px] text-gray-700">{schoolSettings.address}</p>
+                        <p className="text-[11px] print:text-[9px] text-gray-700">
+                          <Mail className="inline h-3 w-3 mr-1 print:h-2 print:w-2" /> {schoolSettings.email} | 
+                          <Phone className="inline h-3 w-3 mx-1 print:h-2 print:w-2" /> {schoolSettings.phone}
+                        </p>
+                        <p className="text-[10px] italic text-amber-700 mt-0.5 print:text-[8px] font-medium">"{schoolSettings.motto}"</p>
+                        <h2 className="font-bold mt-1.5 text-[14px] print:text-[12px] text-blue-900">
                           {getTermLabel(selectedCard.term)} Student's Performance Report
                         </h2>
-                        <p className="text-[10px] mt-1 font-semibold">Academic Session: {selectedCard.academic_year}</p>
+                        <p className="text-[10px] mt-0.5 font-semibold print:text-[8px] text-gray-800">Academic Session: {selectedCard.academic_year}</p>
                       </div>
-                      <div className="w-20 h-24 border border-gray-300 rounded overflow-hidden flex-shrink-0">
+                      <div className="w-16 h-20 sm:w-20 sm:h-24 border-2 border-blue-900 rounded overflow-hidden print:w-14 print:h-16 shrink-0">
                         {selectedCard.student_photo_url ? (
                           <img src={selectedCard.student_photo_url} alt="student" className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-[10px]">Photo</div>
+                          <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400 text-[8px] sm:text-xs">
+                            <User className="h-8 w-8 print:h-6 print:w-6" />
+                          </div>
                         )}
                       </div>
                     </div>
                   </div>
 
                   {/* Student Information */}
-                  <div className="bg-blue-50 p-3 rounded-md mb-5 text-[11px]">
-                    <div className="grid grid-cols-2 gap-2">
-                      <div><span className="font-bold">Student Name:</span> {selectedCard.student_name}</div>
-                      <div><span className="font-bold">Admission No:</span> {selectedCard.student_admission_number || '—'}</div>
-                      <div><span className="font-bold">Class:</span> {selectedCard.class}</div>
-                      <div><span className="font-bold">Term:</span> {getTermLabel(selectedCard.term)}</div>
-                      <div><span className="font-bold">Session:</span> {selectedCard.academic_year}</div>
-                      <div><span className="font-bold">Next Term:</span> {selectedCard.next_term_begins ? new Date(selectedCard.next_term_begins).toLocaleDateString('en-NG') : 'To be announced'}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[12px] mb-4 print:mb-2 print:text-[10px]">
+                    <div className="flex flex-wrap">
+                      <span className="font-bold w-28 sm:w-32 text-gray-700 print:w-24">Name:</span>
+                      <span className="break-words text-black font-medium">{selectedCard.student_name}</span>
+                    </div>
+                    <div className="flex flex-wrap">
+                      <span className="font-bold w-28 sm:w-32 text-gray-700 print:w-24">Admission No:</span>
+                      <span className="text-black font-medium">{selectedCard.student_admission_number || '—'}</span>
+                    </div>
+                    <div className="flex flex-wrap">
+                      <span className="font-bold w-28 sm:w-32 text-gray-700 print:w-24">Class:</span>
+                      <span className="text-black font-medium">{selectedCard.class}</span>
+                    </div>
+                    <div className="flex flex-wrap">
+                      <span className="font-bold w-28 sm:w-32 text-gray-700 print:w-24">Term:</span>
+                      <span className="text-black font-medium">{getTermLabel(selectedCard.term)}</span>
+                    </div>
+                    <div className="flex flex-wrap">
+                      <span className="font-bold w-28 sm:w-32 text-gray-700 print:w-24">Session:</span>
+                      <span className="text-black font-medium">{selectedCard.academic_year}</span>
+                    </div>
+                    <div className="flex flex-wrap items-center">
+                      <span className="font-bold w-28 sm:w-32 text-gray-700 print:w-24">Next Term Begins:</span>
+                      <span className="flex items-center gap-1 text-black font-medium">
+                        <Calendar className="h-3 w-3 text-blue-600 print:h-2 print:w-2" />
+                        {selectedCard.next_term_begins ? new Date(selectedCard.next_term_begins).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' }) : 'To be announced'}
+                      </span>
                     </div>
                   </div>
 
                   {/* Main Content */}
-                  <div className="flex gap-5">
+                  <div className="grid grid-cols-1 lg:grid-cols-[70%_30%] gap-4 print:gap-2">
                     {/* Left Column */}
-                    <div className="flex-1">
-                      <table className="w-full border-collapse border border-gray-300 text-[10px]">
-                        <thead>
-                          <tr className="bg-blue-600 text-white">
-                            <th className="border border-blue-500 px-2 py-1.5 text-left">Subjects</th>
-                            <th className="border border-blue-500 px-2 py-1.5 text-center w-12">CA</th>
-                            <th className="border border-blue-500 px-2 py-1.5 text-center w-12">Exam</th>
-                            <th className="border border-blue-500 px-2 py-1.5 text-center w-12">Total</th>
-                            <th className="border border-blue-500 px-2 py-1.5 text-center w-10">Grade</th>
-                            <th className="border border-blue-500 px-2 py-1.5 text-left">Remark</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {sortSubjectsByOrder(selectedCard.subjects_data || []).map((subject, idx) => (
-                            <tr key={idx}>
-                              <td className="border border-gray-300 px-2 py-1.5">{subject.name}</td>
-                              <td className="border border-gray-300 text-center">{subject.ca || '-'}</td>
-                              <td className="border border-gray-300 text-center">{subject.exam || '-'}</td>
-                              <td className="border border-gray-300 text-center font-bold">{subject.total || '-'}</td>
-                              <td className="border border-gray-300 text-center">
-                                <span className={getGradeStyle(subject.grade)}>{subject.grade || '-'}</span>
-                              </td>
-                              <td className="border border-gray-300 px-2 py-1.5">{subject.remark || '-'}</td>
+                    <div className="min-w-0 overflow-hidden">
+                      <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+                        <table className="w-full border-collapse text-[11px] print:text-[9px] table-fixed">
+                          <thead className="bg-blue-700 text-white">
+                            <tr>
+                              <th className="border border-blue-500 px-2 py-1.5 text-left w-[35%] font-bold print:px-1.5 print:py-1">Subjects</th>
+                              <th className="border border-blue-500 px-2 py-1.5 text-center w-[10%] font-bold print:px-1.5 print:py-1">CA</th>
+                              <th className="border border-blue-500 px-2 py-1.5 text-center w-[10%] font-bold print:px-1.5 print:py-1">Exam</th>
+                              <th className="border border-blue-500 px-2 py-1.5 text-center w-[10%] font-bold print:px-1.5 print:py-1">Total</th>
+                              <th className="border border-blue-500 px-2 py-1.5 text-center w-[12%] font-bold print:px-1.5 print:py-1">Grade</th>
+                              <th className="border border-blue-500 px-2 py-1.5 text-left w-[23%] font-bold print:px-1.5 print:py-1">Remark</th>
                             </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-100 font-bold">
-                          <tr>
-                            <td colSpan={3} className="border border-gray-300 px-2 py-1.5 text-right">TOTAL / AVERAGE:</td>
-                            <td className="border border-gray-300 text-center">{selectedCard.total_score || 0}</td>
-                            <td className="border border-gray-300 text-center">
-                              <span className={getOverallGradeColor(selectedCard.overall_grade)}>{selectedCard.overall_grade}</span>
-                            </td>
-                            <td className="border border-gray-300 text-center">{selectedCard.average_score?.toFixed(2) || '0'}%</td>
-                          </tr>
-                        </tfoot>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {sortSubjectsByOrder(selectedCard.subjects_data || []).map((subject, idx) => (
+                              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                <td className="border border-gray-400 px-2 py-1 font-medium print:px-1.5 print:py-0.5 truncate" title={subject.name}>
+                                  {subject.name}
+                                </td>
+                                <td className="border border-gray-400 text-center font-mono print:px-1.5 print:py-0.5">{subject.ca || '-'}</td>
+                                <td className="border border-gray-400 text-center font-mono print:px-1.5 print:py-0.5">{subject.exam || '-'}</td>
+                                <td className="border border-gray-400 text-center font-bold font-mono print:px-1.5 print:py-0.5">{subject.total || '-'}</td>
+                                <td className="border border-gray-400 text-center print:px-1.5 print:py-0.5">
+                                  <span className={getGradeStyle(subject.grade)}>{subject.grade || '-'}</span>
+                                </td>
+                                <td className="border border-gray-400 px-2 py-1 text-[10px] break-words print:px-1.5 print:py-0.5 print:text-[8px]" title={subject.remark}>
+                                  {subject.remark || '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                          <tfoot className="bg-blue-50 font-bold">
+                            <tr>
+                              <td colSpan={3} className="border border-gray-400 px-2 py-1.5 text-right print:px-1.5 print:py-1">TOTAL / AVERAGE:</td>
+                              <td className="border border-gray-400 text-center print:px-1.5 print:py-1">{selectedCard.total_score || 0}</td>
+                              <td className="border border-gray-400 text-center print:px-1.5 print:py-1">
+                                <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-bold print:text-[8px]", getOverallGradeColor(selectedCard.overall_grade))}>
+                                  {selectedCard.overall_grade}
+                                </span>
+                              </td>
+                              <td className="border border-gray-400 text-center print:px-1.5 print:py-1">{selectedCard.average_score?.toFixed(2) || '0'}%</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
 
                       {/* Remarks */}
-                      <div className="mt-4 space-y-2">
-                        <div className="border-l-4 border-purple-500 bg-purple-50 p-2 text-[10px]">
-                          <div className="font-bold text-purple-700 mb-1 flex items-center gap-1">
-                            <Sparkles className="h-3 w-3" /> CLASS TEACHER'S REMARK
+                      <div className="mt-3 space-y-2 print:mt-2">
+                        <div className="border-l-4 border-purple-600 bg-purple-50 p-2.5 text-[11px] print:text-[9px] print:p-2 rounded-r">
+                          <div className="font-bold text-purple-800 mb-0.5 flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 print:h-2 print:w-2" /> CLASS TEACHER'S REMARK
                           </div>
-                          <p className="italic">{selectedCard.teacher_comments || 'No comment available.'}</p>
+                          <p className="italic text-gray-800 leading-relaxed">{selectedCard.teacher_comments || 'No comment available.'}</p>
                         </div>
-                        <div className="border-l-4 border-blue-500 bg-blue-50 p-2 text-[10px]">
-                          <div className="font-bold text-blue-700 mb-1">PRINCIPAL'S REMARK</div>
-                          <p className="italic">{selectedCard.principal_comments || 'No comment available.'}</p>
+                        <div className="border-l-4 border-blue-600 bg-blue-50 p-2.5 text-[11px] print:text-[9px] print:p-2 rounded-r">
+                          <div className="font-bold text-blue-800 mb-0.5">
+                            <Award className="inline h-3 w-3 mr-1 print:h-2 print:w-2" /> PRINCIPAL'S REMARK
+                          </div>
+                          <p className="italic text-gray-800 leading-relaxed">{selectedCard.principal_comments || 'No comment available.'}</p>
+                        </div>
+                      </div>
+
+                      {/* Grade Scale */}
+                      <div className="mt-3 print:mt-2">
+                        <div className="bg-blue-700 text-white text-[10px] px-2.5 py-1 font-bold rounded-t print:px-2 print:py-0.5 print:text-[8px]">Grade Scale</div>
+                        <div className="border-2 border-t-0 border-blue-900 p-2 rounded-b print:p-1.5">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1 text-[9px] print:text-[7px] print:gap-0.5">
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('A1')}>A1</span> <span className="text-gray-600">75-100</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('B2')}>B2</span> <span className="text-gray-600">70-74</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('B3')}>B3</span> <span className="text-gray-600">65-69</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('C4')}>C4</span> <span className="text-gray-600">60-64</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('C5')}>C5</span> <span className="text-gray-600">55-59</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('C6')}>C6</span> <span className="text-gray-600">50-54</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('D7')}>D7</span> <span className="text-gray-600">45-49</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('E8')}>E8</span> <span className="text-gray-600">40-44</span></div>
+                            <div className="flex items-center gap-1"><span className={getGradeStyle('F9')}>F9</span> <span className="text-gray-600">0-39</span></div>
+                          </div>
+                          <div className="mt-1.5 pt-1.5 border-t border-blue-300 grid grid-cols-5 gap-1 text-[9px] print:mt-1 print:pt-1 print:text-[7px] print:gap-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold print:text-[7px]", getOverallGradeColor('A'))}>A</span>
+                              <span className="text-gray-600">80-100</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold print:text-[7px]", getOverallGradeColor('B'))}>B</span>
+                              <span className="text-gray-600">70-79</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold print:text-[7px]", getOverallGradeColor('C'))}>C</span>
+                              <span className="text-gray-600">60-69</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold print:text-[7px]", getOverallGradeColor('P'))}>P</span>
+                              <span className="text-gray-600">50-59</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <span className={cn("px-1.5 py-0.5 rounded text-[9px] font-bold print:text-[7px]", getOverallGradeColor('F'))}>F</span>
+                              <span className="text-gray-600">0-49</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
 
                     {/* Right Column */}
-                    <div className="w-56 flex-shrink-0 space-y-3">
-                      <div className="border border-gray-300">
-                        <div className="bg-blue-600 text-white text-[10px] font-bold px-2 py-1 uppercase">Performance Summary</div>
-                        <div className="p-2 text-[10px] space-y-1">
-                          <div className="flex justify-between"><span>Total Score:</span><span className="font-bold">{selectedCard.total_score || 0}</span></div>
-                          <div className="flex justify-between"><span>Average:</span><span className="font-bold">{selectedCard.average_score?.toFixed(2) || '0'}%</span></div>
-                          <div className="flex justify-between"><span>Grade:</span><span className={getOverallGradeColor(selectedCard.overall_grade)}>{selectedCard.overall_grade}</span></div>
-                          <div className="flex justify-between"><span>Subjects:</span><span className="font-bold">{selectedCard.subjects_data?.length || 0}</span></div>
-                        </div>
-                      </div>
-
-                      <div className="border border-gray-300">
-                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Grade Scale</div>
-                        <div className="p-2 text-[8px] grid grid-cols-2 gap-x-2 gap-y-0.5">
-                          <div>A1: 75-100%</div><div>B2: 70-74%</div>
-                          <div>B3: 65-69%</div><div>C4: 60-64%</div>
-                          <div>C5: 55-59%</div><div>C6: 50-54%</div>
-                          <div>D7: 45-49%</div><div>E8: 40-44%</div>
-                          <div>F9: 0-39%</div>
+                    <div className="space-y-3 print:space-y-2">
+                      {/* Performance Summary */}
+                      <div className="border-2 border-blue-900 w-full box-border">
+                        <div className="bg-blue-700 text-white text-[10px] font-bold px-2.5 py-1 uppercase print:px-2 print:py-0.5 print:text-[8px]">Performance Summary</div>
+                        <div className="p-2.5 text-[11px] space-y-1 print:p-2 print:text-[9px] print:space-y-0.5">
+                          <div className="flex justify-between flex-wrap">
+                            <span className="text-gray-700 font-medium">Total Score:</span>
+                            <span className="font-bold text-black">{selectedCard.total_score || 0}</span>
+                          </div>
+                          <div className="flex justify-between flex-wrap">
+                            <span className="text-gray-700 font-medium">Average:</span>
+                            <span className="font-bold text-black">{selectedCard.average_score?.toFixed(2) || '0'}%</span>
+                          </div>
+                          <div className="flex justify-between flex-wrap">
+                            <span className="text-gray-700 font-medium">Grade:</span>
+                            <span className={getOverallGradeTextColor(selectedCard.overall_grade)}>
+                              {selectedCard.overall_grade} - {getOverallGradeRemark(selectedCard.overall_grade)}
+                            </span>
+                          </div>
+                          <div className="flex justify-between flex-wrap">
+                            <span className="text-gray-700 font-medium">Subjects:</span>
+                            <span className="font-bold text-black">{selectedCard.subjects_data?.length || 0}</span>
+                          </div>
+                          {selectedCard.subjects_data && selectedCard.subjects_data.length > 0 && (
+                            <>
+                              <div className="flex justify-between text-emerald-700 pt-1 border-t border-gray-300 flex-wrap print:pt-0.5">
+                                <span className="flex items-center gap-1 font-medium">
+                                  <TrendingUp className="h-3 w-3 print:h-2 print:w-2" /> Best:
+                                </span>
+                                <span className="font-bold text-right break-words max-w-[140px]">
+                                  {selectedCard.subjects_data.reduce((a, b) => a.total > b.total ? a : b).name} ({selectedCard.subjects_data.reduce((a, b) => a.total > b.total ? a : b).total})
+                                </span>
+                              </div>
+                              <div className="flex justify-between text-red-600 flex-wrap">
+                                <span className="flex items-center gap-1 font-medium">
+                                  <TrendingDown className="h-3 w-3 print:h-2 print:w-2" /> Improve:
+                                </span>
+                                <span className="font-bold text-right break-words max-w-[140px]">
+                                  {selectedCard.subjects_data.reduce((a, b) => a.total < b.total ? a : b).name}
+                                </span>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
 
                       {/* Affective Domain */}
-                      <div className="border border-gray-300">
-                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Affective Domain</div>
-                        <div className="p-2 text-[9px] space-y-0.5">
+                      <div className="border-2 border-blue-900 w-full box-border">
+                        <div className="bg-blue-700 text-white text-[9px] font-bold px-2.5 py-1 uppercase print:px-2 print:py-0.5 print:text-[8px]">Affective Domain</div>
+                        <div className="p-2 text-[10px] space-y-0.5 print:p-1.5 print:text-[8px] print:space-y-0">
                           {(selectedCard.behavior_ratings || [
                             { name: 'Honesty', rating: 4 }, { name: 'Neatness', rating: 4 },
                             { name: 'Obedience', rating: 4 }, { name: 'Orderliness', rating: 3 },
@@ -891,47 +1014,47 @@ export default function StaffReportCardsPage() {
                             { name: 'Leadership', rating: 3 }, { name: 'Politeness', rating: 4 },
                           ]).map((item) => (
                             <div key={item.name} className="flex justify-between items-center">
-                              <span>{item.name}</span>
-                              <span className="font-bold text-blue-600">{item.rating}</span>
+                              <span className="text-gray-800 font-medium">{item.name}</span>
+                              <span className="font-bold text-blue-700">{item.rating}</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
                       {/* Psychomotor Skills */}
-                      <div className="border border-gray-300">
-                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Psychomotor Skills</div>
-                        <div className="p-2 text-[9px] space-y-0.5">
+                      <div className="border-2 border-blue-900 w-full box-border">
+                        <div className="bg-blue-700 text-white text-[9px] font-bold px-2.5 py-1 uppercase print:px-2 print:py-0.5 print:text-[8px]">Psychomotor Skills</div>
+                        <div className="p-2 text-[10px] space-y-0.5 print:p-1.5 print:text-[8px] print:space-y-0">
                           {(selectedCard.skill_ratings || [
                             { name: 'Handwriting', rating: 4 }, { name: 'Verbal Fluency', rating: 4 },
                             { name: 'Sports', rating: 3 }, { name: 'Handling Tools', rating: 3 },
                             { name: 'Club Activities', rating: 4 },
                           ]).map((item) => (
                             <div key={item.name} className="flex justify-between items-center">
-                              <span>{item.name}</span>
-                              <span className="font-bold text-green-600">{item.rating}</span>
+                              <span className="text-gray-800 font-medium">{item.name}</span>
+                              <span className="font-bold text-green-700">{item.rating}</span>
                             </div>
                           ))}
                         </div>
                       </div>
 
                       {/* Rating Key */}
-                      <div className="border border-gray-300">
-                        <div className="bg-blue-600 text-white text-[9px] font-bold px-2 py-1 uppercase">Rating Key</div>
-                        <div className="p-2 text-[8px] space-y-0.5">
-                          <div>5 - Excellent</div>
-                          <div>4 - Very Good</div>
-                          <div>3 - Good</div>
-                          <div>2 - Fair</div>
-                          <div>1 - Poor</div>
+                      <div className="border-2 border-blue-900 w-full box-border">
+                        <div className="bg-blue-700 text-white text-[9px] font-bold px-2.5 py-1 uppercase print:px-2 print:py-0.5 print:text-[8px]">Rating Key</div>
+                        <div className="p-2 text-[9px] space-y-0.5 print:p-1.5 print:text-[7px] print:space-y-0">
+                          <div className="font-medium text-gray-800">5 - Excellent</div>
+                          <div className="font-medium text-gray-800">4 - Very Good</div>
+                          <div className="font-medium text-gray-800">3 - Good</div>
+                          <div className="font-medium text-gray-800">2 - Fair</div>
+                          <div className="font-medium text-gray-800">1 - Poor</div>
                         </div>
                       </div>
                     </div>
                   </div>
 
                   {/* Footer */}
-                  <div className="border-t-2 border-gray-300 mt-5 pt-2 text-center text-[8px] text-gray-500">
-                    Powered by Vincollins School Management Portal | {schoolSettings.motto}
+                  <div className="border-t-2 border-blue-900 mt-3 pt-1.5 text-center text-[9px] text-gray-600 print:mt-2 print:pt-1 print:text-[7px]">
+                    Powered by Vincollins Portal | {schoolSettings.motto}
                   </div>
                 </div>
               </div>
@@ -943,28 +1066,150 @@ export default function StaffReportCardsPage() {
       {/* PRINT CSS */}
       <style jsx global>{`
         @media print {
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
           body { 
-            background: white; 
-            margin: 0; 
-            padding: 0; 
-            -webkit-print-color-adjust: exact; 
-            print-color-adjust: exact; 
+            background: white !important; 
+            margin: 0 !important; 
+            padding: 0 !important; 
+            font-size: 10px !important;
+            line-height: 1.4 !important;
+            color: #000 !important;
           }
           .no-print { 
             display: none !important; 
           }
           @page { 
             size: A4 portrait; 
-            margin: 0.5cm;
+            margin: 0.4cm;
           }
-          .bg-blue-600, .bg-purple-600 {
+          .print-container {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0.2cm !important;
+            margin: 0 !important;
+          }
+          .print-report {
+            border: none !important;
+            padding: 0.2cm !important;
+            min-height: auto !important;
+            width: 100% !important;
+            font-size: 10px !important;
+          }
+          .bg-blue-700, .bg-blue-600, .bg-purple-600 {
             background-color: #1e40af !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
           }
+          .bg-emerald-600 { background-color: #059669 !important; }
+          .bg-blue-600 { background-color: #2563eb !important; }
+          .bg-cyan-600 { background-color: #0891b2 !important; }
+          .bg-amber-600 { background-color: #d97706 !important; }
+          .bg-red-600 { background-color: #dc2626 !important; }
           .border {
             border-color: #000 !important;
+            border-width: 1px !important;
           }
+          .border-2 {
+            border-color: #000 !important;
+            border-width: 2px !important;
+          }
+          table {
+            table-layout: fixed !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+            font-size: 9px !important;
+          }
+          th, td {
+            word-break: break-word !important;
+            padding: 3px 4px !important;
+            border-color: #000 !important;
+            border-width: 1px !important;
+          }
+          th {
+            font-weight: 700 !important;
+            background-color: #1e40af !important;
+            color: white !important;
+            font-size: 9px !important;
+          }
+          .text-gray-800 { color: #1f2937 !important; }
+          .text-black { color: #000 !important; }
+          .font-bold { font-weight: 700 !important; }
+          .font-semibold { font-weight: 600 !important; }
+          .font-medium { font-weight: 500 !important; }
+          .text-emerald-700 { color: #047857 !important; }
+          .text-red-600 { color: #dc2626 !important; }
+          .text-blue-700 { color: #1d4ed8 !important; }
+          .text-cyan-700 { color: #0e7490 !important; }
+          .text-amber-700 { color: #b45309 !important; }
+          .text-purple-800 { color: #6b21a8 !important; }
+          .text-blue-800 { color: #1e40af !important; }
+          .text-gray-500 { color: #6b7280 !important; }
+          .bg-purple-50 { background-color: #faf5ff !important; }
+          .bg-blue-50 { background-color: #eff6ff !important; }
+          .bg-gray-50 { background-color: #f9fafb !important; }
+          .bg-white { background-color: #ffffff !important; }
+          .grid-cols-\\[70\\%_30\\%\\] {
+            grid-template-columns: 67% 33% !important;
+          }
+          .gap-3 { gap: 8px !important; }
+          .gap-4 { gap: 10px !important; }
+          .space-y-2 > * + * { margin-top: 6px !important; }
+          .space-y-3 > * + * { margin-top: 8px !important; }
+          .space-y-1\\.5 > * + * { margin-top: 4px !important; }
+          .mt-2 { margin-top: 6px !important; }
+          .mt-3 { margin-top: 8px !important; }
+          .mt-4 { margin-top: 10px !important; }
+          .mb-2 { margin-bottom: 6px !important; }
+          .mb-3 { margin-bottom: 8px !important; }
+          .mb-4 { margin-bottom: 10px !important; }
+          .p-2 { padding: 6px !important; }
+          .p-3 { padding: 8px !important; }
+          .p-4 { padding: 10px !important; }
+          .px-2 { padding-left: 6px !important; padding-right: 6px !important; }
+          .px-3 { padding-left: 8px !important; padding-right: 8px !important; }
+          .py-1 { padding-top: 3px !important; padding-bottom: 3px !important; }
+          .py-1\\.5 { padding-top: 4px !important; padding-bottom: 4px !important; }
+          .py-2 { padding-top: 5px !important; padding-bottom: 5px !important; }
+          h1 { font-size: 14px !important; font-weight: 700 !important; }
+          h2 { font-size: 12px !important; font-weight: 700 !important; }
+          .text-\\[18px\\] { font-size: 14px !important; }
+          .text-\\[16px\\] { font-size: 12px !important; }
+          .text-\\[14px\\] { font-size: 12px !important; }
+          .text-\\[12px\\] { font-size: 11px !important; }
+          .text-\\[11px\\] { font-size: 10px !important; }
+          .text-\\[10px\\] { font-size: 9px !important; }
+          .text-\\[9px\\] { font-size: 8px !important; }
+          .text-\\[8px\\] { font-size: 8px !important; }
+          .italic { font-style: italic !important; }
+          .tracking-wide { letter-spacing: 0.025em !important; }
+          .uppercase { text-transform: uppercase !important; }
+          .break-words { word-break: break-word !important; }
+          .w-full { width: 100% !important; }
+          .text-center { text-align: center !important; }
+          .text-left { text-align: left !important; }
+          .text-right { text-align: right !important; }
+          .font-mono { font-family: monospace !important; }
+          .inline-block { display: inline-block !important; }
+          .shrink-0 { flex-shrink: 0 !important; }
+          .w-16 { width: 40px !important; }
+          .w-14 { width: 36px !important; }
+          .w-20 { width: 50px !important; }
+          .h-14 { height: 36px !important; }
+          .h-20 { height: 50px !important; }
+          .h-24 { height: 60px !important; }
+          .object-contain { object-fit: contain !important; }
+          .object-cover { object-fit: cover !important; }
+          .border-t { border-top-width: 1px !important; }
+          .border-t-2 { border-top-width: 2px !important; }
+          .border-b-2 { border-bottom-width: 2px !important; }
+          .rounded-sm { border-radius: 2px !important; }
+          .rounded-t { border-radius: 2px 2px 0 0 !important; }
+          .rounded-b { border-radius: 0 0 2px 2px !important; }
+          .overflow-hidden { overflow: hidden !important; }
         }
       `}</style>
     </div>

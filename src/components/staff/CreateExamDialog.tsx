@@ -181,6 +181,7 @@ const jssSubjects = [
   "Information Technology",
   "Cultural and Creative Arts",
   "French",
+  "Security Education"
 ];
 
 const ssSubjects = [
@@ -199,7 +200,8 @@ const ssSubjects = [
   "Agricultural Science",
   "Civic Education",
   "Data Processing",
-  "Furthermathematics"
+  "Furthermathematics",
+  "CRS"
 ];
 
 // Convert markdown table to HTML with proper styling
