@@ -73,6 +73,7 @@ export interface StaffProfile {
   photo_url?: string
 }
 
+// ✅ FIXED: Added shuffle_questions and shuffle_options
 export interface ExamDetailsForm {
   title: string
   subject: string
@@ -80,11 +81,19 @@ export interface ExamDetailsForm {
   duration: number
   instructions: string
   pass_mark: number
-  shuffle_questions: boolean
-  shuffle_options: boolean
+  shuffle_questions: boolean    // ✅ Added
+  shuffle_options: boolean      // ✅ Added
   term: string
   session_year: string
   target_audience: string
+  // Optional fields that might be used
+  randomize_questions?: boolean
+  randomize_options?: boolean
+  negative_marking?: boolean
+  negative_marking_value?: number
+  show_correct_answers?: boolean
+  allow_review?: boolean
+  [key: string]: any            // Allow any additional properties
 }
 
 export interface ExamAttempt {

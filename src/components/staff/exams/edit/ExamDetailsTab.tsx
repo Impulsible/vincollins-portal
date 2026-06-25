@@ -359,7 +359,7 @@ export function ExamDetailsTab({
           </CardContent>
         </Card>
 
-        {/* Exam Settings */}
+        {/* ✅ FIXED: Exam Settings with shuffle_questions and shuffle_options */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">
@@ -391,7 +391,7 @@ export function ExamDetailsTab({
                 </p>
               </div>
               <Switch
-                checked={formData.shuffle_questions}
+                checked={formData.shuffle_questions || false}
                 onCheckedChange={(v) => onChange({ shuffle_questions: v })}
               />
             </div>
@@ -415,7 +415,7 @@ export function ExamDetailsTab({
                 </p>
               </div>
               <Switch
-                checked={formData.shuffle_options}
+                checked={formData.shuffle_options || false}
                 onCheckedChange={(v) => onChange({ shuffle_options: v })}
               />
             </div>
