@@ -1,5 +1,4 @@
 // src/components/staff/exams/create/hooks/useExamSubmit.ts
-
 "use client";
 
 import { useState, useCallback } from "react";
@@ -24,7 +23,7 @@ interface SubmitOptions {
   theoryQuestionsToAnswer: number | null;
   theoryMarksPerQuestion: number;
   scoringRule: ScoringRule;
-  teacherProfile: TeacherProfile;
+  teacherProfile: TeacherProfile | null; // ✅ accepts null
   submitForApproval: boolean;
 }
 
@@ -32,14 +31,13 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
   const [loading, setLoading] = useState(false);
 
   const submit = useCallback(
-    async (options: SubmitOptions) => {
+    async (options: SubmitOptions): Promise<boolean> => {
       const {
         examDetails,
         questions,
         theoryQuestions,
         hasTheory,
         objectiveMax,
-        theoryMax,
         theoryQuestionsTotal,
         theoryQuestionsToAnswer,
         theoryMarksPerQuestion,
@@ -48,12 +46,23 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
         submitForApproval,
       } = options;
 
-      // ── Validation ──────────────────────────────────────────────────────────
-      if (!examDetails.title || !examDetails.subject || !examDetails.class) {
-        toast.error("Complete exam details first");
+      // ── Validation ─────────────────────────────────────────────────────────
+      if (!examDetails.title?.trim()) {
+        toast.error("Exam title is required");
         return false;
       }
-      if (questions.length === 0 && (!hasTheory || theoryQuestions.length === 0)) {
+      if (!examDetails.subject) {
+        toast.error("Subject is required");
+        return false;
+      }
+      if (!examDetails.class) {
+        toast.error("Class is required");
+        return false;
+      }
+      if (
+        questions.length === 0 &&
+        (!hasTheory || theoryQuestions.length === 0)
+      ) {
         toast.error("Add at least one question");
         return false;
       }
@@ -62,45 +71,52 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
       let examId: string | null = null;
 
       try {
-        // ── Get session — trust server, not client ───────────────────────────
+        // ── Auth — always use verified session ID ───────────────────────────
         const {
-          data: { session },
-        } = await supabase.auth.getSession();
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser();
 
-        if (!session?.user?.id) {
+        if (userError || !user?.id) {
           toast.error("Session expired. Please log in again.");
           return false;
         }
 
-        const createdBy = session.user.id; // Always use verified session ID
+        const createdBy = user.id;
 
-        // ── Fetch profile for display info only ──────────────────────────────
+        // ── Profile — for display name only, non-blocking ───────────────────
         const { data: prof } = await supabase
           .from("profiles")
           .select("full_name, department")
-          .eq("id", createdBy) // Use ID not email
+          .eq("id", createdBy)
           .single();
 
+        // ✅ Safe fallbacks — all TeacherProfile fields are optional
         const teacherName =
-          prof?.full_name || teacherProfile.full_name || "Teacher";
+          prof?.full_name ??
+          teacherProfile?.full_name ??
+          "Teacher";
+
         const department =
-          prof?.department || teacherProfile.department || "General";
+          prof?.department ??
+          teacherProfile?.department ??
+          "General";
 
-        // ── Calculate marks ──────────────────────────────────────────────────
-        const theoryTotalMarks =
-          hasTheory
-            ? scoringRule !== "standard" && theoryQuestionsToAnswer
-              ? theoryQuestionsToAnswer * theoryMarksPerQuestion
-              : theoryQuestionsTotal * theoryMarksPerQuestion
-            : 0;
+        // ── Calculate theory marks ──────────────────────────────────────────
+        const theoryTotalMarks = hasTheory
+          ? scoringRule !== "standard" && theoryQuestionsToAnswer
+            ? theoryQuestionsToAnswer * theoryMarksPerQuestion
+            : theoryQuestionsTotal * theoryMarksPerQuestion
+          : 0;
 
+        // ── Build exam payload ──────────────────────────────────────────────
         const examPayload = {
           title: examDetails.title.trim(),
           duration: examDetails.duration,
           subject: examDetails.subject,
           class: examDetails.class,
           pass_mark: examDetails.pass_mark,
-          instructions: examDetails.instructions.trim(),
+          instructions: examDetails.instructions?.trim() ?? "",
           randomize_questions: examDetails.randomize_questions,
           randomize_options: examDetails.randomize_options,
           has_theory: hasTheory,
@@ -122,19 +138,21 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           updated_at: new Date().toISOString(),
         };
 
-        // ── Insert exam ──────────────────────────────────────────────────────
+        // ── Insert exam ─────────────────────────────────────────────────────
         const { data: examResult, error: examError } = await supabase
           .from("exams")
           .insert([examPayload])
           .select("id")
           .single();
 
-        if (examError) throw new Error(`Exam creation failed: ${examError.message}`);
-        examId = examResult.id;
+        if (examError) {
+          throw new Error(`Exam creation failed: ${examError.message}`);
+        }
 
-        // ── Insert objective questions ────────────────────────────────────────
+        examId = examResult.id;
         let savedCount = 0;
 
+        // ── Insert objective questions ───────────────────────────────────────
         if (questions.length > 0) {
           const objectiveRows = questions.map((q, i) => ({
             exam_id: examId,
@@ -159,7 +177,10 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
             .insert(objectiveRows)
             .select("id");
 
-          if (objError) throw new Error(`Question insert failed: ${objError.message}`);
+          if (objError) {
+            throw new Error(`Question insert failed: ${objError.message}`);
+          }
+
           savedCount += insertedObj?.length ?? 0;
         }
 
@@ -188,12 +209,14 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
             .insert(theoryRows)
             .select("id");
 
-          if (theoryError)
+          if (theoryError) {
             throw new Error(`Theory insert failed: ${theoryError.message}`);
+          }
+
           savedCount += insertedTheory?.length ?? 0;
         }
 
-        // ── Build JSONB snapshot for fast reads ──────────────────────────────
+        // ── Build JSONB snapshot ─────────────────────────────────────────────
         const questionsJsonb = [
           ...questions.map((q, i) => ({
             id: q.id,
@@ -220,8 +243,11 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
 
         const totalMarks =
           questions.reduce((s, q) => s + q.marks, 0) +
-          (hasTheory ? theoryQuestions.reduce((s, q) => s + q.marks, 0) : 0);
+          (hasTheory
+            ? theoryQuestions.reduce((s, q) => s + q.marks, 0)
+            : 0);
 
+        // ── Update exam snapshot — non-fatal ─────────────────────────────────
         const { error: updateError } = await supabase
           .from("exams")
           .update({
@@ -234,8 +260,8 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           .eq("id", examId);
 
         if (updateError) {
-          // Non-fatal — exam and questions are saved
-          console.warn("Snapshot update failed:", updateError.message);
+          // Questions are saved — snapshot failure is non-fatal
+          console.warn("[useExamSubmit] Snapshot update failed:", updateError.message);
         }
 
         toast.success(
@@ -250,10 +276,12 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
       } catch (err: unknown) {
         // ── Rollback orphaned exam ───────────────────────────────────────────
         if (examId) {
-          await supabase.from("exams").delete().eq("id", examId).then(
-            () => console.info("Rolled back exam", examId),
-            (e) => console.error("Rollback failed", e)
-          );
+          try {
+            await supabase.from("exams").delete().eq("id", examId);
+            console.info("[useExamSubmit] Rolled back exam", examId);
+          } catch (rollbackErr) {
+            console.error("[useExamSubmit] Rollback failed:", rollbackErr);
+          }
         }
 
         const message =
