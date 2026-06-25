@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/ExamHeader.tsx - SIMPLE FIX
+// src/components/staff/exams/edit/ExamHeader.tsx
 
 'use client'
 
@@ -28,8 +28,6 @@ export function ExamHeader({
 }: ExamHeaderProps) {
 
   const handleBack = () => {
-    console.log('🔙 Navigating back to exams list...')
-    // ✅ Use window.location for reliable navigation
     window.location.href = '/staff/exams'
   }
 
@@ -40,9 +38,9 @@ export function ExamHeader({
       className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
     >
       <div className="flex items-center gap-4">
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           className="rounded-full shrink-0 hover:bg-slate-100"
           onClick={handleBack}
           aria-label="Go back to exams"
@@ -63,11 +61,18 @@ export function ExamHeader({
         </div>
       </div>
       <div className="flex gap-2 shrink-0">
-        <Button variant="outline" onClick={() => window.location.href = `/staff/exams/${examId}`}>
+        <Button
+          variant="outline"
+          onClick={() => window.location.href = `/staff/exams/${examId}`}
+        >
           <Eye className="mr-2 h-4 w-4" />
           View
         </Button>
-        <Button onClick={onSave} disabled={saving} className="bg-primary">
+        <Button
+          onClick={onSave}
+          disabled={saving}
+          className="bg-primary"
+        >
           {saving ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
           ) : (

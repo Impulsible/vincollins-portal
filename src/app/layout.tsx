@@ -113,6 +113,7 @@ export const metadata: Metadata = {
   },
 };
 
+// Schema.org JSON-LD
 const organizationSchema = {
   '@context': 'https://schema.org',
   '@type': 'EducationalOrganization',
@@ -165,17 +166,6 @@ const organizationSchema = {
   },
 };
 
-// Cache Control Headers Component
-function CacheControlHeaders() {
-  return (
-    <>
-      <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-      <meta httpEquiv="Pragma" content="no-cache" />
-      <meta httpEquiv="Expires" content="0" />
-    </>
-  )
-}
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html 
@@ -191,23 +181,35 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       suppressHydrationWarning
     >
       <head>
-        <CacheControlHeaders />
-        
-        <meta name="format-detection" content="telephone=no, email=no, address=no" />
+        {/* Cache Control */}
+        <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+        <meta httpEquiv="Pragma" content="no-cache" />
+        <meta httpEquiv="Expires" content="0" />
+
+        {/* PWA / Mobile App */}
+        <meta name="application-name" content="Vincollins" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="Vincollins" />
+        <meta name="msapplication-TileColor" content="#0A2472" />
+        <meta name="msapplication-TileImage" content="/images/icons/icon-192.png" />
+        <meta name="msapplication-config" content="none" />
+
+        {/* Apple Touch Icons */}
+        <link rel="apple-touch-icon" href="/images/icons/apple-icon.png" />
+        <link rel="apple-touch-startup-image" href="/images/icons/icon-512.png" />
+
+        {/* Preconnect / DNS Prefetch */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://mvittkvxtasayycmzgha.supabase.co" />
-        
+
+        {/* Schema.org JSON-LD */}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
-        
-        <meta name="mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Vincollins Schools" />
-        <meta name="msapplication-TileColor" content="#0A2472" />
       </head>
       <body 
         className={cn(

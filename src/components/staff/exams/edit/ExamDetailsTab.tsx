@@ -1,4 +1,5 @@
-// src/components/staff/exams/edit/ExamDetailsTab.tsx - COMPLETE FIXED VERSION
+// src/components/staff/exams/edit/ExamDetailsTab.tsx
+
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -7,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { BookOpen, Clock, GraduationCap, FileText, Settings2, HelpCircle, Calendar, Users, Target } from 'lucide-react'
+import { BookOpen, Clock, GraduationCap, FileText, Settings2, HelpCircle, Calendar, Target } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { ExamDetailsForm } from './types'
@@ -29,43 +30,40 @@ const termOptions = [
   { value: 'third', label: 'Third Term' }
 ]
 
-// ✅ Senior Secondary Class Options with proper targeting
 const SENIOR_CLASS_OPTIONS = {
   general: [
-    { value: 'SS1', label: '📚 SS1 (All Students)', description: 'Visible to ALL SS1 students - Science, Arts, Commercial', year: 'SS1' },
-    { value: 'SS2', label: '📚 SS2 (All Students)', description: 'Visible to ALL SS2 students - Science, Arts, Commercial', year: 'SS2' },
-    { value: 'SS3', label: '📚 SS3 (All Students)', description: 'Visible to ALL SS3 students - Science, Arts, Commercial', year: 'SS3' },
+    { value: 'SS1', label: '📚 SS1 (All Students)', description: 'Visible to ALL SS1 students' },
+    { value: 'SS2', label: '📚 SS2 (All Students)', description: 'Visible to ALL SS2 students' },
+    { value: 'SS3', label: '📚 SS3 (All Students)', description: 'Visible to ALL SS3 students' },
   ],
   science: [
-    { value: 'SS1 Science', label: '🔬 SS1 Science', description: 'Science department only', year: 'SS1', department: 'Science' },
-    { value: 'SS2 Science', label: '🔬 SS2 Science', description: 'Science department only', year: 'SS2', department: 'Science' },
-    { value: 'SS3 Science', label: '🔬 SS3 Science', description: 'Science department only', year: 'SS3', department: 'Science' },
+    { value: 'SS1 Science', label: '🔬 SS1 Science', description: 'Science department only' },
+    { value: 'SS2 Science', label: '🔬 SS2 Science', description: 'Science department only' },
+    { value: 'SS3 Science', label: '🔬 SS3 Science', description: 'Science department only' },
   ],
   arts: [
-    { value: 'SS1 Arts', label: '🎨 SS1 Arts', description: 'Arts department only', year: 'SS1', department: 'Arts' },
-    { value: 'SS2 Arts', label: '🎨 SS2 Arts', description: 'Arts department only', year: 'SS2', department: 'Arts' },
-    { value: 'SS3 Arts', label: '🎨 SS3 Arts', description: 'Arts department only', year: 'SS3', department: 'Arts' },
+    { value: 'SS1 Arts', label: '🎨 SS1 Arts', description: 'Arts department only' },
+    { value: 'SS2 Arts', label: '🎨 SS2 Arts', description: 'Arts department only' },
+    { value: 'SS3 Arts', label: '🎨 SS3 Arts', description: 'Arts department only' },
   ],
   commercial: [
-    { value: 'SS1 Commercial', label: '💼 SS1 Commercial', description: 'Commercial department only', year: 'SS1', department: 'Commercial' },
-    { value: 'SS2 Commercial', label: '💼 SS2 Commercial', description: 'Commercial department only', year: 'SS2', department: 'Commercial' },
-    { value: 'SS3 Commercial', label: '💼 SS3 Commercial', description: 'Commercial department only', year: 'SS3', department: 'Commercial' },
+    { value: 'SS1 Commercial', label: '💼 SS1 Commercial', description: 'Commercial department only' },
+    { value: 'SS2 Commercial', label: '💼 SS2 Commercial', description: 'Commercial department only' },
+    { value: 'SS3 Commercial', label: '💼 SS3 Commercial', description: 'Commercial department only' },
   ]
 }
 
-// JSS Options
 const JSS_OPTIONS = [
   { value: 'JSS 1', label: 'JSS 1', description: 'Junior Secondary 1' },
   { value: 'JSS 2', label: 'JSS 2', description: 'Junior Secondary 2' },
   { value: 'JSS 3', label: 'JSS 3', description: 'Junior Secondary 3' },
 ]
 
-// Target Audience Options
 const TARGET_AUDIENCE_OPTIONS = [
-  { value: 'all', label: 'All Students', description: 'All students in this class/year can see this exam', icon: '🌍' },
-  { value: 'Science', label: 'Science Department Only', description: 'Only Science department students can see this exam', icon: '🔬' },
-  { value: 'Arts', label: 'Arts Department Only', description: 'Only Arts department students can see this exam', icon: '🎨' },
-  { value: 'Commercial', label: 'Commercial Department Only', description: 'Only Commercial department students can see this exam', icon: '💼' },
+  { value: 'all', label: 'All Students', description: 'All students in this class can see this exam', icon: '🌍' },
+  { value: 'Science', label: 'Science Department Only', description: 'Only Science department students', icon: '🔬' },
+  { value: 'Arts', label: 'Arts Department Only', description: 'Only Arts department students', icon: '🎨' },
+  { value: 'Commercial', label: 'Commercial Department Only', description: 'Only Commercial department students', icon: '💼' },
 ]
 
 export function ExamDetailsTab({
@@ -79,13 +77,13 @@ export function ExamDetailsTab({
   onHasTheoryChange
 }: ExamDetailsTabProps) {
   const isSeniorClass = formData.class?.startsWith('SS') || false
-  const isJSSClass = formData.class?.startsWith('JSS') || false
   const showTargetAudience = isSeniorClass && formData.class && !formData.class.includes(' ')
 
   return (
     <TooltipProvider>
       <div className="space-y-4 sm:space-y-6">
-        {/* Basic Information Card */}
+
+        {/* Basic Information */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">
@@ -98,7 +96,8 @@ export function ExamDetailsTab({
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {/* Exam Title */}
+
+              {/* Title */}
               <div className="sm:col-span-2">
                 <div className="flex items-center gap-2 mb-1.5">
                   <Label className="text-xs sm:text-sm font-medium">Exam Title</Label>
@@ -111,8 +110,8 @@ export function ExamDetailsTab({
                   className="h-9 sm:h-10 text-sm"
                 />
               </div>
-              
-              {/* Class Selection */}
+
+              {/* Class */}
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
                   <GraduationCap className="h-3.5 w-3.5 text-muted-foreground" />
@@ -127,7 +126,6 @@ export function ExamDetailsTab({
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[400px]">
-                    {/* All Students (General Subjects) - Senior Secondary */}
                     <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 sticky top-0">
                       📚 All Students (General Subjects)
                     </div>
@@ -139,8 +137,6 @@ export function ExamDetailsTab({
                         </div>
                       </SelectItem>
                     ))}
-                    
-                    {/* Science Department */}
                     <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
                       🔬 Science Department
                     </div>
@@ -152,8 +148,6 @@ export function ExamDetailsTab({
                         </div>
                       </SelectItem>
                     ))}
-                    
-                    {/* Arts Department */}
                     <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 mt-2">
                       🎨 Arts Department
                     </div>
@@ -165,8 +159,6 @@ export function ExamDetailsTab({
                         </div>
                       </SelectItem>
                     ))}
-                    
-                    {/* Commercial Department */}
                     <div className="px-2 py-1.5 text-xs font-semibold text-amber-600 bg-amber-50 mt-2">
                       💼 Commercial Department
                     </div>
@@ -178,8 +170,6 @@ export function ExamDetailsTab({
                         </div>
                       </SelectItem>
                     ))}
-                    
-                    {/* Junior Secondary */}
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-600 bg-slate-50 mt-2">
                       📖 Junior Secondary School
                     </div>
@@ -194,7 +184,7 @@ export function ExamDetailsTab({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Subject */}
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
@@ -217,7 +207,7 @@ export function ExamDetailsTab({
                   </SelectContent>
                 </Select>
               </div>
-              
+
               {/* Duration */}
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
@@ -234,11 +224,12 @@ export function ExamDetailsTab({
                   className="h-9 sm:h-10 text-sm"
                 />
               </div>
+
             </div>
           </CardContent>
         </Card>
 
-        {/* Target Audience Card - Only for Senior Secondary General Classes */}
+        {/* Target Audience - Only for SS General classes */}
         {showTargetAudience && (
           <Card className="border-0 shadow-sm overflow-hidden">
             <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
@@ -275,19 +266,7 @@ export function ExamDetailsTab({
                         <span className="text-base sm:text-lg">{option.icon}</span>
                         <p className="font-medium text-sm sm:text-base">{option.label}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {option.description}
-                      </p>
-                      {option.value === 'all' && (
-                        <p className="text-xs text-emerald-600 mt-2">
-                          ✓ All {formData.class} students will see this exam
-                        </p>
-                      )}
-                      {option.value !== 'all' && (
-                        <p className="text-xs text-blue-600 mt-2">
-                          ✓ Only {option.value} department students in {formData.class} will see this exam
-                        </p>
-                      )}
+                      <p className="text-xs text-muted-foreground mt-1">{option.description}</p>
                     </div>
                   </label>
                 ))}
@@ -296,7 +275,7 @@ export function ExamDetailsTab({
           </Card>
         )}
 
-        {/* Academic Period Card */}
+        {/* Academic Period */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">
@@ -309,7 +288,6 @@ export function ExamDetailsTab({
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              {/* Term */}
               <div>
                 <Label className="text-xs sm:text-sm font-medium mb-1.5 block">Term</Label>
                 <Select value={formData.term} onValueChange={(v) => onChange({ term: v })}>
@@ -323,8 +301,6 @@ export function ExamDetailsTab({
                   </SelectContent>
                 </Select>
               </div>
-              
-              {/* Session */}
               <div>
                 <Label className="text-xs sm:text-sm font-medium mb-1.5 block">Session</Label>
                 <Select value={formData.session_year} onValueChange={(v) => onChange({ session_year: v })}>
@@ -344,7 +320,7 @@ export function ExamDetailsTab({
           </CardContent>
         </Card>
 
-        {/* Assessment Criteria Card */}
+        {/* Assessment Criteria */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">
@@ -370,7 +346,6 @@ export function ExamDetailsTab({
                 Students need this percentage to pass the exam
               </p>
             </div>
-
             <div>
               <Label className="text-xs sm:text-sm font-medium mb-1.5 block">Instructions for Students</Label>
               <Textarea
@@ -384,7 +359,7 @@ export function ExamDetailsTab({
           </CardContent>
         </Card>
 
-        {/* Exam Settings Card */}
+        {/* Exam Settings */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">
@@ -396,6 +371,7 @@ export function ExamDetailsTab({
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
+
             {/* Shuffle Questions */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
               <div>
@@ -430,7 +406,7 @@ export function ExamDetailsTab({
                       <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p className="text-xs">Randomize answer options order for objective questions</p>
+                      <p className="text-xs">Randomize answer options for objective questions</p>
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -444,51 +420,10 @@ export function ExamDetailsTab({
               />
             </div>
 
-            {/* Negative Marking */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 bg-slate-50 rounded-lg">
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <Label className="text-sm font-medium">Negative Marking</Label>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p className="text-xs">Deduct points for wrong answers</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                  Penalize students for incorrect responses
-                </p>
-              </div>
-              <Switch
-                checked={formData.negative_marking}
-                onCheckedChange={(v) => onChange({ negative_marking: v })}
-              />
-            </div>
-
-            {/* Negative Marking Value (conditional) */}
-            {formData.negative_marking && (
-              <div className="pl-0 sm:pl-8 pt-2">
-                <Label className="text-xs sm:text-sm font-medium mb-1.5 block">Points Deducted per Wrong Answer</Label>
-                <Input
-                  type="number"
-                  step={0.5}
-                  min={0}
-                  value={formData.negative_marking_value}
-                  onChange={(e) => onChange({ negative_marking_value: parseFloat(e.target.value) || 0.5 })}
-                  className="h-9 sm:h-10 text-sm max-w-[150px]"
-                />
-                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
-                  Example: 0.5 means half a point deducted for wrong answers
-                </p>
-              </div>
-            )}
           </CardContent>
         </Card>
 
-        {/* Theory Questions Toggle Card */}
+        {/* Theory Questions Toggle */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardContent className="p-0">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl">
@@ -501,14 +436,15 @@ export function ExamDetailsTab({
                   Add essay-type questions to this exam for comprehensive assessment
                 </p>
               </div>
-              <Switch 
-                checked={hasTheory} 
+              <Switch
+                checked={hasTheory}
                 onCheckedChange={onHasTheoryChange}
                 className="data-[state=checked]:bg-purple-600"
               />
             </div>
           </CardContent>
         </Card>
+
       </div>
     </TooltipProvider>
   )

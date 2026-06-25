@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/types.ts - COMPLETE TYPES FILE WITH NESTED SUB-QUESTIONS
+// src/components/staff/exams/edit/types.ts
 
 export interface Exam {
   id: string
@@ -13,8 +13,6 @@ export interface Exam {
   has_theory: boolean
   shuffle_questions: boolean
   shuffle_options: boolean
-  negative_marking: boolean
-  negative_marking_value: number
   pass_mark: number
   term?: string
   session_year?: string
@@ -37,7 +35,7 @@ export interface Question {
   correct_answer: string
   points: number
   order_number: number
-  is_draft?: boolean  // ✅ ADDED: Track draft status
+  is_draft?: boolean
   created_at?: string
   updated_at?: string
 }
@@ -49,7 +47,7 @@ export interface TheoryQuestion {
   type: 'theory'
   points: number
   order_number: number
-  is_draft?: boolean  // ✅ ADDED: Track draft status
+  is_draft?: boolean
   created_at?: string
   updated_at?: string
   sub_questions?: TheorySubQuestion[]
@@ -63,7 +61,7 @@ export interface TheorySubQuestion {
   points: number
   keywords?: string[]
   model_answer?: string
-  sub_sub_questions?: TheorySubQuestion[]  // ADD THIS for nested sub-questions (i, ii, iii, etc.)
+  sub_sub_questions?: TheorySubQuestion[]
 }
 
 export interface StaffProfile {
@@ -84,8 +82,6 @@ export interface ExamDetailsForm {
   pass_mark: number
   shuffle_questions: boolean
   shuffle_options: boolean
-  negative_marking: boolean
-  negative_marking_value: number
   term: string
   session_year: string
   target_audience: string

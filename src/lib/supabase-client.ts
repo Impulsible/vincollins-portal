@@ -1,79 +1,76 @@
-// lib/supabase-client.ts
+// src/lib/supabase-client.ts
 import { supabase } from './supabase'
 
-export async function fetchStudentDashboardData(studentId: string, className: string) {
+export async function fetchStudentDashboardData(
+  studentId: string,
+  className: string
+) {
   try {
-    // Fetch report card
-    const { data: reportCard, error: reportCardError } = await supabase
-      .from('report_cards')
-      .select('id, status, term, academic_year, average_score')
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    const [reportCardRes, assignmentsRes, notesRes] = await Promise.allSettled([
+      // ── Report card ─────────────────────────────────────────────────────
+      supabase
+        .from('report_cards')
+        .select('id, status, term, academic_year, average_score')
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
 
-    if (reportCardError) {
-      console.error('Report card error:', reportCardError)
-    }
-
-    // Fetch assignments
-    const { data: assignments, error: assignmentsError } = await supabase
-      .from('assignments')
-      .select('*')
-      .eq('class', className)
-      .order('created_at', { ascending: false })
-      .limit(3)
-
-    if (assignmentsError) {
-      console.error('Assignments error:', assignmentsError)
-    }
-
-    // Fetch notes (with error handling for missing table)
-    let notes = []
-    let notesError = null
-    
-    try {
-      const result = await supabase
-        .from('notes')
+      // ── Assignments ──────────────────────────────────────────────────────
+      supabase
+        .from('assignments')
         .select('*')
         .eq('class', className)
         .order('created_at', { ascending: false })
-        .limit(3)
-      
-      if (result.error) {
-        notesError = result.error
-        console.error('Notes error:', result.error)
+        .limit(3),
+
+      // ── Notes — only columns that actually exist ──────────────────────────
+      // No: term filter removed if session_year doesn't exist
+      supabase
+        .from('notes')
+        .select(
+          'id, title, subject, description, file_url, file_name, ' +
+          'teacher_name, class, status, created_at'
+        )
+        .eq('class', className)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+        .limit(3),
+    ])
+
+    // ── Report card ────────────────────────────────────────────────────────
+    const reportCard = reportCardRes.status === 'fulfilled'
+      ? { data: reportCardRes.value.data ?? null, error: reportCardRes.value.error, success: !reportCardRes.value.error }
+      : { data: null, error: reportCardRes.reason, success: false }
+
+    // ── Assignments ────────────────────────────────────────────────────────
+    const assignments = assignmentsRes.status === 'fulfilled'
+      ? { data: assignmentsRes.value.data ?? [], error: assignmentsRes.value.error, success: !assignmentsRes.value.error }
+      : { data: [], error: assignmentsRes.reason, success: false }
+
+    // ── Notes ──────────────────────────────────────────────────────────────
+    let notes: { data: any[]; error: any; success: boolean }
+
+    if (notesRes.status === 'fulfilled') {
+      if (notesRes.value.error) {
+        console.error('[supabase-client] Notes query error:', notesRes.value.error.message)
+        notes = { data: [], error: notesRes.value.error, success: false }
       } else {
-        notes = result.data || []
+        notes = { data: notesRes.value.data ?? [], error: null, success: true }
       }
-    } catch (err) {
-      console.error('Notes table may not exist:', err)
-      notesError = err
+    } else {
+      console.error('[supabase-client] Notes query rejected:', notesRes.reason)
+      notes = { data: [], error: notesRes.reason, success: false }
     }
 
-    return {
-      reportCard: {
-        data: reportCard || null,
-        error: reportCardError,
-        success: !reportCardError
-      },
-      assignments: {
-        data: assignments || [],
-        error: assignmentsError,
-        success: !assignmentsError
-      },
-      notes: {
-        data: notes,
-        error: notesError,
-        success: !notesError
-      }
-    }
+    return { reportCard, assignments, notes }
+
   } catch (error) {
-    console.error('Unexpected error fetching dashboard data:', error)
+    console.error('[supabase-client] Unexpected error:', error)
     return {
-      reportCard: { data: null, error: error, success: false },
-      assignments: { data: [], error: error, success: false },
-      notes: { data: [], error: error, success: false }
+      reportCard: { data: null, error, success: false },
+      assignments: { data: [], error, success: false },
+      notes: { data: [], error, success: false },
     }
   }
 }

@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/EditExamPage.tsx - COMPLETE FIXED VERSION
+// src/components/staff/exams/edit/EditExamPage.tsx
 
 "use client";
 
@@ -38,7 +38,6 @@ import { QuestionFormDialog } from "./QuestionFormDialog";
 import { TheoryQuestionFormDialog } from "./TheoryQuestionFormDialog";
 import type { Exam, Question, TheoryQuestion, ExamDetailsForm } from "./types";
 
-// Constants
 const CURRENT_TERM = "third";
 const CURRENT_SESSION = "2025/2026";
 const TERM_NAMES: Record<string, string> = {
@@ -48,59 +47,29 @@ const TERM_NAMES: Record<string, string> = {
 };
 
 const CLASSES = [
-  "JSS 1",
-  "JSS 2",
-  "JSS 3",
-  "SS1 Science",
-  "SS1 Arts",
-  "SS1 Commercial",
-  "SS2 Science",
-  "SS2 Arts",
-  "SS2 Commercial",
-  "SS3 Science",
-  "SS3 Arts",
-  "SS3 Commercial",
+  "JSS 1", "JSS 2", "JSS 3",
+  "SS1", "SS2", "SS3",
+  "SS1 Science", "SS1 Arts", "SS1 Commercial",
+  "SS2 Science", "SS2 Arts", "SS2 Commercial",
+  "SS3 Science", "SS3 Arts", "SS3 Commercial",
 ];
+
 const AVAILABLE_SESSIONS = ["2025/2026", "2026/2027"];
 
 const JSS_SUBJECTS = [
-  "Mathematics",
-  "English Studies",
-  "Basic Science",
-  "Basic Technology",
-  "Social Studies",
-  "Civic Education",
-  "Christian Religious Studies",
-  "Islamic Religious Studies",
-  "Business Studies",
-  "Music",
-  "Home Economics",
-  "Agricultural Science",
-  "Physical and Health Education",
-  "Information Technology",
-  "Security Education",
-  "Yoruba",
-  "Cultural and Creative Arts",
-  "French",
+  "Mathematics", "English Studies", "Basic Science", "Basic Technology",
+  "Social Studies", "Civic Education", "Christian Religious Studies",
+  "Islamic Religious Studies", "Business Studies", "Music", "Home Economics",
+  "Agricultural Science", "Physical and Health Education",
+  "Information Technology", "Security Education", "Yoruba",
+  "Cultural and Creative Arts", "French",
 ];
 
 const SS_SUBJECTS = [
-  "Mathematics",
-  "English Language",
-  "Physics",
-  "Chemistry",
-  "Biology",
-  "Economics",
-  "Government",
-  "Literature in English",
-  "Geography",
-  "Commerce",
-  "Data Processing",
-  "Further Mathematics",
-  "Civic Education",
-  "CRS",
-  "Financial Accounting",
-  "Agricultural Science",
+  "Mathematics", "English Language", "Physics", "Chemistry", "Biology",
+  "Economics", "Government", "Literature in English", "Geography",
+  "Commerce", "Data Processing", "Further Mathematics", "Civic Education",
+  "CRS", "Financial Accounting", "Agricultural Science",
 ];
 
 interface EditExamPageProps {
@@ -121,10 +90,8 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
 
-  const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] =
-    useState<number>(1);
-  const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] =
-    useState<number>(5);
+  const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] = useState<number>(1);
+  const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] = useState<number>(5);
 
   const [examDetails, setExamDetails] = useState<ExamDetailsForm>({
     title: "",
@@ -135,8 +102,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     pass_mark: 50,
     shuffle_questions: true,
     shuffle_options: true,
-    negative_marking: false,
-    negative_marking_value: 0.5,
     term: CURRENT_TERM,
     session_year: CURRENT_SESSION,
     target_audience: "all",
@@ -145,8 +110,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const [showQuestionDialog, setShowQuestionDialog] = useState(false);
   const [showTheoryDialog, setShowTheoryDialog] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [editingTheoryQuestion, setEditingTheoryQuestion] =
-    useState<TheoryQuestion | null>(null);
+  const [editingTheoryQuestion, setEditingTheoryQuestion] = useState<TheoryQuestion | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [questionToDelete, setQuestionToDelete] = useState<{
     id: string;
@@ -164,7 +128,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const objectiveCount = questions.length;
   const theoryCount = theoryQuestions.length;
   const totalQuestions = objectiveCount + theoryCount;
-
   const totalObjectivePoints = objectiveCount * objectivePointsPerQuestion;
   const totalTheoryPoints = theoryCount * theoryPointsPerQuestion;
   const totalExamPoints = totalObjectivePoints + totalTheoryPoints;
@@ -172,17 +135,13 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0;
 
   // ============================================
-  // LOAD FUNCTIONS
+  // LOAD QUESTIONS
   // ============================================
-
   const loadQuestions = useCallback(async (caller?: string) => {
-    if (isUpdatingRef.current) {
-      console.log("⏭️ Skipping loadQuestions - update in progress");
-      return;
-    }
+    if (isUpdatingRef.current) return;
 
     try {
-      console.log(`🔵 Loading questions for exam: ${examId} (called by: ${caller || 'unknown'})`);
+      console.log(`🔵 Loading questions (caller: ${caller})`);
 
       const { data: allQuestions, error } = await supabase
         .from("questions")
@@ -196,15 +155,11 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         return;
       }
 
-      console.log(`✅ Loaded ${allQuestions?.length || 0} active questions`);
+      console.log(`✅ Loaded ${allQuestions?.length || 0} questions`);
 
       if (allQuestions && allQuestions.length > 0) {
         const objectiveQs = allQuestions.filter((q) => q.type === "objective");
         const theoryQs = allQuestions.filter((q) => q.type === "theory");
-
-        console.log(
-          `📊 Objective: ${objectiveQs.length}, Theory: ${theoryQs.length}`
-        );
 
         if (objectiveQs.length > 0) {
           const parsed = objectiveQs.map((q) => ({
@@ -212,14 +167,14 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             question_text: q.question_text || "",
             options: q.options || [],
             points:
-              typeof q.points === "string" ? parseFloat(q.points) : q.points || 1,
+              typeof q.points === "string"
+                ? parseFloat(q.points)
+                : q.points || 1,
             type: "objective" as const,
             question_type: q.question_type || "mcq",
           }));
           setQuestions(parsed as Question[]);
-          if (parsed[0]?.points) {
-            setObjectivePointsPerQuestion(parsed[0].points);
-          }
+          if (parsed[0]?.points) setObjectivePointsPerQuestion(parsed[0].points);
         } else {
           setQuestions([]);
         }
@@ -229,16 +184,16 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             ...q,
             question_text: q.question_text || "",
             points:
-              typeof q.points === "string" ? parseFloat(q.points) : q.points || 5,
+              typeof q.points === "string"
+                ? parseFloat(q.points)
+                : q.points || 5,
             sub_questions: q.sub_questions || [],
             keywords: q.keywords || [],
             type: "theory" as const,
             question_type: "theory" as const,
           }));
           setTheoryQuestions(parsed as TheoryQuestion[]);
-          if (parsed[0]?.points) {
-            setTheoryPointsPerQuestion(parsed[0].points);
-          }
+          if (parsed[0]?.points) setTheoryPointsPerQuestion(parsed[0].points);
         } else {
           setTheoryQuestions([]);
         }
@@ -251,6 +206,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     }
   }, [examId]);
 
+  // ============================================
+  // LOAD EXAM DATA
+  // ============================================
   const loadExamData = useCallback(async () => {
     try {
       setLoading(true);
@@ -263,7 +221,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         .single();
 
       if (examError) {
-        console.error("❌ Exam load error:", examError);
         setLoadError(`Failed to load exam: ${examError.message}`);
         throw examError;
       }
@@ -273,40 +230,41 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         throw new Error("Exam not found");
       }
 
-      console.log("✅ Exam data loaded:", examData);
+      console.log("✅ Exam loaded:", examData);
 
       const examWithDefaults = {
         ...examData,
-        shuffle_questions: examData.shuffle_questions ?? true,
-        shuffle_options: examData.shuffle_options ?? true,
-        negative_marking: examData.negative_marking ?? false,
-        negative_marking_value: examData.negative_marking_value ?? 0.5,
+        // ✅ Support both old (randomize_*) and new (shuffle_*) column names
+        shuffle_questions:
+          examData.shuffle_questions ??
+          examData.randomize_questions ??
+          true,
+        shuffle_options:
+          examData.shuffle_options ??
+          examData.randomize_options ??
+          true,
         pass_mark: examData.pass_mark ?? 50,
       };
 
       setExam(examWithDefaults as Exam);
       setHasTheory(examData.has_theory || false);
 
-      const examTerm = examData.term || CURRENT_TERM;
-      const examSession = examData.session_year || CURRENT_SESSION;
-
       setExamDetails({
         title: examData.title || "",
         subject: examData.subject || "",
         class: examData.class || "",
         duration: examData.duration || 60,
-        instructions: examData.description || examData.instructions || "",
+        instructions:
+          examData.instructions || examData.description || "",
         pass_mark: examData.pass_mark || 50,
         shuffle_questions: examWithDefaults.shuffle_questions,
         shuffle_options: examWithDefaults.shuffle_options,
-        negative_marking: examWithDefaults.negative_marking,
-        negative_marking_value: examWithDefaults.negative_marking_value,
-        term: examTerm,
-        session_year: examSession,
+        term: examData.term || CURRENT_TERM,
+        session_year: examData.session_year || CURRENT_SESSION,
         target_audience: examData.target_audience || "all",
       });
 
-      await loadQuestions('loadExamData');
+      await loadQuestions("loadExamData");
       initialLoadDoneRef.current = true;
     } catch (error) {
       console.error("🔥 Error loading exam:", error);
@@ -317,47 +275,42 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   }, [examId, loadQuestions]);
 
   useEffect(() => {
-    if (examId) {
-      loadExamData();
-    }
+    if (examId) loadExamData();
   }, [examId, loadExamData]);
 
   // ============================================
   // UPDATE EXAM TOTALS
   // ============================================
   const updateExamTotals = useCallback(async () => {
-    if (!examId || loading) return;
-    if (isUpdatingRef.current) {
-      console.log("⏭️ Skipping updateExamTotals - update in progress");
-      return;
-    }
+    if (!examId || loading || isUpdatingRef.current) return;
 
     try {
-      console.log("📊 Updating exam totals:", { totalQuestions, totalExamPoints });
-      const { error } = await supabase
+      await supabase
         .from("exams")
         .update({
           total_questions: totalQuestions,
           total_marks: totalExamPoints,
+          total_points: totalExamPoints, // ✅ DB has both
           updated_at: new Date().toISOString(),
         })
         .eq("id", examId);
-
-      if (error) throw error;
     } catch (error) {
       console.error("Error updating exam totals:", error);
     }
   }, [examId, totalQuestions, totalExamPoints, loading]);
 
   useEffect(() => {
-    if (!loading && examId && !isUpdatingRef.current && initialLoadDoneRef.current) {
+    if (
+      !loading &&
+      examId &&
+      !isUpdatingRef.current &&
+      initialLoadDoneRef.current
+    ) {
       updateExamTotals();
     }
   }, [
     totalQuestions,
     totalExamPoints,
-    objectivePointsPerQuestion,
-    theoryPointsPerQuestion,
     loading,
     examId,
     updateExamTotals,
@@ -372,401 +325,416 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       return;
     }
     setRefreshing(true);
-    await loadQuestions('manual refresh');
+    await loadQuestions("manual refresh");
     setRefreshing(false);
     toast.success("Questions refreshed");
   }, [loadQuestions]);
 
+  // ============================================
+  // ✅ FIXED SAVE EXAM
+  // ============================================
   const handleSaveExam = async () => {
+    // Validate required fields
+    if (!examDetails.title.trim()) {
+      toast.error("Please enter an exam title");
+      setActiveTab("details");
+      return;
+    }
+    if (!examDetails.subject) {
+      toast.error("Please select a subject");
+      setActiveTab("details");
+      return;
+    }
+    if (!examDetails.class) {
+      toast.error("Please select a class");
+      setActiveTab("details");
+      return;
+    }
+
     setSaving(true);
     try {
-      const { error } = await supabase
+      // ✅ EXACTLY matching your DB columns from the schema
+      const updatePayload = {
+        // Basic info - all confirmed in DB
+        title: examDetails.title.trim(),
+        subject: examDetails.subject,
+        class: examDetails.class,
+        duration: examDetails.duration,
+        pass_mark: examDetails.pass_mark,
+
+        // Instructions - DB has both columns
+        description: examDetails.instructions,
+        instructions: examDetails.instructions,
+
+        // ✅ Randomize - DB has BOTH column names, send both
+        randomize_questions: examDetails.shuffle_questions,
+        randomize_options: examDetails.shuffle_options,
+        shuffle_questions: examDetails.shuffle_questions,
+        shuffle_options: examDetails.shuffle_options,
+
+        // Theory
+        has_theory: hasTheory,
+
+        // Academic period - confirmed in DB
+        term: examDetails.term,
+        session_year: examDetails.session_year,
+
+        // Audience - confirmed in DB
+        target_audience: examDetails.target_audience,
+
+        // Totals - DB has total_marks AND total_points, send both
+        total_questions: totalQuestions,
+        total_marks: totalExamPoints,
+        total_points: totalExamPoints,
+
+        updated_at: new Date().toISOString(),
+      };
+
+      console.log("💾 Saving exam with payload:", updatePayload);
+
+      const { data, error } = await supabase
         .from("exams")
-        .update({
-          title: examDetails.title,
-          subject: examDetails.subject,
-          class: examDetails.class,
-          duration: examDetails.duration,
-          description: examDetails.instructions,
-          pass_mark: examDetails.pass_mark,
-          shuffle_questions: examDetails.shuffle_questions,
-          shuffle_options: examDetails.shuffle_options,
-          negative_marking: examDetails.negative_marking,
-          negative_marking_value: examDetails.negative_marking_value,
-          has_theory: hasTheory,
-          term: examDetails.term,
-          session_year: examDetails.session_year,
-          target_audience: examDetails.target_audience,
-          total_questions: totalQuestions,
-          total_marks: totalExamPoints,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", examId);
+        .update(updatePayload)
+        .eq("id", examId)
+        .select()
+        .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("❌ Save error:", error);
 
-      toast.success("Exam updated successfully!");
+        // ✅ Handle missing column error gracefully
+        if (error.code === "PGRST204") {
+          const missingCol = error.message.match(/'([^']+)'/)?.[1];
+          console.warn(`⚠️ Missing column: ${missingCol}`);
+
+          // Retry with only confirmed safe columns
+          const safePayload = {
+            title: examDetails.title.trim(),
+            subject: examDetails.subject,
+            class: examDetails.class,
+            duration: examDetails.duration,
+            pass_mark: examDetails.pass_mark,
+            description: examDetails.instructions,
+            instructions: examDetails.instructions,
+            randomize_questions: examDetails.shuffle_questions,
+            randomize_options: examDetails.shuffle_options,
+            has_theory: hasTheory,
+            term: examDetails.term,
+            session_year: examDetails.session_year,
+            target_audience: examDetails.target_audience,
+            total_questions: totalQuestions,
+            total_marks: totalExamPoints,
+            updated_at: new Date().toISOString(),
+          };
+
+          console.log("🔄 Retrying with safe payload:", safePayload);
+
+          const { error: retryError } = await supabase
+            .from("exams")
+            .update(safePayload)
+            .eq("id", examId);
+
+          if (retryError) {
+            console.error("❌ Retry failed:", retryError);
+
+            // Last resort - absolute minimum columns
+            const minPayload = {
+              title: examDetails.title.trim(),
+              subject: examDetails.subject,
+              class: examDetails.class,
+              duration: examDetails.duration,
+              pass_mark: examDetails.pass_mark,
+              updated_at: new Date().toISOString(),
+            };
+
+            const { error: minError } = await supabase
+              .from("exams")
+              .update(minPayload)
+              .eq("id", examId);
+
+            if (minError) {
+              toast.error(`Failed to save: ${minError.message}`);
+              return;
+            }
+
+            toast.warning(
+              "⚠️ Only basic info saved. Some columns are missing from your database."
+            );
+            router.push("/staff/exams");
+            return;
+          }
+
+          toast.success(
+            `✅ Exam saved! (Note: '${missingCol}' column was skipped)`
+          );
+          router.push("/staff/exams");
+          return;
+        }
+
+        throw error;
+      }
+
+      console.log("✅ Exam saved successfully:", data);
+      toast.success("✅ Exam updated successfully!");
       router.push("/staff/exams");
-    } catch (error) {
-      console.error("Error updating exam:", error);
-      toast.error("Failed to update exam");
+    } catch (error: any) {
+      console.error("🔥 Unexpected error saving exam:", error);
+      toast.error(error.message || "Failed to update exam. Please try again.");
     } finally {
       setSaving(false);
     }
   };
 
   // ============================================
-  // OBJECTIVE QUESTION CRUD OPERATIONS
+  // OBJECTIVE QUESTION CRUD
   // ============================================
-
   const handleAddQuestion = async (data: Partial<Question>) => {
     isUpdatingRef.current = true;
-    
     try {
-      console.log("🔵 handleAddQuestion called with data:", data);
-
-      if (!data.question_text || data.question_text.trim() === "") {
+      if (!data.question_text?.trim()) {
         toast.error("Question text is required");
-        isUpdatingRef.current = false;
         return;
       }
 
       const validOptions = (data.options || []).filter(
         (opt) => opt.trim() !== ""
       );
-      if (validOptions.length < 2 && data.is_draft !== true) {
-        toast.error("Please add at least 2 options");
-        isUpdatingRef.current = false;
-        return;
-      }
-
       const isDraft = data.is_draft !== undefined ? data.is_draft : true;
 
-      const newQuestion = {
-        exam_id: examId,
-        question_text: data.question_text.trim(),
-        question_type: "mcq",
-        type: "objective",
-        options: validOptions.length > 0 ? validOptions : ["", "", "", ""],
-        correct_answer: data.correct_answer?.trim() || "",
-        points: objectivePointsPerQuestion,
-        order_number: questions.length + 1,
-        is_draft: isDraft,
-        sub_questions: [],
-        keywords: [],
-        model_answer: "",
-        image_url: null,
-        image_caption: null,
-        deleted_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("🔵 Inserting objective question:", newQuestion);
-
-      const { data: result, error } = await supabase
+      const { error } = await supabase
         .from("questions")
-        .insert([newQuestion])
+        .insert([{
+          exam_id: examId,
+          question_text: data.question_text.trim(),
+          question_type: "mcq",
+          type: "objective",
+          options: validOptions.length > 0 ? validOptions : ["", "", "", ""],
+          correct_answer: data.correct_answer?.trim() || "",
+          points: objectivePointsPerQuestion,
+          order_number: questions.length + 1,
+          is_draft: isDraft,
+          sub_questions: [],
+          keywords: [],
+          model_answer: "",
+          image_url: null,
+          image_caption: null,
+          deleted_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }])
         .select()
         .single();
 
       if (error) {
-        console.error("❌ Supabase error:", error);
         toast.error(`Failed to add question: ${error.message}`);
-        isUpdatingRef.current = false;
         return;
       }
 
-      console.log("✅ Objective question added successfully:", result);
-
-      await loadQuestions('after add');
-
+      await loadQuestions("after add");
       toast.success(
-        isDraft
-          ? "📝 Question saved as draft!"
-          : `✅ Question added (${objectivePointsPerQuestion} point${
-              objectivePointsPerQuestion !== 1 ? "s" : ""
-            })`
+        isDraft ? "📝 Question saved as draft!" : "✅ Question added!"
       );
-
       setShowQuestionDialog(false);
       setEditingQuestion(null);
-      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error adding question:", error);
       toast.error("Failed to add question");
+    } finally {
       isUpdatingRef.current = false;
     }
   };
 
-  // ✅ FIXED: Update Objective Question - removed as const, added select and reload
   const handleUpdateQuestion = async (
     questionId: string,
     data: Partial<Question>
   ) => {
     isUpdatingRef.current = true;
-    
     try {
-      console.log("🔵 handleUpdateQuestion called with data:", JSON.stringify(data, null, 2));
-      console.log("🔵 Question ID:", questionId);
-
-      if (!data.question_text || data.question_text.trim() === "") {
+      if (!data.question_text?.trim()) {
         toast.error("Question text is required");
-        isUpdatingRef.current = false;
         return;
       }
 
       const validOptions = (data.options || []).filter(
         (opt) => opt.trim() !== ""
       );
-
       const isDraft = data.is_draft !== undefined ? data.is_draft : false;
 
-      // ✅ REMOVED as const - using regular strings
-      const updateData = {
-        question_text: data.question_text.trim(),
-        options: validOptions.length > 0 ? validOptions : ["", "", "", ""],
-        correct_answer: data.correct_answer?.trim() || "",
-        points: data.points || objectivePointsPerQuestion,
-        is_draft: isDraft,
-        question_type: "mcq",
-        type: "objective",
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("🔵 Updating objective question with data:", JSON.stringify(updateData, null, 2));
-
-      // ✅ REMOVED .is("deleted_at", null) - RLS policy handles this
-      const { data: updatedResult, error: updateError } = await supabase
+      const { error } = await supabase
         .from("questions")
-        .update(updateData)
-        .eq("id", questionId)
-        .select();
+        .update({
+          question_text: data.question_text.trim(),
+          options:
+            validOptions.length > 0 ? validOptions : ["", "", "", ""],
+          correct_answer: data.correct_answer?.trim() || "",
+          points: data.points || objectivePointsPerQuestion,
+          is_draft: isDraft,
+          question_type: "mcq",
+          type: "objective",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", questionId);
 
-      if (updateError) {
-        console.error("❌ Update error:", updateError);
-        toast.error(`Failed to update question: ${updateError.message}`);
-        isUpdatingRef.current = false;
+      if (error) {
+        toast.error(`Failed to update question: ${error.message}`);
         return;
       }
 
-      console.log("✅ Question updated successfully in database");
-      console.log("📝 Updated result:", JSON.stringify(updatedResult, null, 2));
-
-      if (updatedResult && updatedResult.length > 0) {
-        console.log(`📝 is_draft now: ${updatedResult[0].is_draft}`);
-      }
-
-      // ✅ Reload to get fresh data
-      await loadQuestions('after update');
-
+      await loadQuestions("after update");
       toast.success(
-        isDraft
-          ? "📝 Question saved as draft"
-          : "✅ Question updated and marked as complete!"
+        isDraft ? "📝 Question saved as draft" : "✅ Question updated!"
       );
-
       setShowQuestionDialog(false);
       setEditingQuestion(null);
-      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error updating question:", error);
-      toast.error("Failed to update question. Please try again.");
+      toast.error("Failed to update question");
+    } finally {
       isUpdatingRef.current = false;
     }
   };
 
-  // ✅ FIXED: Delete Question with soft delete
   const handleDeleteQuestion = async () => {
     if (!questionToDelete) return;
     isUpdatingRef.current = true;
 
     try {
-      console.log(`🔵 Soft-deleting question: ${questionToDelete.id}`);
-
       const { error } = await supabase
         .from("questions")
-        .update({ 
+        .update({
           deleted_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq("id", questionToDelete.id);
 
       if (error) {
-        console.error("❌ Delete error:", error);
         toast.error(`Failed to delete question: ${error.message}`);
-        isUpdatingRef.current = false;
         return;
       }
 
-      console.log("✅ Question soft-deleted successfully");
-
-      await loadQuestions('after delete');
-
+      await loadQuestions("after delete");
       toast.success("Question deleted successfully");
-
       setDeleteDialogOpen(false);
       setQuestionToDelete(null);
-      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error deleting question:", error);
       toast.error("Failed to delete question");
+    } finally {
       isUpdatingRef.current = false;
     }
   };
 
   // ============================================
-  // THEORY QUESTION CRUD OPERATIONS
+  // THEORY QUESTION CRUD
   // ============================================
-
   const handleAddTheoryQuestion = async (data: Partial<TheoryQuestion>) => {
     isUpdatingRef.current = true;
-    
     try {
-      console.log("🔵 handleAddTheoryQuestion called with data:", data);
-
-      if (!data.question_text || data.question_text.trim() === "") {
+      if (!data.question_text?.trim()) {
         toast.error("Question text is required");
-        isUpdatingRef.current = false;
         return;
       }
 
       const isDraft = data.is_draft !== undefined ? data.is_draft : true;
 
-      const newQuestion = {
-        exam_id: examId,
-        question_text: data.question_text.trim(),
-        question_type: "theory",
-        type: "theory",
-        points: theoryPointsPerQuestion,
-        order_number: theoryQuestions.length + 1,
-        sub_questions: data.sub_questions || [],
-        keywords: data.keywords || [],
-        model_answer: data.model_answer || "",
-        is_draft: isDraft,
-        options: [],
-        correct_answer: "",
-        image_url: (data as any).image_url || null,
-        image_caption: (data as any).image_caption || null,
-        deleted_at: null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("🔵 Inserting theory question:", newQuestion);
-
-      const { data: result, error } = await supabase
+      const { error } = await supabase
         .from("questions")
-        .insert([newQuestion])
+        .insert([{
+          exam_id: examId,
+          question_text: data.question_text.trim(),
+          question_type: "theory",
+          type: "theory",
+          points: theoryPointsPerQuestion,
+          order_number: theoryQuestions.length + 1,
+          sub_questions: data.sub_questions || [],
+          keywords: data.keywords || [],
+          model_answer: data.model_answer || "",
+          is_draft: isDraft,
+          options: [],
+          correct_answer: "",
+          image_url: (data as any).image_url || null,
+          image_caption: (data as any).image_caption || null,
+          deleted_at: null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }])
         .select()
         .single();
 
       if (error) {
-        console.error("❌ Supabase error:", error);
         toast.error(`Failed to add theory question: ${error.message}`);
-        isUpdatingRef.current = false;
         return;
       }
 
-      console.log("✅ Theory question added successfully:", result);
-
-      await loadQuestions('after theory add');
-
+      await loadQuestions("after theory add");
       toast.success(
         isDraft
           ? "📝 Theory question saved as draft"
-          : `✅ Theory question added (${theoryPointsPerQuestion} point${
-              theoryPointsPerQuestion !== 1 ? "s" : ""
-            })`
+          : "✅ Theory question added!"
       );
-
       setShowTheoryDialog(false);
       setEditingTheoryQuestion(null);
-      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error adding theory question:", error);
       toast.error("Failed to add theory question");
+    } finally {
       isUpdatingRef.current = false;
     }
   };
 
-  // ✅ FIXED: Update Theory Question - removed as const, added select and reload
   const handleUpdateTheoryQuestion = async (
     questionId: string,
     data: Partial<TheoryQuestion>
   ) => {
     isUpdatingRef.current = true;
-    
     try {
-      console.log("🔵 handleUpdateTheoryQuestion called with data:", JSON.stringify(data, null, 2));
-      console.log("🔵 Theory Question ID:", questionId);
-
-      if (!data.question_text || data.question_text.trim() === "") {
+      if (!data.question_text?.trim()) {
         toast.error("Question text is required");
-        isUpdatingRef.current = false;
         return;
       }
 
       const isDraft = data.is_draft !== undefined ? data.is_draft : false;
 
-      // ✅ REMOVED as const - using regular strings
-      const updateData = {
-        question_text: data.question_text.trim(),
-        points: data.points || theoryPointsPerQuestion,
-        sub_questions: data.sub_questions || [],
-        keywords: data.keywords || [],
-        model_answer: data.model_answer || "",
-        is_draft: isDraft,
-        question_type: "theory",
-        type: "theory",
-        image_url: (data as any).image_url || null,
-        image_caption: (data as any).image_caption || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      console.log("🔵 Updating theory question with data:", JSON.stringify(updateData, null, 2));
-
-      // ✅ REMOVED .is("deleted_at", null) - RLS policy handles this
-      const { data: updatedResult, error: updateError } = await supabase
+      const { error } = await supabase
         .from("questions")
-        .update(updateData)
-        .eq("id", questionId)
-        .select();
+        .update({
+          question_text: data.question_text.trim(),
+          points: data.points || theoryPointsPerQuestion,
+          sub_questions: data.sub_questions || [],
+          keywords: data.keywords || [],
+          model_answer: data.model_answer || "",
+          is_draft: isDraft,
+          question_type: "theory",
+          type: "theory",
+          image_url: (data as any).image_url || null,
+          image_caption: (data as any).image_caption || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", questionId);
 
-      if (updateError) {
-        console.error("❌ Update error:", updateError);
-        toast.error(`Failed to update theory question: ${updateError.message}`);
-        isUpdatingRef.current = false;
+      if (error) {
+        toast.error(`Failed to update theory question: ${error.message}`);
         return;
       }
 
-      console.log("✅ Theory question updated successfully in database");
-      console.log("📝 Updated result:", JSON.stringify(updatedResult, null, 2));
-
-      if (updatedResult && updatedResult.length > 0) {
-        console.log(`📝 is_draft now: ${updatedResult[0].is_draft}`);
-      }
-
-      await loadQuestions('after theory update');
-
+      await loadQuestions("after theory update");
       toast.success(
         isDraft
           ? "📝 Theory question saved as draft"
-          : "✅ Theory question updated and marked as complete!"
+          : "✅ Theory question updated!"
       );
-
       setShowTheoryDialog(false);
       setEditingTheoryQuestion(null);
-      isUpdatingRef.current = false;
     } catch (error) {
       console.error("🔥 Error updating theory question:", error);
-      toast.error("Failed to update theory question. Please try again.");
+      toast.error("Failed to update theory question");
+    } finally {
       isUpdatingRef.current = false;
     }
   };
 
   // ============================================
-  // POINTS SUMMARY
+  // POINTS SUMMARY COMPONENT
   // ============================================
   const PointsSummary = () => (
     <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800">
@@ -780,7 +748,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             variant="ghost"
             size="sm"
             onClick={handleRefresh}
-            disabled={refreshing || isUpdatingRef.current}
+            disabled={refreshing}
             className="ml-auto"
           >
             <RefreshCw
@@ -848,7 +816,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   );
 
   // ============================================
-  // QUESTION CARD
+  // QUESTION CARD COMPONENT
   // ============================================
   const QuestionCard = ({
     question,
@@ -891,12 +859,12 @@ export function EditExamPage({ examId }: EditExamPageProps) {
               {question.is_draft ? (
                 <Badge
                   variant="outline"
-                  className="text-amber-600 border-amber-300 bg-amber-100 dark:bg-amber-900/30"
+                  className="text-amber-600 border-amber-300 bg-amber-100"
                 >
                   📝 Draft
                 </Badge>
               ) : isComplete ? (
-                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                <Badge className="bg-emerald-100 text-emerald-700">
                   ✅ Complete
                 </Badge>
               ) : (
@@ -926,11 +894,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             )}
 
             {type === "objective" && question.correct_answer && (
-              <div className="flex items-center gap-3 mt-2">
-                <Badge className="bg-green-100 text-green-700">
-                  Answer: {question.correct_answer}
-                </Badge>
-              </div>
+              <Badge className="bg-green-100 text-green-700 mt-2">
+                Answer: {question.correct_answer}
+              </Badge>
             )}
 
             {type === "theory" && question.sub_questions?.length > 0 && (
@@ -940,7 +906,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             )}
 
             {question.is_draft && (
-              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1">
+              <p className="text-xs text-amber-600 mt-2">
                 ⚠️ This question is a draft. Complete it before publishing.
               </p>
             )}
@@ -970,15 +936,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   };
 
   // ============================================
-  // QUESTIONS LIST
+  // QUESTIONS LIST COMPONENT
   // ============================================
   const QuestionsList = () => {
-    const allQuestions = [
-      ...questions,
-      ...theoryQuestions.map((q) => ({ ...q, type: "theory" as const })),
-    ];
-
-    if (allQuestions.length === 0) {
+    if (questions.length === 0 && theoryQuestions.length === 0) {
       return (
         <div className="text-center py-12 bg-muted/20 rounded-lg border-2 border-dashed">
           <FileQuestion className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -1017,7 +978,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
       <div className="space-y-4">
         <div className="flex justify-between items-center">
           <h3 className="font-semibold text-lg">
-            All Questions ({allQuestions.length})
+            All Questions ({totalQuestions})
           </h3>
           <div className="flex gap-2">
             <Button
@@ -1089,11 +1050,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   // ============================================
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8">
-        <div className="space-y-6">
-          <Skeleton className="h-12 w-48" />
-          <Skeleton className="h-96 w-full rounded-xl" />
-        </div>
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6">
+        <Skeleton className="h-12 w-48" />
+        <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     );
   }
@@ -1140,6 +1099,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   return (
     <div className="relative w-full h-full overflow-y-auto">
       <div className="p-3 sm:p-4 md:p-5 lg:p-6 space-y-4 sm:space-y-6 max-w-[1600px] mx-auto">
+
         <ExamHeader
           examId={examId}
           examTitle={exam?.title}
@@ -1181,7 +1141,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           <TabsContent value="details">
             <ExamDetailsTab
               formData={examDetails}
-              onChange={(data) => setExamDetails({ ...examDetails, ...data })}
+              onChange={(data) =>
+                setExamDetails({ ...examDetails, ...data })
+              }
               availableSubjects={availableSubjects}
               classes={CLASSES}
               availableSessions={AVAILABLE_SESSIONS}
@@ -1263,6 +1225,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
       </div>
     </div>
   );

@@ -1,11 +1,11 @@
 // src/components/ClientLayout.tsx
 'use client'
 
-import { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { Providers } from '@/components/providers'
 import { UserProvider } from '@/contexts/UserContext'
 import { ConditionalHeader } from '@/components/ConditionalHeader'
+import { PWAProvider } from '@/components/PWAProvider'
 
 function ClientLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
@@ -21,10 +21,12 @@ function ClientLayoutContent({ children }: { children: React.ReactNode }) {
 
   return (
     <Providers>
-      {shouldShowHeader && <ConditionalHeader />}
-      <div className="relative flex min-h-screen flex-col">
-        {children}
-      </div>
+      <PWAProvider>
+        {shouldShowHeader && <ConditionalHeader />}
+        <div className="relative flex min-h-screen flex-col">
+          {children}
+        </div>
+      </PWAProvider>
     </Providers>
   )
 }
