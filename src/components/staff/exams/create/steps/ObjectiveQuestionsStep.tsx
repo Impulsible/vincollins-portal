@@ -1,5 +1,4 @@
 // src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx
-
 "use client";
 
 import { useState, useCallback } from "react";
@@ -184,6 +183,9 @@ export function ObjectiveQuestionsStep({
             onDownloadTemplate={downloadTemplate}
             parseButtonLabel="Parse & Add"
             parseButtonIcon={<CheckCheck className="mr-1.5 h-3.5 w-3.5" />}
+            // ── Increase paste area font size ──
+            textareaClassName="text-sm sm:text-base leading-relaxed font-mono"
+            textareaRows={14}
           />
         )}
 
@@ -200,7 +202,8 @@ export function ObjectiveQuestionsStep({
                   setManualQ((p) => ({ ...p, question: e.target.value }))
                 }
                 rows={3}
-                className="mt-1 resize-none text-xs"
+                // ── Also increase manual question textarea ──
+                className="mt-1 resize-none text-sm sm:text-base leading-relaxed"
                 placeholder="Enter question text..."
               />
             </div>
@@ -221,7 +224,8 @@ export function ObjectiveQuestionsStep({
                       opts[idx] = e.target.value;
                       setManualQ((p) => ({ ...p, options: opts }));
                     }}
-                    className="h-8 text-xs"
+                    // ── Also increase option inputs ──
+                    className="h-9 text-sm sm:text-base"
                     placeholder={`Option ${String.fromCharCode(65 + idx)}`}
                   />
                 </div>
@@ -239,14 +243,18 @@ export function ObjectiveQuestionsStep({
                     setManualQ((p) => ({ ...p, correct_answer: v }))
                   }
                 >
-                  <SelectTrigger className="mt-1 h-8 text-xs">
+                  <SelectTrigger className="mt-1 h-9 text-sm sm:text-base">
                     <SelectValue placeholder="Select answer" />
                   </SelectTrigger>
                   <SelectContent>
                     {manualQ.options.map(
                       (o, i) =>
                         o.trim() && (
-                          <SelectItem key={i} value={o}>
+                          <SelectItem
+                            key={i}
+                            value={o}
+                            className="text-sm sm:text-base"
+                          >
                             {String.fromCharCode(65 + i)}. {o}
                           </SelectItem>
                         )
@@ -269,14 +277,14 @@ export function ObjectiveQuestionsStep({
                       marks: parseFloat(e.target.value) || defaultMark,
                     }))
                   }
-                  className="mt-1 h-8 text-xs"
+                  className="mt-1 h-9 text-sm sm:text-base"
                 />
               </div>
             </div>
 
             <Button
               onClick={handleAddManual}
-              className="w-full h-9 text-xs bg-emerald-600 hover:bg-emerald-700"
+              className="w-full h-9 text-sm bg-emerald-600 hover:bg-emerald-700"
             >
               <Plus className="mr-1 h-3.5 w-3.5" />
               Add Question

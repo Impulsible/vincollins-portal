@@ -79,7 +79,7 @@ const JUNIOR_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Agricultural Science', 'Business Studies',
   'Home Economics', 'CRS', 'Yoruba', 'French', 'Information Technology',
-  'CCA', 'Music', 'Physical Education', 'History', 'Security Education'
+  'CCA', 'Music', 'PHE', 'History', 'Security Education'
 ]
 
 // Get available sessions

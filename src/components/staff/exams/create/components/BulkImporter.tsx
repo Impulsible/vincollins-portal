@@ -1,173 +1,221 @@
 // src/components/staff/exams/create/components/BulkImporter.tsx
-
 "use client";
 
 import { useRef } from "react";
-import { FileUp, Loader2, X, Download, Sparkles } from "lucide-react";
+import { Upload, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface BulkImporterProps {
   value: string;
   onChange: (v: string) => void;
-  onFileParse: (file: File) => Promise<void>;
+  onFileParse: (file: File) => void;
   onParse: () => void;
-  isParsingFile: boolean;
-  parseError: string | null;
-  placeholder: string;
-  rows?: number;
-  accentColor?: "emerald" | "purple";
-  onInsertExample: () => void;
-  onDownloadTemplate: () => void;
+  isParsingFile?: boolean;
+  parseError?: string | null;
+  placeholder?: string;
+  accentColor?: "emerald" | "blue" | "purple" | "amber";
+  onInsertExample?: () => void;
+  onDownloadTemplate?: () => void;
   parseButtonLabel?: string;
   parseButtonIcon?: React.ReactNode;
+  // ── NEW: allow callers to customise the textarea ──
+  textareaClassName?: string;
+  textareaRows?: number;
 }
+
+const ACCENT = {
+  emerald: {
+    border: "border-emerald-200 focus-within:border-emerald-400",
+    header: "bg-emerald-50 border-b border-emerald-200",
+    badge: "bg-emerald-100 text-emerald-700",
+    btn: "bg-emerald-600 hover:bg-emerald-700",
+    ghost: "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50",
+    error: "border-red-300 bg-red-50",
+  },
+  blue: {
+    border: "border-blue-200 focus-within:border-blue-400",
+    header: "bg-blue-50 border-b border-blue-200",
+    badge: "bg-blue-100 text-blue-700",
+    btn: "bg-blue-600 hover:bg-blue-700",
+    ghost: "text-blue-600 hover:text-blue-700 hover:bg-blue-50",
+    error: "border-red-300 bg-red-50",
+  },
+  purple: {
+    border: "border-purple-200 focus-within:border-purple-400",
+    header: "bg-purple-50 border-b border-purple-200",
+    badge: "bg-purple-100 text-purple-700",
+    btn: "bg-purple-600 hover:bg-purple-700",
+    ghost: "text-purple-600 hover:text-purple-700 hover:bg-purple-50",
+    error: "border-red-300 bg-red-50",
+  },
+  amber: {
+    border: "border-amber-200 focus-within:border-amber-400",
+    header: "bg-amber-50 border-b border-amber-200",
+    badge: "bg-amber-100 text-amber-700",
+    btn: "bg-amber-600 hover:bg-amber-700",
+    ghost: "text-amber-600 hover:text-amber-700 hover:bg-amber-50",
+    error: "border-red-300 bg-red-50",
+  },
+} as const;
 
 export function BulkImporter({
   value,
   onChange,
   onFileParse,
   onParse,
-  isParsingFile,
-  parseError,
-  placeholder,
-  rows = 8,
-  accentColor = "emerald",
+  isParsingFile = false,
+  parseError = null,
+  placeholder = "Paste your questions here...",
+  accentColor = "blue",
   onInsertExample,
   onDownloadTemplate,
-  parseButtonLabel = "Parse & Add",
+  parseButtonLabel = "Parse",
   parseButtonIcon,
+  // ── defaults give a good readable size ──
+  textareaClassName = "text-sm leading-relaxed font-mono",
+  textareaRows = 14,
 }: BulkImporterProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const accent = ACCENT[accentColor];
 
-  const accent = {
-    emerald: {
-      border: "hover:border-emerald-400 hover:bg-emerald-50/30",
-      icon: "group-hover:bg-emerald-100 group-hover:text-emerald-600",
-      btn: "bg-emerald-600 hover:bg-emerald-700",
-      spinner: "text-emerald-600",
-    },
-    purple: {
-      border: "hover:border-purple-400 hover:bg-purple-50/30",
-      icon: "group-hover:bg-purple-100 group-hover:text-purple-600",
-      btn: "bg-purple-600 hover:bg-purple-700",
-      spinner: "text-purple-600",
-    },
-  }[accentColor];
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    await onFileParse(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (file) {
+      onFileParse(file);
+      e.target.value = "";
+    }
   };
 
   return (
-    <div className="space-y-3">
-      {/* Template Buttons */}
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] text-muted-foreground">
-          Upload a file or paste text below
-        </p>
-        <div className="flex gap-1.5">
+    <div className={cn("rounded-xl border-2 overflow-hidden transition-colors", accent.border)}>
+
+      {/* ── Toolbar ── */}
+      <div className={cn("flex flex-wrap items-center justify-between gap-2 px-3 py-2", accent.header)}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className={cn("text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full", accent.badge)}>
+            Paste Area
+          </span>
+          {value && (
+            <span className="text-[10px] text-gray-500">
+              {value.split("\n").length} lines · {value.length} chars
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 flex-wrap">
+          {/* Insert example */}
+          {onInsertExample && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onInsertExample}
+              className={cn("h-6 text-[10px] px-2", accent.ghost)}
+            >
+              Example
+            </Button>
+          )}
+
+          {/* Download template */}
+          {onDownloadTemplate && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={onDownloadTemplate}
+              className={cn("h-6 text-[10px] px-2", accent.ghost)}
+            >
+              Template
+            </Button>
+          )}
+
+          {/* Clear */}
+          {value && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onChange("")}
+              className="h-6 text-[10px] px-2 text-gray-500 hover:text-red-600 hover:bg-red-50"
+            >
+              Clear
+            </Button>
+          )}
+
+          {/* Upload file */}
           <Button
-            variant="outline"
+            type="button"
+            variant="ghost"
             size="sm"
-            onClick={onInsertExample}
-            className="h-6 text-[10px] px-2"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isParsingFile}
+            className={cn("h-6 text-[10px] px-2", accent.ghost)}
           >
-            <Sparkles className="h-2.5 w-2.5 mr-1" />
-            Example
+            {isParsingFile ? (
+              <Loader2 className="h-3 w-3 animate-spin mr-1" />
+            ) : (
+              <Upload className="h-3 w-3 mr-1" />
+            )}
+            {isParsingFile ? "Parsing…" : "Upload"}
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDownloadTemplate}
-            className="h-6 text-[10px] px-2"
-          >
-            <Download className="h-2.5 w-2.5 mr-1" />
-            Template
-          </Button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,.doc,.docx,.pdf"
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
       </div>
 
-      {/* Drop Zone */}
-      <div
-        onClick={() => fileInputRef.current?.click()}
+      {/* ── Paste textarea ── */}
+      <Textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={textareaRows}
+        placeholder={placeholder}
         className={cn(
-          "border-2 border-dashed border-gray-200 rounded-lg p-4 sm:p-6",
-          "text-center cursor-pointer transition-all group",
-          accent.border
+          // Base structural styles — no border/ring since the wrapper handles it
+          "w-full resize-none rounded-none border-0 ring-0 focus-visible:ring-0",
+          "bg-white placeholder:text-gray-300",
+          // ── Caller-controlled font/spacing ──
+          textareaClassName,
+          // Error state
+          parseError && accent.error
         )}
-      >
-        {isParsingFile ? (
-          <Loader2
-            className={cn("h-6 w-6 mx-auto animate-spin", accent.spinner)}
-          />
-        ) : (
-          <div className="flex flex-col items-center gap-1.5">
-            <div
-              className={cn(
-                "w-10 h-10 bg-gray-100 rounded-lg flex items-center justify-center transition-colors",
-                accent.icon
-              )}
-            >
-              <FileUp className="h-5 w-5 text-gray-400" />
-            </div>
-            <p className="text-xs font-medium text-gray-600">Upload file</p>
-            <p className="text-[10px] text-muted-foreground">
-              .doc .docx .pdf .txt
-            </p>
-          </div>
-        )}
-      </div>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".txt,.md,.doc,.docx,.pdf"
-        onChange={handleFileChange}
-        className="hidden"
+        spellCheck={false}
+        autoCorrect="off"
+        autoCapitalize="off"
       />
 
-      {/* Text Area */}
-      <div className="relative">
-        <Textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          rows={rows}
-          className="font-mono text-[10px] resize-none"
-        />
-        {value && (
-          <button
-            onClick={() => onChange("")}
-            className="absolute top-2 right-2 p-1 text-gray-400 hover:text-gray-600 bg-white rounded border"
-          >
-            <X className="h-3 w-3" />
-          </button>
-        )}
-      </div>
-
-      {/* Parse Button */}
-      <Button
-        onClick={onParse}
-        className={cn("w-full h-9 text-xs", accent.btn)}
-        disabled={!value.trim() || isParsingFile}
-      >
-        {parseButtonIcon}
-        {parseButtonLabel}
-      </Button>
-
-      {/* Error */}
+      {/* ── Error message ── */}
       {parseError && (
-        <Alert variant="destructive" className="rounded-lg">
-          <AlertCircle className="h-3.5 w-3.5" />
-          <AlertDescription className="text-xs">{parseError}</AlertDescription>
-        </Alert>
+        <div className="flex items-start gap-2 px-3 py-2 bg-red-50 border-t border-red-200">
+          <AlertCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+          <p className="text-xs text-red-600 leading-relaxed">{parseError}</p>
+        </div>
       )}
+
+      {/* ── Parse / submit button ── */}
+      <div className="px-3 py-2 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-2">
+        <p className="text-[10px] text-gray-400 leading-snug hidden sm:block">
+          Paste questions above, then click parse to add them.
+        </p>
+        <Button
+          type="button"
+          onClick={onParse}
+          disabled={!value.trim() || isParsingFile}
+          className={cn(
+            "h-8 text-xs font-semibold px-4 text-white shrink-0 ml-auto",
+            accent.btn
+          )}
+        >
+          {parseButtonIcon}
+          {parseButtonLabel}
+        </Button>
+      </div>
     </div>
   );
 }

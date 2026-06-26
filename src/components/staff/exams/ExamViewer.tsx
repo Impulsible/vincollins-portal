@@ -1,4 +1,4 @@
-// components/staff/exams/ExamViewer.tsx - COMPLETE UPDATED WITH BOTH LOADING METHODS
+// components/staff/exams/ExamViewer.tsx - COMPLETE UPDATED WITH ALL BUTTONS LINKED
 
 'use client'
 
@@ -541,6 +541,40 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
   const passPercentage = exam?.pass_mark || 50
   const pointsNeeded = Math.ceil((passPercentage / 100) * totalMarks)
 
+  // ============ NAVIGATION HANDLERS ============
+  
+  // Navigate to submissions page
+  const handleViewSubmissions = () => {
+    if (!examId) {
+      toast.error('Exam ID not found')
+      return
+    }
+    router.push(`/staff/exams/${examId}/submissions`)
+  }
+
+  // Navigate to scores page
+  const handleEnterScores = () => {
+    if (!examId) {
+      toast.error('Exam ID not found')
+      return
+    }
+    router.push(`/staff/exams/${examId}/scores`)
+  }
+
+  // Navigate to preview page
+  const handlePreview = () => {
+    if (!examId) {
+      toast.error('Exam ID not found')
+      return
+    }
+    router.push(`/staff/exams/${examId}/preview`)
+  }
+
+  // Navigate to edit page
+  const handleEdit = () => {
+    onEdit()
+  }
+
   if (loading) {
     return (
       <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4">
@@ -602,10 +636,11 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
             <RefreshCw className="h-3.5 w-3.5" />
           </Button>
           
+          {/* ✅ SUBMISSIONS BUTTON - Links to submissions page */}
           {(exam.status === 'published' || exam.status === 'pending') && (
             <Button 
               size="sm" 
-              onClick={() => router.push(`/staff/exams/${examId}/submissions`)} 
+              onClick={handleViewSubmissions}
               className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-xs"
             >
               <Users className="h-3.5 w-3.5 mr-1" />
@@ -618,7 +653,7 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
           
           {exam.status === 'draft' && (
             <>
-              <Button variant="outline" size="sm" onClick={onEdit} className="h-8 sm:h-9 text-xs">
+              <Button variant="outline" size="sm" onClick={handleEdit} className="h-8 sm:h-9 text-xs">
                 <Edit className="h-3.5 w-3.5 mr-1" /> Edit
               </Button>
               <Button size="sm" onClick={handleSubmit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs">
@@ -627,12 +662,25 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
               </Button>
             </>
           )}
+          
+          {/* ✅ ENTER SCORES BUTTON - Links to scores page */}
           {exam.status === 'published' && (
-            <Button size="sm" onClick={() => router.push(`/staff/exams/${examId}/scores`)} className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs">
+            <Button 
+              size="sm" 
+              onClick={handleEnterScores}
+              className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs"
+            >
               <Calculator className="h-3.5 w-3.5 mr-1" /> Enter Scores
             </Button>
           )}
-          <Button variant="outline" size="sm" onClick={() => router.push(`/staff/exams/${examId}/preview`)} className="h-8 sm:h-9 text-xs">
+          
+          {/* ✅ PREVIEW BUTTON - Links to preview page */}
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handlePreview}
+            className="h-8 sm:h-9 text-xs"
+          >
             <Eye className="h-3.5 w-3.5 mr-1" /> Preview
           </Button>
         </div>
@@ -762,17 +810,20 @@ export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: Exam
                 </div>
               )}
 
+              {/* ✅ SUBMISSIONS CARD - Links to submissions page */}
               {submissionCount > 0 && (
                 <div className="mt-2 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-blue-700">{submissionCount} student{submissionCount !== 1 ? 's' : ''} submitted</p>
+                    <p className="text-xs font-medium text-blue-700">
+                      {submissionCount} student{submissionCount !== 1 ? 's' : ''} submitted
+                    </p>
                     <p className="text-[10px] text-blue-600">View all scores and grades</p>
                   </div>
                   <Button 
                     size="sm" 
                     variant="outline"
                     className="bg-white h-7 text-xs"
-                    onClick={() => router.push(`/staff/exams/${examId}/submissions`)}
+                    onClick={handleViewSubmissions}
                   >
                     <Eye className="h-3 w-3 mr-1" /> View
                   </Button>

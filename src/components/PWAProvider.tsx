@@ -1,3 +1,5 @@
+// src/components/PWAProvider.tsx - UPDATED WITH DEV MODE CHECK
+
 'use client'
 
 import {
@@ -228,6 +230,9 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
   const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null)
   const installDismissedRef = useRef(false)
 
+  // ✅ Check if in development mode
+  const isDev = process.env.NODE_ENV === 'development'
+
   // ── Detect installed (standalone) mode ─────────────────────────────────────
   useEffect(() => {
     const isStandalone =
@@ -239,8 +244,14 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     if (!navigator.onLine) setShowOffline(true)
   }, [])
 
-  // ── Register Service Worker ─────────────────────────────────────────────────
+  // ── Register Service Worker (SKIP IN DEVELOPMENT) ──────────────────────────
   useEffect(() => {
+    // ✅ Skip service worker registration in development mode
+    if (isDev) {
+      console.log('[PWA] ⚠️ Service worker disabled in development mode')
+      return
+    }
+
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
 
     const register = async () => {
@@ -282,7 +293,7 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       // SW took control after update — reload is optional here
     })
-  }, [])
+  }, [isDev])
 
   // ── Online / Offline ────────────────────────────────────────────────────────
   useEffect(() => {

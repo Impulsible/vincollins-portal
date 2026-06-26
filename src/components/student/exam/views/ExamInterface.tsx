@@ -1,4 +1,3 @@
-// src/components/student/exam/views/ExamInterface.tsx
 'use client'
 
 import { Button } from '@/components/ui/button'
@@ -9,179 +8,187 @@ import { QuestionPalette } from '../palette/QuestionPalette'
 import { TheoryAnswer } from '../answers/TheoryAnswer'
 import type { Exam, StudentProfile, Question } from '@/app/student/exam/[id]/types'
 import {
-  Clock, Send, AlertCircle, Wifi, WifiOff, Save, CheckCircle2, Menu,
-  ChevronLeft, ChevronRight, Flag, HelpCircle, Layers, Brain, FileText
+  Clock, Send, AlertCircle, Wifi, WifiOff, Save,
+  CheckCircle2, Menu, ChevronLeft, ChevronRight,
+  Flag, Layers, Brain, FileText, BookOpen, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatTime } from '@/app/student/exam/[id]/utils/scoring'
 import Image from 'next/image'
 import { ExamSidebar } from '../sidebar/ExamSidebar'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { useState } from 'react'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { useState, useEffect } from 'react'
 
-// ============ HELPER FUNCTION TO REMOVE MARKS FROM QUESTION TEXT ============
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────────────────────────────────────
+
 const removeMarksFromText = (text: string): string => {
   if (!text) return ''
-  
-  // Remove patterns like "Marks: 0.5", "Marks: 1", "Marks: 2", "[10 marks]", etc.
-  let cleaned = text
+  return text
     .replace(/Marks?\s*:\s*\d+(?:\.\d+)?/gi, '')
     .replace(/\[\s*\d+\s*marks?\s*\]/gi, '')
     .replace(/\(\s*\d+\s*marks?\s*\)/gi, '')
     .replace(/\s*\d+\s*marks?\s*$/gi, '')
     .replace(/\n\s*\d+\s*marks?\s*\n/gi, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim()
-  
-  // Clean up extra spaces and newlines
-  cleaned = cleaned.replace(/\n{3,}/g, '\n\n')
-  
-  return cleaned
 }
 
-// ============ TABLE CONVERSION WITH TAILWIND CSS ============
 const convertTableToHtml = (tableLines: string[]): string => {
-  let html = '<div class="overflow-x-auto my-4 shadow-md rounded-lg border border-gray-200"><table class="min-w-full bg-white rounded-lg">'
+  let html = `<div class="overflow-x-auto my-4 rounded-xl border border-gray-200 shadow-sm">
+    <table class="min-w-full bg-white text-sm">`
   let isHeader = true
   let hasSeparator = false
-  
+
   for (const line of tableLines) {
     if (line.includes('---') || line.includes('===')) {
-      isHeader = false
-      hasSeparator = true
-      continue
+      isHeader = false; hasSeparator = true; continue
     }
-    if (line.startsWith('|')) {
-      const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
-      if (cells.length === 0) continue
-      html += '<tr class="' + (isHeader && !hasSeparator ? 'bg-gray-100' : 'bg-white hover:bg-gray-50') + ' border-b border-gray-200">'
-      cells.forEach((cell: string, idx: number) => {
-        const tag = isHeader && !hasSeparator ? 'th' : 'td'
-        const classes = (isHeader && !hasSeparator)
-          ? 'px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-200 last:border-r-0'
-          : 'px-4 py-3 text-sm text-gray-600 border-r border-gray-200 last:border-r-0'
-        html += `<${tag} class="${classes}">${cell.trim()}</${tag}>`
-      })
-      html += '<tr>'
-      if (isHeader && hasSeparator) isHeader = false
-    }
+    if (!line.startsWith('|')) continue
+    const cells = line.split('|').filter(c => c.trim() !== '')
+    if (!cells.length) continue
+    const rowClass = isHeader && !hasSeparator
+      ? 'bg-gray-50'
+      : 'bg-white hover:bg-blue-50/30 transition-colors'
+    html += `<tr class="${rowClass} border-b border-gray-100">`
+    cells.forEach(cell => {
+      const tag = isHeader && !hasSeparator ? 'th' : 'td'
+      const cls = isHeader && !hasSeparator
+        ? 'px-4 py-2.5 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider border-r border-gray-100 last:border-0'
+        : 'px-4 py-2.5 text-sm text-gray-700 border-r border-gray-100 last:border-0'
+      html += `<${tag} class="${cls}">${cell.trim()}</${tag}>`
+    })
+    html += '</tr>'
+    if (isHeader && hasSeparator) isHeader = false
   }
-  html += '</tr></div>'
+  html += '</table></div>'
   return html
 }
 
-// ============ RENDER CONTENT WITH MARKS REMOVED ============
 const renderContent = (text: string) => {
   if (!text) return null
-  
-  // Remove marks from the text first
   const cleanedText = removeMarksFromText(text)
-  
-  // Check for markdown tables
   const tableRegex = /(\n?\|[^\n]+\|\n\|[-:\s|]+\|\n(?:\|[^\n]+\|\n?)+)/g
   const match = tableRegex.exec(cleanedText)
-  
+
   if (match) {
-    const tableLines = match[0].split('\n').filter(line => line.trim())
+    const tableLines = match[0].split('\n').filter(l => l.trim())
     const tableHtml = convertTableToHtml(tableLines)
-    const remainingText = cleanedText.replace(match[0], '')
-    
+    const rest = cleanedText.replace(match[0], '')
     return (
-      <div className="space-y-4">
-        {remainingText && (
-          <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
-            {remainingText}
-          </div>
-        )}
+      <div className="space-y-3">
+        {rest && <p className="whitespace-pre-wrap text-gray-700 leading-relaxed text-[15px]">{rest}</p>}
         <div dangerouslySetInnerHTML={{ __html: tableHtml }} />
       </div>
     )
   }
-  
+
   return (
-    <div className="whitespace-pre-wrap text-gray-700 leading-relaxed">
+    <p className="whitespace-pre-wrap text-gray-700 leading-relaxed text-[15px]">
       {cleanedText}
-    </div>
+    </p>
   )
 }
 
-// ============ RENDER SUB-QUESTIONS ============
-const renderSubQuestions = (subQuestions: any[], level: number = 0) => {
-  if (!subQuestions || subQuestions.length === 0) return null
-  
-  const startCharCode = level === 0 ? 97 : 105
-  
+const renderSubQuestions = (subQuestions: any[], level = 0) => {
+  if (!subQuestions?.length) return null
+  const startCode = level === 0 ? 97 : 105
+
   return (
-    <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
-      <p className="text-sm font-semibold text-purple-700">
-        {level === 0 ? 'Sub-questions:' : 'Parts:'}
+    <div className={cn('space-y-3 mt-3', level > 0 ? 'ml-6' : 'ml-2')}>
+      <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">
+        {level === 0 ? 'Sub-questions' : 'Parts'}
       </p>
       {subQuestions.map((sq, idx) => (
-        <div key={idx} className="pl-3 border-l-2 border-purple-200">
-          <div className="font-medium text-gray-800">
-            {String.fromCharCode(startCharCode + idx)}. {renderContent(sq.text)}
-            {sq.marks > 0 && <span className="ml-2 text-xs text-gray-500">({sq.marks} marks)</span>}
+        <div key={idx} className="flex gap-3 pl-3 border-l-2 border-purple-200">
+          <span className="flex-shrink-0 w-5 h-5 rounded-full bg-purple-100 text-purple-700 text-xs font-bold flex items-center justify-center mt-0.5">
+            {String.fromCharCode(startCode + idx)}
+          </span>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm text-gray-800 leading-relaxed">
+              {renderContent(sq.text)}
+            </div>
+            {sq.marks > 0 && (
+              <span className="inline-block mt-1 text-[11px] text-gray-400 font-medium">
+                ({sq.marks} mark{sq.marks !== 1 ? 's' : ''})
+              </span>
+            )}
+            {sq.sub_sub_questions?.length > 0 &&
+              renderSubQuestions(sq.sub_sub_questions, level + 1)}
           </div>
-          {sq.sub_sub_questions && sq.sub_sub_questions.length > 0 && (
-            renderSubQuestions(sq.sub_sub_questions, level + 1)
-          )}
         </div>
       ))}
     </div>
   )
 }
 
-// ============ THEORY QUESTION DISPLAY ============
-function TheoryQuestionDisplay({ question, questionNumber }: { question: Question; questionNumber: number }) {
-  const rawQuestionText = question.question || question.question_text || ''
-  const questionText = removeMarksFromText(rawQuestionText)
+// ─────────────────────────────────────────────────────────────────────────────
+// THEORY QUESTION DISPLAY
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TheoryQuestionDisplay({
+  question, questionNumber,
+}: {
+  question: Question; questionNumber: number
+}) {
+  const questionText = removeMarksFromText(
+    question.question || question.question_text || ''
+  )
   const marks = question.marks || question.points || 10
-  
+
   return (
-    <div className="bg-white rounded-xl border border-purple-200 shadow-sm overflow-hidden">
-      <div className="bg-gradient-to-r from-purple-50 to-purple-100 px-6 py-4 border-b border-purple-200">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-purple-200 flex items-center justify-center">
-              <Brain className="h-4 w-4 text-purple-700" />
+    <div className="rounded-2xl border border-purple-200 shadow-sm overflow-hidden bg-white">
+      {/* Card header */}
+      <div className="bg-gradient-to-r from-purple-600 to-purple-500 px-5 py-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-full bg-white/20 flex items-center justify-center">
+              <Brain className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="text-sm font-semibold text-purple-800">Theory Question</span>
-            <Badge className="bg-purple-200 text-purple-800 border-0">
+            <span className="text-sm font-semibold text-white">Theory Question</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-white/20 text-white border-0 text-xs font-semibold">
               {marks} marks
             </Badge>
-          </div>
-          <div className="text-sm text-purple-600">
-            Q<span className="font-semibold">{questionNumber}</span>
+            <span className="text-purple-200 text-xs">Q{questionNumber}</span>
           </div>
         </div>
       </div>
-      
-      <div className="p-6">
+
+      {/* Question body */}
+      <div className="p-5 sm:p-6 space-y-5">
+        {/* Diagram */}
         {question.image_url && (
-          <div className="mb-5">
-            <img 
-              src={question.image_url} 
-              alt={question.image_caption || 'Question diagram'} 
-              className="max-w-full max-h-[250px] rounded-lg border border-gray-200 object-contain mx-auto" 
+          <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
+            <img
+              src={question.image_url}
+              alt={question.image_caption || 'Diagram'}
+              className="max-h-[220px] max-w-full rounded-lg object-contain"
             />
             {question.image_caption && (
-              <p className="text-sm text-center text-gray-500 mt-2">{question.image_caption}</p>
+              <p className="text-xs text-gray-500 text-center">
+                Fig: {question.image_caption}
+              </p>
             )}
           </div>
         )}
-        
-        <div className="mb-5">
-          <div className="text-base font-semibold text-gray-900 mb-3 flex items-center gap-2">
-            <span className="bg-purple-100 text-purple-700 w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold">?</span>
-            Question {questionNumber}:
+
+        {/* Question text */}
+        <div className="flex gap-3">
+          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-sm font-bold flex items-center justify-center">
+            {questionNumber}
           </div>
-          <div className="pl-3 border-l-3 border-purple-200">
+          <div className="flex-1 min-w-0 pt-0.5">
             {renderContent(questionText)}
           </div>
         </div>
-        
+
+        {/* Sub-questions */}
         {question.sub_questions && question.sub_questions.length > 0 && (
-          <div className="mt-5 pt-4 border-t border-gray-100">
-            {renderSubQuestions(question.sub_questions, 0)}
+          <div className="pt-3 border-t border-gray-100">
+            {renderSubQuestions(question.sub_questions)}
           </div>
         )}
       </div>
@@ -189,83 +196,223 @@ function TheoryQuestionDisplay({ question, questionNumber }: { question: Questio
   )
 }
 
-// ============ OBJECTIVE QUESTION CARD ============
-function ObjectiveQuestionCard({ 
-  question, 
-  questionIndex, 
-  answer, 
-  onAnswer, 
-  marks 
-}: { 
-  question: any; 
-  questionIndex: number; 
-  answer: string; 
-  onAnswer: (value: string) => void; 
-  marks: number;
+// ─────────────────────────────────────────────────────────────────────────────
+// OBJECTIVE QUESTION CARD
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
+
+function ObjectiveQuestionCard({
+  question, questionIndex, answer, onAnswer, marks,
+}: {
+  question: any
+  questionIndex: number
+  answer: string
+  onAnswer: (v: string) => void
+  marks: number
 }) {
-  const optionLetters = ['A', 'B', 'C', 'D', 'E', 'F']
-  const rawQuestionText = question?.question || question?.question_text || ''
-  const questionText = removeMarksFromText(rawQuestionText)
-  const options = question?.options || []
-  
+  const questionText = removeMarksFromText(
+    question?.question || question?.question_text || ''
+  )
+  const options: string[] = (question?.options || []).filter(Boolean)
+
   return (
-    <div className="bg-white rounded-xl border border-blue-200 shadow-sm overflow-hidden">
-      <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-4 border-b border-blue-200">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-full bg-blue-200 flex items-center justify-center">
-              <FileText className="h-4 w-4 text-blue-700" />
+    <div className="rounded-2xl border border-blue-200 shadow-sm overflow-hidden bg-white">
+      {/* Card header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-full bg-white/20 flex items-center justify-center">
+              <FileText className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="text-sm font-semibold text-blue-800">Multiple Choice</span>
-            <Badge className="bg-blue-200 text-blue-800 border-0">
+            <span className="text-sm font-semibold text-white">Multiple Choice</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-white/20 text-white border-0 text-xs font-semibold">
               {marks} mark{marks !== 1 ? 's' : ''}
             </Badge>
-          </div>
-          <div className="text-sm text-blue-600">
-            Q<span className="font-semibold">{questionIndex + 1}</span>
+            <span className="text-blue-200 text-xs">Q{questionIndex + 1}</span>
           </div>
         </div>
       </div>
-      
-      <div className="p-6">
-        <div className="mb-6">
-          <p className="text-gray-800 font-medium leading-relaxed">
-            {questionText}
-          </p>
+
+      {/* Question body */}
+      <div className="p-5 sm:p-6 space-y-5">
+        {/* Question text */}
+        <div className="flex gap-3">
+          <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-sm font-bold flex items-center justify-center">
+            {questionIndex + 1}
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <p className="text-[15px] text-gray-800 font-medium leading-relaxed">
+              {questionText}
+            </p>
+          </div>
         </div>
-        
-        <div className="space-y-3">
-          {options.filter(Boolean).map((option: string, idx: number) => (
-            <label
-              key={idx}
-              className={cn(
-                "flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
-                answer === option
-                  ? "border-blue-500 bg-blue-50"
-                  : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-              )}
-            >
-              <input
-                type="radio"
-                name={`question-${question.id}`}
-                value={option}
-                checked={answer === option}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => onAnswer(e.target.value)}
-                className="h-4 w-4 mt-0.5 text-blue-600 focus:ring-blue-500"
-              />
-              <span className="text-gray-700">
-                <span className="font-semibold mr-2 text-gray-900">{optionLetters[idx]}.</span>
-                {option}
-              </span>
-            </label>
-          ))}
+
+        {/* Options */}
+        <div className="space-y-2.5 pl-0 sm:pl-10">
+          {options.map((option, idx) => {
+            const selected = answer === option
+            return (
+              <label
+                key={idx}
+                className={cn(
+                  'group flex items-start gap-3.5 p-3.5 rounded-xl border-2 cursor-pointer transition-all duration-150 select-none',
+                  selected
+                    ? 'border-blue-500 bg-blue-50 shadow-sm'
+                    : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/40'
+                )}
+              >
+                {/* Custom radio circle */}
+                <div className={cn(
+                  'flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
+                  selected
+                    ? 'border-blue-500 bg-blue-500'
+                    : 'border-gray-300 group-hover:border-blue-400'
+                )}>
+                  {selected && (
+                    <div className="w-2 h-2 rounded-full bg-white" />
+                  )}
+                </div>
+                <input
+                  type="radio"
+                  name={`q-${question.id}`}
+                  value={option}
+                  checked={selected}
+                  onChange={e => onAnswer(e.target.value)}
+                  className="sr-only"
+                />
+                <span className="text-[14px] leading-relaxed text-gray-700 flex-1">
+                  <span className={cn(
+                    'font-bold mr-2',
+                    selected ? 'text-blue-600' : 'text-gray-400'
+                  )}>
+                    {OPTION_LETTERS[idx]}.
+                  </span>
+                  {option}
+                </span>
+              </label>
+            )
+          })}
         </div>
       </div>
     </div>
   )
 }
 
-// ============ MAIN EXAM INTERFACE ============
+// ─────────────────────────────────────────────────────────────────────────────
+// SAVE STATUS PILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function SaveStatus({
+  autoSaving, lastSaved, isOnline,
+}: {
+  autoSaving: boolean; lastSaved: Date | null; isOnline: boolean
+}) {
+  const [relativeTime, setRelativeTime] = useState('')
+
+  useEffect(() => {
+    const update = () => {
+      if (!lastSaved) { setRelativeTime(''); return }
+      const diff = Math.floor((Date.now() - lastSaved.getTime()) / 1000)
+      if (diff < 5)  setRelativeTime('just now')
+      else if (diff < 60) setRelativeTime(`${diff}s ago`)
+      else setRelativeTime(`${Math.floor(diff / 60)}m ago`)
+    }
+    update()
+    const t = setInterval(update, 5000)
+    return () => clearInterval(t)
+  }, [lastSaved])
+
+  if (!isOnline) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-red-500 font-medium">
+        <WifiOff className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Offline</span>
+      </div>
+    )
+  }
+
+  if (autoSaving) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-amber-600 font-medium">
+        <Save className="h-3.5 w-3.5 animate-pulse" />
+        <span className="hidden sm:inline">Saving…</span>
+      </div>
+    )
+  }
+
+  if (lastSaved) {
+    return (
+      <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+        <CheckCircle2 className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Saved {relativeTime}</span>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-gray-400">
+      <Wifi className="h-3.5 w-3.5" />
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TIMER
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TimerPill({ timeLeft }: { timeLeft: number }) {
+  const isWarning = timeLeft < 300   // < 5 min
+  const isDanger  = timeLeft < 60    // < 1 min
+
+  return (
+    <div className={cn(
+      'flex items-center gap-2 px-3.5 py-2 rounded-xl font-mono font-bold text-sm transition-colors',
+      isDanger  ? 'bg-red-100 text-red-700 animate-pulse' :
+      isWarning ? 'bg-amber-50 text-amber-700' :
+                  'bg-gray-100 text-gray-700'
+    )}>
+      <Clock className={cn(
+        'h-4 w-4',
+        isDanger  ? 'text-red-500' :
+        isWarning ? 'text-amber-500' :
+                    'text-gray-500'
+      )} />
+      <span className="tabular-nums tracking-wider text-base">
+        {formatTime(timeLeft)}
+      </span>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// QUESTION COUNTER PILL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function QuestionCounter({
+  currentIndex, total, answeredCount,
+}: {
+  currentIndex: number; total: number; answeredCount: number
+}) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-gray-600">
+      <BookOpen className="h-3.5 w-3.5 text-gray-400" />
+      <span className="font-semibold text-gray-800">{currentIndex + 1}</span>
+      <span className="text-gray-400">/</span>
+      <span>{total}</span>
+      <span className="ml-1 hidden sm:inline text-gray-400">
+        · <span className="text-emerald-600 font-medium">{answeredCount} done</span>
+      </span>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN EXAM INTERFACE
+// ─────────────────────────────────────────────────────────────────────────────
+
 interface ExamInterfaceProps {
   exam: Exam | null
   profile: StudentProfile | null
@@ -298,22 +445,25 @@ export function ExamInterface({
   showQuestionPalette, onUpdateAnswer, onToggleFlag, onNavigate,
   onGoToQuestion, onTogglePalette, onSubmit,
 }: ExamInterfaceProps) {
-  const currentQuestion = allQuestions[currentIndex]
-  const isWarning = timeLeft < 300
-  const isTheory = currentQuestion?.type === 'theory' || 
-                   (currentQuestion?.sub_questions && currentQuestion.sub_questions.length > 0)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
-  const isFlagged = currentQuestion ? flaggedQuestions.has(currentQuestion.id) : false
 
+  const currentQuestion = allQuestions[currentIndex]
+  const isFlagged = currentQuestion ? flaggedQuestions.has(currentQuestion.id) : false
+  const isTheory = currentQuestion?.type === 'theory' ||
+    (currentQuestion?.sub_questions && currentQuestion.sub_questions.length > 0)
+  const isLast = currentIndex === allQuestions.length - 1
+  const isFirst = currentIndex === 0
+
+  // ── Empty state ──
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center p-8">
-          <div className="h-20 w-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
+          <div className="h-20 w-20 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="h-10 w-10 text-gray-300" />
           </div>
-          <p className="text-gray-600 text-lg font-medium">No questions available</p>
-          <p className="text-gray-400 text-sm mt-2">This exam has no questions yet.</p>
+          <p className="text-gray-600 text-lg font-semibold">No questions available</p>
+          <p className="text-gray-400 text-sm mt-1">This exam has no questions yet.</p>
         </div>
       </div>
     )
@@ -326,82 +476,128 @@ export function ExamInterface({
     marks: currentQuestion.marks || currentQuestion.points || 10,
     sub_questions: currentQuestion.sub_questions || [],
     image_url: currentQuestion.image_url,
-    image_caption: currentQuestion.image_caption
+    image_caption: currentQuestion.image_caption,
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      
-      {/* ===== TOP BAR ===== */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3">
-          <div className="flex items-center justify-between gap-4">
-            
-            {/* Left Section */}
-            <div className="flex items-center gap-3 min-w-0">
-              <Button variant="ghost" size="icon" className="lg:hidden h-9 w-9" onClick={() => setMobileSidebarOpen(true)}>
-                <Menu className="h-5 w-5" />
-              </Button>
+    <div className="min-h-screen bg-gray-50/80">
+
+      {/* ════════════════════════════════════════════════════════════════════
+          TOP BAR
+      ════════════════════════════════════════════════════════════════════ */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 py-2.5">
+
+          {/* Main row */}
+          <div className="flex items-center gap-3">
+
+            {/* Mobile sidebar trigger */}
+            <Button
+              variant="ghost" size="icon"
+              className="lg:hidden h-9 w-9 shrink-0 text-gray-500"
+              onClick={() => setMobileSidebarOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
+            {/* Avatar + Exam info */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               {profile?.photo_url ? (
-                <Image src={profile.photo_url} alt="" width={40} height={40} className="rounded-full object-cover ring-2 ring-blue-100" unoptimized />
+                <Image
+                  src={profile.photo_url} alt="" width={36} height={36}
+                  className="rounded-full object-cover ring-2 ring-blue-100 shrink-0"
+                  unoptimized
+                />
               ) : (
-                <div className="h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 font-semibold text-sm">{profile?.full_name?.[0] || 'S'}</span>
+                <div className="h-9 w-9 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shrink-0 shadow-sm">
+                  <span className="text-white font-bold text-sm">
+                    {profile?.full_name?.[0]?.toUpperCase() || 'S'}
+                  </span>
                 </div>
               )}
               <div className="min-w-0">
-                <h1 className="font-semibold text-gray-900 truncate text-sm sm:text-base">{exam?.title}</h1>
-                <p className="text-xs text-gray-500 truncate hidden sm:block">{profile?.full_name} • {exam?.subject}</p>
+                <h1 className="font-semibold text-gray-900 text-sm sm:text-[15px] truncate leading-tight">
+                  {exam?.title}
+                </h1>
+                <p className="text-[11px] text-gray-400 truncate hidden sm:block">
+                  {profile?.full_name} · {exam?.subject}
+                </p>
               </div>
             </div>
 
-            {/* Timer Section */}
-            <div className={cn(
-              "flex items-center gap-2 px-4 py-2 rounded-lg font-mono font-bold",
-              isWarning ? "bg-red-50 text-red-700" : "bg-gray-100 text-gray-700"
-            )}>
-              <Clock className={cn("h-4 w-4", isWarning ? "text-red-500" : "text-gray-500")} />
-              <span className="text-lg tracking-wide">{formatTime(timeLeft)}</span>
+            {/* Centre: question counter */}
+            <div className="hidden md:flex shrink-0">
+              <QuestionCounter
+                currentIndex={currentIndex}
+                total={allQuestions.length}
+                answeredCount={answeredCount}
+              />
             </div>
 
-            {/* Right Section */}
-            <div className="flex items-center gap-2">
-              <Button 
-                variant="ghost" 
-                size="sm" 
+            {/* Right cluster */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Save status */}
+              <SaveStatus
+                autoSaving={autoSaving}
+                lastSaved={lastSaved}
+                isOnline={isOnline}
+              />
+
+              {/* Timer */}
+              <TimerPill timeLeft={timeLeft} />
+
+              {/* Flag button */}
+              <Button
+                variant="ghost" size="sm"
                 onClick={() => onToggleFlag(currentQuestion.id)}
-                className="h-9 px-3"
+                className={cn(
+                  'h-9 px-2.5 gap-1.5 rounded-lg transition-colors',
+                  isFlagged
+                    ? 'text-amber-600 bg-amber-50 hover:bg-amber-100'
+                    : 'text-gray-400 hover:text-gray-600'
+                )}
               >
-                <Flag className={cn("h-4 w-4", isFlagged ? "text-amber-500 fill-amber-500" : "text-gray-400")} />
-                <span className="hidden sm:inline ml-1 text-xs">Flag</span>
+                <Flag className={cn('h-4 w-4', isFlagged && 'fill-amber-500')} />
+                <span className="hidden sm:inline text-xs font-medium">
+                  {isFlagged ? 'Flagged' : 'Flag'}
+                </span>
               </Button>
-              
-              <Button 
-                size="sm" 
-                onClick={onSubmit} 
-                className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-4 text-sm font-medium rounded-lg shadow-sm"
+
+              {/* Submit */}
+              <Button
+                size="sm"
+                onClick={onSubmit}
+                className="bg-blue-600 hover:bg-blue-700 text-white h-9 px-3 sm:px-4 text-xs sm:text-sm font-semibold rounded-xl shadow-sm gap-1.5"
               >
-                <Send className="h-4 w-4 mr-1.5" /> Submit
+                <Send className="h-3.5 w-3.5" />
+                <span className="hidden xs:inline">Submit</span>
               </Button>
             </div>
           </div>
 
-          {/* Progress Bar Section */}
-          <div className="mt-3 flex items-center gap-3">
-            <Progress value={progressPercentage} className="h-1.5 flex-1" />
-            <span className="text-xs text-gray-500 font-medium tabular-nums">
-              {answeredCount}/{allQuestions.length}
+          {/* Progress row */}
+          <div className="mt-2.5 flex items-center gap-3">
+            <Progress
+              value={progressPercentage}
+              className="h-1.5 flex-1 bg-gray-100"
+            />
+            <span className="text-[11px] text-gray-400 tabular-nums shrink-0">
+              {answeredCount}/{allQuestions.length} answered
             </span>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* ===== MAIN CONTENT ===== */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+      {/* ════════════════════════════════════════════════════════════════════
+          MAIN CONTENT
+      ════════════════════════════════════════════════════════════════════ */}
+      <main className="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7">
         <div className="flex flex-col lg:flex-row gap-6">
-          
-          {/* Question Area */}
-          <div className="flex-1 min-w-0">
+
+          {/* ── QUESTION AREA ── */}
+          <div className="flex-1 min-w-0 space-y-4">
+
+            {/* Question card */}
             {isTheory ? (
               <TheoryAnswer
                 answer={answers[currentQuestion.id] || ''}
@@ -421,85 +617,109 @@ export function ExamInterface({
               />
             )}
 
-            {/* Navigation Buttons */}
-            <div className="flex items-center justify-between gap-3 mt-6">
+            {/* ── NAVIGATION BAR ── */}
+            <div className="flex items-center gap-2.5">
+
+              {/* Previous */}
               <Button
                 variant="outline"
                 onClick={() => onNavigate('prev')}
-                disabled={currentIndex === 0}
-                className="flex-1 h-11 rounded-lg border-gray-300 hover:bg-gray-50"
+                disabled={isFirst}
+                className="flex-1 h-11 rounded-xl border-gray-200 text-gray-600 hover:bg-gray-50 gap-2 font-medium text-sm disabled:opacity-40"
               >
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Previous
+                <ChevronLeft className="h-4 w-4" />
+                <span className="hidden xs:inline">Previous</span>
               </Button>
-              
+
+              {/* Palette toggle */}
               <Button
                 variant="outline"
                 onClick={onTogglePalette}
-                className="h-11 px-4 rounded-lg border-gray-300 hover:bg-gray-50"
+                className={cn(
+                  'h-11 px-3.5 rounded-xl border-gray-200 gap-1.5 font-medium text-sm transition-colors',
+                  showQuestionPalette
+                    ? 'bg-blue-50 border-blue-200 text-blue-600'
+                    : 'text-gray-500 hover:bg-gray-50'
+                )}
+                title="Question palette"
               >
                 <Layers className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Palette</span>
               </Button>
-              
+
+              {/* Next / Submit */}
               <Button
-                variant={currentIndex === allQuestions.length - 1 ? "default" : "outline"}
-                onClick={() => {
-                  if (currentIndex === allQuestions.length - 1) {
-                    onSubmit()
-                  } else {
-                    onNavigate('next')
-                  }
-                }}
+                onClick={() => isLast ? onSubmit() : onNavigate('next')}
                 className={cn(
-                  "flex-1 h-11 rounded-lg",
-                  currentIndex === allQuestions.length - 1 
-                    ? "bg-blue-600 hover:bg-blue-700 text-white" 
-                    : "border-gray-300 hover:bg-gray-50"
+                  'flex-1 h-11 rounded-xl gap-2 font-semibold text-sm shadow-sm',
+                  isLast
+                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                    : 'bg-blue-600 hover:bg-blue-700 text-white'
                 )}
               >
-                {currentIndex === allQuestions.length - 1 ? (
-                  <>Submit <Send className="h-4 w-4 ml-2" /></>
+                {isLast ? (
+                  <>Finish & Submit <Send className="h-4 w-4" /></>
                 ) : (
-                  <>Next <ChevronRight className="h-4 w-4 ml-2" /></>
+                  <>Next <ChevronRight className="h-4 w-4" /></>
                 )}
               </Button>
             </div>
 
-            {/* Question Palette */}
+            {/* ── QUESTION PALETTE (collapsible) ── */}
             {showQuestionPalette && (
-              <div className="mt-6">
-                <QuestionPalette
-                  questions={allQuestions}
-                  currentIndex={currentIndex}
-                  answers={answers}
-                  flaggedQuestions={flaggedQuestions}
-                  onGoToQuestion={onGoToQuestion}
-                />
+              <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                  <Layers className="h-3.5 w-3.5 text-gray-400" />
+                  <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Question Palette
+                  </span>
+                </div>
+                <div className="p-3">
+                  <QuestionPalette
+                    questions={allQuestions}
+                    currentIndex={currentIndex}
+                    answers={answers}
+                    flaggedQuestions={flaggedQuestions}
+                    onGoToQuestion={onGoToQuestion}
+                  />
+                </div>
               </div>
             )}
+
+            {/* ── MOBILE QUESTION COUNTER ── */}
+            <div className="flex md:hidden items-center justify-center gap-2 text-xs text-gray-500">
+              <BookOpen className="h-3.5 w-3.5" />
+              Question {currentIndex + 1} of {allQuestions.length}
+              <span className="text-gray-300">·</span>
+              <span className="text-emerald-600 font-medium">{answeredCount} answered</span>
+            </div>
           </div>
 
-          {/* Sidebar */}
-          <div className="lg:w-80 shrink-0">
-            <ExamSidebar
-              profile={profile}
-              exam={exam}
-              answeredCount={answeredCount}
-              flaggedCount={flaggedQuestions.size}
-              unansweredCount={unansweredCount}
-              progressPercentage={progressPercentage}
-              tabSwitches={tabSwitches}
-              fullscreenExits={fullscreenExits}
-              isOnline={isOnline}
-            />
-          </div>
+          {/* ── SIDEBAR (desktop) ── */}
+          <aside className="hidden lg:block lg:w-72 xl:w-80 shrink-0">
+            <div className="sticky top-[88px]">
+              <ExamSidebar
+                profile={profile}
+                exam={exam}
+                answeredCount={answeredCount}
+                flaggedCount={flaggedQuestions.size}
+                unansweredCount={unansweredCount}
+                progressPercentage={progressPercentage}
+                tabSwitches={tabSwitches}
+                fullscreenExits={fullscreenExits}
+                isOnline={isOnline}
+              />
+            </div>
+          </aside>
         </div>
-      </div>
+      </main>
 
-      {/* Mobile Sidebar Drawer */}
+      {/* ════════════════════════════════════════════════════════════════════
+          MOBILE SIDEBAR SHEET
+      ════════════════════════════════════════════════════════════════════ */}
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
-        <SheetContent side="right" className="w-[85vw] max-w-[320px] p-0">
-          <div className="p-4">
+        <SheetContent side="right" className="w-[88vw] max-w-[340px] p-0 bg-white">
+          <div className="h-full overflow-y-auto p-4">
             <ExamSidebar
               profile={profile}
               exam={exam}
