@@ -1,4 +1,4 @@
-// app/staff/schedule/page.tsx - FIXED LAYOUT
+// app/staff/schedule/page.tsx - FIXED
 'use client'
 
 import { useRouter } from 'next/navigation'
@@ -14,7 +14,8 @@ export default function SchedulePage() {
   
   const { profile, loading: authLoading } = useStaffAuth()
   const { termInfo } = useTermSettings()
-  const { sidebarCollapsed } = useStaffContext()
+  const staffContext = useStaffContext()
+  const sidebarCollapsed = staffContext?.sidebarCollapsed ?? false
 
   const handleTabChange = (tab: string) => {
     router.push(`/staff/${tab === 'overview' ? '' : tab}`)
