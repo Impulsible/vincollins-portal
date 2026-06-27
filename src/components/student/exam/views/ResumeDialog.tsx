@@ -9,7 +9,18 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatTime } from '@/app/student/exam/[id]/utils/scoring'
-import type { ResumeData } from '@/app/student/exam/[id]/types'
+
+// ✅ Inline type definition - avoids import path issues with [id]
+interface ResumeData {
+  attemptId: string
+  timeLeft: number
+  answers: Record<string, string>
+  tabSwitches: number
+  fullscreenExits: number
+  unloadCount: number
+  currentIndex?: number
+  flaggedQuestions?: string[]
+}
 
 interface ResumeDialogProps {
   resumeData: ResumeData | null

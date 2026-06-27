@@ -2,7 +2,7 @@
 
 // ✅ Fixed: Changed index signature to accept any type
 export interface ExamResult {
-  [x: string]: any  // ✅ Allows all types (number, boolean, string, undefined)
+  [x: string]: any
   score: number
   total: number
   percentage: number
@@ -27,7 +27,6 @@ export interface ExamResult {
   graded_at?: string
   is_auto_submitted?: boolean
   auto_submit_reason?: string
-  // ✅ CA Scores (for display only)
   ca_score?: number
   ca1_score?: number
   ca2_score?: number
@@ -137,6 +136,7 @@ export interface StudentProfile {
   department: string
   photo_url?: string
   vin_id?: string
+  admission_number?: string  // ✅ ADD THIS LINE
   subject_count?: number
   role?: string
 }
