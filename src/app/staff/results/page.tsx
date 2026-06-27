@@ -1,4 +1,4 @@
-// app/staff/results/page.tsx - FIXED LAYOUT
+// app/staff/results/page.tsx - FIXED
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -17,7 +17,8 @@ export default function ResultsPage() {
   
   const { profile, loading: authLoading } = useStaffAuth()
   const { termInfo } = useTermSettings()
-  const { sidebarCollapsed } = useStaffContext()
+  const staffContext = useStaffContext()
+  const sidebarCollapsed = staffContext?.sidebarCollapsed ?? false
 
   const handleTabChange = (tab: string) => {
     router.push(`/staff/${tab === 'overview' ? '' : tab}`)
