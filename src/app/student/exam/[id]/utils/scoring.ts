@@ -13,6 +13,13 @@ export function formatTime(seconds: number): string {
 }
 
 // ============================================
+// ✅ FORMAT POINTS - ADD THIS
+// ============================================
+export function formatPoints(points: number): string {
+  return `${points} pt${points !== 1 ? 's' : ''}`
+}
+
+// ============================================
 // ✅ Calculate objective score
 // ============================================
 export function calculateScore(questions: Question[], answers: Record<string, string>) {
