@@ -11,14 +11,12 @@ import { useStaffAuth } from '@/components/staff/hooks/useStaffAuth'
 import { useTermSettings } from '@/components/staff/hooks/useTermSettings'
 import { cn } from '@/lib/utils'
 import { DashboardSkeleton } from '@/components/staff/dashboard'
-import { useStaffContext } from '@/app/staff/layout'
 
 export default function AttendancePage() {
   const router = useRouter()
   
   const { profile, loading: authLoading } = useStaffAuth()
   const { termInfo } = useTermSettings()
-  const { sidebarCollapsed } = useStaffContext()
 
   if (authLoading) {
     return (
