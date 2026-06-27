@@ -1,922 +1,803 @@
-// components/staff/exams/ExamViewer.tsx - COMPLETE UPDATED WITH ALL BUTTONS LINKED
+// app/staff/layout.tsx - COMPLETE FIXED VERSION
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import {
+  useState, useEffect, createContext,
+  useContext, useCallback, useRef,
+} from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
-import { 
-  ArrowLeft, Edit, Send, Calendar, Clock, 
-  BookOpen, Award, CheckCircle, AlertCircle, 
-  Eye, Loader2, Calculator, Shuffle, RotateCcw,
-  Users, FileText, Brain, HelpCircle, Flag, Layers, Image as ImageIcon,
-  Database, RefreshCw
-} from 'lucide-react'
+import { StaffSidebar } from '@/components/staff/StaffSidebar'
+import { MobileBottomNav } from '@/components/layout/MobileBottomNav'
+import { NotificationDropdown } from '@/components/staff/NotificationDropdown'
+import { ErrorBoundary } from '@/components/error-boundary'
 import { toast } from 'sonner'
-import { Skeleton } from '@/components/ui/skeleton'
+import { motion, AnimatePresence } from 'framer-motion'
+import {
+  Briefcase, LogOut, User, ChevronDown, GraduationCap,
+  Settings, Bell, Megaphone, RefreshCw,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-interface TheorySubQuestion {
-  text: string
-  marks: number
-  sub_sub_questions?: TheorySubQuestion[]
-}
-
-interface TheoryQuestionData {
+// ── Types ──────────────────────────────────────────────────────────────────────
+interface StaffProfile {
   id: string
-  question: string
-  marks: number
-  sub_questions?: TheorySubQuestion[]
-  image_url?: string
-  image_caption?: string
+  full_name?: string
+  first_name?: string
+  last_name?: string
+  email?: string
+  role?: string
+  avatar_url?: string
+  photo_url?: string | null
+  department?: string
+  title?: string
 }
 
-interface Question {
-  id: string
-  type: string
-  question: string
-  options?: string[]
-  correct_answer?: string
-  marks: number
-  order: number
-  sub_questions?: TheorySubQuestion[]
-  image_url?: string
-  image_caption?: string
-  is_draft?: boolean
+interface StaffStats {
+  totalExams: number
+  publishedExams: number
+  pendingExams: number
+  draftExams: number
+  totalStudents?: number
+  totalClasses?: number
+  totalAssignments?: number
+  totalNotes?: number
+  pendingGrading?: number
+  averagePerformance?: number
+  pendingTheoryCount?: number
 }
 
-interface Exam {
-  id: string
-  title: string
-  subject: string
-  class: string
-  duration: number
-  pass_mark: number
-  shuffle_questions: boolean
-  shuffle_options: boolean
-  has_theory: boolean
-  status: string
-  created_at: string
-  description?: string
-  instructions?: string
-  questions?: Question[]
-  total_questions?: number
-  total_marks?: number
+interface StaffContextType {
+  profile: StaffProfile | null
+  stats: StaffStats
+  refreshData: () => Promise<void>
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
+  handleLogout: () => Promise<void>
+  activeTab: string
+  setActiveTab: (tab: string) => void
 }
 
-interface ExamViewerProps {
-  examId: string
-  onBack: () => void
-  onEdit: () => void
-  onSubmitForApproval: (id: string) => Promise<void>
+const defaultStats: StaffStats = {
+  totalExams: 0,
+  publishedExams: 0,
+  pendingExams: 0,
+  draftExams: 0,
+  totalStudents: 0,
+  totalClasses: 0,
+  totalAssignments: 0,
+  totalNotes: 0,
+  pendingGrading: 0,
+  averagePerformance: 0,
+  pendingTheoryCount: 0,
 }
 
-// ============ HELPER FUNCTIONS FOR RENDERING ============
-
-// Convert markdown table to HTML with Tailwind CSS classes
-const convertTableToHtml = (tableLines: string[]): string => {
-  let html = `
-    <div class="overflow-x-auto my-4 shadow-lg rounded-xl border border-gray-200">
-      <table class="min-w-full bg-white rounded-xl">
-  `
-  let isHeader = true
-  let hasSeparator = false
-  
-  for (const line of tableLines) {
-    if (line.includes('---') || line.includes('===')) {
-      isHeader = false
-      hasSeparator = true
-      continue
-    }
-    
-    if (line.startsWith('|')) {
-      const cells = line.split('|').filter((cell: string) => cell.trim() !== '')
-      if (cells.length === 0) continue
-      
-      let rowClass = ''
-      if (isHeader && !hasSeparator) {
-        rowClass = 'bg-gradient-to-r from-gray-100 to-gray-50 border-b-2 border-gray-300'
-      } else {
-        rowClass = 'bg-white hover:bg-gray-50 transition-colors duration-150 border-b border-gray-200'
-      }
-      
-      html += `<tr class="${rowClass}">`
-      
-      cells.forEach((cell: string, idx: number) => {
-        const tag = isHeader && !hasSeparator ? 'th' : 'td'
-        
-        if (isHeader && !hasSeparator) {
-          html += `<${tag} class="px-5 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300 last:border-r-0">${cell.trim()}</${tag}>`
-        } else {
-          html += `<${tag} class="px-5 py-3 text-sm text-gray-600 border-r border-gray-200 last:border-r-0">${cell.trim()}</${tag}>`
-        }
-      })
-      
-      html += '</tr>'
-      
-      if (isHeader && hasSeparator) {
-        isHeader = false
-      }
-    }
-  }
-  
-  html += `
-      </table>
-    </div>
-  `
-  
-  return html
+// ── Tab ↔ Path mapping ─────────────────────────────────────────────────────────
+const STAFF_PATHS: Record<string, string> = {
+  overview: '/staff',
+  exams: '/staff/exams',
+  assignments: '/staff/assignments',
+  notes: '/staff/notes',
+  students: '/staff/students',
+  'ca-scores': '/staff/ca-scores',
+  'report-cards': '/staff/report-cards',
+  results: '/staff/results',
+  notifications: '/staff/notifications',
+  announcements: '/staff/announcements',
 }
 
-// Enhanced content renderer with proper table detection and Tailwind styling
-const renderContent = (text: string) => {
-  if (!text) return null
-  
-  const lines = text.split('\n')
-  let tableLines: string[] = []
-  let inTable = false
-  let tableStartIndex = -1
-  let result: JSX.Element[] = []
-  let currentIndex = 0
-  
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim()
-    const isTableRow = line.startsWith('|') && line.includes('|') && line.split('|').length >= 3
-    
-    if (isTableRow) {
-      if (!inTable) {
-        inTable = true
-        tableStartIndex = i
-      }
-      tableLines.push(line)
-    } else if (inTable && !isTableRow) {
-      if (tableLines.length >= 2) {
-        const tableHtml = convertTableToHtml(tableLines)
-        
-        if (tableStartIndex > currentIndex) {
-          const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
-          if (beforeText.trim()) {
-            result.push(
-              <div key={`text-before-${currentIndex}`} className="whitespace-pre-wrap mb-3">
-                {beforeText.split('\n').map((line, idx) => {
-                  if (line.match(/^\d+\./)) {
-                    return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
-                  }
-                  if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
-                    return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
-                  }
-                  if (line.match(/^\(?[ivx]+\)?\./i)) {
-                    return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
-                  }
-                  if (line === '') return <br key={idx} />
-                  return <p key={idx} className="mb-1">{line}</p>
-                })}
-              </div>
-            )
-          }
-        }
-        
-        result.push(
-          <div key={`table-${currentIndex}`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
-        )
-        
-        currentIndex = i
-      }
-      inTable = false
-      tableLines = []
-    }
+const DESKTOP_TITLES: Record<string, string> = {
+  overview: 'Dashboard Overview',
+  exams: 'Exams Management',
+  assignments: 'Assignments',
+  notes: 'Lesson Notes',
+  students: 'Students',
+  'report-cards': 'Report Cards',
+  'ca-scores': 'CA Scores',
+  results: 'Results',
+  notifications: 'Notifications',
+  announcements: 'Announcements',
+}
+
+const MOBILE_TITLES: Record<string, string> = {
+  overview: 'Dashboard',
+  exams: 'Exams',
+  assignments: 'Assignments',
+  notes: 'Notes',
+  students: 'Students',
+  'report-cards': 'Reports',
+  'ca-scores': 'CA Scores',
+  results: 'Results',
+  notifications: 'Notifications',
+  announcements: 'Announcements',
+}
+
+function getTabFromPathname(pathname: string): string {
+  if (pathname === '/staff') return 'overview'
+
+  // Check for exam sub-routes first
+  if (pathname.startsWith('/staff/exams/')) {
+    return 'exams'
   }
-  
-  if (inTable && tableLines.length >= 2) {
-    const tableHtml = convertTableToHtml(tableLines)
-    
-    if (tableStartIndex > currentIndex) {
-      const beforeText = lines.slice(currentIndex, tableStartIndex).join('\n')
-      if (beforeText.trim()) {
-        result.push(
-          <div key={`text-before-final`} className="whitespace-pre-wrap mb-3">
-            {beforeText.split('\n').map((line, idx) => {
-              if (line.match(/^\d+\./)) {
-                return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
-              }
-              if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
-                return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
-              }
-              if (line.match(/^\(?[ivx]+\)?\./i)) {
-                return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
-              }
-              if (line === '') return <br key={idx} />
-              return <p key={idx} className="mb-1">{line}</p>
-            })}
-          </div>
-        )
-      }
-    }
-    
-    result.push(
-      <div key={`table-final`} dangerouslySetInnerHTML={{ __html: tableHtml }} />
-    )
-    
-    if (currentIndex + tableLines.length < lines.length) {
-      const afterText = lines.slice(currentIndex + tableLines.length).join('\n')
-      if (afterText.trim()) {
-        result.push(
-          <div key={`text-after-final`} className="whitespace-pre-wrap mt-3">
-            {afterText.split('\n').map((line, idx) => {
-              if (line.match(/^\d+\./)) {
-                return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
-              }
-              if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
-                return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
-              }
-              if (line.match(/^\(?[ivx]+\)?\./i)) {
-                return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
-              }
-              if (line === '') return <br key={idx} />
-              return <p key={idx} className="mb-1">{line}</p>
-            })}
-          </div>
-        )
-      }
-    }
-    
-    return <>{result}</>
+
+  const sortedEntries = Object.entries(STAFF_PATHS)
+    .filter(([tab]) => tab !== 'overview')
+    .sort(([, a], [, b]) => b.length - a.length)
+
+  for (const [tab, path] of sortedEntries) {
+    if (pathname.startsWith(path)) return tab
   }
-  
-  if (result.length > 0) {
-    return <>{result}</>
-  }
-  
-  const imageMatch = text.match(/!\[(.*?)\]\((.*?)\)/)
-  if (imageMatch) {
-    return (
-      <div className="my-3">
-        <img src={imageMatch[2]} alt={imageMatch[1]} className="max-w-full rounded-lg border mx-auto max-h-[200px] object-contain" />
-        {imageMatch[1] && <p className="text-xs text-center text-muted-foreground mt-1">{imageMatch[1]}</p>}
-      </div>
-    )
-  }
-  
-  if (text.includes('█') || text.includes('▓') || text.includes('▒') || text.includes('░')) {
-    return <pre className="font-mono text-xs bg-gray-100 p-2 rounded my-2 whitespace-pre-wrap overflow-x-auto">{text}</pre>
-  }
-  
-  const hasEquation = /[\d\+\-\*\/\(\)=]|x\^2|y\^2|√|∑|∫|π|θ|α|β|γ/.test(text)
-  if (hasEquation && !text.includes('<table')) {
-    return (
-      <span className="font-mono text-sm" dangerouslySetInnerHTML={{ 
-        __html: text
-          .replace(/x\^2/g, 'x²')
-          .replace(/y\^2/g, 'y²')
-          .replace(/\n/g, '<br/>')
-      }} />
-    )
-  }
-  
+
+  return 'overview'
+}
+
+// ── Context ────────────────────────────────────────────────────────────────────
+const StaffContext = createContext<StaffContextType | null>(null)
+
+export const useStaffContext = () => {
+  return useContext(StaffContext)
+}
+
+// ── Loading State ──────────────────────────────────────────────────────────────
+function StaffLoadingState() {
   return (
-    <div className="whitespace-pre-wrap text-sm leading-relaxed">
-      {text.split('\n').map((line, idx) => {
-        if (line.match(/^\d+\./)) {
-          return <p key={idx} className="mb-2 font-semibold text-blue-700">{line}</p>
-        }
-        if (line.match(/^[a-z]\./i) || line.match(/^\([a-z]\)/i)) {
-          return <p key={idx} className="mb-1 ml-4 text-gray-700">{line}</p>
-        }
-        if (line.match(/^\(?[ivx]+\)?\./i)) {
-          return <p key={idx} className="mb-1 ml-8 text-purple-600">{line}</p>
-        }
-        if (line === '') {
-          return <br key={idx} />
-        }
-        return <p key={idx} className="mb-1">{line}</p>
-      })}
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50">
+      <div className="text-center">
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+          className="inline-block"
+        >
+          <Briefcase className="h-16 w-16 text-emerald-600" />
+        </motion.div>
+        <p className="mt-6 text-slate-700 text-lg font-medium">
+          Loading Staff Dashboard
+        </p>
+        <p className="mt-2 text-slate-500 text-sm">
+          Preparing your teaching workspace
+        </p>
+        <div className="flex justify-center gap-1.5 mt-6">
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              className="h-2.5 w-2.5 rounded-full bg-emerald-400"
+              animate={{ y: [0, -12, 0] }}
+              transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
 
-// Render sub-questions recursively
-const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
-  if (!subQuestions || subQuestions.length === 0) return null
-  
-  const startCharCode = level === 0 ? 97 : 105
-  
-  return (
-    <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
-      <p className="text-xs font-semibold text-purple-700">
-        {level === 0 ? 'Sub-questions:' : 'Parts:'}
-      </p>
-      {subQuestions.map((sq, idx) => (
-        <div key={idx} className="pl-3 border-l-2 border-purple-200">
-          <div className="font-medium">
-            <span className="text-sm">{String.fromCharCode(startCharCode + idx)}.</span>
-            <div className="inline ml-1 text-sm">{renderContent(sq.text)}</div>
-            {sq.marks > 0 && <span className="ml-2 text-xs text-muted-foreground">({sq.marks} marks)</span>}
-          </div>
-          {sq.sub_sub_questions && sq.sub_sub_questions.length > 0 && (
-            renderSubQuestions(sq.sub_sub_questions, level + 1)
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// Theory Question Card Component
-function TheoryQuestionCard({ question, index, marks }: { question: TheoryQuestionData; index: number; marks: number }) {
-  return (
-    <div className="p-5 bg-white rounded-xl border shadow-sm hover:shadow-md transition-all duration-200">
-      <div className="flex justify-between items-start gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <Badge className="bg-purple-100 text-purple-700 hover:bg-purple-100 border-0">
-            <Brain className="h-3.5 w-3.5 mr-1" /> Theory
-          </Badge>
-          <span className="text-xs text-muted-foreground font-medium">{marks} marks</span>
-        </div>
-        <Badge variant="outline" className="text-xs font-mono">
-          Q{index + 1}
-        </Badge>
-      </div>
-      
-      {question.image_url && (
-        <div className="mb-4">
-          <img 
-            src={question.image_url} 
-            alt={question.image_caption || 'Question diagram'} 
-            className="max-w-full max-h-[250px] rounded-lg border object-contain mx-auto shadow-sm" 
-          />
-          {question.image_caption && (
-            <p className="text-xs text-center text-muted-foreground mt-2 italic">{question.image_caption}</p>
-          )}
-        </div>
-      )}
-      
-      <div className="mb-4">
-        <div className="text-sm font-semibold text-blue-600 mb-2 flex items-center gap-2">
-          <span className="bg-blue-100 w-5 h-5 rounded-full flex items-center justify-center text-xs">?</span>
-          Question {index + 1}:
-        </div>
-        <div className="pl-2">
-          {renderContent(question.question)}
-        </div>
-      </div>
-      
-      {question.sub_questions && question.sub_questions.length > 0 && (
-        <div className="mt-4 pt-3 border-t border-gray-100">
-          {renderSubQuestions(question.sub_questions, 0)}
-        </div>
-      )}
-    </div>
-  )
-}
-
-export function ExamViewer({ examId, onBack, onEdit, onSubmitForApproval }: ExamViewerProps) {
+// ── Desktop Top Bar ────────────────────────────────────────────────────────────
+function DesktopTopBar({
+  profile,
+  activeTab,
+  onLogout,
+  onRefresh,
+  isRefreshing,
+}: {
+  profile: StaffProfile | null
+  activeTab: string
+  onLogout: () => Promise<void>
+  onRefresh: () => Promise<void>
+  isRefreshing: boolean
+}) {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [exam, setExam] = useState<Exam | null>(null)
-  const [questions, setQuestions] = useState<Question[]>([])
-  const [activeTab, setActiveTab] = useState('overview')
-  const [submitting, setSubmitting] = useState(false)
-  const [submissionCount, setSubmissionCount] = useState(0)
-  const [loadSource, setLoadSource] = useState<'table' | 'jsonb' | 'none'>('none')
+  const pathname = usePathname()
 
-  // ============ LOAD EXAM DETAILS - LOADS FROM BOTH SOURCES ============
-  const loadExamDetails = useCallback(async () => {
-    if (!examId) return
-    
-    setLoading(true)
-    try {
-      // Load exam data
-      const { data: examData, error: examError } = await supabase
-        .from('exams')
-        .select('*')
-        .eq('id', examId)
-        .single()
-
-      if (examError) throw examError
-      
-      setExam(examData)
-
-      // ✅ FIRST: Try to load questions from the questions table
-      let loadedQuestions: Question[] = []
-      let source: 'table' | 'jsonb' | 'none' = 'none'
-      
-      try {
-        const { data: questionsData, error: questionsError } = await supabase
-          .from('questions')
-          .select('*')
-          .eq('exam_id', examId)
-          .is('deleted_at', null)
-          .order('order_number', { ascending: true })
-
-        if (!questionsError && questionsData && questionsData.length > 0) {
-          // ✅ Loaded from questions table
-          loadedQuestions = questionsData.map((q: any) => ({
-            id: q.id,
-            type: q.type || 'objective',
-            question: q.question_text,
-            options: q.options || [],
-            correct_answer: q.correct_answer || '',
-            marks: q.points || 1,
-            order: q.order_number || 0,
-            sub_questions: q.sub_questions || [],
-            image_url: q.image_url,
-            image_caption: q.image_caption,
-            is_draft: q.is_draft || false
-          }))
-          source = 'table'
-          console.log(`✅ Loaded ${loadedQuestions.length} questions from questions table`)
-        }
-      } catch (tableError) {
-        console.warn('⚠️ Could not load from questions table:', tableError)
-      }
-
-      // ✅ SECOND: If no questions from table, try loading from exam.questions JSONB
-      if (loadedQuestions.length === 0 && examData.questions && Array.isArray(examData.questions) && examData.questions.length > 0) {
-        loadedQuestions = examData.questions.map((q: any, idx: number) => ({
-          id: q.id || crypto.randomUUID(),
-          type: q.type || 'objective',
-          question: q.question || q.question_text || '',
-          options: q.options || [],
-          correct_answer: q.correct_answer || '',
-          marks: q.marks || q.points || 1,
-          order: q.order || idx + 1,
-          sub_questions: q.sub_questions || [],
-          image_url: q.image_url,
-          image_caption: q.image_caption,
-          is_draft: q.is_draft || false
-        }))
-        source = 'jsonb'
-        console.log(`✅ Loaded ${loadedQuestions.length} questions from exam.questions JSONB`)
-      }
-
-      setQuestions(loadedQuestions)
-      setLoadSource(source)
-
-      // Get submission count
-      const { count } = await supabase
-        .from('exam_attempts')
-        .select('*', { count: 'exact', head: true })
-        .eq('exam_id', examId)
-      
-      setSubmissionCount(count || 0)
-      
-    } catch (error) {
-      console.error('Error loading exam:', error)
-      toast.error('Failed to load exam details')
-    } finally {
-      setLoading(false)
-    }
-  }, [examId])
-
-  // ============ REFRESH ============
-  const handleRefresh = () => {
-    loadExamDetails()
-    toast.success('Refreshed exam data')
+  const getInitials = (name?: string) => {
+    if (!name) return 'ST'
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2)
   }
+
+  const getDisplayTitle = () => {
+    if (pathname?.startsWith('/staff/exams/')) {
+      return 'Exams Management'
+    }
+    return DESKTOP_TITLES[activeTab] ??
+      activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')
+  }
+
+  return (
+    <header className="h-16 lg:h-20 border-b bg-white flex items-center px-4 lg:px-6 sticky top-0 z-40 shadow-sm">
+      <div className="flex items-center justify-between w-full gap-4">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="hidden sm:flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 flex-shrink-0">
+            <GraduationCap className="h-4 w-4 text-emerald-600" />
+          </div>
+          <div className="min-w-0">
+            <h1 className="text-base lg:text-lg font-semibold text-slate-900 truncate">
+              {getDisplayTitle()}
+            </h1>
+            {profile?.department && (
+              <p className="text-xs text-muted-foreground truncate hidden sm:block">
+                {profile.department} Department
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
+          <button
+            onClick={onRefresh}
+            disabled={isRefreshing}
+            title="Refresh dashboard data"
+            className={cn(
+              'hidden sm:flex items-center justify-center',
+              'h-9 w-9 rounded-lg border border-gray-200',
+              'text-gray-500 hover:text-emerald-600 hover:border-emerald-300',
+              'hover:bg-emerald-50 transition-all',
+              isRefreshing && 'opacity-50 cursor-not-allowed',
+            )}
+          >
+            <RefreshCw
+              className={cn('h-4 w-4', isRefreshing && 'animate-spin')}
+            />
+          </button>
+
+          <NotificationDropdown userId={profile?.id || ''} />
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                className="flex items-center gap-2 lg:gap-3 h-9 px-2 lg:px-3"
+              >
+                <Avatar className="h-8 w-8 lg:h-9 lg:w-9">
+                  <AvatarImage
+                    src={profile?.photo_url || profile?.avatar_url || undefined}
+                  />
+                  <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs lg:text-sm">
+                    {getInitials(profile?.full_name || profile?.first_name)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="hidden md:block text-left">
+                  <p className="text-sm font-medium leading-none">
+                    {profile?.full_name || 'Staff Member'}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {profile?.email || ''}
+                  </p>
+                </div>
+                <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              </Button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium">{profile?.full_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {profile?.email}
+                  </p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => router.push('/staff/announcements')}
+                className="cursor-pointer"
+              >
+                <Megaphone className="mr-2 h-4 w-4" />
+                Announcements
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => router.push('/staff/notifications')}
+                className="cursor-pointer"
+              >
+                <Bell className="mr-2 h-4 w-4" />
+                Notifications
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                View Profile
+              </DropdownMenuItem>
+              <DropdownMenuItem className="cursor-pointer">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={onLogout}
+                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+// ── Mobile Top Bar ─────────────────────────────────────────────────────────────
+function MobileTopBar({
+  profile,
+  activeTab,
+  onRefresh,
+  isRefreshing,
+}: {
+  profile: StaffProfile | null
+  activeTab: string
+  onRefresh: () => Promise<void>
+  isRefreshing: boolean
+}) {
+  const pathname = usePathname()
+  
+  const getMobileTitle = () => {
+    if (pathname?.startsWith('/staff/exams/')) {
+      return 'Exams'
+    }
+    return MOBILE_TITLES[activeTab] ??
+      activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
+  }
+
+  return (
+    <header className="fixed top-0 left-0 right-0 h-[60px] lg:hidden bg-white border-b z-40 flex items-center px-4 shadow-sm">
+      <div className="flex items-center gap-3 w-full">
+        <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 flex-shrink-0">
+          <Briefcase className="h-4 w-4 text-emerald-600" />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <h1 className="font-semibold text-sm text-slate-900">
+            {getMobileTitle()}
+          </h1>
+          <p className="text-[11px] text-muted-foreground truncate">
+            {profile?.full_name || 'Staff Portal'}
+          </p>
+        </div>
+
+        <button
+          onClick={onRefresh}
+          disabled={isRefreshing}
+          className={cn(
+            'flex items-center justify-center h-8 w-8 rounded-lg',
+            'text-gray-500 hover:text-emerald-600',
+            'hover:bg-emerald-50 transition-all',
+            isRefreshing && 'opacity-50',
+          )}
+        >
+          <RefreshCw
+            className={cn('h-4 w-4', isRefreshing && 'animate-spin')}
+          />
+        </button>
+      </div>
+    </header>
+  )
+}
+
+// ── Fetch stats helper ─────────────────────────────────────────────────────────
+async function fetchStaffStats(userId: string): Promise<StaffStats> {
+  const [
+    examsRes,
+    studentsRes,
+    assignmentsRes,
+    notesRes,
+    gradingRes,
+    theoryRes,
+  ] = await Promise.allSettled([
+    supabase.from('exams').select('status, id').eq('created_by', userId),
+    supabase
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('role', 'student'),
+    supabase
+      .from('assignments')
+      .select('*', { count: 'exact', head: true })
+      .eq('created_by', userId),
+    supabase
+      .from('notes')
+      .select('*', { count: 'exact', head: true }),
+    supabase
+      .from('ca_scores')
+      .select('*', { count: 'exact', head: true })
+      .eq('teacher_id', userId),
+    supabase
+      .from('exam_attempts')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending_theory'),
+  ])
+
+  const exams =
+    examsRes.status === 'fulfilled' ? examsRes.value.data ?? [] : []
+  const studentsCount =
+    studentsRes.status === 'fulfilled' ? studentsRes.value.count ?? 0 : 0
+  const assignmentsCount =
+    assignmentsRes.status === 'fulfilled'
+      ? assignmentsRes.value.count ?? 0
+      : 0
+  const notesCount =
+    notesRes.status === 'fulfilled' ? notesRes.value.count ?? 0 : 0
+  const pendingGradingCount =
+    gradingRes.status === 'fulfilled' ? gradingRes.value.count ?? 0 : 0
+  const pendingTheoryCount =
+    theoryRes.status === 'fulfilled' ? theoryRes.value.count ?? 0 : 0
+
+  return {
+    totalExams: exams.length,
+    publishedExams: exams.filter((e) => e.status === 'published').length,
+    pendingExams: exams.filter((e) => e.status === 'pending').length,
+    draftExams: exams.filter((e) => e.status === 'draft').length,
+    totalStudents: studentsCount,
+    totalClasses: 6,
+    totalAssignments: assignmentsCount,
+    totalNotes: notesCount,
+    pendingGrading: pendingGradingCount,
+    averagePerformance: 75,
+    pendingTheoryCount,
+  }
+}
+
+// ── Main Layout ────────────────────────────────────────────────────────────────
+export default function StaffLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // 🔴 DEBUG
+  console.log('🔴 STAFF LAYOUT - pathname:', pathname)
+  console.log('🔴 STAFF LAYOUT - is exam sub-route:', pathname?.startsWith('/staff/exams/'))
+
+  // ✅ If we're on an exam sub-route, render immediately without any checks
+  if (pathname?.startsWith('/staff/exams/')) {
+    console.log('✅ STAFF LAYOUT - Exam sub-route detected, rendering immediately')
+    // Still render the layout structure but skip all auth checks
+    return (
+      <StaffContext.Provider value={{
+        profile: null,
+        stats: defaultStats,
+        refreshData: async () => {},
+        sidebarCollapsed: false,
+        setSidebarCollapsed: () => {},
+        handleLogout: async () => {},
+        activeTab: 'exams',
+        setActiveTab: () => {},
+      }}>
+        <div className="min-h-screen bg-slate-50">
+          <div className="hidden lg:block">
+            <StaffSidebar
+              profile={null}
+              onLogout={async () => {}}
+              collapsed={false}
+              onToggle={() => {}}
+              activeTab="exams"
+              setActiveTab={() => {}}
+            />
+            <div className="min-h-screen transition-all duration-300 ease-in-out" style={{ marginLeft: '280px' }}>
+              <DesktopTopBar
+                profile={null}
+                activeTab="exams"
+                onLogout={async () => {}}
+                onRefresh={async () => {}}
+                isRefreshing={false}
+              />
+              <main className="p-4 lg:p-6 xl:p-8">
+                <div className="max-w-[1600px] mx-auto">
+                  {children}
+                </div>
+              </main>
+            </div>
+          </div>
+          <div className="lg:hidden">
+            <MobileTopBar
+              profile={null}
+              activeTab="exams"
+              onRefresh={async () => {}}
+              isRefreshing={false}
+            />
+            <main className="pt-[60px] pb-24">
+              <div className="px-3 py-4">
+                {children}
+              </div>
+            </main>
+          </div>
+        </div>
+      </StaffContext.Provider>
+    )
+  }
+
+  // ── State for non-exam routes ──────────────────────────────────────────────
+  const [profile, setProfile] = useState<StaffProfile | null>(null)
+  const [stats, setStats] = useState<StaffStats>(defaultStats)
+  const [loading, setLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [activeTab, setActiveTab] = useState(() =>
+    getTabFromPathname(pathname || '/staff'),
+  )
+  const [isHydrated, setIsHydrated] = useState(false)
+
+  const hasLoadedRef = useRef(false)
+
+  // ── Hydration ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    setIsHydrated(true)
+    try {
+      const saved = localStorage.getItem('staff-sidebar-collapsed')
+      if (saved !== null) setSidebarCollapsed(saved === 'true')
+    } catch {}
+  }, [])
 
   useEffect(() => {
-    loadExamDetails()
-  }, [loadExamDetails])
-
-  const handleSubmit = async () => {
-    if (!exam) return
-    
-    if (questions.length === 0) {
-      toast.error('Cannot submit an exam with no questions')
-      return
-    }
-
-    setSubmitting(true)
+    if (!isHydrated) return
     try {
-      await onSubmitForApproval(examId)
-      setExam({ ...exam, status: 'pending' })
-      toast.success('Exam submitted for approval')
-    } finally {
-      setSubmitting(false)
-    }
-  }
+      localStorage.setItem(
+        'staff-sidebar-collapsed',
+        String(sidebarCollapsed),
+      )
+    } catch {}
+  }, [sidebarCollapsed, isHydrated])
 
-  const getStatusBadge = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'published':
-        return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">
-          <CheckCircle className="h-3 w-3 mr-1" /> Published
-        </Badge>
-      case 'pending':
-        return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-0">
-          <Clock className="h-3 w-3 mr-1" /> Pending
-        </Badge>
-      case 'draft':
-        return <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-0">
-          <FileText className="h-3 w-3 mr-1" /> Draft
-        </Badge>
-      default:
-        return <Badge variant="outline">{status || 'Draft'}</Badge>
+  // ── Sync active tab with URL ──────────────────────────────────────────────
+  useEffect(() => {
+    // If we're on an exam sub-route, skip tab sync
+    if (pathname?.startsWith('/staff/exams/')) {
+      return
     }
-  }
+    const tab = getTabFromPathname(pathname || '/staff')
+    setActiveTab(tab)
+  }, [pathname])
 
-  const formatDate = (date: string) => {
-    if (!date) return 'Not set'
-    return new Date(date).toLocaleDateString('en-NG', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+  // ── Load staff data ───────────────────────────────────────────────────────
+  const loadStaffData = useCallback(
+    async (showToast = false) => {
+      // Skip auth check for exam sub-routes
+      if (pathname?.startsWith('/staff/exams/')) {
+        setLoading(false)
+        return
+      }
+
+      try {
+        const {
+          data: { user },
+          error: userError,
+        } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          console.warn('[StaffLayout] No authenticated user')
+          router.replace('/portal')
+          return
+        }
+
+        const { data: profileData, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+
+        if (profileError || !profileData) {
+          console.error('[StaffLayout] Profile error:', profileError)
+          toast.error('Profile not found. Please contact your administrator.')
+          router.replace('/portal')
+          return
+        }
+
+        const allowedRoles = ['staff', 'admin', 'teacher']
+        if (!allowedRoles.includes(profileData.role?.toLowerCase() ?? '')) {
+          toast.error('Access denied. This portal is for staff only.')
+          router.replace('/portal')
+          return
+        }
+
+        setProfile(profileData as StaffProfile)
+
+        const newStats = await fetchStaffStats(user.id)
+        setStats(newStats)
+
+        if (showToast) toast.success('Dashboard refreshed')
+      } catch (err) {
+        console.error('[StaffLayout] Unexpected error:', err)
+        if (showToast) toast.error('Failed to refresh. Please try again.')
+      } finally {
+        setLoading(false)
+        setIsRefreshing(false)
+      }
+    },
+    [router, pathname],
+  )
+
+  useEffect(() => {
+    if (!hasLoadedRef.current) {
+      hasLoadedRef.current = true
+      loadStaffData()
+    }
+  }, [loadStaffData])
+
+  // ── Auth state listener ───────────────────────────────────────────────────
+  useEffect(() => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || !session) {
+        try {
+          localStorage.removeItem('auth_user')
+          localStorage.removeItem('auth_role')
+          localStorage.removeItem('user_profile')
+          sessionStorage.removeItem('login_attempts')
+        } catch {}
+        router.replace('/portal')
+      }
     })
-  }
 
-  // Calculate totals
-  const objectiveQuestions = questions.filter(q => q.type === 'objective' || q.type === 'mcq')
-  const theoryQuestionsData = questions.filter(q => q.type === 'theory')
-  const objectiveCount = objectiveQuestions.length
-  const theoryCount = theoryQuestionsData.length
-  const totalQuestions = questions.length
-  const totalMarks = questions.reduce((sum, q) => sum + (q.marks || 0), 0)
-  const passPercentage = exam?.pass_mark || 50
-  const pointsNeeded = Math.ceil((passPercentage / 100) * totalMarks)
+    return () => subscription.unsubscribe()
+  }, [router])
 
-  // ============ NAVIGATION HANDLERS ============
-  
-  // Navigate to submissions page
-  const handleViewSubmissions = () => {
-    if (!examId) {
-      toast.error('Exam ID not found')
-      return
+  // ── Refresh ───────────────────────────────────────────────────────────────
+  const refreshData = useCallback(async () => {
+    setIsRefreshing(true)
+    await loadStaffData(true)
+  }, [loadStaffData])
+
+  // ── Logout ────────────────────────────────────────────────────────────────
+  const handleLogout = useCallback(async () => {
+    try {
+      localStorage.removeItem('auth_user')
+      localStorage.removeItem('auth_role')
+      localStorage.removeItem('user_profile')
+      sessionStorage.removeItem('login_attempts')
+
+      await supabase.auth.signOut({ scope: 'local' })
+      toast.success('Logged out successfully')
+      router.replace('/portal')
+    } catch (err) {
+      console.error('[StaffLayout] Logout error:', err)
+      router.replace('/portal')
     }
-    router.push(`/staff/exams/${examId}/submissions`)
-  }
+  }, [router])
 
-  // Navigate to scores page
-  const handleEnterScores = () => {
-    if (!examId) {
-      toast.error('Exam ID not found')
-      return
-    }
-    router.push(`/staff/exams/${examId}/scores`)
-  }
+  // ── Tab change with navigation ────────────────────────────────────────────
+  const handleTabChange = useCallback(
+    (tab: string) => {
+      if (pathname?.startsWith('/staff/exams/')) {
+        return
+      }
+      setActiveTab(tab)
+      const path = STAFF_PATHS[tab]
+      if (path) router.push(path)
+    },
+    [router, pathname],
+  )
 
-  // Navigate to preview page
-  const handlePreview = () => {
-    if (!examId) {
-      toast.error('Exam ID not found')
-      return
-    }
-    router.push(`/staff/exams/${examId}/preview`)
-  }
+  // ── Guards ────────────────────────────────────────────────────────────────
+  if (!isHydrated || loading) return <StaffLoadingState />
 
-  // Navigate to edit page
-  const handleEdit = () => {
-    onEdit()
-  }
-
-  if (loading) {
-    return (
-      <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-8 rounded-full" />
-            <div><Skeleton className="h-6 w-48" /><Skeleton className="h-4 w-32 mt-1" /></div>
-          </div>
-          <div className="flex gap-2"><Skeleton className="h-9 w-20" /><Skeleton className="h-9 w-20" /></div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-24 rounded-xl" />)}
-        </div>
-        <Skeleton className="h-96 w-full rounded-xl" />
-      </div>
-    )
-  }
-
-  if (!exam) {
-    return (
-      <div className="text-center py-12">
-        <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
-        <p className="text-muted-foreground">Exam not found</p>
-        <Button onClick={onBack} className="mt-4">Go Back</Button>
-      </div>
-    )
-  }
+  const desktopMarginLeft = sidebarCollapsed ? '80px' : '280px'
+  const isExamSubRoute = pathname?.startsWith('/staff/exams/') || false
 
   return (
-    <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-4 space-y-4 sm:space-y-6">
-      
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Button variant="ghost" size="icon" onClick={onBack} className="h-8 w-8 sm:h-9 sm:w-9 shrink-0">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-base sm:text-lg md:text-xl font-bold">{exam.title}</h1>
-              {getStatusBadge(exam.status)}
-            </div>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-              {exam.subject} • {exam.class}
-            </p>
-          </div>
-        </div>
-        
-        <div className="flex flex-wrap gap-2">
-          {/* Load Source Indicator */}
-          {loadSource !== 'none' && (
-            <Badge variant="outline" className="text-[10px] bg-blue-50 border-blue-200 text-blue-700 hidden sm:flex items-center gap-1">
-              <Database className="h-3 w-3" />
-              {loadSource === 'table' ? 'From Table' : 'From JSONB'}
-            </Badge>
-          )}
-          
-          <Button variant="ghost" size="sm" onClick={handleRefresh} className="h-8 sm:h-9 text-xs">
-            <RefreshCw className="h-3.5 w-3.5" />
-          </Button>
-          
-          {/* ✅ SUBMISSIONS BUTTON - Links to submissions page */}
-          {(exam.status === 'published' || exam.status === 'pending') && (
-            <Button 
-              size="sm" 
-              onClick={handleViewSubmissions}
-              className="bg-blue-600 hover:bg-blue-700 h-8 sm:h-9 text-xs"
-            >
-              <Users className="h-3.5 w-3.5 mr-1" />
-              Submissions
-              {submissionCount > 0 && (
-                <Badge className="ml-1.5 bg-white/20 text-white text-[10px]">{submissionCount}</Badge>
-              )}
-            </Button>
-          )}
-          
-          {exam.status === 'draft' && (
-            <>
-              <Button variant="outline" size="sm" onClick={handleEdit} className="h-8 sm:h-9 text-xs">
-                <Edit className="h-3.5 w-3.5 mr-1" /> Edit
-              </Button>
-              <Button size="sm" onClick={handleSubmit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs">
-                {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1" /> : <Send className="h-3.5 w-3.5 mr-1" />}
-                Submit
-              </Button>
-            </>
-          )}
-          
-          {/* ✅ ENTER SCORES BUTTON - Links to scores page */}
-          {exam.status === 'published' && (
-            <Button 
-              size="sm" 
-              onClick={handleEnterScores}
-              className="bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs"
-            >
-              <Calculator className="h-3.5 w-3.5 mr-1" /> Enter Scores
-            </Button>
-          )}
-          
-          {/* ✅ PREVIEW BUTTON - Links to preview page */}
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handlePreview}
-            className="h-8 sm:h-9 text-xs"
+    <StaffContext.Provider
+      value={{
+        profile,
+        stats,
+        refreshData,
+        sidebarCollapsed,
+        setSidebarCollapsed,
+        handleLogout,
+        activeTab,
+        setActiveTab,
+      }}
+    >
+      <div className="min-h-screen bg-slate-50">
+
+        {/* ── DESKTOP ──────────────────────────────────────────────────────── */}
+        <div className="hidden lg:block">
+          <StaffSidebar
+            profile={profile}
+            onLogout={handleLogout}
+            collapsed={sidebarCollapsed}
+            onToggle={() => setSidebarCollapsed((prev) => !prev)}
+            activeTab={activeTab}
+            setActiveTab={handleTabChange}
+          />
+
+          <div
+            className="min-h-screen transition-all duration-300 ease-in-out"
+            style={{ marginLeft: desktopMarginLeft }}
           >
-            <Eye className="h-3.5 w-3.5 mr-1" /> Preview
-          </Button>
-        </div>
-      </div>
+            <DesktopTopBar
+              profile={profile}
+              activeTab={activeTab}
+              onLogout={handleLogout}
+              onRefresh={refreshData}
+              isRefreshing={isRefreshing}
+            />
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
-        <Card>
-          <CardContent className="p-2.5 sm:p-3 text-center">
-            <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 mx-auto mb-1" />
-            <p className="text-base sm:text-lg font-bold">{totalQuestions}</p>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Total Questions</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-2.5 sm:p-3 text-center">
-            <Award className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mx-auto mb-1" />
-            <p className="text-base sm:text-lg font-bold">{totalMarks}</p>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Total Marks</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-2.5 sm:p-3 text-center">
-            <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 mx-auto mb-1" />
-            <p className="text-base sm:text-lg font-bold">{exam.duration}</p>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Minutes</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-2.5 sm:p-3 text-center">
-            <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 mx-auto mb-1" />
-            <p className="text-base sm:text-lg font-bold">{exam.pass_mark}%</p>
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Pass Mark</p>
-          </CardContent>
-        </Card>
-        <Card className="col-span-2 sm:col-span-1">
-          <CardContent className="p-2.5 sm:p-3">
-            <p className="text-[9px] sm:text-xs text-muted-foreground mb-0.5">Points Needed</p>
-            <Progress value={passPercentage} className="h-1.5 sm:h-2 mb-1" />
-            <p className="text-xs font-medium">Need {pointsNeeded}/{totalMarks} points</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Question Breakdown */}
-      <div className="flex flex-wrap gap-2">
-        <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1.5">
-          <span className="text-[10px] sm:text-xs">
-            📝 Objective: {objectiveCount} questions • {objectiveQuestions.reduce((sum, q) => sum + q.marks, 0)} marks
-            {objectiveCount > 0 && ` (${(objectiveQuestions.reduce((sum, q) => sum + q.marks, 0) / objectiveCount).toFixed(1)} pts avg)`}
-          </span>
-        </div>
-        {theoryCount > 0 && (
-          <div className="bg-slate-100 dark:bg-slate-800 rounded-lg px-2.5 py-1.5">
-            <span className="text-[10px] sm:text-xs">
-              ✍️ Theory: {theoryCount} questions • {theoryQuestionsData.reduce((sum, q) => sum + q.marks, 0)} marks
-              {theoryCount > 0 && ` (${(theoryQuestionsData.reduce((sum, q) => sum + q.marks, 0) / theoryCount).toFixed(1)} pts avg)`}
-            </span>
-          </div>
-        )}
-        {submissionCount > 0 && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5">
-            <span className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-400">
-              👥 {submissionCount} submission{submissionCount !== 1 ? 's' : ''}
-            </span>
-          </div>
-        )}
-        {loadSource !== 'none' && (
-          <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg px-2.5 py-1.5 sm:hidden">
-            <span className="text-[10px] text-blue-700 dark:text-blue-400">
-              📊 {loadSource === 'table' ? 'From Table' : 'From JSONB'}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full max-w-[280px] sm:max-w-md grid-cols-2 h-auto p-1">
-          <TabsTrigger value="overview" className="text-xs sm:text-sm py-1.5">Overview</TabsTrigger>
-          <TabsTrigger value="questions" className="text-xs sm:text-sm py-1.5">
-            Questions ({totalQuestions})
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="space-y-4 mt-4">
-          <Card>
-            <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
-              <CardTitle className="text-base sm:text-lg">Exam Details</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 px-3 sm:px-5 pb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  <div><p className="text-[10px] text-muted-foreground">Created</p><p className="text-xs">{formatDate(exam.created_at)}</p></div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                  <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                  <div><p className="text-[10px] text-muted-foreground">Subject</p><p className="text-xs">{exam.subject}</p></div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                  <div><p className="text-[10px] text-muted-foreground">Class</p><p className="text-xs">{exam.class}</p></div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                  <Shuffle className="h-3.5 w-3.5 text-muted-foreground" />
-                  <div><p className="text-[10px] text-muted-foreground">Shuffle Questions</p><p className="text-xs">{exam.shuffle_questions ? 'Yes' : 'No'}</p></div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg">
-                  <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
-                  <div><p className="text-[10px] text-muted-foreground">Shuffle Options</p><p className="text-xs">{exam.shuffle_options ? 'Yes' : 'No'}</p></div>
-                </div>
-                <div className="flex items-center gap-2 p-2 bg-blue-50 rounded-lg">
-                  <Users className="h-3.5 w-3.5 text-blue-600" />
-                  <div>
-                    <p className="text-[10px] text-muted-foreground">Submissions</p>
-                    <p className="text-xs font-medium text-blue-700">{submissionCount}</p>
-                  </div>
-                </div>
+            <main className="p-4 lg:p-6 xl:p-8">
+              <div className="max-w-[1600px] mx-auto">
+                <ErrorBoundary 
+                  key={pathname} 
+                  variant="staff"
+                  suppressFullPage={isExamSubRoute}
+                >
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={pathname}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {children}
+                    </motion.div>
+                  </AnimatePresence>
+                </ErrorBoundary>
               </div>
-              
-              {exam.instructions && (
-                <div className="mt-2 p-3 bg-slate-50 rounded-lg">
-                  <p className="text-[10px] text-muted-foreground mb-1">Instructions</p>
-                  <p className="text-xs whitespace-pre-wrap">{exam.instructions}</p>
-                </div>
-              )}
+            </main>
+          </div>
+        </div>
 
-              {/* ✅ SUBMISSIONS CARD - Links to submissions page */}
-              {submissionCount > 0 && (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-blue-700">
-                      {submissionCount} student{submissionCount !== 1 ? 's' : ''} submitted
-                    </p>
-                    <p className="text-[10px] text-blue-600">View all scores and grades</p>
-                  </div>
-                  <Button 
-                    size="sm" 
-                    variant="outline"
-                    className="bg-white h-7 text-xs"
-                    onClick={handleViewSubmissions}
+        {/* ── MOBILE ───────────────────────────────────────────────────────── */}
+        <div className="lg:hidden">
+          <MobileTopBar
+            profile={profile}
+            activeTab={activeTab}
+            onRefresh={refreshData}
+            isRefreshing={isRefreshing}
+          />
+
+          <main className="pt-[60px] pb-24">
+            <div className="px-3 py-4">
+              <ErrorBoundary 
+                key={pathname} 
+                variant="staff"
+                suppressFullPage={isExamSubRoute}
+              >
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={pathname}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <Eye className="h-3 w-3 mr-1" /> View
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Questions Tab */}
-        <TabsContent value="questions" className="mt-4 space-y-4">
-          {/* Objective Questions Section */}
-          {objectiveQuestions.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
-                <div className="flex justify-between items-center flex-wrap gap-2">
-                  <CardTitle className="text-sm sm:text-base">Objective Questions</CardTitle>
-                  <Badge variant="outline" className="text-[10px] sm:text-xs">
-                    {objectiveQuestions.reduce((sum, q) => sum + q.marks, 0)} total marks
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="px-3 sm:px-5 pb-4 space-y-3">
-                {objectiveQuestions.map((q, idx) => (
-                  <div key={q.id} className="p-3 bg-slate-50 rounded-lg">
-                    <div className="flex justify-between items-start gap-2">
-                      <p className="text-xs sm:text-sm font-medium flex-1">
-                        {idx + 1}. {q.question}
-                      </p>
-                      <Badge variant="outline" className="text-[10px] shrink-0">
-                        {q.marks} pt{q.marks !== 1 ? 's' : ''}
-                      </Badge>
-                    </div>
-                    {q.options && q.options.length > 0 && (
-                      <div className="mt-2 space-y-1 pl-2">
-                        {q.options.map((opt, optIdx) => (
-                          <p key={optIdx} className="text-[11px] sm:text-xs">
-                            {String.fromCharCode(65 + optIdx)}. {opt}
-                            {opt === q.correct_answer && <CheckCircle className="h-3 w-3 text-green-600 inline ml-1" />}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {q.is_draft && (
-                      <Badge variant="outline" className="text-[10px] text-amber-600 border-amber-300 mt-1">
-                        📝 Draft
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Theory Questions Section */}
-          {theoryQuestionsData.length > 0 && (
-            <Card>
-              <CardHeader className="pb-2 px-3 sm:px-5 pt-3">
-                <div className="flex justify-between items-center flex-wrap gap-2">
-                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
-                    <Brain className="h-4 w-4 text-purple-600" />
-                    Theory Questions
-                  </CardTitle>
-                  <Badge variant="outline" className="text-[10px] sm:text-xs">
-                    {theoryQuestionsData.reduce((sum, q) => sum + q.marks, 0)} total marks
-                  </Badge>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {theoryQuestionsData.length} question{theoryQuestionsData.length !== 1 ? 's' : ''} • Essay type with sub-questions
-                </p>
-              </CardHeader>
-              <CardContent className="px-3 sm:px-5 pb-4 space-y-4">
-                {theoryQuestionsData.map((q, idx) => (
-                  <TheoryQuestionCard
-                    key={q.id}
-                    question={q as TheoryQuestionData}
-                    index={idx}
-                    marks={q.marks}
-                  />
-                ))}
-              </CardContent>
-            </Card>
-          )}
-
-          {totalQuestions === 0 && (
-            <div className="text-center py-8">
-              <HelpCircle className="h-10 w-10 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">No questions added to this exam yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Questions can be stored in the questions table or as JSONB</p>
+                    {children}
+                  </motion.div>
+                </AnimatePresence>
+              </ErrorBoundary>
             </div>
-          )}
-        </TabsContent>
-      </Tabs>
-    </div>
+          </main>
+
+          <MobileBottomNav
+            role="staff"
+            activeTab={activeTab}
+            onTabChange={handleTabChange}
+            profile={
+              profile
+                ? {
+                    full_name: profile.full_name,
+                    email: profile.email,
+                    photo_url: profile.photo_url || profile.avatar_url,
+                  }
+                : null
+            }
+            onLogout={handleLogout}
+          />
+        </div>
+      </div>
+    </StaffContext.Provider>
   )
 }

@@ -1,13 +1,18 @@
 // src/components/student/exam/dialogs/SubmitDialog.tsx
+'use client'
+
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { AlertTriangle, Send, Loader2, FileText, CheckCircle2, Info } from 'lucide-react'
+import {
+  AlertTriangle, Send, Loader2, CheckCircle2,
+  X, PenTool, Shield, ClipboardCheck,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface TheoryInfo {
@@ -37,147 +42,233 @@ export function SubmitDialog({
   onSubmit,
   theoryInfo,
 }: SubmitDialogProps) {
-  const theoryComplete = theoryInfo ? theoryInfo.answered >= theoryInfo.required : true
-  const canSubmit = unansweredCount === 0 || (theoryInfo && theoryComplete)
+  const theoryComplete =
+    theoryInfo ? theoryInfo.answered >= theoryInfo.required : true
+  const allAnswered     = unansweredCount === 0
+  const isFullyComplete = allAnswered && theoryComplete
+
+  const progressPct =
+    totalQuestions > 0
+      ? Math.min(100, Math.round((answeredCount / totalQuestions) * 100))
+      : 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md bg-white border-slate-200 rounded-2xl shadow-xl">
-        <DialogHeader>
-          <DialogTitle className="text-xl font-bold text-slate-900">
-            Submit Exam?
-          </DialogTitle>
-          <p className="text-slate-500 text-sm">
-            Review your answers before submitting
-          </p>
-        </DialogHeader>
+      <DialogContent className="max-w-[420px] w-[95vw] p-0 gap-0 bg-white dark:bg-zinc-950 border border-zinc-200 dark:border-zinc-800 shadow-2xl rounded-2xl overflow-hidden">
 
-        <div className="py-2 space-y-3">
-          {/* Overall Progress */}
-          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-slate-600 text-sm font-medium">Progress</span>
-              <span className="text-sm font-bold text-slate-800">
-                {answeredCount}/{totalQuestions}
+        <DialogDescription className="sr-only">
+          Confirm your exam submission.
+        </DialogDescription>
+
+        {/* Close */}
+        <button
+          onClick={() => onOpenChange(false)}
+          disabled={isSubmitting}
+          className="absolute top-4 right-4 z-20 h-6 w-6 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 flex items-center justify-center transition-colors disabled:opacity-50"
+          aria-label="Close"
+        >
+          <X className="h-3.5 w-3.5 text-zinc-400" />
+        </button>
+
+        {/* ── Header ── */}
+        <div className="px-6 pt-7 pb-5 border-b border-zinc-100 dark:border-zinc-800">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="h-10 w-10 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center shrink-0">
+                <ClipboardCheck className="h-5 w-5 text-zinc-600 dark:text-zinc-300" />
+              </div>
+              <div>
+                <DialogTitle className="text-base font-semibold text-zinc-900 dark:text-zinc-50 leading-tight">
+                  Submit Exam
+                </DialogTitle>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Review your progress before submitting
+                </p>
+              </div>
+            </div>
+          </DialogHeader>
+        </div>
+
+        {/* ── Body ── */}
+        <div className="px-6 py-5 space-y-4">
+
+          {/* Progress section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] text-zinc-400 font-semibold uppercase tracking-widest">
+                Progress
+              </span>
+              <span className="text-xs text-zinc-500">
+                <span className="font-semibold text-zinc-900 dark:text-zinc-50">
+                  {answeredCount}
+                </span>
+                <span className="text-zinc-300 dark:text-zinc-600">
+                  {' '}/{' '}{totalQuestions}
+                </span>
               </span>
             </div>
-            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-              <div 
+
+            {/* Progress bar */}
+            <div className="h-1.5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+              <div
                 className={cn(
-                  "h-full rounded-full transition-all",
-                  answeredCount === totalQuestions ? "bg-emerald-500" : "bg-blue-500"
+                  'h-full rounded-full transition-all duration-500',
+                  isFullyComplete
+                    ? 'bg-zinc-900 dark:bg-zinc-100'
+                    : 'bg-zinc-400 dark:bg-zinc-500',
                 )}
-                style={{ width: `${Math.min(100, (answeredCount / totalQuestions) * 100)}%` }}
+                style={{ width: `${progressPct}%` }}
               />
+            </div>
+
+            {/* Stat grid */}
+            <div className="grid grid-cols-3 gap-px bg-zinc-100 dark:bg-zinc-800 rounded-xl overflow-hidden">
+              {[
+                { label: 'Answered', value: answeredCount,   active: true },
+                { label: 'Skipped',  value: unansweredCount, active: unansweredCount > 0 },
+                { label: 'Total',    value: totalQuestions,  active: false },
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="flex flex-col items-center gap-0.5 py-2.5 bg-white dark:bg-zinc-950"
+                >
+                  <span className={cn(
+                    'text-sm font-semibold tabular-nums',
+                    stat.active && stat.label === 'Skipped'
+                      ? 'text-zinc-900 dark:text-zinc-50'
+                      : stat.active
+                      ? 'text-zinc-900 dark:text-zinc-50'
+                      : 'text-zinc-400',
+                  )}>
+                    {stat.value}
+                  </span>
+                  <span className="text-[9px] text-zinc-400 font-medium uppercase tracking-widest">
+                    {stat.label}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Theory info */}
+          {/* Theory section */}
           {theoryInfo && (
-            <div className={cn(
-              "rounded-xl p-4 border text-sm",
-              theoryComplete
-                ? "bg-emerald-50 border-emerald-200"
-                : "bg-amber-50 border-amber-200"
-            )}>
-              <div className="flex items-center gap-2 font-semibold mb-2">
-                <FileText className={cn(
-                  "h-4 w-4",
-                  theoryComplete ? "text-emerald-600" : "text-amber-600"
-                )} />
-                <span className={theoryComplete ? "text-emerald-800" : "text-amber-800"}>
-                  Theory Questions
+            <div className="rounded-xl border border-zinc-100 dark:border-zinc-800 overflow-hidden">
+              <div className="flex items-center justify-between px-3.5 py-3 bg-zinc-50 dark:bg-zinc-900">
+                <div className="flex items-center gap-2.5">
+                  <PenTool className="h-3.5 w-3.5 text-zinc-500" />
+                  <span className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                    Theory Questions
+                  </span>
+                </div>
+                <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-50 tabular-nums">
+                  {theoryInfo.answered}
+                  <span className="text-zinc-300 dark:text-zinc-600 font-normal">
+                    {' '}/{' '}{theoryInfo.required} required
+                  </span>
                 </span>
               </div>
-              <p className={theoryComplete ? "text-emerald-700" : "text-amber-700"}>
-                You answered <strong>{theoryInfo.answered}</strong> of <strong>{theoryInfo.required}</strong> required
-                (out of {theoryInfo.total} total theory questions).
-              </p>
-              {!theoryComplete && (
-                <p className="text-red-600 text-xs mt-2 font-medium flex items-center gap-1">
-                  <AlertTriangle className="h-3 w-3" />
-                  You need to answer at least {theoryInfo.required} theory questions.
+              <div className="px-3.5 py-2.5">
+                {/* Theory progress */}
+                <div className="h-1 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden mb-2">
+                  <div
+                    className={cn(
+                      'h-full rounded-full transition-all duration-500',
+                      theoryComplete
+                        ? 'bg-zinc-900 dark:bg-zinc-100'
+                        : 'bg-zinc-400',
+                    )}
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        Math.round(
+                          (theoryInfo.answered / theoryInfo.required) * 100,
+                        ),
+                      )}%`,
+                    }}
+                  />
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-snug">
+                  {theoryComplete
+                    ? theoryInfo.answered > theoryInfo.required
+                      ? `${theoryInfo.answered - theoryInfo.required} extra beyond the ${theoryInfo.required} required.`
+                      : 'All required theory questions answered.'
+                    : `${theoryInfo.required - theoryInfo.answered} more required to submit.`}
                 </p>
-              )}
-              {theoryComplete && theoryInfo.answered >= theoryInfo.required && (
-                <p className="text-emerald-600 text-xs mt-2 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {theoryInfo.answered > theoryInfo.required 
-                    ? `You've answered extra theory questions beyond the required ${theoryInfo.required}.`
-                    : 'Required theory questions completed!'}
-                </p>
-              )}
+              </div>
             </div>
           )}
 
-          {/* Unanswered warning */}
+          {/* Status messages */}
           {unansweredCount > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+              <AlertTriangle className="h-4 w-4 text-zinc-400 shrink-0 mt-0.5" />
               <div>
-                <p className="text-amber-800 font-medium text-sm">
-                  {unansweredCount} required question{unansweredCount > 1 ? 's' : ''} unanswered
+                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  {unansweredCount} question{unansweredCount !== 1 ? 's' : ''} unanswered
                 </p>
-                <p className="text-amber-600 text-xs mt-0.5">
+                <p className="text-[11px] text-zinc-400 mt-0.5">
                   Unanswered questions will be marked as incorrect.
                 </p>
               </div>
             </div>
           )}
 
-          {/* All complete */}
-          {canSubmit && unansweredCount === 0 && (
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-start gap-3">
-              <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+          {isFullyComplete && (
+            <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+              <CheckCircle2 className="h-4 w-4 text-zinc-600 dark:text-zinc-300 shrink-0 mt-0.5" />
               <div>
-                <p className="text-emerald-800 font-medium text-sm">
-                  All required questions answered!
+                <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                  Ready to submit
                 </p>
-                <p className="text-emerald-600 text-xs mt-0.5">
-                  You're ready to submit your exam.
+                <p className="text-[11px] text-zinc-400 mt-0.5">
+                  All required questions have been answered.
                 </p>
               </div>
             </div>
           )}
 
-          {/* One-attempt warning */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2">
-            <Info className="h-4 w-4 text-blue-500 shrink-0 mt-0.5" />
+          {/* Policy notice */}
+          <div className="flex items-start gap-2.5 px-3.5 py-3 rounded-xl bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800">
+            <Shield className="h-4 w-4 text-zinc-400 shrink-0 mt-0.5" />
             <div>
-              <p className="text-blue-700 text-xs font-medium">Single Attempt Policy</p>
-              <p className="text-blue-600 text-xs mt-0.5">
-                This exam can only be taken once. Once submitted, you cannot retake it.
+              <p className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+                Single attempt
+              </p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">
+                This exam cannot be retaken once submitted.
               </p>
             </div>
           </div>
         </div>
 
-        <DialogFooter className="gap-3 flex-col sm:flex-row">
+        {/* ── Footer ── */}
+        <div className="px-6 pb-6 pt-1 grid grid-cols-2 gap-2.5">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="border-slate-200 text-slate-700 hover:bg-slate-50 rounded-xl w-full sm:w-auto order-2 sm:order-1"
+            disabled={isSubmitting}
+            className="h-11 text-sm font-semibold rounded-xl border-zinc-200 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-50 dark:hover:bg-zinc-900 transition-colors"
           >
-            Continue Exam
+            Continue
           </Button>
           <Button
             onClick={onSubmit}
             disabled={isSubmitting}
-            className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl w-full sm:w-auto order-1 sm:order-2 font-semibold"
+            className="h-11 text-sm font-semibold rounded-xl bg-zinc-900 hover:bg-zinc-800 dark:bg-zinc-50 dark:hover:bg-zinc-200 dark:text-zinc-900 text-white transition-colors"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Submitting...
+                Submitting…
               </>
             ) : (
               <>
                 <Send className="mr-2 h-4 w-4" />
-                Submit Exam
+                Submit
               </>
             )}
           </Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   )

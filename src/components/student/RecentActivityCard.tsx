@@ -58,8 +58,19 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
           <div className="space-y-2">
             {attempts.slice(0, 5).map((attempt, index) => {
               const isInProgress = attempt.status === 'in_progress'
-              const displayPct = attempt.display_percentage || attempt.ca_percentage || attempt.percentage || 0
-              const isPassed = displayPct >= 40
+              
+              // ✅ Use CA score when available, otherwise exam percentage
+              const hasCA = attempt.has_ca && attempt.ca_score
+              const displayPct = hasCA 
+                ? Number(attempt.ca_score.total_score) || 0
+                : (attempt.percentage || 0)
+              
+              const displayGrade = hasCA ? attempt.ca_score.grade : null
+              
+              // ✅ Pass/fail based on CA grade (WAEC) or 50% threshold
+              const isPassed = hasCA 
+                ? attempt.ca_score.grade !== 'F9'
+                : displayPct >= 50
               
               return (
                 <div 
@@ -101,6 +112,16 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                           <span className={cn("font-bold", getScoreColor(displayPct))}>
                             {Math.round(displayPct)}%
                           </span>
+                          {displayGrade && (
+                            <Badge className={cn(
+                              "text-[10px] px-1 py-0 ml-1 font-bold",
+                              displayGrade === 'F9' 
+                                ? 'bg-red-100 text-red-700' 
+                                : 'bg-emerald-100 text-emerald-700'
+                            )}>
+                              {displayGrade}
+                            </Badge>
+                          )}
                         </span>
                       )}
                       <span className="flex items-center gap-1">

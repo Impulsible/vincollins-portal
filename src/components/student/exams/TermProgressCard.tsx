@@ -1,4 +1,5 @@
-// src/components/student/exams/TermProgressCard.tsx
+// components/student/exams/TermProgressCard.tsx - COMPLETE FIXED VERSION
+
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,25 +20,37 @@ interface TermProgressCardProps {
 }
 
 export function TermProgressCard({
-  stats, availableTerms, selectedTermSession, onTermChange, onRefresh,
+  stats,
+  availableTerms,
+  selectedTermSession,
+  onTermChange,
+  onRefresh,
 }: TermProgressCardProps) {
   const completionPercentage = stats.totalSubjects > 0 
     ? Math.round((stats.completed / stats.totalSubjects) * 100) : 0
 
+  // ✅ Grade styles for all possible grades
   const getGradeStyle = (grade: string) => {
     switch (grade) {
-      case 'A1': return "bg-emerald-50 text-emerald-700 border-emerald-300"
-      case 'B2': return "bg-blue-50 text-blue-700 border-blue-300"
-      case 'B3': return "bg-sky-50 text-sky-700 border-sky-300"
-      case 'C4': return "bg-teal-50 text-teal-700 border-teal-300"
-      case 'C5': return "bg-amber-50 text-amber-700 border-amber-300"
-      case 'C6': return "bg-orange-50 text-orange-700 border-orange-300"
-      case 'D7': return "bg-yellow-50 text-yellow-700 border-yellow-300"
-      case 'E8': return "bg-red-50 text-red-400 border-red-300"
-      case 'F9': return "bg-red-100 text-red-600 border-red-400"
-      default: return "bg-slate-50 text-slate-600 border-slate-300"
+      case 'A':
+        return "bg-emerald-50 text-emerald-700 border-emerald-300 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-800"
+      case 'B':
+        return "bg-blue-50 text-blue-700 border-blue-300 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-800"
+      case 'C':
+        return "bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-800"
+      case 'P':
+        return "bg-purple-50 text-purple-700 border-purple-300 dark:bg-purple-950/30 dark:text-purple-400 dark:border-purple-800"
+      case 'F':
+        return "bg-red-100 text-red-600 border-red-400 dark:bg-red-950/30 dark:text-red-400 dark:border-red-800"
+      default:
+        return "bg-slate-50 text-slate-600 border-slate-300 dark:bg-slate-900 dark:text-slate-400 dark:border-slate-700"
     }
   }
+
+  // ✅ Use stats.currentGrade directly from the database
+  const displayGrade = stats.completed > 0 && stats.currentGrade && stats.currentGrade !== 'N/A'
+    ? stats.currentGrade
+    : 'N/A'
 
   return (
     <div className="mb-5 sm:mb-8">
@@ -56,7 +69,9 @@ export function TermProgressCard({
                   </SelectTrigger>
                   <SelectContent>
                     {availableTerms.map((t) => (
-                      <SelectItem key={`${t.term}|${t.session_year}`} value={`${t.term}|${t.session_year}`}>{t.label}</SelectItem>
+                      <SelectItem key={`${t.term}|${t.session_year}`} value={`${t.term}|${t.session_year}`}>
+                        {t.label}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -71,13 +86,14 @@ export function TermProgressCard({
                 {stats.completed}/{stats.totalSubjects} Completed
               </Badge>
               
-              {stats.completed > 0 && stats.currentGrade !== 'N/A' && (
+              {/* ✅ Show grade from stats.currentGrade */}
+              {stats.completed > 0 && displayGrade !== 'N/A' && (
                 <Badge className={cn(
                   "text-xs sm:text-sm font-semibold border px-3 py-1 rounded-full",
-                  getGradeStyle(stats.currentGrade)
+                  getGradeStyle(displayGrade)
                 )}>
                   <Award className="h-3.5 w-3.5 mr-1" />
-                  {stats.currentGrade}
+                  {displayGrade}
                 </Badge>
               )}
             </div>
@@ -94,7 +110,7 @@ export function TermProgressCard({
             </div>
             <Progress value={completionPercentage} className="h-2" />
             <p className="text-xs text-muted-foreground mt-2">
-              {stats.completed} of {stats.totalSubjects} subjects completed • Average Score: {stats.averageScore}%
+              {stats.completed} of {stats.totalSubjects} subjects completed • Average Score: {stats.averageScore}% • Grade: {displayGrade}
             </p>
           </div>
         </CardContent>

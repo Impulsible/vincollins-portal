@@ -1,4 +1,5 @@
-// middleware.ts
+// middleware.ts - FIXED VERSION
+
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
@@ -33,6 +34,16 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next({ request: { headers: req.headers } })
   const pathname = req.nextUrl.pathname
 
+  // ✅ Debug: Log the current path
+  console.log('🔍 Middleware - Path:', pathname)
+
+  // ✅ Skip middleware for staff exam sub-routes (let them pass through)
+  // This prevents the middleware from interfering with /staff/exams/[id]/submissions
+  if (pathname.startsWith('/staff/exams/')) {
+    console.log('✅ Staff exam route - allowing through:', pathname)
+    return res
+  }
+
   // Validate env — fail fast in dev, log in prod
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
@@ -45,7 +56,7 @@ export async function middleware(req: NextRequest) {
     return res
   }
 
-  // Build supabase client with cookie forwarding - FIXED cookies structure
+  // Build supabase client with cookie forwarding
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
@@ -102,7 +113,7 @@ export async function middleware(req: NextRequest) {
     // Not logged in — send to portal
     if (!isLoggedIn) {
       const url = new URL('/portal', req.url)
-      url.searchParams.set('redirect', pathname) // remember where they were going
+      url.searchParams.set('redirect', pathname)
       return NextResponse.redirect(url)
     }
 

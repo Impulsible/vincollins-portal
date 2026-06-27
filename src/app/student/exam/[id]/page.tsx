@@ -1,4 +1,3 @@
-// src/app/student/exam/[id]/page.tsx
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
@@ -10,9 +9,8 @@ import { useExamTimer } from './hooks/useExamTimer'
 import { useExamSecurity } from './hooks/useExamSecurity'
 import { useAutoSave } from './hooks/useAutoSave'
 import { useNetworkStatus } from './hooks/useNetworkStatus'
-import { calculateScore, calculateTheoryTotal } from './utils/scoring'
+import { calculateScore, calculateTheoryTotal, formatTime } from './utils/scoring'
 import type { ExamState, ExamResult } from './types'
-import { CURRENT_TERM, CURRENT_SESSION } from './constants'
 
 import { LoadingView } from '@/components/student/exam/views/LoadingView'
 import { ErrorView } from '@/components/student/exam/views/ErrorView'
@@ -50,6 +48,7 @@ export default function TakeExamPage() {
     resumeData, showResumeDialog, setShowResumeDialog,
     examTerminated, setExamTerminated,
     handleResumeExam, handleStartNewAttempt, handleDiscardAndStart,
+    startNewAttempt,
   } = useExamLoader(examId, router)
 
   const isOnline = useNetworkStatus()
@@ -59,7 +58,6 @@ export default function TakeExamPage() {
     () => handleSubmit(true, 'Time expired')
   )
 
-  // ✅ Fixed: Pass initial violations and attemptId for persistence
   const { tabSwitches, fullscreenExits, fullscreen, setFullscreen, showFullscreenPrompt, setShowFullscreenPrompt, enterFullscreen } = useExamSecurity(
     examState.examStarted,
     examEndedRef,
@@ -97,34 +95,24 @@ export default function TakeExamPage() {
       else if ((elem as any).webkitRequestFullscreen) await (elem as any).webkitRequestFullscreen()
       setFullscreen(true)
       
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session?.user) {
-        const { data: att, error: insertError } = await supabase
-          .from('exam_attempts')
-          .insert({
-            exam_id: examId, student_id: session.user.id,
-            student_name: profile?.full_name || session.user.email?.split('@')[0] || 'Student',
-            student_email: session.user.email || '', student_class: profile?.class || '',
-            status: 'in_progress', started_at: new Date().toISOString(),
-            tab_switches: 0, fullscreen_exits: 0, unload_count: 0,
-            attempt_number: attemptsUsed + 1,
-            term: exam?.term || CURRENT_TERM, session_year: exam?.session_year || CURRENT_SESSION,
-          }).select('id').single()
-
-        if (insertError) {
-          console.error('Insert error:', insertError)
-          toast.error('Failed to start exam')
-          setExamState(prev => ({ ...prev, startingExam: false }))
-          return
-        }
-        if (att) setAttemptId(att.id)
+      const result = await startNewAttempt()
+      
+      if (result) {
+        setAttemptId(result.attemptId)
+        setExamState(prev => ({ 
+          ...prev, 
+          examStarted: true, 
+          showInstructions: false, 
+          startingExam: false 
+        }))
+        setTimeLeft((exam?.duration || 30) * 60)
+        examEndedRef.current = false
+        toast.success('Exam started! Good luck!')
+      } else {
+        setExamState(prev => ({ ...prev, startingExam: false }))
       }
-
-      setExamState(prev => ({ ...prev, examStarted: true, showInstructions: false, startingExam: false }))
-      setTimeLeft((exam?.duration || 30) * 60)
-      examEndedRef.current = false
-      toast.success('Exam started! Good luck!')
     } catch (error: any) {
+      console.error('Start exam error:', error)
       toast.error('Failed to start exam')
       setExamState(prev => ({ ...prev, startingExam: false }))
     }
@@ -142,63 +130,195 @@ export default function TakeExamPage() {
     }
   }
 
-  // ===== SUBMIT EXAM =====
+  // ============================================
+  // ✅ SUBMIT EXAM - COMPLETE FIXED VERSION
+  // ============================================
   const handleSubmit = useCallback(async (isAuto = false, reason = 'manual') => {
-    if (isSubmittingRef.current || examEndedRef.current) return
+    // ✅ Prevent multiple submissions
+    if (isSubmittingRef.current || examEndedRef.current) {
+      console.log('⚠️ Submit already in progress or exam ended')
+      return
+    }
+    
     isSubmittingRef.current = true
     examEndedRef.current = true
 
     setExamState(prev => ({ ...prev, examEnded: true, isSubmitting: true, showSubmitDialog: false }))
-    if (document.fullscreenElement) { try { await document.exitFullscreen() } catch (e) {} }
+    
+    // ✅ Try to exit fullscreen
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen()
+      }
+    } catch (e) {
+      console.warn('Fullscreen exit error:', e)
+    }
 
     try {
+      console.log('📝 Starting submit process...')
+      
+      // Calculate objective score
       const result = calculateScore(allQuestions, examState.answers)
-      const theoryTotal = calculateTheoryTotal(allQuestions)
+      console.log('📊 Score calculated:', result)
+      
       const passingScore = exam?.passing_percentage || 50
-      const isPassed = result.percentage >= passingScore
+      const objectiveMax = exam?.objective_max || 20
+      const theoryMax = exam?.theory_max || 40
+      const hasTheory = exam?.has_theory && theoryQuestionCount > 0
 
+      // Calculate percentage
+      let displayPercentage = result.total > 0 ? Math.round((result.score / result.total) * 100) : 0
+      const isPassed = displayPercentage >= passingScore
+
+      // Separate answers
       const objectiveAnswers: Record<string, string> = {}
       const theoryAnswers: Record<string, string> = {}
       allQuestions.forEach((q: any) => {
-        if (q.type === 'theory') theoryAnswers[q.id] = examState.answers[q.id] || ''
-        else objectiveAnswers[q.id] = examState.answers[q.id] || ''
+        if (q.type === 'theory') {
+          theoryAnswers[q.id] = examState.answers[q.id] || ''
+        } else {
+          objectiveAnswers[q.id] = examState.answers[q.id] || ''
+        }
       })
 
-      const hasTheory = exam?.has_theory && theoryQuestionCount > 0
       const status = hasTheory ? 'pending_theory' : 'completed'
 
+      // ✅ Get CA scores (for display only - not stored in exam_attempts)
+      let caTotalScore = 0
+      let ca1Score = 0
+      let ca2Score = 0
+      
+      if (profile?.id) {
+        try {
+          const { data: caData } = await supabase
+            .from('ca_scores')
+            .select('ca1_score, ca2_score')
+            .eq('student_id', profile.id)
+            .eq('exam_id', examId)
+            .maybeSingle()
+          
+          if (caData) {
+            ca1Score = Number(caData.ca1_score) || 0
+            ca2Score = Number(caData.ca2_score) || 0
+            caTotalScore = ca1Score + ca2Score
+            console.log('✅ CA Scores (display):', { ca1Score, ca2Score, caTotalScore })
+          }
+        } catch (caError) {
+          console.warn('⚠️ Error fetching CA scores:', caError)
+        }
+      }
+
+      // ✅ UPDATE the attempt - ONLY columns that exist in exam_attempts
       if (attemptId) {
-        await supabase.from('exam_attempts').update({
-          status: status, submitted_at: new Date().toISOString(),
-          is_auto_submitted: isAuto, auto_submit_reason: isAuto ? reason : null,
-          tab_switches: tabSwitches, fullscreen_exits: fullscreenExits,
-          answers: objectiveAnswers, theory_answers: theoryAnswers,
-          objective_score: result.score, objective_total: result.total,
-          theory_total: theoryTotal, total_score: result.score,
-          total_marks: result.total + theoryTotal, percentage: result.percentage,
-          is_passed: isPassed, correct_count: result.correct,
-          incorrect_count: result.incorrect, unanswered_count: result.unanswered,
-        }).eq('id', attemptId)
+        console.log('📝 Updating attempt:', attemptId)
+        
+        const updateData = {
+          status: status,
+          submitted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          is_auto_submitted: isAuto,
+          auto_submit_reason: isAuto ? reason : null,
+          tab_switches: tabSwitches || 0,
+          fullscreen_exits: fullscreenExits || 0,
+          answers: objectiveAnswers,
+          theory_answers: theoryAnswers,
+          objective_score: result.score,
+          objective_total: objectiveMax,
+          theory_score: 0,
+          theory_total: theoryMax,
+          total_score: result.score,
+          total_marks: objectiveMax,
+          percentage: displayPercentage,
+          is_passed: isPassed,
+          correct_count: result.correct || 0,
+          incorrect_count: result.incorrect || 0,
+          unanswered_count: result.unanswered || 0
+        }
+
+        console.log('📤 Update data:', updateData)
+
+        const { error } = await supabase
+          .from('exam_attempts')
+          .update(updateData)
+          .eq('id', attemptId)
+
+        if (error) {
+          console.error('❌ Submit error:', error)
+          toast.error('Failed to save exam results: ' + error.message)
+          setExamState(prev => ({ ...prev, isSubmitting: false }))
+          isSubmittingRef.current = false
+          examEndedRef.current = false
+          return
+        }
+        
+        console.log('✅ Attempt updated successfully')
+      } else {
+        console.error('❌ No attempt ID found')
+        toast.error('No active exam session found')
+        setExamState(prev => ({ ...prev, isSubmitting: false }))
+        isSubmittingRef.current = false
+        examEndedRef.current = false
+        return
+      }
+
+      // ✅ Get all attempts count
+      const { data: allAttempts } = await supabase
+        .from('exam_attempts')
+        .select('id, status')
+        .eq('exam_id', examId)
+        .eq('student_id', profile?.id)
+        .in('status', ['completed', 'graded', 'pending_theory', 'terminated'])
+
+      const totalCompletedAttempts = allAttempts?.length || 1
+
+      // ✅ Calculate final percentage with CA for display only
+      let finalPercentage = displayPercentage
+      if (caTotalScore > 0) {
+        const totalWithCA = objectiveMax + 40
+        const scoreWithCA = result.score + caTotalScore
+        finalPercentage = totalWithCA > 0 ? Math.round((scoreWithCA / totalWithCA) * 100) : 0
       }
 
       const finalResult: ExamResult = {
-        ...result, theory_score: 0, theory_total: theoryTotal,
-        is_passed: isPassed, passing_percentage: passingScore, status: status,
-        attempts_used: attemptsUsed + 1, max_attempts: exam?.max_attempts || 1,
+        ...result,
+        theory_score: 0,
+        theory_total: theoryMax,
+        is_passed: isPassed,
+        passing_percentage: passingScore,
+        status: status,
+        attempts_used: totalCompletedAttempts,
+        max_attempts: exam?.max_attempts || 10,
         submitted_at: new Date().toISOString(),
+        percentage: finalPercentage,
+        total_score: result.score,
+        total_marks: objectiveMax,
+        objective_score: result.score,
+        objective_total: objectiveMax,
+        ca_score: caTotalScore,
+        ca1_score: ca1Score,
+        ca2_score: ca2Score,
+        grade: isPassed ? 'P' : 'F'
       }
 
       setExamResult(finalResult)
       setExamState(prev => ({ ...prev, examStarted: false, isSubmitting: false, showResultDialog: true }))
-      toast.success(isAuto ? 'Exam submitted due to: ' + reason : hasTheory ? 'Exam submitted! Theory answers will be graded.' : 'Exam submitted successfully!')
+      
+      toast.success(
+        hasTheory 
+          ? `Exam submitted! Theory pending grading. Score: ${finalPercentage}% (Attempt ${totalCompletedAttempts}/${exam?.max_attempts || 10})` 
+          : `Exam completed! Score: ${finalPercentage}% (Attempt ${totalCompletedAttempts}/${exam?.max_attempts || 10})`
+      )
+      
+      console.log('✅ Submit complete!')
+      
     } catch (error: any) {
-      console.error('Submit error:', error)
-      toast.error('Failed to submit exam')
+      console.error('❌ Submit error:', error)
+      toast.error('Failed to submit exam: ' + (error.message || 'Unknown error'))
       setExamState(prev => ({ ...prev, isSubmitting: false }))
       isSubmittingRef.current = false
       examEndedRef.current = false
     }
-  }, [allQuestions, examState.answers, exam, attemptId, tabSwitches, fullscreenExits, attemptsUsed, profile, examId, theoryQuestionCount])
+  }, [allQuestions, examState.answers, exam, attemptId, tabSwitches, fullscreenExits, profile, examId, theoryQuestionCount])
 
   const updateAnswer = (questionId: string, value: string) => {
     setExamState(prev => ({ ...prev, answers: { ...prev.answers, [questionId]: value } }))
@@ -243,7 +363,6 @@ export default function TakeExamPage() {
     )
   }
 
-  // ✅ FIXED: ResumeDialog with correct props (no onNewAttempt or onDiscard)
   if (showResumeDialog) {
     return (
       <ResumeDialog
@@ -271,8 +390,11 @@ export default function TakeExamPage() {
   if (!examState.examStarted && examState.showInstructions) {
     return (
       <InstructionsView
-        exam={exam!} profile={profile} allQuestions={allQuestions}
-        startingExam={examState.startingExam} onStart={startExam}
+        exam={exam!} 
+        profile={profile} 
+        allQuestions={allQuestions}
+        startingExam={examState.startingExam} 
+        onStart={startExam}
         onCancel={() => router.push('/student/exams')}
       />
     )

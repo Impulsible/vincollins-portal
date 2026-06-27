@@ -1,3 +1,5 @@
+// components/error-boundary.tsx - FIXED VERSION
+
 'use client'
 
 import { Component, ReactNode } from 'react'
@@ -6,10 +8,10 @@ import { RefreshCw, AlertTriangle, Home, ChevronDown, ChevronUp } from 'lucide-r
 interface Props {
   children: ReactNode
   fallback?: ReactNode
-  // Which portal context we're in — affects styling
   variant?: 'default' | 'staff' | 'student' | 'admin'
-  // If true, show a minimal inline error instead of full screen
   inline?: boolean
+  // ✅ NEW: Prevent full-page error for specific routes
+  suppressFullPage?: boolean
 }
 
 interface State {
@@ -39,14 +41,10 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: { componentStack: string }) {
-    // In production you'd send this to Sentry / LogRocket / etc.
     console.error('[ErrorBoundary] Caught error:', error)
     console.error('[ErrorBoundary] Component stack:', info.componentStack)
 
     this.setState({ errorInfo: info.componentStack })
-
-    // Report to your logging service here
-    // e.g. Sentry.captureException(error, { extra: info })
   }
 
   handleRetry = () => {
@@ -73,7 +71,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     const { hasError, error, errorInfo, showDetails, retryCount } = this.state
-    const { children, fallback, inline } = this.props
+    const { children, fallback, inline, variant, suppressFullPage } = this.props
 
     if (!hasError) return children
     if (fallback) return fallback
@@ -99,17 +97,64 @@ export class ErrorBoundary extends Component<Props, State> {
       )
     }
 
-    // ── Full screen variant ───────────────────────────────────────────────────
+    // ── Staff variant - show inline error instead of full page ──────────────
+    if (variant === 'staff' || suppressFullPage) {
+      return (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center max-w-2xl mx-auto my-8">
+          <AlertTriangle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-red-700 mb-2">
+            Something went wrong
+          </h2>
+          <p className="text-sm text-red-600 mb-1">
+            {error?.message || 'An unexpected error occurred'}
+          </p>
+          {process.env.NODE_ENV === 'development' && error?.stack && (
+            <div className="mt-3 text-left">
+              <button
+                onClick={this.toggleDetails}
+                className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700"
+              >
+                {showDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                {showDetails ? 'Hide' : 'Show'} error details
+              </button>
+              {showDetails && (
+                <div className="mt-2 p-3 bg-gray-900 rounded-lg overflow-auto max-h-48">
+                  <pre className="text-[10px] text-red-400 whitespace-pre-wrap font-mono">
+                    {error?.stack}
+                    {errorInfo && `\n\nComponent Stack:${errorInfo}`}
+                  </pre>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="flex gap-3 justify-center mt-6">
+            <button
+              onClick={this.handleRetry}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {retryCount >= MAX_RETRIES ? 'Reload Page' : 'Try Again'}
+            </button>
+            <button
+              onClick={this.handleGoHome}
+              className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-600 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Go Home
+            </button>
+          </div>
+        </div>
+      )
+    }
+
+    // ── Full screen variant (default) ──────────────────────────────────────────
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
         <div className="w-full max-w-md">
-          {/* Card */}
           <div className="bg-white rounded-2xl shadow-xl border border-red-100 overflow-hidden">
-            {/* Top bar */}
             <div className="h-1.5 bg-gradient-to-r from-red-500 to-orange-500" />
 
             <div className="p-8 text-center">
-              {/* Icon */}
               <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-red-100">
                 <AlertTriangle className="h-8 w-8 text-red-500" />
               </div>
@@ -128,7 +173,6 @@ export class ErrorBoundary extends Component<Props, State> {
                 </p>
               )}
 
-              {/* Actions */}
               <div className="flex flex-col gap-3 mt-8">
                 <button
                   onClick={this.handleRetry}
@@ -147,17 +191,13 @@ export class ErrorBoundary extends Component<Props, State> {
                 </button>
               </div>
 
-              {/* Error details (collapsed by default) */}
               {process.env.NODE_ENV === 'development' && (
                 <div className="mt-6 text-left">
                   <button
                     onClick={this.toggleDetails}
                     className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors w-full"
                   >
-                    {showDetails
-                      ? <ChevronUp className="h-3.5 w-3.5" />
-                      : <ChevronDown className="h-3.5 w-3.5" />
-                    }
+                    {showDetails ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
                     {showDetails ? 'Hide' : 'Show'} error details
                   </button>
 
@@ -186,13 +226,17 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 }
 
-// ── Convenience wrapper for functional components ─────────────────────────────
+// ── Convenience wrapper ─────────────────────────────────────────────────────────
 export function withErrorBoundary<P extends object>(
   Component: React.ComponentType<P>,
-  options?: { inline?: boolean; variant?: Props['variant'] }
+  options?: { inline?: boolean; variant?: Props['variant']; suppressFullPage?: boolean }
 ) {
   const Wrapped = (props: P) => (
-    <ErrorBoundary inline={options?.inline} variant={options?.variant}>
+    <ErrorBoundary 
+      inline={options?.inline} 
+      variant={options?.variant}
+      suppressFullPage={options?.suppressFullPage}
+    >
       <Component {...props} />
     </ErrorBoundary>
   )

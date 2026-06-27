@@ -1,4 +1,5 @@
-// src/app/student/exams/hooks/useExamsData.ts
+// src/app/student/exams/hooks/useExamsData.ts - COMPLETE FIXED VERSION
+
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -30,7 +31,7 @@ const extractYear = (className: string): string => {
   return className
 }
 
-// Grade calculation: A=80+, B=70-79, C=60-69, P=50-59, F=below 50
+// ✅ FIXED: Grade calculation - matches database grade mapping
 const calculateLetterGrade = (percentage: number): { grade: string; color: string } => {
   if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
   if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
@@ -39,38 +40,54 @@ const calculateLetterGrade = (percentage: number): { grade: string; color: strin
   return { grade: 'F', color: 'text-red-600' }
 }
 
-// ✅ Calculate score including CA for ALL statuses
+// ✅ FIXED: Calculate score including CA for ALL statuses
 const calculateSubjectPercentage = (attempt: any, caScores: any): number => {
-  // CA scores (added before exam, max 40)
+  // Objective score (max 20)
+  const objectiveScore = attempt.objective_score || 0
+  const objectiveMax = attempt.objective_total || 20
+  
+  // CA scores (max 40 total - CA1 + CA2)
   const ca1 = caScores?.ca1_score || 0
   const ca2 = caScores?.ca2_score || 0
   const caTotal = ca1 + ca2  // Max 40
   
-  // Objective score (max 20)
-  const objectiveScore = attempt.objective_score || 0
+  // Check if theory is graded
+  let theoryScore = 0
+  let hasTheoryGraded = false
   
-  // For pending theory: CA + Objective only (theory not graded yet)
-  if (attempt.status === 'pending_theory') {
-    const totalScore = caTotal + objectiveScore
-    const totalMarks = 60  // CA (40) + Objective (20)
-    return totalMarks > 0 ? (totalScore / totalMarks) * 100 : 0
+  if (attempt.theory_feedback) {
+    try {
+      const feedback = typeof attempt.theory_feedback === 'string' 
+        ? JSON.parse(attempt.theory_feedback) 
+        : attempt.theory_feedback
+      if (feedback?.total?.score !== undefined && feedback?.total?.score > 0) {
+        theoryScore = Number(feedback.total.score)
+        hasTheoryGraded = true
+      }
+    } catch {}
   }
   
-  // For completed/graded: Full score including theory
-  if (attempt.status === 'completed' || attempt.status === 'graded') {
-    let theoryScore = 0
-    if (attempt.theory_feedback) {
-      try {
-        const feedback = typeof attempt.theory_feedback === 'string' ? JSON.parse(attempt.theory_feedback) : attempt.theory_feedback
-        if (feedback?.total?.score !== undefined) theoryScore = Number(feedback.total.score)
-      } catch {}
-    }
-    const totalScore = caTotal + objectiveScore + theoryScore
-    const totalMarks = 100  // CA (40) + Objective (20) + Theory (40)
-    return totalMarks > 0 ? (totalScore / totalMarks) * 100 : 0
+  // Determine what's available and calculate accordingly
+  const hasCA = caTotal > 0
+  const hasTheory = hasTheoryGraded || theoryScore > 0
+  
+  let totalScore = objectiveScore
+  let totalMarks = objectiveMax
+  
+  // Add CA if available
+  if (hasCA) {
+    totalScore += caTotal
+    totalMarks += 40  // CA max
   }
   
-  return 0
+  // Add Theory if available
+  if (hasTheory) {
+    totalScore += theoryScore
+    totalMarks += 40  // Theory max
+  }
+  
+  // Calculate percentage
+  return totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0
 }
 
 export function useExamsData(router: ReturnType<typeof useRouter>) {
@@ -82,7 +99,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
   const [selectedTermSession, setSelectedTermSession] = useState<TermSession | null>(null)
   const [stats, setStats] = useState<LocalStatsState>({
     available: 0, completed: 0, upcoming: 0, averageScore: 0,
-    currentGrade: "N/A", gradeColor: "text-gray-400",
+    currentGrade: "F", gradeColor: "text-red-600",
     totalSubjects: 17, termName: "Third Term", sessionYear: "2025/2026",
     pendingTheoryCount: 0
   })
@@ -302,7 +319,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       })
       setExamAttempts(enrichedAm)
 
-      // Get term progress
+      // Get term progress from database
       const { data: termProgressData } = await supabase
         .from("student_term_progress")
         .select("total_subjects, completed_exams, average_score, grade")
@@ -311,37 +328,53 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         .eq("session_year", targetSession)
         .maybeSingle()
 
-      // ✅ ALL attempts that count toward completion (including pending_theory)
+      // ALL attempts that count toward completion (including pending_theory)
       const allCompletedAttempts = Object.values(enrichedAm).filter(a => 
         ['completed', 'graded', 'pending_theory'].includes(a.status)
       )
       const pendingTheoryAttempts = Object.values(enrichedAm).filter(a => a.status === 'pending_theory')
-      const hasPendingTheory = pendingTheoryAttempts.length > 0
 
-      // ✅ Calculate average score INCLUDING CA for pending theory
+      // ✅ Calculate average score from completed exams
       let avgScore = 0
       if (allCompletedAttempts.length > 0) {
         let totalPercentage = 0
+        let validAttempts = 0
+        
         allCompletedAttempts.forEach((attempt) => {
           const ca = {
-            ca1_score: attempt.ca1_score,
-            ca2_score: attempt.ca2_score
+            ca1_score: attempt.ca1_score || 0,
+            ca2_score: attempt.ca2_score || 0
           }
           const percentage = calculateSubjectPercentage(attempt, ca)
-          totalPercentage += percentage
+          if (percentage > 0) {
+            totalPercentage += percentage
+            validAttempts++
+          }
         })
-        avgScore = Math.round(totalPercentage / allCompletedAttempts.length)
+        
+        if (validAttempts > 0) {
+          avgScore = Math.round(totalPercentage / validAttempts)
+        }
       }
 
-      // ✅ Calculate grade based on ALL completed attempts (including pending theory)
-      const gradeInfo = calculateLetterGrade(avgScore)
-      
-      // ✅ Completed count includes pending_theory
+      // ✅ Calculate grade based on avgScore
+      const gradeInfo = avgScore > 0 
+        ? calculateLetterGrade(avgScore)
+        : { grade: 'F', color: 'text-red-600' }
+
+      // ✅ Debug log
+      console.log('📊 Grade Calculation:', {
+        avgScore,
+        gradeInfo,
+        completedExams: allCompletedAttempts.length
+      })
+
+      // Completed count includes pending_theory
       const actualCompleted = termProgressData?.completed_exams || allCompletedAttempts.length
       const actualTotalSubjects = termProgressData?.total_subjects || totalSubjects
       const displayAverageScore = termProgressData?.average_score || avgScore
 
-      // ✅ Available exams: exams with no attempt OR in_progress only
+      // Available exams
       const availableCount = filteredExams.filter((e: Exam) => {
         const a = enrichedAm[e.id]
         if (!a) return true
@@ -352,18 +385,23 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         e.starts_at && new Date(e.starts_at) > new Date()
       ).length
 
-      setStats({
+      // ✅ Set stats with correct grade
+      const newStats: LocalStatsState = {
         available: availableCount,
         completed: actualCompleted,
         upcoming: upcomingCount,
         averageScore: displayAverageScore,
-        currentGrade: gradeInfo.grade,
+        currentGrade: gradeInfo.grade,  // ✅ This will be 'A' for 80%
         gradeColor: gradeInfo.color,
         totalSubjects: actualTotalSubjects,
         termName: TERM_NAMES[targetTerm] || targetTerm,
         sessionYear: targetSession,
         pendingTheoryCount: pendingTheoryAttempts.length,
-      })
+      }
+
+      console.log('📊 Final Stats:', newStats)
+      setStats(newStats)
+
     } catch (e) { 
       console.error("Error loading exams data:", e)
       toast.error("Failed to load exams")

@@ -1,4 +1,5 @@
-// app/staff/exams/[id]/submissions/page.tsx - FIXED SCORE WITH CA SUPPORT
+// app/staff/exams/[id]/submissions/page.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -62,30 +63,62 @@ export default function ExamSubmissionsPage() {
   const [exam, setExam] = useState<any>(null)
   const [submissions, setSubmissions] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  // 🔴 DEBUG
+  console.log('🔴 SUBMISSIONS PAGE - examId:', examId)
 
   const loadData = useCallback(async (showToast = false) => {
-    if (!examId) return
+    if (!examId) {
+      console.error('❌ No examId in loadData')
+      setError('No exam ID found')
+      setLoading(false)
+      return
+    }
+    
     setLoading(true)
+    setError(null)
+    
     try {
+      // ✅ DON'T redirect - just log and handle gracefully
       const { data: { session } } = await supabase.auth.getSession()
-      if (!session) { router.push('/portal'); return }
+      if (!session) { 
+        console.error('❌ No session - showing error instead of redirecting')
+        setError('Please log in to view submissions')
+        setLoading(false)
+        return
+      }
 
-      const { data: examData } = await supabase
+      const { data: examData, error: examError } = await supabase
         .from('exams')
         .select('id, title, subject, class, total_marks, total_questions, objective_max, theory_max')
         .eq('id', examId)
         .single()
+
+      if (examError) {
+        console.error('❌ Exam error:', examError)
+        setError('Failed to load exam details')
+        setLoading(false)
+        return
+      }
+      
       setExam(examData)
 
-      const { data: subs } = await supabase
+      const { data: subs, error: subsError } = await supabase
         .from('exam_attempts')
         .select('*')
         .eq('exam_id', examId)
         .order('submitted_at', { ascending: false })
 
+      if (subsError) {
+        console.error('❌ Submissions error:', subsError)
+        setError('Failed to load submissions')
+        setLoading(false)
+        return
+      }
+
       const studentIds = [...new Set((subs || []).map(s => s.student_id))]
 
-      // ✅ Fetch CA scores from ca_scores table
       const { data: caScores } = await supabase
         .from('ca_scores')
         .select('student_id, exam_id, ca1_score, ca2_score')
@@ -110,7 +143,6 @@ export default function ExamSubmissionsPage() {
 
         const objScore = sub.objective_score || 0
         
-        // Get theory score
         let theoryScore = sub.theory_score || 0
         if (theoryScore === 0 && sub.theory_feedback) {
           try {
@@ -119,13 +151,11 @@ export default function ExamSubmissionsPage() {
           } catch { /* ignore */ }
         }
         
-        // Get CA scores
         const caData = caScoreMap.get(sub.student_id)
         const caTotal = caData?.caTotal || 0
         
-        // Calculate combined score
         const grandTotal = caTotal + objScore + theoryScore
-        const percentage = Math.round(grandTotal) // ✅ CA(40) + Objective(20) + Theory(40) = 100
+        const percentage = Math.round(grandTotal)
         
         return {
           ...sub,
@@ -148,16 +178,29 @@ export default function ExamSubmissionsPage() {
       }
     } catch (e: any) {
       console.error('Load error:', e)
+      setError(e.message || 'Failed to load submissions')
       if (showToast) toast.error(e.message || 'Failed to load submissions')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [examId, router])
+  }, [examId])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => { 
+    console.log('🔴 useEffect - calling loadData')
+    loadData() 
+  }, [loadData])
 
-  const handleRefresh = () => { setRefreshing(true); loadData(true) }
+  const handleRefresh = () => { 
+    setRefreshing(true)
+    loadData(true) 
+  }
+
+  // ✅ Navigate back to exam detail
+  const handleBack = () => {
+    console.log('🔙 Going back to exam detail:', `/staff/exams/${examId}`)
+    router.push(`/staff/exams/${examId}`)
+  }
 
   const filtered = submissions.filter(s => {
     const q = searchQuery.toLowerCase()
@@ -167,6 +210,23 @@ export default function ExamSubmissionsPage() {
   const formatDate = (d?: string) => {
     if (!d) return '—'
     try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) } catch { return '—' }
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+          <h2 className="text-lg font-semibold text-red-700">Error Loading Submissions</h2>
+          <p className="text-sm text-red-600 mt-1">{error}</p>
+          <Button onClick={handleBack} className="mt-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Exam
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   if (loading && submissions.length === 0) {
@@ -186,9 +246,14 @@ export default function ExamSubmissionsPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full max-w-full p-4 sm:p-6 lg:p-8">
+      {/* ✅ VISUAL INDICATOR - Shows page loaded */}
+      <div className="bg-emerald-500 text-white p-2 rounded-lg text-center text-sm font-bold">
+        ✅ SUBMISSIONS PAGE LOADED - {submissions.length} submissions found
+      </div>
+
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="outline" size="sm" onClick={() => router.push('/staff/exams')} className="shrink-0">
+          <Button variant="outline" size="sm" onClick={handleBack} className="shrink-0">
             <ArrowLeft className="mr-1.5 h-4 w-4" />Back
           </Button>
           <div className="min-w-0">

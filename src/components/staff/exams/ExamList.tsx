@@ -1,10 +1,13 @@
+// components/staff/exams/ExamList.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { PlusCircle, Search, Clock, FileText, Eye, Edit, MoreVertical, Copy, Send, Trash2, Calculator } from 'lucide-react'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
   TableBody,
@@ -13,7 +16,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,8 +24,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import {
+  Search,
+  PlusCircle,
+  Eye,
+  Edit,
+  MoreVertical,
+  Copy,
+  Send,
+  Trash2,
+  Calculator,
+  Clock,
+  FileText,
+  Users,
+  Award,
+} from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 interface Exam {
@@ -55,9 +71,11 @@ interface ExamListProps {
   onCreateExam: () => void
   onViewExam: (id: string) => void
   onEditExam: (id: string) => void
-  onDeleteExam: (id: string) => void
-  onDuplicateExam: (id: string) => void
-  onSubmitForApproval: (id: string) => void
+  onDeleteExam: (id: string) => Promise<void> | void
+  onDuplicateExam: (id: string) => Promise<void> | void
+  onSubmitForApproval: (id: string) => Promise<void> | void
+  onViewSubmissions?: (id: string) => void  // ✅ ADDED
+  onEnterScores?: (id: string) => void      // ✅ ADDED
   totalExams: number
   draftCount: number
   pendingCount: number
@@ -97,6 +115,8 @@ export function ExamList({
   onDeleteExam,
   onDuplicateExam,
   onSubmitForApproval,
+  onViewSubmissions,    // ✅ ADDED
+  onEnterScores,        // ✅ ADDED
   totalExams,
   draftCount,
   pendingCount,
@@ -126,9 +146,26 @@ export function ExamList({
     setDuplicating(null)
   }
 
+  // ✅ Navigation handlers
+  const handleViewSubmissions = (examId: string) => {
+    if (onViewSubmissions) {
+      onViewSubmissions(examId)
+    } else {
+      router.push(`/staff/exams/${examId}/submissions`)
+    }
+  }
+
+  const handleEnterScores = (examId: string) => {
+    if (onEnterScores) {
+      onEnterScores(examId)
+    } else {
+      router.push(`/staff/exams/${examId}/scores`)
+    }
+  }
+
   return (
     <div className="w-full space-y-4 sm:space-y-6">
-      {/* Header - Responsive */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
@@ -147,7 +184,7 @@ export function ExamList({
         </Button>
       </div>
 
-      {/* Stats Cards - Responsive Grid */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-2.5 sm:p-3 md:p-4">
@@ -175,7 +212,7 @@ export function ExamList({
         </Card>
       </div>
 
-      {/* Filters - Responsive */}
+      {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
@@ -196,7 +233,7 @@ export function ExamList({
         </Tabs>
       </div>
 
-      {/* Exam Table/List - Responsive */}
+      {/* Exam Table/List */}
       <Card className="border-0 shadow-xl overflow-hidden">
         <CardHeader className="pb-2 sm:pb-3 border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 pt-4 sm:pt-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -257,11 +294,24 @@ export function ExamList({
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] sm:text-xs text-slate-400">{formatDate(exam.created_at)}</span>
                       <div className="flex items-center gap-0.5 sm:gap-1">
+                        {/* ✅ View Submissions Button */}
+                        {(exam.status === 'published' || exam.status === 'pending') && (
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => handleViewSubmissions(exam.id)} 
+                            className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                            title="View Submissions"
+                          >
+                            <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                          </Button>
+                        )}
                         <Button 
                           variant="ghost" 
                           size="icon" 
                           onClick={() => onViewExam(exam.id)} 
                           className="h-7 w-7 sm:h-8 sm:w-8"
+                          title="View Exam"
                         >
                           <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
@@ -282,6 +332,19 @@ export function ExamList({
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem onClick={() => onViewExam(exam.id)}>
+                              <Eye className="mr-2 h-3.5 w-3.5" /> View Details
+                            </DropdownMenuItem>
+                            {(exam.status === 'published' || exam.status === 'pending') && (
+                              <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)}>
+                                <Users className="mr-2 h-3.5 w-3.5" /> View Submissions
+                              </DropdownMenuItem>
+                            )}
+                            {exam.status === 'published' && (
+                              <DropdownMenuItem onClick={() => handleEnterScores(exam.id)}>
+                                <Award className="mr-2 h-3.5 w-3.5" /> Enter Scores
+                              </DropdownMenuItem>
+                            )}
                             <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id}>
                               <Copy className="mr-2 h-3.5 w-3.5" />
                               {duplicating === exam.id ? 'Duplicating...' : 'Duplicate'}
@@ -289,11 +352,6 @@ export function ExamList({
                             {exam.status === 'draft' && (
                               <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)}>
                                 <Send className="mr-2 h-3.5 w-3.5" /> Submit for Approval
-                              </DropdownMenuItem>
-                            )}
-                            {exam.status === 'published' && (
-                              <DropdownMenuItem onClick={() => router.push(`/staff/exams/${exam.id}/scores`)}>
-                                <Calculator className="mr-2 h-3.5 w-3.5" /> Enter Scores
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
@@ -345,6 +403,18 @@ export function ExamList({
                         <TableCell className="text-sm text-slate-500">{formatDate(exam.created_at)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {/* ✅ View Submissions Button */}
+                            {(exam.status === 'published' || exam.status === 'pending') && (
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleViewSubmissions(exam.id)} 
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                title="View Submissions"
+                              >
+                                <Users className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button 
                               variant="ghost" 
                               size="icon" 
@@ -374,6 +444,19 @@ export function ExamList({
                               <DropdownMenuContent align="end" className="w-48">
                                 <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => onViewExam(exam.id)}>
+                                  <Eye className="mr-2 h-3.5 w-3.5" /> View Details
+                                </DropdownMenuItem>
+                                {(exam.status === 'published' || exam.status === 'pending') && (
+                                  <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)}>
+                                    <Users className="mr-2 h-3.5 w-3.5" /> View Submissions
+                                  </DropdownMenuItem>
+                                )}
+                                {exam.status === 'published' && (
+                                  <DropdownMenuItem onClick={() => handleEnterScores(exam.id)}>
+                                    <Award className="mr-2 h-3.5 w-3.5" /> Enter Scores
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id}>
                                   <Copy className="mr-2 h-3.5 w-3.5" />
                                   {duplicating === exam.id ? 'Duplicating...' : 'Duplicate'}
@@ -381,11 +464,6 @@ export function ExamList({
                                 {exam.status === 'draft' && (
                                   <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)}>
                                     <Send className="mr-2 h-3.5 w-3.5" /> Submit for Approval
-                                  </DropdownMenuItem>
-                                )}
-                                {exam.status === 'published' && (
-                                  <DropdownMenuItem onClick={() => router.push(`/staff/exams/${exam.id}/scores`)}>
-                                    <Calculator className="mr-2 h-3.5 w-3.5" /> Enter Scores
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator />

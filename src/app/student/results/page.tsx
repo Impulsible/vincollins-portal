@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
 // app/student/results/page.tsx - COMPLETE FIXED VERSION
 
 'use client'
@@ -208,7 +207,7 @@ export default function StudentResultsPage() {
   }, [router])
 
   // ============================================
-  // LOAD RESULTS - SEPARATE QUERIES (NO FOREIGN KEY)
+  // ✅ FIXED: LOAD RESULTS - INCLUDES PENDING THEORY
   // ============================================
   const loadResults = useCallback(async (showToast = false) => {
     if (!profile?.id) return
@@ -297,14 +296,14 @@ export default function StudentResultsPage() {
         const exam = examMap[attempt.exam_id]
         const ca = caScoresMap[attempt.exam_id]
         
-        // Include completed, graded exams
-        if (attempt.status === 'completed' || attempt.status === 'graded') {
+        // ✅ FIXED: Include pending_theory as well
+        if (attempt.status === 'completed' || attempt.status === 'graded' || attempt.status === 'pending_theory') {
           // Use percentage from database (calculated by trigger)
           const percentage = attempt.percentage || 0
           const passingScore = exam?.passing_percentage || 50
           const isPassed = percentage >= passingScore
           
-          console.log(`📊 ${exam?.subject || 'Unknown'}: ${percentage}% (from DB), Passed: ${isPassed}`)
+          console.log(`📊 ${exam?.subject || 'Unknown'}: ${percentage}% (from DB), Passed: ${isPassed}, Status: ${attempt.status}`)
           
           const result: ExamResult = {
             id: attempt.id,
@@ -919,6 +918,17 @@ export default function StudentResultsPage() {
                                       <Badge variant="outline" className="text-[10px] sm:text-xs">
                                         {result.exam_subject}
                                       </Badge>
+                                      {/* ✅ FIXED: Status Badge - Shows "Theory Pending" */}
+                                      <Badge className={cn(
+                                        "text-[10px] sm:text-xs",
+                                        result.status === 'graded' ? "bg-green-100 text-green-700" :
+                                        result.status === 'pending_theory' ? "bg-yellow-100 text-yellow-700 border-yellow-200" :
+                                        result.is_passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                                      )}>
+                                        {result.status === 'pending_theory' ? '⏳ Theory Pending' :
+                                         result.status === 'graded' ? '✅ Graded' :
+                                         result.is_passed ? '✅ Passed' : '❌ Failed'}
+                                      </Badge>
                                       {hasCA && (
                                         <Badge className="bg-blue-100 text-blue-700 text-[10px] sm:text-xs">
                                           CA: {result.ca1_score || 0}/{result.ca2_score || 0}
@@ -958,14 +968,9 @@ export default function StudentResultsPage() {
                                     )}>
                                       {result.percentage}%
                                     </span>
-                                    <Badge className={cn(
-                                      "text-[10px] sm:text-xs",
-                                      result.is_passed 
-                                        ? "bg-green-100 text-green-700" 
-                                        : "bg-red-100 text-red-700"
-                                    )}>
-                                      {result.is_passed ? 'Passed' : 'Failed'}
-                                    </Badge>
+                                  </div>
+                                  <div className="text-[10px] sm:text-xs text-slate-500">
+                                    {result.total_score}/{result.total_marks} marks
                                   </div>
                                 </div>
                                 

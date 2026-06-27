@@ -1,4 +1,5 @@
-// app/staff/layout.tsx
+// app/staff/layout.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import {
@@ -29,7 +30,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types ──────────────────────────────────────────────────────────────────────
 interface StaffProfile {
   id: string
   full_name?: string
@@ -82,7 +83,7 @@ const defaultStats: StaffStats = {
   pendingTheoryCount: 0,
 }
 
-// ── Tab ↔ Path mapping ────────────────────────────────────────────────────────
+// ── Tab ↔ Path mapping ─────────────────────────────────────────────────────────
 const STAFF_PATHS: Record<string, string> = {
   overview: '/staff',
   exams: '/staff/exams',
@@ -124,22 +125,30 @@ const MOBILE_TITLES: Record<string, string> = {
 
 function getTabFromPathname(pathname: string): string {
   if (pathname === '/staff') return 'overview'
-  for (const [tab, path] of Object.entries(STAFF_PATHS)) {
-    if (tab !== 'overview' && pathname.startsWith(path)) return tab
+
+  if (pathname.startsWith('/staff/exams/')) {
+    return 'exams'
   }
+
+  const sortedEntries = Object.entries(STAFF_PATHS)
+    .filter(([tab]) => tab !== 'overview')
+    .sort(([, a], [, b]) => b.length - a.length)
+
+  for (const [tab, path] of sortedEntries) {
+    if (pathname.startsWith(path)) return tab
+  }
+
   return 'overview'
 }
 
-// ── Context ───────────────────────────────────────────────────────────────────
+// ── Context ────────────────────────────────────────────────────────────────────
 const StaffContext = createContext<StaffContextType | null>(null)
 
 export const useStaffContext = () => {
-  const ctx = useContext(StaffContext)
-  if (!ctx) throw new Error('useStaffContext must be used within StaffLayout')
-  return ctx
+  return useContext(StaffContext)
 }
 
-// ── Loading State ─────────────────────────────────────────────────────────────
+// ── Loading State ──────────────────────────────────────────────────────────────
 function StaffLoadingState() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50">
@@ -172,7 +181,7 @@ function StaffLoadingState() {
   )
 }
 
-// ── Desktop Top Bar ───────────────────────────────────────────────────────────
+// ── Desktop Top Bar ────────────────────────────────────────────────────────────
 function DesktopTopBar({
   profile,
   activeTab,
@@ -187,6 +196,7 @@ function DesktopTopBar({
   isRefreshing: boolean
 }) {
   const router = useRouter()
+  const pathname = usePathname()
 
   const getInitials = (name?: string) => {
     if (!name) return 'ST'
@@ -198,19 +208,24 @@ function DesktopTopBar({
       .slice(0, 2)
   }
 
+  const getDisplayTitle = () => {
+    if (pathname?.startsWith('/staff/exams/')) {
+      return 'Exams Management'
+    }
+    return DESKTOP_TITLES[activeTab] ??
+      activeTab.charAt(0).toUpperCase() + activeTab.slice(1).replace('-', ' ')
+  }
+
   return (
     <header className="h-16 lg:h-20 border-b bg-white flex items-center px-4 lg:px-6 sticky top-0 z-40 shadow-sm">
       <div className="flex items-center justify-between w-full gap-4">
-        {/* Left: Page title */}
         <div className="flex items-center gap-3 min-w-0">
           <div className="hidden sm:flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 flex-shrink-0">
             <GraduationCap className="h-4 w-4 text-emerald-600" />
           </div>
           <div className="min-w-0">
             <h1 className="text-base lg:text-lg font-semibold text-slate-900 truncate">
-              {DESKTOP_TITLES[activeTab] ??
-                activeTab.charAt(0).toUpperCase() +
-                  activeTab.slice(1).replace('-', ' ')}
+              {getDisplayTitle()}
             </h1>
             {profile?.department && (
               <p className="text-xs text-muted-foreground truncate hidden sm:block">
@@ -220,9 +235,7 @@ function DesktopTopBar({
           </div>
         </div>
 
-        {/* Right: Actions */}
         <div className="flex items-center gap-2 lg:gap-3 flex-shrink-0">
-          {/* Refresh button */}
           <button
             onClick={onRefresh}
             disabled={isRefreshing}
@@ -240,10 +253,8 @@ function DesktopTopBar({
             />
           </button>
 
-          {/* Notifications */}
-          {profile?.id && <NotificationDropdown userId={profile.id} />}
+          <NotificationDropdown userId={profile?.id || ''} />
 
-          {/* Profile dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
@@ -318,7 +329,7 @@ function DesktopTopBar({
   )
 }
 
-// ── Mobile Top Bar ────────────────────────────────────────────────────────────
+// ── Mobile Top Bar ─────────────────────────────────────────────────────────────
 function MobileTopBar({
   profile,
   activeTab,
@@ -330,6 +341,16 @@ function MobileTopBar({
   onRefresh: () => Promise<void>
   isRefreshing: boolean
 }) {
+  const pathname = usePathname()
+  
+  const getMobileTitle = () => {
+    if (pathname?.startsWith('/staff/exams/')) {
+      return 'Exams'
+    }
+    return MOBILE_TITLES[activeTab] ??
+      activeTab.charAt(0).toUpperCase() + activeTab.slice(1)
+  }
+
   return (
     <header className="fixed top-0 left-0 right-0 h-[60px] lg:hidden bg-white border-b z-40 flex items-center px-4 shadow-sm">
       <div className="flex items-center gap-3 w-full">
@@ -339,15 +360,13 @@ function MobileTopBar({
 
         <div className="min-w-0 flex-1">
           <h1 className="font-semibold text-sm text-slate-900">
-            {MOBILE_TITLES[activeTab] ??
-              activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}
+            {getMobileTitle()}
           </h1>
           <p className="text-[11px] text-muted-foreground truncate">
             {profile?.full_name || 'Staff Portal'}
           </p>
         </div>
 
-        {/* Mobile refresh */}
         <button
           onClick={onRefresh}
           disabled={isRefreshing}
@@ -367,69 +386,74 @@ function MobileTopBar({
   )
 }
 
-// ── Fetch stats helper ────────────────────────────────────────────────────────
+// ── Fetch stats helper ─────────────────────────────────────────────────────────
 async function fetchStaffStats(userId: string): Promise<StaffStats> {
-  const [
-    examsRes,
-    studentsRes,
-    assignmentsRes,
-    notesRes,
-    gradingRes,
-    theoryRes,
-  ] = await Promise.allSettled([
-    supabase.from('exams').select('status, id').eq('created_by', userId),
-    supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('role', 'student'),
-    supabase
-      .from('assignments')
-      .select('*', { count: 'exact', head: true })
-      .eq('created_by', userId),
-    supabase
-      .from('notes')
-      .select('*', { count: 'exact', head: true }),
-    supabase
-      .from('ca_scores')
-      .select('*', { count: 'exact', head: true })
-      .eq('teacher_id', userId),
-    supabase
-      .from('exam_attempts')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'pending_theory'),
-  ])
+  try {
+    const [
+      examsRes,
+      studentsRes,
+      assignmentsRes,
+      notesRes,
+      gradingRes,
+      theoryRes,
+    ] = await Promise.allSettled([
+      supabase.from('exams').select('status, id').eq('created_by', userId),
+      supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'student'),
+      supabase
+        .from('assignments')
+        .select('*', { count: 'exact', head: true })
+        .eq('created_by', userId),
+      supabase
+        .from('notes')
+        .select('*', { count: 'exact', head: true }),
+      supabase
+        .from('ca_scores')
+        .select('*', { count: 'exact', head: true })
+        .eq('teacher_id', userId),
+      supabase
+        .from('exam_attempts')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending_theory'),
+    ])
 
-  const exams =
-    examsRes.status === 'fulfilled' ? examsRes.value.data ?? [] : []
-  const studentsCount =
-    studentsRes.status === 'fulfilled' ? studentsRes.value.count ?? 0 : 0
-  const assignmentsCount =
-    assignmentsRes.status === 'fulfilled'
-      ? assignmentsRes.value.count ?? 0
-      : 0
-  const notesCount =
-    notesRes.status === 'fulfilled' ? notesRes.value.count ?? 0 : 0
-  const pendingGradingCount =
-    gradingRes.status === 'fulfilled' ? gradingRes.value.count ?? 0 : 0
-  const pendingTheoryCount =
-    theoryRes.status === 'fulfilled' ? theoryRes.value.count ?? 0 : 0
+    const exams =
+      examsRes.status === 'fulfilled' ? examsRes.value.data ?? [] : []
+    const studentsCount =
+      studentsRes.status === 'fulfilled' ? studentsRes.value.count ?? 0 : 0
+    const assignmentsCount =
+      assignmentsRes.status === 'fulfilled'
+        ? assignmentsRes.value.count ?? 0
+        : 0
+    const notesCount =
+      notesRes.status === 'fulfilled' ? notesRes.value.count ?? 0 : 0
+    const pendingGradingCount =
+      gradingRes.status === 'fulfilled' ? gradingRes.value.count ?? 0 : 0
+    const pendingTheoryCount =
+      theoryRes.status === 'fulfilled' ? theoryRes.value.count ?? 0 : 0
 
-  return {
-    totalExams: exams.length,
-    publishedExams: exams.filter((e) => e.status === 'published').length,
-    pendingExams: exams.filter((e) => e.status === 'pending').length,
-    draftExams: exams.filter((e) => e.status === 'draft').length,
-    totalStudents: studentsCount,
-    totalClasses: 6,
-    totalAssignments: assignmentsCount,
-    totalNotes: notesCount,
-    pendingGrading: pendingGradingCount,
-    averagePerformance: 75,
-    pendingTheoryCount,
+    return {
+      totalExams: exams.length,
+      publishedExams: exams.filter((e) => e.status === 'published').length,
+      pendingExams: exams.filter((e) => e.status === 'pending').length,
+      draftExams: exams.filter((e) => e.status === 'draft').length,
+      totalStudents: studentsCount,
+      totalClasses: 6,
+      totalAssignments: assignmentsCount,
+      totalNotes: notesCount,
+      pendingGrading: pendingGradingCount,
+      averagePerformance: 75,
+      pendingTheoryCount,
+    }
+  } catch (error) {
+    console.error('Error fetching staff stats:', error)
+    return defaultStats
   }
 }
 
-// ── Main Layout ───────────────────────────────────────────────────────────────
+// ── Main Layout ────────────────────────────────────────────────────────────────
 export default function StaffLayout({
   children,
 }: {
@@ -438,6 +462,68 @@ export default function StaffLayout({
   const router = useRouter()
   const pathname = usePathname()
 
+  // 🔴 DEBUG
+  console.log('🔴 STAFF LAYOUT - pathname:', pathname)
+  console.log('🔴 STAFF LAYOUT - is exam sub-route:', pathname?.startsWith('/staff/exams/'))
+
+  // ✅ EARLY RETURN: If on exam sub-route, render immediately without any auth checks
+  if (pathname?.startsWith('/staff/exams/')) {
+    console.log('✅ STAFF LAYOUT - Exam sub-route detected, rendering immediately')
+    return (
+      <StaffContext.Provider value={{
+        profile: null,
+        stats: defaultStats,
+        refreshData: async () => {},
+        sidebarCollapsed: false,
+        setSidebarCollapsed: () => {},
+        handleLogout: async () => {},
+        activeTab: 'exams',
+        setActiveTab: () => {},
+      }}>
+        <div className="min-h-screen bg-slate-50">
+          <div className="hidden lg:block">
+            <StaffSidebar
+              profile={null}
+              onLogout={async () => {}}
+              collapsed={false}
+              onToggle={() => {}}
+              activeTab="exams"
+              setActiveTab={() => {}}
+            />
+            <div className="min-h-screen transition-all duration-300 ease-in-out" style={{ marginLeft: '280px' }}>
+              <DesktopTopBar
+                profile={null}
+                activeTab="exams"
+                onLogout={async () => {}}
+                onRefresh={async () => {}}
+                isRefreshing={false}
+              />
+              <main className="p-4 lg:p-6 xl:p-8">
+                <div className="max-w-[1600px] mx-auto">
+                  {children}
+                </div>
+              </main>
+            </div>
+          </div>
+          <div className="lg:hidden">
+            <MobileTopBar
+              profile={null}
+              activeTab="exams"
+              onRefresh={async () => {}}
+              isRefreshing={false}
+            />
+            <main className="pt-[60px] pb-24">
+              <div className="px-3 py-4">
+                {children}
+              </div>
+            </main>
+          </div>
+        </div>
+      </StaffContext.Provider>
+    )
+  }
+
+  // ── State for non-exam routes ──────────────────────────────────────────────
   const [profile, setProfile] = useState<StaffProfile | null>(null)
   const [stats, setStats] = useState<StaffStats>(defaultStats)
   const [loading, setLoading] = useState(true)
@@ -448,10 +534,9 @@ export default function StaffLayout({
   )
   const [isHydrated, setIsHydrated] = useState(false)
 
-  // Track if we've already loaded to avoid double-fetching
   const hasLoadedRef = useRef(false)
 
-  // ── Hydration: restore sidebar preference ──────────────────────────────────
+  // ── Hydration ────────────────────────────────────────────────────────────────
   useEffect(() => {
     setIsHydrated(true)
     try {
@@ -463,19 +548,29 @@ export default function StaffLayout({
   useEffect(() => {
     if (!isHydrated) return
     try {
-      localStorage.setItem('staff-sidebar-collapsed', String(sidebarCollapsed))
+      localStorage.setItem(
+        'staff-sidebar-collapsed',
+        String(sidebarCollapsed),
+      )
     } catch {}
   }, [sidebarCollapsed, isHydrated])
 
-  // ── Sync active tab with URL ───────────────────────────────────────────────
+  // ── Sync active tab with URL ──────────────────────────────────────────────
   useEffect(() => {
     const tab = getTabFromPathname(pathname || '/staff')
     setActiveTab(tab)
   }, [pathname])
 
-  // ── Load staff data ────────────────────────────────────────────────────────
+  // ── Load staff data ───────────────────────────────────────────────────────
   const loadStaffData = useCallback(
     async (showToast = false) => {
+      // ✅ Skip auth check for exam sub-routes (already handled by early return)
+      if (pathname?.startsWith('/staff/exams/')) {
+        console.log('✅ STAFF LAYOUT - On exam sub-route, skipping auth check')
+        setLoading(false)
+        return
+      }
+
       try {
         const {
           data: { user },
@@ -484,7 +579,8 @@ export default function StaffLayout({
 
         if (userError || !user) {
           console.warn('[StaffLayout] No authenticated user')
-          router.replace('/portal')
+          // ✅ Don't redirect to portal immediately, just show loading
+          setLoading(false)
           return
         }
 
@@ -497,20 +593,19 @@ export default function StaffLayout({
         if (profileError || !profileData) {
           console.error('[StaffLayout] Profile error:', profileError)
           toast.error('Profile not found. Please contact your administrator.')
-          router.replace('/portal')
+          setLoading(false)
           return
         }
 
         const allowedRoles = ['staff', 'admin', 'teacher']
         if (!allowedRoles.includes(profileData.role?.toLowerCase() ?? '')) {
           toast.error('Access denied. This portal is for staff only.')
-          router.replace('/portal')
+          setLoading(false)
           return
         }
 
         setProfile(profileData as StaffProfile)
 
-        // Fetch stats in parallel — non-fatal if individual queries fail
         const newStats = await fetchStaffStats(user.id)
         setStats(newStats)
 
@@ -523,7 +618,7 @@ export default function StaffLayout({
         setIsRefreshing(false)
       }
     },
-    [router],
+    [router, pathname],
   )
 
   useEffect(() => {
@@ -533,13 +628,12 @@ export default function StaffLayout({
     }
   }, [loadStaffData])
 
-  // ── Auth state listener ────────────────────────────────────────────────────
+  // ── Auth state listener ───────────────────────────────────────────────────
   useEffect(() => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        // Clear all local auth data
         try {
           localStorage.removeItem('auth_user')
           localStorage.removeItem('auth_role')
@@ -548,25 +642,20 @@ export default function StaffLayout({
         } catch {}
         router.replace('/portal')
       }
-
-      if (event === 'TOKEN_REFRESHED') {
-        console.log('[StaffLayout] Token refreshed silently')
-      }
     })
 
     return () => subscription.unsubscribe()
   }, [router])
 
-  // ── Refresh ────────────────────────────────────────────────────────────────
+  // ── Refresh ───────────────────────────────────────────────────────────────
   const refreshData = useCallback(async () => {
     setIsRefreshing(true)
     await loadStaffData(true)
   }, [loadStaffData])
 
-  // ── Logout ─────────────────────────────────────────────────────────────────
+  // ── Logout ────────────────────────────────────────────────────────────────
   const handleLogout = useCallback(async () => {
     try {
-      // Clear local storage first
       localStorage.removeItem('auth_user')
       localStorage.removeItem('auth_role')
       localStorage.removeItem('user_profile')
@@ -577,12 +666,11 @@ export default function StaffLayout({
       router.replace('/portal')
     } catch (err) {
       console.error('[StaffLayout] Logout error:', err)
-      // Force redirect anyway
       router.replace('/portal')
     }
   }, [router])
 
-  // ── Tab change with navigation ─────────────────────────────────────────────
+  // ── Tab change with navigation ────────────────────────────────────────────
   const handleTabChange = useCallback(
     (tab: string) => {
       setActiveTab(tab)
@@ -592,10 +680,13 @@ export default function StaffLayout({
     [router],
   )
 
-  // ── Guards ─────────────────────────────────────────────────────────────────
-  if (!isHydrated || loading) return <StaffLoadingState />
+  // ── Guards ────────────────────────────────────────────────────────────────
+  if (!isHydrated || loading) {
+    return <StaffLoadingState />
+  }
 
   const desktopMarginLeft = sidebarCollapsed ? '80px' : '280px'
+  const isExamSubRoute = pathname?.startsWith('/staff/exams/') || false
 
   return (
     <StaffContext.Provider
@@ -612,7 +703,7 @@ export default function StaffLayout({
     >
       <div className="min-h-screen bg-slate-50">
 
-        {/* ── DESKTOP ────────────────────────────────────────────────────── */}
+        {/* ── DESKTOP ──────────────────────────────────────────────────────── */}
         <div className="hidden lg:block">
           <StaffSidebar
             profile={profile}
@@ -637,7 +728,11 @@ export default function StaffLayout({
 
             <main className="p-4 lg:p-6 xl:p-8">
               <div className="max-w-[1600px] mx-auto">
-                <ErrorBoundary variant="staff">
+                <ErrorBoundary 
+                  key={pathname} 
+                  variant="staff"
+                  suppressFullPage={isExamSubRoute}
+                >
                   <AnimatePresence mode="wait">
                     <motion.div
                       key={pathname}
@@ -655,7 +750,7 @@ export default function StaffLayout({
           </div>
         </div>
 
-        {/* ── MOBILE ─────────────────────────────────────────────────────── */}
+        {/* ── MOBILE ───────────────────────────────────────────────────────── */}
         <div className="lg:hidden">
           <MobileTopBar
             profile={profile}
@@ -666,7 +761,11 @@ export default function StaffLayout({
 
           <main className="pt-[60px] pb-24">
             <div className="px-3 py-4">
-              <ErrorBoundary variant="staff">
+              <ErrorBoundary 
+                key={pathname} 
+                variant="staff"
+                suppressFullPage={isExamSubRoute}
+              >
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={pathname}

@@ -1,4 +1,4 @@
-// app/staff/exams/[id]/page.tsx
+// app/staff/exams/[id]/page.tsx - COMPLETE FIXED VERSION
 
 'use client'
 
@@ -87,18 +87,22 @@ export default function ExamDetailPage() {
 
   // Load data
   const loadData = useCallback(async (showToast = false) => {
-    if (!examId) return
+    if (!examId) {
+      console.error('❌ No examId in loadData')
+      setLoading(false)
+      return
+    }
     
     setLoading(true)
     try {
-      // Get session
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) {
-        router.push('/portal')
+        console.error('❌ No session')
+        toast.error('Please log in again')
+        setLoading(false)
         return
       }
 
-      // Fetch exam details
       const { data: examData, error: examError } = await supabase
         .from('exams')
         .select('*')
@@ -108,7 +112,6 @@ export default function ExamDetailPage() {
       if (examError) throw examError
       setExam(examData)
 
-      // Fetch all submissions for this exam
       const { data: submissions, error: submissionsError } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -116,14 +119,12 @@ export default function ExamDetailPage() {
 
       if (submissionsError) throw submissionsError
 
-      // Calculate statistics
       const total = submissions?.length || 0
       const completed = submissions?.filter(s => s.status === 'completed' || s.status === 'graded').length || 0
       const inProgress = submissions?.filter(s => s.status === 'in_progress').length || 0
       const pendingTheory = submissions?.filter(s => s.status === 'pending_theory').length || 0
       const graded = submissions?.filter(s => s.status === 'graded').length || 0
 
-      // Calculate scores
       let totalScore = 0
       let highest = 0
       let lowest = 100
@@ -156,12 +157,10 @@ export default function ExamDetailPage() {
 
       setSubmissionCount(total)
 
-      // Get recent submissions (last 5)
       const recent = submissions
         ?.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 5) || []
       
-      // Enrich with student names
       const enrichedRecent = await Promise.all(recent.map(async (sub) => {
         const { data: student } = await supabase
           .from('profiles')
@@ -190,27 +189,33 @@ export default function ExamDetailPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [examId, router])
+  }, [examId])
 
-  // Initial load
   useEffect(() => {
     loadData()
   }, [loadData])
 
-  // Handle refresh
   const handleRefresh = () => {
     setRefreshing(true)
     loadData(true)
   }
 
-  // Navigation handlers
+  // ✅ FIXED: Navigation with fallback
   const handleViewSubmissions = () => {
     if (!examId) {
       toast.error('Exam ID not found')
       return
     }
-    // ✅ CORRECT: Navigates to the submissions page
-    router.push(`/staff/exams/${examId}/submissions`)
+    
+    const targetPath = `/staff/exams/${examId}/submissions`
+    console.log('🔍 Navigating to submissions:', targetPath)
+    
+    try {
+      router.push(targetPath)
+    } catch (error) {
+      console.error('❌ Router push failed, using fallback:', error)
+      window.location.href = targetPath
+    }
   }
 
   const handleEditExam = () => {
@@ -235,7 +240,6 @@ export default function ExamDetailPage() {
     }
   }
 
-  // Format date
   const formatDate = (date?: string) => {
     if (!date) return 'N/A'
     try {
@@ -251,7 +255,6 @@ export default function ExamDetailPage() {
     }
   }
 
-  // Get status badge
   const getStatusBadge = (status?: string) => {
     switch (status) {
       case 'draft':
@@ -269,7 +272,6 @@ export default function ExamDetailPage() {
     }
   }
 
-  // Loading state
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)]">
@@ -279,7 +281,6 @@ export default function ExamDetailPage() {
     )
   }
 
-  // Exam not found
   if (!exam) {
     return (
       <div className="flex flex-col items-center justify-center h-[calc(100vh-4rem)]">
@@ -422,7 +423,6 @@ export default function ExamDetailPage() {
           {/* Overview Tab */}
           <TabsContent value="overview">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Exam Information */}
               <Card className="lg:col-span-2">
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center gap-2">
@@ -486,13 +486,11 @@ export default function ExamDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Quick Actions */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  {/* ✅ SUBMISSIONS BUTTON - This now correctly navigates to the submissions page */}
                   <Button 
                     className="w-full justify-start bg-emerald-600 hover:bg-emerald-700"
                     onClick={handleViewSubmissions}
@@ -550,7 +548,6 @@ export default function ExamDetailPage() {
                     <Users className="h-5 w-5 text-emerald-600" />
                     Submissions
                   </CardTitle>
-                  {/* ✅ SUBMISSIONS BUTTON - Also in the Submissions tab */}
                   <Button 
                     size="sm"
                     onClick={handleViewSubmissions}
@@ -562,7 +559,6 @@ export default function ExamDetailPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                {/* Submission stats summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                   <div className="bg-slate-50 rounded-lg p-3">
                     <p className="text-xs text-slate-500">Total</p>
@@ -582,7 +578,6 @@ export default function ExamDetailPage() {
                   </div>
                 </div>
 
-                {/* Recent submissions */}
                 {recentSubmissions.length > 0 ? (
                   <div className="space-y-3">
                     <p className="text-sm font-medium text-slate-700">Recent Submissions</p>

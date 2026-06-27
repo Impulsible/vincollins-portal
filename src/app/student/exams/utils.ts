@@ -1,4 +1,5 @@
-// src/app/student/exams/utils.ts
+// src/app/student/exams/utils.ts - COMPLETE FIXED VERSION
+
 import { SUBJECT_CONFIG, DEFAULT_SUBJECT_CONFIG } from "./constants"
 import type { SubjectConfig } from "./types"
 
@@ -10,7 +11,7 @@ export function getSubjectCountForClass(className: string): number {
   return 17
 }
 
-// Overall Term Grade (used in dashboard banner & term progress)
+// ✅ Overall Term Grade (used in dashboard banner & term progress)
 export function calculateGrade(percentage: number): { grade: string; color: string } {
   if (percentage >= 80) return { grade: "A", color: "text-emerald-600" }
   if (percentage >= 70) return { grade: "B", color: "text-blue-600" }

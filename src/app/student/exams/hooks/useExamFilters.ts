@@ -1,9 +1,10 @@
-// src/app/student/exams/hooks/useExamFilters.ts
+// src/app/student/exams/hooks/useExamFilters.ts - COMPLETE FIXED VERSION
+
 'use client'
 
 import { useState, useMemo } from 'react'
-import type { Exam, ExamAttempt, ViewMode, TabType, ExamStatus } from '../types'
-import { getSubjectConfig } from '../utils'
+import type { Exam, ExamAttempt, ViewMode, TabType, ExamStatus, SubjectConfig } from '../types'
+import { getSubjectConfig } from '../utils'  // ✅ Import from utils
 
 export function useExamFilters(
   exams: Exam[],
@@ -61,6 +62,7 @@ export function useExamFilters(
     return 'available'
   }
 
+  // ✅ Return all values including getSubjectConfig
   return {
     searchQuery,
     setSearchQuery,
@@ -73,6 +75,6 @@ export function useExamFilters(
     filteredExams,
     availableSubjects,
     getExamStatus,
-    getSubjectConfig,
+    getSubjectConfig,  // ✅ Make sure this is included
   }
 }

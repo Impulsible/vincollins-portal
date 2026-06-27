@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx - PROFESSIONALLY STYLED
+// app/student/results/[id]/page.tsx - WAEC GRADING PERSISTENT
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -18,8 +18,8 @@ import {
   GraduationCap, Calendar, ArrowLeft,
   Home, ChevronRight, AlertCircle, FileText,
   Trophy, Target, BarChart3, Award,
-  CheckCheck, X, HelpCircle, Loader2,
-  Minus, Printer, Download
+  CheckCheck, X, Loader2,
+  Minus, Printer
 } from 'lucide-react'
 import Link from 'next/link'
 
@@ -40,13 +40,17 @@ interface StudentProfile {
   department: string; photo_url?: string
 }
 
-// ─── Grade Configuration ────────────────────────────────
+// ─── WAEC Grade Configuration ────────────────────────────────
 const getGradeConfig = (percentage: number) => {
-  if (percentage >= 80) return { grade: 'A', label: 'Excellent', color: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Trophy }
-  if (percentage >= 70) return { grade: 'B', label: 'Very Good', color: 'blue', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Award }
-  if (percentage >= 60) return { grade: 'C', label: 'Good', color: 'amber', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Target }
-  if (percentage >= 50) return { grade: 'P', label: 'Pass', color: 'purple', bg: 'bg-purple-50', text: 'text-purple-700', border: 'border-purple-200', icon: CheckCheck }
-  return { grade: 'F', label: 'Fail', color: 'red', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: X }
+  if (percentage >= 75) return { grade: 'A1', label: 'Excellent', color: 'emerald', bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', icon: Trophy }
+  if (percentage >= 70) return { grade: 'B2', label: 'Very Good', color: 'blue', bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Award }
+  if (percentage >= 65) return { grade: 'B3', label: 'Good', color: 'sky', bg: 'bg-sky-50', text: 'text-sky-700', border: 'border-sky-200', icon: Award }
+  if (percentage >= 60) return { grade: 'C4', label: 'Credit', color: 'cyan', bg: 'bg-cyan-50', text: 'text-cyan-700', border: 'border-cyan-200', icon: Target }
+  if (percentage >= 55) return { grade: 'C5', label: 'Credit', color: 'teal', bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-200', icon: Target }
+  if (percentage >= 50) return { grade: 'C6', label: 'Credit', color: 'amber', bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: CheckCheck }
+  if (percentage >= 45) return { grade: 'D7', label: 'Pass', color: 'orange', bg: 'bg-orange-50', text: 'text-orange-700', border: 'border-orange-200', icon: CheckCheck }
+  if (percentage >= 40) return { grade: 'E8', label: 'Pass', color: 'yellow', bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', icon: Minus }
+  return { grade: 'F9', label: 'Fail', color: 'red', bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', icon: X }
 }
 
 const fmtTime = (seconds?: number) => {
@@ -142,27 +146,44 @@ export default function StudentResultDetailPage() {
         } catch { /* ignore */ }
       }
 
+      // Get CA scores with full saved data
       const { data: ca } = await supabase
         .from('ca_scores')
-        .select('ca1_score, ca2_score')
+        .select('ca1_score, ca2_score, total_score, percentage, grade')
         .eq('student_id', session.user.id)
         .eq('exam_id', examId)
         .maybeSingle()
 
       const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
-      const ca1Value = ca1 || 0
-      const ca2Value = ca2 || 0
-      const caTotal = ca1Value + ca2Value
+      const hasCA = ca1 !== null && ca2 !== null
 
-      const objectiveTotal = att.objective_total || 20
-      const theoryTotal = att.theory_total || 40
-      const objectiveScore = Number(att.objective_score) || 0
-      const theoryScoreValue = theoryScore || 0
-      const examScore = objectiveScore + theoryScoreValue
-      const grandTotal = caTotal + examScore
-      const percentage = Math.round((grandTotal / 100) * 100)
-      const isPassed = percentage >= (exam?.passing_percentage || 50)
+      // ✅ Calculate percentage and grade
+      let percentage: number
+      let grandTotal: number
+      let finalGrade: string
+
+      if (hasCA && ca) {
+        // Use saved CA scores - they already have the correct combined calculation
+        percentage = ca.percentage || 0
+        grandTotal = ca.total_score || 0
+      } else {
+        // Calculate from exam only (no CA yet)
+        const ca1Value = ca1 || 0
+        const ca2Value = ca2 || 0
+        const caTotal = ca1Value + ca2Value
+        const objectiveScore = Number(att.objective_score) || 0
+        const theoryScoreValue = theoryScore || 0
+        const examScore = objectiveScore + theoryScoreValue
+        grandTotal = caTotal + examScore
+        percentage = Math.round((grandTotal / 100) * 100)
+      }
+
+      // ✅ ALWAYS calculate WAEC grade from percentage
+      finalGrade = getGradeConfig(percentage).grade
+      
+      // WAEC pass = not F9 (40%+)
+      const isPassed = finalGrade !== 'F9'
 
       setResult({
         id: att.id,
@@ -174,15 +195,15 @@ export default function StudentResultDetailPage() {
         percentage: percentage,
         total_score: grandTotal,
         total_marks: 100,
-        objective_score: Math.round(objectiveScore),
-        objective_total: objectiveTotal,
+        objective_score: Math.round(Number(att.objective_score) || 0),
+        objective_total: att.objective_total || 20,
         theory_score: theoryScore,
-        theory_total: theoryTotal,
+        theory_total: att.theory_total || 40,
         ca1_score: ca1,
         ca2_score: ca2,
         is_passed: isPassed,
         submitted_at: att.submitted_at,
-        passing_percentage: exam?.passing_percentage || 50,
+        passing_percentage: 40, // WAEC pass mark
         time_spent: att.time_spent,
         correct_count: att.correct_count || 0,
         incorrect_count: att.incorrect_count || 0,
@@ -261,7 +282,7 @@ export default function StudentResultDetailPage() {
   const caTotal = (result.ca1_score || 0) + (result.ca2_score || 0)
   const theoryScore = result.theory_score || 0
   const totalQuestions = result.correct_count + result.incorrect_count + result.unanswered_count
-  const passMark = result.passing_percentage || 50
+  const passMark = 40 // WAEC pass mark
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">

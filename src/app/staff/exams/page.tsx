@@ -1,22 +1,21 @@
-// app/staff/exams/page.tsx - FIXED IMPORTS
+// app/staff/exams/page.tsx - LIST PAGE
+
 'use client'
 
 import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 import { useStaffContext } from '../layout'
 import { useExams } from './hooks/useExams'
 import { ExamList } from '@/components/staff/exams/ExamList'
-import { ExamViewer } from '@/components/staff/exams/ExamViewer'
-import { EditExamPage } from '@/components/staff/exams/edit/EditExamPage'  // ✅ Changed from ExamEditor to EditExamPage
 import { CreateExamDialog } from '@/components/staff/CreateExamDialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import { toast } from 'sonner'
 
 export default function StaffExamsPage() {
+  const router = useRouter()
   const context = useStaffContext()
   const profile = context?.profile
 
-  const [viewMode, setViewMode] = useState<'list' | 'view' | 'edit'>('list')
-  const [selectedExamId, setSelectedExamId] = useState<string | null>(null)
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
   const {
@@ -24,6 +23,32 @@ export default function StaffExamsPage() {
     statusFilter, setStatusFilter, loadExams,
     handleDeleteExam, handleDuplicateExam, handleSubmitForApproval
   } = useExams(profile?.id)
+
+  // ✅ Navigate to view exam
+  const handleViewExam = (id: string) => {
+    router.push(`/staff/exams/${id}`)
+  }
+
+  // ✅ Navigate to edit exam
+  const handleEditExam = (id: string) => {
+    router.push(`/staff/exams/${id}/edit`)
+  }
+
+  // ✅ Navigate to submissions
+  const handleViewSubmissions = (id: string) => {
+    router.push(`/staff/exams/${id}/submissions`)
+  }
+
+  // ✅ Navigate to scores
+  const handleEnterScores = (id: string) => {
+    router.push(`/staff/exams/${id}/scores`)
+  }
+
+  const handleCreateSuccess = () => {
+    loadExams()
+    setShowCreateDialog(false)
+    toast.success('Exam created successfully!')
+  }
 
   if (!profile) return null
 
@@ -34,6 +59,7 @@ export default function StaffExamsPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
         </div>
+        <Skeleton className="h-96 w-full rounded-xl" />
       </div>
     )
   }
@@ -45,51 +71,31 @@ export default function StaffExamsPage() {
   return (
     <>
       <div className="mt-6 sm:mt-8 lg:mt-10 p-6 sm:p-8 lg:p-10 max-w-[1600px] mx-auto">
-        <AnimatePresence mode="wait">
-          {viewMode === 'list' && (
-            <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ExamList
-                exams={filteredExams} 
-                searchQuery={searchQuery} 
-                onSearchChange={setSearchQuery}
-                statusFilter={statusFilter} 
-                onStatusFilterChange={setStatusFilter}
-                onCreateExam={() => setShowCreateDialog(true)}
-                onViewExam={(id) => { setSelectedExamId(id); setViewMode('view') }}
-                onEditExam={(id) => { setSelectedExamId(id); setViewMode('edit') }}
-                onDeleteExam={handleDeleteExam} 
-                onDuplicateExam={handleDuplicateExam}
-                onSubmitForApproval={handleSubmitForApproval}
-                totalExams={exams.length} 
-                draftCount={draftCount}
-                pendingCount={pendingCount} 
-                publishedCount={publishedCount}
-              />
-            </motion.div>
-          )}
-          {viewMode === 'view' && selectedExamId && (
-            <motion.div key="view" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <ExamViewer 
-                examId={selectedExamId} 
-                onBack={() => { setViewMode('list'); setSelectedExamId(null) }} 
-                onEdit={() => setViewMode('edit')} 
-                onSubmitForApproval={handleSubmitForApproval} 
-              />
-            </motion.div>
-          )}
-          {viewMode === 'edit' && selectedExamId && (
-            <motion.div key="edit" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-              <EditExamPage 
-                examId={selectedExamId} 
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <ExamList
+          exams={filteredExams}
+          searchQuery={searchQuery} 
+          onSearchChange={setSearchQuery}
+          statusFilter={statusFilter} 
+          onStatusFilterChange={setStatusFilter}
+          onCreateExam={() => setShowCreateDialog(true)}
+          onViewExam={handleViewExam}
+          onEditExam={handleEditExam}
+          onDeleteExam={handleDeleteExam} 
+          onDuplicateExam={handleDuplicateExam}
+          onSubmitForApproval={handleSubmitForApproval}
+          onViewSubmissions={handleViewSubmissions}
+          onEnterScores={handleEnterScores}
+          totalExams={exams.length} 
+          draftCount={draftCount}
+          pendingCount={pendingCount} 
+          publishedCount={publishedCount}
+        />
       </div>
+      
       <CreateExamDialog 
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog} 
-        onSuccess={() => { loadExams(); setShowCreateDialog(false) }} 
+        onSuccess={handleCreateSuccess}
         teacherProfile={profile} 
       />
     </>
