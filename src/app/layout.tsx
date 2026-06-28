@@ -1,6 +1,5 @@
 // src/app/layout.tsx
 
-import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
@@ -54,26 +53,22 @@ export const metadata: Metadata = {
     default: 'Vincollins Schools | Affordable Quality Education in Lagos',
     template: '%s | Vincollins Schools',
   },
-  description: 'Vincollins Schools in Lagos offers Nursery (1-5 yrs), Primary (5-11 yrs), and College (11-17 yrs) education.',
+  description:
+    'Vincollins Schools in Lagos offers Nursery (1-5 yrs), Primary (5-11 yrs), and College (11-17 yrs) education.',
   keywords: [
-    'Vincollins Schools', 'schools in Lagos', 'Lagos Nigeria schools', 'Nursery school Lagos',
-    'Primary school Lagos', 'College Lagos', 'affordable education Nigeria',
-    'best schools in Lagos', 'private schools Nigeria'
+    'Vincollins Schools', 'schools in Lagos', 'Lagos Nigeria schools',
+    'Nursery school Lagos', 'Primary school Lagos', 'College Lagos',
+    'affordable education Nigeria', 'best schools in Lagos', 'private schools Nigeria',
   ],
   authors: [{ name: 'Mrs. Joy Adaobi Nnoli' }],
   creator: 'Vincollins Schools',
   publisher: 'Vincollins Schools',
-  formatDetection: { 
-    email: false, 
-    address: false, 
-    telephone: false 
-  },
+  formatDetection: { email: false, address: false, telephone: false },
   robots: {
     index: true,
     follow: true,
     googleBot: {
-      index: true,
-      follow: true,
+      index: true, follow: true,
       'max-video-preview': -1,
       'max-image-preview': 'large',
       'max-snippet': -1,
@@ -115,7 +110,6 @@ export const metadata: Metadata = {
   },
 };
 
-// Schema.org JSON-LD
 const organizationSchema = {
   '@context': 'https://schema.org',
   '@type': 'EducationalOrganization',
@@ -125,11 +119,7 @@ const organizationSchema = {
   logo: 'https://vincollinsschools.org/images/logo.png',
   image: 'https://vincollinsschools.org/images/og-image.jpg',
   description: 'Vincollins Schools offers affordable, convenient, and excellent educational background for children in Lagos.',
-  founder: {
-    '@type': 'Person',
-    name: 'Mrs. Joy Adaobi Nnoli',
-    jobTitle: 'Proprietress',
-  },
+  founder: { '@type': 'Person', name: 'Mrs. Joy Adaobi Nnoli', jobTitle: 'Proprietress' },
   address: { '@type': 'PostalAddress', addressLocality: 'Lagos', addressCountry: 'NG' },
   foundingDate: '2019',
   knowsAbout: ['Early Years Education', 'Primary Education', 'Secondary Education', 'Financial Literacy'],
@@ -168,17 +158,44 @@ const organizationSchema = {
   },
 };
 
+/*
+  ─────────────────────────────────────────────────────────────────
+  NO inline script in layout.tsx at all.
+
+  The previous inline script was the root cause of the dark
+  background appearing in normal browser tabs on reload because:
+  
+  1. The script ran before React hydrated
+  2. matchMedia('display-mode: standalone') can briefly return
+     false even in PWA during a hard reload before the browser
+     has fully initialised the display-mode — causing the script
+     to either not set the dark bg (good) OR on some browser
+     versions/reload scenarios to behave inconsistently
+  3. More critically: the script set backgroundColor on <html>
+     which persisted even when the component later decided it
+     was NOT a PWA and tried to clean up — the cleanup came
+     too late, after the browser had already painted
+
+  Solution: Remove the inline script entirely.
+  The TwoStageSplashScreen component handles everything
+  client-side in a useEffect which only runs AFTER the browser
+  has fully initialised and display-mode is accurate.
+  The 'pending' stage renders children transparently so there
+  is never a dark flash on the browser.
+  ─────────────────────────────────────────────────────────────────
+*/
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html 
-      lang="en" 
+    <html
+      lang="en"
       className={cn(
         GeistSans.variable,
         GeistMono.variable,
         inter.variable,
         dancingScript.variable,
         playfair.variable,
-        "font-sans"
+        'font-sans',
       )}
       suppressHydrationWarning
     >
@@ -188,7 +205,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta httpEquiv="Pragma" content="no-cache" />
         <meta httpEquiv="Expires" content="0" />
 
-        {/* PWA / Mobile App */}
+        {/* PWA / Mobile App meta */}
         <meta name="application-name" content="Vincollins" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -213,17 +230,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationSchema) }}
         />
       </head>
-      <body 
+
+      <body
         className={cn(
           GeistSans.className,
-          "antialiased bg-background text-foreground",
-          "min-h-screen flex flex-col"
+          'antialiased bg-background text-foreground',
+          'min-h-screen flex flex-col',
         )}
         suppressHydrationWarning
       >
         <ProgressBar />
+
         <SessionProvider>
-          {/* ✅ Two-Stage Splash Screen Wrapper */}
           <TwoStageSplashScreen>
             <ClientLayout>
               {children}
