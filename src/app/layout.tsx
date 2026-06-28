@@ -10,9 +10,10 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { ClientLayout } from '@/components/ClientLayout';
 import { VersionBanner } from '@/components/VersionBanner';
 import { SessionProvider } from '@/components/SessionProvider';
+import { PWAProvider } from '@/components/PWAProvider';
 import { TwoStageSplashScreen } from '@/components/TwoStageSplashScreen';
 
-const inter = Inter({ 
+const inter = Inter({
   subsets: ['latin'],
   variable: '--font-inter',
   display: 'swap',
@@ -20,7 +21,7 @@ const inter = Inter({
   fallback: ['system-ui', 'arial', 'sans-serif'],
 });
 
-const dancingScript = Dancing_Script({ 
+const dancingScript = Dancing_Script({
   subsets: ['latin'],
   variable: '--font-dancing-script',
   display: 'swap',
@@ -28,7 +29,7 @@ const dancingScript = Dancing_Script({
   fallback: ['cursive', 'Brush Script MT'],
 });
 
-const playfair = Playfair_Display({ 
+const playfair = Playfair_Display({
   subsets: ['latin'],
   variable: '--font-playfair',
   display: 'swap',
@@ -68,7 +69,8 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
     googleBot: {
-      index: true, follow: true,
+      index: true,
+      follow: true,
       'max-video-preview': -1,
       'max-image-preview': 'large',
       'max-snippet': -1,
@@ -81,7 +83,14 @@ export const metadata: Metadata = {
     siteName: 'Vincollins Schools',
     title: 'Vincollins Schools | Affordable Quality Education in Lagos',
     description: 'Vincollins Schools offers Nursery, Primary, and College education.',
-    images: [{ url: '/images/og-image.jpg', width: 1200, height: 630, alt: 'Vincollins Schools Campus' }],
+    images: [
+      {
+        url: '/images/og-image.jpg',
+        width: 1200,
+        height: 630,
+        alt: 'Vincollins Schools Campus',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
@@ -97,7 +106,9 @@ export const metadata: Metadata = {
       { url: '/images/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
       { url: '/images/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
-    apple: [{ url: '/images/icons/apple-icon.png', sizes: '180x180', type: 'image/png' }],
+    apple: [
+      { url: '/images/icons/apple-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
     shortcut: ['/favicon.png'],
   },
   manifest: '/manifest.json',
@@ -118,11 +129,25 @@ const organizationSchema = {
   url: 'https://vincollinsschools.org',
   logo: 'https://vincollinsschools.org/images/logo.png',
   image: 'https://vincollinsschools.org/images/og-image.jpg',
-  description: 'Vincollins Schools offers affordable, convenient, and excellent educational background for children in Lagos.',
-  founder: { '@type': 'Person', name: 'Mrs. Joy Adaobi Nnoli', jobTitle: 'Proprietress' },
-  address: { '@type': 'PostalAddress', addressLocality: 'Lagos', addressCountry: 'NG' },
+  description:
+    'Vincollins Schools offers affordable, convenient, and excellent educational background for children in Lagos.',
+  founder: {
+    '@type': 'Person',
+    name: 'Mrs. Joy Adaobi Nnoli',
+    jobTitle: 'Proprietress',
+  },
+  address: {
+    '@type': 'PostalAddress',
+    addressLocality: 'Lagos',
+    addressCountry: 'NG',
+  },
   foundingDate: '2019',
-  knowsAbout: ['Early Years Education', 'Primary Education', 'Secondary Education', 'Financial Literacy'],
+  knowsAbout: [
+    'Early Years Education',
+    'Primary Education',
+    'Secondary Education',
+    'Financial Literacy',
+  ],
   hasOfferCatalog: {
     '@type': 'OfferCatalog',
     name: 'Academic Programs',
@@ -158,34 +183,11 @@ const organizationSchema = {
   },
 };
 
-/*
-  ─────────────────────────────────────────────────────────────────
-  NO inline script in layout.tsx at all.
-
-  The previous inline script was the root cause of the dark
-  background appearing in normal browser tabs on reload because:
-  
-  1. The script ran before React hydrated
-  2. matchMedia('display-mode: standalone') can briefly return
-     false even in PWA during a hard reload before the browser
-     has fully initialised the display-mode — causing the script
-     to either not set the dark bg (good) OR on some browser
-     versions/reload scenarios to behave inconsistently
-  3. More critically: the script set backgroundColor on <html>
-     which persisted even when the component later decided it
-     was NOT a PWA and tried to clean up — the cleanup came
-     too late, after the browser had already painted
-
-  Solution: Remove the inline script entirely.
-  The TwoStageSplashScreen component handles everything
-  client-side in a useEffect which only runs AFTER the browser
-  has fully initialised and display-mode is accurate.
-  The 'pending' stage renders children transparently so there
-  is never a dark flash on the browser.
-  ─────────────────────────────────────────────────────────────────
-*/
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html
       lang="en"
@@ -239,15 +241,28 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         )}
         suppressHydrationWarning
       >
-        <ProgressBar />
-
         <SessionProvider>
-          <TwoStageSplashScreen>
-            <ClientLayout>
-              {children}
-              <VersionBanner />
-            </ClientLayout>
-          </TwoStageSplashScreen>
+          {/*
+            PWAProvider wraps TwoStageSplashScreen so that:
+            - PWA detection (isInstalled) is available to the splash
+            - Service worker, offline/online banners, install prompt
+              and reload button all work correctly
+            - The reload button only appears in installed PWA mode
+          */}
+          <PWAProvider>
+            <TwoStageSplashScreen>
+              {/*
+                ProgressBar inside splash wrapper:
+                prevents it rendering/flashing during splash stages.
+                It only appears once children are revealed.
+              */}
+              <ProgressBar />
+              <ClientLayout>
+                {children}
+                <VersionBanner />
+              </ClientLayout>
+            </TwoStageSplashScreen>
+          </PWAProvider>
         </SessionProvider>
       </body>
     </html>

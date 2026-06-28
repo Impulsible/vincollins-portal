@@ -2,7 +2,7 @@
   "name": "Vincollins College Portal",
   "short_name": "Vincollins",
   "description": "Comprehensive School Management System with CBT Platform",
-  "start_url": "/portal",
+  "start_url": "/?launch=app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
