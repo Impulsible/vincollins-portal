@@ -3,10 +3,10 @@
 const nextConfig = {
   // ✅ Keep StrictMode OFF to prevent double auth calls in development
   reactStrictMode: false,
-  
+
   // ✅ COMMENT THIS OUT TO FIX WINDOWS + PNPM SYMLINK ERRORS
   // output: 'standalone',
-  
+
   // ✅ Image optimization
   images: {
     remotePatterns: [
@@ -53,19 +53,19 @@ const nextConfig = {
     minimumCacheTTL: 60,
     dangerouslyAllowSVG: true,
   },
-  
+
   // ✅ Enable compression
   compress: true,
-  
+
   // ✅ Disable source maps in production
   productionBrowserSourceMaps: false,
-  
+
   // ✅ Experimental optimizations
   experimental: {
     optimizeCss: true,
     optimizePackageImports: [
-      'lucide-react', 
-      '@radix-ui/react-icons', 
+      'lucide-react',
+      '@radix-ui/react-icons',
       'sonner',
       '@radix-ui/react-dialog',
       '@radix-ui/react-dropdown-menu',
@@ -76,7 +76,7 @@ const nextConfig = {
     ],
     scrollRestoration: true,
   },
-  
+
   // ✅ Webpack configuration
   webpack: (config, { isServer, dev }) => {
     if (!isServer) {
@@ -87,9 +87,9 @@ const nextConfig = {
         tls: false,
         dns: false,
         child_process: false,
-      };
+      }
     }
-    
+
     // ✅ Watch options - ignore system files
     config.watchOptions = {
       ignored: [
@@ -110,8 +110,8 @@ const nextConfig = {
       ],
       poll: dev ? 1000 : false,
       aggregateTimeout: 300,
-    };
-    
+    }
+
     // ✅ Ignore warnings
     config.ignoreWarnings = [
       { module: /node_modules\/@radix-ui/ },
@@ -122,8 +122,8 @@ const nextConfig = {
       { message: /EINVAL: invalid argument/ },
       { message: /lstat/ },
       { message: /System Volume Information/ },
-    ];
-    
+    ]
+
     // ✅ Production optimizations
     if (!dev && !isServer) {
       config.optimization = {
@@ -134,15 +134,13 @@ const nextConfig = {
             vendor: {
               test: /[\\/]node_modules[\\/]/,
               name(module) {
-                if (!module.context) {
-                  return 'vendor.unknown';
-                }
-                const match = module.context.match(/[\\/]node_modules[\\/](.*?)([\\/]|$)/);
-                if (!match) {
-                  return 'vendor.unknown';
-                }
-                const packageName = match[1];
-                return `vendor.${packageName.replace('@', '')}`;
+                if (!module.context) return 'vendor.unknown'
+                const match = module.context.match(
+                  /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                )
+                if (!match) return 'vendor.unknown'
+                const packageName = match[1]
+                return `vendor.${packageName.replace('@', '')}`
               },
               priority: 10,
               minChunks: 1,
@@ -161,12 +159,12 @@ const nextConfig = {
           },
         },
         minimize: true,
-      };
+      }
     }
-    
-    return config;
+
+    return config
   },
-  
+
   // ✅ URL rewrites
   async rewrites() {
     return [
@@ -186,13 +184,13 @@ const nextConfig = {
         source: '/apple-icon-180.png',
         destination: '/favicon.png',
       },
-    ];
+    ]
   },
-  
+
   // ✅ Security headers + Caching (COMPLETE)
   async headers() {
     return [
-      // Global security headers
+      // ── Global security headers ──────────────────────────────────────────
       {
         source: '/(.*)',
         headers: [
@@ -218,8 +216,60 @@ const nextConfig = {
           },
         ],
       },
-      
-      // ✅ PORTAL PAGE - NO CACHE (critical for login)
+
+      // ── SERVICE WORKER — must never be cached by the browser ─────────────
+      // If the browser caches sw.js, users get the old SW forever and your
+      // cache-busting (CACHE_VERSION bump) never reaches them.
+      {
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+          {
+            // Allows the SW to control the entire origin (scope: '/')
+            key: 'Service-Worker-Allowed',
+            value: '/',
+          },
+          {
+            key: 'Content-Type',
+            value: 'application/javascript; charset=utf-8',
+          },
+        ],
+      },
+
+      // ── MANIFEST — revalidate on every load ──────────────────────────────
+      // start_url, icons, display mode changes must reach users immediately.
+      {
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+          {
+            key: 'Content-Type',
+            value: 'application/manifest+json; charset=utf-8',
+          },
+        ],
+      },
+
+      // ── HOME PAGE — short cache (splash screen reads this fresh) ─────────
+      // Keep max-age low so ?launch=app always gets a real network response.
+      // The SW fetch handler already bypasses cache for /?launch=app,
+      // but this header is an extra safety net at the CDN/proxy layer.
+      {
+        source: '/',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+
+      // ── PORTAL PAGE — no cache (critical for login) ──────────────────────
       {
         source: '/portal',
         headers: [
@@ -237,8 +287,8 @@ const nextConfig = {
           },
         ],
       },
-      
-      // ✅ ADMIN PORTAL
+
+      // ── ADMIN PORTAL ─────────────────────────────────────────────────────
       {
         source: '/admin/portal',
         headers: [
@@ -256,8 +306,8 @@ const nextConfig = {
           },
         ],
       },
-      
-      // ✅ FORGOT PASSWORD - NO CACHE
+
+      // ── FORGOT PASSWORD ───────────────────────────────────────────────────
       {
         source: '/forgot-password',
         headers: [
@@ -275,8 +325,8 @@ const nextConfig = {
           },
         ],
       },
-      
-      // ✅ RESET PASSWORD - NO CACHE
+
+      // ── RESET PASSWORD ────────────────────────────────────────────────────
       {
         source: '/reset-password',
         headers: [
@@ -294,8 +344,8 @@ const nextConfig = {
           },
         ],
       },
-      
-      // ✅ Dashboard pages - NO CACHE
+
+      // ── DASHBOARD PAGES — no cache ────────────────────────────────────────
       {
         source: '/admin/:path*',
         headers: [
@@ -347,8 +397,8 @@ const nextConfig = {
           },
         ],
       },
-      
-      // Static images - long cache
+
+      // ── STATIC IMAGES — 1 day, revalidate after 7 days ───────────────────
       {
         source: '/images/:path*',
         headers: [
@@ -358,7 +408,8 @@ const nextConfig = {
           },
         ],
       },
-      // Fonts - immutable cache
+
+      // ── FONTS — immutable ─────────────────────────────────────────────────
       {
         source: '/fonts/:path*',
         headers: [
@@ -368,7 +419,8 @@ const nextConfig = {
           },
         ],
       },
-      // Next.js static assets - immutable
+
+      // ── NEXT.JS STATIC ASSETS — immutable ────────────────────────────────
       {
         source: '/_next/static/:path*',
         headers: [
@@ -378,7 +430,8 @@ const nextConfig = {
           },
         ],
       },
-      // API routes - no cache
+
+      // ── API ROUTES — no cache ─────────────────────────────────────────────
       {
         source: '/api/:path*',
         headers: [
@@ -396,16 +449,8 @@ const nextConfig = {
           },
         ],
       },
-      // Home and public pages - short cache
-      {
-        source: '/',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=300, stale-while-revalidate=600',
-          },
-        ],
-      },
+
+      // ── PUBLIC PAGES — short cache ────────────────────────────────────────
       {
         source: '/about',
         headers: [
@@ -442,34 +487,34 @@ const nextConfig = {
           },
         ],
       },
-    ];
+    ]
   },
-  
+
   // ✅ Development optimizations
   onDemandEntries: {
     maxInactiveAge: 60 * 1000,
     pagesBufferLength: 5,
   },
-  
+
   // ✅ Remove X-Powered-By header
   poweredByHeader: false,
-  
+
   // ✅ Transpile packages for better tree-shaking
   transpilePackages: [
-    'lucide-react', 
+    'lucide-react',
     'sonner',
     '@radix-ui/react-dialog',
     '@radix-ui/react-dropdown-menu',
   ],
-  
+
   // ✅ TypeScript and ESLint
   typescript: {
     ignoreBuildErrors: false,
   },
-  
+
   eslint: {
     ignoreDuringBuilds: false,
   },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig

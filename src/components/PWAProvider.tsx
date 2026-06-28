@@ -1,5 +1,4 @@
-// src/components/PWAProvider.tsx - UPDATED WITH DEV MODE CHECK
-
+// src/components/PWAProvider.tsx
 'use client'
 
 import {
@@ -10,30 +9,39 @@ import { cn } from '@/lib/utils'
 
 // ── Context ───────────────────────────────────────────────────────────────────
 interface PWAContextValue {
-  isInstalled: boolean
-  isOnline: boolean
-  canInstall: boolean
+  isInstalled:   boolean
+  isOnline:      boolean
+  canInstall:    boolean
   promptInstall: () => void
-  reload: () => void
+  reload:        () => void
 }
 
 const PWAContext = createContext<PWAContextValue>({
-  isInstalled: false,
-  isOnline: true,
-  canInstall: false,
+  isInstalled:   false,
+  isOnline:      true,
+  canInstall:    false,
   promptInstall: () => {},
-  reload: () => {},
+  reload:        () => {},
 })
 
 export const usePWA = () => useContext(PWAContext)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>
+  prompt:     () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
 
-// ── Reload Button (always visible when installed) ────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function detectStandalone(): boolean {
+  if (typeof window === 'undefined') return false
+  return (
+    window.matchMedia('(display-mode: standalone)').matches ||
+    (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+  )
+}
+
+// ── Reload Button ─────────────────────────────────────────────────────────────
 function PWAReloadButton({ onClick }: { onClick: () => void }) {
   const [spinning, setSpinning] = useState(false)
 
@@ -69,7 +77,7 @@ function UpdateToast({
   onUpdate,
   onDismiss,
 }: {
-  onUpdate: () => void
+  onUpdate:  () => void
   onDismiss: () => void
 }) {
   return (
@@ -123,12 +131,12 @@ function OfflineBanner() {
       'animate-in slide-in-from-top-2 duration-300',
     )}>
       <WifiOff className="h-4 w-4 flex-shrink-0" />
-      <span>You're offline — some features may not be available</span>
+      <span>You&apos;re offline — some features may not be available</span>
     </div>
   )
 }
 
-// ── Online Toast (brief) ──────────────────────────────────────────────────────
+// ── Online Toast ──────────────────────────────────────────────────────────────
 function OnlineToast({ onDismiss }: { onDismiss: () => void }) {
   useEffect(() => {
     const t = setTimeout(onDismiss, 3000)
@@ -179,17 +187,14 @@ function InstallBanner({
       </button>
 
       <div className="flex items-start gap-3">
-        {/* App Icon */}
         <div className="w-12 h-12 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center flex-shrink-0 text-2xl">
           🎓
         </div>
-
         <div className="flex-1 min-w-0 pr-4">
           <p className="font-bold text-sm">Install Vincollins Portal</p>
           <p className="text-xs text-white/70 mt-0.5 leading-relaxed">
             Add to your home screen for faster access and offline support
           </p>
-
           <div className="flex gap-2 mt-3">
             <button
               onClick={onInstall}
@@ -219,39 +224,32 @@ function InstallBanner({
 
 // ── Main Provider ─────────────────────────────────────────────────────────────
 export function PWAProvider({ children }: { children: React.ReactNode }) {
-  const [isInstalled, setIsInstalled] = useState(false)
-  const [isOnline, setIsOnline] = useState(true)
-  const [showOffline, setShowOffline] = useState(false)
-  const [showOnlineToast, setShowOnlineToast] = useState(false)
-  const [showUpdate, setShowUpdate] = useState(false)
-  const [showInstallBanner, setShowInstallBanner] = useState(false)
-  const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null)
+  const [isInstalled,      setIsInstalled]      = useState(false)
+  const [isOnline,         setIsOnline]         = useState(true)
+  const [showOffline,      setShowOffline]      = useState(false)
+  const [showOnlineToast,  setShowOnlineToast]  = useState(false)
+  const [showUpdate,       setShowUpdate]       = useState(false)
+  const [showInstallBanner,setShowInstallBanner]= useState(false)
+  const [swRegistration,   setSwRegistration]   = useState<ServiceWorkerRegistration | null>(null)
 
-  const deferredPromptRef = useRef<BeforeInstallPromptEvent | null>(null)
-  const installDismissedRef = useRef(false)
+  const deferredPromptRef    = useRef<BeforeInstallPromptEvent | null>(null)
+  const installDismissedRef  = useRef(false)
 
-  // ✅ Check if in development mode
   const isDev = process.env.NODE_ENV === 'development'
 
-  // ── Detect installed (standalone) mode ─────────────────────────────────────
+  // ── Detect standalone + initial online state ──────────────────────────────
   useEffect(() => {
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true
-
-    setIsInstalled(isStandalone)
+    setIsInstalled(detectStandalone())
     setIsOnline(navigator.onLine)
     if (!navigator.onLine) setShowOffline(true)
   }, [])
 
-  // ── Register Service Worker (SKIP IN DEVELOPMENT) ──────────────────────────
+  // ── Register Service Worker (production only) ─────────────────────────────
   useEffect(() => {
-    // ✅ Skip service worker registration in development mode
     if (isDev) {
       console.log('[PWA] ⚠️ Service worker disabled in development mode')
       return
     }
-
     if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return
 
     const register = async () => {
@@ -264,86 +262,74 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
         setSwRegistration(reg)
         console.log('[PWA] Service worker registered')
 
-        // Check for update
         reg.addEventListener('updatefound', () => {
           const newWorker = reg.installing
           if (!newWorker) return
-
           newWorker.addEventListener('statechange', () => {
             if (
               newWorker.state === 'installed' &&
               navigator.serviceWorker.controller
             ) {
-              // New SW installed, old one still controlling
               setShowUpdate(true)
             }
           })
         })
 
-        // Periodic update check
-        setInterval(() => reg.update(), 60 * 60 * 1000) // every hour
+        // Check for updates every hour
+        setInterval(() => reg.update(), 60 * 60 * 1000)
       } catch (err) {
         console.warn('[PWA] Service worker registration failed:', err)
       }
     }
 
     register()
-
-    // Listen for controller change (after update)
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      // SW took control after update — reload is optional here
-    })
   }, [isDev])
 
-  // ── Online / Offline ────────────────────────────────────────────────────────
+  // ── Online / Offline ──────────────────────────────────────────────────────
   useEffect(() => {
     const handleOnline = () => {
       setIsOnline(true)
       setShowOffline(false)
       setShowOnlineToast(true)
     }
-
     const handleOffline = () => {
       setIsOnline(false)
       setShowOffline(true)
       setShowOnlineToast(false)
     }
 
-    window.addEventListener('online', handleOnline)
+    window.addEventListener('online',  handleOnline)
     window.addEventListener('offline', handleOffline)
-
     return () => {
-      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('online',  handleOnline)
       window.removeEventListener('offline', handleOffline)
     }
   }, [])
 
-  // ── Install Prompt ──────────────────────────────────────────────────────────
+  // ── Install Prompt ────────────────────────────────────────────────────────
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault()
       deferredPromptRef.current = e as BeforeInstallPromptEvent
 
-      // Only show after 30s, and only if not dismissed before
-      const dismissed = localStorage.getItem('pwa-install-dismissed')
+      const dismissed     = localStorage.getItem('pwa-install-dismissed')
       const lastDismissed = dismissed ? parseInt(dismissed) : 0
-      const oneWeek = 7 * 24 * 60 * 60 * 1000
+      const oneWeek       = 7 * 24 * 60 * 60 * 1000
 
       if (!installDismissedRef.current && Date.now() - lastDismissed > oneWeek) {
         setTimeout(() => {
           if (deferredPromptRef.current) setShowInstallBanner(true)
-        }, 30000)
+        }, 30_000)
       }
     }
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     }
   }, [])
 
-  // ── Actions ─────────────────────────────────────────────────────────────────
+  // ── Actions ───────────────────────────────────────────────────────────────
   const promptInstall = useCallback(async () => {
     if (!deferredPromptRef.current) return
     await deferredPromptRef.current.prompt()
@@ -375,33 +361,20 @@ export function PWAProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <PWAContext.Provider
-      value={{ isInstalled, isOnline, canInstall: !!deferredPromptRef.current, promptInstall, reload }}
+      value={{
+        isInstalled,
+        isOnline,
+        canInstall:    !!deferredPromptRef.current,
+        promptInstall,
+        reload,
+      }}
     >
-      {/* Offline banner — top of screen */}
-      {showOffline && <OfflineBanner />}
-
-      {/* Back online toast */}
-      {showOnlineToast && (
-        <OnlineToast onDismiss={() => setShowOnlineToast(false)} />
-      )}
-
-      {/* SW update toast */}
-      {showUpdate && (
-        <UpdateToast
-          onUpdate={handleUpdate}
-          onDismiss={() => setShowUpdate(false)}
-        />
-      )}
-
-      {/* Install banner */}
+      {showOffline     && <OfflineBanner />}
+      {showOnlineToast && <OnlineToast onDismiss={() => setShowOnlineToast(false)} />}
+      {showUpdate      && <UpdateToast onUpdate={handleUpdate} onDismiss={() => setShowUpdate(false)} />}
       {showInstallBanner && (
-        <InstallBanner
-          onInstall={promptInstall}
-          onDismiss={dismissInstall}
-        />
+        <InstallBanner onInstall={promptInstall} onDismiss={dismissInstall} />
       )}
-
-      {/* Reload button — only in standalone/installed mode */}
       {isInstalled && <PWAReloadButton onClick={reload} />}
 
       {children}
