@@ -1,4 +1,5 @@
 // src/components/TwoStageSplashScreen.tsx
+
 'use client'
 
 import {
@@ -376,7 +377,7 @@ export function TwoStageSplashScreen({ children, onLogin, onGoHome }: Props) {
               />
             </motion.div>
 
-            {/* Name + tagline */}
+            {/* ✅ FIX 1: Name + tagline - REMOVED "App" */}
             <motion.div
               initial={{ opacity: 0, y: 40 }}
               animate={spinDone ? { opacity: 1, y: 0 } : {}}
@@ -397,13 +398,7 @@ export function TwoStageSplashScreen({ children, onLogin, onGoHome }: Props) {
                 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-none"
               >Vincollins College</motion.h1>
 
-              <motion.h2
-                initial={{ opacity: 0, scale: 0.5 }}
-                animate={spinDone ? { opacity: 1, scale: 1 } : {}}
-                transition={{ delay: 0.25, duration: 0.5, type: 'spring', bounce: 0.4 }}
-                className="text-2xl md:text-3xl font-bold tracking-tight leading-none mt-1"
-                style={{ color: '#60A5FA' }}
-              >App</motion.h2>
+              {/* ✅ "App" text REMOVED */}
 
               <motion.p
                 initial={{ opacity: 0 }}
