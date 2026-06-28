@@ -548,7 +548,8 @@ export default function LoginPage() {
 
             {/* ── LEFT: Hero Image ──────────────────────────────────────── */}
             <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]">
-              <div className="relative w-full">
+              {/* ✅ FIX: Added min-h-[calc(100vh-80px)] to parent container */}
+              <div className="relative w-full min-h-[calc(100vh-80px)]">
                 {!imageError && (
                   <>
                     {!heroLoaded && (
