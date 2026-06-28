@@ -19,7 +19,7 @@ export default function ExamEditPage() {
     : (params?.id as string)
 
   const [checking, setChecking] = useState(true)
-  const [allowed, setAllowed]   = useState(false)
+  const [allowed, setAllowed] = useState(false)
 
   // ✅ Verify auth + exam ownership before rendering editor
   useEffect(() => {
@@ -99,10 +99,6 @@ export default function ExamEditPage() {
     )
   }
 
-  // ── Render editor ──────────────────────────────────────────────────────────
-  return (
-    <div className="mt-4 sm:mt-6 lg:mt-8 max-w-[1600px] mx-auto">
-      <EditExamPage examId={examId} />
-    </div>
-  )
+  // ── Render editor - NO extra wrapper div ──────────────────────────────────
+  return <EditExamPage examId={examId} />
 }

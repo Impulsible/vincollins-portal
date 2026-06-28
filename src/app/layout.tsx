@@ -1,4 +1,5 @@
 // src/app/layout.tsx
+
 import { Suspense } from 'react';
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
@@ -10,6 +11,7 @@ import { ProgressBar } from '@/components/ProgressBar';
 import { ClientLayout } from '@/components/ClientLayout';
 import { VersionBanner } from '@/components/VersionBanner';
 import { SessionProvider } from '@/components/SessionProvider';
+import { TwoStageSplashScreen } from '@/components/TwoStageSplashScreen';
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -221,10 +223,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         <ProgressBar />
         <SessionProvider>
-          <ClientLayout>
-            {children}
-            <VersionBanner />
-          </ClientLayout>
+          {/* ✅ Two-Stage Splash Screen Wrapper */}
+          <TwoStageSplashScreen>
+            <ClientLayout>
+              {children}
+              <VersionBanner />
+            </ClientLayout>
+          </TwoStageSplashScreen>
         </SessionProvider>
       </body>
     </html>

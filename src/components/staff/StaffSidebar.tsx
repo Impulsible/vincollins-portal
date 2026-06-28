@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/staff/StaffSidebar.tsx - WITH GRADE ASSIGNMENTS
+// components/staff/StaffSidebar.tsx - WITH GRADE ASSIGNMENTS & FIXED STATS FETCHING
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,7 +11,7 @@ import {
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, User, CalendarDays,
   Bell, HelpCircle, Notebook, Megaphone,
-  CheckSquare  // Add this for grading icon
+  CheckSquare
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -64,7 +64,7 @@ interface NavigationItem {
 interface SidebarStats {
   studentCount: number
   examCount: number
-  pendingGradingCount: number  // Add this
+  pendingGradingCount: number
 }
 
 // ✅ Primary navigation with Announcements and Grade Assignments
@@ -164,54 +164,91 @@ export function StaffSidebar({
     examCount: 0,
     pendingGradingCount: 0 
   })
+  const [isLoading, setIsLoading] = useState(true)
 
-  // Fetch stats in background
+  // ✅ FIXED: Fetch stats - works even when profile is null
   useEffect(() => {
+    let mounted = true
+    let retryTimeout: NodeJS.Timeout
+    let retryCount = 0
+    const maxRetries = 3
+
     const fetchStats = async () => {
-      if (!profile?.id) return
-      
       try {
+        console.log('📊 Fetching sidebar stats...', profile?.id ? `for user ${profile.id}` : '(general)')
+        
+        // ✅ Always fetch student count (doesn't need profile)
         const { count: studentsCount } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .eq('role', 'student')
 
-        const { count: examsCount } = await supabase
-          .from('exams')
-          .select('*', { count: 'exact', head: true })
-          .eq('created_by', profile.id)
-
-        // Get pending grading count
-        const { data: teacherAssignments } = await supabase
-          .from('assignments')
-          .select('id')
-          .eq('created_by', profile.id)
-
-        const assignmentIds = teacherAssignments?.map(a => a.id) || []
-
-        let pendingCount = 0
-        if (assignmentIds.length > 0) {
+        // ✅ Fetch exams - if we have profile.id, get user's exams, otherwise get all
+        let examsCount = 0
+        if (profile?.id) {
           const { count } = await supabase
-            .from('assignment_submissions')
+            .from('exams')
             .select('*', { count: 'exact', head: true })
-            .in('assignment_id', assignmentIds)
-            .eq('status', 'submitted')
-          
-          pendingCount = count || 0
+            .eq('created_by', profile.id)
+          examsCount = count || 0
+        } else {
+          // ✅ If no profile, get total exams count
+          const { count } = await supabase
+            .from('exams')
+            .select('*', { count: 'exact', head: true })
+          examsCount = count || 0
         }
 
-        setStats({
-          studentCount: studentsCount || 0,
-          examCount: examsCount || 0,
-          pendingGradingCount: pendingCount
-        })
+        // ✅ Get pending grading count (only if we have profile.id)
+        let pendingCount = 0
+        if (profile?.id) {
+          const { data: teacherAssignments } = await supabase
+            .from('assignments')
+            .select('id')
+            .eq('created_by', profile.id)
+
+          const assignmentIds = teacherAssignments?.map(a => a.id) || []
+
+          if (assignmentIds.length > 0) {
+            const { count } = await supabase
+              .from('assignment_submissions')
+              .select('*', { count: 'exact', head: true })
+              .in('assignment_id', assignmentIds)
+              .eq('status', 'submitted')
+            
+            pendingCount = count || 0
+          }
+        }
+
+        if (mounted) {
+          console.log('✅ Stats fetched:', { studentsCount, examsCount, pendingCount })
+          setStats({
+            studentCount: studentsCount || 0,
+            examCount: examsCount || 0,
+            pendingGradingCount: pendingCount
+          })
+          setIsLoading(false)
+        }
       } catch (error) {
         console.error('Error fetching stats:', error)
+        // Retry on error
+        if (retryCount < maxRetries && mounted) {
+          retryCount++
+          console.log(`🔄 Retrying stats fetch (${retryCount}/${maxRetries})...`)
+          retryTimeout = setTimeout(fetchStats, 2000 * retryCount)
+        } else if (mounted) {
+          setIsLoading(false)
+        }
       }
     }
 
     fetchStats()
-  }, [profile?.id])
+
+    return () => {
+      mounted = false
+      clearTimeout(retryTimeout)
+    }
+  }, [profile?.id]) // Re-run when profile.id changes
 
   // Sync active tab with pathname
   useEffect(() => {
@@ -429,24 +466,24 @@ export function StaffSidebar({
                 )}
               </div>
 
-              {/* Stats */}
+              {/* Stats - Show loading state */}
               <div className="grid grid-cols-3 gap-2 pt-2">
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Students</p>
                   <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
-                    {stats.studentCount}
+                    {isLoading ? '...' : stats.studentCount}
                   </p>
                 </div>
                 <div className="bg-teal-50 dark:bg-teal-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-teal-600 dark:text-teal-400 font-medium">Exams</p>
                   <p className="text-xs font-bold text-teal-700 dark:text-teal-300">
-                    {stats.examCount}
+                    {isLoading ? '...' : stats.examCount}
                   </p>
                 </div>
                 <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">
                   <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">To Grade</p>
                   <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
-                    {stats.pendingGradingCount}
+                    {isLoading ? '...' : stats.pendingGradingCount}
                   </p>
                 </div>
               </div>
