@@ -31,63 +31,16 @@ const extractYear = (className: string): string => {
   return className
 }
 
-// ✅ FIXED: Grade calculation - matches database grade mapping
-const calculateLetterGrade = (percentage: number): { grade: string; color: string } => {
-  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
-  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
-  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
-  if (percentage >= 50) return { grade: 'P', color: 'text-purple-500' }
-  return { grade: 'F', color: 'text-red-600' }
-}
-
-// ✅ FIXED: Calculate score including CA for ALL statuses
-const calculateSubjectPercentage = (attempt: any, caScores: any): number => {
-  // Objective score (max 20)
-  const objectiveScore = attempt.objective_score || 0
-  const objectiveMax = attempt.objective_total || 20
-  
-  // CA scores (max 40 total - CA1 + CA2)
-  const ca1 = caScores?.ca1_score || 0
-  const ca2 = caScores?.ca2_score || 0
-  const caTotal = ca1 + ca2  // Max 40
-  
-  // Check if theory is graded
-  let theoryScore = 0
-  let hasTheoryGraded = false
-  
-  if (attempt.theory_feedback) {
-    try {
-      const feedback = typeof attempt.theory_feedback === 'string' 
-        ? JSON.parse(attempt.theory_feedback) 
-        : attempt.theory_feedback
-      if (feedback?.total?.score !== undefined && feedback?.total?.score > 0) {
-        theoryScore = Number(feedback.total.score)
-        hasTheoryGraded = true
-      }
-    } catch {}
+// Grade color mapping
+const getGradeColor = (grade: string): string => {
+  switch (grade) {
+    case 'A': return 'text-emerald-600'
+    case 'B': return 'text-blue-600'
+    case 'C': return 'text-amber-600'
+    case 'P': return 'text-purple-500'
+    case 'F': return 'text-red-600'
+    default: return 'text-red-600'
   }
-  
-  // Determine what's available and calculate accordingly
-  const hasCA = caTotal > 0
-  const hasTheory = hasTheoryGraded || theoryScore > 0
-  
-  let totalScore = objectiveScore
-  let totalMarks = objectiveMax
-  
-  // Add CA if available
-  if (hasCA) {
-    totalScore += caTotal
-    totalMarks += 40  // CA max
-  }
-  
-  // Add Theory if available
-  if (hasTheory) {
-    totalScore += theoryScore
-    totalMarks += 40  // Theory max
-  }
-  
-  // Calculate percentage
-  return totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0
 }
 
 export function useExamsData(router: ReturnType<typeof useRouter>) {
@@ -319,7 +272,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       })
       setExamAttempts(enrichedAm)
 
-      // Get term progress from database
+      // ✅ GET TERM PROGRESS FROM DATABASE - USE THIS AS SOURCE OF TRUTH
       const { data: termProgressData } = await supabase
         .from("student_term_progress")
         .select("total_subjects, completed_exams, average_score, grade")
@@ -328,51 +281,13 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         .eq("session_year", targetSession)
         .maybeSingle()
 
-      // ALL attempts that count toward completion (including pending_theory)
-      const allCompletedAttempts = Object.values(enrichedAm).filter(a => 
-        ['completed', 'graded', 'pending_theory'].includes(a.status)
-      )
       const pendingTheoryAttempts = Object.values(enrichedAm).filter(a => a.status === 'pending_theory')
 
-      // ✅ Calculate average score from completed exams
-      let avgScore = 0
-      if (allCompletedAttempts.length > 0) {
-        let totalPercentage = 0
-        let validAttempts = 0
-        
-        allCompletedAttempts.forEach((attempt) => {
-          const ca = {
-            ca1_score: attempt.ca1_score || 0,
-            ca2_score: attempt.ca2_score || 0
-          }
-          const percentage = calculateSubjectPercentage(attempt, ca)
-          if (percentage > 0) {
-            totalPercentage += percentage
-            validAttempts++
-          }
-        })
-        
-        if (validAttempts > 0) {
-          avgScore = Math.round(totalPercentage / validAttempts)
-        }
-      }
-
-      // ✅ Calculate grade based on avgScore
-      const gradeInfo = avgScore > 0 
-        ? calculateLetterGrade(avgScore)
-        : { grade: 'F', color: 'text-red-600' }
-
-      // ✅ Debug log
-      console.log('📊 Grade Calculation:', {
-        avgScore,
-        gradeInfo,
-        completedExams: allCompletedAttempts.length
-      })
-
-      // Completed count includes pending_theory
-      const actualCompleted = termProgressData?.completed_exams || allCompletedAttempts.length
-      const actualTotalSubjects = termProgressData?.total_subjects || totalSubjects
-      const displayAverageScore = termProgressData?.average_score || avgScore
+      // ✅ Use database values directly
+      const dbGrade = termProgressData?.grade || 'F'
+      const dbAverageScore = termProgressData?.average_score ?? 0
+      const dbCompleted = termProgressData?.completed_exams ?? 0
+      const dbTotalSubjects = termProgressData?.total_subjects ?? totalSubjects
 
       // Available exams
       const availableCount = filteredExams.filter((e: Exam) => {
@@ -385,21 +300,27 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         e.starts_at && new Date(e.starts_at) > new Date()
       ).length
 
-      // ✅ Set stats with correct grade
+      // ✅ Set stats with DATABASE values (source of truth)
       const newStats: LocalStatsState = {
         available: availableCount,
-        completed: actualCompleted,
+        completed: dbCompleted,
         upcoming: upcomingCount,
-        averageScore: displayAverageScore,
-        currentGrade: gradeInfo.grade,  // ✅ This will be 'A' for 80%
-        gradeColor: gradeInfo.color,
-        totalSubjects: actualTotalSubjects,
+        averageScore: dbAverageScore,
+        currentGrade: dbGrade,
+        gradeColor: getGradeColor(dbGrade),
+        totalSubjects: dbTotalSubjects,
         termName: TERM_NAMES[targetTerm] || targetTerm,
         sessionYear: targetSession,
         pendingTheoryCount: pendingTheoryAttempts.length,
       }
 
-      console.log('📊 Final Stats:', newStats)
+      console.log('📊 Final Stats (from DB):', {
+        dbGrade,
+        dbAverageScore,
+        dbCompleted,
+        dbTotalSubjects
+      })
+
       setStats(newStats)
 
     } catch (e) { 
