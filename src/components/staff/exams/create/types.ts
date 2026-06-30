@@ -35,6 +35,7 @@ export interface ExamDetails {
   randomize_options: boolean
   term: string
   session_year: string
+  passage_text?: string
 }
 
 export interface TeacherProfile {

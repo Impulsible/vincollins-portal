@@ -19,6 +19,7 @@ interface PreviewStepProps {
   hasTheory: boolean;
   objectiveMax: number;
   theoryMax: number;
+  passageText?: string;
 }
 
 // ── Helper: Detect table in content ─────────────────────────────────────────
@@ -84,7 +85,6 @@ const convertMarkdownTableToHtml = (text: string): string => {
 const renderContent = (text: string, maxLength?: number) => {
   if (!text) return null;
 
-  // ── Markdown tables ──────────────────────────────────────────────────────
   if (text.includes('|') && text.includes('---')) {
     const tableHtml = convertMarkdownTableToHtml(text);
     if (tableHtml) {
@@ -99,7 +99,6 @@ const renderContent = (text: string, maxLength?: number) => {
     }
   }
 
-  // ── HTML tables ──────────────────────────────────────────────────────────
   if (text.includes('<table') && text.includes('</table>')) {
     const tableMatch = text.match(/<table[\s\S]*?<\/table>/i);
     if (tableMatch) {
@@ -114,7 +113,6 @@ const renderContent = (text: string, maxLength?: number) => {
     }
   }
 
-  // ── ASCII tables ─────────────────────────────────────────────────────────
   if (text.includes('+--') && text.includes('--+')) {
     return (
       <pre className="mt-2 text-xs font-mono bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700 overflow-x-auto whitespace-pre-wrap text-gray-700 dark:text-gray-300">
@@ -123,7 +121,6 @@ const renderContent = (text: string, maxLength?: number) => {
     );
   }
 
-  // ── Regular text ─────────────────────────────────────────────────────────
   let displayText = text;
   if (maxLength && !text.includes('|') && !text.includes('<table')) {
     displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
@@ -201,6 +198,7 @@ export function PreviewStep({
   hasTheory,
   objectiveMax,
   theoryMax,
+  passageText,
 }: PreviewStepProps) {
   const totalMarks = objectiveMax + theoryMax;
 
@@ -237,12 +235,7 @@ export function PreviewStep({
             {[
               { label: "Duration", value: `${examDetails.duration}m` },
               { label: "Pass Mark", value: `${examDetails.pass_mark}%` },
-              {
-                label: "Term",
-                value:
-                  examDetails.term.charAt(0).toUpperCase() +
-                  examDetails.term.slice(1),
-              },
+              { label: "Term", value: examDetails.term.charAt(0).toUpperCase() + examDetails.term.slice(1) },
               { label: "Session", value: examDetails.session_year },
             ].map(({ label, value }) => (
               <div key={label} className="text-center p-2 bg-white rounded-lg border">
@@ -258,9 +251,7 @@ export function PreviewStep({
               <p className="text-[10px] text-blue-600">Objective</p>
             </div>
             <div className="p-2 bg-purple-50 rounded-lg border border-purple-100 text-center">
-              <p className="text-lg font-bold text-purple-700">
-                {theoryQuestions.length}
-              </p>
+              <p className="text-lg font-bold text-purple-700">{theoryQuestions.length}</p>
               <p className="text-[10px] text-purple-600">Theory</p>
             </div>
             <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100 text-center">
@@ -276,8 +267,8 @@ export function PreviewStep({
             Student View Preview
           </p>
 
-          {/* ✅ Passage Preview */}
-          {(examDetails as any).passage_text && (
+          {/* Passage Preview */}
+          {passageText && (
             <div className="mb-3 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 sm:p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
                 <BookOpen className="h-4 w-4 text-amber-600" />
@@ -286,7 +277,7 @@ export function PreviewStep({
                 </span>
               </div>
               <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed font-serif text-[13px] whitespace-pre-wrap">
-                {(examDetails as any).passage_text}
+                {passageText}
               </div>
             </div>
           )}
@@ -334,7 +325,6 @@ function CBTPreview({
     [questions, theoryQuestions, hasTheory]
   );
 
-  // Timer — stop at zero, pause when hidden
   useEffect(() => {
     if (timeLeft <= 0) return;
 
@@ -363,12 +353,10 @@ function CBTPreview({
       clearInterval(timerRef.current!);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const formatTime = (seconds: number) =>
-    `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60)
-      .toString()
-      .padStart(2, "0")}`;
+    `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
 
   const current = allQuestions[currentIndex];
   const total = allQuestions.length;
@@ -382,36 +370,26 @@ function CBTPreview({
     );
   }
 
-  // Check if current question has table content
   const hasTableContent = hasTable(current?.question || '');
   const hasChartContent = hasChart(current?.question || '');
   const hasImageContent = hasImage(current?.question || '');
 
   return (
     <div className="rounded-xl overflow-hidden border shadow-md bg-gray-50">
-      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 to-indigo-700 text-white px-3 sm:px-4 py-2.5 sm:py-3">
         <div className="flex justify-between items-center mb-2">
           <div className="min-w-0 flex-1 mr-3">
-            <h3 className="font-bold text-xs sm:text-sm truncate">
-              {examDetails.title || "Untitled"}
-            </h3>
-            <p className="text-blue-200 text-[10px] truncate">
-              {examDetails.subject} • {examDetails.class}
-            </p>
+            <h3 className="font-bold text-xs sm:text-sm truncate">{examDetails.title || "Untitled"}</h3>
+            <p className="text-blue-200 text-[10px] truncate">{examDetails.subject} • {examDetails.class}</p>
           </div>
           <div className="flex items-center gap-1 bg-white/20 px-2 py-1 rounded-full flex-shrink-0">
             <Clock className="h-3 w-3" />
             <span className="font-mono text-xs font-bold">{formatTime(timeLeft)}</span>
           </div>
         </div>
-        <Progress
-          value={((currentIndex + 1) / total) * 100}
-          className="h-1 bg-blue-800/50"
-        />
+        <Progress value={((currentIndex + 1) / total) * 100} className="h-1 bg-blue-800/50" />
       </div>
 
-      {/* Question Nav */}
       <div className="bg-white border-b px-2 py-1.5 overflow-x-auto">
         <div className="flex gap-1 min-w-max">
           {allQuestions.map((q, idx) => {
@@ -442,7 +420,6 @@ function CBTPreview({
         </div>
       </div>
 
-      {/* Question Body */}
       {current && (
         <div className="p-3 sm:p-4">
           <div className="bg-white rounded-lg border p-3 mb-3 shadow-sm">
@@ -456,20 +433,17 @@ function CBTPreview({
               <div className="flex gap-1">
                 {hasTableContent && (
                   <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">
-                    <Table className="h-2.5 w-2.5 mr-0.5" />
-                    Table
+                    <Table className="h-2.5 w-2.5 mr-0.5" /> Table
                   </Badge>
                 )}
                 {hasChartContent && (
                   <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-600 border-amber-200">
-                    <BarChart3 className="h-2.5 w-2.5 mr-0.5" />
-                    Chart
+                    <BarChart3 className="h-2.5 w-2.5 mr-0.5" /> Chart
                   </Badge>
                 )}
                 {hasImageContent && (
                   <Badge variant="outline" className="text-[10px] bg-green-50 text-green-600 border-green-200">
-                    <ImageIcon className="h-2.5 w-2.5 mr-0.5" />
-                    Image
+                    <ImageIcon className="h-2.5 w-2.5 mr-0.5" /> Image
                   </Badge>
                 )}
               </div>
@@ -479,7 +453,6 @@ function CBTPreview({
             </div>
           </div>
 
-          {/* Objective Options */}
           {current._type === "objective" &&
             current.options?.map((opt, idx) => (
               <label
@@ -491,86 +464,47 @@ function CBTPreview({
                     : "border-gray-100 bg-white hover:border-gray-300"
                 )}
               >
-                <div
-                  className={cn(
-                    "w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold flex-shrink-0",
-                    answers[current.id] === opt
-                      ? "border-blue-500 bg-blue-500 text-white"
-                      : "border-gray-300 text-gray-500"
-                  )}
-                >
+                <div className={cn(
+                  "w-5 h-5 rounded-full border-2 flex items-center justify-center text-[10px] font-bold flex-shrink-0",
+                  answers[current.id] === opt
+                    ? "border-blue-500 bg-blue-500 text-white"
+                    : "border-gray-300 text-gray-500"
+                )}>
                   {String.fromCharCode(65 + idx)}
                 </div>
-                <input
-                  type="radio"
-                  className="hidden"
-                  checked={answers[current.id] === opt}
-                  onChange={() =>
-                    setAnswers((prev) => ({ ...prev, [current.id]: opt }))
-                  }
-                />
+                <input type="radio" className="hidden" checked={answers[current.id] === opt}
+                  onChange={() => setAnswers((prev) => ({ ...prev, [current.id]: opt }))} />
                 <span className="text-xs">{opt}</span>
               </label>
             ))}
 
-          {/* Theory Answer Box */}
           {current._type === "theory" && (
             <div className="space-y-2">
               {current.image_url && (
-                <img
-                  src={current.image_url}
-                  alt={current.image_caption || "Diagram"}
-                  className="max-h-32 rounded border object-contain"
-                />
+                <img src={current.image_url} alt={current.image_caption || "Diagram"} className="max-h-32 rounded border object-contain" />
               )}
               {current.sub_questions && current.sub_questions.length > 0 && (
                 <div className="bg-gray-50 rounded p-2 text-xs space-y-1">
                   {renderSubQuestions(current.sub_questions)}
                 </div>
               )}
-              <Textarea
-                placeholder="Type your answer here..."
-                rows={4}
-                className="resize-none text-xs"
-                disabled
-              />
+              <Textarea placeholder="Type your answer here..." rows={4} className="resize-none text-xs" disabled />
             </div>
           )}
         </div>
       )}
 
-      {/* Footer Nav */}
       <div className="bg-white border-t px-3 py-2 flex justify-between items-center">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
-          disabled={currentIndex === 0}
-          className="h-7 text-xs px-2"
-        >
-          <ChevronLeft className="h-3 w-3 mr-0.5" />
-          Prev
+        <Button variant="outline" size="sm" onClick={() => setCurrentIndex(Math.max(0, currentIndex - 1))}
+          disabled={currentIndex === 0} className="h-7 text-xs px-2">
+          <ChevronLeft className="h-3 w-3 mr-0.5" /> Prev
         </Button>
-        <span className="text-[10px] text-muted-foreground">
-          {currentIndex + 1} / {total}
-        </span>
+        <span className="text-[10px] text-muted-foreground">{currentIndex + 1} / {total}</span>
         {currentIndex === total - 1 ? (
-          <Button
-            size="sm"
-            className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs px-2"
-          >
-            Submit
-          </Button>
+          <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 h-7 text-xs px-2">Submit</Button>
         ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setCurrentIndex(Math.min(total - 1, currentIndex + 1))}
-            className="h-7 text-xs px-2"
-          >
-            Next
-            <ChevronRight className="h-3 w-3 ml-0.5" />
-          </Button>
+          <Button variant="outline" size="sm" onClick={() => setCurrentIndex(Math.min(total - 1, currentIndex + 1))}
+            className="h-7 text-xs px-2">Next <ChevronRight className="h-3 w-3 ml-0.5" /></Button>
         )}
       </div>
     </div>

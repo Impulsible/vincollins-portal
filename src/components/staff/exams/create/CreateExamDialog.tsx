@@ -410,6 +410,7 @@ export function CreateExamDialog({
               hasTheory={hasTheory}
               objectiveMax={objectiveMax}
               theoryMax={theoryMax}
+              passageText={hasPassage ? passageText : undefined}
             />
           )}
         </div>
