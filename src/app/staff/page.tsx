@@ -1,4 +1,4 @@
-// app/staff/page.tsx
+// app/staff/page.tsx - FIXED AVERAGE PERFORMANCE
 'use client'
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
@@ -75,7 +75,7 @@ function readCache(): DashboardData | null {
     const raw = localStorage.getItem(CACHE_KEY)
     if (!raw) return null
     const { data, ts } = JSON.parse(raw)
-    if (Date.now() - ts > CACHE_TTL_MS) return null // expired
+    if (Date.now() - ts > CACHE_TTL_MS) return null
     return data as DashboardData
   } catch {
     return null
@@ -168,9 +168,9 @@ function TimeoutScreen({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-// ── Data fetcher (shared between initial load and refresh) ────────────────────
+// ── Data fetcher ──────────────────────────────────────────────────────────────
 async function fetchDashboardData(userId: string): Promise<DashboardData> {
-  // Step 1: Get teacher's exam IDs — needed for theory/grading queries
+  // Step 1: Get teacher's exam IDs
   const { data: teacherExams } = await supabase
     .from('exams')
     .select('id')
@@ -178,49 +178,36 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
 
   const teacherExamIds = (teacherExams ?? []).map((e: any) => e.id)
 
-  // Step 2: Parallel fetches — all independent queries run together
+  // Step 2: Parallel fetches
   const [
     examsRes,
     assignmentsRes,
     notesRes,
     studentsRes,
     submissionsRes,
-    scoredAttemptsRes,
   ] = await Promise.allSettled([
-
-    // ── Exams ──────────────────────────────────────────────────────────────
     supabase
       .from('exams')
       .select('id, title, subject, class, status, created_at')
       .eq('created_by', userId)
       .order('created_at', { ascending: false })
       .limit(10),
-
-    // ── Assignments ────────────────────────────────────────────────────────
     supabase
       .from('assignments')
       .select('id, title, subject, class, classes, status, due_date, total_points, created_at')
       .eq('created_by', userId)
       .order('created_at', { ascending: false })
       .limit(5),
-
-    // ── Notes — ONLY columns that exist in the notes table ─────────────────
-    // ✅ No session_year filter (column doesn't exist)
-    // ✅ No select('*') — explicit safe columns only
     supabase
       .from('notes')
       .select('id, title, subject, status, created_at')
       .eq('created_by', userId)
       .order('created_at', { ascending: false })
       .limit(4),
-
-    // ── Students ───────────────────────────────────────────────────────────
     supabase
       .from('profiles')
       .select('class, is_active')
       .eq('role', 'student'),
-
-    // ── Pending theory submissions (teacher's exams only) ──────────────────
     teacherExamIds.length > 0
       ? supabase
           .from('exam_attempts')
@@ -230,35 +217,16 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
           .order('submitted_at', { ascending: false })
           .limit(20)
       : Promise.resolve({ data: [], error: null }),
-
-    // ── Graded scores for performance average ──────────────────────────────
-    teacherExamIds.length > 0
-      ? supabase
-          .from('exam_attempts')
-          .select('percentage')
-          .in('exam_id', teacherExamIds)
-          .eq('status', 'graded')
-          .limit(10000)
-      : Promise.resolve({ data: [], error: null }),
   ])
 
-  // ── Unpack results safely ─────────────────────────────────────────────────
-  const exams =
-    examsRes.status === 'fulfilled' && !examsRes.value.error
-      ? examsRes.value.data ?? []
-      : []
-
-  const rawAssignments =
-    assignmentsRes.status === 'fulfilled' && !assignmentsRes.value.error
-      ? assignmentsRes.value.data ?? []
-      : []
-
-  // ✅ Notes: handle 400 gracefully with a fallback to minimal columns
+  // Unpack results
+  const exams = examsRes.status === 'fulfilled' && !examsRes.value.error ? examsRes.value.data ?? [] : []
+  
+  const rawAssignments = assignmentsRes.status === 'fulfilled' && !assignmentsRes.value.error ? assignmentsRes.value.data ?? [] : []
+  
   let notes: any[] = []
   if (notesRes.status === 'fulfilled') {
     if (notesRes.value.error) {
-      console.error('[StaffPage] Notes query error:', notesRes.value.error.message)
-      // Fallback — bare minimum columns that definitely exist
       const { data: fallbackNotes } = await supabase
         .from('notes')
         .select('id, title, created_at')
@@ -271,22 +239,11 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
     }
   }
 
-  const students =
-    studentsRes.status === 'fulfilled' && !studentsRes.value.error
-      ? studentsRes.value.data ?? []
-      : []
+  const students = studentsRes.status === 'fulfilled' && !studentsRes.value.error ? studentsRes.value.data ?? [] : []
+  
+  const submissions = submissionsRes.status === 'fulfilled' && !submissionsRes.value.error ? submissionsRes.value.data ?? [] : []
 
-  const submissions =
-    submissionsRes.status === 'fulfilled' && !submissionsRes.value.error
-      ? submissionsRes.value.data ?? []
-      : []
-
-  const scoredAttempts =
-    scoredAttemptsRes.status === 'fulfilled' && !scoredAttemptsRes.value.error
-      ? scoredAttemptsRes.value.data ?? []
-      : []
-
-  // ── Enrich submissions with exam details ──────────────────────────────────
+  // ── Enrich submissions ────────────────────────────────────────────────────
   let enrichedSubmissions: any[] = []
   if (submissions.length > 0) {
     const submissionExamIds = [...new Set(submissions.map((s: any) => s.exam_id))]
@@ -312,15 +269,64 @@ async function fetchDashboardData(userId: string): Promise<DashboardData> {
     if (s.class) classMap.set(s.class, (classMap.get(s.class) ?? 0) + 1)
   })
 
-  // ── Average performance ───────────────────────────────────────────────────
-  const scores = (scoredAttempts as any[])
-    .map((s) => s.percentage ?? 0)
-    .filter((n) => n > 0)
+  // ── ✅ FIXED: Average performance with CA scores ──────────────────────────
+  // Get CA scores for teacher's exams
+  let caScoresMap: Record<string, any> = {}
+  let caOnlyScores: any[] = []
+  
+  if (teacherExamIds.length > 0) {
+    const { data: caData } = await supabase
+      .from('ca_scores')
+      .select('exam_id, student_id, percentage, total_score')
+      .in('exam_id', teacherExamIds)
+    
+    if (caData) {
+      caData.forEach((ca: any) => {
+        const key = `${ca.student_id}|${ca.exam_id}`
+        caScoresMap[key] = ca
+      })
+      caOnlyScores = caData
+    }
+  }
 
-  const averagePerformance =
-    scores.length > 0
-      ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-      : 0
+  // Get all completed/graded attempts
+  const studentExamScores: number[] = []
+  const seenPairs = new Set<string>()
+  
+  if (teacherExamIds.length > 0) {
+    const { data: allAttempts } = await supabase
+      .from('exam_attempts')
+      .select('student_id, exam_id, percentage, status')
+      .in('exam_id', teacherExamIds)
+      .in('status', ['completed', 'graded'])
+    
+    if (allAttempts) {
+      allAttempts.forEach((a: any) => {
+        const key = `${a.student_id}|${a.exam_id}`
+        if (seenPairs.has(key)) return
+        seenPairs.add(key)
+        
+        const ca = caScoresMap[key]
+        // Use CA percentage if available (includes combined exam+CA)
+        const pct = ca?.percentage ?? a.percentage ?? 0
+        if (pct > 0) {
+          studentExamScores.push(pct)
+        }
+      })
+    }
+    
+    // Also include CA-only scores (no exam attempt)
+    caOnlyScores.forEach((ca: any) => {
+      const key = `${ca.student_id}|${ca.exam_id}`
+      if (!seenPairs.has(key) && ca.percentage > 0) {
+        studentExamScores.push(ca.percentage)
+      }
+    })
+  }
+
+  const averagePerformance = studentExamScores.length > 0
+    ? Math.round(studentExamScores.reduce((a, b) => a + b, 0) / studentExamScores.length)
+    : 0
 
   // ── Enrich assignments ────────────────────────────────────────────────────
   const assignments = rawAssignments.map((a: any) => ({
@@ -400,17 +406,11 @@ export default function StaffDashboardPage() {
     async (userId: string, showToast = false) => {
       try {
         setRefreshing(true)
-
-        // 10 second timeout
-        timeoutRef.current = setTimeout(() => {
-          if (loading) setTimedOut(true)
-        }, 10000)
-
+        timeoutRef.current = setTimeout(() => { if (loading) setTimedOut(true) }, 10000)
         const data = await fetchDashboardData(userId)
         setDashboardData(data)
         writeCache(data)
         setLoading(false)
-
         if (showToast) toast.success('Dashboard refreshed')
       } catch (err) {
         console.error('[StaffPage] fetchDashboardData error:', err)
@@ -426,30 +426,16 @@ export default function StaffDashboardPage() {
   // ── Auth guard + initial fetch ─────────────────────────────────────────────
   useEffect(() => {
     if (authLoading) return
-    if (!isAuthenticated || !contextUser?.id) {
-      router.replace('/portal')
-      return
-    }
-
+    if (!isAuthenticated || !contextUser?.id) { router.replace('/portal'); return }
     const role = contextUser.role?.toLowerCase()
-    if (!['staff', 'teacher', 'admin'].includes(role ?? '')) {
-      router.replace('/portal')
-      return
-    }
-
+    if (!['staff', 'teacher', 'admin'].includes(role ?? '')) { router.replace('/portal'); return }
     if (fetchedRef.current) return
     fetchedRef.current = true
     loadData(contextUser.id)
   }, [authLoading, isAuthenticated, contextUser, router, loadData])
 
-  // ── Cleanup ────────────────────────────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
-    }
-  }, [])
+  useEffect(() => { return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current) } }, [])
 
-  // ── Refresh handler ────────────────────────────────────────────────────────
   const handleRefresh = useCallback(async () => {
     if (!contextUser?.id || refreshing) return
     fetchedRef.current = false
@@ -460,17 +446,11 @@ export default function StaffDashboardPage() {
   // ── Guards ─────────────────────────────────────────────────────────────────
   if (authLoading) return <LoadingScreen />
   if (!isAuthenticated || !contextUser) return null
-
   const role = contextUser.role?.toLowerCase()
   if (!['staff', 'teacher', 'admin'].includes(role ?? '')) return null
-
-  if (loading && !dashboardData && timedOut) {
-    return <TimeoutScreen onRetry={() => window.location.reload()} />
-  }
-
+  if (loading && !dashboardData && timedOut) return <TimeoutScreen onRetry={() => window.location.reload()} />
   if (loading && !dashboardData) return <LoadingScreen />
 
-  // ── Data aliases ───────────────────────────────────────────────────────────
   const exams = dashboardData?.exams ?? []
   const assignments = dashboardData?.assignments ?? []
   const notes = dashboardData?.notes ?? []
@@ -496,182 +476,68 @@ export default function StaffDashboardPage() {
       />
 
       <div className="px-4 sm:px-6 lg:px-8 pb-8">
-
-        {/* Refreshing indicator */}
         {refreshing && (
           <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg px-3 py-1.5 flex items-center gap-2 text-xs text-slate-500 border">
-            <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />
-            Refreshing...
+            <Loader2 className="h-3 w-3 animate-spin text-emerald-500" /> Refreshing...
           </div>
         )}
 
-        {/* Quick Actions */}
         <div className="flex items-center gap-2 mt-4 sm:mt-5 flex-wrap">
-          <Button
-            size="sm"
-            onClick={() => router.push('/staff/exams')}
-            className="h-9 text-sm bg-emerald-600 hover:bg-emerald-700"
-          >
-            <Plus className="h-4 w-4 mr-1.5" />New Exam
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => router.push('/staff/assignments/create')}
-            variant="outline"
-            className="h-9 text-sm"
-          >
-            <FileText className="h-4 w-4 mr-1.5" />Assignment
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => router.push('/staff/notes/create')}
-            variant="outline"
-            className="h-9 text-sm"
-          >
-            <BookOpen className="h-4 w-4 mr-1.5" />Notes
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => router.push('/staff/ca-scores')}
-            variant="outline"
-            className="h-9 text-sm"
-          >
-            <Calculator className="h-4 w-4 mr-1.5" />CA Scores
-          </Button>
-          <Button
-            size="sm"
-            onClick={handleRefresh}
-            variant="ghost"
-            className="h-9 text-sm ml-auto"
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={cn('h-4 w-4 mr-1.5', refreshing && 'animate-spin')}
-            />
-            Refresh
-          </Button>
+          <Button size="sm" onClick={() => router.push('/staff/exams')} className="h-9 text-sm bg-emerald-600 hover:bg-emerald-700"><Plus className="h-4 w-4 mr-1.5" />New Exam</Button>
+          <Button size="sm" onClick={() => router.push('/staff/assignments/create')} variant="outline" className="h-9 text-sm"><FileText className="h-4 w-4 mr-1.5" />Assignment</Button>
+          <Button size="sm" onClick={() => router.push('/staff/notes/create')} variant="outline" className="h-9 text-sm"><BookOpen className="h-4 w-4 mr-1.5" />Notes</Button>
+          <Button size="sm" onClick={() => router.push('/staff/ca-scores')} variant="outline" className="h-9 text-sm"><Calculator className="h-4 w-4 mr-1.5" />CA Scores</Button>
+          <Button size="sm" onClick={handleRefresh} variant="ghost" className="h-9 text-sm ml-auto" disabled={refreshing}><RefreshCw className={cn('h-4 w-4 mr-1.5', refreshing && 'animate-spin')} />Refresh</Button>
         </div>
 
-        {/* Pending theory submissions */}
         {stats.recentSubmissions.length > 0 && (
           <div className="mt-4 p-4 bg-white border rounded-xl shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <Clock className="h-4 w-4 text-amber-600" />
-                Pending Submissions
-                <Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">
-                  {stats.recentSubmissions.length}
-                </Badge>
-              </h3>
+              <h3 className="text-sm font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-amber-600" />Pending Submissions<Badge className="text-xs bg-amber-100 text-amber-700 border-amber-200">{stats.recentSubmissions.length}</Badge></h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
               {stats.recentSubmissions.slice(0, 6).map((sub: any) => (
-                <div
-                  key={sub.id}
-                  className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border hover:border-amber-300 cursor-pointer transition-colors"
-                  onClick={() =>
-                    router.push(
-                      `/staff/exams/${sub.exam_id}/submissions/${sub.id}`
-                    )
-                  }
-                >
+                <div key={sub.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-lg border hover:border-amber-300 cursor-pointer transition-colors" onClick={() => router.push(`/staff/exams/${sub.exam_id}/submissions/${sub.id}`)}>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate">
-                      {sub.student_name ?? 'Unknown'}
-                    </p>
-                    <p className="text-xs text-muted-foreground truncate">
-                      {sub.exam_title}
-                    </p>
+                    <p className="text-sm font-medium truncate">{sub.student_name ?? 'Unknown'}</p>
+                    <p className="text-xs text-muted-foreground truncate">{sub.exam_title}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[11px] text-slate-500">
-                        {formatDate(sub.submitted_at)}
-                      </span>
-                      <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0">
-                        Needs Grading
-                      </Badge>
+                      <span className="text-[11px] text-slate-500">{formatDate(sub.submitted_at)}</span>
+                      <Badge className="text-[10px] bg-amber-100 text-amber-700 border-0">Needs Grading</Badge>
                     </div>
                   </div>
-                  <Button
-                    size="sm"
-                    className="h-7 text-xs bg-amber-600 hover:bg-amber-700 flex-shrink-0"
-                  >
-                    Grade
-                  </Button>
+                  <Button size="sm" className="h-7 text-xs bg-amber-600 hover:bg-amber-700 flex-shrink-0">Grade</Button>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* All caught up */}
         {stats.recentSubmissions.length === 0 && stats.totalExams > 0 && (
           <div className="mt-4 p-6 bg-emerald-50 border border-emerald-200 rounded-xl text-center">
             <CheckCircle2 className="h-8 w-8 text-emerald-500 mx-auto mb-2" />
             <p className="text-sm font-medium text-emerald-700">All caught up!</p>
-            <p className="text-xs text-emerald-600 mt-1">
-              No pending submissions to grade
-            </p>
+            <p className="text-xs text-emerald-600 mt-1">No pending submissions to grade</p>
           </div>
         )}
 
-        {/* Main grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
-
-          {/* Left column */}
           <div className="lg:col-span-2 space-y-4">
-
-            {/* Recent Exams */}
             <Card className="shadow-sm">
               <CardHeader className="flex-row items-center justify-between py-3 px-4 border-b">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <MonitorPlay className="h-4 w-4 text-emerald-600" />
-                  Recent Exams
-                </CardTitle>
-                <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
-                  <Link href="/staff/exams">
-                    View all <ArrowRight className="ml-1 h-3 w-3" />
-                  </Link>
-                </Button>
+                <CardTitle className="text-sm font-medium flex items-center gap-2"><MonitorPlay className="h-4 w-4 text-emerald-600" />Recent Exams</CardTitle>
+                <Button variant="ghost" size="sm" asChild className="h-8 text-xs"><Link href="/staff/exams">View all <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-3">
-                {exams.length === 0 ? (
-                  <EmptyState
-                    icon={MonitorPlay}
-                    title="No exams yet"
-                    action={{
-                      label: 'Create Exam',
-                      onClick: () => router.push('/staff/exams'),
-                    }}
-                  />
-                ) : (
+                {exams.length === 0 ? <EmptyState icon={MonitorPlay} title="No exams yet" action={{ label: 'Create Exam', onClick: () => router.push('/staff/exams') }} /> : (
                   <div className="divide-y">
                     {exams.slice(0, 4).map((exam: any) => (
-                      <div
-                        key={exam.id}
-                        className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
-                        onClick={() =>
-                          router.push(`/staff/exams/${exam.id}/submissions`)
-                        }
-                      >
+                      <div key={exam.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors" onClick={() => router.push(`/staff/exams/${exam.id}/submissions`)}>
                         <div className="flex items-center gap-3 min-w-0">
-                          <div className="p-1.5 bg-blue-50 rounded flex-shrink-0">
-                            <MonitorPlay className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {exam.title}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {exam.subject} · {exam.class}
-                            </p>
-                          </div>
+                          <div className="p-1.5 bg-blue-50 rounded flex-shrink-0"><MonitorPlay className="h-4 w-4 text-blue-600" /></div>
+                          <div className="min-w-0"><p className="text-sm font-medium truncate">{exam.title}</p><p className="text-xs text-muted-foreground">{exam.subject} · {exam.class}</p></div>
                         </div>
-                        <Badge
-                          variant="outline"
-                          className="text-xs flex-shrink-0 ml-2 capitalize"
-                        >
-                          {exam.status ?? 'draft'}
-                        </Badge>
+                        <Badge variant="outline" className="text-xs flex-shrink-0 ml-2 capitalize">{exam.status ?? 'draft'}</Badge>
                       </div>
                     ))}
                   </div>
@@ -679,50 +545,18 @@ export default function StaffDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Recent Assignments */}
             <Card className="shadow-sm">
               <CardHeader className="flex-row items-center justify-between py-3 px-4 border-b">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  Recent Assignments
-                </CardTitle>
-                <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
-                  <Link href="/staff/assignments">
-                    View all <ArrowRight className="ml-1 h-3 w-3" />
-                  </Link>
-                </Button>
+                <CardTitle className="text-sm font-medium flex items-center gap-2"><FileText className="h-4 w-4 text-blue-600" />Recent Assignments</CardTitle>
+                <Button variant="ghost" size="sm" asChild className="h-8 text-xs"><Link href="/staff/assignments">View all <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-3">
-                {assignments.length === 0 ? (
-                  <EmptyState
-                    icon={FileText}
-                    title="No assignments yet"
-                    action={{
-                      label: 'New Assignment',
-                      onClick: () => router.push('/staff/assignments/create'),
-                    }}
-                  />
-                ) : (
+                {assignments.length === 0 ? <EmptyState icon={FileText} title="No assignments yet" action={{ label: 'New Assignment', onClick: () => router.push('/staff/assignments/create') }} /> : (
                   <div className="divide-y">
                     {assignments.map((item: any) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors"
-                        onClick={() =>
-                          router.push(`/staff/assignments/${item.id}`)
-                        }
-                      >
-                        <div className="p-1.5 bg-emerald-50 rounded flex-shrink-0">
-                          <FileText className="h-4 w-4 text-emerald-600" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium truncate">
-                            {item.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {item.displaySubject} · {item.displayClass}
-                          </p>
-                        </div>
+                      <div key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0 cursor-pointer hover:bg-slate-50 -mx-2 px-2 rounded transition-colors" onClick={() => router.push(`/staff/assignments/${item.id}`)}>
+                        <div className="p-1.5 bg-emerald-50 rounded flex-shrink-0"><FileText className="h-4 w-4 text-emerald-600" /></div>
+                        <div className="min-w-0 flex-1"><p className="text-sm font-medium truncate">{item.title}</p><p className="text-xs text-muted-foreground">{item.displaySubject} · {item.displayClass}</p></div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground/30 flex-shrink-0" />
                       </div>
                     ))}
@@ -731,48 +565,18 @@ export default function StaffDashboardPage() {
               </CardContent>
             </Card>
 
-            {/* Study Notes */}
             <Card className="shadow-sm">
               <CardHeader className="flex-row items-center justify-between py-3 px-4 border-b">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-purple-600" />
-                  Study Notes
-                </CardTitle>
-                <Button variant="ghost" size="sm" asChild className="h-8 text-xs">
-                  <Link href="/staff/notes">
-                    View all <ArrowRight className="ml-1 h-3 w-3" />
-                  </Link>
-                </Button>
+                <CardTitle className="text-sm font-medium flex items-center gap-2"><BookOpen className="h-4 w-4 text-purple-600" />Study Notes</CardTitle>
+                <Button variant="ghost" size="sm" asChild className="h-8 text-xs"><Link href="/staff/notes">View all <ArrowRight className="ml-1 h-3 w-3" /></Link></Button>
               </CardHeader>
               <CardContent className="px-4 pb-4 pt-3">
-                {notes.length === 0 ? (
-                  <EmptyState
-                    icon={BookOpen}
-                    title="No notes yet"
-                    action={{
-                      label: 'Add Notes',
-                      onClick: () => router.push('/staff/notes/create'),
-                    }}
-                  />
-                ) : (
+                {notes.length === 0 ? <EmptyState icon={BookOpen} title="No notes yet" action={{ label: 'Add Notes', onClick: () => router.push('/staff/notes/create') }} /> : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {notes.map((note: any) => (
-                      <div
-                        key={note.id}
-                        className="flex items-center gap-3 p-2.5 rounded-lg border hover:border-purple-200 cursor-pointer transition-colors"
-                        onClick={() => router.push(`/staff/notes/${note.id}`)}
-                      >
-                        <div className="p-1.5 bg-purple-50 rounded flex-shrink-0">
-                          <BookOpen className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {note.title}
-                          </p>
-                          <p className="text-xs text-muted-foreground capitalize">
-                            {note.subject ?? 'General'}
-                          </p>
-                        </div>
+                      <div key={note.id} className="flex items-center gap-3 p-2.5 rounded-lg border hover:border-purple-200 cursor-pointer transition-colors" onClick={() => router.push(`/staff/notes/${note.id}`)}>
+                        <div className="p-1.5 bg-purple-50 rounded flex-shrink-0"><BookOpen className="h-4 w-4 text-purple-600" /></div>
+                        <div className="min-w-0"><p className="text-sm font-medium truncate">{note.title}</p><p className="text-xs text-muted-foreground capitalize">{note.subject ?? 'General'}</p></div>
                       </div>
                     ))}
                   </div>
@@ -781,110 +585,37 @@ export default function StaffDashboardPage() {
             </Card>
           </div>
 
-          {/* Right sidebar */}
           <div className="space-y-4">
-
-            {/* Overview */}
             <Card className="shadow-sm">
-              <CardHeader className="py-3 px-4 border-b">
-                <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4 text-emerald-600" />
-                  Overview
-                </CardTitle>
-              </CardHeader>
+              <CardHeader className="py-3 px-4 border-b"><CardTitle className="text-sm font-medium flex items-center gap-2"><GraduationCap className="h-4 w-4 text-emerald-600" />Overview</CardTitle></CardHeader>
               <CardContent className="px-4 pb-4 pt-3 space-y-3">
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-2xl font-semibold">
-                      {stats.totalStudents}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Students</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-2xl font-semibold">
-                      {stats.activeClasses}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Classes</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-2xl font-semibold">
-                      {stats.activeStudents}
-                    </p>
-                    <p className="text-xs text-muted-foreground">Active</p>
-                  </div>
-                  <div className="p-3 bg-amber-50 rounded-lg">
-                    <p className="text-2xl font-semibold text-amber-700">
-                      {stats.recentSubmissions.length}
-                    </p>
-                    <p className="text-xs text-amber-600">Need Grading</p>
-                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg"><p className="text-2xl font-semibold">{stats.totalStudents}</p><p className="text-xs text-muted-foreground">Students</p></div>
+                  <div className="p-3 bg-slate-50 rounded-lg"><p className="text-2xl font-semibold">{stats.activeClasses}</p><p className="text-xs text-muted-foreground">Classes</p></div>
+                  <div className="p-3 bg-slate-50 rounded-lg"><p className="text-2xl font-semibold">{stats.activeStudents}</p><p className="text-xs text-muted-foreground">Active</p></div>
+                  <div className="p-3 bg-amber-50 rounded-lg"><p className="text-2xl font-semibold text-amber-700">{stats.recentSubmissions.length}</p><p className="text-xs text-amber-600">Need Grading</p></div>
                 </div>
-
                 {stats.classBreakdown.length > 0 && (
                   <div>
-                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-                      Class Breakdown
-                    </p>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Class Breakdown</p>
                     <div className="space-y-1">
                       {stats.classBreakdown.slice(0, 5).map((cls) => (
-                        <div
-                          key={cls.name}
-                          className="flex justify-between items-center py-1"
-                        >
-                          <span className="text-sm">{cls.name}</span>
-                          <span className="text-sm text-muted-foreground">
-                            {cls.count}
-                          </span>
-                        </div>
+                        <div key={cls.name} className="flex justify-between items-center py-1"><span className="text-sm">{cls.name}</span><span className="text-sm text-muted-foreground">{cls.count}</span></div>
                       ))}
                     </div>
                   </div>
                 )}
-
                 <div>
-                  <div className="flex justify-between text-xs mb-1.5">
-                    <span className="text-muted-foreground">
-                      Avg Performance
-                    </span>
-                    <span className="font-semibold">
-                      {stats.averagePerformance}%
-                    </span>
-                  </div>
-                  <Progress
-                    value={stats.averagePerformance}
-                    className="h-1.5"
-                  />
+                  <div className="flex justify-between text-xs mb-1.5"><span className="text-muted-foreground">Avg Performance</span><span className="font-semibold">{stats.averagePerformance}%</span></div>
+                  <Progress value={stats.averagePerformance} className="h-1.5" />
                 </div>
               </CardContent>
             </Card>
-
-            {/* Quick Links */}
             <Card className="shadow-sm">
               <CardContent className="p-4 space-y-2">
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-10 text-sm"
-                  onClick={() => router.push('/staff/ca-scores')}
-                >
-                  <Calculator className="h-4 w-4 mr-2 text-amber-600" />
-                  CA Scores
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-10 text-sm"
-                  onClick={() => router.push('/staff/report-cards')}
-                >
-                  <FileCheck className="h-4 w-4 mr-2 text-blue-600" />
-                  Report Cards
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start h-10 text-sm"
-                  onClick={() => router.push('/staff/students')}
-                >
-                  <Users className="h-4 w-4 mr-2 text-emerald-600" />
-                  All Students
-                </Button>
+                <Button variant="outline" className="w-full justify-start h-10 text-sm" onClick={() => router.push('/staff/ca-scores')}><Calculator className="h-4 w-4 mr-2 text-amber-600" />CA Scores</Button>
+                <Button variant="outline" className="w-full justify-start h-10 text-sm" onClick={() => router.push('/staff/report-cards')}><FileCheck className="h-4 w-4 mr-2 text-blue-600" />Report Cards</Button>
+                <Button variant="outline" className="w-full justify-start h-10 text-sm" onClick={() => router.push('/staff/students')}><Users className="h-4 w-4 mr-2 text-emerald-600" />All Students</Button>
               </CardContent>
             </Card>
           </div>

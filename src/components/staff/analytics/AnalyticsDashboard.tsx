@@ -1,4 +1,4 @@
-// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED SUBJECT MAPPING
+// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED MERGED SCORES
 // @ts-nocheck
 'use client'
 
@@ -83,7 +83,7 @@ export function AnalyticsDashboard() {
       const studentMap: Record<string, any> = {}
       students?.forEach(s => { studentMap[s.id] = s })
 
-      // ✅ Step 3: Get scores from BOTH tables
+      // ✅ Step 3: Get scores - MERGE exam_attempts + ca_scores
       const allScores: any[] = []
 
       if (examIds.length > 0) {
@@ -105,18 +105,34 @@ export function AnalyticsDashboard() {
 
         console.log('📊 [ANALYTICS] Raw data:', {
           attemptsCount: attempts.length,
-          caScoresCount: caScores.length,
-          sampleAttempt: attempts[0] // Log first attempt to see structure
+          caScoresCount: caScores.length
         })
 
-        // Enrich exam_attempts - FIXED: Get subject from examMap
+        // ✅ Build CA map for quick lookup
+        const caMap: Record<string, any> = {}
+        caScores.forEach((c: any) => {
+          const key = `${c.student_id}|${c.exam_id}`
+          caMap[key] = c
+        })
+
+        // ✅ Track which student+exam pairs have been processed
+        const processedKeys = new Set<string>()
+
+        // Process exam_attempts - MERGE with CA scores
         attempts.forEach((a: any) => {
           const exam = examMap[a.exam_id]
-          const score = a.percentage || a.total_score || a.score || 0
-          const grade = a.grade || a.letter_grade || getGradeFromScore(score)
+          const key = `${a.student_id}|${a.exam_id}`
+          const ca = caMap[key]
           
-          // ✅ Get subject from exam table first, then fallback to attempt fields
-          const subject = exam?.subject || a.subject || a.exam_subject || 'Unknown Subject'
+          processedKeys.add(key)
+          
+          // ✅ Use CA percentage if available (combined score), otherwise exam percentage
+          const hasCA = ca && (ca.ca1_score > 0 || ca.ca2_score > 0)
+          const percentage = hasCA ? (ca.percentage || 0) : (a.percentage || 0)
+          const totalScore = hasCA ? (ca.total_score || 0) : (a.total_score || 0)
+          const grade = hasCA ? (ca.grade || getGradeFromScore(percentage)) : (a.grade || getGradeFromScore(percentage))
+          
+          const subject = exam?.subject || a.subject || 'Unknown Subject'
           const studentClass = studentMap[a.student_id]?.class || a.class || exam?.class || 'Unknown Class'
           
           allScores.push({
@@ -124,21 +140,22 @@ export function AnalyticsDashboard() {
             student_name: a.student_name || studentMap[a.student_id]?.full_name || 'Unknown Student',
             student_class: studentClass,
             subject: subject,
-            total_score: score,
-            percentage: a.percentage,
+            total_score: totalScore,
+            percentage: percentage,
             grade: grade,
             exam_id: a.exam_id,
-            type: 'exam'
+            has_ca: hasCA
           })
         })
 
-        // Enrich ca_scores - FIXED: Get subject from examMap
+        // Process CA-only entries (no exam attempt)
         caScores.forEach((c: any) => {
           const exam = examMap[c.exam_id]
-          const score = c.total_score || c.score || 0
-          const grade = c.grade || getGradeFromScore(score)
+          const key = `${c.student_id}|${c.exam_id}`
           
-          // ✅ Get subject from exam table first
+          // Skip if already merged with exam attempt
+          if (processedKeys.has(key)) return
+          
           const subject = exam?.subject || c.subject || 'Unknown Subject'
           const studentClass = studentMap[c.student_id]?.class || c.class || exam?.class || 'Unknown Class'
           
@@ -147,18 +164,16 @@ export function AnalyticsDashboard() {
             student_name: c.student_name || studentMap[c.student_id]?.full_name || 'Unknown Student',
             student_class: studentClass,
             subject: subject,
-            total_score: score,
-            percentage: score,
-            grade: grade,
+            total_score: c.total_score || 0,
+            percentage: c.percentage || 0,
+            grade: c.grade || getGradeFromScore(c.total_score || 0),
             exam_id: c.exam_id,
-            type: 'ca'
+            has_ca: true
           })
         })
       }
 
-      // ✅ Log unique subjects for debugging
-      const uniqueSubjects = [...new Set(allScores.map(s => s.subject))]
-      console.log('📊 [ANALYTICS] Unique subjects found:', uniqueSubjects)
+      console.log('📊 [ANALYTICS] Merged scores count:', allScores.length)
 
       // ✅ Step 4: Filter by class
       const filtered = selectedClass !== 'all'
@@ -176,7 +191,7 @@ export function AnalyticsDashboard() {
 
       // ✅ Step 5: Calculate overview using valid scores
       const avgScore = validScores.length > 0
-        ? Math.round(validScores.reduce((sum, s) => sum + (s.total_score || 0), 0) / validScores.length)
+        ? Math.round(validScores.reduce((sum, s) => sum + (s.percentage || s.total_score || 0), 0) / validScores.length)
         : 0
 
       const passingScores = validScores.filter(s => isPassing(s.grade))
@@ -200,7 +215,7 @@ export function AnalyticsDashboard() {
         if (!subjMap[subj]) {
           subjMap[subj] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
         }
-        const score = s.total_score || 0
+        const score = s.percentage || s.total_score || 0
         subjMap[subj].total += score
         subjMap[subj].count++
         if (score > subjMap[subj].high) subjMap[subj].high = score
@@ -226,7 +241,7 @@ export function AnalyticsDashboard() {
         if (!classMap[cls]) {
           classMap[cls] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
         }
-        const score = s.total_score || 0
+        const score = s.percentage || s.total_score || 0
         classMap[cls].total += score
         classMap[cls].count++
         if (score > classMap[cls].high) classMap[cls].high = score
@@ -256,7 +271,7 @@ export function AnalyticsDashboard() {
             count: 0
           }
         }
-        studentScores[key].total += (s.total_score || 0)
+        studentScores[key].total += (s.percentage || s.total_score || 0)
         studentScores[key].count++
       })
 
@@ -277,7 +292,7 @@ export function AnalyticsDashboard() {
       allGrades.forEach(g => { gradeCounts[g] = 0 })
       
       validScores.forEach(s => {
-        const grade = s.grade || getGradeFromScore(s.total_score || 0)
+        const grade = s.grade || getGradeFromScore(s.percentage || s.total_score || 0)
         if (gradeCounts[grade] !== undefined) {
           gradeCounts[grade]++
         }

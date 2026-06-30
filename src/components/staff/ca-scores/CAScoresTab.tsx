@@ -12,9 +12,10 @@ import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import {
   Save, Search, Edit, Trash2, Users, Loader2, RefreshCw,
-  CheckCircle2, Bell, FileText, TrendingUp,
+  CheckCircle2, FileText, TrendingUp,
   Award, GraduationCap, BarChart3, SaveAll, Trash,
-  AlertTriangle, Database, Layers, Lock, Circle
+  AlertTriangle, Database, Layers, Lock, Circle,
+  ChevronRight, BookOpen, Settings2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -35,7 +36,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Progress } from '@/components/ui/progress'
 
-// Grading System
 const GRADING_SCALE = [
   { grade: 'A1', min: 75, max: 100, label: 'Excellent', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
   { grade: 'B2', min: 70, max: 74, label: 'Very Good', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
@@ -82,17 +82,15 @@ const JUNIOR_SUBJECTS = [
   'CCA', 'Music', 'PHE', 'History', 'Security Education'
 ]
 
-// Get available sessions
 const getAvailableSessions = (currentSession: string): string[] => {
   const year = parseInt(currentSession.split('/')[0])
   return [
-    `${year-1}/${year}`,
-    `${year}/${year+1}`,
-    `${year+1}/${year+2}`,
+    `${year - 1}/${year}`,
+    `${year}/${year + 1}`,
+    `${year + 1}/${year + 2}`,
   ]
 }
 
-// Helper to get all class variations
 const getClassVariations = (classType: string): string[] => {
   if (classType === 'JSS 1') return ['JSS 1']
   if (classType === 'JSS 2') return ['JSS 2']
@@ -103,7 +101,6 @@ const getClassVariations = (classType: string): string[] => {
   return [classType]
 }
 
-// Check if a class is a general class
 const isGeneralClass = (className: string): boolean => {
   return ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3'].includes(className)
 }
@@ -153,39 +150,55 @@ const STORAGE_KEYS = {
 
 const SubjectStatusIcon = ({ status }: { status?: SubjectStatus }) => {
   if (!status) return null
-
   if (status.enteredByOther) {
     return (
-      <span
-        className="flex items-center gap-1 text-red-500 dark:text-red-400"
-        title={`Locked - ${status.otherTeacherName || 'Another teacher'} entered scores for ${status.studentCount} student(s)`}
-      >
-        <Lock className="h-4 w-4" />
+      <span className="flex items-center gap-1 text-red-500 dark:text-red-400"
+        title={`Locked — ${status.otherTeacherName || 'Another teacher'} entered scores for ${status.studentCount} student(s)`}>
+        <Lock className="h-3.5 w-3.5" />
         <span className="text-xs font-medium">Locked</span>
       </span>
     )
   }
-
   if (status.enteredByMe) {
     return (
-      <span
-        className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
-        title={`You entered scores for ${status.studentCount} student(s)`}
-      >
-        <CheckCircle2 className="h-4 w-4" />
+      <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
+        title={`You entered scores for ${status.studentCount} student(s)`}>
+        <CheckCircle2 className="h-3.5 w-3.5" />
         <span className="text-xs font-medium">You</span>
       </span>
     )
   }
-
   return (
-    <span
-      className="flex items-center gap-1 text-slate-400 dark:text-slate-500"
-      title="Available - No scores entered yet"
-    >
-      <Circle className="h-4 w-4" />
-      <span className="text-xs">Available</span>
+    <span className="flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Available">
+      <Circle className="h-3.5 w-3.5" />
+      <span className="text-xs">Open</span>
     </span>
+  )
+}
+
+// ── Stat Card ──────────────────────────────────────────────────────────────────
+function StatCard({
+  label, value, sub, icon: Icon, accent,
+}: {
+  label: string; value: string | number; sub?: string
+  icon: React.ElementType; accent: string
+}) {
+  return (
+    <Card className="relative overflow-hidden border-0 shadow-sm bg-white dark:bg-slate-900">
+      <div className={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', accent)} />
+      <CardContent className="p-4 pl-5">
+        <div className="flex items-start justify-between">
+          <div>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</p>
+            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{value}</p>
+            {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>}
+          </div>
+          <div className={cn('p-2 rounded-lg', accent.replace('bg-', 'bg-').replace('-500', '-100'), 'dark:bg-slate-800')}>
+            <Icon className={cn('h-5 w-5', accent.replace('bg-', 'text-'))} />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -220,13 +233,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [deleteProgress, setDeleteProgress] = useState(0)
 
   const [stats, setStats] = useState<Stats>({
-    totalStudents: 0,
-    gradedStudents: 0,
-    classAverage: 0,
-    highestScore: 0,
-    passCount: 0,
-    failCount: 0,
-    passRate: 0
+    totalStudents: 0, gradedStudents: 0, classAverage: 0,
+    highestScore: 0, passCount: 0, failCount: 0, passRate: 0,
   })
 
   const [subjectsStatus, setSubjectsStatus] = useState<Record<string, SubjectStatus>>({})
@@ -236,1720 +244,726 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const isInitialMount = useRef(true)
   const sessionOptions = getAvailableSessions(termInfo?.sessionYear || '2025/2026')
 
-  // ===== CHECK SUBJECTS STATUS - FIXED FOR SS STREAMS =====
+  // ── Check subject status ───────────────────────────────────────────────────
   const checkSubjectsStatus = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear || !staffProfile?.id) return
-
     setCheckingSubjects(true)
     const allSubjects = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
     const classVariations = getClassVariations(selectedClass)
 
-    let query = supabase
-      .from('ca_scores')
-      .select('subject, teacher_id, teacher_name, student_id, class')
+    let query = supabase.from('ca_scores').select('subject, teacher_id, teacher_name, student_id, class')
+    query = classVariations.length > 1 ? query.in('class', classVariations) : query.eq('class', selectedClass)
 
-    if (classVariations.length > 1) {
-      query = query.in('class', classVariations)
-    } else {
-      query = query.eq('class', selectedClass)
-    }
-
-    const { data: allScores } = await query
-      .eq('term', selectedTerm)
-      .eq('academic_year', selectedYear)
-
+    const { data: allScores } = await query.eq('term', selectedTerm).eq('academic_year', selectedYear)
     const statusMap: Record<string, SubjectStatus> = {}
 
     for (const subject of allSubjects) {
       const scores = (allScores || []).filter(s => s.subject === subject)
-
       if (scores.length === 0) {
-        statusMap[subject] = {
-          hasScores: false,
-          enteredByMe: false,
-          enteredByOther: false,
-          studentCount: 0,
-        }
+        statusMap[subject] = { hasScores: false, enteredByMe: false, enteredByOther: false, studentCount: 0 }
       } else {
         const uniqueStudents = new Set(scores.map(s => s.student_id))
         const enteredByMe = scores.some(s => s.teacher_id === staffProfile.id)
         const enteredByOther = scores.some(s => s.teacher_id !== staffProfile.id)
         const otherTeacher = scores.find(s => s.teacher_id !== staffProfile.id)
-
         statusMap[subject] = {
           hasScores: true,
           enteredByMe: enteredByMe && !enteredByOther,
-          enteredByOther: enteredByOther,
+          enteredByOther,
           otherTeacherName: otherTeacher?.teacher_name,
           studentCount: uniqueStudents.size,
         }
       }
     }
-
     setSubjectsStatus(statusMap)
     setCheckingSubjects(false)
   }, [selectedClass, selectedTerm, selectedYear, staffProfile?.id])
 
-  // Restore from localStorage on mount
+  // ── Restore from localStorage ──────────────────────────────────────────────
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const savedClass = localStorage.getItem(STORAGE_KEYS.SELECTED_CLASS)
-      const savedSubject = localStorage.getItem(STORAGE_KEYS.SELECTED_SUBJECT)
-      const savedTerm = localStorage.getItem(STORAGE_KEYS.SELECTED_TERM)
-      const savedYear = localStorage.getItem(STORAGE_KEYS.SELECTED_YEAR)
-      const savedExam = localStorage.getItem(STORAGE_KEYS.SELECTED_EXAM)
-      const savedTab = localStorage.getItem(STORAGE_KEYS.ACTIVE_TAB)
-      const savedSkipExam = localStorage.getItem(STORAGE_KEYS.SKIP_EXAM)
-
-      if (savedClass) setSelectedClass(savedClass)
-      if (savedSubject) setSelectedSubject(savedSubject)
-      if (savedTerm) setSelectedTerm(savedTerm)
-      if (savedYear) setSelectedYear(savedYear)
-      if (savedExam) setSelectedExamId(savedExam)
-      if (savedTab) setActiveTab(savedTab)
-      if (savedSkipExam === 'true') setSkipExam(true)
+      const get = (k: string) => localStorage.getItem(k)
+      if (get(STORAGE_KEYS.SELECTED_CLASS)) setSelectedClass(get(STORAGE_KEYS.SELECTED_CLASS)!)
+      if (get(STORAGE_KEYS.SELECTED_SUBJECT)) setSelectedSubject(get(STORAGE_KEYS.SELECTED_SUBJECT)!)
+      if (get(STORAGE_KEYS.SELECTED_TERM)) setSelectedTerm(get(STORAGE_KEYS.SELECTED_TERM)!)
+      if (get(STORAGE_KEYS.SELECTED_YEAR)) setSelectedYear(get(STORAGE_KEYS.SELECTED_YEAR)!)
+      if (get(STORAGE_KEYS.SELECTED_EXAM)) setSelectedExamId(get(STORAGE_KEYS.SELECTED_EXAM)!)
+      if (get(STORAGE_KEYS.ACTIVE_TAB)) setActiveTab(get(STORAGE_KEYS.ACTIVE_TAB)!)
+      if (get(STORAGE_KEYS.SKIP_EXAM) === 'true') setSkipExam(true)
     }
     setIsRestoring(false)
     setMounted(true)
   }, [])
 
-  useEffect(() => {
-    if (isInitialMount.current) {
-      isInitialMount.current = false
-    }
-  }, [])
+  useEffect(() => { if (isInitialMount.current) isInitialMount.current = false }, [])
 
-  // Save to localStorage when values change
-  useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined' && selectedClass) {
-      localStorage.setItem(STORAGE_KEYS.SELECTED_CLASS, selectedClass)
-    }
-  }, [selectedClass, isRestoring])
+  // ── Persist to localStorage ────────────────────────────────────────────────
+  useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedClass) localStorage.setItem(STORAGE_KEYS.SELECTED_CLASS, selectedClass) }, [selectedClass, isRestoring])
+  useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedSubject) localStorage.setItem(STORAGE_KEYS.SELECTED_SUBJECT, selectedSubject) }, [selectedSubject, isRestoring])
+  useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SELECTED_TERM, selectedTerm) }, [selectedTerm, isRestoring])
+  useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SELECTED_YEAR, selectedYear) }, [selectedYear, isRestoring])
+  useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedExamId) localStorage.setItem(STORAGE_KEYS.SELECTED_EXAM, selectedExamId) }, [selectedExamId, isRestoring])
+  useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.ACTIVE_TAB, activeTab) }, [activeTab, isRestoring])
+  useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SKIP_EXAM, String(skipExam)) }, [skipExam, isRestoring])
 
   useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined' && selectedSubject) {
-      localStorage.setItem(STORAGE_KEYS.SELECTED_SUBJECT, selectedSubject)
-    }
-  }, [selectedSubject, isRestoring])
-
-  useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.SELECTED_TERM, selectedTerm)
-    }
-  }, [selectedTerm, isRestoring])
-
-  useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.SELECTED_YEAR, selectedYear)
-    }
-  }, [selectedYear, isRestoring])
-
-  useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined' && selectedExamId) {
-      localStorage.setItem(STORAGE_KEYS.SELECTED_EXAM, selectedExamId)
-    }
-  }, [selectedExamId, isRestoring])
-
-  useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.ACTIVE_TAB, activeTab)
-    }
-  }, [activeTab, isRestoring])
-
-  useEffect(() => {
-    if (isInitialMount.current || isRestoring) return
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(STORAGE_KEYS.SKIP_EXAM, String(skipExam))
-    }
-  }, [skipExam, isRestoring])
-
-  // Check subject status when config changes
-  useEffect(() => {
-    if (mounted && !isRestoring && selectedClass && staffProfile?.id) {
-      checkSubjectsStatus()
-    }
+    if (mounted && !isRestoring && selectedClass && staffProfile?.id) checkSubjectsStatus()
   }, [mounted, isRestoring, selectedClass, selectedTerm, selectedYear, staffProfile?.id, checkSubjectsStatus])
 
-  // Update isLocked when subject changes
   useEffect(() => {
-    if (selectedSubject && subjectsStatus[selectedSubject]) {
-      setIsLocked(subjectsStatus[selectedSubject].enteredByOther)
-    } else {
-      setIsLocked(false)
-    }
+    setIsLocked(selectedSubject ? !!subjectsStatus[selectedSubject]?.enteredByOther : false)
   }, [selectedSubject, subjectsStatus])
 
-  const handleTabChange = (value: string) => {
-    setActiveTab(value)
-  }
+  // ── Handlers ───────────────────────────────────────────────────────────────
+  const handleClassChange = (v: string) => { setSelectedClass(v); setSelectedSubject(''); setCAScores([]) }
+  const handleSubjectChange = (v: string) => { setSelectedSubject(v); setSelectedExamId(''); setSkipExam(false); setCAScores([]) }
+  const handleTermChange = (v: string) => { setSelectedTerm(v); setSelectedExamId(''); setSkipExam(false); setCAScores([]) }
+  const handleYearChange = (v: string) => { setSelectedYear(v); setSelectedExamId(''); setSkipExam(false); setCAScores([]) }
+  const handleExamChange = (v: string) => { setSelectedExamId(v); setSkipExam(false) }
+  const handleSkipExam = () => { setSkipExam(true); setSelectedExamId('') }
 
-  const handleClassChange = (value: string) => {
-    setSelectedClass(value)
-    setSelectedSubject('')
-    setCAScores([])
-  }
-
-  const handleSubjectChange = (value: string) => {
-    setSelectedSubject(value)
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-  }
-
-  const handleTermChange = (value: string) => {
-    setSelectedTerm(value)
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-  }
-
-  const handleYearChange = (value: string) => {
-    setSelectedYear(value)
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-  }
-
-  const handleExamChange = (value: string) => {
-    setSelectedExamId(value)
-    setSkipExam(false)
-  }
-
-  const handleSkipExam = () => {
-    setSkipExam(true)
-    setSelectedExamId('')
-  }
-
-  // Load classes with general classes included
+  // ── Load classes ───────────────────────────────────────────────────────────
   const loadClasses = useCallback(async () => {
-    const { data } = await supabase
-      .from('profiles')
-      .select('class')
-      .eq('role', 'student')
-      .not('class', 'is', null)
-
-    const uniqueClasses = [...new Set((data || []).map(d => d.class).filter(Boolean))] as string[]
-    
-    const generalClasses = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3']
-    const allClasses = [...new Set([...generalClasses, ...uniqueClasses])].sort()
-    
-    setClasses(allClasses)
-    
-    if (allClasses.length > 0 && !selectedClass && !isRestoring) {
-      setSelectedClass(allClasses[0])
-    }
+    const { data } = await supabase.from('profiles').select('class').eq('role', 'student').not('class', 'is', null)
+    const unique = [...new Set((data || []).map((d: any) => d.class).filter(Boolean))] as string[]
+    const general = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3']
+    const all = [...new Set([...general, ...unique])].sort()
+    setClasses(all)
+    if (all.length > 0 && !selectedClass && !isRestoring) setSelectedClass(all[0])
   }, [selectedClass, isRestoring])
 
-  useEffect(() => {
-    if (mounted && !isRestoring) {
-      loadClasses()
-    }
-  }, [mounted, isRestoring, loadClasses])
+  useEffect(() => { if (mounted && !isRestoring) loadClasses() }, [mounted, isRestoring, loadClasses])
 
   useEffect(() => {
     if (!selectedClass || isRestoring) return
-    
-    const isJSS = selectedClass.toUpperCase().startsWith('JSS')
-    const list = isJSS ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
+    const list = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
     setSubjects(list)
-    
-    if (!selectedSubject && list.length > 0) {
-      setSelectedSubject(list[0])
-    }
+    if (!selectedSubject && list.length > 0) setSelectedSubject(list[0])
   }, [selectedClass, selectedSubject, isRestoring])
 
   useEffect(() => {
     if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring || skipExam) return
-    
     const loadExams = async () => {
-      const { data } = await supabase
-        .from('exams')
-        .select('id, title')
-        .eq('subject', selectedSubject)
-        .eq('term', selectedTerm)
-        .eq('session_year', selectedYear)
-        .eq('status', 'published')
+      const { data } = await supabase.from('exams').select('id, title')
+        .eq('subject', selectedSubject).eq('term', selectedTerm)
+        .eq('session_year', selectedYear).eq('status', 'published')
         .order('created_at', { ascending: false })
-
       setAvailableExams(data || [])
-      
-      if (data && data.length > 0 && !selectedExamId && !skipExam) {
-        setSelectedExamId(data[0].id)
-      }
+      if (data && data.length > 0 && !selectedExamId && !skipExam) setSelectedExamId(data[0].id)
     }
-    
     loadExams()
   }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring, skipExam])
 
-  // Load students with proper class filtering (handles general classes)
+  // ── Load all entry data ────────────────────────────────────────────────────
   const loadAllData = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
-    
     setLoading(true)
-    
     try {
       const classVariations = getClassVariations(selectedClass)
-      
-      let query = supabase
-        .from('profiles')
-        .select('id, full_name, display_name, class, admission_number, vin_id')
-        .eq('role', 'student')
-
-      if (classVariations.length > 1) {
-        query = query.in('class', classVariations)
-      } else {
-        query = query.eq('class', selectedClass)
-      }
-
-      const { data: profileData, error: profileError } = await query.order('display_name')
-
+      let q = supabase.from('profiles').select('id, full_name, display_name, class, admission_number, vin_id').eq('role', 'student')
+      q = classVariations.length > 1 ? q.in('class', classVariations) : q.eq('class', selectedClass)
+      const { data: profileData, error: profileError } = await q.order('display_name')
       if (profileError) throw profileError
+      if (!profileData || profileData.length === 0) { setStudents([]); setCAScores([]); setLoading(false); return }
 
-      if (!profileData || profileData.length === 0) {
-        setStudents([])
-        setCAScores([])
-        setLoading(false)
-        return
-      }
-
-      const formatted: Student[] = profileData.map(profile => ({
-        id: profile.id,
-        full_name: profile.display_name || profile.full_name || 'Unknown',
-        class: profile.class,
-        admission_number: profile.admission_number || '—',
-        vin_id: profile.vin_id || '—'
+      const formatted: Student[] = profileData.map((p: any) => ({
+        id: p.id, full_name: p.display_name || p.full_name || 'Unknown',
+        class: p.class, admission_number: p.admission_number || '—', vin_id: p.vin_id || '—',
       }))
-
       setStudents(formatted)
-      
-      let scoresQuery = supabase
-        .from('ca_scores')
-        .select('*')
-        .in('student_id', formatted.map(s => s.id))
-        .eq('subject', selectedSubject)
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
 
-      if (classVariations.length > 1) {
-        scoresQuery = scoresQuery.in('class', classVariations)
-      } else {
-        scoresQuery = scoresQuery.eq('class', selectedClass)
-      }
-
-      if (skipExam || !selectedExamId) {
-        scoresQuery = scoresQuery.is('exam_id', null)
-      } else {
-        scoresQuery = scoresQuery.eq('exam_id', selectedExamId)
-      }
-
-      const { data: scoresData, error: scoresError } = await scoresQuery
-
+      let sq = supabase.from('ca_scores').select('*').in('student_id', formatted.map(s => s.id))
+        .eq('subject', selectedSubject).eq('term', selectedTerm).eq('academic_year', selectedYear)
+      sq = classVariations.length > 1 ? sq.in('class', classVariations) : sq.eq('class', selectedClass)
+      sq = (skipExam || !selectedExamId) ? sq.is('exam_id', null) : sq.eq('exam_id', selectedExamId)
+      const { data: scoresData, error: scoresError } = await sq
       if (scoresError) throw scoresError
-      
+
       const entries: Record<string, ScoreEntry> = {}
       const savedMap: Record<string, boolean> = {}
-      
-      formatted.forEach(s => {
-        entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false }
-      })
-      
-      let totalScoreSum = 0
-      let gradedCount = 0
-      let highestScore = 0
-      let passCount = 0
-      let failCount = 0
-      
+      formatted.forEach(s => { entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false } })
+
+      let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
       ;(scoresData || []).forEach((score: any) => {
         const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
         const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
-        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-        const grade = getGrade(percentage)
-        
         entries[score.student_id] = {
-          ca1: score.ca1_score?.toString() || '',
-          ca2: score.ca2_score?.toString() || '',
-          exam: examTotal > 0 ? examTotal.toString() : '',
-          is_saved: true
+          ca1: score.ca1_score?.toString() || '', ca2: score.ca2_score?.toString() || '',
+          exam: examTotal > 0 ? examTotal.toString() : '', is_saved: true,
         }
-        
         savedMap[score.student_id] = true
-        
         if (total > 0) {
-          totalScoreSum += total
-          gradedCount++
-          if (total > highestScore) highestScore = total
-          if (grade !== 'F9') passCount++
+          totalSum += total; gradedCount++
+          if (total > highest) highest = total
+          if (getGrade(Math.round((total / 100) * 100)) !== 'F9') passCount++
           else failCount++
         }
       })
-      
-      setScoreEntries(entries)
-      setSavedStatus(savedMap)
+      setScoreEntries(entries); setSavedStatus(savedMap)
       setStats({
-        totalStudents: formatted.length,
-        gradedStudents: gradedCount,
-        classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
-        highestScore: highestScore,
-        passCount: passCount,
-        failCount: failCount,
-        passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
+        totalStudents: formatted.length, gradedStudents: gradedCount,
+        classAverage: gradedCount > 0 ? Math.round(totalSum / gradedCount) : 0,
+        highestScore: highest, passCount, failCount,
+        passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0,
       })
-      
-    } catch (error) {
-      toast.error('Failed to load data')
-    } finally {
-      setLoading(false)
-    }
+    } catch { toast.error('Failed to load data') }
+    finally { setLoading(false) }
   }, [selectedClass, selectedSubject, selectedTerm, selectedYear, selectedExamId, skipExam])
 
-  // Load scores for View Tab
+  // ── Load view-tab scores ───────────────────────────────────────────────────
   const loadScoresForViewTab = useCallback(async () => {
     if (!selectedClass || !selectedSubject) return
-    
     setLoading(true)
     try {
       const classVariations = getClassVariations(selectedClass)
-      
-      let query = supabase
-        .from('ca_scores')
-        .select('*')
-        .eq('subject', selectedSubject)
-
-      if (classVariations.length > 1) {
-        query = query.in('class', classVariations)
-      } else {
-        query = query.eq('class', selectedClass)
-      }
-
-      const { data: scoresData, error: scoresError } = await query
-
-      if (scoresError) throw scoresError
-      
+      let q = supabase.from('ca_scores').select('*').eq('subject', selectedSubject)
+      q = classVariations.length > 1 ? q.in('class', classVariations) : q.eq('class', selectedClass)
+      const { data: scoresData, error } = await q
+      if (error) throw error
       if (scoresData && scoresData.length > 0) {
-        const studentIds = [...new Set(scoresData.map(s => s.student_id))]
-        
-        const { data: studentsData, error: studentsError } = await supabase
-          .from('profiles')
-          .select('id, full_name, display_name, admission_number')
-          .in('id', studentIds)
-        
-        if (studentsError) {
-          toast.error('Failed to load student data')
-        }
-        
-        const studentMap = new Map()
-        studentsData?.forEach(s => {
-          studentMap.set(s.id, {
-            full_name: s.display_name || s.full_name || 'Unknown',
-            admission_number: s.admission_number || '—'
-          })
-        })
-        
-        const enrichedScores = scoresData.map(score => ({
-          ...score,
-          student: studentMap.get(score.student_id) || {
-            full_name: 'Unknown Student',
-            admission_number: '—'
-          }
-        }))
-        
-        setCAScores(enrichedScores)
-      } else {
-        setCAScores([])
-      }
-    } catch (error) {
-      toast.error('Failed to load scores')
-    } finally {
-      setLoading(false)
-    }
+        const ids = [...new Set(scoresData.map((s: any) => s.student_id))]
+        const { data: sd } = await supabase.from('profiles').select('id, full_name, display_name, admission_number').in('id', ids)
+        const map = new Map(); sd?.forEach((s: any) => map.set(s.id, { full_name: s.display_name || s.full_name || 'Unknown', admission_number: s.admission_number || '—' }))
+        setCAScores(scoresData.map((s: any) => ({ ...s, student: map.get(s.student_id) || { full_name: 'Unknown', admission_number: '—' } })))
+      } else setCAScores([])
+    } catch { toast.error('Failed to load scores') }
+    finally { setLoading(false) }
   }, [selectedClass, selectedSubject])
 
-  useEffect(() => {
-    if (isRestoring) return
-    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
-    
-    loadAllData()
-  }, [loadAllData, isRestoring])
-
-  useEffect(() => {
-    if (activeTab === 'view' && selectedClass && selectedSubject) {
-      loadScoresForViewTab()
-    }
-  }, [activeTab, selectedClass, selectedSubject, loadScoresForViewTab])
+  useEffect(() => { if (!isRestoring && selectedClass && selectedSubject && selectedTerm && selectedYear) loadAllData() }, [loadAllData, isRestoring])
+  useEffect(() => { if (activeTab === 'view' && selectedClass && selectedSubject) loadScoresForViewTab() }, [activeTab, selectedClass, selectedSubject, loadScoresForViewTab])
 
   const updateStatsFromEntries = () => {
-    let totalScoreSum = 0
-    let gradedCount = 0
-    let highestScore = 0
-    let passCount = 0
-    let failCount = 0
-
+    let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
     students.forEach(student => {
-      const entry = scoreEntries[student.id]
-      if (!entry) return
-      
-      const ca1 = parseInt(entry.ca1) || 0
-      const ca2 = parseInt(entry.ca2) || 0
-      const exam = parseInt(entry.exam) || 0
-      const total = ca1 + ca2 + exam
-      
+      const e = scoreEntries[student.id]; if (!e) return
+      const total = (parseInt(e.ca1) || 0) + (parseInt(e.ca2) || 0) + (parseInt(e.exam) || 0)
       if (total > 0) {
-        totalScoreSum += total
-        gradedCount++
-        if (total > highestScore) highestScore = total
-        const percentage = Math.round((total / 100) * 100)
-        const grade = getGrade(percentage)
-        if (grade !== 'F9') passCount++
+        totalSum += total; gradedCount++
+        if (total > highest) highest = total
+        if (getGrade(Math.round((total / 100) * 100)) !== 'F9') passCount++
         else failCount++
       }
     })
-
-    setStats({
-      totalStudents: students.length,
-      gradedStudents: gradedCount,
-      classAverage: gradedCount > 0 ? Math.round(totalScoreSum / gradedCount) : 0,
-      highestScore: highestScore,
-      passCount: passCount,
-      failCount: failCount,
-      passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0
-    })
+    setStats({ totalStudents: students.length, gradedStudents: gradedCount, classAverage: gradedCount > 0 ? Math.round(totalSum / gradedCount) : 0, highestScore: highest, passCount, failCount, passRate: gradedCount > 0 ? Math.round((passCount / gradedCount) * 100) : 0 })
   }
 
   const handleScoreChange = (studentId: string, field: keyof ScoreEntry, value: string) => {
     if (isLocked || field === 'is_saved') return
-    
     const maxValues = { ca1: 20, ca2: 20, exam: 60 }
-    let numValue = parseFloat(value) || 0
-    numValue = Math.min(maxValues[field], Math.max(0, numValue))
-    
-    setScoreEntries(prev => ({
-      ...prev,
-      [studentId]: { ...prev[studentId], [field]: numValue.toString(), is_saved: false }
-    }))
-    
+    let num = Math.min(maxValues[field], Math.max(0, parseFloat(value) || 0))
+    setScoreEntries(prev => ({ ...prev, [studentId]: { ...prev[studentId], [field]: num.toString(), is_saved: false } }))
     setSavedStatus(prev => ({ ...prev, [studentId]: false }))
-    setTimeout(() => updateStatsFromEntries(), 50)
+    setTimeout(updateStatsFromEntries, 50)
   }
 
   const calculateSubjectScore = (ca1: number, ca2: number, exam: number) => {
     const total = ca1 + ca2 + exam
     const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
     const grade = getGrade(percentage)
-    const remark = getGradeRemark(grade)
-    return { total_score: total, percentage, grade, remark }
+    return { total_score: total, percentage, grade, remark: getGradeRemark(grade) }
+  }
+
+  const buildSavePayload = (studentId: string, ca1: number, ca2: number, exam: number, studentClass: string): any => {
+    const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1, ca2, exam)
+    const now = new Date().toISOString()
+    const d: any = {
+      student_id: studentId, subject: selectedSubject, term: selectedTerm, academic_year: selectedYear,
+      ca1_score: ca1, ca2_score: ca2,
+      exam_objective_score: Math.round(exam * 0.6), exam_theory_score: Math.round(exam * 0.4),
+      total_score, percentage, grade, remark,
+      teacher_id: staffProfile.id, teacher_name: staffProfile.full_name || staffProfile.display_name || 'Teacher',
+      class: studentClass, status: 'approved', submitted_at: now, updated_at: now,
+    }
+    if (selectedExamId && !skipExam) d.exam_id = selectedExamId
+    return d
   }
 
   const handleSaveSingle = async (studentId: string) => {
-    if (!staffProfile?.id) {
-      toast.error('Missing teacher information')
-      return
-    }
-
-    if (isLocked) {
-      toast.error(`Cannot save. Scores locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}.`)
-      return
-    }
-
-    const entry = scoreEntries[studentId]
-    if (!entry) return
-
-    const ca1Score = parseInt(entry.ca1) || 0
-    const ca2Score = parseInt(entry.ca2) || 0
-    const examScore = parseInt(entry.exam) || 0
-
-    if (ca1Score === 0 && ca2Score === 0 && examScore === 0) {
-      toast.info('No scores to save for this student')
-      return
-    }
-
+    if (!staffProfile?.id) { toast.error('Missing teacher information'); return }
+    if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
+    const entry = scoreEntries[studentId]; if (!entry) return
+    const ca1 = parseInt(entry.ca1) || 0, ca2 = parseInt(entry.ca2) || 0, exam = parseInt(entry.exam) || 0
+    if (ca1 + ca2 + exam === 0) { toast.info('No scores to save'); return }
     setSaving(true)
-
     try {
-      const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
-      const now = new Date().toISOString()
-
-      const dataToSave: any = {
-        student_id: studentId,
-        subject: selectedSubject,
-        term: selectedTerm,
-        academic_year: selectedYear,
-        ca1_score: ca1Score,
-        ca2_score: ca2Score,
-        exam_objective_score: Math.round(examScore * 0.6),
-        exam_theory_score: Math.round(examScore * 0.4),
-        total_score: total_score,
-        percentage: percentage,
-        grade: grade,
-        remark: remark,
-        teacher_id: staffProfile.id,
-        teacher_name: staffProfile.full_name || staffProfile.display_name || 'Teacher',
-        class: students.find(s => s.id === studentId)?.class || selectedClass,
-        status: 'approved',
-        submitted_at: now,
-        updated_at: now
-      }
-
-      if (selectedExamId && !skipExam) {
-        dataToSave.exam_id = selectedExamId
-      }
-
-      let query = supabase
-        .from('ca_scores')
-        .select('id')
-        .eq('student_id', studentId)
-        .eq('subject', selectedSubject)
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-
-      if (selectedExamId && !skipExam) {
-        query = query.eq('exam_id', selectedExamId)
-      } else {
-        query = query.is('exam_id', null)
-      }
-
-      const { data: existing } = await query.maybeSingle()
-
-      let result
-      if (existing) {
-        const updateData = { ...dataToSave }
-        if (!selectedExamId || skipExam) {
-          delete updateData.exam_id
-        }
-        result = await supabase
-          .from('ca_scores')
-          .update(updateData)
-          .eq('id', existing.id)
-      } else {
-        result = await supabase
-          .from('ca_scores')
-          .insert([dataToSave])
-      }
-
-      if (result.error) {
-        console.error('❌ Save error:', {
-          message: result.error.message,
-          code: result.error.code,
-          details: result.error.details,
-          hint: result.error.hint
-        })
-        throw result.error
-      }
-
+      const payload = buildSavePayload(studentId, ca1, ca2, exam, students.find(s => s.id === studentId)?.class || selectedClass)
+      let q = supabase.from('ca_scores').select('id').eq('student_id', studentId).eq('subject', selectedSubject).eq('term', selectedTerm).eq('academic_year', selectedYear)
+      q = (skipExam || !selectedExamId) ? q.is('exam_id', null) : q.eq('exam_id', selectedExamId)
+      const { data: existing } = await q.maybeSingle()
+      const result = existing
+        ? await supabase.from('ca_scores').update(payload).eq('id', existing.id)
+        : await supabase.from('ca_scores').insert([payload])
+      if (result.error) throw result.error
       setSavedStatus(prev => ({ ...prev, [studentId]: true }))
-      setScoreEntries(prev => ({
-        ...prev,
-        [studentId]: { ...prev[studentId], is_saved: true }
-      }))
-      
-      toast.success(`Scores saved for ${getStudentName(studentId)}`)
-      
-      await checkSubjectsStatus()
-      await loadAllData()
-      if (activeTab === 'view') {
-        await loadScoresForViewTab()
-      }
-      
-    } catch (error: any) {
-      toast.error(`Failed to save: ${error.message}`)
-    } finally {
-      setSaving(false)
-    }
+      setScoreEntries(prev => ({ ...prev, [studentId]: { ...prev[studentId], is_saved: true } }))
+      toast.success(`Saved for ${getStudentName(studentId)}`)
+      await checkSubjectsStatus(); await loadAllData()
+      if (activeTab === 'view') await loadScoresForViewTab()
+    } catch (e: any) { toast.error(`Failed: ${e.message}`) }
+    finally { setSaving(false) }
   }
 
   const handleSaveAll = async () => {
-    if (!staffProfile?.id) {
-      toast.error('Missing teacher information')
-      return
-    }
-
-    if (isLocked) {
-      toast.error(`Cannot save. Scores locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}.`)
-      return
-    }
-
-    setSaving(true)
-    let savedCount = 0
-    let errorCount = 0
-
+    if (!staffProfile?.id) { toast.error('Missing teacher information'); return }
+    if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
+    setSaving(true); let saved = 0, errors = 0
     try {
-      const now = new Date().toISOString()
-      
       for (const student of students) {
-        const entry = scoreEntries[student.id]
-        if (!entry) continue
-
-        const ca1Score = parseInt(entry.ca1) || 0
-        const ca2Score = parseInt(entry.ca2) || 0
-        const examScore = parseInt(entry.exam) || 0
-
-        if (ca1Score === 0 && ca2Score === 0 && examScore === 0) continue
-
-        const { total_score, percentage, grade, remark } = calculateSubjectScore(ca1Score, ca2Score, examScore)
-
-        const dataToSave: any = {
-          student_id: student.id,
-          subject: selectedSubject,
-          term: selectedTerm,
-          academic_year: selectedYear,
-          ca1_score: ca1Score,
-          ca2_score: ca2Score,
-          exam_objective_score: Math.round(examScore * 0.6),
-          exam_theory_score: Math.round(examScore * 0.4),
-          total_score: total_score,
-          percentage: percentage,
-          grade: grade,
-          remark: remark,
-          teacher_id: staffProfile.id,
-          teacher_name: staffProfile.full_name || staffProfile.display_name || 'Teacher',
-          class: student.class,
-          status: 'approved',
-          submitted_at: now,
-          updated_at: now
-        }
-
-        if (selectedExamId && !skipExam) {
-          dataToSave.exam_id = selectedExamId
-        }
-
-        let query = supabase
-          .from('ca_scores')
-          .select('id')
-          .eq('student_id', student.id)
-          .eq('subject', selectedSubject)
-          .eq('term', selectedTerm)
-          .eq('academic_year', selectedYear)
-
-        if (selectedExamId && !skipExam) {
-          query = query.eq('exam_id', selectedExamId)
-        } else {
-          query = query.is('exam_id', null)
-        }
-
-        const { data: existing } = await query.maybeSingle()
-
-        let result
-        if (existing) {
-          const updateData = { ...dataToSave }
-          if (!selectedExamId || skipExam) {
-            delete updateData.exam_id
-          }
-          result = await supabase
-            .from('ca_scores')
-            .update(updateData)
-            .eq('id', existing.id)
-        } else {
-          result = await supabase
-            .from('ca_scores')
-            .insert([dataToSave])
-        }
-
-        if (result.error) {
-          console.error('❌ Save error:', {
-            student: getStudentName(student.id),
-            message: result.error.message,
-            code: result.error.code,
-            details: result.error.details,
-            hint: result.error.hint
-          })
-          errorCount++
-        } else {
-          savedCount++
-        }
+        const entry = scoreEntries[student.id]; if (!entry) continue
+        const ca1 = parseInt(entry.ca1) || 0, ca2 = parseInt(entry.ca2) || 0, exam = parseInt(entry.exam) || 0
+        if (ca1 + ca2 + exam === 0) continue
+        const payload = buildSavePayload(student.id, ca1, ca2, exam, student.class)
+        let q = supabase.from('ca_scores').select('id').eq('student_id', student.id).eq('subject', selectedSubject).eq('term', selectedTerm).eq('academic_year', selectedYear)
+        q = (skipExam || !selectedExamId) ? q.is('exam_id', null) : q.eq('exam_id', selectedExamId)
+        const { data: existing } = await q.maybeSingle()
+        const result = existing
+          ? await supabase.from('ca_scores').update(payload).eq('id', existing.id)
+          : await supabase.from('ca_scores').insert([payload])
+        result.error ? errors++ : saved++
       }
-
-      if (savedCount > 0) {
-        toast.success(`✅ ${savedCount} score(s) saved successfully`)
-        if (errorCount > 0) {
-          toast.warning(`⚠️ ${errorCount} student(s) had errors`)
-        }
-        
-        const newSavedStatus: Record<string, boolean> = { ...savedStatus }
-        students.forEach(student => {
-          const entry = scoreEntries[student.id]
-          if (entry && (parseInt(entry.ca1) || 0) + (parseInt(entry.ca2) || 0) + (parseInt(entry.exam) || 0) > 0) {
-            newSavedStatus[student.id] = true
-          }
-        })
-        setSavedStatus(newSavedStatus)
-        
-        await checkSubjectsStatus()
-        await loadAllData()
-        if (activeTab === 'view') {
-          await loadScoresForViewTab()
-        }
-      } else if (errorCount > 0) {
-        toast.error(`Failed to save ${errorCount} student(s)`)
-      } else {
-        toast.info('No new scores to save')
-      }
-    } catch (error: any) {
-      toast.error(`Failed to save: ${error.message}`)
-    } finally {
-      setSaving(false)
-    }
+      if (saved > 0) {
+        toast.success(`${saved} score(s) saved${errors > 0 ? `, ${errors} failed` : ''}`)
+        const ns = { ...savedStatus }
+        students.forEach(s => { const e = scoreEntries[s.id]; if (e && (parseInt(e.ca1) || 0) + (parseInt(e.ca2) || 0) + (parseInt(e.exam) || 0) > 0) ns[s.id] = true })
+        setSavedStatus(ns)
+        await checkSubjectsStatus(); await loadAllData()
+        if (activeTab === 'view') await loadScoresForViewTab()
+      } else if (errors > 0) toast.error(`Failed to save ${errors} student(s)`)
+      else toast.info('No new scores to save')
+    } catch (e: any) { toast.error(`Failed: ${e.message}`) }
+    finally { setSaving(false) }
   }
 
-  // Delete All Scores - with progress AND lock protection
   const handleDeleteAllScores = async () => {
-    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) {
-      toast.error('Please select class, subject, term, and year')
-      return
-    }
-
-    if (isLocked) {
-      toast.error(`Cannot delete. Scores are locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}.`)
-      return
-    }
-
-    setIsDeletingAll(true)
-    setDeleteProgress(0)
-    setShowDeleteAllDialog(false)
-
+    if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
+    setIsDeletingAll(true); setDeleteProgress(0); setShowDeleteAllDialog(false)
     try {
       const classVariations = getClassVariations(selectedClass)
-      
-      let countQuery = supabase
-        .from('ca_scores')
-        .select('id', { count: 'exact', head: true })
-        .eq('subject', selectedSubject)
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-
-      if (classVariations.length > 1) {
-        countQuery = countQuery.in('class', classVariations)
-      } else {
-        countQuery = countQuery.eq('class', selectedClass)
+      let cq = supabase.from('ca_scores').select('id', { count: 'exact', head: true }).eq('subject', selectedSubject).eq('term', selectedTerm).eq('academic_year', selectedYear)
+      cq = classVariations.length > 1 ? cq.in('class', classVariations) : cq.eq('class', selectedClass)
+      cq = (skipExam || !selectedExamId) ? cq.is('exam_id', null) : cq.eq('exam_id', selectedExamId)
+      const { count: total } = await cq
+      if (!total || total === 0) { toast.info('No scores to delete'); setIsDeletingAll(false); return }
+      let deleted = 0
+      while (deleted < total) {
+        let dq = supabase.from('ca_scores').delete().eq('subject', selectedSubject).eq('term', selectedTerm).eq('academic_year', selectedYear)
+        dq = classVariations.length > 1 ? dq.in('class', classVariations) : dq.eq('class', selectedClass)
+        dq = (skipExam || !selectedExamId) ? dq.is('exam_id', null) : dq.eq('exam_id', selectedExamId)
+        const { error } = await dq.limit(100)
+        if (error) { toast.error(`Delete failed: ${error.message}`); break }
+        deleted += 100; setDeleteProgress(Math.min(Math.round((deleted / total) * 100), 100))
       }
-
-      if (selectedExamId && !skipExam) {
-        countQuery = countQuery.eq('exam_id', selectedExamId)
-      } else {
-        countQuery = countQuery.is('exam_id', null)
-      }
-
-      const { count: totalCount } = await countQuery
-
-      if (!totalCount || totalCount === 0) {
-        toast.info('No scores to delete')
-        setIsDeletingAll(false)
-        return
-      }
-
-      let deletedCount = 0
-      const batchSize = 100
-
-      while (deletedCount < totalCount) {
-        let deleteQuery = supabase
-          .from('ca_scores')
-          .delete()
-          .eq('subject', selectedSubject)
-          .eq('term', selectedTerm)
-          .eq('academic_year', selectedYear)
-
-        if (classVariations.length > 1) {
-          deleteQuery = deleteQuery.in('class', classVariations)
-        } else {
-          deleteQuery = deleteQuery.eq('class', selectedClass)
-        }
-
-        if (selectedExamId && !skipExam) {
-          deleteQuery = deleteQuery.eq('exam_id', selectedExamId)
-        } else {
-          deleteQuery = deleteQuery.is('exam_id', null)
-        }
-
-        deleteQuery = deleteQuery.limit(batchSize)
-
-        const { error: deleteError } = await deleteQuery
-
-        if (deleteError) {
-          toast.error(`Failed to delete scores: ${deleteError.message}`)
-          break
-        }
-
-        deletedCount += batchSize
-        const progress = Math.min(Math.round((deletedCount / totalCount) * 100), 100)
-        setDeleteProgress(progress)
-      }
-
-      toast.success(`✅ All ${totalCount} scores for ${selectedSubject} (${selectedClass}) have been deleted!`)
-      
-      await checkSubjectsStatus()
-      await loadAllData()
-      if (activeTab === 'view') {
-        await loadScoresForViewTab()
-      }
-      
-    } catch (error: any) {
-      toast.error(`Failed to delete scores: ${error.message}`)
-    } finally {
-      setIsDeletingAll(false)
-      setDeleteProgress(0)
-    }
+      toast.success(`Deleted ${total} score(s)`)
+      await checkSubjectsStatus(); await loadAllData()
+      if (activeTab === 'view') await loadScoresForViewTab()
+    } catch (e: any) { toast.error(`Failed: ${e.message}`) }
+    finally { setIsDeletingAll(false); setDeleteProgress(0) }
   }
 
-  // ✅ FIXED: .single() → .maybeSingle() to avoid 406 errors
   const handleAutoFetchSingle = async (studentId: string) => {
-    if (!selectedExamId || skipExam) {
-      toast.info('No exam selected. Please select an exam or create one first.')
-      return
-    }
-
-    const { data, error } = await supabase
-      .from('exam_attempts')
-      .select('objective_score, theory_feedback')
-      .eq('exam_id', selectedExamId)
-      .eq('student_id', studentId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
-
-    if (error) {
-      console.error('❌ Auto-fetch error:', error)
-      toast.info('No exam attempt found for this student')
-      return
-    }
-
-    if (data) {
-      const objectiveScore = Number(data.objective_score) || 0
-      let theoryScore = 0
-
-      if (data.theory_feedback?.total?.score !== undefined) {
-        theoryScore = Number(data.theory_feedback.total.score)
-      }
-
-      const examTotal = objectiveScore + theoryScore
-
-      setScoreEntries(prev => ({
-        ...prev,
-        [studentId]: {
-          ...prev[studentId],
-          exam: examTotal > 0 ? String(Math.round(examTotal)) : '',
-          is_saved: false
-        }
-      }))
-
-      setSavedStatus(prev => ({ ...prev, [studentId]: false }))
-      toast.success('Exam score loaded')
-      setTimeout(() => updateStatsFromEntries(), 50)
-    }
+    if (!selectedExamId || skipExam) { toast.info('No exam selected'); return }
+    const { data, error } = await supabase.from('exam_attempts').select('objective_score, theory_feedback').eq('exam_id', selectedExamId).eq('student_id', studentId).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (error || !data) { toast.info('No attempt found'); return }
+    const obj = Number(data.objective_score) || 0
+    const thy = data.theory_feedback?.total?.score !== undefined ? Number(data.theory_feedback.total.score) : 0
+    const total = obj + thy
+    setScoreEntries(prev => ({ ...prev, [studentId]: { ...prev[studentId], exam: total > 0 ? String(Math.round(total)) : '', is_saved: false } }))
+    setSavedStatus(prev => ({ ...prev, [studentId]: false })); toast.success('Exam score loaded')
+    setTimeout(updateStatsFromEntries, 50)
   }
 
-  // ✅ FIXED: .single() → .maybeSingle() to avoid 406 errors
   const handleAutoFetchAll = async () => {
-    if (!selectedExamId || skipExam) {
-      toast.info('No exam selected. Please select an exam or create one first.')
-      return
-    }
-    
-    setAutoFetching(true)
-    let count = 0
-
+    if (!selectedExamId || skipExam) { toast.info('No exam selected'); return }
+    setAutoFetching(true); let count = 0
     for (const student of students) {
-      const { data, error } = await supabase
-        .from('exam_attempts')
-        .select('objective_score, theory_feedback')
-        .eq('exam_id', selectedExamId)
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
-
+      const { data, error } = await supabase.from('exam_attempts').select('objective_score, theory_feedback').eq('exam_id', selectedExamId).eq('student_id', student.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
       if (!error && data) {
-        const objectiveScore = Number(data.objective_score) || 0
-        let theoryScore = 0
-
-        if (data.theory_feedback?.total?.score !== undefined) {
-          theoryScore = Number(data.theory_feedback.total.score)
-        }
-
-        const examTotal = objectiveScore + theoryScore
-
-        setScoreEntries(prev => ({
-          ...prev,
-          [student.id]: {
-            ...prev[student.id],
-            exam: examTotal > 0 ? String(Math.round(examTotal)) : '',
-            is_saved: false
-          }
-        }))
-
-        setSavedStatus(prev => ({ ...prev, [student.id]: false }))
-        count++
+        const obj = Number(data.objective_score) || 0
+        const thy = data.theory_feedback?.total?.score !== undefined ? Number(data.theory_feedback.total.score) : 0
+        const total = obj + thy
+        setScoreEntries(prev => ({ ...prev, [student.id]: { ...prev[student.id], exam: total > 0 ? String(Math.round(total)) : '', is_saved: false } }))
+        setSavedStatus(prev => ({ ...prev, [student.id]: false })); count++
       }
     }
-
-    setAutoFetching(false)
-    toast.success(`Loaded ${count} exam score(s)`)
-    setTimeout(() => updateStatsFromEntries(), 50)
-  }
-
-  const getStudentName = (studentId: string) => {
-    const student = students.find(s => s.id === studentId)
-    return student?.full_name || 'Unknown'
-  }
-
-  const getStudentAdmission = (studentId: string) => {
-    const student = students.find(s => s.id === studentId)
-    return student?.admission_number || '—'
+    setAutoFetching(false); toast.success(`Loaded ${count} exam score(s)`); setTimeout(updateStatsFromEntries, 50)
   }
 
   const handleRefresh = async () => {
-    await checkSubjectsStatus()
-    await loadAllData()
-    if (activeTab === 'view') {
-      await loadScoresForViewTab()
-    }
-    toast.success('Data refreshed')
+    await checkSubjectsStatus(); await loadAllData()
+    if (activeTab === 'view') await loadScoresForViewTab()
+    toast.success('Refreshed')
   }
 
-  const groupedStudents = students.reduce((acc: Record<string, Student[]>, student) => {
-    const cls = student.class || 'Unknown'
-    if (!acc[cls]) acc[cls] = []
-    acc[cls].push(student)
-    return acc
-  }, {})
+  const getStudentName = (id: string) => students.find(s => s.id === id)?.full_name || 'Unknown'
+  const getStudentAdmission = (id: string) => students.find(s => s.id === id)?.admission_number || '—'
 
+  const groupedStudents = students.reduce((acc: Record<string, Student[]>, s) => {
+    const cls = s.class || 'Unknown'; if (!acc[cls]) acc[cls] = []; acc[cls].push(s); return acc
+  }, {})
   const classOrder = Object.keys(groupedStudents).sort()
-  
-  const filteredScores = caScores.filter(score => {
-    const studentName = score.student?.full_name || getStudentName(score.student_id)
-    return studentName.toLowerCase().includes(searchQuery.toLowerCase())
-  })
+  const filteredScores = caScores.filter(s => (s.student?.full_name || getStudentName(s.student_id)).toLowerCase().includes(searchQuery.toLowerCase()))
 
   if (!mounted || isRestoring) {
     return (
       <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <div className="text-center space-y-3">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+          <p className="text-sm text-slate-500">Loading assessment data…</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Total Students</p>
-                <p className="text-2xl font-bold text-slate-800">{stats.totalStudents}</p>
-              </div>
-              <Users className="h-8 w-8 text-emerald-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-l-4 border-l-blue-500 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Graded Students</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.gradedStudents}</p>
-              </div>
-              <GraduationCap className="h-8 w-8 text-blue-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-l-4 border-l-purple-500 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Class Average</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.classAverage}%</p>
-              </div>
-              <TrendingUp className="h-8 w-8 text-purple-500" />
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="border-l-4 border-l-amber-500 shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-500">Pass Rate</p>
-                <p className="text-2xl font-bold text-amber-600">{stats.passRate}%</p>
-              </div>
-              <Award className="h-8 w-8 text-amber-500" />
-            </div>
-          </CardContent>
-        </Card>
+    <div className="space-y-5">
+
+      {/* ── Stats Row ──────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <StatCard label="Total Students" value={stats.totalStudents} icon={Users} accent="bg-emerald-500" />
+        <StatCard label="Graded" value={stats.gradedStudents} sub={`of ${stats.totalStudents}`} icon={GraduationCap} accent="bg-blue-500" />
+        <StatCard label="Class Average" value={`${stats.classAverage}%`} icon={TrendingUp} accent="bg-violet-500" />
+        <StatCard label="Pass Rate" value={`${stats.passRate}%`} sub={`${stats.passCount} passed · ${stats.failCount} failed`} icon={Award} accent="bg-amber-500" />
       </div>
 
-      {/* Subject Status Legend */}
-      <div className="bg-white dark:bg-slate-950 rounded-lg p-3 border border-slate-200 dark:border-slate-800">
-        <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Subject Status:</p>
-        <div className="flex flex-wrap gap-4 text-xs">
-          <div className="flex items-center gap-1.5">
-            <Circle className="h-4 w-4 text-slate-400 dark:text-slate-500" />
-            <span className="text-slate-600 dark:text-slate-400">Available - No scores entered</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            <span className="text-slate-600 dark:text-slate-400">You - Scores entered by you</span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Lock className="h-4 w-4 text-red-500" />
-            <span className="text-slate-600 dark:text-slate-400">Locked - Entered by another teacher</span>
-          </div>
-        </div>
+      {/* ── Status Legend ─────────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-slate-500 dark:text-slate-400">
+        <span className="font-semibold text-slate-600 dark:text-slate-300">Subject status:</span>
+        <span className="flex items-center gap-1.5"><Circle className="h-3.5 w-3.5 text-slate-400" /> Available</span>
+        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> Entered by you</span>
+        <span className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-red-500" /> Locked by another teacher</span>
       </div>
 
-      {/* Grading Scale Banner */}
-      <div className="bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/20 dark:to-teal-950/20 rounded-lg p-4 border border-emerald-200 dark:border-emerald-800">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-            <span className="font-semibold text-emerald-800 dark:text-emerald-300">Grading Scale:</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {GRADING_SCALE.map((scale) => (
-              <Badge key={scale.grade} className={cn(scale.color, "font-medium")}>
-                {scale.grade}: {scale.min}-{scale.max === 100 ? '100' : scale.max}
-              </Badge>
-            ))}
-          </div>
-        </div>
-        <p className="text-xs text-emerald-700 dark:text-emerald-400/80 mt-2 flex items-center gap-1">
-          <Bell className="h-3 w-3" />
-          Scores are automatically saved and persist across sessions
-        </p>
-      </div>
-
-      {/* Configuration Card */}
-      <Card>
-        <CardHeader className="pb-3">
+      {/* ── Configuration Card ────────────────────────────────────────────── */}
+      <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
+        <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">Assessment Configuration</CardTitle>
-            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={loading || checkingSubjects}>
-              <RefreshCw className={cn("h-4 w-4 mr-2", (loading || checkingSubjects) && "animate-spin")} />
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
+                <Settings2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">
+                Assessment Configuration
+              </CardTitle>
+            </div>
+            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading || checkingSubjects}
+              className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 h-8 px-3">
+              <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', (loading || checkingSubjects) && 'animate-spin')} />
               Refresh
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div>
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Class</Label>
+
+        <CardContent className="pt-4 space-y-5">
+          {/* Selectors */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
+            {/* Class */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Class</Label>
               <Select value={selectedClass} onValueChange={handleClassChange}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
                 <SelectContent>
                   {classes.map(cls => (
                     <SelectItem key={cls} value={cls}>
-                      {isGeneralClass(cls) ? (
-                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">📚 {cls} (All Streams)</span>
-                      ) : (
-                        cls
-                      )}
+                      {isGeneralClass(cls)
+                        ? <span className="font-medium text-emerald-600 dark:text-emerald-400">{cls} <span className="text-xs opacity-70">(All Streams)</span></span>
+                        : cls}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {isGeneralClass(selectedClass) && (
-                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                  <Layers className="h-3 w-3" />
-                  Includes all {selectedClass} streams
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <Layers className="h-3 w-3" /> All {selectedClass} streams
                 </p>
               )}
             </div>
-            
-            <div>
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Subject</Label>
+
+            {/* Subject */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Subject</Label>
               <Select value={selectedSubject} onValueChange={handleSubjectChange}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
                   <SelectValue placeholder="Select subject">
                     {selectedSubject && (
-                      <div className="flex items-center gap-2">
-                        <span>{selectedSubject}</span>
-                        {subjectsStatus[selectedSubject] && (
-                          <SubjectStatusIcon status={subjectsStatus[selectedSubject]} />
-                        )}
+                      <div className="flex items-center justify-between w-full gap-2">
+                        <span className="truncate">{selectedSubject}</span>
+                        <SubjectStatusIcon status={subjectsStatus[selectedSubject]} />
                       </div>
                     )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {checkingSubjects ? (
-                    <div className="flex items-center justify-center py-4 px-2">
-                      <Loader2 className="h-4 w-4 animate-spin text-emerald-600 mr-2" />
-                      <span className="text-sm text-slate-500">Checking subjects...</span>
-                    </div>
-                  ) : (
-                    subjects.map(sub => {
-                      const status = subjectsStatus[sub]
-                      return (
-                        <SelectItem key={sub} value={sub}>
-                          <div className="flex items-center justify-between w-full gap-2">
-                            <span>{sub}</span>
-                            <SubjectStatusIcon status={status} />
-                          </div>
-                        </SelectItem>
-                      )
-                    })
-                  )}
+                  {checkingSubjects
+                    ? <div className="flex items-center gap-2 py-4 px-3 text-sm text-slate-500"><Loader2 className="h-4 w-4 animate-spin" /> Checking…</div>
+                    : subjects.map(sub => (
+                      <SelectItem key={sub} value={sub}>
+                        <div className="flex items-center justify-between w-full gap-3">
+                          <span>{sub}</span>
+                          <SubjectStatusIcon status={subjectsStatus[sub]} />
+                        </div>
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
-              
-              {/* Lock warning banner */}
+
+              {/* Lock / status indicators */}
               {isLocked && selectedSubject && (
-                <div className="mt-2 flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950/20 rounded-md border border-red-200 dark:border-red-800/50">
-                  <Lock className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs">
-                    <p className="font-medium text-red-700 dark:text-red-400">Score Entry Locked</p>
-                    <p className="text-red-600 dark:text-red-500">
-                      {subjectsStatus[selectedSubject]?.otherTeacherName || 'Another teacher'} has already entered scores for {selectedSubject}.
-                      You cannot modify these scores.
-                    </p>
+                <div className="flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800/50 text-xs">
+                  <Lock className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-red-700 dark:text-red-400">Locked</p>
+                    <p className="text-red-600 dark:text-red-500">{subjectsStatus[selectedSubject]?.otherTeacherName || 'Another teacher'} has entered scores.</p>
                   </div>
                 </div>
               )}
-              
-              {/* My scores indicator */}
               {!isLocked && selectedSubject && subjectsStatus[selectedSubject]?.enteredByMe && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
-                  <CheckCircle2 className="h-3.5 w-3.5" />
-                  <span>You have entered scores for {subjectsStatus[selectedSubject]?.studentCount} student(s)</span>
-                </div>
-              )}
-              
-              {/* Available indicator */}
-              {!isLocked && selectedSubject && !subjectsStatus[selectedSubject]?.hasScores && (
-                <div className="mt-2 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-                  <Circle className="h-3.5 w-3.5" />
-                  <span>Available for score entry</span>
-                </div>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" /> {subjectsStatus[selectedSubject]?.studentCount} student(s) recorded
+                </p>
               )}
             </div>
-            
-            <div>
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Examination</Label>
+
+            {/* Exam */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Examination</Label>
               <Select value={selectedExamId} onValueChange={handleExamChange} disabled={skipExam || isLocked}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder={skipExam ? "Exam skipped" : "Select exam"} />
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
+                  <SelectValue placeholder={skipExam ? 'Skipped (CA only)' : 'Select exam'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableExams.length === 0 ? (
-                    <div className="px-2 py-1.5 text-sm text-slate-500">No exams available</div>
-                  ) : (
-                    availableExams.map(exam => (
-                      <SelectItem key={exam.id} value={exam.id}>
-                        {exam.title}
-                      </SelectItem>
-                    ))
-                  )}
+                  {availableExams.length === 0
+                    ? <div className="px-3 py-2 text-sm text-slate-400">No exams available</div>
+                    : availableExams.map(e => <SelectItem key={e.id} value={e.id}>{e.title}</SelectItem>)}
                 </SelectContent>
               </Select>
               {!isLocked && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Button
-                    type="button"
-                    variant={skipExam ? "default" : "outline"}
-                    size="sm"
-                    onClick={handleSkipExam}
-                    className="h-6 text-xs"
-                  >
-                    {skipExam ? "✓ Skip Exam (CA Only)" : "Skip Exam (CA Only)"}
-                  </Button>
+                <div className="flex gap-1.5">
+                  <button onClick={handleSkipExam}
+                    className={cn('text-xs px-2 py-0.5 rounded border transition-colors',
+                      skipExam
+                        ? 'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700'
+                        : 'text-slate-500 border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600')}>
+                    {skipExam ? '✓ CA Only' : 'Skip exam'}
+                  </button>
                   {skipExam && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSkipExam(false)
-                        if (availableExams.length > 0) {
-                          setSelectedExamId(availableExams[0].id)
-                        }
-                      }}
-                      className="h-6 text-xs"
-                    >
+                    <button onClick={() => { setSkipExam(false); if (availableExams.length > 0) setSelectedExamId(availableExams[0].id) }}
+                      className="text-xs px-2 py-0.5 rounded border border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 transition-colors">
                       Cancel
-                    </Button>
+                    </button>
                   )}
                 </div>
               )}
             </div>
-            
-            <div>
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Term</Label>
+
+            {/* Term */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Term</Label>
               <Select value={selectedTerm} onValueChange={handleTermChange}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {TERM_OPTIONS.map(opt => <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>)}
+                  {TERM_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            
-            <div>
-              <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Session</Label>
+
+            {/* Session */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Session</Label>
               <Select value={selectedYear} onValueChange={handleYearChange}>
-                <SelectTrigger className="h-10">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {sessionOptions.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                  {sessionOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 pt-2">
-            <Button 
-              onClick={handleSaveAll} 
-              disabled={saving || students.length === 0 || isLocked} 
-              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
-            >
+          {/* Action buttons */}
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+            <Button onClick={handleSaveAll} disabled={saving || students.length === 0 || isLocked} size="sm"
+              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white shadow-sm h-9">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <SaveAll className="h-4 w-4 mr-2" />}
-              {isLocked ? 'Locked by Another Teacher' : 'Save All Scores'}
+              {isLocked ? 'Locked' : 'Save All Scores'}
             </Button>
-            
+
             {!skipExam && selectedExamId && !isLocked && (
-              <Button 
-                onClick={handleAutoFetchAll} 
-                disabled={autoFetching || students.length === 0}
-                variant="outline"
-              >
-                <RefreshCw className={cn("h-4 w-4 mr-2", autoFetching && "animate-spin")} />
-                Auto-Fetch All Exam Scores
+              <Button onClick={handleAutoFetchAll} disabled={autoFetching || students.length === 0} variant="outline" size="sm" className="h-9">
+                <RefreshCw className={cn('h-4 w-4 mr-2', autoFetching && 'animate-spin')} />
+                Auto-Fetch Exam Scores
               </Button>
             )}
-            
-            <Button 
-              onClick={() => setShowDeleteAllDialog(true)}
-              disabled={caScores.length === 0 || loading || isLocked}
-              variant="destructive"
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-            >
+
+            <Button onClick={() => setShowDeleteAllDialog(true)} disabled={caScores.length === 0 || loading || isLocked}
+              variant="outline" size="sm"
+              className="h-9 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30 ml-auto">
               <Trash className="h-4 w-4 mr-2" />
-              {isLocked ? 'Locked by Another Teacher' : 'Delete All Scores'}
+              Delete All
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* FIXED: Delete Confirmation Dialog with better contrast */}
-      <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
-        <AlertDialogContent className="max-w-md bg-white dark:bg-slate-900 border-2 border-red-300 dark:border-red-700 shadow-2xl">
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-full bg-red-100 dark:bg-red-900/50">
-                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
-              </div>
-              <AlertDialogTitle className="text-lg font-bold text-red-700 dark:text-red-300">
-                Delete Score Records
-              </AlertDialogTitle>
-            </div>
-          </AlertDialogHeader>
-
-          <div className="py-3 space-y-4">
-            {/* Summary Chips with better contrast */}
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant="secondary" className="font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1">
-                {selectedClass}
-              </Badge>
-              <span className="text-slate-400 dark:text-slate-500 font-bold">·</span>
-              <Badge variant="secondary" className="font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1">
-                {selectedSubject}
-              </Badge>
-              <span className="text-slate-400 dark:text-slate-500 font-bold">·</span>
-              <Badge variant="secondary" className="font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1">
-                {TERM_OPTIONS.find(t => t.value === selectedTerm)?.label || selectedTerm}
-              </Badge>
-              <span className="text-slate-400 dark:text-slate-500 font-bold">·</span>
-              <Badge variant="secondary" className="font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1">
-                {selectedYear}
-              </Badge>
-              {selectedExamId && !skipExam && (
-                <>
-                  <span className="text-slate-400 dark:text-slate-500 font-bold">·</span>
-                  <Badge variant="secondary" className="font-semibold bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-200 px-2.5 py-1">
-                    {availableExams.find(e => e.id === selectedExamId)?.title || selectedExamId}
-                  </Badge>
-                </>
-              )}
-              {skipExam && (
-                <>
-                  <span className="text-slate-400 dark:text-slate-500 font-bold">·</span>
-                  <Badge variant="outline" className="font-semibold border-amber-400 bg-amber-100 text-amber-800 dark:border-amber-600 dark:bg-amber-900/40 dark:text-amber-300 px-2.5 py-1">
-                    CA Only
-                  </Badge>
-                </>
-              )}
-            </div>
-
-            {/* Danger Summary with better contrast */}
-            <div className="flex items-center gap-3 bg-red-100 dark:bg-red-950/50 rounded-lg px-4 py-3 border-2 border-red-300 dark:border-red-700">
-              <Database className="h-5 w-5 text-red-600 dark:text-red-400 flex-shrink-0" />
-              <div>
-                <span className="text-base font-bold text-red-800 dark:text-red-200">
-                  {caScores.length} record{caScores.length !== 1 ? 's' : ''}
-                </span>
-                <span className="text-sm font-semibold text-red-700 dark:text-red-300"> will be permanently deleted</span>
-              </div>
-            </div>
-
-            {/* Warning with better contrast */}
-            <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 text-sm font-medium bg-amber-50 dark:bg-amber-950/30 rounded-lg px-3 py-2 border border-amber-300 dark:border-amber-700">
-              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-              <span>This action cannot be undone. All score data will be lost permanently.</span>
-            </div>
-          </div>
-
-          <AlertDialogFooter className="gap-3 mt-4">
-            <AlertDialogCancel 
-              disabled={isDeletingAll} 
-              className="px-5 py-2.5 text-slate-700 dark:text-slate-300 font-semibold bg-slate-100 dark:bg-slate-800 border-2 border-slate-300 dark:border-slate-600 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg"
-            >
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteAllScores}
-              disabled={isDeletingAll}
-              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white px-6 py-2.5 gap-2 font-bold shadow-lg border-2 border-red-700 dark:border-red-500 rounded-lg"
-            >
-              {isDeletingAll ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash className="h-4 w-4" />
-                  Delete Permanently
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Delete Progress Dialog */}
-      <Dialog open={isDeletingAll && deleteProgress > 0 && deleteProgress < 100} onOpenChange={() => {}}>
-        <DialogContent className="max-w-sm bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-2xl p-0 overflow-hidden">
-          <div className="p-6 pb-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-red-50/50 to-rose-50/50 dark:from-red-950/20 dark:to-rose-950/20">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-3 text-slate-800 dark:text-slate-200">
-                <div className="p-2 rounded-full bg-red-100 dark:bg-red-900/30">
-                  <Loader2 className="h-5 w-5 animate-spin text-red-600 dark:text-red-400" />
-                </div>
-                Deleting Scores...
-              </DialogTitle>
-            </DialogHeader>
-          </div>
-          
-          <div className="p-6 space-y-4">
-            <p className="text-sm text-slate-600 dark:text-slate-400 text-center">
-              Please wait while scores are being deleted
-            </p>
-            <div className="space-y-2">
-              <Progress value={deleteProgress} className="h-3 bg-slate-200 dark:bg-slate-700" />
-              <div className="flex justify-between text-xs">
-                <span className="text-slate-500 dark:text-slate-400">Progress</span>
-                <span className="font-semibold text-slate-700 dark:text-slate-300">{deleteProgress}%</span>
-              </div>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Edit Score Dialog */}
-      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-md bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800">
-          <DialogHeader>
-            <DialogTitle className="text-slate-800 dark:text-slate-200">Edit Assessment Score</DialogTitle>
-            <DialogDescription className="text-slate-500 dark:text-slate-400">
-              Update scores for {getStudentName(editingScore?.student_id)}
-            </DialogDescription>
-          </DialogHeader>
-
-          {editingScore && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">CA1 Score (max 20)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={editingScore.ca1_score || 0}
-                    onChange={e => setEditingScore({
-                      ...editingScore,
-                      ca1_score: parseInt(e.target.value) || 0
-                    })}
-                    className="mt-1"
-                  />
-                </div>
-                
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 dark:text-slate-300">CA2 Score (max 20)</Label>
-                  <Input
-                    type="number"
-                    min="0"
-                    max="20"
-                    value={editingScore.ca2_score || 0}
-                    onChange={e => setEditingScore({
-                      ...editingScore,
-                      ca2_score: parseInt(e.target.value) || 0
-                    })}
-                    className="mt-1"
-                  />
-                </div>
-              </div>
-
-              <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-4 text-center border border-emerald-200 dark:border-emerald-800">
-                <p className="text-sm text-emerald-600 dark:text-emerald-400 mb-1">Total CA Score</p>
-                <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">
-                  {(editingScore.ca1_score || 0) + (editingScore.ca2_score || 0)} / 40
-                </p>
-              </div>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
-            <Button
-              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800"
-              onClick={async () => {
-                if (!editingScore) return
-
-                const ca1 = editingScore.ca1_score || 0
-                const ca2 = editingScore.ca2_score || 0
-                const total = ca1 + ca2
-                const percentage = total > 0 ? Math.round((total / 40) * 100) : 0
-                const grade = getGrade(percentage)
-                const remark = getGradeRemark(grade)
-                const now = new Date().toISOString()
-
-                const { error } = await supabase
-                  .from('ca_scores')
-                  .update({
-                    ca1_score: ca1,
-                    ca2_score: ca2,
-                    total_score: total,
-                    percentage: percentage,
-                    grade: grade,
-                    remark: remark,
-                    status: 'approved',
-                    updated_at: now
-                  })
-                  .eq('id', editingScore.id)
-
-                if (error) {
-                  toast.error('Failed to update score')
-                  return
-                }
-
-                toast.success('Score updated successfully')
-                setShowEditDialog(false)
-                await checkSubjectsStatus()
-                await loadAllData()
-                await loadScoresForViewTab()
-              }}
-            >
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={handleTabChange}>
-        <TabsList className="grid w-full max-w-md grid-cols-2 bg-slate-100 dark:bg-slate-800">
-          <TabsTrigger value="entry" className="flex items-center gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900">
-            <FileText className="h-4 w-4" />
-            Score Entry
+      {/* ── Tabs ──────────────────────────────────────────────────────────── */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="h-10 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-auto inline-flex">
+          <TabsTrigger value="entry" className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 px-4">
+            <FileText className="h-4 w-4" /> Score Entry
           </TabsTrigger>
-          <TabsTrigger value="view" className="flex items-center gap-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900">
-            <BarChart3 className="h-4 w-4" />
-            View Scores ({caScores.length})
+          <TabsTrigger value="view" className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 px-4">
+            <BarChart3 className="h-4 w-4" /> View Scores
+            {caScores.length > 0 && (
+              <span className="ml-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                {caScores.length}
+              </span>
+            )}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="entry" className="mt-6">
+        {/* ── Entry Tab ───────────────────────────────────────────────────── */}
+        <TabsContent value="entry" className="mt-4 space-y-4">
           {isLocked ? (
-            <Card className="border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/10">
-              <CardContent className="py-12 text-center">
-                <div className="flex flex-col items-center gap-4">
-                  <div className="p-4 rounded-full bg-red-100 dark:bg-red-900/30">
-                    <Lock className="h-12 w-12 text-red-500 dark:text-red-400" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-red-700 dark:text-red-400">
-                      Score Entry Locked
-                    </h3>
-                    <p className="text-sm text-red-600 dark:text-red-500 mt-2 max-w-md">
-                      Scores for <strong>{selectedSubject}</strong> in <strong>{selectedClass}</strong> have been 
-                      entered by <strong>{subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}</strong>.
-                    </p>
-                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">
-                      To prevent overwriting, score entry is disabled. Please select another subject.
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      const availableSubject = subjects.find(
-                        s => !subjectsStatus[s]?.enteredByOther && s !== selectedSubject
-                      )
-                      if (availableSubject) {
-                        setSelectedSubject(availableSubject)
-                      } else {
-                        toast.info('All subjects have scores entered. Check the View tab.')
-                      }
-                    }}
-                    className="mt-2"
-                  >
-                    Switch to Available Subject
-                  </Button>
+            <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
+              <CardContent className="py-16 text-center">
+                <div className="inline-flex p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 mb-4">
+                  <Lock className="h-10 w-10 text-red-400 dark:text-red-500" />
                 </div>
+                <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-1">Score Entry Locked</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  <strong>{selectedSubject}</strong> scores for <strong>{selectedClass}</strong> were entered by{' '}
+                  <strong>{subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}</strong>.
+                </p>
+                <Button variant="outline" size="sm" className="mt-5" onClick={() => {
+                  const avail = subjects.find(s => !subjectsStatus[s]?.enteredByOther && s !== selectedSubject)
+                  avail ? setSelectedSubject(avail) : toast.info('All subjects have scores entered.')
+                }}>
+                  Switch to Available Subject <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
               </CardContent>
             </Card>
           ) : loading ? (
-            <Card>
-              <CardContent className="text-center py-12">
+            <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
+              <CardContent className="text-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
-                <p className="text-slate-500">Loading students...</p>
+                <p className="text-sm text-slate-500">Loading students…</p>
               </CardContent>
             </Card>
           ) : students.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                <p className="text-slate-500">No students found in {selectedClass}</p>
+            <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
+              <CardContent className="text-center py-16">
+                <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
+                  <Users className="h-10 w-10 text-slate-400" />
+                </div>
+                <p className="text-sm text-slate-500">No students found in <strong>{selectedClass}</strong></p>
               </CardContent>
             </Card>
           ) : (
             classOrder.map(cls => (
-              <div key={cls} className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
-                    <GraduationCap className="h-5 w-5 text-emerald-600" />
-                    {cls}
-                    <Badge variant="secondary" className="ml-2">
+              <Card key={cls} className="border-0 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+                {/* Class header */}
+                <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{cls}</span>
+                    <Badge variant="secondary" className="text-xs font-medium ml-1">
                       {groupedStudents[cls].length} students
                     </Badge>
-                  </h3>
+                  </div>
+                  <div className="text-xs text-slate-400 dark:text-slate-500">
+                    CA1 /20 · CA2 /20 · Exam /60
+                  </div>
                 </div>
-                
-                <div className="border rounded-lg overflow-x-auto dark:border-slate-700">
+
+                <div className="overflow-x-auto">
                   <Table>
-                    <TableHeader className="bg-slate-50 dark:bg-slate-900/50">
-                      <TableRow>
-                        <TableHead className="font-semibold min-w-[180px] text-slate-700 dark:text-slate-300">Student</TableHead>
-                        <TableHead className="text-center w-24 font-semibold text-slate-700 dark:text-slate-300">CA1</TableHead>
-                        <TableHead className="text-center w-24 font-semibold text-slate-700 dark:text-slate-300">CA2</TableHead>
-                        <TableHead className="text-center w-28 font-semibold text-slate-700 dark:text-slate-300">Exam</TableHead>
-                        <TableHead className="text-center w-20 font-semibold text-slate-700 dark:text-slate-300">Total</TableHead>
-                        <TableHead className="text-center w-24 font-semibold text-slate-700 dark:text-slate-300">Grade</TableHead>
-                        <TableHead className="text-center w-24 font-semibold text-slate-700 dark:text-slate-300">Actions</TableHead>
+                    <TableHeader>
+                      <TableRow className="border-slate-100 dark:border-slate-800 hover:bg-transparent">
+                        <TableHead className="pl-5 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide min-w-[200px]">Student</TableHead>
+                        <TableHead className="text-center w-28 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">CA1</TableHead>
+                        <TableHead className="text-center w-28 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">CA2</TableHead>
+                        <TableHead className="text-center w-32 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Exam</TableHead>
+                        <TableHead className="text-center w-20 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Total</TableHead>
+                        <TableHead className="text-center w-24 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Grade</TableHead>
+                        <TableHead className="text-center w-24 pr-5 font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">Save</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {groupedStudents[cls].map(student => {
+                      {groupedStudents[cls].map((student, idx) => {
                         const entry = scoreEntries[student.id] || { ca1: '', ca2: '', exam: '' }
                         const total = (parseInt(entry.ca1) || 0) + (parseInt(entry.ca2) || 0) + (parseInt(entry.exam) || 0)
                         const grade = total > 0 ? getGrade(Math.round((total / 100) * 100)) : ''
-                        const hasExamScore = entry.exam && parseInt(entry.exam) > 0
+                        const hasExam = entry.exam && parseInt(entry.exam) > 0
                         const isSaved = savedStatus[student.id]
-                        
+
                         return (
-                          <TableRow key={student.id} className="dark:border-slate-700">
-                            <TableCell className="font-medium text-slate-800 dark:text-slate-200">
-                              {student.full_name}
-                              <p className="text-xs text-slate-400 font-mono">{student.admission_number}</p>
+                          <TableRow key={student.id}
+                            className={cn(
+                              'border-slate-100 dark:border-slate-800 transition-colors',
+                              idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/20',
+                              isSaved && 'bg-emerald-50/30 dark:bg-emerald-950/10',
+                            )}>
+                            <TableCell className="pl-5 py-2.5">
+                              <div>
+                                <p className="font-medium text-sm text-slate-800 dark:text-slate-200">{student.full_name}</p>
+                                <p className="text-xs text-slate-400 font-mono mt-0.5">{student.admission_number}</p>
+                              </div>
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                max="20" 
-                                value={entry.ca1}
+                            <TableCell className="text-center py-2.5">
+                              <Input type="number" min="0" max="20" value={entry.ca1}
                                 onChange={e => handleScoreChange(student.id, 'ca1', e.target.value)}
-                                className="w-20 text-center mx-auto dark:bg-slate-900 dark:border-slate-700" 
-                                placeholder="0"
-                                disabled={isLocked}
-                              />
+                                className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500"
+                                placeholder="0" disabled={isLocked} />
                             </TableCell>
-                            <TableCell className="text-center">
-                              <Input 
-                                type="number" 
-                                min="0" 
-                                max="20" 
-                                value={entry.ca2}
+                            <TableCell className="text-center py-2.5">
+                              <Input type="number" min="0" max="20" value={entry.ca2}
                                 onChange={e => handleScoreChange(student.id, 'ca2', e.target.value)}
-                                className="w-20 text-center mx-auto dark:bg-slate-900 dark:border-slate-700" 
-                                placeholder="0"
-                                disabled={isLocked}
-                              />
+                                className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500"
+                                placeholder="0" disabled={isLocked} />
                             </TableCell>
-                            <TableCell className="text-center">
-                              {hasExamScore ? (
-                                <span className="font-medium text-emerald-600 dark:text-emerald-400">{parseInt(entry.exam)}</span>
-                              ) : (
-                                !skipExam && selectedExamId && !isLocked ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleAutoFetchSingle(student.id)}
-                                    className="h-7 text-xs dark:hover:bg-slate-800"
-                                  >
-                                    <RefreshCw className="h-3 w-3 mr-1" />
-                                    Load
-                                  </Button>
-                                ) : (
-                                  <Input 
-                                    type="number" 
-                                    min="0" 
-                                    max="60" 
-                                    value={entry.exam}
-                                    onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
-                                    className="w-20 text-center mx-auto dark:bg-slate-900 dark:border-slate-700" 
-                                    placeholder="0"
-                                    disabled={isLocked}
-                                  />
-                                )
-                              )}
-                            </TableCell>
-                            <TableCell className="text-center font-bold text-slate-800 dark:text-slate-200">
-                              {total > 0 ? total : '—'}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {grade && (
-                                <Badge className={getGradeColor(grade)}>
-                                  {grade}
-                                </Badge>
-                              )}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSaveSingle(student.id)}
-                                disabled={saving || isLocked}
-                                className="h-8 px-3 dark:hover:bg-slate-800"
-                              >
-                                {saving ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : isSaved ? (
-                                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                                ) : (
-                                  <Save className="h-4 w-4 text-slate-500" />
-                                )}
-                                <span className="ml-1 text-xs">
-                                  {isLocked ? 'Locked' : isSaved ? 'Saved' : 'Save'}
+                            <TableCell className="text-center py-2.5">
+                              {hasExam ? (
+                                <span className="inline-flex items-center justify-center w-20 h-8 mx-auto font-semibold text-sm text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 rounded-md border border-emerald-200 dark:border-emerald-800">
+                                  {parseInt(entry.exam)}
                                 </span>
+                              ) : !skipExam && selectedExamId && !isLocked ? (
+                                <Button variant="ghost" size="sm" onClick={() => handleAutoFetchSingle(student.id)}
+                                  className="h-8 w-20 mx-auto text-xs text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30">
+                                  <RefreshCw className="h-3 w-3 mr-1" /> Load
+                                </Button>
+                              ) : (
+                                <Input type="number" min="0" max="60" value={entry.exam}
+                                  onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
+                                  className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500"
+                                  placeholder="0" disabled={isLocked} />
+                              )}
+                            </TableCell>
+                            <TableCell className="text-center py-2.5">
+                              <span className={cn('font-bold text-sm', total > 0 ? 'text-slate-800 dark:text-slate-100' : 'text-slate-300 dark:text-slate-600')}>
+                                {total > 0 ? total : '—'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center py-2.5">
+                              {grade
+                                ? <Badge className={cn(getGradeColor(grade), 'font-semibold text-xs')}>{grade}</Badge>
+                                : <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>}
+                            </TableCell>
+                            <TableCell className="text-center pr-5 py-2.5">
+                              <Button variant="ghost" size="sm" onClick={() => handleSaveSingle(student.id)}
+                                disabled={saving || isLocked}
+                                className={cn('h-8 px-3 text-xs gap-1.5 rounded-md transition-colors',
+                                  isSaved
+                                    ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30'
+                                    : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300')}>
+                                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  : isSaved ? <CheckCircle2 className="h-3.5 w-3.5" />
+                                    : <Save className="h-3.5 w-3.5" />}
+                                {isSaved ? 'Saved' : 'Save'}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -1958,161 +972,123 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                     </TableBody>
                   </Table>
                 </div>
-              </div>
+              </Card>
             ))
           )}
         </TabsContent>
 
-        <TabsContent value="view" className="mt-6">
-          <Card className="dark:bg-slate-950 dark:border-slate-800">
-            <CardHeader>
+        {/* ── View Tab ────────────────────────────────────────────────────── */}
+        <TabsContent value="view" className="mt-4">
+          <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
+            <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                <CardTitle className="text-slate-800 dark:text-slate-200">Published Scores</CardTitle>
-                <div className="flex gap-2">
-                  <div className="relative w-full sm:w-72">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                    <Input 
-                      placeholder="Search students..." 
-                      value={searchQuery} 
-                      onChange={e => setSearchQuery(e.target.value)} 
-                      className="pl-9 dark:bg-slate-900 dark:border-slate-700" 
-                    />
+                <div>
+                  <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Published Scores</CardTitle>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
+                    {selectedClass} · {selectedSubject} · {TERM_OPTIONS.find(t => t.value === selectedTerm)?.label}
+                    {isLocked && (
+                      <Badge className="ml-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">
+                        <Lock className="h-3 w-3 mr-1" /> Locked
+                      </Badge>
+                    )}
+                  </p>
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                    <Input placeholder="Search students…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+                      className="pl-8 h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
                   </div>
-                  <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading}>
-                    <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} />
+                  <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading} className="h-9 w-9 p-0">
+                    <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                   </Button>
                 </div>
               </div>
-              <div className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                Showing {caScores.length} score(s) for {selectedClass} - {selectedSubject}
-                {isLocked && (
-                  <Badge className="ml-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
-                    <Lock className="h-3 w-3 mr-1" />
-                    Locked
-                  </Badge>
-                )}
-              </div>
             </CardHeader>
-            <CardContent>
+
+            <CardContent className="p-0">
               {loading ? (
-                <div className="text-center py-12">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-                  <p className="text-slate-500 mt-2">Loading scores...</p>
+                <div className="text-center py-16">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500">Loading scores…</p>
                 </div>
               ) : caScores.length === 0 ? (
-                <div className="text-center py-12">
-                  <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                  <p className="text-slate-500">No scores have been published yet for {selectedSubject} in {selectedClass}.</p>
-                  <p className="text-sm text-slate-400 mt-1">Enter scores in the Score Entry tab and click Save.</p>
-                  <div className="mt-4 flex gap-2 justify-center">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setActiveTab('entry')}
-                      disabled={isLocked}
-                    >
-                      Go to Score Entry
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={loadScoresForViewTab}
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Refresh
-                    </Button>
+                <div className="text-center py-16">
+                  <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
+                    <FileText className="h-10 w-10 text-slate-400" />
                   </div>
+                  <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No scores published yet</p>
+                  <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 mb-5">Enter scores and save them to see them here.</p>
+                  <Button variant="outline" size="sm" onClick={() => setActiveTab('entry')} disabled={isLocked}>
+                    Go to Score Entry <ChevronRight className="h-4 w-4 ml-1" />
+                  </Button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="dark:border-slate-700">
-                        <TableHead className="min-w-[180px] text-slate-700 dark:text-slate-300">Student</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Admission No</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">CA1</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">CA2</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Exam</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Total</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Percentage</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Grade</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Entered By</TableHead>
-                        <TableHead className="text-center text-slate-700 dark:text-slate-300">Actions</TableHead>
+                      <TableRow className="border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/60">
+                        {['Student', 'Adm. No', 'CA1', 'CA2', 'Exam', 'Total', '%', 'Grade', 'By', 'Actions'].map(h => (
+                          <TableHead key={h} className={cn('font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide py-3', h === 'Student' ? 'pl-5 min-w-[180px]' : 'text-center', h === 'Actions' ? 'pr-5' : '')}>
+                            {h}
+                          </TableHead>
+                        ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredScores.map(score => {
+                      {filteredScores.map((score, idx) => {
                         const ca1 = score.ca1_score || 0
                         const ca2 = score.ca2_score || 0
                         const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
                         const total = ca1 + ca2 + examTotal
-                        const percentage = total > 0 ? Math.round((total / 100) * 100) : 0
-                        const grade = getGrade(percentage)
-                        const studentName = score.student?.full_name || getStudentName(score.student_id)
-                        const admissionNumber = score.student?.admission_number || getStudentAdmission(score.student_id)
-                        const isOwnScore = score.teacher_id === staffProfile?.id
-                        
+                        const pct = total > 0 ? Math.round((total / 100) * 100) : 0
+                        const grade = getGrade(pct)
+                        const name = score.student?.full_name || getStudentName(score.student_id)
+                        const adm = score.student?.admission_number || getStudentAdmission(score.student_id)
+                        const isOwn = score.teacher_id === staffProfile?.id
+
                         return (
-                          <TableRow key={score.id} className="dark:border-slate-700">
-                            <TableCell className="font-medium text-slate-800 dark:text-slate-200">
-                              {studentName}
-                              {!isOwnScore && (
-                                <Lock className="h-3 w-3 inline ml-1 text-red-500" />
-                              )}
+                          <TableRow key={score.id}
+                            className={cn(
+                              'border-slate-100 dark:border-slate-800',
+                              idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/20',
+                            )}>
+                            <TableCell className="pl-5 py-3 font-medium text-sm text-slate-800 dark:text-slate-200">
+                              <div className="flex items-center gap-1.5">
+                                {name}
+                                {!isOwn && <Lock className="h-3 w-3 text-red-400 flex-shrink-0" />}
+                              </div>
                             </TableCell>
-                            <TableCell className="text-center font-mono text-xs text-slate-600 dark:text-slate-400">{admissionNumber}</TableCell>
-                            <TableCell className="text-center font-medium text-slate-700 dark:text-slate-300">{ca1 || '—'}</TableCell>
-                            <TableCell className="text-center font-medium text-slate-700 dark:text-slate-300">{ca2 || '—'}</TableCell>
-                            <TableCell className="text-center font-medium text-slate-700 dark:text-slate-300">{examTotal || '—'}</TableCell>
-                            <TableCell className="text-center font-bold text-slate-800 dark:text-slate-200">{total || '—'}</TableCell>
-                            <TableCell className="text-center text-slate-700 dark:text-slate-300">{percentage > 0 ? `${percentage}%` : '—'}</TableCell>
+                            <TableCell className="text-center text-xs font-mono text-slate-500 dark:text-slate-400">{adm}</TableCell>
+                            <TableCell className="text-center text-sm text-slate-700 dark:text-slate-300">{ca1 || '—'}</TableCell>
+                            <TableCell className="text-center text-sm text-slate-700 dark:text-slate-300">{ca2 || '—'}</TableCell>
+                            <TableCell className="text-center text-sm text-slate-700 dark:text-slate-300">{examTotal || '—'}</TableCell>
+                            <TableCell className="text-center font-bold text-sm text-slate-800 dark:text-slate-100">{total || '—'}</TableCell>
+                            <TableCell className="text-center text-sm text-slate-600 dark:text-slate-400">{pct > 0 ? `${pct}%` : '—'}</TableCell>
                             <TableCell className="text-center">
-                              {grade && <Badge className={getGradeColor(grade)}>{grade}</Badge>}
-                            </TableCell>
-                            <TableCell className="text-center">
-                              {score.teacher_id && !isOwnScore ? (
-                                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs">
-                                  <AlertTriangle className="h-3 w-3 mr-1" />
-                                  {score.teacher_name || 'Other Teacher'}
-                                </Badge>
-                              ) : (
-                                <Badge variant="secondary" className="text-xs">
-                                  <CheckCircle2 className="h-3 w-3 mr-1" />
-                                  You
-                                </Badge>
-                              )}
+                              {grade && <Badge className={cn(getGradeColor(grade), 'font-semibold text-xs')}>{grade}</Badge>}
                             </TableCell>
                             <TableCell className="text-center">
-                              <div className="flex justify-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingScore(score)
-                                    setShowEditDialog(true)
-                                  }}
-                                  className="dark:hover:bg-slate-800"
-                                  disabled={!isOwnScore}
-                                >
-                                  <Edit className="h-4 w-4" />
+                              {isOwn
+                                ? <Badge variant="secondary" className="text-xs gap-1"><CheckCircle2 className="h-3 w-3 text-emerald-500" /> You</Badge>
+                                : <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs gap-1"><AlertTriangle className="h-3 w-3" />{score.teacher_name || 'Other'}</Badge>}
+                            </TableCell>
+                            <TableCell className="text-center pr-5">
+                              <div className="flex items-center justify-center gap-1">
+                                <Button variant="ghost" size="sm" disabled={!isOwn}
+                                  onClick={() => { setEditingScore(score); setShowEditDialog(true) }}
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-30">
+                                  <Edit className="h-3.5 w-3.5" />
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
+                                <Button variant="ghost" size="sm" disabled={!isOwn}
                                   onClick={async () => {
                                     if (!confirm('Delete this score?')) return
                                     const { error } = await supabase.from('ca_scores').delete().eq('id', score.id)
-                                    if (error) {
-                                      toast.error('Failed to delete score')
-                                    } else {
-                                      toast.success('Score deleted')
-                                      await checkSubjectsStatus()
-                                      await loadAllData()
-                                      await loadScoresForViewTab()
-                                    }
+                                    if (error) toast.error('Failed to delete')
+                                    else { toast.success('Deleted'); await checkSubjectsStatus(); await loadAllData(); await loadScoresForViewTab() }
                                   }}
-                                  className="text-red-500 hover:text-red-600 dark:hover:bg-slate-800"
-                                  disabled={!isOwnScore}
-                                >
-                                  <Trash2 className="h-4 w-4" />
+                                  className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30">
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
                             </TableCell>
@@ -2127,6 +1103,117 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* ── Delete Confirmation ────────────────────────────────────────────── */}
+      <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
+        <AlertDialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              <AlertDialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">
+                Delete All Score Records?
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3 pl-11">
+                <div className="flex flex-wrap gap-1.5">
+                  {[selectedClass, selectedSubject, TERM_OPTIONS.find(t => t.value === selectedTerm)?.label, selectedYear].map((v, i) => v && (
+                    <Badge key={i} variant="secondary" className="text-xs font-medium">{v}</Badge>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 p-2.5 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800/50">
+                  <Database className="h-4 w-4 text-red-500 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-red-700 dark:text-red-400">
+                    {caScores.length} record{caScores.length !== 1 ? 's' : ''} will be permanently deleted
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">This action cannot be undone.</p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 mt-2">
+            <AlertDialogCancel disabled={isDeletingAll} className="h-9">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAllScores} disabled={isDeletingAll}
+              className="bg-red-600 hover:bg-red-700 text-white h-9 gap-1.5">
+              {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ── Delete Progress ────────────────────────────────────────────────── */}
+      <Dialog open={isDeletingAll && deleteProgress > 0 && deleteProgress < 100} onOpenChange={() => {}}>
+        <DialogContent className="max-w-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
+              <Loader2 className="h-4 w-4 animate-spin text-red-500" /> Deleting scores…
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 pt-1">
+            <Progress value={deleteProgress} className="h-2" />
+            <p className="text-right text-xs text-slate-500">{deleteProgress}%</p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Edit Dialog ────────────────────────────────────────────────────── */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
+          <DialogHeader>
+            <DialogTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Edit Score</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400 text-sm">
+              {getStudentName(editingScore?.student_id)}
+            </DialogDescription>
+          </DialogHeader>
+          {editingScore && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">CA1 /20</Label>
+                  <Input type="number" min="0" max="20" value={editingScore.ca1_score || 0}
+                    onChange={e => setEditingScore({ ...editingScore, ca1_score: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-center text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">CA2 /20</Label>
+                  <Input type="number" min="0" max="20" value={editingScore.ca2_score || 0}
+                    onChange={e => setEditingScore({ ...editingScore, ca2_score: parseInt(e.target.value) || 0 })}
+                    className="h-9 text-center text-sm" />
+                </div>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <span className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">CA Total</span>
+                <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
+                  {(editingScore.ca1_score || 0) + (editingScore.ca2_score || 0)} / 40
+                </span>
+              </div>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" size="sm" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => {
+              if (!editingScore) return
+              const ca1 = editingScore.ca1_score || 0, ca2 = editingScore.ca2_score || 0
+              const total = ca1 + ca2, pct = total > 0 ? Math.round((total / 40) * 100) : 0
+              const grade = getGrade(pct)
+              const { error } = await supabase.from('ca_scores').update({
+                ca1_score: ca1, ca2_score: ca2, total_score: total,
+                percentage: pct, grade, remark: getGradeRemark(grade),
+                status: 'approved', updated_at: new Date().toISOString(),
+              }).eq('id', editingScore.id)
+              if (error) { toast.error('Failed to update'); return }
+              toast.success('Score updated')
+              setShowEditDialog(false)
+              await checkSubjectsStatus(); await loadAllData(); await loadScoresForViewTab()
+            }}>
+              Save Changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
