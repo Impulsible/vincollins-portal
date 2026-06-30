@@ -44,13 +44,11 @@ export const parseDocument = async (file: File): Promise<string> => {
 
 // ── Helper: Detect section header ────────────────────────────────────────────
 const isSectionHeader = (line: string): string | null => {
-  // Match: **SECTION A: COMPRÉHENSION (1–5)** or SECTION A: GRAMMAR or **SECTION C: GRAMMAIRE (36-40)**
   const cleaned = line.replace(/\*/g, '').trim();
   const match = cleaned.match(/^SECTION\s+([A-E])\s*:\s*(.+?)(?:\s*\(\d+[–-]\d+\))?$/i);
   if (match) {
     const sectionLetter = match[1].toUpperCase();
     const sectionTitle = match[2].trim();
-    // Check if there's a range like (36-40) in the original line
     const rangeMatch = line.match(/\((\d+)[–-](\d+)\)/);
     if (rangeMatch) {
       return `SECTION ${sectionLetter}: ${sectionTitle} (${rangeMatch[1]}-${rangeMatch[2]})`;
@@ -78,7 +76,7 @@ export function useQuestionParser(defaultMark: number) {
       const lines = text.split(/\r?\n/);
       let current: Partial<Question> | null = null;
       let currentOptions: string[] = [];
-      let currentSection = '';
+      let pendingSection = '';  // ✅ Section header to add to NEXT question only
       let skipUntilNextSection = false;
 
       const flush = (lineNumber: number) => {
@@ -112,10 +110,13 @@ export function useQuestionParser(defaultMark: number) {
           return;
         }
 
-        // ✅ Prefix with plain section header (no ** markers)
-        const questionText = currentSection 
-          ? `${currentSection}\n${current.question!.trim()}`
+        // ✅ Add pending section header to THIS question, then clear it
+        const questionText = pendingSection 
+          ? `${pendingSection}\n${current.question!.trim()}`
           : current.question!.trim();
+
+        // ✅ Clear section after using it (only first question gets it)
+        pendingSection = '';
 
         items.push({
           id: crypto.randomUUID(),
@@ -138,7 +139,7 @@ export function useQuestionParser(defaultMark: number) {
         const sectionMatch = isSectionHeader(trimmed);
         if (sectionMatch) {
           flush(idx);
-          currentSection = sectionMatch;
+          pendingSection = sectionMatch;  // ✅ Store for next question only
           skipUntilNextSection = false;
           return;
         }
@@ -230,7 +231,7 @@ export function useQuestionParser(defaultMark: number) {
     let contentLines: string[] = [];
     let subQuestions: string[] = [];
     let inSubSection = false;
-    let currentSection = '';
+    let pendingSection = '';  // ✅ Section header for next question only
     let skipUntilNextSection = false;
 
     const finalize = () => {
@@ -241,9 +242,10 @@ export function useQuestionParser(defaultMark: number) {
         questionText = questionText.replace(new RegExp(key, "g"), value);
       });
 
-      // ✅ Prefix with plain section header
-      if (currentSection) {
-        questionText = `${currentSection}\n${questionText}`;
+      // ✅ Add pending section header to THIS question, then clear
+      if (pendingSection) {
+        questionText = `${pendingSection}\n${questionText}`;
+        pendingSection = '';  // ✅ Clear after first question
       }
 
       currentQ.question = questionText;
@@ -277,7 +279,7 @@ export function useQuestionParser(defaultMark: number) {
       const sectionMatch = isSectionHeader(trimmed);
       if (sectionMatch) {
         finalize();
-        currentSection = sectionMatch;
+        pendingSection = sectionMatch;  // ✅ Store for next question only
         skipUntilNextSection = false;
         continue;
       }
