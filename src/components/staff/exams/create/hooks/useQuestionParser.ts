@@ -44,18 +44,26 @@ export const parseDocument = async (file: File): Promise<string> => {
 
 // ── Helper: Detect section header ────────────────────────────────────────────
 const isSectionHeader = (line: string): string | null => {
-  // Match: **SECTION A: COMPRÉHENSION (1–5)** or SECTION A: GRAMMAR
-  const match = line.match(/^\*{0,2}SECTION\s+([A-E])\s*:\s*(.+?)\*{0,2}\s*(?:\(\d+[–-]\d+\))?$/i);
+  // Match: **SECTION A: COMPRÉHENSION (1–5)** or SECTION A: GRAMMAR or **SECTION C: GRAMMAIRE (36-40)**
+  const cleaned = line.replace(/\*/g, '').trim();
+  const match = cleaned.match(/^SECTION\s+([A-E])\s*:\s*(.+?)(?:\s*\(\d+[–-]\d+\))?$/i);
   if (match) {
-    return `SECTION ${match[1].toUpperCase()}: ${match[2].trim()}`;
+    const sectionLetter = match[1].toUpperCase();
+    const sectionTitle = match[2].trim();
+    // Check if there's a range like (36-40) in the original line
+    const rangeMatch = line.match(/\((\d+)[–-](\d+)\)/);
+    if (rangeMatch) {
+      return `SECTION ${sectionLetter}: ${sectionTitle} (${rangeMatch[1]}-${rangeMatch[2]})`;
+    }
+    return `SECTION ${sectionLetter}: ${sectionTitle}`;
   }
   return null;
 };
 
 // ── Helper: Skip passage/comprehension text ──────────────────────────────────
 const isPassageHeader = (line: string): boolean => {
-  const passageKeywords = ['TEXTE', 'PASSAGE', 'COMPRÉHENSION', 'READING', 'COMPREHENSION'];
   const cleaned = line.replace(/\*+/g, '').trim().toUpperCase();
+  const passageKeywords = ['TEXTE', 'PASSAGE', 'COMPRÉHENSION', 'READING', 'COMPREHENSION'];
   return passageKeywords.some(kw => cleaned === kw || cleaned.startsWith(kw));
 };
 
@@ -104,9 +112,9 @@ export function useQuestionParser(defaultMark: number) {
           return;
         }
 
-        // ✅ Prefix with section header if present
+        // ✅ Prefix with plain section header (no ** markers)
         const questionText = currentSection 
-          ? `**${currentSection}**\n${current.question!.trim()}`
+          ? `${currentSection}\n${current.question!.trim()}`
           : current.question!.trim();
 
         items.push({
@@ -144,11 +152,10 @@ export function useQuestionParser(defaultMark: number) {
 
         // ✅ Skip lines while in passage mode
         if (skipUntilNextSection) {
-          // Check if we've reached a section header or question number
           if (isSectionHeader(trimmed) || trimmed.match(/^\d+[\.\)]/)) {
             skipUntilNextSection = false;
           } else {
-            return; // Skip passage content
+            return;
           }
         }
 
@@ -234,9 +241,9 @@ export function useQuestionParser(defaultMark: number) {
         questionText = questionText.replace(new RegExp(key, "g"), value);
       });
 
-      // ✅ Prefix with section header
+      // ✅ Prefix with plain section header
       if (currentSection) {
-        questionText = `**${currentSection}**\n${questionText}`;
+        questionText = `${currentSection}\n${questionText}`;
       }
 
       currentQ.question = questionText;
