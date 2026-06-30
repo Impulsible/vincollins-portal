@@ -1,4 +1,5 @@
 // src/components/staff/exams/create/hooks/useExamSubmit.ts
+
 "use client";
 
 import { useState, useCallback } from "react";
@@ -23,8 +24,9 @@ interface SubmitOptions {
   theoryQuestionsToAnswer: number | null;
   theoryMarksPerQuestion: number;
   scoringRule: ScoringRule;
-  teacherProfile: TeacherProfile | null; // ✅ accepts null
+  teacherProfile: TeacherProfile | null;
   submitForApproval: boolean;
+  passageText?: string | null;
 }
 
 export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
@@ -44,6 +46,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
         scoringRule,
         teacherProfile,
         submitForApproval,
+        passageText,
       } = options;
 
       // ── Validation ─────────────────────────────────────────────────────────
@@ -71,7 +74,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
       let examId: string | null = null;
 
       try {
-        // ── Auth — always use verified session ID ───────────────────────────
+        // ── Auth ───────────────────────────────────────────────────────────
         const {
           data: { user },
           error: userError,
@@ -84,14 +87,13 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
 
         const createdBy = user.id;
 
-        // ── Profile — for display name only, non-blocking ───────────────────
+        // ── Profile ────────────────────────────────────────────────────────
         const { data: prof } = await supabase
           .from("profiles")
           .select("full_name, department")
           .eq("id", createdBy)
           .single();
 
-        // ✅ Safe fallbacks — all TeacherProfile fields are optional
         const teacherName =
           prof?.full_name ??
           teacherProfile?.full_name ??
@@ -102,14 +104,14 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           teacherProfile?.department ??
           "General";
 
-        // ── Calculate theory marks ──────────────────────────────────────────
+        // ── Calculate theory marks ─────────────────────────────────────────
         const theoryTotalMarks = hasTheory
           ? scoringRule !== "standard" && theoryQuestionsToAnswer
             ? theoryQuestionsToAnswer * theoryMarksPerQuestion
             : theoryQuestionsTotal * theoryMarksPerQuestion
           : 0;
 
-        // ── Build exam payload ──────────────────────────────────────────────
+        // ── Build exam payload ─────────────────────────────────────────────
         const examPayload = {
           title: examDetails.title.trim(),
           duration: examDetails.duration,
@@ -134,11 +136,12 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           scoring_rule: scoringRule,
           total_questions: 0,
           total_marks: 0,
+          passage_text: passageText || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
 
-        // ── Insert exam ─────────────────────────────────────────────────────
+        // ── Insert exam ────────────────────────────────────────────────────
         const { data: examResult, error: examError } = await supabase
           .from("exams")
           .insert([examPayload])
@@ -152,7 +155,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
         examId = examResult.id;
         let savedCount = 0;
 
-        // ── Insert objective questions ───────────────────────────────────────
+        // ── Insert objective questions ──────────────────────────────────────
         if (questions.length > 0) {
           const objectiveRows = questions.map((q, i) => ({
             exam_id: examId,
@@ -184,7 +187,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           savedCount += insertedObj?.length ?? 0;
         }
 
-        // ── Insert theory questions ──────────────────────────────────────────
+        // ── Insert theory questions ─────────────────────────────────────────
         if (hasTheory && theoryQuestions.length > 0) {
           const theoryRows = theoryQuestions.map((q, i) => ({
             exam_id: examId,
@@ -216,7 +219,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           savedCount += insertedTheory?.length ?? 0;
         }
 
-        // ── Build JSONB snapshot ─────────────────────────────────────────────
+        // ── Build JSONB snapshot ────────────────────────────────────────────
         const questionsJsonb = [
           ...questions.map((q, i) => ({
             id: q.id,
@@ -247,7 +250,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
             ? theoryQuestions.reduce((s, q) => s + q.marks, 0)
             : 0);
 
-        // ── Update exam snapshot — non-fatal ─────────────────────────────────
+        // ── Update exam snapshot ────────────────────────────────────────────
         const { error: updateError } = await supabase
           .from("exams")
           .update({
@@ -260,7 +263,6 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           .eq("id", examId);
 
         if (updateError) {
-          // Questions are saved — snapshot failure is non-fatal
           console.warn("[useExamSubmit] Snapshot update failed:", updateError.message);
         }
 

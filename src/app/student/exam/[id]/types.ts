@@ -1,6 +1,5 @@
-// app/student/exam/[id]/types.ts - COMPLETE FIXED VERSION
+// app/student/exam/[id]/types.ts
 
-// ✅ Fixed: Changed index signature to accept any type
 export interface ExamResult {
   [x: string]: any
   score: number
@@ -94,6 +93,7 @@ export interface Exam {
   max_attempts?: number
   term?: string
   session_year?: string
+  passage_text?: string
 }
 
 export interface ExamAttempt {
@@ -136,7 +136,7 @@ export interface StudentProfile {
   department: string
   photo_url?: string
   vin_id?: string
-  admission_number?: string  // ✅ ADD THIS LINE
+  admission_number?: string
   subject_count?: number
   role?: string
 }

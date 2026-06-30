@@ -37,13 +37,11 @@ export interface ExamDetails {
   session_year: string
 }
 
-// ✅ All fields optional — matches StaffProfile, AdminProfile, and any
-// other profile shape passed from parent layouts
 export interface TeacherProfile {
   id: string
-  full_name?: string        // ← was: string (required) — now optional
-  department?: string       // ← was: string (required) — now optional
-  email?: string            // ← was: string (required) — now optional
+  full_name?: string
+  department?: string
+  email?: string
   photo_url?: string | null
   avatar_url?: string | null
   role?: string
@@ -67,6 +65,8 @@ export interface DraftData {
   defaultMark: number
   bulkQuestionsText: string
   bulkTheoryText: string
+  passageText: string
+  hasPassage: boolean
   savedAt: string
 }
 
@@ -83,5 +83,5 @@ export interface CreateExamDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
-  teacherProfile: TeacherProfile | null  // ← accepts null too
+  teacherProfile: TeacherProfile | null
 }

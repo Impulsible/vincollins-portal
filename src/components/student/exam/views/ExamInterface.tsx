@@ -3,8 +3,6 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { QuestionNavigation } from '../question/QuestionNavigation'
-import { QuestionPalette } from '../palette/QuestionPalette'
 import { TheoryAnswer } from '../answers/TheoryAnswer'
 import type { Exam, StudentProfile, Question } from '@/app/student/exam/[id]/types'
 import {
@@ -17,6 +15,7 @@ import { formatTime } from '@/app/student/exam/[id]/utils/scoring'
 import Image from 'next/image'
 import { ExamSidebar } from '../sidebar/ExamSidebar'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
+import { QuestionPalette } from '../palette/QuestionPalette'
 import { useState, useEffect } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +42,9 @@ const convertTableToHtml = (tableLines: string[]): string => {
 
   for (const line of tableLines) {
     if (line.includes('---') || line.includes('===')) {
-      isHeader = false; hasSeparator = true; continue
+      isHeader = false
+      hasSeparator = true
+      continue
     }
     if (!line.startsWith('|')) continue
     const cells = line.split('|').filter(c => c.trim() !== '')
@@ -128,9 +129,11 @@ const renderSubQuestions = (subQuestions: any[], level = 0) => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function TheoryQuestionDisplay({
-  question, questionNumber,
+  question,
+  questionNumber,
 }: {
-  question: Question; questionNumber: number
+  question: Question
+  questionNumber: number
 }) {
   const questionText = removeMarksFromText(
     question.question || question.question_text || ''
@@ -139,7 +142,6 @@ function TheoryQuestionDisplay({
 
   return (
     <div className="rounded-2xl border border-purple-200 shadow-sm overflow-hidden bg-white">
-      {/* Card header */}
       <div className="bg-gradient-to-r from-purple-600 to-purple-500 px-5 py-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -157,9 +159,7 @@ function TheoryQuestionDisplay({
         </div>
       </div>
 
-      {/* Question body */}
       <div className="p-5 sm:p-6 space-y-5">
-        {/* Diagram */}
         {question.image_url && (
           <div className="flex flex-col items-center gap-2 p-4 bg-gray-50 rounded-xl border border-gray-200">
             <img
@@ -175,7 +175,6 @@ function TheoryQuestionDisplay({
           </div>
         )}
 
-        {/* Question text */}
         <div className="flex gap-3">
           <div className="flex-shrink-0 w-7 h-7 rounded-full bg-purple-100 text-purple-700 text-sm font-bold flex items-center justify-center">
             {questionNumber}
@@ -185,7 +184,6 @@ function TheoryQuestionDisplay({
           </div>
         </div>
 
-        {/* Sub-questions */}
         {question.sub_questions && question.sub_questions.length > 0 && (
           <div className="pt-3 border-t border-gray-100">
             {renderSubQuestions(question.sub_questions)}
@@ -203,7 +201,11 @@ function TheoryQuestionDisplay({
 const OPTION_LETTERS = ['A', 'B', 'C', 'D', 'E', 'F']
 
 function ObjectiveQuestionCard({
-  question, questionIndex, answer, onAnswer, marks,
+  question,
+  questionIndex,
+  answer,
+  onAnswer,
+  marks,
 }: {
   question: any
   questionIndex: number
@@ -218,7 +220,6 @@ function ObjectiveQuestionCard({
 
   return (
     <div className="rounded-2xl border border-blue-200 shadow-sm overflow-hidden bg-white">
-      {/* Card header */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-500 px-5 py-3.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -236,9 +237,7 @@ function ObjectiveQuestionCard({
         </div>
       </div>
 
-      {/* Question body */}
       <div className="p-5 sm:p-6 space-y-5">
-        {/* Question text */}
         <div className="flex gap-3">
           <div className="flex-shrink-0 w-7 h-7 rounded-full bg-blue-100 text-blue-700 text-sm font-bold flex items-center justify-center">
             {questionIndex + 1}
@@ -250,7 +249,6 @@ function ObjectiveQuestionCard({
           </div>
         </div>
 
-        {/* Options */}
         <div className="space-y-2.5 pl-0 sm:pl-10">
           {options.map((option, idx) => {
             const selected = answer === option
@@ -264,7 +262,6 @@ function ObjectiveQuestionCard({
                     : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/40'
                 )}
               >
-                {/* Custom radio circle */}
                 <div className={cn(
                   'flex-shrink-0 mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors',
                   selected
@@ -306,17 +303,24 @@ function ObjectiveQuestionCard({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function SaveStatus({
-  autoSaving, lastSaved, isOnline,
+  autoSaving,
+  lastSaved,
+  isOnline,
 }: {
-  autoSaving: boolean; lastSaved: Date | null; isOnline: boolean
+  autoSaving: boolean
+  lastSaved: Date | null
+  isOnline: boolean
 }) {
   const [relativeTime, setRelativeTime] = useState('')
 
   useEffect(() => {
     const update = () => {
-      if (!lastSaved) { setRelativeTime(''); return }
+      if (!lastSaved) {
+        setRelativeTime('')
+        return
+      }
       const diff = Math.floor((Date.now() - lastSaved.getTime()) / 1000)
-      if (diff < 5)  setRelativeTime('just now')
+      if (diff < 5) setRelativeTime('just now')
       else if (diff < 60) setRelativeTime(`${diff}s ago`)
       else setRelativeTime(`${Math.floor(diff / 60)}m ago`)
     }
@@ -364,21 +368,21 @@ function SaveStatus({
 // ─────────────────────────────────────────────────────────────────────────────
 
 function TimerPill({ timeLeft }: { timeLeft: number }) {
-  const isWarning = timeLeft < 300   // < 5 min
-  const isDanger  = timeLeft < 60    // < 1 min
+  const isWarning = timeLeft < 300
+  const isDanger = timeLeft < 60
 
   return (
     <div className={cn(
       'flex items-center gap-2 px-3.5 py-2 rounded-xl font-mono font-bold text-sm transition-colors',
-      isDanger  ? 'bg-red-100 text-red-700 animate-pulse' :
+      isDanger ? 'bg-red-100 text-red-700 animate-pulse' :
       isWarning ? 'bg-amber-50 text-amber-700' :
-                  'bg-gray-100 text-gray-700'
+      'bg-gray-100 text-gray-700'
     )}>
       <Clock className={cn(
         'h-4 w-4',
-        isDanger  ? 'text-red-500' :
+        isDanger ? 'text-red-500' :
         isWarning ? 'text-amber-500' :
-                    'text-gray-500'
+        'text-gray-500'
       )} />
       <span className="tabular-nums tracking-wider text-base">
         {formatTime(timeLeft)}
@@ -392,9 +396,13 @@ function TimerPill({ timeLeft }: { timeLeft: number }) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function QuestionCounter({
-  currentIndex, total, answeredCount,
+  currentIndex,
+  total,
+  answeredCount,
 }: {
-  currentIndex: number; total: number; answeredCount: number
+  currentIndex: number
+  total: number
+  answeredCount: number
 }) {
   return (
     <div className="flex items-center gap-1.5 text-xs text-gray-600">
@@ -439,11 +447,28 @@ interface ExamInterfaceProps {
 }
 
 export function ExamInterface({
-  exam, profile, allQuestions, currentIndex, answers, flaggedQuestions,
-  answeredCount, unansweredCount, progressPercentage, timeLeft,
-  tabSwitches, fullscreenExits, isOnline, autoSaving, lastSaved,
-  showQuestionPalette, onUpdateAnswer, onToggleFlag, onNavigate,
-  onGoToQuestion, onTogglePalette, onSubmit,
+  exam,
+  profile,
+  allQuestions,
+  currentIndex,
+  answers,
+  flaggedQuestions,
+  answeredCount,
+  unansweredCount,
+  progressPercentage,
+  timeLeft,
+  tabSwitches,
+  fullscreenExits,
+  isOnline,
+  autoSaving,
+  lastSaved,
+  showQuestionPalette,
+  onUpdateAnswer,
+  onToggleFlag,
+  onNavigate,
+  onGoToQuestion,
+  onTogglePalette,
+  onSubmit,
 }: ExamInterfaceProps) {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
 
@@ -454,7 +479,6 @@ export function ExamInterface({
   const isLast = currentIndex === allQuestions.length - 1
   const isFirst = currentIndex === 0
 
-  // ── Empty state ──
   if (!currentQuestion) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -487,24 +511,23 @@ export function ExamInterface({
       ════════════════════════════════════════════════════════════════════ */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-5 py-2.5">
-
-          {/* Main row */}
           <div className="flex items-center gap-3">
-
-            {/* Mobile sidebar trigger */}
             <Button
-              variant="ghost" size="icon"
+              variant="ghost"
+              size="icon"
               className="lg:hidden h-9 w-9 shrink-0 text-gray-500"
               onClick={() => setMobileSidebarOpen(true)}
             >
               <Menu className="h-5 w-5" />
             </Button>
 
-            {/* Avatar + Exam info */}
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               {profile?.photo_url ? (
                 <Image
-                  src={profile.photo_url} alt="" width={36} height={36}
+                  src={profile.photo_url}
+                  alt=""
+                  width={36}
+                  height={36}
                   className="rounded-full object-cover ring-2 ring-blue-100 shrink-0"
                   unoptimized
                 />
@@ -525,7 +548,6 @@ export function ExamInterface({
               </div>
             </div>
 
-            {/* Centre: question counter */}
             <div className="hidden md:flex shrink-0">
               <QuestionCounter
                 currentIndex={currentIndex}
@@ -534,21 +556,12 @@ export function ExamInterface({
               />
             </div>
 
-            {/* Right cluster */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Save status */}
-              <SaveStatus
-                autoSaving={autoSaving}
-                lastSaved={lastSaved}
-                isOnline={isOnline}
-              />
-
-              {/* Timer */}
+              <SaveStatus autoSaving={autoSaving} lastSaved={lastSaved} isOnline={isOnline} />
               <TimerPill timeLeft={timeLeft} />
-
-              {/* Flag button */}
               <Button
-                variant="ghost" size="sm"
+                variant="ghost"
+                size="sm"
                 onClick={() => onToggleFlag(currentQuestion.id)}
                 className={cn(
                   'h-9 px-2.5 gap-1.5 rounded-lg transition-colors',
@@ -562,8 +575,6 @@ export function ExamInterface({
                   {isFlagged ? 'Flagged' : 'Flag'}
                 </span>
               </Button>
-
-              {/* Submit */}
               <Button
                 size="sm"
                 onClick={onSubmit}
@@ -575,12 +586,8 @@ export function ExamInterface({
             </div>
           </div>
 
-          {/* Progress row */}
           <div className="mt-2.5 flex items-center gap-3">
-            <Progress
-              value={progressPercentage}
-              className="h-1.5 flex-1 bg-gray-100"
-            />
+            <Progress value={progressPercentage} className="h-1.5 flex-1 bg-gray-100" />
             <span className="text-[11px] text-gray-400 tabular-nums shrink-0">
               {answeredCount}/{allQuestions.length} answered
             </span>
@@ -589,15 +596,31 @@ export function ExamInterface({
       </header>
 
       {/* ════════════════════════════════════════════════════════════════════
+          COMPREHENSION PASSAGE
+      ════════════════════════════════════════════════════════════════════ */}
+      {exam?.passage_text && (
+        <div className="max-w-7xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5">
+          <div className="bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 sm:p-5 shadow-sm">
+            <div className="flex items-center gap-2 mb-3">
+              <BookOpen className="h-4 w-4 text-amber-600" />
+              <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+                📖 Read the passage below and answer the questions
+              </span>
+            </div>
+            <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed font-serif text-[15px] whitespace-pre-wrap">
+              {exam.passage_text}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════════
           MAIN CONTENT
       ════════════════════════════════════════════════════════════════════ */}
       <main className="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7">
         <div className="flex flex-col lg:flex-row gap-6">
 
-          {/* ── QUESTION AREA ── */}
           <div className="flex-1 min-w-0 space-y-4">
-
-            {/* Question card */}
             {isTheory ? (
               <TheoryAnswer
                 answer={answers[currentQuestion.id] || ''}
@@ -617,10 +640,7 @@ export function ExamInterface({
               />
             )}
 
-            {/* ── NAVIGATION BAR ── */}
             <div className="flex items-center gap-2.5">
-
-              {/* Previous */}
               <Button
                 variant="outline"
                 onClick={() => onNavigate('prev')}
@@ -631,7 +651,6 @@ export function ExamInterface({
                 <span className="hidden xs:inline">Previous</span>
               </Button>
 
-              {/* Palette toggle */}
               <Button
                 variant="outline"
                 onClick={onTogglePalette}
@@ -647,7 +666,6 @@ export function ExamInterface({
                 <span className="hidden sm:inline text-xs">Palette</span>
               </Button>
 
-              {/* Next / Submit */}
               <Button
                 onClick={() => isLast ? onSubmit() : onNavigate('next')}
                 className={cn(
@@ -665,7 +683,6 @@ export function ExamInterface({
               </Button>
             </div>
 
-            {/* ── QUESTION PALETTE (collapsible) ── */}
             {showQuestionPalette && (
               <div className="rounded-2xl border border-gray-200 bg-white shadow-sm overflow-hidden">
                 <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
@@ -686,7 +703,6 @@ export function ExamInterface({
               </div>
             )}
 
-            {/* ── MOBILE QUESTION COUNTER ── */}
             <div className="flex md:hidden items-center justify-center gap-2 text-xs text-gray-500">
               <BookOpen className="h-3.5 w-3.5" />
               Question {currentIndex + 1} of {allQuestions.length}
@@ -695,7 +711,6 @@ export function ExamInterface({
             </div>
           </div>
 
-          {/* ── SIDEBAR (desktop) ── */}
           <aside className="hidden lg:block lg:w-72 xl:w-80 shrink-0">
             <div className="sticky top-[88px]">
               <ExamSidebar
@@ -714,9 +729,6 @@ export function ExamInterface({
         </div>
       </main>
 
-      {/* ════════════════════════════════════════════════════════════════════
-          MOBILE SIDEBAR SHEET
-      ════════════════════════════════════════════════════════════════════ */}
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
         <SheetContent side="right" className="w-[88vw] max-w-[340px] p-0 bg-white">
           <div className="h-full overflow-y-auto p-4">

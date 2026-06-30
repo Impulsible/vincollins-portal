@@ -1,15 +1,19 @@
 // src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx
+
 "use client";
 
 import { useState, useCallback } from "react";
-import { Plus, CheckCheck, Sparkles } from "lucide-react";
+import { Plus, CheckCheck, Sparkles, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -27,6 +31,10 @@ interface ObjectiveQuestionsStepProps {
   bulkText: string;
   onBulkTextChange: (v: string) => void;
   onParse: (text: string) => ParseResult<Question>;
+  passageText: string;
+  onPassageTextChange: (v: string) => void;
+  hasPassage: boolean;
+  onHasPassageChange: (v: boolean) => void;
 }
 
 export function ObjectiveQuestionsStep({
@@ -37,6 +45,10 @@ export function ObjectiveQuestionsStep({
   bulkText,
   onBulkTextChange,
   onParse,
+  passageText,
+  onPassageTextChange,
+  hasPassage,
+  onHasPassageChange,
 }: ObjectiveQuestionsStepProps) {
   const [mode, setMode] = useState<"bulk" | "manual">("bulk");
   const [parseError, setParseError] = useState<string | null>(null);
@@ -88,7 +100,9 @@ export function ObjectiveQuestionsStep({
           if (result.warnings.length > 0) {
             result.warnings.forEach((w) => toast.warning(w));
           }
-          toast.success(`✅ ${result.items.length} questions imported from file`);
+          toast.success(
+            `✅ ${result.items.length} questions imported from file`
+          );
         } else {
           toast.warning("No questions found in file. Check the format.");
         }
@@ -154,9 +168,65 @@ export function ObjectiveQuestionsStep({
         {/* Stats */}
         <div className="grid grid-cols-3 gap-2">
           <StatCard value={questions.length} label="Questions" color="blue" />
-          <StatCard value={totalMarks.toFixed(1)} label="Marks" color="emerald" />
+          <StatCard
+            value={totalMarks.toFixed(1)}
+            label="Marks"
+            color="emerald"
+          />
           <StatCard value={objectiveMax} label="Max" color="purple" />
         </div>
+
+        {/* Comprehension Passage Toggle */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant={hasPassage ? "default" : "outline"}
+            size="sm"
+            onClick={() => onHasPassageChange(!hasPassage)}
+            className={cn(
+              "text-xs",
+              hasPassage && "bg-amber-500 hover:bg-amber-600 text-white"
+            )}
+          >
+            <BookOpen className="h-3 w-3 mr-1" />
+            {hasPassage ? "📖 Passage Enabled" : "Add Comprehension Passage"}
+          </Button>
+          {hasPassage && (
+            <span className="text-[10px] text-amber-600 hidden sm:inline">
+              Passage will appear above questions during exam
+            </span>
+          )}
+        </div>
+
+        {/* Passage Text Area */}
+        {hasPassage && (
+          <div className="space-y-1.5 p-3 bg-amber-50 rounded-lg border border-amber-200">
+            <Label className="text-[10px] font-semibold text-amber-700 uppercase flex items-center gap-1">
+              <BookOpen className="h-3 w-3" />
+              Comprehension Passage
+            </Label>
+            <Textarea
+              value={passageText}
+              onChange={(e) => onPassageTextChange(e.target.value)}
+              rows={8}
+              className="mt-1 resize-none text-sm sm:text-base leading-relaxed bg-white"
+              placeholder={`Paste the reading passage here...
+
+Example:
+Kofi was a young boy who lived in a small village near the Volta River. 
+He was known for his kindness and bravery. Every morning, he helped 
+the elderly fetch water before going to school.
+
+One day, he found an injured eagle and nursed it back to health. 
+The eagle became his loyal companion, and the villagers called him 
+"The Eagle Boy."
+
+Read the passage above and answer the following questions.`}
+            />
+            <p className="text-[10px] text-amber-600">
+              Students will see this passage during the exam.
+            </p>
+          </div>
+        )}
 
         {/* Mode Switcher */}
         <ModeSwitcher
@@ -183,7 +253,6 @@ export function ObjectiveQuestionsStep({
             onDownloadTemplate={downloadTemplate}
             parseButtonLabel="Parse & Add"
             parseButtonIcon={<CheckCheck className="mr-1.5 h-3.5 w-3.5" />}
-            // ── Increase paste area font size ──
             textareaClassName="text-sm sm:text-base leading-relaxed font-mono"
             textareaRows={14}
           />
@@ -202,7 +271,6 @@ export function ObjectiveQuestionsStep({
                   setManualQ((p) => ({ ...p, question: e.target.value }))
                 }
                 rows={3}
-                // ── Also increase manual question textarea ──
                 className="mt-1 resize-none text-sm sm:text-base leading-relaxed"
                 placeholder="Enter question text..."
               />
@@ -224,7 +292,6 @@ export function ObjectiveQuestionsStep({
                       opts[idx] = e.target.value;
                       setManualQ((p) => ({ ...p, options: opts }));
                     }}
-                    // ── Also increase option inputs ──
                     className="h-9 text-sm sm:text-base"
                     placeholder={`Option ${String.fromCharCode(65 + idx)}`}
                   />
@@ -328,6 +395,7 @@ export function ObjectiveQuestionsStep({
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
+
 function StatCard({
   value,
   label,
@@ -361,7 +429,11 @@ function ModeSwitcher({
   active,
   onChange,
 }: {
-  modes: { id: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  modes: {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[];
   active: string;
   onChange: (id: string) => void;
 }) {

@@ -228,7 +228,7 @@ export default function ViewReportCardPage() {
       try {
         const res = await fetch('/api/generate-comments', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studentName: firstName, averageScore, subjects: subjectsForAPI, className, gender })
+          body: JSON.stringify({ studentName: firstName, averageScore: Math.round(averageScore), subjects: subjectsForAPI, className, gender })
         })
         if (res.ok) {
           const d = await res.json()
@@ -238,8 +238,8 @@ export default function ViewReportCardPage() {
       } catch {
         const best = subjects.reduce((a, b) => a.total > b.total ? a : b, subjects[0])
         const worst = subjects.reduce((a, b) => a.total < b.total ? a : b, subjects[0])
-        newTeacher = getFallbackTeacherComment(firstName, averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
-        newPrincipal = getFallbackPrincipalComment(averageScore, firstName, gender)
+        newTeacher = getFallbackTeacherComment(firstName, Math.round(averageScore), best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
+        newPrincipal = getFallbackPrincipalComment(Math.round(averageScore), firstName, gender)
       }
 
       await supabase.from('report_cards').update({ teacher_comments: newTeacher, principal_comments: newPrincipal }).eq('id', reportCardId)
@@ -322,7 +322,7 @@ export default function ViewReportCardPage() {
         try {
           const res = await fetch('/api/generate-comments', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ studentName: firstName, averageScore: avg, subjects: processed.map(s => ({ name: s.name, score: s.total })), className: sd?.class || '—', gender })
+            body: JSON.stringify({ studentName: firstName, averageScore: Math.round(avg), subjects: processed.map(s => ({ name: s.name, score: s.total })), className: sd?.class || '—', gender })
           })
           if (res.ok) {
             const d = await res.json()
@@ -331,8 +331,8 @@ export default function ViewReportCardPage() {
         } catch {
           const best = processed.reduce((a, b) => a.total > b.total ? a : b, processed[0])
           const worst = processed.reduce((a, b) => a.total < b.total ? a : b, processed[0])
-          setTeacherComment(getFallbackTeacherComment(firstName, avg, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender))
-          setPrincipalComment(getFallbackPrincipalComment(avg, firstName, gender))
+          setTeacherComment(getFallbackTeacherComment(firstName, Math.round(avg), best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender))
+          setPrincipalComment(getFallbackPrincipalComment(Math.round(avg), firstName, gender))
         }
       }
     } catch (e) { console.error(e); toast.error('Failed to load scores') }

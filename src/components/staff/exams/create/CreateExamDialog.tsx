@@ -61,6 +61,10 @@ export function CreateExamDialog({
   const [bulkQuestionsText, setBulkQuestionsText] = useState("");
   const [bulkTheoryText, setBulkTheoryText] = useState("");
 
+  // ── Passage ───────────────────────────────────────────────────────────────
+  const [passageText, setPassageText] = useState("");
+  const [hasPassage, setHasPassage] = useState(false);
+
   // ── Draft UI ──────────────────────────────────────────────────────────────
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
@@ -111,12 +115,27 @@ export function CreateExamDialog({
       defaultMark,
       bulkQuestionsText,
       bulkTheoryText,
+      passageText,
+      hasPassage,
     });
   }, [
-    activeStep, hasTheory, examDetails, questions, theoryQuestions,
-    objectiveMax, theoryMax, theoryQuestionsTotal, theoryQuestionsToAnswer,
-    theoryMarksPerQuestion, scoringRule, defaultMark,
-    bulkQuestionsText, bulkTheoryText, debouncedSave,
+    activeStep,
+    hasTheory,
+    examDetails,
+    questions,
+    theoryQuestions,
+    objectiveMax,
+    theoryMax,
+    theoryQuestionsTotal,
+    theoryQuestionsToAnswer,
+    theoryMarksPerQuestion,
+    scoringRule,
+    defaultMark,
+    bulkQuestionsText,
+    bulkTheoryText,
+    passageText,
+    hasPassage,
+    debouncedSave,
   ]);
 
   // ── Load draft on open ────────────────────────────────────────────────────
@@ -141,6 +160,8 @@ export function CreateExamDialog({
     setDefaultMark(draft.defaultMark ?? 0.5);
     setBulkQuestionsText(draft.bulkQuestionsText ?? "");
     setBulkTheoryText(draft.bulkTheoryText ?? "");
+    setPassageText(draft.passageText ?? "");
+    setHasPassage(draft.hasPassage ?? false);
 
     toast.info("📝 Draft restored", {
       description: `${draft.questions?.length ?? 0} obj + ${draft.theoryQuestions?.length ?? 0} theory`,
@@ -174,6 +195,8 @@ export function CreateExamDialog({
     setTheoryQuestions([]);
     setBulkQuestionsText("");
     setBulkTheoryText("");
+    setPassageText("");
+    setHasPassage(false);
     setDefaultMark(0.5);
     setObjectiveMax(20);
     setTheoryMax(40);
@@ -211,6 +234,7 @@ export function CreateExamDialog({
         scoringRule,
         teacherProfile,
         submitForApproval,
+        passageText: hasPassage ? passageText : null,
       });
       if (success) {
         clearStorage();
@@ -218,9 +242,21 @@ export function CreateExamDialog({
       }
     },
     [
-      submit, examDetails, questions, theoryQuestions, hasTheory,
-      objectiveMax, theoryMax, theoryQuestionsTotal, theoryQuestionsToAnswer,
-      theoryMarksPerQuestion, scoringRule, teacherProfile, clearStorage,
+      submit,
+      examDetails,
+      questions,
+      theoryQuestions,
+      hasTheory,
+      objectiveMax,
+      theoryMax,
+      theoryQuestionsTotal,
+      theoryQuestionsToAnswer,
+      theoryMarksPerQuestion,
+      scoringRule,
+      teacherProfile,
+      clearStorage,
+      passageText,
+      hasPassage,
     ]
   );
 
@@ -264,7 +300,9 @@ export function CreateExamDialog({
                   <span className="text-[10px] text-white font-semibold">
                     {questions.length + theoryQuestions.length}Q
                   </span>
-                  <span className="text-[10px] text-gray-400">• {totalMarks}mk</span>
+                  <span className="text-[10px] text-gray-400">
+                    • {totalMarks}mk
+                  </span>
                 </div>
               )}
               <div className="hidden sm:flex items-center gap-1 bg-white/10 rounded-full px-2 py-0.5">
@@ -274,7 +312,9 @@ export function CreateExamDialog({
                     style={{ width: `${examProgress}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-gray-400">{examProgress}%</span>
+                <span className="text-[10px] text-gray-400">
+                  {examProgress}%
+                </span>
               </div>
               {(examDetails.title || questions.length > 0) && (
                 <button
@@ -342,6 +382,10 @@ export function CreateExamDialog({
               bulkText={bulkQuestionsText}
               onBulkTextChange={setBulkQuestionsText}
               onParse={parseObjective}
+              passageText={passageText}
+              onPassageTextChange={setPassageText}
+              hasPassage={hasPassage}
+              onHasPassageChange={setHasPassage}
             />
           )}
 
