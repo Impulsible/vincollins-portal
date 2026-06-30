@@ -42,6 +42,23 @@ export const parseDocument = async (file: File): Promise<string> => {
   );
 };
 
+// ── Helper: Detect section header ────────────────────────────────────────────
+const isSectionHeader = (line: string): string | null => {
+  // Match: **SECTION A: COMPRÉHENSION (1–5)** or SECTION A: GRAMMAR
+  const match = line.match(/^\*{0,2}SECTION\s+([A-E])\s*:\s*(.+?)\*{0,2}\s*(?:\(\d+[–-]\d+\))?$/i);
+  if (match) {
+    return `SECTION ${match[1].toUpperCase()}: ${match[2].trim()}`;
+  }
+  return null;
+};
+
+// ── Helper: Skip passage/comprehension text ──────────────────────────────────
+const isPassageHeader = (line: string): boolean => {
+  const passageKeywords = ['TEXTE', 'PASSAGE', 'COMPRÉHENSION', 'READING', 'COMPREHENSION'];
+  const cleaned = line.replace(/\*+/g, '').trim().toUpperCase();
+  return passageKeywords.some(kw => cleaned === kw || cleaned.startsWith(kw));
+};
+
 // ── Objective Parser ─────────────────────────────────────────────────────────
 export function useQuestionParser(defaultMark: number) {
   const parseObjective = useCallback(
@@ -53,6 +70,8 @@ export function useQuestionParser(defaultMark: number) {
       const lines = text.split(/\r?\n/);
       let current: Partial<Question> | null = null;
       let currentOptions: string[] = [];
+      let currentSection = '';
+      let skipUntilNextSection = false;
 
       const flush = (lineNumber: number) => {
         if (!current) return;
@@ -62,6 +81,8 @@ export function useQuestionParser(defaultMark: number) {
 
         if (!hasQuestion) {
           skipped++;
+          current = null;
+          currentOptions = [];
           return;
         }
         if (!hasOptions) {
@@ -69,6 +90,8 @@ export function useQuestionParser(defaultMark: number) {
             `Q${items.length + 1} (line ~${lineNumber}): No options found — skipped`
           );
           skipped++;
+          current = null;
+          currentOptions = [];
           return;
         }
         if (!hasAnswer) {
@@ -76,13 +99,20 @@ export function useQuestionParser(defaultMark: number) {
             `Q${items.length + 1} (line ~${lineNumber}): No answer found — skipped`
           );
           skipped++;
+          current = null;
+          currentOptions = [];
           return;
         }
+
+        // ✅ Prefix with section header if present
+        const questionText = currentSection 
+          ? `**${currentSection}**\n${current.question!.trim()}`
+          : current.question!.trim();
 
         items.push({
           id: crypto.randomUUID(),
           type: "mcq",
-          question: current.question!.trim(),
+          question: questionText,
           options: currentOptions.filter((o) => o.trim()),
           correct_answer: current.correct_answer!,
           marks: current.marks ?? defaultMark,
@@ -95,6 +125,32 @@ export function useQuestionParser(defaultMark: number) {
       lines.forEach((line, idx) => {
         const trimmed = line.trim();
         if (!trimmed) return;
+
+        // ✅ Check for section header
+        const sectionMatch = isSectionHeader(trimmed);
+        if (sectionMatch) {
+          flush(idx);
+          currentSection = sectionMatch;
+          skipUntilNextSection = false;
+          return;
+        }
+
+        // ✅ Skip passage/comprehension content
+        if (isPassageHeader(trimmed)) {
+          skipUntilNextSection = true;
+          flush(idx);
+          return;
+        }
+
+        // ✅ Skip lines while in passage mode
+        if (skipUntilNextSection) {
+          // Check if we've reached a section header or question number
+          if (isSectionHeader(trimmed) || trimmed.match(/^\d+[\.\)]/)) {
+            skipUntilNextSection = false;
+          } else {
+            return; // Skip passage content
+          }
+        }
 
         // New question: starts with number
         const questionMatch = trimmed.match(/^(\d+)[\.\)]\s+(.+)/);
@@ -167,6 +223,8 @@ export function useQuestionParser(defaultMark: number) {
     let contentLines: string[] = [];
     let subQuestions: string[] = [];
     let inSubSection = false;
+    let currentSection = '';
+    let skipUntilNextSection = false;
 
     const finalize = () => {
       if (!currentQ || !contentLines.length) return;
@@ -175,6 +233,11 @@ export function useQuestionParser(defaultMark: number) {
       tableMap.forEach((value, key) => {
         questionText = questionText.replace(new RegExp(key, "g"), value);
       });
+
+      // ✅ Prefix with section header
+      if (currentSection) {
+        questionText = `**${currentSection}**\n${questionText}`;
+      }
 
       currentQ.question = questionText;
 
@@ -202,6 +265,30 @@ export function useQuestionParser(defaultMark: number) {
 
     for (const line of lines) {
       const trimmed = line.trim();
+
+      // ✅ Section header
+      const sectionMatch = isSectionHeader(trimmed);
+      if (sectionMatch) {
+        finalize();
+        currentSection = sectionMatch;
+        skipUntilNextSection = false;
+        continue;
+      }
+
+      // ✅ Skip passage content
+      if (isPassageHeader(trimmed)) {
+        skipUntilNextSection = true;
+        finalize();
+        continue;
+      }
+
+      if (skipUntilNextSection) {
+        if (isSectionHeader(trimmed) || trimmed.match(/^\d+[\.\)]/)) {
+          skipUntilNextSection = false;
+        } else {
+          continue;
+        }
+      }
 
       // New numbered question
       const questionMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
