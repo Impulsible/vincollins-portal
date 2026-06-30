@@ -3,7 +3,7 @@
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from "react";
-import { Clock, Eye, ChevronLeft, ChevronRight, Table, BarChart3, Image as ImageIcon } from "lucide-react";
+import { Clock, Eye, ChevronLeft, ChevronRight, Table, BarChart3, Image as ImageIcon, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -275,6 +275,22 @@ export function PreviewStep({
           <p className="text-[10px] font-semibold text-gray-600 uppercase mb-2">
             Student View Preview
           </p>
+
+          {/* ✅ Passage Preview */}
+          {(examDetails as any).passage_text && (
+            <div className="mb-3 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 sm:p-4 shadow-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <BookOpen className="h-4 w-4 text-amber-600" />
+                <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+                  📖 Read the passage below and answer the questions
+                </span>
+              </div>
+              <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed font-serif text-[13px] whitespace-pre-wrap">
+                {(examDetails as any).passage_text}
+              </div>
+            </div>
+          )}
+
           <CBTPreview
             examDetails={examDetails}
             questions={questions}
@@ -370,8 +386,6 @@ function CBTPreview({
   const hasTableContent = hasTable(current?.question || '');
   const hasChartContent = hasChart(current?.question || '');
   const hasImageContent = hasImage(current?.question || '');
-  const hasSubTable = current?._type === "theory" && 
-    current.sub_questions?.some(sq => hasTable(sq.text || ''));
 
   return (
     <div className="rounded-xl overflow-hidden border shadow-md bg-gray-50">
