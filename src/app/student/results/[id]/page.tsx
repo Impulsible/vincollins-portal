@@ -1,4 +1,4 @@
-// app/student/results/[id]/page.tsx - FIXED CALCULATION
+// app/student/results/[id]/page.tsx - FINAL FIXED VERSION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -158,27 +158,33 @@ export default function StudentResultDetailPage() {
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
       const hasCA = ca1 !== null && ca2 !== null
 
-      // ✅ FIXED: Calculate percentage and grade
+      // ✅ Calculate percentage and grade
       let percentage: number
       let grandTotal: number
-      let displayTotalMarks: number
 
       if (hasCA && ca) {
-        // Use saved CA scores - they already have the correct combined calculation
+        // Use saved CA scores - already have correct combined calculation
         percentage = ca.percentage || 0
         grandTotal = ca.total_score || 0
-        displayTotalMarks = 100
       } else {
-        // ✅ No CA - use exam attempt values directly from database
-        percentage = att.percentage || 0
-        grandTotal = att.total_score || (Number(att.objective_score) || 0) + (theoryScore || 0)
-        displayTotalMarks = att.total_marks || 20
+        // No CA - calculate from exam attempt
+        const ca1Value = ca1 || 0
+        const ca2Value = ca2 || 0
+        const objectiveScore = Number(att.objective_score) || 0
+        const theoryScoreValue = theoryScore || 0
+        grandTotal = ca1Value + ca2Value + objectiveScore + theoryScoreValue
+        
+        // Calculate percentage based on what was attempted
+        const objTotal = att.objective_total || 20
+        const thTotal = (theoryScoreValue > 0 || att.status === 'pending_theory') ? (att.theory_total || 40) : 0
+        const caTotalMarks = (ca1Value > 0 || ca2Value > 0) ? 40 : 0
+        const totalPossible = caTotalMarks + objTotal + thTotal
+        
+        percentage = totalPossible > 0 ? Math.round((grandTotal / totalPossible) * 100) : 0
       }
 
-      // ✅ ALWAYS calculate WAEC grade from percentage
+      // ✅ WAEC grade from percentage
       const finalGrade = getGradeConfig(percentage).grade
-      
-      // WAEC pass = not F9 (40%+)
       const isPassed = finalGrade !== 'F9'
 
       setResult({
@@ -190,7 +196,7 @@ export default function StudentResultDetailPage() {
         status: att.status,
         percentage: percentage,
         total_score: grandTotal,
-        total_marks: displayTotalMarks,
+        total_marks: 100, // Always out of 100
         objective_score: Math.round(Number(att.objective_score) || 0),
         objective_total: att.objective_total || 20,
         theory_score: theoryScore,
@@ -328,7 +334,7 @@ export default function StudentResultDetailPage() {
                         {result.percentage}%
                       </div>
                       <div className={cn("text-sm mt-1", result.is_passed ? "text-emerald-300" : "text-red-300")}>
-                        {result.total_score}/{result.total_marks} pts
+                        {result.total_score}/100 pts
                       </div>
                     </div>
                   </div>
@@ -339,7 +345,7 @@ export default function StudentResultDetailPage() {
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-800">{result.total_score}</p>
                     <p className="text-xs text-slate-500 mt-1">Total Score</p>
-                    <p className="text-[10px] text-slate-400">out of {result.total_marks} marks</p>
+                    <p className="text-[10px] text-slate-400">out of 100 marks</p>
                   </div>
                   <div className="text-center">
                     <p className="text-2xl font-bold text-slate-800">{result.correct_count}</p>
@@ -449,7 +455,7 @@ export default function StudentResultDetailPage() {
                   <div className="flex justify-between text-base font-bold">
                     <span className="text-slate-800">Grand Total</span>
                     <div className="text-right">
-                      <span className="text-slate-800">{result.total_score}/{result.total_marks}</span>
+                      <span className="text-slate-800">{result.total_score}/100</span>
                       {theoryPending && (
                         <p className="text-[10px] text-amber-600 font-normal">*Score may increase after theory grading</p>
                       )}
