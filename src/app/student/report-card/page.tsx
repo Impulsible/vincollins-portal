@@ -15,6 +15,56 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
+// ── Subject name mapping ──────────────────────────────────────────────────────
+const SUBJECT_NAME_MAP: Record<string, string> = {
+  'Physical Education': 'PHE',
+  'PHE': 'PHE',
+  'English': 'English Language',
+  'Eng': 'English Language',
+  'Math': 'Mathematics',
+  'Maths': 'Mathematics',
+  'Agric': 'Agricultural Science',
+  'Agriculture': 'Agricultural Science',
+  'Bio': 'Biology',
+  'Chem': 'Chemistry',
+  'Phy': 'Physics',
+  'Further Maths': 'Further Mathematics',
+  'F. Maths': 'Further Mathematics',
+  'ICT': 'Information Technology',
+  'Comp Sci': 'Information Technology',
+  'Computer Science': 'Information Technology',
+  'CRK': 'CRS',
+  'Christian Religious Knowledge': 'CRS',
+  'Civic': 'Civic Education',
+  'Govt': 'Government',
+  'Lit': 'Literature in English',
+  'Literature': 'Literature in English',
+  'Acc': 'Financial Accounting',
+  'Accounting': 'Financial Accounting',
+  'Bus Stud': 'Business Studies',
+  'Business': 'Business Studies',
+  'H. Econ': 'Home Economics',
+  'Home Econ': 'Home Economics',
+  'Data Proc': 'Data Processing',
+  'Data': 'Data Processing',
+  'Social': 'Social Studies',
+  'Soc Stud': 'Social Studies',
+  'Basic Tech': 'Basic Technology',
+  'Tech': 'Basic Technology',
+  'CCA': 'Creative Arts',
+  'Creative Art': 'Creative Arts',
+  'Art': 'Creative Arts',
+  'Music': 'Music',
+  'Yor': 'Yoruba',
+  'French': 'French',
+  'Security': 'Security Education',
+  'Sec Ed': 'Security Education',
+}
+
+const normalizeSubjectName = (name: string): string => {
+  return SUBJECT_NAME_MAP[name] || name
+}
+
 // ── Subject ordering ──────────────────────────────────────────────────────────
 const SUBJECT_ORDER: Record<string, number> = {
   'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
@@ -25,7 +75,7 @@ const SUBJECT_ORDER: Record<string, number> = {
   'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
   'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
   'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
-  'PHE': 27, 'Physical Education': 27, 'Security Education': 28,
+  'PHE': 27, 'Security Education': 28,
 }
 
 const sortSubjectsByOrder = (subjects: any[]) =>
@@ -274,25 +324,34 @@ export default function StudentReportCardPage() {
 
       if (!scores || scores.length === 0) { setHasReport(false); return }
 
+      // Process scores with subject name normalization and deduplication
       let processed: SubjectScore[] = scores.map((s: any) => {
         const ca = (s.ca1_score || 0) + (s.ca2_score || 0)
         const exam = (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
         const total = ca + exam
         const grade = getSubjectGrade(total)
+        // Normalize subject name
+        const normalizedSubject = normalizeSubjectName(s.subject)
         return {
-          subject: s.subject, ca,
+          subject: normalizedSubject,
+          ca,
           exam_obj: s.exam_objective_score || 0,
           exam_theory: s.exam_theory_score || 0,
-          total, grade, remark: getSubjectGradeRemark(grade),
+          total,
+          grade,
+          remark: getSubjectGradeRemark(grade),
         }
       })
 
-      const map = new Map<string, SubjectScore>()
+      // Deduplicate subjects - keep the one with highest total score
+      const subjectMap = new Map<string, SubjectScore>()
       processed.forEach(s => {
-        const e = map.get(s.subject)
-        if (!e || s.total > e.total) map.set(s.subject, s)
+        const existing = subjectMap.get(s.subject)
+        if (!existing || s.total > existing.total) {
+          subjectMap.set(s.subject, s)
+        }
       })
-      processed = sortSubjectsByOrder(Array.from(map.values()))
+      processed = sortSubjectsByOrder(Array.from(subjectMap.values()))
 
       setSubjects(processed)
       setHasReport(true)

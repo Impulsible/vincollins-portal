@@ -28,6 +28,39 @@ import html2canvas from 'html2canvas'
 import jsPDF from 'jspdf'
 
 // ============================================
+// SUBJECT NAME NORMALIZATION
+// ============================================
+const SUBJECT_NAME_MAP: Record<string, string> = {
+  'Physical Education': 'PHE',
+  'P.H.E.': 'PHE',
+  'P H E': 'PHE',
+  'Physical and Health Education': 'PHE',
+  'Security Edu': 'Security Education',
+  'Computer Studies': 'Information Technology',
+  'ICT': 'Information Technology',
+  'C.R.S.': 'CRS',
+  'C.R.K': 'CRS',
+  'Christian Religious Studies': 'CRS',
+  'Christian Religious Knowledge': 'CRS',
+  'C.C.A.': 'CCA',
+  'Cultural and Creative Arts': 'CCA',
+  'Agric Science': 'Agricultural Science',
+  'Basic Sci': 'Basic Science',
+  'Basic Tech': 'Basic Technology',
+  'Bus Studies': 'Business Studies',
+  'Civic Edu': 'Civic Education',
+  'Social Std': 'Social Studies',
+  'Home Econ': 'Home Economics',
+  'Further Maths': 'Further Mathematics',
+  'Lit in English': 'Literature in English',
+  'English': 'English Studies',
+}
+
+const normalizeSubjectName = (name: string): string => {
+  return SUBJECT_NAME_MAP[name] || name
+}
+
+// ============================================
 // SUBJECT ORDERING
 // ============================================
 const SUBJECT_ORDER: Record<string, number> = {
@@ -44,7 +77,24 @@ const SUBJECT_ORDER: Record<string, number> = {
 
 const sortSubjectsByOrder = (subjects: any[]) => {
   if (!subjects || subjects.length === 0) return []
-  return [...subjects].sort((a, b) =>
+  
+  // Normalize and deduplicate subjects
+  const normalizedMap = new Map<string, any>()
+  
+  subjects.forEach((s: any) => {
+    const name = normalizeSubjectName(s.name || s.subject || '')
+    if (normalizedMap.has(name)) {
+      const existing = normalizedMap.get(name)!
+      // Keep the entry with higher total score
+      if ((s.total || 0) > (existing.total || 0)) {
+        normalizedMap.set(name, { ...s, name })
+      }
+    } else {
+      normalizedMap.set(name, { ...s, name })
+    }
+  })
+  
+  return Array.from(normalizedMap.values()).sort((a, b) =>
     (SUBJECT_ORDER[a.name] || 999) - (SUBJECT_ORDER[b.name] || 999)
   )
 }
@@ -220,7 +270,6 @@ export default function StaffReportCardsPage() {
           .single()
         if (data) {
           setStaffProfile(data)
-          // Pre-select staff's assigned class if set
           if (data.assigned_class) setSelectedClass(data.assigned_class)
         }
       }
@@ -235,7 +284,6 @@ export default function StaffReportCardsPage() {
       if (school) {
         setSchoolSettings({
           name: school.school_name || DEFAULT_SCHOOL.name,
-          // ── FIX: correct column name ──
           address: school.school_address || school.address || DEFAULT_SCHOOL.address,
           phone: school.school_phone || DEFAULT_SCHOOL.phone,
           email: school.school_email || DEFAULT_SCHOOL.email,
@@ -272,13 +320,11 @@ export default function StaffReportCardsPage() {
           event: 'UPDATE',
           schema: 'public',
           table: 'report_cards',
-          // Only care about cards becoming published
         },
         (payload) => {
           if (payload.new?.status === 'published' && payload.old?.status !== 'published') {
             const studentName = payload.new?.student_name || payload.new?.student_display_name || 'A student'
             setNewPublishAlert(`📄 ${studentName}'s report card has been published!`)
-            // Auto-reload after short delay
             setTimeout(() => loadReportCards(), 1000)
           }
         }
@@ -321,8 +367,6 @@ export default function StaffReportCardsPage() {
   }
 
   // ── CORE LOAD FUNCTION ──
-  // ✅ ENFORCES publish gate: only fetches status='published'
-  // Staff can only see published report cards — not generated/approved ones
   const loadReportCards = useCallback(async () => {
     setLoading(true)
     try {
@@ -331,13 +375,9 @@ export default function StaffReportCardsPage() {
         .select('*')
         .eq('term', selectedTerm)
         .eq('academic_year', selectedYear)
-        // ── THE PUBLISH GATE ──
-        // Staff can ONLY see published report cards
-        // generated / approved cards are invisible here
         .eq('status', 'published')
         .order('class', { ascending: true })
 
-      // Filter by class if not 'all'
       if (selectedClass !== 'all') {
         query = query.eq('class', selectedClass)
       }
@@ -352,7 +392,6 @@ export default function StaffReportCardsPage() {
         return
       }
 
-      // Enrich with student profile data
       const studentIds = [...new Set(data.map((rc: any) => rc.student_id))]
       const { data: profiles } = await supabase
         .from('profiles')
@@ -374,6 +413,24 @@ export default function StaffReportCardsPage() {
         const overallGrade = getOverallGrade(avgScore)
         const { behaviorRatings, skillRatings } = generateRatings(avgScore)
 
+        // Normalize and deduplicate subjects
+        const rawSubjects = rc.subjects_data || []
+        const normalizedSubjectsMap = new Map<string, any>()
+        
+        rawSubjects.forEach((s: any) => {
+          const name = normalizeSubjectName(s.name || s.subject || '')
+          if (normalizedSubjectsMap.has(name)) {
+            const existing = normalizedSubjectsMap.get(name)!
+            if ((s.total || 0) > (existing.total || 0)) {
+              normalizedSubjectsMap.set(name, { ...s, name })
+            }
+          } else {
+            normalizedSubjectsMap.set(name, { ...s, name })
+          }
+        })
+        
+        const dedupedSubjects = Array.from(normalizedSubjectsMap.values())
+
         return {
           id: rc.id,
           student_id: rc.student_id,
@@ -383,7 +440,7 @@ export default function StaffReportCardsPage() {
           class: rc.class,
           term: rc.term,
           academic_year: rc.academic_year,
-          subjects_data: rc.subjects_data || [],
+          subjects_data: dedupedSubjects,
           average_score: avgScore,
           total_score: rc.total_score || 0,
           grade: rc.grade || getWAECGrade(avgScore),
@@ -393,7 +450,6 @@ export default function StaffReportCardsPage() {
           status: rc.status,
           generated_at: rc.generated_at,
           published_at: rc.published_at || null,
-          // ── Use next_term_begins from report card OR fall back to system_settings ──
           next_term_begins: rc.next_term_begins || nextTermDate || null,
           behavior_ratings: behaviorRatings,
           skill_ratings: skillRatings,
@@ -402,7 +458,6 @@ export default function StaffReportCardsPage() {
 
       setReportCards(cards)
 
-      // Build per-class stats
       const statsMap = new Map<string, ClassStats>()
       cards.forEach(card => {
         const existing = statsMap.get(card.class)
@@ -562,7 +617,6 @@ export default function StaffReportCardsPage() {
           <p className="text-sm text-slate-500 mt-1">
             View published report cards • {getTermLabel(selectedTerm)} {selectedYear}
           </p>
-          {/* ── Publish gate reminder ── */}
           <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
             <Lock className="h-3 w-3" />
             Only report cards released by the admin are shown here
@@ -958,7 +1012,7 @@ export default function StaffReportCardsPage() {
                           </thead>
                           <tbody>
                             {sortSubjectsByOrder(selectedCard.subjects_data || []).map((subject, idx) => (
-                              <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <tr key={`${subject.name}-${idx}`} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                                 <td className="border border-gray-400 px-2 py-1 font-medium print:px-1.5 print:py-0.5 truncate" title={subject.name}>
                                   {subject.name}
                                 </td>
@@ -1077,8 +1131,8 @@ export default function StaffReportCardsPage() {
                                   <TrendingUp className="h-3 w-3 print:h-2 print:w-2" /> Best:
                                 </span>
                                 <span className="font-bold text-right break-words max-w-[130px]">
-                                  {selectedCard.subjects_data.reduce((a, b) => a.total > b.total ? a : b).name}
-                                  {' '}({selectedCard.subjects_data.reduce((a, b) => a.total > b.total ? a : b).total})
+                                  {selectedCard.subjects_data.reduce((a, b) => (a.total || 0) > (b.total || 0) ? a : b).name}
+                                  {' '}({selectedCard.subjects_data.reduce((a, b) => (a.total || 0) > (b.total || 0) ? a : b).total})
                                 </span>
                               </div>
                               <div className="flex justify-between text-red-600 flex-wrap">
@@ -1086,7 +1140,7 @@ export default function StaffReportCardsPage() {
                                   <TrendingDown className="h-3 w-3 print:h-2 print:w-2" /> Improve:
                                 </span>
                                 <span className="font-bold text-right break-words max-w-[130px]">
-                                  {selectedCard.subjects_data.reduce((a, b) => a.total < b.total ? a : b).name}
+                                  {selectedCard.subjects_data.reduce((a, b) => (a.total || 0) < (b.total || 0) ? a : b).name}
                                 </span>
                               </div>
                             </>

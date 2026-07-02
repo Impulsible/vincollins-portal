@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/PreviewTab.tsx - UPDATED with better preview
+// src/components/staff/exams/edit/PreviewTab.tsx - WITH PASSAGE SUPPORT
 
 'use client'
 
@@ -15,13 +15,15 @@ interface PreviewTabProps {
   questions: Question[]
   theoryQuestions: TheoryQuestion[]
   hasTheory: boolean
+  passageText?: string  // ✅ ADD THIS
 }
 
 export function PreviewTab({
   examDetails,
   questions,
   theoryQuestions,
-  hasTheory
+  hasTheory,
+  passageText,  // ✅ ADD THIS
 }: PreviewTabProps) {
   const [showAllQuestions, setShowAllQuestions] = useState(false)
   
@@ -38,6 +40,23 @@ export function PreviewTab({
 
   return (
     <div className="space-y-4">
+      {/* ✅ Passage Preview */}
+      {passageText && (
+        <Card className="border-2 border-amber-200 bg-amber-50">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <BookOpen className="h-4 w-4 text-amber-600" />
+              <span className="text-xs font-semibold text-amber-700 uppercase tracking-wider">
+                📖 Read the passage below and answer the questions
+              </span>
+            </div>
+            <div className="text-sm text-gray-800 leading-relaxed font-serif whitespace-pre-wrap">
+              {passageText}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Exam Summary Card */}
       <Card>
         <CardContent className="p-6">

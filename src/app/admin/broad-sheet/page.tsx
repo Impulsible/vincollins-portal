@@ -31,8 +31,7 @@ const SUBJECT_ORDER: Record<string, number> = {
   'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
   'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
   'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
-  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
-  'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
+  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
   'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
   'PHE': 27, 'Security Education': 28,
 }
@@ -59,7 +58,7 @@ const JSS_SUBJECTS = [
   'French', 'Yoruba', 'CCA', 'Music', 'Security Education',
 ]
 const SS_SUBJECTS_SCIENCE = ['English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics', 'Further Mathematics', 'Agricultural Science', 'Data Processing', 'Civic Education', 'Economics']
-const SS_SUBJECTS_ARTS = ['English Language', 'Mathematics', 'Literature in English', 'Government', 'CRS', 'Economics', 'Information Technology', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology']
+const SS_SUBJECTS_ARTS = ['English Language', 'Mathematics', 'Literature in English', 'Government', 'CRS', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology']
 const SS_SUBJECTS_COMMERCIAL = ['English Language', 'Mathematics', 'Economics', 'Commerce', 'Financial Accounting', 'Government', 'Civic Education', 'Data Processing', 'Geography', 'Literature in English']
 
 const getSubjectsForStudent = (cls: string, dept?: string | null) => {

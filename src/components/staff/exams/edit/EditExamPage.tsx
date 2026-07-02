@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/EditExamPage.tsx
+// src/components/staff/exams/edit/EditExamPage.tsx - WITH PASSAGE SUPPORT
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -13,6 +13,9 @@ import {
   CheckCircle2, AlertTriangle, FileText, LayoutList,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -32,9 +35,7 @@ import type { Exam, Question, TheoryQuestion, ExamDetailsForm } from "./types";
 const CURRENT_TERM = "third";
 const CURRENT_SESSION = "2025/2026";
 const TERM_NAMES: Record<string, string> = {
-  first: "First Term",
-  second: "Second Term",
-  third: "Third Term",
+  first: "First Term", second: "Second Term", third: "Third Term",
 };
 
 const CLASSES = [
@@ -67,7 +68,6 @@ interface EditExamPageProps {
   examId: string;
 }
 
-// ── Mini stat tile used inside the summary card ────────────────────────────
 function StatTile({
   value, label, accent,
 }: { value: string | number; label: string; accent: string }) {
@@ -92,6 +92,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
+
+  // ✅ Passage state
+  const [passageText, setPassageText] = useState("");
+  const [hasPassage, setHasPassage] = useState(false);
 
   const [objectivePointsPerQuestion, setObjectivePointsPerQuestion] = useState(1);
   const [theoryPointsPerQuestion, setTheoryPointsPerQuestion] = useState(5);
@@ -181,6 +185,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         shuffle_options: merged.shuffle_options, term: examData.term || CURRENT_TERM,
         session_year: examData.session_year || CURRENT_SESSION, target_audience: examData.target_audience || "all",
       });
+      // ✅ Load passage
+      setPassageText(examData.passage_text || "");
+      setHasPassage(!!examData.passage_text);
+      
       await loadQuestions(true);
       initialLoadDoneRef.current = true;
     } catch {
@@ -223,7 +231,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         shuffle_questions: examDetails.shuffle_questions, shuffle_options: examDetails.shuffle_options,
         has_theory: hasTheory, term: examDetails.term, session_year: examDetails.session_year,
         target_audience: examDetails.target_audience, total_questions: totalQuestions,
-        total_marks: totalExamPoints, total_points: totalExamPoints, updated_at: new Date().toISOString(),
+        total_marks: totalExamPoints, total_points: totalExamPoints,
+        // ✅ Save passage
+        passage_text: hasPassage ? passageText : null,
+        updated_at: new Date().toISOString(),
       };
       const { error } = await supabase.from("exams").update(payload).eq("id", examId);
       if (error) {
@@ -232,7 +243,9 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           duration: payload.duration, pass_mark: payload.pass_mark,
           description: payload.instructions, instructions: payload.instructions,
           has_theory: hasTheory, term: payload.term, session_year: payload.session_year,
-          total_questions: totalQuestions, total_marks: totalExamPoints, updated_at: payload.updated_at,
+          total_questions: totalQuestions, total_marks: totalExamPoints,
+          passage_text: hasPassage ? passageText : null,
+          updated_at: payload.updated_at,
         };
         const { error: e2 } = await supabase.from("exams").update(safe).eq("id", examId);
         if (e2) throw e2;
@@ -400,6 +413,40 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     </Card>
   );
 
+  // ── Passage editor ─────────────────────────────────────────────────────────
+  const PassageEditor = () => (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <Button
+          variant={hasPassage ? "default" : "outline"}
+          size="sm"
+          onClick={() => setHasPassage(!hasPassage)}
+          className={cn("text-xs", hasPassage && "bg-amber-500 hover:bg-amber-600 text-white")}
+        >
+          <BookOpen className="h-3 w-3 mr-1" />
+          {hasPassage ? "📖 Passage Enabled" : "Add Comprehension Passage"}
+        </Button>
+        {hasPassage && (
+          <span className="text-[10px] text-amber-600 hidden sm:inline">
+            Students will see this during the exam
+          </span>
+        )}
+      </div>
+      {hasPassage && (
+        <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
+          <Label className="text-[10px] font-semibold text-amber-700 uppercase">Comprehension Passage</Label>
+          <Textarea
+            value={passageText}
+            onChange={(e) => setPassageText(e.target.value)}
+            rows={6}
+            className="mt-1 resize-none text-sm bg-white"
+            placeholder="Paste the reading passage here..."
+          />
+        </div>
+      )}
+    </div>
+  );
+
   // ── Question card ─────────────────────────────────────────────────────────
   const QuestionCard = ({
     question, index, type, onEdit, onDelete,
@@ -421,13 +468,11 @@ export function EditExamPage({ examId }: EditExamPageProps) {
     return (
       <div className={cn("rounded-xl border p-4 transition-all hover:shadow-sm group", statusConfig.classes)}>
         <div className="flex items-start gap-3">
-          {/* Index bubble */}
           <div className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5">
             {index}
           </div>
 
           <div className="flex-1 min-w-0">
-            {/* Badges row */}
             <div className="flex flex-wrap items-center gap-1.5 mb-2">
               <Badge variant="outline" className={cn("text-xs font-medium gap-1 border-0", type === "objective" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400")}>
                 {type === "objective" ? <BookOpen className="h-3 w-3" /> : <FlaskConical className="h-3 w-3" />}
@@ -442,12 +487,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
               </Badge>
             </div>
 
-            {/* Question text */}
             <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug line-clamp-3">
               {question.question_text}
             </p>
 
-            {/* Options (objective) */}
             {type === "objective" && question.options && (
               <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1">
                 {question.options.map((opt: string, idx: number) => {
@@ -467,7 +510,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
               </div>
             )}
 
-            {/* Sub-questions count (theory) */}
             {type === "theory" && question.sub_questions?.length > 0 && (
               <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
                 {question.sub_questions.length} sub-question{question.sub_questions.length !== 1 ? "s" : ""}
@@ -475,7 +517,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
             )}
           </div>
 
-          {/* Actions */}
           <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <Button variant="ghost" size="sm" onClick={onEdit}
               className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
@@ -522,16 +563,11 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
     return (
       <Card className="border-0 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-        {/* Card header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
           <div className="flex items-center gap-2">
             <LayoutList className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">
-              All Questions
-            </span>
-            <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-medium">
-              {totalQuestions}
-            </span>
+            <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">All Questions</span>
+            <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-medium">{totalQuestions}</span>
             {draftCount > 0 && (
               <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">
                 {draftCount} draft{draftCount !== 1 ? "s" : ""}
@@ -555,7 +591,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
         <CardContent className="p-4">
           <ScrollArea className="h-[520px] pr-2">
             <div className="space-y-2.5 pr-2">
-              {/* Section: Objective */}
               {questions.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 py-1">
@@ -573,7 +608,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
                 </div>
               )}
 
-              {/* Section: Theory */}
               {theoryQuestions.length > 0 && (
                 <div className="space-y-2 mt-4">
                   <div className="flex items-center gap-2 py-1">
@@ -610,8 +644,10 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
         <PointsSummary />
 
+        {/* ✅ Passage Editor */}
+        <PassageEditor />
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          {/* Tab bar */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border-0 p-1 mb-4">
             <TabsList className="w-full grid grid-cols-3 bg-transparent gap-1 h-auto">
               {[
@@ -661,6 +697,7 @@ export function EditExamPage({ examId }: EditExamPageProps) {
               questions={questions}
               theoryQuestions={theoryQuestions}
               hasTheory={hasTheory}
+              passageText={hasPassage ? passageText : undefined}
             />
           </TabsContent>
         </Tabs>
@@ -682,7 +719,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
           onCancel={() => { setShowTheoryDialog(false); setEditingTheoryQuestion(null); }}
         />
 
-        {/* Delete confirmation */}
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <DialogContent className="max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl">
             <DialogHeader>

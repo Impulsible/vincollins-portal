@@ -15,6 +15,39 @@ import { cn } from '@/lib/utils'
 import { useReactToPrint } from 'react-to-print'
 
 // ============================================
+// SUBJECT NAME NORMALIZATION
+// ============================================
+const SUBJECT_NAME_MAP: Record<string, string> = {
+  'Physical Education': 'PHE',
+  'P.H.E.': 'PHE',
+  'P H E': 'PHE',
+  'Physical and Health Education': 'PHE',
+  'Security Edu': 'Security Education',
+  'Computer Studies': 'Information Technology',
+  'ICT': 'Information Technology',
+  'C.R.S.': 'CRS',
+  'C.R.K': 'CRS',
+  'Christian Religious Studies': 'CRS',
+  'Christian Religious Knowledge': 'CRS',
+  'C.C.A.': 'CCA',
+  'Cultural and Creative Arts': 'CCA',
+  'Agric Science': 'Agricultural Science',
+  'Basic Sci': 'Basic Science',
+  'Basic Tech': 'Basic Technology',
+  'Bus Studies': 'Business Studies',
+  'Civic Edu': 'Civic Education',
+  'Social Std': 'Social Studies',
+  'Home Econ': 'Home Economics',
+  'Further Maths': 'Further Mathematics',
+  'Lit in English': 'Literature in English',
+  'English': 'English Studies',
+}
+
+const normalizeSubjectName = (name: string): string => {
+  return SUBJECT_NAME_MAP[name] || name
+}
+
+// ============================================
 // SUBJECT ORDERING
 // ============================================
 const SUBJECT_ORDER: Record<string, number> = {
@@ -277,14 +310,42 @@ export default function ViewReportCardPage() {
         const { data: scores } = await supabase.from('ca_scores').select('*')
           .eq('student_id', studentId).eq('term', term).eq('academic_year', year).eq('status', 'approved')
 
-        let processed: SubjectScore[] = (scores || []).map((s: any) => {
+        // Process scores with normalization and deduplication
+        const merged = new Map<string, SubjectScore>()
+        
+        ;(scores || []).forEach((s: any) => {
           const ca = (s.ca1_score || 0) + (s.ca2_score || 0)
           const exam = (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
           const total = ca + exam
           const grade = getSubjectGrade(total)
-          return { name: s.subject, ca, exam, total, grade, remark: getSubjectGradeRemark(grade) }
+          const normalizedName = normalizeSubjectName(s.subject)
+          
+          if (merged.has(normalizedName)) {
+            // Keep the higher score if duplicate
+            const existing = merged.get(normalizedName)!
+            if (total > existing.total) {
+              merged.set(normalizedName, {
+                name: normalizedName,
+                ca,
+                exam,
+                total,
+                grade,
+                remark: getSubjectGradeRemark(grade)
+              })
+            }
+          } else {
+            merged.set(normalizedName, {
+              name: normalizedName,
+              ca,
+              exam,
+              total,
+              grade,
+              remark: getSubjectGradeRemark(grade)
+            })
+          }
         })
-        processed = sortSubjectsByOrder(processed)
+
+        let processed = sortSubjectsByOrder(Array.from(merged.values()))
         setSubjects(processed)
 
         const tot = processed.reduce((s, x) => s + x.total, 0)
