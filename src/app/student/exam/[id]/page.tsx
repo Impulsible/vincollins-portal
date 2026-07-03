@@ -131,10 +131,9 @@ export default function TakeExamPage() {
   }
 
   // ============================================
-  // ✅ SUBMIT EXAM - COMPLETE FIXED VERSION
+  // ✅ SUBMIT EXAM - DYNAMIC CALCULATION
   // ============================================
   const handleSubmit = useCallback(async (isAuto = false, reason = 'manual') => {
-    // ✅ Prevent multiple submissions
     if (isSubmittingRef.current || examEndedRef.current) {
       console.log('⚠️ Submit already in progress or exam ended')
       return
@@ -145,7 +144,6 @@ export default function TakeExamPage() {
 
     setExamState(prev => ({ ...prev, examEnded: true, isSubmitting: true, showSubmitDialog: false }))
     
-    // ✅ Try to exit fullscreen
     try {
       if (document.fullscreenElement) {
         await document.exitFullscreen()
@@ -162,13 +160,16 @@ export default function TakeExamPage() {
       console.log('📊 Score calculated:', result)
       
       const passingScore = exam?.passing_percentage || 50
-      const objectiveMax = exam?.objective_max || 20
-      const theoryMax = exam?.theory_max || 40
-      const hasTheory = exam?.has_theory && theoryQuestionCount > 0
+      const hasTheoryQuestions = exam?.has_theory && theoryQuestionCount > 0
 
-      // Calculate percentage
-      let displayPercentage = result.total > 0 ? Math.round((result.score / result.total) * 100) : 0
-      const isPassed = displayPercentage >= passingScore
+      // ✅ DYNAMIC: Calculate actual totals from questions
+      const actualObjectiveMax = result.total  // Sum of actual question points
+      const actualTheoryMax = hasTheoryQuestions ? (exam?.theory_max || 40) : 0
+      const actualTotalMarks = actualObjectiveMax + actualTheoryMax
+      
+      // ✅ DYNAMIC: Correct percentage based on actual totals
+      const correctPercentage = actualTotalMarks > 0 ? Math.round((result.score / actualTotalMarks) * 100) : 0
+      const isPassed = correctPercentage >= passingScore
 
       // Separate answers
       const objectiveAnswers: Record<string, string> = {}
@@ -181,9 +182,9 @@ export default function TakeExamPage() {
         }
       })
 
-      const status = hasTheory ? 'pending_theory' : 'completed'
+      const status = hasTheoryQuestions ? 'pending_theory' : 'completed'
 
-      // ✅ Get CA scores (for display only - not stored in exam_attempts)
+      // Get CA scores (for display only)
       let caTotalScore = 0
       let ca1Score = 0
       let ca2Score = 0
@@ -201,14 +202,13 @@ export default function TakeExamPage() {
             ca1Score = Number(caData.ca1_score) || 0
             ca2Score = Number(caData.ca2_score) || 0
             caTotalScore = ca1Score + ca2Score
-            console.log('✅ CA Scores (display):', { ca1Score, ca2Score, caTotalScore })
           }
         } catch (caError) {
           console.warn('⚠️ Error fetching CA scores:', caError)
         }
       }
 
-      // ✅ UPDATE the attempt - ONLY columns that exist in exam_attempts
+      // ✅ UPDATE the attempt with DYNAMIC values
       if (attemptId) {
         console.log('📝 Updating attempt:', attemptId)
         
@@ -223,12 +223,12 @@ export default function TakeExamPage() {
           answers: objectiveAnswers,
           theory_answers: theoryAnswers,
           objective_score: result.score,
-          objective_total: objectiveMax,
+          objective_total: actualObjectiveMax,
           theory_score: 0,
-          theory_total: theoryMax,
+          theory_total: actualTheoryMax,
           total_score: result.score,
-          total_marks: objectiveMax,
-          percentage: displayPercentage,
+          total_marks: actualTotalMarks,
+          percentage: correctPercentage,
           is_passed: isPassed,
           correct_count: result.correct || 0,
           incorrect_count: result.incorrect || 0,
@@ -261,7 +261,7 @@ export default function TakeExamPage() {
         return
       }
 
-      // ✅ Get all attempts count
+      // Get all attempts count
       const { data: allAttempts } = await supabase
         .from('exam_attempts')
         .select('id, status')
@@ -271,10 +271,10 @@ export default function TakeExamPage() {
 
       const totalCompletedAttempts = allAttempts?.length || 1
 
-      // ✅ Calculate final percentage with CA for display only
-      let finalPercentage = displayPercentage
+      // Calculate final percentage with CA for display
+      let finalPercentage = correctPercentage
       if (caTotalScore > 0) {
-        const totalWithCA = objectiveMax + 40
+        const totalWithCA = 40 + actualTotalMarks
         const scoreWithCA = result.score + caTotalScore
         finalPercentage = totalWithCA > 0 ? Math.round((scoreWithCA / totalWithCA) * 100) : 0
       }
@@ -282,7 +282,7 @@ export default function TakeExamPage() {
       const finalResult: ExamResult = {
         ...result,
         theory_score: 0,
-        theory_total: theoryMax,
+        theory_total: actualTheoryMax,
         is_passed: isPassed,
         passing_percentage: passingScore,
         status: status,
@@ -291,9 +291,9 @@ export default function TakeExamPage() {
         submitted_at: new Date().toISOString(),
         percentage: finalPercentage,
         total_score: result.score,
-        total_marks: objectiveMax,
+        total_marks: actualTotalMarks,
         objective_score: result.score,
-        objective_total: objectiveMax,
+        objective_total: actualObjectiveMax,
         ca_score: caTotalScore,
         ca1_score: ca1Score,
         ca2_score: ca2Score,
@@ -304,7 +304,7 @@ export default function TakeExamPage() {
       setExamState(prev => ({ ...prev, examStarted: false, isSubmitting: false, showResultDialog: true }))
       
       toast.success(
-        hasTheory 
+        hasTheoryQuestions 
           ? `Exam submitted! Theory pending grading. Score: ${finalPercentage}% (Attempt ${totalCompletedAttempts}/${exam?.max_attempts || 10})` 
           : `Exam completed! Score: ${finalPercentage}% (Attempt ${totalCompletedAttempts}/${exam?.max_attempts || 10})`
       )

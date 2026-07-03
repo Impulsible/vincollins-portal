@@ -1,3 +1,4 @@
+// src/app/student/exam/[id]/hooks/useAutoSave.ts - FIXED
 "use client"
 
 import { useEffect, useRef, useState } from 'react'
@@ -52,6 +53,9 @@ export function useAutoSave(
         if (result && result.total > 0) {
           updateData.objective_score = result.score
           updateData.objective_total = result.total
+          updateData.total_score = result.score
+          updateData.total_marks = result.total  // ✅ Auto-save sets correct total_marks
+          updateData.theory_total = 0  // ✅ Mid-exam, theory not submitted yet
           updateData.correct_count = result.correct
           updateData.incorrect_count = result.incorrect
           updateData.unanswered_count = result.unanswered

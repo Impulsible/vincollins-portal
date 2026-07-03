@@ -1,3 +1,5 @@
+// src/app/student/exam/[id]/hooks/useExamLoader.ts - DYNAMIC FIXED
+
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -61,7 +63,6 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
     const theoryMax = attempt.theory_max || exam?.theory_max || 40
     const objectiveScore = attempt.objective_score || 0
     const theoryScore = attempt.theory_score || 0
-    // ✅ Note: ca_total_score may not exist in exam_attempts, use 0 if not found
     const caScore = attempt.ca_total_score || 0
 
     if (attempt.status === 'pending_theory') {
@@ -177,6 +178,11 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       const allQ = [...shuffledMcq, ...theoryList]
       setAllQuestions(allQ)
 
+      // ✅ Determine if exam has theory questions
+      const hasTheoryQuestions = ed.has_theory && theoryQuestionsFromDB.length > 0
+      const actualTheoryTotal = hasTheoryQuestions ? theoryMax : 0
+      const actualTotalMarks = objectiveMax + actualTheoryTotal
+
       // Check existing attempts - INCLUDE pending_theory as completed
       const { data: existingAttempts } = await supabase
         .from("exam_attempts")
@@ -202,7 +208,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         const displayPercentage = calculateFlexiblePercentage(latest)
         setExamResult({
           score: latest.total_score || 0, 
-          total: latest.total_marks || 100,
+          total: latest.total_marks || actualTotalMarks,
           percentage: displayPercentage,
           correct: latest.correct_count || 0,
           incorrect: latest.incorrect_count || 0,
@@ -233,7 +239,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           const displayPercentage = calculateFlexiblePercentage(latest)
           setExamResult({
             score: latest.total_score || 0, 
-            total: latest.total_marks || 100,
+            total: latest.total_marks || actualTotalMarks,
             percentage: displayPercentage,
             correct: latest.correct_count || 0,
             incorrect: latest.incorrect_count || 0,
@@ -259,11 +265,8 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             const existingAnswers = latest.answers || {}
             const result = calcScore(allQ, existingAnswers)
             
-            const displayPercentage = calculateFlexiblePercentage({
-              ...latest,
-              objective_score: result.score,
-              status: 'pending_theory'
-            })
+            // ✅ DYNAMIC: Calculate correct totals for auto-submit
+            const autoSubmitPercentage = actualTotalMarks > 0 ? Math.round((result.score / actualTotalMarks) * 100) : 0
 
             const objectiveAnswers: Record<string, string> = {}
             const theoryAnswers: Record<string, string> = {}
@@ -283,11 +286,11 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
               objective_score: result.score,
               objective_total: objectiveMax,
               theory_score: 0,
-              theory_total: theoryMax,
+              theory_total: actualTheoryTotal,
               total_score: result.score,
-              total_marks: objectiveMax,
-              percentage: displayPercentage,
-              is_passed: displayPercentage >= (ed.passing_percentage || 50),
+              total_marks: actualTotalMarks,
+              percentage: autoSubmitPercentage,
+              is_passed: autoSubmitPercentage >= (ed.passing_percentage || 50),
               correct_count: result.correct,
               incorrect_count: result.incorrect,
               unanswered_count: result.unanswered,
@@ -297,18 +300,18 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             setAttemptsUsed(completedCount + 1)
             setExamResult({
               score: result.score, 
-              total: objectiveMax,
-              percentage: displayPercentage,
+              total: actualTotalMarks,
+              percentage: autoSubmitPercentage,
               correct: result.correct, 
               incorrect: result.incorrect,
               unanswered: result.unanswered,
-              is_passed: displayPercentage >= (ed.passing_percentage || 50),
+              is_passed: autoSubmitPercentage >= (ed.passing_percentage || 50),
               passing_percentage: ed.passing_percentage || 50,
               status: ed.has_theory ? 'pending_theory' : 'completed',
               objective_score: result.score,
               objective_total: objectiveMax,
               theory_score: 0,
-              theory_total: theoryMax,
+              theory_total: actualTheoryTotal,
               attempts_used: completedCount + 1, 
               max_attempts: ed.max_attempts || 1,
               submitted_at: new Date().toISOString(),
@@ -330,12 +333,11 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           })
           setShowResumeDialog(true)
         } else if (["completed", "pending_theory", "graded"].includes(latest.status)) {
-          // ✅ Treat pending_theory as completed
           setHasCompletedAttempt(true)
           const displayPercentage = calculateFlexiblePercentage(latest)
           setExamResult({
             score: latest.total_score || 0, 
-            total: latest.total_marks || 100,
+            total: latest.total_marks || actualTotalMarks,
             percentage: displayPercentage,
             correct: latest.correct_count || 0,
             incorrect: latest.incorrect_count || 0,
@@ -355,7 +357,6 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           })
         }
       } else {
-        // ✅ No existing attempt - show instructions
         setAttemptsUsed(0)
         setHasCompletedAttempt(false)
         setAttemptId(null)
@@ -374,7 +375,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
   }, [loadExam])
 
   // ============================================
-  // ✅ START NEW ATTEMPT - Creates attempt with proper schema
+  // ✅ START NEW ATTEMPT - DYNAMIC TOTALS
   // ============================================
   const startNewAttempt = useCallback(async () => {
     try {
@@ -399,7 +400,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         return { attemptId: existingAttempt.id, isResuming: true, attemptNumber: existingAttempt.attempt_number }
       }
 
-      // ✅ Count ALL previous attempts (including completed, graded, pending_theory)
+      // Count ALL previous attempts
       const { data: previousAttempts } = await supabase
         .from('exam_attempts')
         .select('id, status')
@@ -407,7 +408,6 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         .eq('student_id', session.user.id)
         .in('status', ['completed', 'graded', 'pending_theory', 'terminated'])
 
-      // ✅ Calculate attempt number correctly (previous attempts + 1)
       const attemptNumber = (previousAttempts?.length || 0) + 1
 
       console.log(`📝 Attempt #${attemptNumber} - Previous attempts: ${previousAttempts?.length || 0}`)
@@ -420,6 +420,11 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       const theoryMarksPerQuestion = exam?.theory_marks_per_question || 10
       const scoringRule = exam?.scoring_rule || 'standard'
       
+      // ✅ DYNAMIC: Calculate correct totals
+      const hasTheoryQuestions = exam?.has_theory && theoryQuestionsTotal > 0
+      const actualTheoryTotal = hasTheoryQuestions ? theoryMax : 0
+      const actualTotalMarks = objectiveMax + actualTheoryTotal
+      
       const examMax = objectiveMax + (scoringRule !== 'standard' && theoryQuestionsToAnswer 
         ? theoryQuestionsToAnswer * theoryMarksPerQuestion 
         : theoryQuestionsTotal * theoryMarksPerQuestion)
@@ -427,10 +432,10 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       const grandMax = caMax + examMax
 
       console.log(`📊 Creating attempt #${attemptNumber} with config:`, {
-        objectiveMax, theoryMax, examMax, caMax, grandMax
+        objectiveMax, theoryMax, actualTheoryTotal, actualTotalMarks, examMax, caMax, grandMax
       })
 
-      // ✅ Create new attempt with correct status - ONLY columns that exist
+      // ✅ Create new attempt with DYNAMIC totals
       const { data: newAttempt, error: insertError } = await supabase
         .from('exam_attempts')
         .insert({
@@ -450,23 +455,20 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           attempt_number: attemptNumber,
           term: exam?.term || 'third',
           session_year: exam?.session_year || '2025/2026',
-          // ✅ Scoring configuration
           objective_max: objectiveMax,
           objective_total: objectiveMax,
           theory_max: theoryMax,
-          theory_total: theoryMax,
+          theory_total: actualTheoryTotal,
           exam_max: examMax,
           ca_max: caMax,
           grand_max: grandMax,
           theory_questions_to_answer: theoryQuestionsToAnswer,
           theory_marks_per_question: theoryMarksPerQuestion,
           scoring_rule: scoringRule,
-          // ✅ Initialize answers
           answers: {},
           theory_answers: {},
           answer_results: {},
-          // ✅ Initialize scores
-          total_marks: objectiveMax,
+          total_marks: actualTotalMarks,
           total_score: 0,
           percentage: 0,
           percentage_score: 0,
