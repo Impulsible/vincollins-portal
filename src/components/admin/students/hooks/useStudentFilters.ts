@@ -21,6 +21,15 @@ interface UseStudentFiltersReturn {
   filteredStudents: Student[]
 }
 
+// Helper: check if a class belongs to an SS year group
+const isSSYear = (studentClass: string, year: string): boolean => {
+  const upper = studentClass.toUpperCase()
+  if (year === 'SS1') return upper.includes('SS1') || upper.includes('SS 1')
+  if (year === 'SS2') return upper.includes('SS2') || upper.includes('SS 2')
+  if (year === 'SS3') return upper.includes('SS3') || upper.includes('SS 3')
+  return false
+}
+
 export function useStudentFilters(students: Student[]): UseStudentFiltersReturn {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedClass, setSelectedClass] = useState<string | null>(null)
@@ -56,6 +65,21 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
       }
       groups[className].students.push(student)
       groups[className].count++
+
+      // Also add to the general SS year group if applicable
+      if (className.startsWith('SS1')) {
+        if (!groups['SS1']) groups['SS1'] = { students: [], count: 0, onlineCount: 0 }
+        groups['SS1'].students.push(student)
+        groups['SS1'].count++
+      } else if (className.startsWith('SS2')) {
+        if (!groups['SS2']) groups['SS2'] = { students: [], count: 0, onlineCount: 0 }
+        groups['SS2'].students.push(student)
+        groups['SS2'].count++
+      } else if (className.startsWith('SS3')) {
+        if (!groups['SS3']) groups['SS3'] = { students: [], count: 0, onlineCount: 0 }
+        groups['SS3'].students.push(student)
+        groups['SS3'].count++
+      }
     })
 
     return groups
@@ -76,10 +100,19 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
       )
     }
 
+    const filterByClass = (filterValue: string) => {
+      // If selecting a general SS class (SS1, SS2, SS3), show all departments
+      if (filterValue === 'SS1' || filterValue === 'SS2' || filterValue === 'SS3') {
+        return filtered.filter(s => isSSYear(s.class, filterValue))
+      }
+      // For all other classes (JSS or specific departments), exact match
+      return filtered.filter(s => s.class === filterValue)
+    }
+
     if (selectedClass) {
-      filtered = filtered.filter(s => s.class === selectedClass)
+      filtered = filterByClass(selectedClass)
     } else if (classFilter !== 'all') {
-      filtered = filtered.filter(s => s.class === classFilter)
+      filtered = filterByClass(classFilter)
     }
 
     return filtered

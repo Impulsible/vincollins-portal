@@ -71,7 +71,7 @@ const SENIOR_SUBJECTS = [
   'English Language', 'Mathematics', 'Civic Education',
   'Physics', 'Chemistry', 'Biology', 'Agricultural Science',
   'Economics', 'Geography', 'Government', 'Literature in English',
-  'CRS', 'Yoruba', 'Commerce', 'Financial Accounting', 'Information Technology',
+  'CRS', 'Yoruba', 'Commerce', 'Financial Accounting',
   'Data Processing', 'Further Mathematics'
 ]
 
