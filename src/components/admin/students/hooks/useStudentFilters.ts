@@ -21,6 +21,15 @@ interface UseStudentFiltersReturn {
   filteredStudents: Student[]
 }
 
+// All class keys including general SS groups
+const ALL_CLASS_KEYS = [
+  'JSS 1', 'JSS 2', 'JSS 3',
+  'SS1', 'SS2', 'SS3',
+  'SS1 Science', 'SS2 Science', 'SS3 Science',
+  'SS1 Arts', 'SS2 Arts', 'SS3 Arts',
+  'SS1 Commercial', 'SS2 Commercial', 'SS3 Commercial',
+]
+
 // Helper: check if a class belongs to an SS year group
 const isSSYear = (studentClass: string, year: string): boolean => {
   const upper = studentClass.toUpperCase()
@@ -52,31 +61,30 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
 
   // Group students by class
   const classGroups = useMemo(() => {
+    // Initialize ALL groups upfront so they always appear
     const groups: Record<string, ClassGroup> = {}
-
-    CLASSES.forEach(cls => {
+    ALL_CLASS_KEYS.forEach(cls => {
       groups[cls] = { students: [], count: 0, onlineCount: 0 }
     })
 
     sortedStudents.forEach(student => {
       const className = student.class
+
+      // Add to the specific class group
       if (!groups[className]) {
         groups[className] = { students: [], count: 0, onlineCount: 0 }
       }
       groups[className].students.push(student)
       groups[className].count++
 
-      // Also add to the general SS year group if applicable
-      if (className.startsWith('SS1')) {
-        if (!groups['SS1']) groups['SS1'] = { students: [], count: 0, onlineCount: 0 }
+      // Also add to the general SS year group if it's a department class
+      if (className === 'SS1 Science' || className === 'SS1 Arts' || className === 'SS1 Commercial') {
         groups['SS1'].students.push(student)
         groups['SS1'].count++
-      } else if (className.startsWith('SS2')) {
-        if (!groups['SS2']) groups['SS2'] = { students: [], count: 0, onlineCount: 0 }
+      } else if (className === 'SS2 Science' || className === 'SS2 Arts' || className === 'SS2 Commercial') {
         groups['SS2'].students.push(student)
         groups['SS2'].count++
-      } else if (className.startsWith('SS3')) {
-        if (!groups['SS3']) groups['SS3'] = { students: [], count: 0, onlineCount: 0 }
+      } else if (className === 'SS3 Science' || className === 'SS3 Arts' || className === 'SS3 Commercial') {
         groups['SS3'].students.push(student)
         groups['SS3'].count++
       }
