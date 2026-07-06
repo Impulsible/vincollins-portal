@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/EditExamPage.tsx - WITH PASSAGE SUPPORT
+// src/components/staff/exams/edit/EditExamPage.tsx - WITH PASSAGE SUPPORT & AUTO JSON SYNC
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
@@ -128,6 +128,39 @@ export function EditExamPage({ examId }: EditExamPageProps) {
   const totalExamPoints = totalObjectivePoints + totalTheoryPoints;
   const passMarkPercentage = totalExamPoints > 0 ? (examDetails.pass_mark / totalExamPoints) * 100 : 0;
 
+  // ── Build JSON for exams.questions / exams.theory_questions ──────────────
+  const buildQuestionsJSON = useCallback(() => {
+    return questions.map((q, idx) => ({
+      id: q.id,
+      question: q.question_text,
+      question_text: q.question_text,
+      options: q.options || [],
+      correct_answer: q.correct_answer || "",
+      answer: q.correct_answer || "",
+      marks: q.points || objectivePointsPerQuestion,
+      points: q.points || objectivePointsPerQuestion,
+      type: "objective",
+      order: idx + 1,
+    }));
+  }, [questions, objectivePointsPerQuestion]);
+
+  const buildTheoryQuestionsJSON = useCallback(() => {
+    return theoryQuestions.map((q, idx) => ({
+      id: q.id,
+      question: q.question_text,
+      question_text: q.question_text,
+      marks: q.points || theoryPointsPerQuestion,
+      points: q.points || theoryPointsPerQuestion,
+      type: "theory",
+      sub_questions: q.sub_questions || [],
+      keywords: q.keywords || [],
+      model_answer: q.model_answer || "",
+      image_url: (q as any).image_url || null,
+      image_caption: (q as any).image_caption || null,
+      order: idx + 1,
+    }));
+  }, [theoryQuestions, theoryPointsPerQuestion]);
+
   // ── Load questions ────────────────────────────────────────────────────────
   const loadQuestions = useCallback(async (silent = false) => {
     try {
@@ -200,17 +233,27 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
   useEffect(() => { if (examId) loadExamData(); }, [examId, loadExamData]);
 
-  // ── Auto-update totals ────────────────────────────────────────────────────
+  // ── Auto-update totals & JSON sync ───────────────────────────────────────
   const updateExamTotals = useCallback(async () => {
     if (!examId || loading || !initialLoadDoneRef.current) return;
+    
+    const questionsJSON = buildQuestionsJSON();
+    const theoryQuestionsJSON = buildTheoryQuestionsJSON();
+    
     await supabase.from("exams").update({
-      total_questions: totalQuestions, total_marks: totalExamPoints,
-      total_points: totalExamPoints, updated_at: new Date().toISOString(),
+      total_questions: totalQuestions,
+      total_marks: totalExamPoints,
+      total_points: totalExamPoints,
+      questions: questionsJSON,
+      theory_questions: theoryQuestionsJSON,
+      updated_at: new Date().toISOString(),
     }).eq("id", examId);
-  }, [examId, totalQuestions, totalExamPoints, loading]);
+  }, [examId, totalQuestions, totalExamPoints, loading, buildQuestionsJSON, buildTheoryQuestionsJSON]);
 
   useEffect(() => {
-    if (!loading && initialLoadDoneRef.current) updateExamTotals();
+    if (!loading && initialLoadDoneRef.current) {
+      updateExamTotals();
+    }
   }, [totalQuestions, totalExamPoints, updateExamTotals, loading]);
 
   const handleRefresh = useCallback(() => loadQuestions(false), [loadQuestions]);
@@ -223,33 +266,37 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
     setSaving(true);
     try {
+      const questionsJSON = buildQuestionsJSON();
+      const theoryQuestionsJSON = buildTheoryQuestionsJSON();
+
       const payload: any = {
-        title: examDetails.title.trim(), subject: examDetails.subject, class: examDetails.class,
-        duration: examDetails.duration, pass_mark: examDetails.pass_mark,
-        description: examDetails.instructions, instructions: examDetails.instructions,
-        randomize_questions: examDetails.shuffle_questions, randomize_options: examDetails.shuffle_options,
-        shuffle_questions: examDetails.shuffle_questions, shuffle_options: examDetails.shuffle_options,
-        has_theory: hasTheory, term: examDetails.term, session_year: examDetails.session_year,
-        target_audience: examDetails.target_audience, total_questions: totalQuestions,
-        total_marks: totalExamPoints, total_points: totalExamPoints,
-        // ✅ Save passage
+        title: examDetails.title.trim(),
+        subject: examDetails.subject,
+        class: examDetails.class,
+        duration: examDetails.duration,
+        pass_mark: examDetails.pass_mark,
+        description: examDetails.instructions,
+        instructions: examDetails.instructions,
+        randomize_questions: examDetails.shuffle_questions,
+        randomize_options: examDetails.shuffle_options,
+        shuffle_questions: examDetails.shuffle_questions,
+        shuffle_options: examDetails.shuffle_options,
+        has_theory: hasTheory,
+        term: examDetails.term,
+        session_year: examDetails.session_year,
+        target_audience: examDetails.target_audience,
+        total_questions: totalQuestions,
+        total_marks: totalExamPoints,
+        total_points: totalExamPoints,
         passage_text: hasPassage ? passageText : null,
+        questions: questionsJSON,
+        theory_questions: theoryQuestionsJSON,
         updated_at: new Date().toISOString(),
       };
+
       const { error } = await supabase.from("exams").update(payload).eq("id", examId);
-      if (error) {
-        const safe = {
-          title: payload.title, subject: payload.subject, class: payload.class,
-          duration: payload.duration, pass_mark: payload.pass_mark,
-          description: payload.instructions, instructions: payload.instructions,
-          has_theory: hasTheory, term: payload.term, session_year: payload.session_year,
-          total_questions: totalQuestions, total_marks: totalExamPoints,
-          passage_text: hasPassage ? passageText : null,
-          updated_at: payload.updated_at,
-        };
-        const { error: e2 } = await supabase.from("exams").update(safe).eq("id", examId);
-        if (e2) throw e2;
-      }
+      if (error) throw error;
+
       toast.success("Exam updated successfully");
       router.push("/staff/exams");
     } catch (e: any) {
@@ -644,7 +691,6 @@ export function EditExamPage({ examId }: EditExamPageProps) {
 
         <PointsSummary />
 
-        {/* ✅ Passage Editor */}
         <PassageEditor />
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
