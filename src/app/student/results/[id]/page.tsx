@@ -74,15 +74,12 @@ function ScoreRing({ percentage, size = 160, grade }: { percentage: number; size
 
   return (
     <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      {/* Glow ring */}
       <div className={cn(
         'absolute inset-2 rounded-full opacity-20 blur-md',
         grade.bar
       )} />
       <svg width={size} height={size} className="-rotate-90 absolute">
-        {/* Track */}
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={10} />
-        {/* Progress */}
         <motion.circle
           cx={size / 2} cy={size / 2} r={r} fill="none"
           className={grade.bar.replace('bg-', 'stroke-')}
@@ -93,7 +90,6 @@ function ScoreRing({ percentage, size = 160, grade }: { percentage: number; size
           transition={{ duration: 1.5, ease: 'easeOut', delay: 0.3 }}
         />
       </svg>
-      {/* Center content */}
       <div className="relative z-10 text-center">
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
@@ -173,6 +169,7 @@ export default function StudentResultDetailPage() {
   const [result, setResult] = useState<ExamResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // ─── FIXED: Load result dynamically from exam config ──
   const loadResult = useCallback(async () => {
     if (!examId) return
     setLoading(true); setError(null)
@@ -183,7 +180,14 @@ export default function StudentResultDetailPage() {
       const { data: pd } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
       if (!pd) { setError('Profile not found'); setLoading(false); return }
 
-      setProfile({ id: pd.id, full_name: pd.full_name || 'Student', email: pd.email || '', class: pd.class || '—', department: pd.department || '—', photo_url: pd.photo_url || undefined })
+      setProfile({
+        id: pd.id,
+        full_name: pd.full_name || 'Student',
+        email: pd.email || '',
+        class: pd.class || '—',
+        department: pd.department || '—',
+        photo_url: pd.photo_url || undefined
+      })
 
       const { data: att } = await supabase.from('exam_attempts').select('*')
         .eq('exam_id', examId).eq('student_id', session.user.id)
@@ -191,6 +195,7 @@ export default function StudentResultDetailPage() {
 
       if (!att) { setError('No submission found for this exam'); setLoading(false); return }
 
+      // ✅ Get exam details dynamically
       const { data: exam } = await supabase.from('exams').select('*').eq('id', att.exam_id).maybeSingle()
 
       let theoryScore: number | null = null
@@ -211,35 +216,65 @@ export default function StudentResultDetailPage() {
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
       const hasCA = ca1 !== null && ca2 !== null
 
-      const objectiveScore = Number(att.objective_score) || 0
-      const objectiveTotal = att.objective_total || 20
-      const objectiveOutOf20 = objectiveTotal > 0 ? Math.round((objectiveScore / objectiveTotal) * 20) : 0
-      const ca1Value = ca1 || 0, ca2Value = ca2 || 0, caTotal = ca1Value + ca2Value
-      const theoryValue = theoryScore || 0
-      const grandTotal = caTotal + objectiveOutOf20 + theoryValue
+      // ✅ DYNAMIC: Read actual exam configuration
+      const objectiveMax = exam?.objective_max || 30
+      const theoryMax = exam?.theory_max || 30
+      const totalExamMax = exam?.total_marks || (objectiveMax + theoryMax)
 
-      let percentage: number, totalPossible: number
+      // ✅ Get the actual scores (already out of objectiveMax and theoryMax)
+      const objectiveScore = Number(att.objective_score) || 0
+      const theoryValue = theoryScore || 0
+
+      // Calculate CA total (out of 40)
+      const ca1Value = ca1 || 0
+      const ca2Value = ca2 || 0
+      const caTotal = ca1Value + ca2Value // Always out of 40
+
+      // ✅ Exam total = objectiveScore + theoryValue (out of totalExamMax)
+      const examTotal = objectiveScore + theoryValue
+
+      // ✅ Grand total = CA (40) + Exam (totalExamMax)
+      const maxPossible = 40 + totalExamMax // CA (40) + Exam (totalExamMax)
+      const grandTotal = caTotal + examTotal
+
+      // ✅ Calculate percentage based on max possible
+      let percentage: number
       if (hasCA) {
-        totalPossible = 100
-        percentage = Math.round((grandTotal / totalPossible) * 100)
+        // With CA: total out of (40 + totalExamMax)
+        percentage = Math.round((grandTotal / maxPossible) * 100)
       } else {
-        totalPossible = objectiveTotal + (theoryValue > 0 ? 40 : 0)
-        percentage = totalPossible > 0 ? Math.round(((objectiveOutOf20 + theoryValue) / totalPossible) * 100) : 0
+        // Without CA: only exam
+        percentage = Math.round((examTotal / totalExamMax) * 100)
       }
 
       const finalGrade = getGradeConfig(percentage).grade
       const isPassed = finalGrade !== 'F9'
 
       setResult({
-        id: att.id, exam_id: att.exam_id, exam_title: exam?.title || 'Untitled Exam',
-        exam_subject: exam?.subject || '—', exam_class: exam?.class || '—', status: att.status,
-        percentage, total_score: grandTotal, total_marks: 100,
-        objective_score: objectiveOutOf20, objective_total: 20,
-        theory_score: theoryValue, theory_total: 40,
-        ca1_score: ca1, ca2_score: ca2, is_passed: isPassed,
-        submitted_at: att.submitted_at, passing_percentage: 40, time_spent: att.time_spent,
-        correct_count: att.correct_count || 0, incorrect_count: att.incorrect_count || 0,
-        unanswered_count: att.unanswered_count || 0, teacher_feedback: teacherFeedback,
+        id: att.id,
+        exam_id: att.exam_id,
+        exam_title: exam?.title || 'Untitled Exam',
+        exam_subject: exam?.subject || '—',
+        exam_class: exam?.class || '—',
+        status: att.status,
+        percentage,
+        total_score: grandTotal,
+        total_marks: maxPossible, // Dynamic max possible
+        // ✅ Show actual scores with their actual totals
+        objective_score: objectiveScore,
+        objective_total: objectiveMax,
+        theory_score: theoryValue,
+        theory_total: theoryMax,
+        ca1_score: ca1,
+        ca2_score: ca2,
+        is_passed: isPassed,
+        submitted_at: att.submitted_at,
+        passing_percentage: exam?.passing_percentage || 40,
+        time_spent: att.time_spent,
+        correct_count: att.correct_count || 0,
+        incorrect_count: att.incorrect_count || 0,
+        unanswered_count: att.unanswered_count || 0,
+        teacher_feedback: teacherFeedback,
       })
     } catch (err) {
       console.error(err); setError('Failed to load result. Please try again.')
@@ -247,6 +282,7 @@ export default function StudentResultDetailPage() {
   }, [examId, router])
 
   useEffect(() => { loadResult() }, [loadResult])
+
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' }); toast.success('Logged out'); router.push('/portal')
   }
@@ -321,6 +357,11 @@ export default function StudentResultDetailPage() {
   const theoryPercentage = result.theory_total > 0 ? Math.round((theoryScore / result.theory_total) * 100) : 0
   const caPercentage = 40 > 0 ? Math.round((caTotal / 40) * 100) : 0
 
+  // Calculate percentage of total for each section
+  const caWeight = 40 // CA is always out of 40
+  const examWeight = result.total_marks - 40 // Exam weight is dynamic
+  const totalWeight = result.total_marks
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
       <Header user={{
@@ -367,7 +408,6 @@ export default function StudentResultDetailPage() {
               ══════════════════════════════════════ */}
               <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
                 <div className="rounded-3xl overflow-hidden shadow-xl">
-                  {/* Top gradient bar */}
                   <div className={cn(
                     'h-1.5 w-full',
                     result.is_passed
@@ -375,13 +415,10 @@ export default function StudentResultDetailPage() {
                       : 'bg-gradient-to-r from-red-400 via-rose-400 to-pink-400'
                   )} />
 
-                  {/* Dark header */}
                   <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 px-5 sm:px-8 pt-6 pb-0 relative overflow-hidden">
-                    {/* Background decoration */}
                     <div className="absolute top-0 right-0 w-64 h-64 bg-white/[0.02] rounded-full -translate-y-32 translate-x-16" />
                     <div className="absolute bottom-0 left-1/3 w-48 h-48 bg-blue-500/5 rounded-full translate-y-24" />
 
-                    {/* Subject + Class tags */}
                     <div className="flex flex-wrap items-center gap-2 mb-4 relative">
                       <span className="flex items-center gap-1.5 text-xs text-slate-300 bg-white/10 px-3 py-1 rounded-full">
                         <BookOpen className="h-3 w-3 text-blue-300" /> {result.exam_subject}
@@ -401,17 +438,15 @@ export default function StudentResultDetailPage() {
                       </span>
                     </div>
 
-                    {/* Exam title */}
                     <h1 className="text-xl sm:text-2xl font-bold text-white mb-6 relative leading-snug">
                       {result.exam_title}
                     </h1>
 
-                    {/* Score ring + stats row */}
                     <div className="flex flex-col sm:flex-row items-center gap-6 relative pb-6">
                       <ScoreRing percentage={result.percentage} size={140} grade={gradeConfig} />
 
                       <div className="flex-1 grid grid-cols-2 gap-3 w-full">
-                        <StatPill icon={Trophy}    label="Total Score"   value={`${result.total_score}/100`}  color="text-purple-600" />
+                        <StatPill icon={Trophy}    label="Total Score"   value={`${result.total_score}/${result.total_marks}`}  color="text-purple-600" />
                         <StatPill icon={Star}      label="Grade"         value={gradeConfig.grade}             color={gradeConfig.text} />
                         <StatPill icon={Clock}     label="Time Spent"    value={fmtTime(result.time_spent)}    color="text-blue-600" />
                         <StatPill icon={Target}    label="Pass Mark"     value={`${result.passing_percentage}%`} color="text-slate-500" />
@@ -419,7 +454,6 @@ export default function StudentResultDetailPage() {
                     </div>
                   </div>
 
-                  {/* Grade ribbon */}
                   <div className={cn('px-5 sm:px-8 py-4 flex items-center gap-4 border-t', gradeConfig.bg, gradeConfig.border)}>
                     <div className={cn(
                       'h-12 w-12 rounded-2xl flex items-center justify-center shadow-md shrink-0',
@@ -442,9 +476,7 @@ export default function StudentResultDetailPage() {
                 </div>
               </motion.div>
 
-              {/* ══════════════════════════════════════
-                  THEORY PENDING NOTICE
-              ══════════════════════════════════════ */}
+              {/* ── Theory Pending Notice ───────────────── */}
               {theoryPending && (
                 <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
                   <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -464,54 +496,62 @@ export default function StudentResultDetailPage() {
               )}
 
               {/* ══════════════════════════════════════
-                  SCORE BREAKDOWN
+                  SCORE BREAKDOWN - DYNAMIC
               ══════════════════════════════════════ */}
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}>
                 <Card className="border-0 shadow-sm rounded-3xl overflow-hidden">
-                  {/* Header */}
                   <div className="flex items-center gap-3 px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                     <div className="h-8 w-8 rounded-xl bg-blue-100 flex items-center justify-center">
                       <BarChart3 className="h-4 w-4 text-blue-600" />
                     </div>
                     <h2 className="text-sm font-bold text-slate-800">Score Breakdown</h2>
                     <Badge className="ml-auto bg-slate-100 text-slate-600 border-0 text-[10px]">
-                      {result.total_score}/100 marks
+                      {result.total_score}/{result.total_marks} marks
                     </Badge>
                   </div>
 
                   <div className="p-5 sm:p-6 space-y-5">
 
-                    {/* Stacked visual bar */}
+                    {/* Stacked visual bar - Dynamic */}
                     <div className="space-y-1.5">
                       <div className="flex h-4 rounded-full overflow-hidden gap-0.5">
                         {hasCA && (
-                          <motion.div className="bg-blue-500 flex items-center justify-center"
-                            style={{ width: `${caTotal}%` }}
-                            initial={{ width: 0 }} animate={{ width: `${caTotal}%` }}
-                            transition={{ duration: 0.8, ease: 'easeOut' }} />
+                          <motion.div 
+                            className="bg-blue-500"
+                            style={{ width: `${(caTotal / totalWeight) * 100}%` }}
+                            initial={{ width: 0 }} 
+                            animate={{ width: `${(caTotal / totalWeight) * 100}%` }}
+                            transition={{ duration: 0.8, ease: 'easeOut' }} 
+                          />
                         )}
-                        <motion.div className="bg-violet-500"
-                          style={{ width: `${result.objective_score}%` }}
-                          initial={{ width: 0 }} animate={{ width: `${result.objective_score}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }} />
+                        <motion.div 
+                          className="bg-violet-500"
+                          style={{ width: `${(result.objective_score / totalWeight) * 100}%` }}
+                          initial={{ width: 0 }} 
+                          animate={{ width: `${(result.objective_score / totalWeight) * 100}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }} 
+                        />
                         {!theoryPending && theoryScore > 0 && (
-                          <motion.div className="bg-amber-500"
-                            style={{ width: `${theoryScore}%` }}
-                            initial={{ width: 0 }} animate={{ width: `${theoryScore}%` }}
-                            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }} />
+                          <motion.div 
+                            className="bg-amber-500"
+                            style={{ width: `${(theoryScore / totalWeight) * 100}%` }}
+                            initial={{ width: 0 }} 
+                            animate={{ width: `${(theoryScore / totalWeight) * 100}%` }}
+                            transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }} 
+                          />
                         )}
                         <div className="bg-slate-100 flex-1 rounded-r-full" />
                       </div>
                       <div className="flex items-center gap-3 flex-wrap text-[10px] text-slate-500">
                         {hasCA && <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-blue-500" />CA ({caTotal}/40)</span>}
-                        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-500" />Objective ({result.objective_score}/20)</span>
-                        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" />Theory ({theoryPending ? 'Pending' : `${theoryScore}/40`})</span>
+                        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-violet-500" />Objective ({result.objective_score}/{result.objective_total})</span>
+                        <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" />Theory ({theoryPending ? 'Pending' : `${theoryScore}/${result.theory_total}`})</span>
                       </div>
                     </div>
 
                     <Separator />
 
-                    {/* CA Section */}
+                    {/* CA Section - Always out of 40 */}
                     <ScoreBar
                       label="Continuous Assessment"
                       sublabel="(40 marks)"
@@ -544,27 +584,22 @@ export default function StudentResultDetailPage() {
 
                     <Separator />
 
-                    {/* Objective Section */}
+                    {/* Objective Section - Dynamic */}
                     <ScoreBar
                       label="Objective Exam"
-                      sublabel="(20 marks)"
+                      sublabel={`(${result.objective_total} marks)`}
                       score={result.objective_score}
                       total={result.objective_total}
                       color="bg-violet-500"
                       delay={0.2}
                     />
-                    {result.objective_total !== 20 && (
-                      <p className="text-[10px] text-slate-400 -mt-2 pl-1">
-                        Converted from {result.objective_total} questions to /20
-                      </p>
-                    )}
 
                     <Separator />
 
-                    {/* Theory Section */}
+                    {/* Theory Section - Dynamic */}
                     <ScoreBar
                       label="Theory Exam"
-                      sublabel="(40 marks)"
+                      sublabel={`(${result.theory_total} marks)`}
                       score={theoryScore}
                       total={result.theory_total}
                       color="bg-amber-500"
@@ -574,7 +609,7 @@ export default function StudentResultDetailPage() {
 
                     <Separator />
 
-                    {/* Grand Total */}
+                    {/* Grand Total - Dynamic */}
                     <div className={cn(
                       'flex items-center justify-between p-4 rounded-2xl border-2',
                       gradeConfig.bg, gradeConfig.border
@@ -585,7 +620,7 @@ export default function StudentResultDetailPage() {
                       </div>
                       <div className="text-right">
                         <p className={cn('text-2xl font-black', gradeConfig.text)}>
-                          {result.total_score}<span className="text-base font-normal text-slate-400">/100</span>
+                          {result.total_score}<span className="text-base font-normal text-slate-400">/{result.total_marks}</span>
                         </p>
                         <p className={cn('text-xs font-semibold', gradeConfig.text)}>{result.percentage}%</p>
                       </div>
@@ -610,7 +645,6 @@ export default function StudentResultDetailPage() {
                       </Badge>
                     </div>
                     <div className="p-5 sm:p-6 space-y-4">
-                      {/* Segmented bar */}
                       <div className="h-4 rounded-full overflow-hidden flex gap-0.5">
                         <motion.div className="bg-emerald-500 rounded-l-full"
                           initial={{ width: 0 }} animate={{ width: `${correctPct}%` }}
@@ -623,7 +657,6 @@ export default function StudentResultDetailPage() {
                           transition={{ delay: 0.3 }} />
                       </div>
 
-                      {/* Three stat cards */}
                       <div className="grid grid-cols-3 gap-3">
                         {[
                           { icon: CheckCircle, label: 'Correct',  value: result.correct_count,    pct: correctPct,   color: 'text-emerald-600', bg: 'bg-emerald-50', bar: 'bg-emerald-500' },
@@ -657,7 +690,6 @@ export default function StudentResultDetailPage() {
                     </div>
                     <div className="p-5 sm:p-6">
                       <div className="relative bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl p-5 border border-indigo-100">
-                        {/* Quote mark */}
                         <div className="absolute top-3 left-4 text-4xl text-indigo-200 font-serif leading-none select-none">"</div>
                         <p className="text-slate-700 italic leading-relaxed text-sm pl-4 pt-3">
                           {result.teacher_feedback}

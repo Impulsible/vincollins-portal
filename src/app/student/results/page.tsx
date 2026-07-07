@@ -322,7 +322,7 @@ function ResultCard({ result, index, onClick }: { result: ExamResult; index: num
                         {result.percentage}%
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        {result.total_score}/100
+                        {result.total_score}/{result.total_marks}
                       </div>
                       <div className={cn('text-[10px] font-semibold mt-1', cfg.color)}>
                         {cfg.label}
@@ -419,18 +419,39 @@ export default function StudentResultsPage() {
         setResults([]); setFilteredResults([]); setSubjectPerformance([])
         setAvailableSubjects([])
         setStats({ totalExams: 0, passedExams: 0, failedExams: 0, averageScore: 0, highestScore: 0, lowestScore: 100, pendingResults: 0 })
+        setLoading(false); setRefreshing(false)
         return
       }
 
       const examIds = [...new Set(attemptsData.map(a => a.exam_id))]
-      const { data: examsData } = await supabase.from('exams').select('id, title, subject, passing_percentage').in('id', examIds)
+      const { data: examsData } = await supabase
+        .from('exams')
+        .select('id, title, subject, passing_percentage, objective_max, theory_max, total_marks')
+        .in('id', examIds)
+      
       const examMap: Record<string, any> = {}
       if (examsData) examsData.forEach(e => { examMap[e.id] = e })
 
-      const { data: caScoresData } = await supabase.from('ca_scores')
-        .select('exam_id, ca1_score, ca2_score, total_score, percentage, grade').eq('student_id', profile.id)
+      // ✅ FIX: Get CA scores for the student
+      const { data: caScoresData } = await supabase
+        .from('ca_scores')
+        .select('exam_id, ca1_score, ca2_score, total_score, percentage, grade, subject, term, academic_year')
+        .eq('student_id', profile.id)
+
+      // Build CA scores map by exam_id
       const caScoresMap: Record<string, any> = {}
-      if (caScoresData) caScoresData.forEach(ca => { caScoresMap[ca.exam_id] = ca })
+      if (caScoresData) {
+        caScoresData.forEach(ca => {
+          if (ca.exam_id) {
+            caScoresMap[ca.exam_id] = ca
+          }
+          // Also store by subject for CA without exam_id
+          if (ca.subject) {
+            const key = `${ca.subject}_${ca.term || 'third'}_${ca.academic_year || '2025/2026'}`
+            caScoresMap[key] = ca
+          }
+        })
+      }
 
       const completedResults: ExamResult[] = []
       const subjectScores: Record<string, number[]> = {}
@@ -439,22 +460,68 @@ export default function StudentResultsPage() {
       for (const attempt of attemptsData) {
         if (!['completed', 'graded', 'pending_theory'].includes(attempt.status)) continue
         const exam = examMap[attempt.exam_id]
-        const ca = caScoresMap[attempt.exam_id]
+        
+        // ✅ FIX: Try to find CA by exam_id first, then by subject
+        let ca = caScoresMap[attempt.exam_id]
+        if (!ca && exam) {
+          const key = `${exam.subject}_third_2025/2026`
+          ca = caScoresMap[key]
+        }
+        
         const hasCA = !!(ca?.ca1_score || ca?.ca2_score)
-        const percentage = hasCA && ca?.percentage !== undefined ? ca.percentage : (attempt.percentage || 0)
-        const totalScore = hasCA ? (ca?.total_score || 0) : (attempt.total_score || 0)
+        
+        // ✅ FIX: Get dynamic exam configuration
+        const objectiveMax = exam?.objective_max || 30
+        const theoryMax = exam?.theory_max || 30
+        const totalExamMax = exam?.total_marks || (objectiveMax + theoryMax)
+        
+        const objectiveScore = Number(attempt.objective_score) || 0
+        const theoryScore = Number(attempt.theory_score) || 0
+        const examTotal = objectiveScore + theoryScore
+        const caTotal = (ca?.ca1_score || 0) + (ca?.ca2_score || 0)
+        
+        // ✅ Calculate percentage dynamically
+        let percentage: number
+        let totalScore: number
+        let totalMarks: number
+        
+        if (hasCA) {
+          // With CA: total out of (40 + totalExamMax)
+          const maxPossible = 40 + totalExamMax
+          totalScore = caTotal + examTotal
+          totalMarks = maxPossible
+          percentage = Math.round((totalScore / maxPossible) * 100)
+        } else {
+          // Without CA: only exam
+          totalScore = examTotal
+          totalMarks = totalExamMax
+          percentage = Math.round((examTotal / totalExamMax) * 100)
+        }
+        
         const isPassed = percentage >= 40
 
         completedResults.push({
-          id: attempt.id, exam_id: attempt.exam_id,
-          exam_title: exam?.title || 'Unknown Exam', exam_subject: exam?.subject || 'Unknown Subject',
-          status: attempt.status, percentage, total_score: totalScore, total_marks: 100,
-          objective_score: attempt.objective_score, objective_total: attempt.objective_total || 20,
-          theory_score: attempt.theory_score, theory_total: attempt.theory_total || 40,
-          ca1_score: ca?.ca1_score, ca2_score: ca?.ca2_score, has_ca: hasCA,
-          is_passed: isPassed, started_at: attempt.started_at || attempt.created_at,
-          completed_at: attempt.submitted_at, attempt_number: attempt.attempt_number || 1,
-          passing_percentage: 40, grade: getWAECGrade(percentage),
+          id: attempt.id, 
+          exam_id: attempt.exam_id,
+          exam_title: exam?.title || 'Unknown Exam', 
+          exam_subject: exam?.subject || 'Unknown Subject',
+          status: attempt.status, 
+          percentage, 
+          total_score: totalScore, 
+          total_marks: totalMarks,
+          objective_score: objectiveScore, 
+          objective_total: objectiveMax,
+          theory_score: attempt.theory_score || 0, 
+          theory_total: theoryMax,
+          ca1_score: ca?.ca1_score || null, 
+          ca2_score: ca?.ca2_score || null, 
+          has_ca: hasCA,
+          is_passed: isPassed, 
+          started_at: attempt.started_at || attempt.created_at,
+          completed_at: attempt.submitted_at, 
+          attempt_number: attempt.attempt_number || 1,
+          passing_percentage: exam?.passing_percentage || 40, 
+          grade: getWAECGrade(percentage),
         })
 
         const subj = exam?.subject || 'Unknown'
@@ -472,9 +539,12 @@ export default function StudentResultsPage() {
         .map(([subject, scores]) => {
           const avg = scores.reduce((a, b) => a + b, 0) / scores.length
           return {
-            subject, averageScore: Number(avg.toFixed(2)),
-            examsTaken: scores.length, bestScore: Math.max(...scores),
-            lowestScore: Math.min(...scores), grade: getWAECGrade(avg),
+            subject, 
+            averageScore: Number(avg.toFixed(2)),
+            examsTaken: scores.length, 
+            bestScore: Math.max(...scores),
+            lowestScore: Math.min(...scores), 
+            grade: getWAECGrade(avg),
           }
         })
         .sort((a, b) => b.averageScore - a.averageScore)
@@ -482,10 +552,19 @@ export default function StudentResultsPage() {
       const avgScore = completedResults.length > 0
         ? Number((totalPct / completedResults.length).toFixed(2)) : 0
 
-      setResults(completedResults); setFilteredResults(completedResults)
+      setResults(completedResults); 
+      setFilteredResults(completedResults)
       setAvailableSubjects([...new Set(Object.keys(subjectScores))].sort())
       setSubjectPerformance(performance)
-      setStats({ totalExams: completedResults.length, passedExams: passedCount, failedExams: failedCount, averageScore: avgScore, highestScore, lowestScore: lowestScore === 100 ? 0 : lowestScore, pendingResults: 0 })
+      setStats({ 
+        totalExams: completedResults.length, 
+        passedExams: passedCount, 
+        failedExams: failedCount, 
+        averageScore: avgScore, 
+        highestScore, 
+        lowestScore: lowestScore === 100 ? 0 : lowestScore, 
+        pendingResults: 0 
+      })
       if (showToast) toast.success('Results refreshed!')
     } catch (error) {
       console.error(error); toast.error('Failed to load results')

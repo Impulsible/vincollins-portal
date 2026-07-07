@@ -138,7 +138,17 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   useEffect(()=>{if(mounted&&!isRestoring&&selectedClass&&staffProfile?.id)checkSubjectsStatus()},[mounted,isRestoring,selectedClass,selectedTerm,selectedYear,staffProfile?.id,checkSubjectsStatus])
   useEffect(()=>{setIsLocked(selectedSubject?!!subjectsStatus[selectedSubject]?.enteredByOther:false)},[selectedSubject,subjectsStatus])
 
-  const handleClassChange=(v:string)=>{setSelectedClass(v);setSelectedSubject('');setSelectedExamId('');setSkipExam(false);setCAScores([])}
+  const handleClassChange=(v:string)=>{
+    setSelectedClass(v)
+    setSelectedSubject('')
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+    // Clear existing score entries when class changes
+    setScoreEntries({})
+    setSavedStatus({})
+  }
+
   const handleSubjectChange=(v:string)=>{setSelectedSubject(v);setSelectedExamId('');setSkipExam(false);setCAScores([])}
   const handleTermChange=(v:string)=>{setSelectedTerm(v);setSelectedExamId('');setSkipExam(false);setCAScores([])}
   const handleYearChange=(v:string)=>{setSelectedYear(v);setSelectedExamId('');setSkipExam(false);setCAScores([])}
@@ -163,7 +173,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   useEffect(()=>{
     if(!selectedSubject||!selectedTerm||!selectedYear||isRestoring||skipExam)return
     const loadExams=async()=>{
-      const{data}=await supabase.from('exams').select('id,title,class').eq('subject',selectedSubject).eq('term',selectedTerm).eq('session_year',selectedYear).eq('status','published').order('created_at',{ascending:false})
+      const{data}=await supabase.from('exams').select('id,title,class,objective_max,theory_max,total_marks').eq('subject',selectedSubject).eq('term',selectedTerm).eq('session_year',selectedYear).eq('status','published').order('created_at',{ascending:false})
       setAvailableExams(data||[])
       if(data&&data.length>0&&!selectedExamId&&!skipExam){
         const matchingExam=data.find((e:any)=>e.class===selectedClass)
@@ -185,17 +195,17 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       if(!profileData||profileData.length===0){setStudents([]);setCAScores([]);setLoading(false);return}
       const formatted:Student[]=profileData.map((p:any)=>({id:p.id,full_name:p.display_name||p.full_name||'Unknown',class:p.class,admission_number:p.admission_number||'—',vin_id:p.vin_id||'—'}))
       setStudents(formatted)
+      
       let sq=supabase.from('ca_scores').select('*').in('student_id',formatted.map(s=>s.id)).eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
       sq=classVariations.length>1?sq.in('class',classVariations):sq.eq('class',selectedClass)
       const{data:scoresData,error:scoresError}=await sq
       if(scoresError)throw scoresError
+      
       const entries:Record<string,ScoreEntry>={}; const savedMap:Record<string,boolean>={}
       formatted.forEach(s=>{entries[s.id]={ca1:'',ca2:'',exam:'',is_saved:false}})
       let totalSum=0,gradedCount=0,highest=0,passCount=0,failCount=0
       ;(scoresData||[]).forEach((score:any)=>{
-        // FIX: Get exam total correctly - combine objective and theory
         const examTotal=(score.exam_objective_score||0)+(score.exam_theory_score||0)
-        // If there's a separate exam_total field, use it (for backward compatibility)
         const examScore = score.exam_total || examTotal
         const total=(score.ca1_score||0)+(score.ca2_score||0)+examScore
         entries[score.student_id]={ca1:score.ca1_score?.toString()||'',ca2:score.ca2_score?.toString()||'',exam:examScore>0?examScore.toString():'',is_saved:true}
@@ -206,9 +216,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       setStats({totalStudents:formatted.length,gradedStudents:gradedCount,classAverage:gradedCount>0?Math.round(totalSum/gradedCount):0,highestScore:highest,passCount,failCount,passRate:gradedCount>0?Math.round((passCount/gradedCount)*100):0})
     }catch{toast.error('Failed to load data')}
     finally{setLoading(false)}
-  },[selectedClass,selectedSubject,selectedTerm,selectedYear,selectedExamId,skipExam])
+  },[selectedClass,selectedSubject,selectedTerm,selectedYear])
 
-  // FIX: Completely rewritten loadScoresForViewTab to handle duplicates and sorting properly
   const loadScoresForViewTab=useCallback(async()=>{
     if(!selectedClass||!selectedSubject||!selectedTerm||!selectedYear)return
     setLoading(true)
@@ -220,31 +229,24 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       if(error)throw error
       
       if(scoresData&&scoresData.length>0){
-        // Group by student_id to remove duplicates
         const studentMap=new Map()
         scoresData.forEach((s:any)=>{
           const existing=studentMap.get(s.student_id)
           if(!existing){
-            // First time seeing this student - store the score
             studentMap.set(s.student_id,{...s})
           } else {
-            // Merge scores - prefer non-zero values
-            // For CA1: use the non-zero value
             if(s.ca1_score>0 && existing.ca1_score===0) {
               existing.ca1_score = s.ca1_score
             }
-            // For CA2: use the non-zero value
             if(s.ca2_score>0 && existing.ca2_score===0) {
               existing.ca2_score = s.ca2_score
             }
-            // For Exam: combine objective and theory, use the non-zero total
             const sExam=(s.exam_objective_score||0)+(s.exam_theory_score||0)
             const eExam=(existing.exam_objective_score||0)+(existing.exam_theory_score||0)
             if(sExam>0 && eExam===0){
               existing.exam_objective_score = s.exam_objective_score || 0
               existing.exam_theory_score = s.exam_theory_score || 0
             }
-            // Recalculate totals
             const ca1=existing.ca1_score||0
             const ca2=existing.ca2_score||0
             const exam=(existing.exam_objective_score||0)+(existing.exam_theory_score||0)
@@ -253,12 +255,10 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             existing.percentage=total>0 ? total : 0
             existing.grade=getGrade(total)
             existing.remark=getGradeRemark(existing.grade)
-            // Update the map with merged data
             studentMap.set(s.student_id,existing)
           }
         })
         
-        // Get student details
         const studentIds=Array.from(studentMap.keys())
         const{data:profiles}=await supabase
           .from('profiles')
@@ -273,7 +273,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           })
         })
         
-        // Build final array and sort alphabetically
         const mergedScores=Array.from(studentMap.values())
         const result=mergedScores
           .map((s:any)=>({
@@ -298,13 +297,37 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   },[selectedClass,selectedSubject,selectedTerm,selectedYear])
 
-  useEffect(()=>{if(!isRestoring&&selectedClass&&selectedSubject&&selectedTerm&&selectedYear)loadAllData()},[loadAllData,isRestoring])
+  useEffect(()=>{
+    if(!isRestoring&&selectedClass&&selectedSubject&&selectedTerm&&selectedYear){
+      loadAllData()
+    }
+  },[selectedClass,selectedSubject,selectedTerm,selectedYear,loadAllData,isRestoring])
+
   useEffect(()=>{if(activeTab==='view'&&selectedClass&&selectedSubject)loadScoresForViewTab()},[activeTab,selectedClass,selectedSubject,loadScoresForViewTab])
 
   const updateStatsFromEntries=()=>{
     let totalSum=0,gradedCount=0,highest=0,passCount=0,failCount=0
-    students.forEach(student=>{const e=scoreEntries[student.id];if(!e)return;const total=(parseInt(e.ca1)||0)+(parseInt(e.ca2)||0)+(parseInt(e.exam)||0);if(total>0){totalSum+=total;gradedCount++;if(total>highest)highest=total;if(getGrade(total)!=='F9')passCount++;else failCount++}})
-    setStats({totalStudents:students.length,gradedStudents:gradedCount,classAverage:gradedCount>0?Math.round(totalSum/gradedCount):0,highestScore:highest,passCount,failCount,passRate:gradedCount>0?Math.round((passCount/gradedCount)*100):0})
+    students.forEach(student=>{
+      const e=scoreEntries[student.id]
+      if(!e)return
+      const total=(parseInt(e.ca1)||0)+(parseInt(e.ca2)||0)+(parseInt(e.exam)||0)
+      if(total>0){
+        totalSum+=total
+        gradedCount++
+        if(total>highest)highest=total
+        if(getGrade(total)!=='F9')passCount++
+        else failCount++
+      }
+    })
+    setStats({
+      totalStudents:students.length,
+      gradedStudents:gradedCount,
+      classAverage:gradedCount>0?Math.round(totalSum/gradedCount):0,
+      highestScore:highest,
+      passCount,
+      failCount,
+      passRate:gradedCount>0?Math.round((passCount/gradedCount)*100):0
+    })
   }
 
   const handleScoreChange=(studentId:string,field:keyof ScoreEntry,value:string)=>{
@@ -316,7 +339,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setTimeout(updateStatsFromEntries,50)
   }
 
-  // FIX: Store exam score properly - use exam_theory_score for the total exam score
   const buildSavePayload=(studentId:string,ca1:number,ca2:number,exam:number,studentClass:string):any=>{
     const total=ca1+ca2+exam
     const percentage=total>0?total:0
@@ -329,10 +351,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       academic_year:selectedYear,
       ca1_score:ca1,
       ca2_score:ca2,
-      // Store the exam score in exam_theory_score (as total exam score)
-      // Set exam_objective_score to 0 since we're entering total exam score
       exam_objective_score:0,
-      exam_theory_score:exam, // Store total exam score here
+      exam_theory_score:exam,
       total_score:total,
       percentage,
       grade,
@@ -348,37 +368,243 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return d
   }
 
-  const handleAutoFetchSingle=async(studentId:string)=>{
-    if(!selectedExamId||skipExam){toast.info('No exam selected');return}
-    const{data,error}=await supabase.from('exam_attempts').select('*').eq('exam_id',selectedExamId).eq('student_id',studentId).order('created_at',{ascending:false}).limit(1).maybeSingle()
-    if(error||!data){toast.info('No attempt found');return}
-    const obj=Number(data.objective_score)||0
-    const thy=Number(data.theory_score)||0
-    let total=obj+thy
-    if(total===0&&data.total_score)total=Number(data.total_score)
-    if(total===0){toast.info('No score found');return}
-    setScoreEntries(prev=>({...prev,[studentId]:{...prev[studentId],exam:String(Math.round(total)),is_saved:false}}))
-    setSavedStatus(prev=>({...prev,[studentId]:false}))
-    toast.success(`Loaded: ${Math.round(total)}`);setTimeout(updateStatsFromEntries,50)
+  // ✅ FIXED: Auto-fetch single - fetches from ALL exams for the subject
+  const handleAutoFetchSingle = async (studentId: string) => {
+    if (!selectedSubject || !selectedTerm || !selectedYear) {
+      toast.info('Please select subject, term, and year first')
+      return
+    }
+    
+    try {
+      // Get ALL exams for this subject, term, and year
+      const { data: examsData } = await supabase
+        .from('exams')
+        .select('id, total_marks')
+        .eq('subject', selectedSubject)
+        .eq('term', selectedTerm)
+        .eq('session_year', selectedYear)
+        .eq('status', 'published')
+      
+      if (!examsData || examsData.length === 0) {
+        toast.info('No published exams found')
+        return
+      }
+      
+      const examIds = examsData.map(e => e.id)
+      
+      // Get the latest attempt for this student across ALL exams
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .in('exam_id', examIds)
+        .eq('student_id', studentId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      
+      if (error || !data) { 
+        toast.info('No attempt found') 
+        return 
+      }
+      
+      // Find which exam this attempt belongs to
+      const exam = examsData.find(e => e.id === data.exam_id)
+      const totalMax = exam?.total_marks || 60
+      
+      const objScore = Number(data.objective_score) || 0
+      const theoryScore = Number(data.theory_score) || 0
+      
+      // Use total_score if available, otherwise calculate
+      let total = data.total_score || (objScore + theoryScore)
+      
+      if (total === 0 && (objScore > 0 || theoryScore > 0)) {
+        total = objScore + theoryScore
+      }
+      
+      if (total === 0) { 
+        toast.info('No score found') 
+        return 
+      }
+      
+      // ✅ Update score entries
+      setScoreEntries(prev => ({
+        ...prev,
+        [studentId]: { 
+          ...prev[studentId], 
+          ca1: prev[studentId]?.ca1 || '',
+          ca2: prev[studentId]?.ca2 || '',
+          exam: String(Math.round(total)), 
+          is_saved: false 
+        }
+      }))
+      setSavedStatus(prev => ({ ...prev, [studentId]: false }))
+      toast.success(`Loaded: ${Math.round(total)}/${totalMax}`)
+      setTimeout(updateStatsFromEntries, 50)
+      
+    } catch (error) {
+      console.error('Auto-fetch error:', error)
+      toast.error('Failed to fetch exam score')
+    }
   }
 
-  const handleAutoFetchAll=async()=>{
-    if(!selectedExamId||skipExam){toast.info('No exam selected');return}
-    setAutoFetching(true)
-    const{data:allAttempts}=await supabase.from('exam_attempts').select('*').eq('exam_id',selectedExamId)
-    let resultsMap=new Map();if(allAttempts)allAttempts.forEach((a:any)=>{if(!resultsMap.has(a.student_id))resultsMap.set(a.student_id,a)})
-    let count=0;const newEntries={...scoreEntries},newSaved={...savedStatus}
-    for(const student of students){
-      const attempt=resultsMap.get(student.id)
-      if(attempt){
-        const obj=Number(attempt.objective_score)||0,thy=Number(attempt.theory_score)||0
-        let total=obj+thy;if(total===0&&attempt.total_score)total=Number(attempt.total_score)
-        if(total>0){newEntries[student.id]={...newEntries[student.id],exam:String(Math.round(total)),is_saved:false};newSaved[student.id]=false;count++}
-      }
+  // ✅ FIXED: Auto-fetch all - fetches from ALL exams for the subject
+  const handleAutoFetchAll = async () => {
+    if (!selectedSubject || !selectedTerm || !selectedYear) {
+      toast.info('Please select subject, term, and year first')
+      return
     }
-    setScoreEntries(newEntries);setSavedStatus(newSaved);setAutoFetching(false)
-    if(count>0){toast.success(`Loaded ${count} exam score(s)`);setTimeout(updateStatsFromEntries,50)}
-    else toast.info('No matching scores found')
+    
+    if (!selectedClass) {
+      toast.info('Please select a class first')
+      return
+    }
+    
+    setAutoFetching(true)
+    let count = 0
+    let totalFound = 0
+    
+    try {
+      // Get ALL exams for this subject, term, and year
+      const { data: examsData, error: examsError } = await supabase
+        .from('exams')
+        .select('id, title, objective_max, theory_max, total_marks, class')
+        .eq('subject', selectedSubject)
+        .eq('term', selectedTerm)
+        .eq('session_year', selectedYear)
+        .eq('status', 'published')
+      
+      if (examsError) {
+        console.error('❌ Exams fetch error:', examsError)
+        toast.error('Failed to fetch exam configuration')
+        setAutoFetching(false)
+        return
+      }
+      
+      if (!examsData || examsData.length === 0) {
+        toast.info('No published exams found for this subject, term, and year')
+        setAutoFetching(false)
+        return
+      }
+      
+      console.log(`📋 Found ${examsData.length} exams for ${selectedSubject} (${selectedTerm} ${selectedYear}):`)
+      examsData.forEach(e => console.log(`  - ${e.title} (Class: ${e.class || 'N/A'}) (${e.id})`))
+      
+      // Get ALL attempts for ALL these exams
+      const examIds = examsData.map(e => e.id)
+      const { data: allAttempts, error: attemptsError } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .in('exam_id', examIds)
+      
+      if (attemptsError) {
+        console.error('❌ Attempts fetch error:', attemptsError)
+        toast.error('Failed to fetch exam attempts')
+        setAutoFetching(false)
+        return
+      }
+      
+      console.log(`📊 Found ${allAttempts?.length || 0} total exam attempts across ${examsData.length} exams`)
+      
+      // Map attempts by student_id (keep the latest)
+      const resultsMap = new Map()
+      if (allAttempts) {
+        allAttempts.forEach((a: any) => {
+          const existing = resultsMap.get(a.student_id)
+          if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
+            resultsMap.set(a.student_id, a)
+          }
+        })
+      }
+      
+      console.log(`📊 ${resultsMap.size} unique students with attempts`)
+      console.log(`🎯 Looking for students in class: ${selectedClass}`)
+      
+      // Debug: Log current students
+      console.log('👨‍🎓 Current students in UI:', students.map(s => ({ id: s.id, name: s.full_name, class: s.class })))
+      
+      // Check if students exist
+      if (students.length === 0) {
+        toast.warning('No students found for this class. Please refresh the page.')
+        setAutoFetching(false)
+        return
+      }
+      
+      // Create new entries
+      const newEntries = { ...scoreEntries }
+      const newSaved = { ...savedStatus }
+      const loadedStudents: string[] = []
+      
+      for (const student of students) {
+        const attempt = resultsMap.get(student.id)
+        if (attempt) {
+          const exam = examsData.find(e => e.id === attempt.exam_id)
+          const totalMax = exam?.total_marks || 60
+          
+          const objScore = Number(attempt.objective_score) || 0
+          const theoryScore = Number(attempt.theory_score) || 0
+          
+          // Use total_score if available, otherwise calculate
+          let total = attempt.total_score || (objScore + theoryScore)
+          
+          if (total === 0 && (objScore > 0 || theoryScore > 0)) {
+            total = objScore + theoryScore
+          }
+          
+          console.log(`📝 ${student.full_name}: Obj=${objScore}, Theory=${theoryScore}, Total=${total}/${totalMax}`)
+          
+          if (total > 0) {
+            newEntries[student.id] = {
+              ca1: newEntries[student.id]?.ca1 || '',
+              ca2: newEntries[student.id]?.ca2 || '',
+              exam: String(Math.round(total)),
+              is_saved: false
+            }
+            newSaved[student.id] = false
+            count++
+            totalFound += total
+            loadedStudents.push(`${student.full_name} (${total}/${totalMax})`)
+          } else {
+            console.log(`⚠️ ${student.full_name}: Score is 0, skipping`)
+          }
+        } else {
+          console.log(`❌ ${student.full_name}: No attempt found`)
+        }
+      }
+      
+      console.log(`✅ Loaded ${count} scores for:`, loadedStudents)
+      
+      // ✅ Update state
+      setScoreEntries(newEntries)
+      setSavedStatus(newSaved)
+      
+      // ✅ Force stats update
+      setTimeout(() => {
+        updateStatsFromEntries()
+      }, 50)
+      
+      if (count > 0) {
+        const avgScore = Math.round(totalFound / count)
+        toast.success(`Loaded ${count} exam score(s) for ${selectedClass} (avg: ${avgScore}%)`)
+      } else {
+        if (resultsMap.size > 0) {
+          const studentIds = new Set(students.map(s => s.id))
+          const matchedStudents = Array.from(resultsMap.keys()).filter(id => studentIds.has(id))
+          
+          if (matchedStudents.length === 0) {
+            toast.warning(`Found ${resultsMap.size} attempts but none match students in "${selectedClass}". The attempts may be for a different class.`)
+          } else {
+            toast.info(`Found ${matchedStudents.length} students with attempts but no scores > 0`)
+          }
+        } else {
+          toast.info(`No exam attempts found for ${selectedClass} in this subject`)
+        }
+      }
+    } catch (error: any) {
+      console.error('❌ Auto-fetch error:', error)
+      toast.error(`Failed to fetch exam scores: ${error.message}`)
+    } finally {
+      setAutoFetching(false)
+    }
   }
 
   const handleSaveSingle=async(studentId:string)=>{
