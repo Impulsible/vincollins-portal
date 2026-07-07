@@ -1,4 +1,4 @@
-// src/app/student/exam/[id]/hooks/useExamLoader.ts - DYNAMIC FIXED
+// src/app/student/exam/[id]/hooks/useExamLoader.ts - DYNAMIC FIXED + SHUFFLE RESPECT
 
 "use client"
 
@@ -173,9 +173,10 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         image_caption: q.image_caption || null,
       }))
 
-      // Shuffle MCQ questions
-      const shuffledMcq = shuffleArray(mcqList)
-      const allQ = [...shuffledMcq, ...theoryList]
+      // ✅ Respect exam shuffle setting
+      const shouldShuffle = ed.shuffle_questions !== false && ed.randomize_questions !== false
+      const orderedMcq = shouldShuffle ? shuffleArray(mcqList) : mcqList
+      const allQ = [...orderedMcq, ...theoryList]
       setAllQuestions(allQ)
 
       // ✅ Determine if exam has theory questions
