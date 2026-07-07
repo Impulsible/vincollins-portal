@@ -1,4 +1,4 @@
-// src/app/student/exam/[id]/hooks/useExamLoader.ts - DYNAMIC FIXED + SHUFFLE RESPECT
+// src/app/student/exam/[id]/hooks/useExamLoader.ts - FIXED MISSING TYPE FIELD
 
 "use client"
 
@@ -130,7 +130,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       const allQuestionsFromDB = ed.questions || []
       const theoryQuestionsFromDB = ed.theory_questions || []
 
-      // Separate questions
+      // Separate questions - ✅ FIXED: Handle missing type field (defaults to objective)
       let objectiveQuestionsRaw: any[] = []
       let theoryQuestionsRaw: any[] = []
 
@@ -138,9 +138,14 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         theoryQuestionsRaw = theoryQuestionsFromDB
         objectiveQuestionsRaw = allQuestionsFromDB.filter((q: any) => q.type !== 'theory')
       } else {
-        objectiveQuestionsRaw = allQuestionsFromDB.filter((q: any) => q.type === 'mcq' || q.type === 'objective')
+        // ✅ Include questions without type as objective (fixes Yoruba, French, etc.)
+        objectiveQuestionsRaw = allQuestionsFromDB.filter((q: any) => 
+          q.type === 'mcq' || q.type === 'objective' || !q.type || q.type === null
+        )
         theoryQuestionsRaw = allQuestionsFromDB.filter((q: any) => q.type === 'theory')
       }
+
+      console.log(`📊 Questions found: ${objectiveQuestionsRaw.length} objective, ${theoryQuestionsRaw.length} theory`)
 
       // Build MCQ/Objective questions
       let mcqList = objectiveQuestionsRaw.map((q: any, i: number) => ({
@@ -150,9 +155,9 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         type: "objective",
         options: q.options || [],
         correct_answer: q.correct_answer || "",
-        marks: Number(q.marks || 0.5),
-        points: Number(q.marks || 0.5),
-        order_number: q.order || i + 1,
+        marks: Number(q.marks || q.points || 0.5),
+        points: Number(q.points || q.marks || 0.5),
+        order_number: q.order || q.order_number || i + 1,
         is_theory: false,
       }))
 
@@ -164,9 +169,9 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         type: "theory",
         options: [],
         correct_answer: "",
-        marks: Number(q.marks || theoryMarksPerQuestion),
-        points: Number(q.marks || theoryMarksPerQuestion),
-        order_number: q.order || i + 1,
+        marks: Number(q.marks || q.points || theoryMarksPerQuestion),
+        points: Number(q.points || q.marks || theoryMarksPerQuestion),
+        order_number: q.order || q.order_number || i + 1,
         is_theory: true,
         sub_questions: q.sub_questions || [],
         image_url: q.image_url || null,
