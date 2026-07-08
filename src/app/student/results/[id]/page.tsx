@@ -169,7 +169,7 @@ export default function StudentResultDetailPage() {
   const [result, setResult] = useState<ExamResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // ─── FIXED: Load result dynamically from exam config ──
+  // ─── FIXED: Load result with grade progression ──
   const loadResult = useCallback(async () => {
     if (!examId) return
     setLoading(true); setError(null)
@@ -195,7 +195,6 @@ export default function StudentResultDetailPage() {
 
       if (!att) { setError('No submission found for this exam'); setLoading(false); return }
 
-      // ✅ Get exam details dynamically
       const { data: exam } = await supabase.from('exams').select('*').eq('id', att.exam_id).maybeSingle()
 
       let theoryScore: number | null = null
@@ -215,37 +214,47 @@ export default function StudentResultDetailPage() {
       const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
       const hasCA = ca1 !== null && ca2 !== null
+      const hasTheory = theoryScore !== null && theoryScore > 0
 
-      // ✅ DYNAMIC: Read actual exam configuration
-      const objectiveMax = exam?.objective_max || 30
-      const theoryMax = exam?.theory_max || 30
-      const totalExamMax = exam?.total_marks || (objectiveMax + theoryMax)
+      // ✅ Get exam configuration
+      const objectiveMax = exam?.objective_max ?? 20
+      const theoryMax = 60 - objectiveMax
+      const totalExamMax = 60
 
-      // ✅ Get the actual scores (already out of objectiveMax and theoryMax)
+      // Get scores
       const objectiveScore = Number(att.objective_score) || 0
       const theoryValue = theoryScore || 0
 
       // Calculate CA total (out of 40)
       const ca1Value = ca1 || 0
       const ca2Value = ca2 || 0
-      const caTotal = ca1Value + ca2Value // Always out of 40
+      const caTotal = ca1Value + ca2Value
 
-      // ✅ Exam total = objectiveScore + theoryValue (out of totalExamMax)
-      const examTotal = objectiveScore + theoryValue
-
-      // ✅ Grand total = CA (40) + Exam (totalExamMax)
-      const maxPossible = 40 + totalExamMax // CA (40) + Exam (totalExamMax)
-      const grandTotal = caTotal + examTotal
-
-      // ✅ Calculate percentage based on max possible
+      // ✅ Grade Progression - Calculate based on what's available
       let percentage: number
+      let totalScore: number
+      let totalMarks: number
+
       if (hasCA) {
-        // With CA: total out of (40 + totalExamMax)
-        percentage = Math.round((grandTotal / maxPossible) * 100)
+        // ✅ When CA is available, total is ALWAYS out of 100
+        // Even if theory is pending, it's counted as 0
+        totalScore = caTotal + objectiveScore + theoryValue  // theoryValue is 0 if pending
+        totalMarks = 100
+        percentage = Math.round((totalScore / totalMarks) * 100)
+      } else if (hasTheory) {
+        // ✅ No CA, but theory available: out of 60
+        totalScore = objectiveScore + theoryValue
+        totalMarks = 60
+        percentage = Math.round((totalScore / totalMarks) * 100)
       } else {
-        // Without CA: only exam
-        percentage = Math.round((examTotal / totalExamMax) * 100)
+        // ✅ Only Objective: out of objectiveMax
+        totalScore = objectiveScore
+        totalMarks = objectiveMax
+        percentage = Math.round((totalScore / totalMarks) * 100)
       }
+
+      // ✅ Safety: Cap at 100
+      if (percentage > 100) percentage = 100
 
       const finalGrade = getGradeConfig(percentage).grade
       const isPassed = finalGrade !== 'F9'
@@ -258,9 +267,8 @@ export default function StudentResultDetailPage() {
         exam_class: exam?.class || '—',
         status: att.status,
         percentage,
-        total_score: grandTotal,
-        total_marks: maxPossible, // Dynamic max possible
-        // ✅ Show actual scores with their actual totals
+        total_score: totalScore,
+        total_marks: totalMarks,
         objective_score: objectiveScore,
         objective_total: objectiveMax,
         theory_score: theoryValue,
@@ -345,7 +353,7 @@ export default function StudentResultDetailPage() {
   // ── Data ───────────────────────────────────────────
   const gradeConfig = getGradeConfig(result.percentage)
   const GradeIcon = gradeConfig.icon
-  const theoryPending = result.status === 'pending_theory'
+  const theoryPending = result.status === 'pending_theory' || (result.theory_score === 0 && result.theory_total > 0)
   const hasCA = result.ca1_score !== null && result.ca2_score !== null
   const caTotal = (result.ca1_score || 0) + (result.ca2_score || 0)
   const theoryScore = result.theory_score || 0
@@ -358,8 +366,6 @@ export default function StudentResultDetailPage() {
   const caPercentage = 40 > 0 ? Math.round((caTotal / 40) * 100) : 0
 
   // Calculate percentage of total for each section
-  const caWeight = 40 // CA is always out of 40
-  const examWeight = result.total_marks - 40 // Exam weight is dynamic
   const totalWeight = result.total_marks
 
   return (
@@ -487,8 +493,28 @@ export default function StudentResultDetailPage() {
                       <p className="text-sm font-semibold text-amber-800">Theory Grading In Progress</p>
                       <p className="text-xs text-amber-700 mt-1 leading-relaxed">
                         Your theory answers are being reviewed by your teacher. The current score of{' '}
-                        <strong>{result.percentage}%</strong> reflects only the objective section
-                        {hasCA ? ' and CA scores' : ''}. Your final score will update once grading is complete.
+                        <strong>{result.percentage}%</strong> reflects{' '}
+                        {hasCA ? 'Objective + CA scores' : 'Objective section only'}.
+                        Your final score will update once theory grading is complete.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── CA Pending Notice ───────────────── */}
+              {!hasCA && (
+                <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
+                  <div className="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl p-4">
+                    <div className="h-9 w-9 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                      <Clock className="h-4.5 w-4.5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-blue-800">CA Scores Pending</p>
+                      <p className="text-xs text-blue-700 mt-1 leading-relaxed">
+                        Your Continuous Assessment scores are being added by your teacher.
+                        Current score reflects {theoryPending ? 'Objective only' : 'Objective + Theory'}.
+                        Final grade will update once CA is added.
                       </p>
                     </div>
                   </div>
@@ -617,6 +643,7 @@ export default function StudentResultDetailPage() {
                       <div>
                         <p className="text-sm font-bold text-slate-700">Grand Total</p>
                         {theoryPending && <p className="text-[10px] text-amber-600 mt-0.5">*May increase after theory grading</p>}
+                        {!hasCA && <p className="text-[10px] text-blue-600 mt-0.5">*CA scores pending</p>}
                       </div>
                       <div className="text-right">
                         <p className={cn('text-2xl font-black', gradeConfig.text)}>

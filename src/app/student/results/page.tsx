@@ -322,7 +322,7 @@ function ResultCard({ result, index, onClick }: { result: ExamResult; index: num
                         {result.percentage}%
                       </div>
                       <div className="text-[10px] text-slate-400 mt-0.5">
-                        {result.total_score}/{result.total_marks}
+                        {result.total_score}/100
                       </div>
                       <div className={cn('text-[10px] font-semibold mt-1', cfg.color)}>
                         {cfg.label}
@@ -432,20 +432,19 @@ export default function StudentResultsPage() {
       const examMap: Record<string, any> = {}
       if (examsData) examsData.forEach(e => { examMap[e.id] = e })
 
-      // ✅ FIX: Get CA scores for the student
+      // ✅ Get CA scores
       const { data: caScoresData } = await supabase
         .from('ca_scores')
         .select('exam_id, ca1_score, ca2_score, total_score, percentage, grade, subject, term, academic_year')
         .eq('student_id', profile.id)
 
-      // Build CA scores map by exam_id
+      // Build CA scores map
       const caScoresMap: Record<string, any> = {}
       if (caScoresData) {
         caScoresData.forEach(ca => {
           if (ca.exam_id) {
             caScoresMap[ca.exam_id] = ca
           }
-          // Also store by subject for CA without exam_id
           if (ca.subject) {
             const key = `${ca.subject}_${ca.term || 'third'}_${ca.academic_year || '2025/2026'}`
             caScoresMap[key] = ca
@@ -461,7 +460,7 @@ export default function StudentResultsPage() {
         if (!['completed', 'graded', 'pending_theory'].includes(attempt.status)) continue
         const exam = examMap[attempt.exam_id]
         
-        // ✅ FIX: Try to find CA by exam_id first, then by subject
+        // ✅ Find CA
         let ca = caScoresMap[attempt.exam_id]
         if (!ca && exam) {
           const key = `${exam.subject}_third_2025/2026`
@@ -469,34 +468,39 @@ export default function StudentResultsPage() {
         }
         
         const hasCA = !!(ca?.ca1_score || ca?.ca2_score)
-        
-        // ✅ FIX: Get dynamic exam configuration
         const objectiveMax = exam?.objective_max || 30
         const theoryMax = exam?.theory_max || 30
-        const totalExamMax = exam?.total_marks || (objectiveMax + theoryMax)
         
         const objectiveScore = Number(attempt.objective_score) || 0
         const theoryScore = Number(attempt.theory_score) || 0
-        const examTotal = objectiveScore + theoryScore
         const caTotal = (ca?.ca1_score || 0) + (ca?.ca2_score || 0)
         
-        // ✅ Calculate percentage dynamically
+        // ✅ CORRECT CALCULATION - Scale everything to 100
         let percentage: number
         let totalScore: number
-        let totalMarks: number
+        let totalMarks: number = 100  // Always 100
+        let grade: string
         
         if (hasCA) {
-          // With CA: total out of (40 + totalExamMax)
-          const maxPossible = 40 + totalExamMax
-          totalScore = caTotal + examTotal
-          totalMarks = maxPossible
-          percentage = Math.round((totalScore / maxPossible) * 100)
+          // ✅ Stage 3: CA + Objective + Theory = out of 100
+          totalScore = caTotal + objectiveScore + theoryScore
+          percentage = Math.round((totalScore / 100) * 100)
+          grade = ca?.grade || getWAECGrade(percentage)
+        } else if (theoryScore > 0) {
+          // ✅ Stage 2: Objective + Theory = out of 60, scaled to 100
+          const examTotal = objectiveScore + theoryScore
+          totalScore = Math.round((examTotal / 60) * 100)
+          percentage = totalScore
+          grade = getWAECGrade(percentage)
         } else {
-          // Without CA: only exam
-          totalScore = examTotal
-          totalMarks = totalExamMax
-          percentage = Math.round((examTotal / totalExamMax) * 100)
+          // ✅ Stage 1: Only Objective = out of objectiveMax, scaled to 100
+          totalScore = Math.round((objectiveScore / objectiveMax) * 100)
+          percentage = totalScore
+          grade = getWAECGrade(percentage)
         }
+        
+        // Safety cap
+        if (percentage > 100) percentage = 100
         
         const isPassed = percentage >= 40
 
@@ -508,7 +512,7 @@ export default function StudentResultsPage() {
           status: attempt.status, 
           percentage, 
           total_score: totalScore, 
-          total_marks: totalMarks,
+          total_marks: totalMarks,  // ✅ Always 100
           objective_score: objectiveScore, 
           objective_total: objectiveMax,
           theory_score: attempt.theory_score || 0, 
@@ -521,7 +525,7 @@ export default function StudentResultsPage() {
           completed_at: attempt.submitted_at, 
           attempt_number: attempt.attempt_number || 1,
           passing_percentage: exam?.passing_percentage || 40, 
-          grade: getWAECGrade(percentage),
+          grade: grade,
         })
 
         const subj = exam?.subject || 'Unknown'
