@@ -1,5 +1,5 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/staff/StaffSidebar.tsx - WITH GRADE ASSIGNMENTS & FIXED STATS FETCHING
+// components/staff/StaffSidebar.tsx - WITH FIXED STATS FETCHING
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -41,6 +41,8 @@ interface StaffProfile {
   avatar_url?: string | null
   department?: string
   role?: string
+  school_id?: string | null
+  class?: string | null
 }
 
 interface StaffSidebarProps {
@@ -65,9 +67,10 @@ interface SidebarStats {
   studentCount: number
   examCount: number
   pendingGradingCount: number
+  assignmentCount: number
 }
 
-// ✅ Primary navigation with Announcements and Grade Assignments
+// Primary Navigation
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
   { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'School Updates', route: '/staff/announcements' },
@@ -86,7 +89,7 @@ const secondaryNavigation: NavigationItem[] = [
   { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance', route: '/staff/help' },
 ]
 
-// Get first name from profile
+// Helper functions
 const getFirstName = (profile?: StaffProfile | null): string => {
   if (profile?.first_name) {
     const firstName = profile.first_name.trim()
@@ -102,37 +105,26 @@ const getFirstName = (profile?: StaffProfile | null): string => {
   return 'Teacher'
 }
 
-// Get display name
 const getDisplayName = (profile?: StaffProfile | null): string => {
-  if (profile?.display_name) {
-    return profile.display_name
-  }
-  
+  if (profile?.display_name) return profile.display_name
   if (profile?.first_name && profile?.last_name) {
     const firstName = profile.first_name.trim()
     const lastName = profile.last_name.trim()
     return `${firstName} ${lastName}`.split(' ').map(p => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()).join(' ')
   }
-  
-  if (profile?.full_name) {
-    return profile.full_name
-  }
-  
+  if (profile?.full_name) return profile.full_name
   return 'Staff Member'
 }
 
-// Get initials for avatar
 const getInitials = (profile?: StaffProfile | null): string => {
   const displayName = profile?.display_name || profile?.full_name || 'Teacher'
   const names = displayName.split(' ')
-  
   if (names.length >= 2) {
     return (names[0][0] + names[names.length - 1][0]).toUpperCase()
   }
   return displayName.slice(0, 2).toUpperCase()
 }
 
-// Get role display
 const getRoleDisplay = (role?: string): string => {
   if (role === 'admin') return 'Administrator'
   if (role === 'teacher' || role === 'staff') return 'Teacher'
@@ -162,11 +154,12 @@ export function StaffSidebar({
   const [stats, setStats] = useState<SidebarStats>({ 
     studentCount: 0, 
     examCount: 0,
-    pendingGradingCount: 0 
+    pendingGradingCount: 0,
+    assignmentCount: 0
   })
   const [isLoading, setIsLoading] = useState(true)
 
-  // ✅ FIXED: Fetch stats - works even when profile is null
+  // ✅ FIXED: Fetch stats with proper filtering
   useEffect(() => {
     let mounted = true
     let retryTimeout: NodeJS.Timeout
@@ -177,61 +170,96 @@ export function StaffSidebar({
       try {
         console.log('📊 Fetching sidebar stats...', profile?.id ? `for user ${profile.id}` : '(general)')
         
-        // ✅ Always fetch student count (doesn't need profile)
-        const { count: studentsCount } = await supabase
+        // ✅ 1. Get student count (by school or all)
+        let studentQuery = supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .eq('role', 'student')
 
-        // ✅ Fetch exams - if we have profile.id, get user's exams, otherwise get all
-        let examsCount = 0
-        if (profile?.id) {
-          const { count } = await supabase
-            .from('exams')
-            .select('*', { count: 'exact', head: true })
-            .eq('created_by', profile.id)
-          examsCount = count || 0
-        } else {
-          // ✅ If no profile, get total exams count
-          const { count } = await supabase
-            .from('exams')
-            .select('*', { count: 'exact', head: true })
-          examsCount = count || 0
+        // If staff has a school_id, filter by it
+        if (profile?.school_id) {
+          studentQuery = studentQuery.eq('school_id', profile.school_id)
+        }
+        // If staff has a class, filter by it
+        if (profile?.class) {
+          studentQuery = studentQuery.eq('class', profile.class)
         }
 
-        // ✅ Get pending grading count (only if we have profile.id)
+        const { count: studentsCount, error: studentError } = await studentQuery
+        if (studentError) console.error('Student count error:', studentError)
+
+        // ✅ 2. Get exams count
+        let examQuery = supabase
+          .from('exams')
+          .select('*', { count: 'exact', head: true })
+
+        // If staff has a school_id, filter exams by school
+        if (profile?.school_id) {
+          examQuery = examQuery.eq('school_id', profile.school_id)
+        }
+        // If staff has a class, filter by class
+        if (profile?.class) {
+          examQuery = examQuery.eq('class', profile.class)
+        }
+
+        const { count: examsCount, error: examError } = await examQuery
+        if (examError) console.error('Exam count error:', examError)
+
+        // ✅ 3. Get assignments count
+        let assignmentQuery = supabase
+          .from('assignments')
+          .select('*', { count: 'exact', head: true })
+
+        // Filter assignments by staff ID if they created them
+        if (profile?.id) {
+          assignmentQuery = assignmentQuery.eq('created_by', profile.id)
+        }
+
+        const { count: assignmentsCount, error: assignmentError } = await assignmentQuery
+        if (assignmentError) console.error('Assignment count error:', assignmentError)
+
+        // ✅ 4. Get pending grading count (submitted assignments)
         let pendingCount = 0
         if (profile?.id) {
-          const { data: teacherAssignments } = await supabase
+          // First get assignments created by this staff
+          const { data: teacherAssignments, error: assignError } = await supabase
             .from('assignments')
             .select('id')
             .eq('created_by', profile.id)
 
-          const assignmentIds = teacherAssignments?.map(a => a.id) || []
+          if (!assignError && teacherAssignments && teacherAssignments.length > 0) {
+            const assignmentIds = teacherAssignments.map(a => a.id)
 
-          if (assignmentIds.length > 0) {
-            const { count } = await supabase
+            // Then get submissions for those assignments
+            const { count, error: subError } = await supabase
               .from('assignment_submissions')
               .select('*', { count: 'exact', head: true })
               .in('assignment_id', assignmentIds)
               .eq('status', 'submitted')
             
-            pendingCount = count || 0
+            if (!subError) {
+              pendingCount = count || 0
+            }
           }
         }
 
         if (mounted) {
-          console.log('✅ Stats fetched:', { studentsCount, examsCount, pendingCount })
+          console.log('✅ Stats fetched:', { 
+            studentsCount, 
+            examsCount, 
+            assignmentsCount,
+            pendingCount 
+          })
           setStats({
             studentCount: studentsCount || 0,
             examCount: examsCount || 0,
+            assignmentCount: assignmentsCount || 0,
             pendingGradingCount: pendingCount
           })
           setIsLoading(false)
         }
       } catch (error) {
         console.error('Error fetching stats:', error)
-        // Retry on error
         if (retryCount < maxRetries && mounted) {
           retryCount++
           console.log(`🔄 Retrying stats fetch (${retryCount}/${maxRetries})...`)
@@ -242,13 +270,44 @@ export function StaffSidebar({
       }
     }
 
-    fetchStats()
+    // Only fetch if we have a profile
+    if (profile?.id) {
+      fetchStats()
+    } else {
+      // If no profile, try to get stats anyway (fallback)
+      const fetchFallbackStats = async () => {
+        try {
+          const { count: studentsCount } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .eq('role', 'student')
+
+          const { count: examsCount } = await supabase
+            .from('exams')
+            .select('*', { count: 'exact', head: true })
+
+          if (mounted) {
+            setStats({
+              studentCount: studentsCount || 0,
+              examCount: examsCount || 0,
+              assignmentCount: 0,
+              pendingGradingCount: 0
+            })
+            setIsLoading(false)
+          }
+        } catch (error) {
+          console.error('Fallback stats error:', error)
+          if (mounted) setIsLoading(false)
+        }
+      }
+      fetchFallbackStats()
+    }
 
     return () => {
       mounted = false
       clearTimeout(retryTimeout)
     }
-  }, [profile?.id]) // Re-run when profile.id changes
+  }, [profile?.id, profile?.school_id, profile?.class]) // Re-fetch when these change
 
   // Sync active tab with pathname
   useEffect(() => {

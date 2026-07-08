@@ -1,4 +1,4 @@
-// src/app/student/exam/[id]/hooks/useExamLoader.ts - FIXED MISSING TYPE FIELD
+// src/app/student/exam/[id]/hooks/useExamLoader.ts - FIXED
 
 "use client"
 
@@ -111,26 +111,12 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       }
       setExam(ed)
 
-      // Build questions
-      const objectiveMax = ed.objective_max || 20
-      const theoryMax = ed.theory_max || 40
-      const theoryQuestionsTotal = ed.theory_questions_total || 0
-      const theoryQuestionsToAnswer = ed.theory_questions_to_answer || null
-      const theoryMarksPerQuestion = ed.theory_marks_per_question || 10
-      const scoringRule = ed.scoring_rule || 'standard'
-      
-      const examMax = objectiveMax + (scoringRule !== 'standard' && theoryQuestionsToAnswer 
-        ? theoryQuestionsToAnswer * theoryMarksPerQuestion 
-        : theoryQuestionsTotal * theoryMarksPerQuestion)
-      const caMax = 40
-      const grandMax = caMax + examMax
-
-      console.log(`📊 Exam Configuration:`, { objectiveMax, theoryMax, examMax, caMax, grandMax })
-
+      // ── FIX: Calculate objective max from actual questions ──────────────
+      // Build questions first to get accurate counts
       const allQuestionsFromDB = ed.questions || []
       const theoryQuestionsFromDB = ed.theory_questions || []
 
-      // Separate questions - ✅ FIXED: Handle missing type field (defaults to objective)
+      // Separate questions
       let objectiveQuestionsRaw: any[] = []
       let theoryQuestionsRaw: any[] = []
 
@@ -138,14 +124,19 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         theoryQuestionsRaw = theoryQuestionsFromDB
         objectiveQuestionsRaw = allQuestionsFromDB.filter((q: any) => q.type !== 'theory')
       } else {
-        // ✅ Include questions without type as objective (fixes Yoruba, French, etc.)
         objectiveQuestionsRaw = allQuestionsFromDB.filter((q: any) => 
           q.type === 'mcq' || q.type === 'objective' || !q.type || q.type === null
         )
         theoryQuestionsRaw = allQuestionsFromDB.filter((q: any) => q.type === 'theory')
       }
 
-      console.log(`📊 Questions found: ${objectiveQuestionsRaw.length} objective, ${theoryQuestionsRaw.length} theory`)
+      // ── FIX: Calculate objective max from the actual questions ──────────
+      const objectiveMax = objectiveQuestionsRaw.length || ed.objective_max || 20
+      const theoryMax = theoryQuestionsRaw.length > 0 ? (ed.theory_max || 40) : 0
+      
+      console.log(`📊 Actual objective questions: ${objectiveQuestionsRaw.length}`)
+      console.log(`📊 Actual theory questions: ${theoryQuestionsRaw.length}`)
+      console.log(`📊 Objective Max: ${objectiveMax}, Theory Max: ${theoryMax}`)
 
       // Build MCQ/Objective questions
       let mcqList = objectiveQuestionsRaw.map((q: any, i: number) => ({
@@ -169,8 +160,8 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
         type: "theory",
         options: [],
         correct_answer: "",
-        marks: Number(q.marks || q.points || theoryMarksPerQuestion),
-        points: Number(q.points || q.marks || theoryMarksPerQuestion),
+        marks: Number(q.marks || q.points || 10),
+        points: Number(q.points || q.marks || 10),
         order_number: q.order || q.order_number || i + 1,
         is_theory: true,
         sub_questions: q.sub_questions || [],
@@ -185,11 +176,13 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       setAllQuestions(allQ)
 
       // ✅ Determine if exam has theory questions
-      const hasTheoryQuestions = ed.has_theory && theoryQuestionsFromDB.length > 0
+      const hasTheoryQuestions = ed.has_theory && theoryQuestionsRaw.length > 0
       const actualTheoryTotal = hasTheoryQuestions ? theoryMax : 0
       const actualTotalMarks = objectiveMax + actualTheoryTotal
 
-      // Check existing attempts - INCLUDE pending_theory as completed
+      console.log(`📊 Final totals - Objective: ${objectiveMax}, Theory: ${actualTheoryTotal}, Total: ${actualTotalMarks}`)
+
+      // Check existing attempts
       const { data: existingAttempts } = await supabase
         .from("exam_attempts")
         .select("*")
@@ -223,9 +216,9 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           passing_percentage: ed.passing_percentage || 50,
           status: latest.status,
           objective_score: latest.objective_score,
-          objective_total: latest.objective_total,
+          objective_total: latest.objective_total || objectiveMax,
           theory_score: latest.theory_score,
-          theory_total: latest.theory_total,
+          theory_total: latest.theory_total || actualTheoryTotal,
           attempts_used: completedCount, 
           max_attempts: ed.max_attempts || 1,
           submitted_at: latest.submitted_at,
@@ -254,9 +247,9 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             passing_percentage: ed.passing_percentage || 50,
             status: latest.status,
             objective_score: latest.objective_score,
-            objective_total: latest.objective_total,
+            objective_total: latest.objective_total || objectiveMax,
             theory_score: latest.theory_score,
-            theory_total: latest.theory_total,
+            theory_total: latest.theory_total || actualTheoryTotal,
             attempts_used: completedCount, 
             max_attempts: ed.max_attempts || 1,
             submitted_at: latest.submitted_at,
@@ -271,7 +264,6 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             const existingAnswers = latest.answers || {}
             const result = calcScore(allQ, existingAnswers)
             
-            // ✅ DYNAMIC: Calculate correct totals for auto-submit
             const autoSubmitPercentage = actualTotalMarks > 0 ? Math.round((result.score / actualTotalMarks) * 100) : 0
 
             const objectiveAnswers: Record<string, string> = {}
@@ -352,9 +344,9 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
             passing_percentage: ed.passing_percentage || 50,
             status: latest.status,
             objective_score: latest.objective_score,
-            objective_total: latest.objective_total,
+            objective_total: latest.objective_total || objectiveMax,
             theory_score: latest.theory_score,
-            theory_total: latest.theory_total,
+            theory_total: latest.theory_total || actualTheoryTotal,
             attempts_used: completedCount, 
             max_attempts: ed.max_attempts || 1,
             graded_by: latest.graded_by, 
@@ -418,27 +410,22 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
 
       console.log(`📝 Attempt #${attemptNumber} - Previous attempts: ${previousAttempts?.length || 0}`)
 
-      // Get exam configuration
-      const objectiveMax = exam?.objective_max || 20
-      const theoryMax = exam?.theory_max || 40
-      const theoryQuestionsTotal = exam?.theory_questions_total || 0
-      const theoryQuestionsToAnswer = exam?.theory_questions_to_answer || null
-      const theoryMarksPerQuestion = exam?.theory_marks_per_question || 10
-      const scoringRule = exam?.scoring_rule || 'standard'
+      // ── FIX: Calculate objective max from actual questions ──────────────
+      const objectiveQuestionsCount = allQuestions.filter((q: any) => q.type !== "theory").length
+      const objectiveMax = objectiveQuestionsCount || exam?.objective_max || 20
+      const theoryQuestionsCount = allQuestions.filter((q: any) => q.type === "theory").length
+      const theoryMax = theoryQuestionsCount > 0 ? (exam?.theory_max || 40) : 0
       
-      // ✅ DYNAMIC: Calculate correct totals
-      const hasTheoryQuestions = exam?.has_theory && theoryQuestionsTotal > 0
-      const actualTheoryTotal = hasTheoryQuestions ? theoryMax : 0
+      const actualTheoryTotal = theoryQuestionsCount > 0 ? theoryMax : 0
       const actualTotalMarks = objectiveMax + actualTheoryTotal
-      
-      const examMax = objectiveMax + (scoringRule !== 'standard' && theoryQuestionsToAnswer 
-        ? theoryQuestionsToAnswer * theoryMarksPerQuestion 
-        : theoryQuestionsTotal * theoryMarksPerQuestion)
-      const caMax = 40
-      const grandMax = caMax + examMax
 
-      console.log(`📊 Creating attempt #${attemptNumber} with config:`, {
-        objectiveMax, theoryMax, actualTheoryTotal, actualTotalMarks, examMax, caMax, grandMax
+      console.log(`📊 Creating attempt #${attemptNumber} with:`, {
+        objectiveQuestionsCount,
+        objectiveMax,
+        theoryQuestionsCount,
+        theoryMax,
+        actualTheoryTotal,
+        actualTotalMarks
       })
 
       // ✅ Create new attempt with DYNAMIC totals
@@ -465,16 +452,10 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
           objective_total: objectiveMax,
           theory_max: theoryMax,
           theory_total: actualTheoryTotal,
-          exam_max: examMax,
-          ca_max: caMax,
-          grand_max: grandMax,
-          theory_questions_to_answer: theoryQuestionsToAnswer,
-          theory_marks_per_question: theoryMarksPerQuestion,
-          scoring_rule: scoringRule,
+          total_marks: actualTotalMarks,
           answers: {},
           theory_answers: {},
           answer_results: {},
-          total_marks: actualTotalMarks,
           total_score: 0,
           percentage: 0,
           percentage_score: 0,
@@ -504,7 +485,7 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
       toast.error('Failed to start exam')
       return null
     }
-  }, [examId, exam, profile])
+  }, [examId, exam, profile, allQuestions])
 
   const handleResumeExam = async () => {
     if (!resumeData) return null

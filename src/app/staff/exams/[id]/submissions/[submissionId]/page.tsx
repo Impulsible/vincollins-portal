@@ -160,10 +160,14 @@ export default function GradeSubmissionPage() {
       if (attErr || !att) { toast.error('Submission not found'); setLoading(false); return }
 
       const { data: examData } = await supabase.from('exams').select('*').eq('id', att.exam_id).single()
-      setExam(examData); setExamTitle(examData?.title || 'Untitled Exam'); setSubjectName(examData?.subject || '')
+      setExam(examData)
+      setExamTitle(examData?.title || 'Untitled Exam')
+      setSubjectName(examData?.subject || '')
 
-      const rawObjMax = Number(att.objective_max) || Number(examData?.objective_max) || 20
-      setObjectiveMax(rawObjMax); setTheoryMax(EXAM_TOTAL - rawObjMax)
+      // ✅ FIX: Get objective_max from exam configuration
+      const objectiveMaxFromExam = Number(examData?.objective_max) || Number(examData?.total_questions) || 20
+      setObjectiveMax(objectiveMaxFromExam)
+      setTheoryMax(EXAM_TOTAL - objectiveMaxFromExam)
 
       const examHasTheory = examData?.has_theory || (Array.isArray(examData?.theory_questions) && examData.theory_questions.length > 0)
       setHasTheory(examHasTheory)
@@ -224,16 +228,34 @@ export default function GradeSubmissionPage() {
       tScore = Math.min(Math.round(tScore), theoryMax)
     }
     setSaving(true)
+    
+    // ✅ Use the actual objectiveMax from the exam configuration
     const objScore = Math.min(Math.round(Number(attempt.objective_score) || 0), objectiveMax)
     const examScore = objScore + tScore
     const grandScore = examScore + caScores.total
     const grandPct = Math.round((grandScore / (EXAM_TOTAL + CA_TOTAL)) * 100)
     const grade = getWAECGrade(grandPct)
+    
     try {
-      const updateData: any = { status: 'graded', objective_score: objScore, objective_total: objectiveMax, theory_score: tScore, theory_total: theoryMax, total_score: examScore, total_marks: EXAM_TOTAL, percentage: grandPct, is_passed: grandPct >= 40, updated_at: new Date().toISOString(), grade, feedback: feedback || `Theory: ${tScore}/${theoryMax} | CA: ${caScores.total}/${CA_TOTAL}` }
+      const updateData: any = { 
+        status: 'graded', 
+        objective_score: objScore, 
+        objective_total: objectiveMax, 
+        theory_score: tScore, 
+        theory_total: theoryMax, 
+        total_score: examScore, 
+        total_marks: EXAM_TOTAL, 
+        percentage: grandPct, 
+        is_passed: grandPct >= 40, 
+        updated_at: new Date().toISOString(), 
+        grade, 
+        feedback: feedback || `Theory: ${tScore}/${theoryMax} | CA: ${caScores.total}/${CA_TOTAL}` 
+      }
       if (hasTheory) updateData.theory_feedback = { total: { score: tScore, max: theoryMax, feedback: feedback || `Theory: ${tScore}/${theoryMax}` } }
+      
       const { error } = await supabase.from('exam_attempts').update(updateData).eq('id', submissionId)
       if (error) { toast.error(`Failed to save: ${error.message}`); setSaving(false); return }
+      
       toast.success(`Grade saved — ${grade} (${grandPct}%)`)
       await updateTermProgress(attempt.student_id, attempt.student_class)
       setTimeout(() => { router.push(`/staff/exams/${examId}/submissions`); router.refresh() }, 1800)
@@ -252,6 +274,15 @@ export default function GradeSubmissionPage() {
     if (!d) return '—'
     try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) } catch { return '—' }
   }
+
+  // ── Live calculations ─────────────────────────────────────────────────────
+  const objScore = Math.min(Math.round(Number(attempt?.objective_score) || 0), objectiveMax)
+  const tScore = hasTheory ? Math.min(Math.round(parseFloat(theoryScore) || 0), theoryMax) : 0
+  const examScore = objScore + tScore
+  const grandScore = examScore + caScores.total
+  const grandTotal = EXAM_TOTAL + CA_TOTAL
+  const grandPct = Math.round((grandScore / grandTotal) * 100)
+  const grade = getWAECGrade(grandPct)
 
   // ── Loading / error states ────────────────────────────────────────────────
   if (loading) {
@@ -281,16 +312,6 @@ export default function GradeSubmissionPage() {
       </div>
     )
   }
-
-  // ── Live calculations ─────────────────────────────────────────────────────
-  const objScore = Math.min(Math.round(Number(attempt.objective_score) || 0), objectiveMax)
-  const tScore = hasTheory ? Math.min(Math.round(parseFloat(theoryScore) || 0), theoryMax) : 0
-  const examScore = objScore + tScore
-  const examPct = Math.round((examScore / EXAM_TOTAL) * 100)
-  const grandScore = examScore + caScores.total
-  const grandTotal = EXAM_TOTAL + CA_TOTAL
-  const grandPct = Math.round((grandScore / grandTotal) * 100)
-  const grade = getWAECGrade(grandPct)
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
