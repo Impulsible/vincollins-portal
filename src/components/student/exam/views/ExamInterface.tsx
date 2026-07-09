@@ -499,8 +499,8 @@ export function ExamInterface({
     question_text: currentQuestion.question_text || currentQuestion.question || '',
     marks: currentQuestion.marks || currentQuestion.points || 10,
     sub_questions: currentQuestion.sub_questions || [],
-    image_url: currentQuestion.image_url,
-    image_caption: currentQuestion.image_caption,
+    image_url: currentQuestion.image_url ?? undefined,
+    image_caption: currentQuestion.image_caption ?? undefined,
   }
 
   return (

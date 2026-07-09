@@ -5,7 +5,6 @@
 // ============================================
 
 export interface ExamResult {
-  [x: string]: number | string | boolean | null | undefined
   // Core scores
   score: number
   total: number
@@ -43,13 +42,19 @@ export interface ExamResult {
   graded_at?: string | null
   graded_by?: string | null
   
+  // Time tracking
+  time_spent?: number
+  duration?: number
+  started_at?: string | null
+  ended_at?: string | null
+  
   // Auto-submit info
   is_auto_submitted?: boolean
   auto_submit_reason?: string | null
   
-  // Computed
-  total_score?: number  // Alias for score (backward compatibility)
-  total_marks?: number  // Alias for total (backward compatibility)
+  // Backward compatibility aliases
+  total_score?: number
+  total_marks?: number
 }
 
 // ============================================
@@ -57,14 +62,9 @@ export interface ExamResult {
 // ============================================
 
 export interface ExamState {
-  // Navigation
   currentIndex: number
-  
-  // Answers
-  answers: Record<string, string>           // All answers by question ID
-  theoryAnswers: Record<string, string>     // Theory answers separately (optional)
-  
-  // UI State
+  answers: Record<string, string>
+  theoryAnswers: Record<string, string>
   flaggedQuestions: Set<string>
   examStarted: boolean
   examEnded: boolean
@@ -73,13 +73,9 @@ export interface ExamState {
   showSubmitDialog: boolean
   showResultDialog: boolean
   showFullscreenPrompt: boolean
-  
-  // Loading/Submitting
   startingExam: boolean
   isSubmitting: boolean
   isAutoSubmitting?: boolean
-  
-  // Error state
   error?: string | null
 }
 
@@ -89,31 +85,19 @@ export interface ExamState {
 
 export interface Question {
   id: string
-  
-  // Content
   question: string
   question_text?: string
   type: 'objective' | 'theory'
-  
-  // Options (for objective)
   options?: string[]
   correct_answer?: string
-  
-  // Scoring
   marks: number
   points?: number
-  
-  // Ordering
   order_number?: number
   is_theory?: boolean
-  
-  // Theory specific
   sub_questions?: TheorySubQuestion[]
   image_url?: string | null
   image_caption?: string | null
-  
-  // For resume
-  student_answer?: string  // Saved answer from previous attempt
+  student_answer?: string
 }
 
 // ============================================
@@ -125,8 +109,36 @@ export interface TheorySubQuestion {
   text: string
   marks: number
   sub_sub_questions?: TheorySubQuestion[]
-  image_url?: string
-  image_caption?: string
+  image_url?: string | null
+  image_caption?: string | null
+}
+
+// ============================================
+// THEORY QUESTION DATA - ✅ FIXED
+// ============================================
+
+export interface TheoryQuestionData {
+  id: string
+  question: string
+  question_text?: string
+  marks: number
+  sub_questions?: TheorySubQuestion[]
+  image_url?: string | null
+  image_caption?: string | null
+}
+
+// ============================================
+// THEORY QUESTION - ✅ ADDED FOR RENDERER
+// ============================================
+
+export interface TheoryQuestion {
+  id: string
+  question: string
+  question_text: string
+  marks: number
+  sub_questions: TheorySubQuestion[]
+  image_url?: string | null
+  image_caption?: string | null
 }
 
 // ============================================
@@ -138,44 +150,26 @@ export interface Exam {
   title: string
   subject: string
   class: string
-  
-  // Timing
-  duration: number  // in minutes
-  
-  // Scoring
+  duration: number
   total_marks: number
   total_questions: number
   passing_percentage: number
-  
-  // Theory settings
   has_theory: boolean
   theory_questions_total?: number
   theory_questions_to_answer?: number
   theory_marks_per_question?: number
-  
-  // Objective settings
   objective_max?: number
   theory_max?: number
-  
-  // Attempts
   max_attempts?: number
-  
-  // Metadata
   status: 'draft' | 'published' | 'ongoing' | 'completed' | 'archived'
   description?: string
   instructions?: string
   passage_text?: string
-  
-  // Timestamps
   created_at: string
   starts_at?: string
   ends_at?: string
-  
-  // Academic info
   term?: string
   session_year?: string
-  
-  // Scoping
   scoring_rule?: 'standard' | 'custom'
   is_locked?: boolean
   version?: number
@@ -189,12 +183,8 @@ export interface ExamAttempt {
   id: string
   exam_id: string
   student_id: string
-  
-  // Status
   status: 'in_progress' | 'completed' | 'pending_theory' | 'graded' | 'terminated'
   attempt_number: number
-  
-  // Scores
   objective_score: number
   objective_total: number
   theory_score: number
@@ -203,37 +193,23 @@ export interface ExamAttempt {
   total_marks: number
   percentage: number
   is_passed: boolean
-  
-  // Answers
   answers?: Record<string, string>
   theory_answers?: Record<string, string>
-  attempt_questions?: any[]  // Stored questions for versioning
-  
-  // Security
+  attempt_questions?: any[]
   tab_switches: number
   fullscreen_exits: number
   unload_count: number
-  
-  // Timestamps
   started_at: string
   submitted_at?: string | null
   completed_at?: string | null
-  
-  // Academic info
   term: string
   session_year: string
-  
-  // Grading
   grade?: string
   remark?: string
   graded_by?: string
   graded_at?: string | null
-  
-  // Auto-submit
   is_auto_submitted?: boolean
   auto_submit_reason?: string | null
-  
-  // Versioning
   question_version?: number
 }
 
@@ -256,19 +232,6 @@ export interface StudentProfile {
   role?: string
   gender?: string
   display_name?: string
-}
-
-// ============================================
-// THEORY QUESTION DATA
-// ============================================
-
-export interface TheoryQuestionData {
-  id: string
-  question: string
-  marks: number
-  sub_questions?: TheorySubQuestion[]
-  image_url?: string | null
-  image_caption?: string | null
 }
 
 // ============================================
@@ -305,10 +268,16 @@ export interface SecurityState {
 // ============================================
 
 export type QuestionStatus = 'answered' | 'flagged' | 'current' | 'not-answered'
-
 export type ExamStatus = 'in_progress' | 'completed' | 'pending_theory' | 'graded' | 'terminated'
-
 export type QuestionType = 'objective' | 'theory'
+
+// ============================================
+// TYPE GUARDS
+// ============================================
+
+export function isTheoryQuestionData(data: any): data is TheoryQuestionData {
+  return data && typeof data === 'object' && 'id' in data && 'question' in data
+}
 
 // ============================================
 // HELPERS - Create default states
@@ -358,5 +327,9 @@ export function createDefaultExamResult(): ExamResult {
     max_attempts: 1,
     is_auto_submitted: false,
     auto_submit_reason: null,
+    time_spent: 0,
+    duration: 0,
+    started_at: null,
+    ended_at: null,
   }
 }
