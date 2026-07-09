@@ -25,15 +25,55 @@ import { cn } from '@/lib/utils'
 const JSS_MIN_SUBJECTS = 16
 const SS_MIN_SUBJECTS = 9
 
+// ✅ Subject name mapping for display (short names)
+const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
+  'Cultural and Creative Arts': 'CCA',
+  'Physical and Health Education': 'PHE',
+  'English Studies': 'English',
+  'Basic Technology': 'Basic Tech',
+  'Information Technology': 'Info Tech',
+  'Agricultural Science': 'Agric',
+  'Home Economics': 'Home Econ',
+  'Security Education': 'Security',
+  'Financial Accounting': 'Finance',
+  'Literature in English': 'Literature',
+  'Business Studies': 'Business',
+  'Social Studies': 'Social',
+  'Civic Education': 'Civic',
+}
+
+// ✅ Subject order for consistent display
 const SUBJECT_ORDER: Record<string, number> = {
-  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
-  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
-  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
-  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
-  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
-  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
-  'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
-  'PHE': 27, 'Security Education': 28,
+  'English Language': 1, 
+  'English Studies': 1, 
+  'Mathematics': 2,
+  'Physics': 3, 
+  'Chemistry': 4, 
+  'Further Mathematics': 5, 
+  'Basic Science': 6,
+  'Biology': 7, 
+  'Agricultural Science': 8, 
+  'Basic Technology': 9,
+  'Economics': 10, 
+  'Geography': 11, 
+  'Social Studies': 12, 
+  'Civic Education': 13,
+  'Government': 14, 
+  'History': 15, 
+  'Commerce': 16, 
+  'Financial Accounting': 17,
+  'Business Studies': 18, 
+  'Literature in English': 19, 
+  'CRS': 20, 
+  'Cultural and Creative Arts': 21, 
+  'Music': 22, 
+  'Yoruba': 23, 
+  'French': 24,
+  'Data Processing': 25, 
+  'Information Technology': 26, 
+  'Home Economics': 27,
+  'Physical and Health Education': 28, 
+  'Security Education': 29,
 }
 
 const sortSubjectsByOrder = (subjects: string[]) =>
@@ -51,11 +91,16 @@ const extractYear = (className: string): string => {
   return className
 }
 
+const getDisplaySubjectName = (subject: string): string => {
+  return SUBJECT_DISPLAY_NAMES[subject] || subject
+}
+
+// ✅ Updated subject lists with FULL NAMES (match database)
 const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
-  'Agricultural Science', 'Home Economics', 'PHE', 'CRS',
-  'French', 'Yoruba', 'CCA', 'Music', 'Security Education',
+  'Agricultural Science', 'Home Economics', 'Physical and Health Education', 'CRS',
+  'French', 'Yoruba', 'Cultural and Creative Arts', 'Music', 'Security Education',
 ]
 const SS_SUBJECTS_SCIENCE = ['English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics', 'Further Mathematics', 'Agricultural Science', 'Data Processing', 'Civic Education', 'Economics']
 const SS_SUBJECTS_ARTS = ['English Language', 'Mathematics', 'Literature in English', 'Government', 'CRS', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology']
@@ -237,8 +282,8 @@ export default function BroadSheetPage() {
         async (payload) => {
           if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
             const sub = payload.new?.subject
-            setNewScoreAlert(`${sub} scores have been updated`)
-            toast.info(`${sub} scores updated`, { duration: 3000 })
+            setNewScoreAlert(`${getDisplaySubjectName(sub)} scores have been updated`)
+            toast.info(`${getDisplaySubjectName(sub)} scores updated`, { duration: 3000 })
             await loadBroadSheet()
           }
         }).subscribe()
@@ -277,12 +322,40 @@ export default function BroadSheetPage() {
         const subjectMap: Record<string, SubjectScore> = {}
         scores.forEach(s => {
           const total = (s.ca1_score || 0) + (s.ca2_score || 0) + (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
-          subjectMap[s.subject] = { subject: s.subject, ca1: s.ca1_score || 0, ca2: s.ca2_score || 0, exam_obj: s.exam_objective_score || 0, exam_theory: s.exam_theory_score || 0, total, grade: getSubjectGrade(Math.round((total / 100) * 100)), status: s.status || 'approved', teacher_name: s.teacher_name || '' }
+          subjectMap[s.subject] = { 
+            subject: s.subject, 
+            ca1: s.ca1_score || 0, 
+            ca2: s.ca2_score || 0, 
+            exam_obj: s.exam_objective_score || 0, 
+            exam_theory: s.exam_theory_score || 0, 
+            total, 
+            grade: getSubjectGrade(Math.round((total / 100) * 100)), 
+            status: s.status || 'approved', 
+            teacher_name: s.teacher_name || '' 
+          }
         })
         const scored = Object.keys(subjectMap).length
         const totalScore = Object.values(subjectMap).reduce((s, x) => s + x.total, 0)
         const avg = scored > 0 ? Math.round(totalScore / scored) : 0
-        return { id: student.id, name: student.display_name || student.full_name || 'Student', admission_number: student.admission_number || '—', vin_id: student.vin_id || '—', class: student.class, department: student.department || (isJSS ? 'Junior' : 'General'), subjectMap, totalScore, averageScore: avg, grade: scored > 0 ? getOverallGrade(avg) : '—', completedSubjects: scored, totalSubjects: subs.length, expectedSubjects: subs, hasAllSubjects: scored >= subs.length, meetsMinimum: meetsMinimumSubjects(student.class, scored), allSubmitted: meetsMinimumSubjects(student.class, scored), reportCardStatus: rcMap[student.id] || null }
+        return { 
+          id: student.id, 
+          name: student.display_name || student.full_name || 'Student', 
+          admission_number: student.admission_number || '—', 
+          vin_id: student.vin_id || '—', 
+          class: student.class, 
+          department: student.department || (isJSS ? 'Junior' : 'General'), 
+          subjectMap, 
+          totalScore, 
+          averageScore: avg, 
+          grade: scored > 0 ? getOverallGrade(avg) : '—', 
+          completedSubjects: scored, 
+          totalSubjects: subs.length, 
+          expectedSubjects: subs, 
+          hasAllSubjects: scored >= subs.length, 
+          meetsMinimum: meetsMinimumSubjects(student.class, scored), 
+          allSubmitted: meetsMinimumSubjects(student.class, scored), 
+          reportCardStatus: rcMap[student.id] || null 
+        }
       })
 
       setStudents(selectedDepartment !== 'all' ? records.filter(s => s.department === selectedDepartment) : records)
@@ -317,7 +390,35 @@ export default function BroadSheetPage() {
         } catch { teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender); principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender) }
 
         await supabase.from('report_cards').delete().eq('student_id', student.id).eq('term', selectedTerm).eq('academic_year', selectedYear)
-        const { error } = await supabase.from('report_cards').insert({ student_id: student.id, student_name: student.name, student_display_name: student.name, student_vin: student.vin_id, student_admission_number: student.admission_number, term: selectedTerm, academic_year: selectedYear, class: selectedClass, class_teacher: profile?.full_name || 'Class Teacher', principal_name: 'Principal', school_name: 'VINCOLLINS COLLEGE', total_score: student.totalScore, average_score: student.averageScore, class_highest: allAvgs.length > 0 ? Math.max(...allAvgs) : 0, class_lowest: allAvgs.length > 0 ? Math.min(...allAvgs) : 0, class_average: allAvgs.length > 0 ? Math.round(allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : 0, position: pos, total_students: students.length, subjects_data: formatted, teacher_comments: teacherComment, principal_comments: principalComment, status: 'generated', generated_by: profile?.id, generated_at: new Date().toISOString(), session_year: selectedYear, submitted_at: new Date().toISOString(), published_at: null }).select()
+        const { error } = await supabase.from('report_cards').insert({ 
+          student_id: student.id, 
+          student_name: student.name, 
+          student_display_name: student.name, 
+          student_vin: student.vin_id, 
+          student_admission_number: student.admission_number, 
+          term: selectedTerm, 
+          academic_year: selectedYear, 
+          class: selectedClass, 
+          class_teacher: profile?.full_name || 'Class Teacher', 
+          principal_name: 'Principal', 
+          school_name: 'VINCOLLINS COLLEGE', 
+          total_score: student.totalScore, 
+          average_score: student.averageScore, 
+          class_highest: allAvgs.length > 0 ? Math.max(...allAvgs) : 0, 
+          class_lowest: allAvgs.length > 0 ? Math.min(...allAvgs) : 0, 
+          class_average: allAvgs.length > 0 ? Math.round(allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : 0, 
+          position: pos, 
+          total_students: students.length, 
+          subjects_data: formatted, 
+          teacher_comments: teacherComment, 
+          principal_comments: principalComment, 
+          status: 'generated', 
+          generated_by: profile?.id, 
+          generated_at: new Date().toISOString(), 
+          session_year: selectedYear, 
+          submitted_at: new Date().toISOString(), 
+          published_at: null 
+        }).select()
         if (error) throw error
         count++; setGenProgress({ current: count, total: ready.length })
       }
@@ -358,8 +459,20 @@ export default function BroadSheetPage() {
 
   const handleExportCSV = () => {
     if (!students.length) { toast.error('No data to export'); return }
-    const headers = ['Student Name', 'Department', 'Admission No', ...expectedSubjects, 'Total', 'Average', 'Grade', 'Report Status']
-    const rows = students.map(s => [s.name, s.department || '—', s.admission_number, ...expectedSubjects.map(sub => { const sc = s.subjectMap[sub]; return sc ? `${sc.total}(${sc.grade})` : '—' }), s.totalScore, `${s.averageScore}%`, s.grade, s.reportCardStatus || 'None'])
+    const headers = ['Student Name', 'Department', 'Admission No', ...expectedSubjects.map(getDisplaySubjectName), 'Total', 'Average', 'Grade', 'Report Status']
+    const rows = students.map(s => [
+      s.name, 
+      s.department || '—', 
+      s.admission_number, 
+      ...expectedSubjects.map(sub => { 
+        const sc = s.subjectMap[sub]; 
+        return sc ? `${sc.total}(${sc.grade})` : '—' 
+      }), 
+      s.totalScore, 
+      `${s.averageScore}%`, 
+      s.grade, 
+      s.reportCardStatus || 'None'
+    ])
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
     a.download = `BroadSheet_${selectedClass}_${selectedTerm}_${selectedYear.replace('/', '_')}.csv`; a.click()
@@ -372,8 +485,11 @@ export default function BroadSheetPage() {
     const published = students.filter(s => s.reportCardStatus === 'published')
     const avgs = ready.map(s => s.averageScore).filter(a => a > 0)
     return {
-      total: students.length, complete: students.filter(s => s.hasAllSubjects).length,
-      readyForReport: ready.length, generated: generated.length, published: published.length,
+      total: students.length, 
+      complete: students.filter(s => s.hasAllSubjects).length,
+      readyForReport: ready.length, 
+      generated: generated.length, 
+      published: published.length,
       incomplete: students.filter(s => !s.meetsMinimum).length,
       classAvg: avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : 0,
       topScore: ready.length ? Math.max(...ready.map(s => s.totalScore)) : 0,
@@ -540,7 +656,6 @@ export default function BroadSheetPage() {
 
             {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-              {/* Generate */}
               <Button onClick={handleGenerateReportCards} disabled={generating || publishing || stats.readyForReport === 0}
                 className="bg-violet-600 hover:bg-violet-700 text-white shadow-sm gap-2 h-9">
                 {generating
@@ -548,7 +663,6 @@ export default function BroadSheetPage() {
                   : <><Sparkles className="h-4 w-4" /> Generate Reports <span className="ml-0.5 bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full">{stats.readyForReport}</span></>}
               </Button>
 
-              {/* Publish */}
               {stats.generated > 0 && (
                 <Button onClick={handlePublishReportCards} disabled={generating || publishing}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-2 h-9">
@@ -558,7 +672,6 @@ export default function BroadSheetPage() {
                 </Button>
               )}
 
-              {/* Unpublish */}
               {stats.published > 0 && (
                 <Button onClick={handleUnpublishReportCards} disabled={generating || publishing} variant="outline"
                   className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30 gap-2 h-9">
@@ -566,7 +679,6 @@ export default function BroadSheetPage() {
                 </Button>
               )}
 
-              {/* View report cards */}
               <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-slate-500 hover:text-slate-700 ml-auto"
                 onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear, status: 'generated' }); router.push(`/admin/report-cards?${p}`) }}>
                 <Eye className="h-4 w-4" /> View Report Cards
@@ -662,7 +774,7 @@ export default function BroadSheetPage() {
                   </th>
                   {expectedSubjects.map(subject => (
                     <th key={subject} className="px-2 py-3 text-center font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-[10px] whitespace-nowrap min-w-[64px]">
-                      {subject.split(' ').slice(0, 2).join(' ')}
+                      {getDisplaySubjectName(subject)}
                     </th>
                   ))}
                   <th className="px-3 py-3 text-center font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide text-[10px] min-w-[60px]">Total</th>

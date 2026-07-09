@@ -35,7 +35,13 @@ const getGradeRemark = (grade: string): string => { return GRADING_SCALE.find(g 
 
 const TERM_OPTIONS = [{ value: 'first', label: 'First Term' }, { value: 'second', label: 'Second Term' }, { value: 'third', label: 'Third Term' }]
 const SENIOR_SUBJECTS = ['English Language','Mathematics','Civic Education','Physics','Chemistry','Biology','Agricultural Science','Economics','Geography','Government','Literature in English','CRS','Yoruba','Commerce','Financial Accounting','Data Processing','Further Mathematics']
-const JUNIOR_SUBJECTS = ['English Studies','Mathematics','Basic Science','Basic Technology','Social Studies','Civic Education','Agricultural Science','Business Studies','Home Economics','CRS','Yoruba','French','Information Technology','CCA','Music','PHE','History','Security Education']
+const JUNIOR_SUBJECTS = ['English Studies','Mathematics','Basic Science','Basic Technology','Social Studies','Civic Education','Agricultural Science','Business Studies','Home Economics','CRS','Yoruba','French','Information Technology','Cultural and Creative Arts','Music','Physical and Health Education','History','Security Education']
+
+// ✅ Add subject name mapping
+const SUBJECT_NAME_MAPPING: Record<string, string> = {
+  'CCA': 'Cultural and Creative Arts',
+  'PHE': 'Physical and Health Education',
+}
 
 const getAvailableSessions = (currentSession: string): string[] => { const year = parseInt(currentSession.split('/')[0]); return [`${year - 1}/${year}`,`${year}/${year + 1}`,`${year + 1}/${year + 2}`] }
 const getClassVariations = (classType: string): string[] => { if (classType==='JSS 1') return ['JSS 1']; if (classType==='JSS 2') return ['JSS 2']; if (classType==='JSS 3') return ['JSS 3']; if (classType==='SS1') return ['SS1 Science','SS1 Arts','SS1 Commercial']; if (classType==='SS2') return ['SS2 Science','SS2 Arts','SS2 Commercial']; if (classType==='SS3') return ['SS3 Science','SS3 Arts','SS3 Commercial']; return [classType] }
@@ -92,6 +98,11 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const isInitialMount = useRef(true)
   const sessionOptions = getAvailableSessions(termInfo?.sessionYear||'2025/2026')
 
+  // ✅ Helper function to get mapped subject name
+  const getMappedSubject = useCallback((subject: string) => {
+    return SUBJECT_NAME_MAPPING[subject] || subject
+  }, [])
+
   const checkSubjectsStatus = useCallback(async () => {
     if (!selectedClass||!selectedTerm||!selectedYear||!staffProfile?.id) return
     setCheckingSubjects(true)
@@ -144,7 +155,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setSelectedExamId('')
     setSkipExam(false)
     setCAScores([])
-    // Clear existing score entries when class changes
     setScoreEntries({})
     setSavedStatus({})
   }
@@ -196,7 +206,9 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       const formatted:Student[]=profileData.map((p:any)=>({id:p.id,full_name:p.display_name||p.full_name||'Unknown',class:p.class,admission_number:p.admission_number||'—',vin_id:p.vin_id||'—'}))
       setStudents(formatted)
       
-      let sq=supabase.from('ca_scores').select('*').in('student_id',formatted.map(s=>s.id)).eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
+      // ✅ Use mapped subject name
+      const mappedSubject = getMappedSubject(selectedSubject)
+      let sq=supabase.from('ca_scores').select('*').in('student_id',formatted.map(s=>s.id)).eq('subject',mappedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
       sq=classVariations.length>1?sq.in('class',classVariations):sq.eq('class',selectedClass)
       const{data:scoresData,error:scoresError}=await sq
       if(scoresError)throw scoresError
@@ -216,14 +228,15 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       setStats({totalStudents:formatted.length,gradedStudents:gradedCount,classAverage:gradedCount>0?Math.round(totalSum/gradedCount):0,highestScore:highest,passCount,failCount,passRate:gradedCount>0?Math.round((passCount/gradedCount)*100):0})
     }catch{toast.error('Failed to load data')}
     finally{setLoading(false)}
-  },[selectedClass,selectedSubject,selectedTerm,selectedYear])
+  },[selectedClass,selectedSubject,selectedTerm,selectedYear,getMappedSubject])
 
   const loadScoresForViewTab=useCallback(async()=>{
     if(!selectedClass||!selectedSubject||!selectedTerm||!selectedYear)return
     setLoading(true)
     try{
       const classVariations=getClassVariations(selectedClass)
-      let q=supabase.from('ca_scores').select('*').eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
+      const mappedSubject = getMappedSubject(selectedSubject)
+      let q=supabase.from('ca_scores').select('*').eq('subject',mappedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
       q=classVariations.length>1?q.in('class',classVariations):q.eq('class',selectedClass)
       const{data:scoresData,error}=await q
       if(error)throw error
@@ -295,7 +308,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     } finally{
       setLoading(false)
     }
-  },[selectedClass,selectedSubject,selectedTerm,selectedYear])
+  },[selectedClass,selectedSubject,selectedTerm,selectedYear,getMappedSubject])
 
   useEffect(()=>{
     if(!isRestoring&&selectedClass&&selectedSubject&&selectedTerm&&selectedYear){
@@ -346,7 +359,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     const now=new Date().toISOString()
     const d:any={
       student_id:studentId,
-      subject:selectedSubject,
+      subject:getMappedSubject(selectedSubject),
       term:selectedTerm,
       academic_year:selectedYear,
       ca1_score:ca1,
@@ -376,7 +389,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
     
     try {
-      // Get ALL exams for this subject, term, and year
       const { data: examsData } = await supabase
         .from('exams')
         .select('id, total_marks')
@@ -392,7 +404,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       
       const examIds = examsData.map(e => e.id)
       
-      // Get the latest attempt for this student across ALL exams
       const { data, error } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -407,14 +418,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         return 
       }
       
-      // Find which exam this attempt belongs to
       const exam = examsData.find(e => e.id === data.exam_id)
       const totalMax = exam?.total_marks || 60
       
       const objScore = Number(data.objective_score) || 0
       const theoryScore = Number(data.theory_score) || 0
       
-      // Use total_score if available, otherwise calculate
       let total = data.total_score || (objScore + theoryScore)
       
       if (total === 0 && (objScore > 0 || theoryScore > 0)) {
@@ -426,7 +435,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         return 
       }
       
-      // ✅ Update score entries
       setScoreEntries(prev => ({
         ...prev,
         [studentId]: { 
@@ -464,7 +472,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     let totalFound = 0
     
     try {
-      // Get ALL exams for this subject, term, and year
       const { data: examsData, error: examsError } = await supabase
         .from('exams')
         .select('id, title, objective_max, theory_max, total_marks, class')
@@ -489,7 +496,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       console.log(`📋 Found ${examsData.length} exams for ${selectedSubject} (${selectedTerm} ${selectedYear}):`)
       examsData.forEach(e => console.log(`  - ${e.title} (Class: ${e.class || 'N/A'}) (${e.id})`))
       
-      // Get ALL attempts for ALL these exams
       const examIds = examsData.map(e => e.id)
       const { data: allAttempts, error: attemptsError } = await supabase
         .from('exam_attempts')
@@ -505,7 +511,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       
       console.log(`📊 Found ${allAttempts?.length || 0} total exam attempts across ${examsData.length} exams`)
       
-      // Map attempts by student_id (keep the latest)
       const resultsMap = new Map()
       if (allAttempts) {
         allAttempts.forEach((a: any) => {
@@ -519,17 +524,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       console.log(`📊 ${resultsMap.size} unique students with attempts`)
       console.log(`🎯 Looking for students in class: ${selectedClass}`)
       
-      // Debug: Log current students
-      console.log('👨‍🎓 Current students in UI:', students.map(s => ({ id: s.id, name: s.full_name, class: s.class })))
-      
-      // Check if students exist
       if (students.length === 0) {
         toast.warning('No students found for this class. Please refresh the page.')
         setAutoFetching(false)
         return
       }
       
-      // Create new entries
       const newEntries = { ...scoreEntries }
       const newSaved = { ...savedStatus }
       const loadedStudents: string[] = []
@@ -543,7 +543,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           const objScore = Number(attempt.objective_score) || 0
           const theoryScore = Number(attempt.theory_score) || 0
           
-          // Use total_score if available, otherwise calculate
           let total = attempt.total_score || (objScore + theoryScore)
           
           if (total === 0 && (objScore > 0 || theoryScore > 0)) {
@@ -573,11 +572,9 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       
       console.log(`✅ Loaded ${count} scores for:`, loadedStudents)
       
-      // ✅ Update state
       setScoreEntries(newEntries)
       setSavedStatus(newSaved)
       
-      // ✅ Force stats update
       setTimeout(() => {
         updateStatsFromEntries()
       }, 50)
@@ -615,7 +612,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     if(ca1+ca2+exam===0){toast.info('No scores to save');return}
     setSaving(true)
     try{
-      const{data:existing}=await supabase.from('ca_scores').select('*').eq('student_id',studentId).eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear).maybeSingle()
+      const mappedSubject = getMappedSubject(selectedSubject)
+      const{data:existing}=await supabase.from('ca_scores').select('*').eq('student_id',studentId).eq('subject',mappedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear).maybeSingle()
       if(existing){
         const f1=ca1>0?ca1:(existing.ca1_score||0)
         const f2=ca2>0?ca2:(existing.ca2_score||0)
@@ -640,7 +638,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     if(!staffProfile?.id){toast.error('Missing teacher information');return}
     if(isLocked){toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName||'another teacher'}`);return}
     setSaving(true);let saved=0,errors=0
-    const{data:existingScores}=await supabase.from('ca_scores').select('*').eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear).in('student_id',students.map(s=>s.id))
+    const mappedSubject = getMappedSubject(selectedSubject)
+    const{data:existingScores}=await supabase.from('ca_scores').select('*').eq('subject',mappedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear).in('student_id',students.map(s=>s.id))
     const existingMap=new Map();if(existingScores)existingScores.forEach((s:any)=>existingMap.set(s.student_id,s))
     try{
       for(const student of students){
@@ -674,13 +673,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setIsDeletingAll(true);setDeleteProgress(0);setShowDeleteAllDialog(false)
     try{
       const classVariations=getClassVariations(selectedClass)
-      let cq=supabase.from('ca_scores').select('id',{count:'exact',head:true}).eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
+      const mappedSubject = getMappedSubject(selectedSubject)
+      let cq=supabase.from('ca_scores').select('id',{count:'exact',head:true}).eq('subject',mappedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
       cq=classVariations.length>1?cq.in('class',classVariations):cq.eq('class',selectedClass)
       const{count:total}=await cq
       if(!total||total===0){toast.info('No scores to delete');setIsDeletingAll(false);return}
       let deleted=0
       while(deleted<total){
-        let dq=supabase.from('ca_scores').delete().eq('subject',selectedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
+        let dq=supabase.from('ca_scores').delete().eq('subject',mappedSubject).eq('term',selectedTerm).eq('academic_year',selectedYear)
         dq=classVariations.length>1?dq.in('class',classVariations):dq.eq('class',selectedClass)
         const{error}=await dq.limit(100)
         if(error){toast.error(`Delete failed: ${error.message}`);break}

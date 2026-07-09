@@ -1,3 +1,5 @@
+// src/app/student/exam/[id]/hooks/useExamSecurity.ts
+
 "use client"
 
 import { useState, useEffect, useCallback, useRef } from "react"
@@ -40,6 +42,9 @@ interface UseExamSecurityProps {
   initialTabSwitches?: number;
   initialFullscreenExits?: number;
   attemptId?: string | null;
+  answers?: Record<string, string>;
+  questions?: any[];
+  onAutoSubmit?: (reason: string) => Promise<void>;
 }
 
 export function useExamSecurity({
@@ -49,6 +54,9 @@ export function useExamSecurity({
   initialTabSwitches = 0,
   initialFullscreenExits = 0,
   attemptId = null,
+  answers = {},
+  questions = [],
+  onAutoSubmit,
 }: UseExamSecurityProps) {
   const [tabSwitches, setTabSwitches] = useState(initialTabSwitches)
   const [fullscreenExits, setFullscreenExits] = useState(initialFullscreenExits)
@@ -68,6 +76,7 @@ export function useExamSecurity({
   const reloadCountRef = useRef(0)
   const maxReloads = 3
   const reloadWindowMs = 60000
+  const isSubmittingRef = useRef(false)
   
   // System event tracking with grace periods
   const lastVisibilityChangeRef = useRef<number>(Date.now())
@@ -82,23 +91,133 @@ export function useExamSecurity({
   const lastTabSwitchTimeRef = useRef<number>(0)
   const lastFullscreenExitTimeRef = useRef<number>(0)
   
-  // Grace periods and limits (increased for better user experience)
-  const SYSTEM_EVENT_GRACE_PERIOD = 10000 // 10 seconds for system sleep detection
-  const DISPLAY_OFF_GRACE_PERIOD = 30000 // 30 seconds for display sleep
-  const NETWORK_WARNING_LIMIT = 5 // Increased from 3
-  const DISPLAY_OFF_LIMIT = 5 // Increased from 3
-  const BLUR_GRACE_PERIOD = 3000 // 3 seconds between blurs
-  const TAB_SWITCH_GRACE_PERIOD = 5000 // 5 seconds between tab switches
-  const BLUR_DURATION_THRESHOLD = 2000 // 2 seconds before counting as violation
-  const INACTIVITY_THRESHOLD = 120000 // 2 minutes
-  const NETWORK_RECONNECT_GRACE = 60000 // 60 seconds before terminating
+  // Grace periods and limits
+  const SYSTEM_EVENT_GRACE_PERIOD = 10000
+  const DISPLAY_OFF_GRACE_PERIOD = 30000
+  const NETWORK_WARNING_LIMIT = 5
+  const DISPLAY_OFF_LIMIT = 5
+  const BLUR_GRACE_PERIOD = 3000
+  const TAB_SWITCH_GRACE_PERIOD = 5000
+  const BLUR_DURATION_THRESHOLD = 2000
+  const INACTIVITY_THRESHOLD = 120000
+  const NETWORK_RECONNECT_GRACE = 60000
   
-  // Use useRef for storage key since it changes with attemptId
   const getStorageKey = useCallback(() => {
     return `exam_security_${attemptIdRef.current || 'default'}`
   }, [])
 
-  // Save state to sessionStorage on changes
+  // ✅ Auto-save on violation
+  const autoSaveAndSubmit = useCallback(async (reason: string) => {
+    if (isSubmittingRef.current || examEndedRef.current) return
+    if (!attemptIdRef.current) return
+    
+    isSubmittingRef.current = true
+    
+    try {
+      console.log(`🔄 Auto-submitting exam: ${reason}`)
+      
+      if (onAutoSubmit) {
+        await onAutoSubmit(reason)
+        return
+      }
+      
+      // Calculate score from answers
+      let objectiveScore = 0
+      let theoryScore = 0
+      let correctCount = 0
+      let incorrectCount = 0
+      let unansweredCount = 0
+      
+      questions.forEach((q: any) => {
+        const answer = answers[q.id] || ''
+        const isTheory = q.type === 'theory'
+        
+        if (isTheory) {
+          if (answer && answer.trim()) {
+            theoryScore += q.marks || q.points || 10
+          }
+        } else {
+          const maxScore = q.marks || q.points || 0.5
+          const correctAnswer = String(q.correct_answer || '').trim()
+          const studentAnswer = answer.trim()
+          
+          if (studentAnswer) {
+            if (studentAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+              objectiveScore += maxScore
+              correctCount++
+            } else {
+              incorrectCount++
+            }
+          } else {
+            unansweredCount++
+          }
+        }
+      })
+      
+      const totalScore = objectiveScore + theoryScore
+      const totalMax = questions.reduce((sum, q) => sum + (q.marks || q.points || (q.type === 'theory' ? 10 : 0.5)), 0)
+      const percentage = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0
+      
+      // Separate objective and theory answers
+      const objectiveAnswers: Record<string, string> = {}
+      const theoryAnswers: Record<string, string> = {}
+      
+      questions.forEach((q: any) => {
+        const answer = answers[q.id] || ''
+        if (q.type === 'theory') {
+          theoryAnswers[q.id] = answer
+        } else {
+          objectiveAnswers[q.id] = answer
+        }
+      })
+      
+      const { error } = await supabase
+        .from('exam_attempts')
+        .update({
+          answers: objectiveAnswers,
+          theory_answers: theoryAnswers,
+          objective_score: objectiveScore,
+          theory_score: theoryScore,
+          total_score: totalScore,
+          percentage: percentage,
+          correct_count: correctCount,
+          incorrect_count: incorrectCount,
+          unanswered_count: unansweredCount,
+          status: 'pending_theory',
+          submitted_at: new Date().toISOString(),
+          is_auto_submitted: true,
+          auto_submit_reason: reason,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', attemptIdRef.current)
+      
+      if (error) {
+        console.error('Auto-submit error:', error)
+        try {
+          const pending = JSON.parse(localStorage.getItem('pending_exam_submissions') || '[]')
+          pending.push({
+            attemptId: attemptIdRef.current,
+            answers,
+            reason,
+            timestamp: Date.now()
+          })
+          localStorage.setItem('pending_exam_submissions', JSON.stringify(pending))
+        } catch (e) {
+          console.error('Failed to store pending submission:', e)
+        }
+      } else {
+        console.log(`✅ Exam auto-submitted: ${reason}`)
+        toast.info(`Exam auto-submitted: ${reason}`)
+      }
+    } catch (error) {
+      console.error('Auto-submit error:', error)
+    } finally {
+      isSubmittingRef.current = false
+      examEndedRef.current = true
+    }
+  }, [attemptIdRef, answers, questions, onAutoSubmit, examEndedRef])
+
+  // Save security state
   const saveSecurityState = useCallback(() => {
     if (!attemptIdRef.current) return
     try {
@@ -118,7 +237,7 @@ export function useExamSecurity({
     }
   }, [tabSwitches, fullscreenExits, networkWarnings, displayOffCount, getStorageKey])
 
-  // Restore state from sessionStorage on mount/reload
+  // Restore state from sessionStorage
   const restoreSecurityState = useCallback(() => {
     if (!attemptIdRef.current) return
     try {
@@ -137,7 +256,7 @@ export function useExamSecurity({
           
           if (data.tabSwitches >= TAB_SWITCH_LIMIT || 
               data.fullscreenExits >= FULLSCREEN_EXIT_LIMIT) {
-            handleViolation("Security limit reached before reload")
+            autoSaveAndSubmit("Security limit reached before reload")
           }
         } else {
           sessionStorage.removeItem(getStorageKey())
@@ -146,7 +265,7 @@ export function useExamSecurity({
     } catch (e) {
       console.error('Failed to restore security state:', e)
     }
-  }, [getStorageKey])
+  }, [getStorageKey, autoSaveAndSubmit])
 
   // Restore on mount
   useEffect(() => {
@@ -206,7 +325,7 @@ export function useExamSecurity({
     }
   }
 
-  // Sync pending updates when network reconnects
+  // Sync pending updates
   const syncPendingUpdates = useCallback(async () => {
     try {
       const pending: PendingUpdate[] = JSON.parse(localStorage.getItem('pending_exam_updates') || '[]')
@@ -242,23 +361,31 @@ export function useExamSecurity({
     }
   }, [])
 
+  // ✅ UPDATED: triggerViolation with auto-save
   const triggerViolation = useCallback((reason: string) => {
     if (violationRef.current || examTerminated) return
     violationRef.current = true
-    setSecurityViolated(true)
-    setExamTerminated(true)
     
-    saveSecurityState()
-    
-    toast.error("SECURITY VIOLATION: " + reason + " - Exam terminated!")
-    setTimeout(() => onViolation(), 300)
-  }, [onViolation, examTerminated, saveSecurityState])
+    autoSaveAndSubmit(`Security violation: ${reason}`).then(() => {
+      setSecurityViolated(true)
+      setExamTerminated(true)
+      saveSecurityState()
+      
+      toast.error(`SECURITY VIOLATION: ${reason} - Exam submitted automatically!`)
+      setTimeout(() => onViolation(), 500)
+    }).catch(() => {
+      setSecurityViolated(true)
+      setExamTerminated(true)
+      toast.error(`SECURITY VIOLATION: ${reason} - Exam terminated!`)
+      setTimeout(() => onViolation(), 300)
+    })
+  }, [onViolation, examTerminated, saveSecurityState, autoSaveAndSubmit])
 
   const handleViolation = useCallback((reason: string) => {
     triggerViolation(reason)
   }, [triggerViolation])
 
-  // --- System Sleep Detection with User Activity Check ---
+  // --- System Sleep Detection ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
 
@@ -271,7 +398,6 @@ export function useExamSecurity({
         lastVisibilityChangeRef.current = now
         displayOffStartTimeRef.current = now
         
-        // Only mark as system sleep if user was inactive before going hidden
         if (timeSinceActivity > INACTIVITY_THRESHOLD) {
           if (visibilityTimeoutRef.current) {
             clearTimeout(visibilityTimeoutRef.current)
@@ -279,14 +405,12 @@ export function useExamSecurity({
           
           visibilityTimeoutRef.current = setTimeout(() => {
             if (document.hidden && !examEndedRef.current && !examTerminated) {
-              // Check if still hidden and user is inactive
               const stillInactive = Date.now() - lastUserActivityRef.current > INACTIVITY_THRESHOLD
               if (stillInactive) {
                 isSystemSleepRef.current = true
                 setIsSystemSleeping(true)
                 toast.warning("System sleep detected - Resuming exam...")
                 
-                // Only count if sleep was longer than grace period
                 const sleepDuration = Date.now() - (displayOffStartTimeRef.current || now)
                 if (sleepDuration > DISPLAY_OFF_GRACE_PERIOD) {
                   setDisplayOffCount(prev => {
@@ -302,11 +426,9 @@ export function useExamSecurity({
             }
           }, SYSTEM_EVENT_GRACE_PERIOD)
         } else {
-          // User was active recently, likely a quick tab switch
           console.log('Quick tab switch detected, ignoring sleep detection')
         }
       } else {
-        // Document is visible again
         if (visibilityTimeoutRef.current) {
           clearTimeout(visibilityTimeoutRef.current)
           visibilityTimeoutRef.current = null
@@ -324,7 +446,6 @@ export function useExamSecurity({
         }
         
         lastVisibilityChangeRef.current = now
-        // Reset system sleep flag if user is active
         if (isSystemSleepRef.current) {
           isSystemSleepRef.current = false
           setIsSystemSleeping(false)
@@ -385,11 +506,7 @@ export function useExamSecurity({
       const getBattery = (navigator as Navigator & { getBattery?: () => Promise<BatteryManager> }).getBattery
       
       if (getBattery) {
-        getBattery().then(() => {
-          // Battery API available, but not needed for sleep detection
-        }).catch(() => {
-          // Battery API not available, skip
-        })
+        getBattery().then(() => {}).catch(() => {})
       }
     }
 
@@ -407,7 +524,6 @@ export function useExamSecurity({
         setIsSystemSleeping(false)
         toast.info("Exam resumed after system sleep")
       }
-      // Reset blur tracking
       isBlurCountingRef.current = false
       blurStartTimeRef.current = 0
     }
@@ -421,7 +537,7 @@ export function useExamSecurity({
     }
   }, [examStarted, examTerminated, examEndedRef])
 
-  // --- Enhanced Network Status Monitoring ---
+  // --- Network Status Monitoring ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
 
@@ -455,7 +571,6 @@ export function useExamSecurity({
         } else if (n === 2) {
           toast.error("Network issues detected! Your answers may not be saved")
         } else if (n >= NETWORK_WARNING_LIMIT) {
-          // Only terminate if network is down for extended period
           if (reconnectTimeout) {
             clearTimeout(reconnectTimeout)
           }
@@ -506,7 +621,6 @@ export function useExamSecurity({
         resetTimeRef.current = now
       }
       
-      // Only count user-initiated reloads
       const isUserReload = performance?.navigation?.type === 1
       
       if (isUserReload) {
@@ -566,7 +680,7 @@ export function useExamSecurity({
     }
   }, [examStarted])
 
-  // --- Tab Switch Detection with Grace Period ---
+  // --- Tab Switch Detection ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
     
@@ -578,7 +692,6 @@ export function useExamSecurity({
       
       if (document.hidden && !examEndedRef.current && !examTerminated) {
         const now = Date.now()
-        // Ignore if tab switches are too frequent (within grace period)
         if (now - lastTabSwitchTimeRef.current < TAB_SWITCH_GRACE_PERIOD) {
           console.log('Tab switch within grace period - ignoring')
           return
@@ -599,7 +712,7 @@ export function useExamSecurity({
     return () => document.removeEventListener("visibilitychange", h)
   }, [examStarted, examTerminated, examEndedRef, persistViolation, handleViolation])
 
-  // --- Fullscreen Detection with Grace Period ---
+  // --- Fullscreen Detection ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
     
@@ -614,7 +727,6 @@ export function useExamSecurity({
       
       if (!fs && !examEndedRef.current && !examTerminated) {
         const now = Date.now()
-        // Ignore if fullscreen exits are too frequent
         if (now - lastFullscreenExitTimeRef.current < 5000) {
           console.log('Fullscreen exit within grace period - ignoring')
           return
@@ -645,7 +757,7 @@ export function useExamSecurity({
     }
   }, [examStarted, examTerminated, examEndedRef, persistViolation, handleViolation])
 
-  // --- Window Blur with Duration Check ---
+  // --- Window Blur Detection ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
     
@@ -658,7 +770,6 @@ export function useExamSecurity({
       
       const now = Date.now()
       
-      // Ignore if blurs are too frequent
       if (now - lastBlurTimeRef.current < BLUR_GRACE_PERIOD) {
         console.log('Blur within grace period - ignoring')
         return
@@ -668,12 +779,10 @@ export function useExamSecurity({
       blurStartTimeRef.current = now
       isBlurCountingRef.current = true
       
-      // Check after duration threshold
       setTimeout(() => {
         if (document.hidden && isBlurCountingRef.current) {
           const blurDuration = Date.now() - blurStartTimeRef.current
           if (blurDuration > BLUR_DURATION_THRESHOLD) {
-            // Only count if hidden for more than threshold
             blurCountRef.current++
             
             if (blurCountRef.current >= 3) {
@@ -727,8 +836,6 @@ export function useExamSecurity({
         return
       }
       
-      // Don't block Alt key alone - it's used for alt+tab
-      // But block Alt+Tab (switching apps)
       if (e.altKey && e.key === 'Tab') {
         e.preventDefault()
         toast.warning("Alt+Tab blocked during exam")

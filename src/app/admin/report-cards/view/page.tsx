@@ -18,51 +18,151 @@ import { useReactToPrint } from 'react-to-print'
 // SUBJECT NAME NORMALIZATION
 // ============================================
 const SUBJECT_NAME_MAP: Record<string, string> = {
+  // Physical Education variations
   'Physical Education': 'PHE',
   'P.H.E.': 'PHE',
   'P H E': 'PHE',
   'Physical and Health Education': 'PHE',
+  'PHE': 'PHE',
+  
+  // Security Education
   'Security Edu': 'Security Education',
+  'Security Education': 'Security Education',
+  
+  // Computer/IT
   'Computer Studies': 'Information Technology',
   'ICT': 'Information Technology',
+  'Information Technology': 'Information Technology',
+  
+  // Religious Studies
   'C.R.S.': 'CRS',
   'C.R.K': 'CRS',
   'Christian Religious Studies': 'CRS',
   'Christian Religious Knowledge': 'CRS',
+  'CRS': 'CRS',
+  
+  // Creative Arts
   'C.C.A.': 'CCA',
   'Cultural and Creative Arts': 'CCA',
+  'CCA': 'CCA',
+  
+  // Sciences
   'Agric Science': 'Agricultural Science',
+  'Agricultural Science': 'Agricultural Science',
   'Basic Sci': 'Basic Science',
+  'Basic Science': 'Basic Science',
   'Basic Tech': 'Basic Technology',
+  'Basic Technology': 'Basic Technology',
+  
+  // Business/Commerce
   'Bus Studies': 'Business Studies',
+  'Business Studies': 'Business Studies',
+  
+  // Humanities
   'Civic Edu': 'Civic Education',
+  'Civic Education': 'Civic Education',
   'Social Std': 'Social Studies',
+  'Social Studies': 'Social Studies',
   'Home Econ': 'Home Economics',
+  'Home Economics': 'Home Economics',
+  
+  // Mathematics
   'Further Maths': 'Further Mathematics',
+  'Further Mathematics': 'Further Mathematics',
+  'Mathematics': 'Mathematics',
+  
+  // Languages
   'Lit in English': 'Literature in English',
-  'English': 'English Studies',
+  'Literature in English': 'Literature in English',
+  'English': 'English Language',
+  'English Language': 'English Language',
+  'English Studies': 'English Language',
 }
 
+// Main display names for subjects (these will be shown on the report card)
+const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
+  'English Language': 'English Language',
+  'Mathematics': 'Mathematics',
+  'Physics': 'Physics',
+  'Chemistry': 'Chemistry',
+  'Further Mathematics': 'Further Mathematics',
+  'Basic Science': 'Basic Science',
+  'Biology': 'Biology',
+  'Agricultural Science': 'Agricultural Science',
+  'Basic Technology': 'Basic Technology',
+  'Economics': 'Economics',
+  'Geography': 'Geography',
+  'Social Studies': 'Social Studies',
+  'Civic Education': 'Civic Education',
+  'Government': 'Government',
+  'History': 'History',
+  'Commerce': 'Commerce',
+  'Financial Accounting': 'Financial Accounting',
+  'Business Studies': 'Business Studies',
+  'Literature in English': 'Literature in English',
+  'CRS': 'CRS',
+  'CCA': 'CCA',
+  'Music': 'Music',
+  'Yoruba': 'Yoruba',
+  'French': 'French',
+  'Data Processing': 'Data Processing',
+  'Information Technology': 'Information Technology',
+  'Home Economics': 'Home Economics',
+  'PHE': 'PHE',
+  'Security Education': 'Security Education',
+}
+
+// Normalize subject name (convert variations to canonical form)
 const normalizeSubjectName = (name: string): string => {
   return SUBJECT_NAME_MAP[name] || name
 }
 
+// Get display name for a subject (canonical display name)
+const getSubjectDisplayName = (canonicalName: string): string => {
+  return SUBJECT_DISPLAY_NAMES[canonicalName] || canonicalName
+}
+
 // ============================================
-// SUBJECT ORDERING
+// SUBJECT ORDERING - Use canonical names
 // ============================================
 const SUBJECT_ORDER: Record<string, number> = {
-  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
-  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
-  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
-  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
-  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
-  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
-  'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
-  'PHE': 27, 'Security Education': 28,
+  'English Language': 1,
+  'Mathematics': 2,
+  'Physics': 3,
+  'Chemistry': 4,
+  'Further Mathematics': 5,
+  'Basic Science': 6,
+  'Biology': 7,
+  'Agricultural Science': 8,
+  'Basic Technology': 9,
+  'Economics': 10,
+  'Geography': 11,
+  'Social Studies': 12,
+  'Civic Education': 13,
+  'Government': 14,
+  'History': 15,
+  'Commerce': 16,
+  'Financial Accounting': 17,
+  'Business Studies': 18,
+  'Literature in English': 19,
+  'CRS': 20,
+  'CCA': 21,
+  'Music': 22,
+  'Yoruba': 23,
+  'French': 24,
+  'Data Processing': 25,
+  'Information Technology': 26,
+  'Home Economics': 27,
+  'PHE': 28,
+  'Security Education': 29,
 }
 
 const sortSubjectsByOrder = (subjects: any[]) =>
-  [...subjects].sort((a, b) => (SUBJECT_ORDER[a.name] || 999) - (SUBJECT_ORDER[b.name] || 999))
+  [...subjects].sort((a, b) => {
+    const orderA = SUBJECT_ORDER[a.name] || 999
+    const orderB = SUBJECT_ORDER[b.name] || 999
+    return orderA - orderB
+  })
 
 // ============================================
 // GRADING
@@ -159,11 +259,24 @@ const getFallbackPrincipalComment = (avg: number, firstName: string, gender: str
 // TYPES
 // ============================================
 interface SubjectScore {
-  name: string; ca: number; exam: number; total: number; grade: string; remark: string
+  name: string // Canonical name used for ordering
+  displayName: string // Display name shown on report
+  ca: number
+  exam: number
+  total: number
+  grade: string
+  remark: string
 }
+
 interface SchoolSettings {
-  name: string; address: string; phone: string; email: string; logo_url?: string; motto?: string
+  name: string
+  address: string
+  phone: string
+  email: string
+  logo_url?: string
+  motto?: string
 }
+
 interface AssessmentData {
   behaviorRatings?: Array<{ name: string; rating: number }>
   skillRatings?: Array<{ name: string; rating: number }>
@@ -253,7 +366,7 @@ export default function ViewReportCardPage() {
       const firstName = (student.display_name || student.full_name || 'Student').split(' ')[0]
       const gender = student.gender || 'male'
       const className = student.class || '—'
-      const subjectsForAPI = subjects.map(s => ({ name: s.name, score: s.total }))
+      const subjectsForAPI = subjects.map(s => ({ name: s.displayName, score: s.total }))
 
       let newTeacher = ''
       let newPrincipal = ''
@@ -271,7 +384,7 @@ export default function ViewReportCardPage() {
       } catch {
         const best = subjects.reduce((a, b) => a.total > b.total ? a : b, subjects[0])
         const worst = subjects.reduce((a, b) => a.total < b.total ? a : b, subjects[0])
-        newTeacher = getFallbackTeacherComment(firstName, Math.round(averageScore), best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
+        newTeacher = getFallbackTeacherComment(firstName, Math.round(averageScore), best?.displayName || '', best?.total || 0, worst?.displayName || '', worst?.total || 0, gender)
         newPrincipal = getFallbackPrincipalComment(Math.round(averageScore), firstName, gender)
       }
 
@@ -298,7 +411,12 @@ export default function ViewReportCardPage() {
 
       if (rc) {
         setReportCardId(rc.id)
-        setSubjects(rc.subjects_data || [])
+        // Map subjects to include display names
+        const mappedSubjects = (rc.subjects_data || []).map((s: any) => ({
+          ...s,
+          displayName: getSubjectDisplayName(s.name)
+        }))
+        setSubjects(mappedSubjects)
         setAssessmentData(rc.assessment_data || {})
         setTeacherComment(rc.teacher_comments || '')
         setPrincipalComment(rc.principal_comments || '')
@@ -318,14 +436,16 @@ export default function ViewReportCardPage() {
           const exam = (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
           const total = ca + exam
           const grade = getSubjectGrade(total)
-          const normalizedName = normalizeSubjectName(s.subject)
+          const canonicalName = normalizeSubjectName(s.subject)
+          const displayName = getSubjectDisplayName(canonicalName)
           
-          if (merged.has(normalizedName)) {
+          if (merged.has(canonicalName)) {
             // Keep the higher score if duplicate
-            const existing = merged.get(normalizedName)!
+            const existing = merged.get(canonicalName)!
             if (total > existing.total) {
-              merged.set(normalizedName, {
-                name: normalizedName,
+              merged.set(canonicalName, {
+                name: canonicalName,
+                displayName: displayName,
                 ca,
                 exam,
                 total,
@@ -334,8 +454,9 @@ export default function ViewReportCardPage() {
               })
             }
           } else {
-            merged.set(normalizedName, {
-              name: normalizedName,
+            merged.set(canonicalName, {
+              name: canonicalName,
+              displayName: displayName,
               ca,
               exam,
               total,
@@ -345,6 +466,7 @@ export default function ViewReportCardPage() {
           }
         })
 
+        // Sort subjects by order (using canonical names)
         let processed = sortSubjectsByOrder(Array.from(merged.values()))
         setSubjects(processed)
 
@@ -383,7 +505,13 @@ export default function ViewReportCardPage() {
         try {
           const res = await fetch('/api/generate-comments', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ studentName: firstName, averageScore: Math.round(avg), subjects: processed.map(s => ({ name: s.name, score: s.total })), className: sd?.class || '—', gender })
+            body: JSON.stringify({ 
+              studentName: firstName, 
+              averageScore: Math.round(avg), 
+              subjects: processed.map(s => ({ name: s.displayName, score: s.total })), 
+              className: sd?.class || '—', 
+              gender 
+            })
           })
           if (res.ok) {
             const d = await res.json()
@@ -392,7 +520,7 @@ export default function ViewReportCardPage() {
         } catch {
           const best = processed.reduce((a, b) => a.total > b.total ? a : b, processed[0])
           const worst = processed.reduce((a, b) => a.total < b.total ? a : b, processed[0])
-          setTeacherComment(getFallbackTeacherComment(firstName, Math.round(avg), best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender))
+          setTeacherComment(getFallbackTeacherComment(firstName, Math.round(avg), best?.displayName || '', best?.total || 0, worst?.displayName || '', worst?.total || 0, gender))
           setPrincipalComment(getFallbackPrincipalComment(Math.round(avg), firstName, gender))
         }
       }
@@ -654,7 +782,8 @@ export default function ViewReportCardPage() {
                           </tr>
                         ) : subjects.map((s, i) => (
                           <tr key={s.name} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="border border-gray-400 px-1.5 py-0.5 font-medium break-words">{s.name}</td>
+                            {/* Use displayName for the subject name shown to users */}
+                            <td className="border border-gray-400 px-1.5 py-0.5 font-medium break-words">{s.displayName}</td>
                             <td className="border border-gray-400 text-center font-mono py-0.5">{s.ca}</td>
                             <td className="border border-gray-400 text-center font-mono py-0.5">{s.exam}</td>
                             <td className="border border-gray-400 text-center font-bold font-mono py-0.5">{s.total}</td>
@@ -765,7 +894,7 @@ export default function ViewReportCardPage() {
                           <TrendingUp className="h-3 w-3 shrink-0" /> Best
                         </span>
                         <span className="font-bold text-right text-[9px] sm:text-[10px] break-words ml-1">
-                          {bestSubject.name} ({bestSubject.total})
+                          {bestSubject.displayName} ({bestSubject.total})
                         </span>
                       </div>
                     )}
@@ -775,7 +904,7 @@ export default function ViewReportCardPage() {
                           <TrendingDown className="h-3 w-3 shrink-0" /> Improve
                         </span>
                         <span className="font-bold text-right text-[9px] sm:text-[10px] break-words ml-1">
-                          {worstSubject.name} ({worstSubject.total})
+                          {worstSubject.displayName} ({worstSubject.total})
                         </span>
                       </div>
                     )}

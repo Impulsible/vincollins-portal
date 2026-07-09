@@ -42,6 +42,7 @@ export default function TakeExamPage() {
   const [examState, setExamState] = useState<ExamState>({
     currentIndex: 0,
     answers: {},
+    theoryAnswers: {},
     flaggedQuestions: new Set(),
     examStarted: false,
     examEnded: false,
@@ -93,7 +94,7 @@ export default function TakeExamPage() {
     attemptId: attemptId || undefined,
   });
 
-  // ✅ FIXED: useExamSecurity expects an object with named properties
+  // ✅ FIXED: useExamSecurity with auto-save on violation
   const {
     tabSwitches,
     fullscreenExits,
@@ -102,13 +103,25 @@ export default function TakeExamPage() {
     showFullscreenPrompt,
     setShowFullscreenPrompt,
     enterFullscreen,
+    securityViolated,
   } = useExamSecurity({
     examStarted: examState.examStarted,
     examEndedRef: examEndedRef,
-    onViolation: () => handleSubmit(true, "Security violation"),
+    onViolation: () => {
+      // Auto-save already happened in the hook
+      // Just navigate away
+      router.push("/student/exams");
+    },
     initialTabSwitches: resumeData?.tabSwitches || 0,
     initialFullscreenExits: resumeData?.fullscreenExits || 0,
     attemptId: attemptId || undefined,
+    answers: examState.answers, // ✅ Pass answers for auto-submit
+    questions: allQuestions, // ✅ Pass questions for auto-submit
+    onAutoSubmit: async (reason: string) => {
+      // ✅ Auto-submit handler
+      console.log(`🔄 Auto-submitting: ${reason}`);
+      await handleSubmit(true, reason);
+    },
   });
 
   const { autoSaving, lastSaved } = useAutoSave({
@@ -119,7 +132,7 @@ export default function TakeExamPage() {
     examEndedRef: examEndedRef,
   });
 
-  const isTerminated = examTerminated;
+  const isTerminated = examTerminated || securityViolated;
 
   const theoryQuestionCount = allQuestions.filter(
     (q) => q.type === "theory",
@@ -204,9 +217,47 @@ export default function TakeExamPage() {
   // ===== SUBMIT EXAM =====
   const handleSubmit = useCallback(
     async (isAuto = false, reason = "manual") => {
+      // ✅ Prevent duplicate submissions
       if (isSubmittingRef.current || examEndedRef.current) {
         console.log("⚠️ Submit already in progress or exam ended");
         return;
+      }
+
+      // ✅ Check if already submitted via database
+      if (attemptId) {
+        const { data: attempt } = await supabase
+          .from("exam_attempts")
+          .select("submitted_at, status")
+          .eq("id", attemptId)
+          .single();
+
+        if (attempt?.submitted_at) {
+          console.log("⚠️ Attempt already submitted");
+          toast.warning("This exam has already been submitted");
+          examEndedRef.current = true;
+          setExamState((prev) => ({
+            ...prev,
+            examStarted: false,
+            examEnded: true,
+          }));
+          return;
+        }
+
+        if (
+          ["pending_theory", "graded", "completed", "terminated"].includes(
+            attempt?.status
+          )
+        ) {
+          console.log("⚠️ Attempt already has final status");
+          toast.warning("This exam has already been completed");
+          examEndedRef.current = true;
+          setExamState((prev) => ({
+            ...prev,
+            examStarted: false,
+            examEnded: true,
+          }));
+          return;
+        }
       }
 
       isSubmittingRef.current = true;
@@ -228,7 +279,7 @@ export default function TakeExamPage() {
       }
 
       try {
-        console.log("📝 Starting submit process...");
+        console.log(`📝 Starting submit process... (Auto: ${isAuto}, Reason: ${reason})`);
 
         const result = calculateScore(allQuestions, examState.answers);
         console.log("📊 Score calculated:", result);
@@ -468,7 +519,7 @@ export default function TakeExamPage() {
           </h2>
           <p className="text-red-600 mb-4">Security Policy Violation</p>
           <p className="text-slate-500 text-sm mb-6">
-            This attempt has been recorded with your current score.
+            Your answers have been saved and this attempt is recorded with your current score.
           </p>
           <Button
             onClick={() => router.push("/student/exams")}

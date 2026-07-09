@@ -30,21 +30,99 @@ export function useAutoSave({
   const lastAnswersRef = useRef<string>("")
   const isMountedRef = useRef(true)
 
-  // Save answers to database
+  const calculateScores = useCallback((answers: Record<string, string>) => {
+    let objectiveScore = 0
+    let theoryScore = 0
+    let correctCount = 0
+    let incorrectCount = 0
+    let unansweredCount = 0
+
+    questions.forEach(q => {
+      const answer = answers[q.id] || ''
+      const isTheory = q.type === 'theory'
+      
+      if (isTheory) {
+        if (answer && answer.trim()) {
+          theoryScore += q.marks || q.points || 10
+        }
+      } else {
+        const maxScore = q.marks || q.points || 0.5
+        const correctAnswer = String(q.correct_answer || '').trim()
+        const studentAnswer = answer.trim()
+        
+        if (studentAnswer) {
+          if (studentAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
+            objectiveScore += maxScore
+            correctCount++
+          } else {
+            incorrectCount++
+          }
+        } else {
+          unansweredCount++
+        }
+      }
+    })
+
+    const totalScore = objectiveScore + theoryScore
+    const totalMax = questions.reduce((sum, q) => sum + (q.marks || q.points || (q.type === 'theory' ? 10 : 0.5)), 0)
+    const percentage = totalMax > 0 ? Math.round((totalScore / totalMax) * 100) : 0
+
+    return {
+      objectiveScore,
+      theoryScore,
+      totalScore,
+      percentage,
+      correctCount,
+      incorrectCount,
+      unansweredCount,
+      totalMax
+    }
+  }, [questions])
+
+  // ✅ Check if attempt is already submitted
+  const checkSubmitted = useCallback(async (): Promise<boolean> => {
+    if (!attemptId) return true
+    
+    try {
+      const { data, error } = await supabase
+        .from('exam_attempts')
+        .select('submitted_at, status')
+        .eq('id', attemptId)
+        .single()
+      
+      if (error) {
+        console.error('Failed to check submission status:', error)
+        return false
+      }
+      
+      if (data?.submitted_at) return true
+      if (['pending_theory', 'graded', 'completed', 'terminated'].includes(data?.status)) return true
+      
+      return false
+    } catch (error) {
+      console.error('Error checking submission status:', error)
+      return false
+    }
+  }, [attemptId])
+
+  // ✅ Save answers with submission check
   const saveAnswers = useCallback(async (force = false) => {
     if (!attemptId || !isActive || examEndedRef.current) return
     
-    // Skip if no changes and not forced
+    // ✅ Check if already submitted
+    const isSubmitted = await checkSubmitted()
+    if (isSubmitted) {
+      console.log('⛔ Attempt already submitted - skipping auto-save')
+      return
+    }
+    
     const answersStr = JSON.stringify(answers)
     if (!force && answersStr === lastAnswersRef.current) return
-    
-    // Skip if already saving
     if (autoSaving && !force) return
     
     setAutoSaving(true)
     
     try {
-      // Separate objective and theory answers
       const objectiveAnswers: Record<string, string> = {}
       const theoryAnswers: Record<string, string> = {}
       
@@ -57,23 +135,30 @@ export function useAutoSave({
         }
       })
       
+      const scores = calculateScores(answers)
+      
       const { error } = await supabase
         .from('exam_attempts')
         .update({
           answers: objectiveAnswers,
           theory_answers: theoryAnswers,
+          objective_score: scores.objectiveScore,
+          theory_score: scores.theoryScore,
+          total_score: scores.totalScore,
+          percentage: scores.percentage,
+          correct_count: scores.correctCount,
+          incorrect_count: scores.incorrectCount,
+          unanswered_count: scores.unansweredCount,
           updated_at: new Date().toISOString()
         })
         .eq('id', attemptId)
       
       if (error) {
         console.error('Auto-save error:', error)
-        // Store pending save
         pendingSaveRef.current = true
         return
       }
       
-      // Update last saved
       lastAnswersRef.current = answersStr
       setLastSaved(new Date())
       pendingSaveRef.current = false
@@ -86,7 +171,7 @@ export function useAutoSave({
         setAutoSaving(false)
       }
     }
-  }, [attemptId, isActive, answers, questions, autoSaving, examEndedRef])
+  }, [attemptId, isActive, answers, questions, autoSaving, examEndedRef, calculateScores, checkSubmitted])
 
   // Schedule auto-save
   useEffect(() => {
@@ -98,17 +183,15 @@ export function useAutoSave({
       return
     }
     
-    // Save immediately when answers change
     const answersStr = JSON.stringify(answers)
     if (answersStr !== lastAnswersRef.current) {
-      // Debounce save to avoid too many requests
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
       
       saveTimeoutRef.current = setTimeout(() => {
         saveAnswers()
-      }, 2000) // 2 second debounce
+      }, 2000)
     }
     
     return () => {
@@ -140,7 +223,6 @@ export function useAutoSave({
   useEffect(() => {
     const handleBeforeUnload = () => {
       if (isActive && attemptId && !examEndedRef.current) {
-        // Try to save synchronously
         const answersStr = JSON.stringify(answers)
         if (answersStr !== lastAnswersRef.current) {
           navigator.sendBeacon('/api/save-exam-progress', JSON.stringify({
@@ -158,7 +240,6 @@ export function useAutoSave({
     }
   }, [isActive, attemptId, answers, examEndedRef])
 
-  // Cleanup
   useEffect(() => {
     isMountedRef.current = true
     return () => {
@@ -170,7 +251,6 @@ export function useAutoSave({
     }
   }, [])
 
-  // Force save (for manual triggers)
   const forceSave = useCallback(async () => {
     await saveAnswers(true)
   }, [saveAnswers])

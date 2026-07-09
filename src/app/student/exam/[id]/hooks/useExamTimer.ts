@@ -13,7 +13,7 @@ interface ExamTimerOptions {
   onTimeUp: () => void
   onTimeWarning?: (timeLeft: number) => void
   autoSubmit?: boolean
-  startTime?: number // Server-provided start time
+  startTime?: number
   examId?: string
   attemptId?: string
   onTimeSync?: (remaining: number) => void
@@ -39,14 +39,12 @@ export function useExamTimer({
 }: ExamTimerOptions) {
   const [timeLeft, setTimeLeft] = useState(durationMinutes * 60)
   const [isTimeUp, setIsTimeUp] = useState(false)
-  const [isWarningShown, setIsWarningShown] = useState(false)
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const onTimeUpRef = useRef(onTimeUp)
   const onTimeWarningRef = useRef(onTimeWarning)
   const startTimeRef = useRef<number | null>(null)
   const hasAutoSubmittedRef = useRef(false)
   const warningTriggeredRef = useRef(false)
-  const syncIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Update refs when callbacks change
   useEffect(() => {
@@ -68,14 +66,14 @@ export function useExamTimer({
     return durationMinutes * 60
   }, [durationMinutes])
 
-  // Sync time with server
+  // ✅ FIXED: Simplified sync with server - only check submitted_at
   const syncTimeWithServer = useCallback(async () => {
-    if (!attemptId || !examId || !examStarted) return
+    if (!attemptId || !examId || !examStarted || examEndedRef.current) return
 
     try {
       const { data, error } = await supabase
         .from('exam_attempts')
-        .select('started_at, duration_minutes, remaining_time, status')
+        .select('submitted_at, status')
         .eq('id', attemptId)
         .single()
 
@@ -84,45 +82,20 @@ export function useExamTimer({
         return
       }
 
-      if (data) {
-        const serverStartTime = new Date(data.started_at).getTime()
-        const durationSeconds = data.duration_minutes * 60
-        const elapsed = Math.floor((Date.now() - serverStartTime) / 1000)
-        const remaining = Math.max(0, durationSeconds - elapsed)
-
-        // Update local time if server time is different
-        const difference = Math.abs(remaining - timeLeft)
-        if (difference > 5) {
-          setTimeLeft(remaining)
-          if (onTimeSync) {
-            onTimeSync(remaining)
-          }
+      // ✅ If already submitted, stop timer
+      if (data?.submitted_at || ['pending_theory', 'graded', 'completed', 'terminated'].includes(data?.status)) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
         }
-
-        // Check if exam should be auto-submitted
-        if (remaining <= 0 && data.status !== 'completed' && data.status !== 'graded') {
-          if (!hasAutoSubmittedRef.current) {
-            hasAutoSubmittedRef.current = true
-            setIsTimeUp(true)
-            toast.error("⏰ Time's up! Auto-submitting your exam...")
-            setTimeout(() => {
-              onTimeUpRef.current()
-            }, 1500)
-          }
-        }
-
-        // Update remaining time in database periodically
-        if (remaining > 0 && remaining % 30 === 0) {
-          await supabase
-            .from('exam_attempts')
-            .update({ remaining_time: remaining })
-            .eq('id', attemptId)
-        }
+        examEndedRef.current = true
+        onTimeUpRef.current()
+        return
       }
     } catch (error) {
       console.error('Time sync error:', error)
     }
-  }, [attemptId, examId, examStarted, timeLeft, onTimeSync])
+  }, [attemptId, examId, examStarted, examEndedRef])
 
   // Initialize timer when exam starts
   useEffect(() => {
@@ -131,17 +104,12 @@ export function useExamTimer({
         clearInterval(timerRef.current)
         timerRef.current = null
       }
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current)
-        syncIntervalRef.current = null
-      }
       return
     }
 
     // Reset auto-submit flag
     hasAutoSubmittedRef.current = false
     warningTriggeredRef.current = false
-    setIsWarningShown(false)
 
     // Initialize start time
     if (startTime) {
@@ -162,13 +130,21 @@ export function useExamTimer({
 
     // Start timer
     timerRef.current = setInterval(() => {
+      // ✅ Check if exam ended
+      if (examEndedRef.current) {
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
+        }
+        return
+      }
+
       const remaining = calculateTimeLeft()
       setTimeLeft(remaining)
 
       // Check for time warning at 5 minutes
       if (remaining <= 300 && remaining > 0 && !warningTriggeredRef.current) {
         warningTriggeredRef.current = true
-        setIsWarningShown(true)
         
         const minutes = Math.floor(remaining / 60)
         const seconds = remaining % 60
@@ -184,45 +160,39 @@ export function useExamTimer({
       }
 
       // Check if time is up
-      if (remaining <= 0) {
-        clearInterval(timerRef.current!)
-        timerRef.current = null
+      if (remaining <= 0 && !hasAutoSubmittedRef.current && !examEndedRef.current) {
+        hasAutoSubmittedRef.current = true
+        setIsTimeUp(true)
         
-        if (!hasAutoSubmittedRef.current && !examEndedRef.current) {
-          hasAutoSubmittedRef.current = true
-          setIsTimeUp(true)
-          
-          if (autoSubmit) {
-            toast.error("⏰ Time's up! Auto-submitting your exam...")
-            setTimeout(() => {
-              onTimeUpRef.current()
-            }, 1500)
-          } else {
+        if (timerRef.current) {
+          clearInterval(timerRef.current)
+          timerRef.current = null
+        }
+        
+        if (autoSubmit) {
+          toast.error("⏰ Time's up! Auto-submitting your exam...")
+          setTimeout(() => {
             onTimeUpRef.current()
-          }
+          }, 1500)
+        } else {
+          onTimeUpRef.current()
         }
       }
     }, 1000)
 
-    // Start sync interval (every 30 seconds)
-    if (syncIntervalRef.current) {
-      clearInterval(syncIntervalRef.current)
-    }
-    syncIntervalRef.current = setInterval(() => {
+    // ✅ FIXED: Sync with server every 60 seconds (check if submitted)
+    const syncInterval = setInterval(() => {
       if (!examEndedRef.current) {
         syncTimeWithServer()
       }
-    }, 30000)
+    }, 60000)
 
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current)
         timerRef.current = null
       }
-      if (syncIntervalRef.current) {
-        clearInterval(syncIntervalRef.current)
-        syncIntervalRef.current = null
-      }
+      clearInterval(syncInterval)
     }
   }, [examStarted, examEndedRef, durationMinutes, startTime, calculateTimeLeft, autoSubmit, syncTimeWithServer])
 
@@ -280,10 +250,6 @@ export function useExamTimer({
       clearInterval(timerRef.current)
       timerRef.current = null
     }
-    if (syncIntervalRef.current) {
-      clearInterval(syncIntervalRef.current)
-      syncIntervalRef.current = null
-    }
   }, [])
 
   // Cleanup on unmount
@@ -294,7 +260,7 @@ export function useExamTimer({
   // Reset timer
   const resetTimer = useCallback((newDuration?: number, newStartTime?: number) => {
     if (newDuration) {
-      // Update duration
+      // Update duration if needed
     }
     if (newStartTime) {
       startTimeRef.current = newStartTime
@@ -304,38 +270,21 @@ export function useExamTimer({
     const initialTime = calculateTimeLeft()
     setTimeLeft(initialTime)
     setIsTimeUp(false)
-    setIsWarningShown(false)
     hasAutoSubmittedRef.current = false
     warningTriggeredRef.current = false
   }, [calculateTimeLeft])
 
-  // Extend time
+  // ✅ FIXED: Extend time - only updates local state, no DB columns
   const extendTime = useCallback((additionalMinutes: number) => {
     const additionalSeconds = additionalMinutes * 60
     setTimeLeft(prev => prev + additionalSeconds)
     toast.success(`⏰ Time extended by ${additionalMinutes} minute${additionalMinutes > 1 ? 's' : ''}`)
-    
-    if (attemptId) {
-      supabase
-        .from('exam_attempts')
-        .update({ 
-          remaining_time: timeLeft + additionalSeconds,
-          duration_minutes: durationMinutes + additionalMinutes
-        })
-        .eq('id', attemptId)
-        .then(({ error }) => {
-          if (error) {
-            console.error('Failed to update extended time:', error)
-          }
-        })
-    }
-  }, [attemptId, durationMinutes, timeLeft])
+  }, [])
 
   return {
     timeLeft,
     setTimeLeft,
     isTimeUp,
-    isWarningShown,
     formatTime,
     getTimeComponents,
     isTimeRunningLow,
