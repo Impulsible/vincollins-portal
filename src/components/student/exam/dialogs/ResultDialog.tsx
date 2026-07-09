@@ -51,6 +51,15 @@ const getGradeRemark = (grade: string): string => {
   }
 }
 
+const parseSeconds = (value: unknown): number | undefined => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isNaN(parsed) ? undefined : parsed
+  }
+  return undefined
+}
+
 // ✅ Safely format seconds → "Xm Ys"
 const formatDuration = (seconds?: number): string => {
   if (!seconds || seconds <= 0) return '—'
@@ -264,9 +273,9 @@ export function ResultDialog({
             <div className="flex items-center gap-2.5 py-2.5 px-3.5 bg-white dark:bg-zinc-950">
               <Timer className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
               <div>
-                {/* ✅ time_spent is now typed as optional on ExamResult */}
+                {/* ✅ time_spent can be optional or non-numeric on ExamResult */}
                 <p className="text-xs font-semibold text-zinc-900 dark:text-zinc-50 tabular-nums">
-                  {formatDuration(examResult.time_spent)}
+                  {formatDuration(parseSeconds(examResult.time_spent))}
                 </p>
                 <p className="text-[9px] text-zinc-400 font-medium uppercase tracking-widest">
                   Duration

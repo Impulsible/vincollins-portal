@@ -167,34 +167,57 @@ export type QuestionType = 'objective' | 'theory'
 export type QuestionStatus = 'answered' | 'flagged' | 'current' | 'not-answered'
 
 // ============================================
-// ✅ EXAM RESULT
+// ✅ EXAM RESULT - FIXED WITH time_spent
 // ============================================
 export interface ExamResult {
+  // Core scores
   score: number
   total: number
   percentage: number
+  
+  // Breakdown
   objective_score: number
   objective_total: number
   theory_score: number
   theory_total: number
+  
+  // Statistics
   correct: number
   incorrect: number
   unanswered: number
+  
+  // CA scores
   ca_score: number
   ca1_score: number
   ca2_score: number
+  
+  // Status
   is_passed: boolean
   passing_percentage: number
   status: 'in_progress' | 'completed' | 'pending_theory' | 'graded' | 'terminated'
   grade: Grade | null
   remark?: string
+  
+  // Attempt info
   attempts_used: number
   max_attempts: number
+  
+  // Timestamps
   submitted_at: string | null
   graded_at?: string | null
   graded_by?: string | null
+  
+  // ✅ Time tracking - FIXED
+  time_spent?: number    // Time spent in seconds
+  duration?: number      // Total exam duration in minutes
+  started_at?: string | null
+  ended_at?: string | null
+  
+  // Auto-submit info
   is_auto_submitted?: boolean
   auto_submit_reason?: string | null
+  
+  // Backward compatibility aliases
   total_score?: number  // Alias for score
   total_marks?: number  // Alias for total
 }
@@ -294,6 +317,11 @@ export function createDefaultExamResult(): ExamResult {
     max_attempts: 1,
     is_auto_submitted: false,
     auto_submit_reason: null,
+    // ✅ Time tracking defaults
+    time_spent: 0,
+    duration: 0,
+    started_at: null,
+    ended_at: null,
   }
 }
 
@@ -321,4 +349,8 @@ export function isExamAttempt(attempt: any): attempt is ExamAttempt {
 
 export function isTermProgress(progress: any): progress is TermProgress {
   return progress && typeof progress === 'object' && 'term' in progress && 'session_year' in progress
+}
+
+export function isExamResult(result: any): result is ExamResult {
+  return result && typeof result === 'object' && 'score' in result && 'total' in result && 'percentage' in result
 }

@@ -5,6 +5,7 @@
 // ============================================
 
 export interface ExamResult {
+  [x: string]: number | string | boolean | null | undefined
   // Core scores
   score: number
   total: number
