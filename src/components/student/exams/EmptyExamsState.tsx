@@ -3,6 +3,7 @@
 
 import { motion } from 'framer-motion'
 import { MonitorPlay, Award, Clock } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import type { TabType, StatsState } from '@/app/student/exams/types'
 
 interface EmptyExamsStateProps {
@@ -29,6 +30,12 @@ const CONFIG = {
     description: 'No upcoming exams are scheduled at the moment.',
     color: 'text-amber-500', bg: 'bg-amber-50',
   },
+  expired: {
+    icon: Clock,
+    title: 'No expired exams',
+    description: 'There are no exams that have expired.',
+    color: 'text-slate-500', bg: 'bg-slate-50',
+  },
 }
 
 export function EmptyExamsState({ activeTab, stats }: EmptyExamsStateProps) {
@@ -50,5 +57,3 @@ export function EmptyExamsState({ activeTab, stats }: EmptyExamsStateProps) {
   )
 }
 
-// need cn here too
-import { cn } from '@/lib/utils'
