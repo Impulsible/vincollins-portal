@@ -38,6 +38,7 @@ export function InstructionsView({
   const objectiveQuestions = allQuestions.filter(q => q.type !== 'theory')
   const theoryQuestions = allQuestions.filter(q => q.type === 'theory')
   const totalPoints = allQuestions.reduce((sum, q) => sum + Number(q.points || 1), 0)
+  const termLabel = TERM_NAMES[(exam?.term as keyof typeof TERM_NAMES) ?? CURRENT_TERM]
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
@@ -64,7 +65,7 @@ export function InstructionsView({
                   <span className="hidden sm:inline">•</span>
                   <span className="flex items-center gap-1">
                     <Calendar className="h-3.5 w-3.5" />
-                    {TERM_NAMES[exam?.term || CURRENT_TERM]} {exam?.session_year || CURRENT_SESSION}
+                    {termLabel} {exam?.session_year || CURRENT_SESSION}
                   </span>
                 </div>
               </div>
