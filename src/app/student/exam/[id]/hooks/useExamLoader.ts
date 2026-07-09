@@ -1,4 +1,4 @@
-// src/app/student/exam/[id]/hooks/useExamLoader.ts - FIXED
+// src/app/student/exam/[id]/hooks/useExamLoader.ts - COMPLETE FIXED VERSION
 
 "use client"
 
@@ -40,7 +40,36 @@ function calcScore(questions: any[], answers: Record<string, string>) {
   return { score, total: tp, percentage: tp > 0 ? Math.round((score / tp) * 100) : 0, correct, incorrect, unanswered }
 }
 
-export function useExamLoader(examId: string, router: ReturnType<typeof useRouter>) {
+interface UseExamLoaderReturn {
+  loading: boolean
+  loadError: string | null
+  exam: any
+  profile: any
+  allQuestions: any[]
+  hasCompletedAttempt: boolean
+  examResult: any
+  setExamResult: (result: any) => void
+  attemptId: string | null
+  setAttemptId: (id: string | null) => void
+  attemptsUsed: number
+  resumeData: any
+  showResumeDialog: boolean
+  setShowResumeDialog: (show: boolean) => void
+  examTerminated: boolean
+  setExamTerminated: (terminated: boolean) => void
+  noAttemptsLeft: boolean
+  unloadCount: number
+  handleResumeExam: () => Promise<any>
+  startNewAttempt: () => Promise<{ attemptId: string; isResuming: boolean; attemptNumber: number } | null>
+  handleStartNewAttempt: () => void
+  handleDiscardAndStart: () => void
+  calculateFlexiblePercentage: (attempt: any) => number
+}
+
+export function useExamLoader(
+  examId: string, 
+  router: ReturnType<typeof useRouter>
+): UseExamLoaderReturn {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [exam, setExam] = useState<any>(null)
@@ -506,6 +535,14 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
     return resumeData
   }
 
+  const handleStartNewAttempt = () => {
+    setShowResumeDialog(false)
+  }
+
+  const handleDiscardAndStart = () => {
+    setShowResumeDialog(false)
+  }
+
   return {
     loading, 
     loadError, 
@@ -527,8 +564,8 @@ export function useExamLoader(examId: string, router: ReturnType<typeof useRoute
     unloadCount,
     handleResumeExam,
     startNewAttempt,
-    handleStartNewAttempt: () => setShowResumeDialog(false),
-    handleDiscardAndStart: () => setShowResumeDialog(false),
+    handleStartNewAttempt,
+    handleDiscardAndStart,
     calculateFlexiblePercentage,
   }
 }

@@ -1,115 +1,184 @@
-// src/app/student/exam/[id]/hooks/useAutoSave.ts - FIXED
+// src/app/student/exam/[id]/hooks/useAutoSave.ts
+
 "use client"
 
-import { useEffect, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect, useRef, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { toast } from "sonner"
 
-export function useAutoSave(
-  attemptId: string | null,
-  examStarted: boolean,
-  answers: Record<string, string>,
-  allQuestions: any[],
+interface UseAutoSaveProps {
+  attemptId: string | undefined
+  isActive: boolean
+  answers: Record<string, string>
+  questions: any[]
   examEndedRef: React.MutableRefObject<boolean>
-) {
+  interval?: number
+}
+
+export function useAutoSave({
+  attemptId,
+  isActive,
+  answers,
+  questions,
+  examEndedRef,
+  interval = 30000,
+}: UseAutoSaveProps) {
   const [autoSaving, setAutoSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const previousAnswersRef = useRef<string>('')
+  const pendingSaveRef = useRef<boolean>(false)
+  const lastAnswersRef = useRef<string>("")
+  const isMountedRef = useRef(true)
 
-  useEffect(() => {
-    if (!attemptId || !examStarted || examEndedRef.current) return
-
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
-    }
-
-    saveTimeoutRef.current = setTimeout(async () => {
-      const answersString = JSON.stringify(answers)
-      if (answersString === previousAnswersRef.current) return
-      previousAnswersRef.current = answersString
-
-      setAutoSaving(true)
-      try {
-        const objectiveAnswers: Record<string, string> = {}
-        const theoryAnswers: Record<string, string> = {}
-        
-        allQuestions.forEach((q: any) => {
-          if (q.type === 'theory') {
-            theoryAnswers[q.id] = answers[q.id] || ''
-          } else {
-            objectiveAnswers[q.id] = answers[q.id] || ''
-          }
-        })
-
-        const result = calculateObjectiveScore(allQuestions, answers)
-
-        const updateData: any = {
+  // Save answers to database
+  const saveAnswers = useCallback(async (force = false) => {
+    if (!attemptId || !isActive || examEndedRef.current) return
+    
+    // Skip if no changes and not forced
+    const answersStr = JSON.stringify(answers)
+    if (!force && answersStr === lastAnswersRef.current) return
+    
+    // Skip if already saving
+    if (autoSaving && !force) return
+    
+    setAutoSaving(true)
+    
+    try {
+      // Separate objective and theory answers
+      const objectiveAnswers: Record<string, string> = {}
+      const theoryAnswers: Record<string, string> = {}
+      
+      questions.forEach(q => {
+        const answer = answers[q.id] || ''
+        if (q.type === 'theory') {
+          theoryAnswers[q.id] = answer
+        } else {
+          objectiveAnswers[q.id] = answer
+        }
+      })
+      
+      const { error } = await supabase
+        .from('exam_attempts')
+        .update({
           answers: objectiveAnswers,
           theory_answers: theoryAnswers,
-          last_auto_save: new Date().toISOString(),
           updated_at: new Date().toISOString()
-        }
-
-        if (result && result.total > 0) {
-          updateData.objective_score = result.score
-          updateData.objective_total = result.total
-          updateData.total_score = result.score
-          updateData.total_marks = result.total  // ✅ Auto-save sets correct total_marks
-          updateData.theory_total = 0  // ✅ Mid-exam, theory not submitted yet
-          updateData.correct_count = result.correct
-          updateData.incorrect_count = result.incorrect
-          updateData.unanswered_count = result.unanswered
-          updateData.percentage = Math.round((result.score / result.total) * 100)
-        }
-
-        const { error } = await supabase
-          .from('exam_attempts')
-          .update(updateData)
-          .eq('id', attemptId)
-
-        if (error) {
-          console.error('Auto-save error:', error)
-        } else {
-          setLastSaved(new Date())
-        }
-      } catch (error) {
+        })
+        .eq('id', attemptId)
+      
+      if (error) {
         console.error('Auto-save error:', error)
-      } finally {
+        // Store pending save
+        pendingSaveRef.current = true
+        return
+      }
+      
+      // Update last saved
+      lastAnswersRef.current = answersStr
+      setLastSaved(new Date())
+      pendingSaveRef.current = false
+      
+    } catch (error) {
+      console.error('Auto-save error:', error)
+      pendingSaveRef.current = true
+    } finally {
+      if (isMountedRef.current) {
         setAutoSaving(false)
       }
-    }, 2000)
+    }
+  }, [attemptId, isActive, answers, questions, autoSaving, examEndedRef])
 
-    return () => {
+  // Schedule auto-save
+  useEffect(() => {
+    if (!isActive || !attemptId || examEndedRef.current) {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
+      return
+    }
+    
+    // Save immediately when answers change
+    const answersStr = JSON.stringify(answers)
+    if (answersStr !== lastAnswersRef.current) {
+      // Debounce save to avoid too many requests
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current)
       }
+      
+      saveTimeoutRef.current = setTimeout(() => {
+        saveAnswers()
+      }, 2000) // 2 second debounce
     }
-  }, [attemptId, examStarted, answers, allQuestions, examEndedRef])
-
-  return { autoSaving, lastSaved }
-}
-
-function calculateObjectiveScore(questions: any[], answers: Record<string, string>) {
-  const objectiveQuestions = questions.filter((q: any) => q.type !== 'theory')
-  let score = 0, total = 0, correct = 0, incorrect = 0, unanswered = 0
-
-  objectiveQuestions.forEach((q: any) => {
-    const pts = Number(q.marks || q.points || 1)
-    total += pts
-    const answer = answers[q.id]
-    const correctAnswer = String(q.correct_answer || '').trim()
-
-    if (answer?.trim()) {
-      if (answer.trim().toLowerCase() === correctAnswer.toLowerCase()) {
-        score += pts
-        correct++
-      } else {
-        incorrect++
+    
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
       }
-    } else {
-      unanswered++
     }
-  })
+  }, [answers, isActive, attemptId, saveAnswers, examEndedRef])
 
-  return { score, total, correct, incorrect, unanswered }
+  // Periodic auto-save
+  useEffect(() => {
+    if (!isActive || !attemptId || examEndedRef.current) return
+    
+    const intervalId = setInterval(() => {
+      if (pendingSaveRef.current) {
+        saveAnswers(true)
+      } else {
+        saveAnswers()
+      }
+    }, interval)
+    
+    return () => {
+      clearInterval(intervalId)
+    }
+  }, [isActive, attemptId, interval, saveAnswers, examEndedRef])
+
+  // Save on page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (isActive && attemptId && !examEndedRef.current) {
+        // Try to save synchronously
+        const answersStr = JSON.stringify(answers)
+        if (answersStr !== lastAnswersRef.current) {
+          navigator.sendBeacon('/api/save-exam-progress', JSON.stringify({
+            attemptId,
+            answers: answers,
+            timestamp: Date.now()
+          }))
+        }
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [isActive, attemptId, answers, examEndedRef])
+
+  // Cleanup
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current)
+        saveTimeoutRef.current = null
+      }
+    }
+  }, [])
+
+  // Force save (for manual triggers)
+  const forceSave = useCallback(async () => {
+    await saveAnswers(true)
+  }, [saveAnswers])
+
+  return {
+    autoSaving,
+    lastSaved,
+    forceSave,
+    hasPendingSave: pendingSaveRef.current,
+  }
 }

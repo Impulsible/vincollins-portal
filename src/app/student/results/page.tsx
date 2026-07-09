@@ -6,110 +6,76 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
-  Loader2, Award, CheckCircle, XCircle, Search, TrendingUp,
-  Target, Trophy, ChevronRight, BookOpen, GraduationCap,
-  Calendar, BarChart3, Filter, ArrowUpDown, FileText,
-  RefreshCw, Home, ArrowLeft, Star, Zap, Medal,
-  TrendingDown, Activity, Clock, Eye,
+  Loader2, Award, CheckCircle2, XCircle, Search, TrendingUp, TrendingDown,
+  Target, Trophy, ChevronRight, GraduationCap, BarChart3, Filter,
+  ArrowUpDown, FileText, RefreshCw, Home, ArrowLeft, Activity, Clock,
+  Sparkles, Star, Medal, Flame, ArrowUpRight, BookOpen, ChevronDown,
+  Grid3x3, List,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
 
-// ============================================
-// TYPES
-// ============================================
+// ─── Types ───────────────────────────────────────────
 interface StudentProfile {
-  id: string
-  full_name: string
-  first_name?: string
-  last_name?: string
-  email: string
-  class: string
-  department: string
-  vin_id?: string
-  photo_url?: string
+  id: string; full_name: string; first_name?: string; last_name?: string
+  email: string; class: string; department: string; vin_id?: string; photo_url?: string
 }
-
 interface ExamResult {
-  id: string
-  exam_id: string
-  exam_title: string
-  exam_subject: string
-  status: string
-  percentage: number
-  total_score: number
-  total_marks: number
-  objective_score?: number
-  objective_total?: number
-  theory_score?: number
-  theory_total?: number
-  ca1_score?: number
-  ca2_score?: number
-  has_ca?: boolean
-  is_passed: boolean
-  started_at: string
-  completed_at?: string
-  attempt_number: number
-  passing_percentage?: number
-  grade?: string
+  id: string; exam_id: string; exam_title: string; exam_subject: string
+  status: string; percentage: number; total_score: number; total_marks: number
+  objective_score?: number; objective_total?: number; theory_score?: number; theory_total?: number
+  ca1_score?: number; ca2_score?: number; has_ca?: boolean; is_passed: boolean
+  started_at: string; completed_at?: string; attempt_number: number
+  passing_percentage?: number; grade?: string
 }
-
 interface SubjectPerformance {
-  subject: string
-  averageScore: number
-  examsTaken: number
-  bestScore: number
-  lowestScore: number
-  grade: string
+  subject: string; averageScore: number; examsTaken: number
+  bestScore: number; lowestScore: number; grade: string
 }
 
-// ============================================
-// GRADING HELPERS
-// ============================================
-const getWAECGrade = (percentage: number): string => {
-  if (percentage >= 75) return 'A1'
-  if (percentage >= 70) return 'B2'
-  if (percentage >= 65) return 'B3'
-  if (percentage >= 60) return 'C4'
-  if (percentage >= 55) return 'C5'
-  if (percentage >= 50) return 'C6'
-  if (percentage >= 45) return 'D7'
-  if (percentage >= 40) return 'E8'
-  return 'F9'
+// ─── Grading ─────────────────────────────────────────
+const getWAECGrade = (p: number) => {
+  if (p >= 75) return 'A1'; if (p >= 70) return 'B2'; if (p >= 65) return 'B3'
+  if (p >= 60) return 'C4'; if (p >= 55) return 'C5'; if (p >= 50) return 'C6'
+  if (p >= 45) return 'D7'; if (p >= 40) return 'E8'; return 'F9'
 }
 
-const getWAECGradeConfig = (percentage: number) => {
-  if (percentage >= 75) return { grade: 'A1', label: 'Excellent',  color: 'text-emerald-600', bg: 'bg-emerald-50',  border: 'border-emerald-200', bar: 'bg-emerald-500', ring: 'ring-emerald-200' }
-  if (percentage >= 70) return { grade: 'B2', label: 'Very Good',  color: 'text-blue-600',    bg: 'bg-blue-50',    border: 'border-blue-200',    bar: 'bg-blue-500',    ring: 'ring-blue-200' }
-  if (percentage >= 65) return { grade: 'B3', label: 'Good',       color: 'text-sky-600',     bg: 'bg-sky-50',     border: 'border-sky-200',     bar: 'bg-sky-500',     ring: 'ring-sky-200' }
-  if (percentage >= 60) return { grade: 'C4', label: 'Credit',     color: 'text-cyan-600',    bg: 'bg-cyan-50',    border: 'border-cyan-200',    bar: 'bg-cyan-500',    ring: 'ring-cyan-200' }
-  if (percentage >= 55) return { grade: 'C5', label: 'Credit',     color: 'text-teal-600',    bg: 'bg-teal-50',    border: 'border-teal-200',    bar: 'bg-teal-500',    ring: 'ring-teal-200' }
-  if (percentage >= 50) return { grade: 'C6', label: 'Credit',     color: 'text-amber-600',   bg: 'bg-amber-50',   border: 'border-amber-200',   bar: 'bg-amber-500',   ring: 'ring-amber-200' }
-  if (percentage >= 45) return { grade: 'D7', label: 'Pass',       color: 'text-orange-600',  bg: 'bg-orange-50',  border: 'border-orange-200',  bar: 'bg-orange-500',  ring: 'ring-orange-200' }
-  if (percentage >= 40) return { grade: 'E8', label: 'Pass',       color: 'text-yellow-600',  bg: 'bg-yellow-50',  border: 'border-yellow-200',  bar: 'bg-yellow-500',  ring: 'ring-yellow-200' }
-  return               { grade: 'F9', label: 'Fail',       color: 'text-red-600',     bg: 'bg-red-50',     border: 'border-red-200',     bar: 'bg-red-500',     ring: 'ring-red-200' }
+type GradeStyle = {
+  grade: string; label: string
+  text: string; textDark: string
+  bg: string; bgSolid: string
+  border: string; ring: string
+  gradient: string; shadow: string
 }
 
-const getSimplifiedGradeConfig = (percentage: number) => {
-  if (percentage >= 80) return { grade: 'A', label: 'Excellent', color: 'text-emerald-600', bg: 'bg-emerald-500', soft: 'bg-emerald-50', border: 'border-emerald-200' }
-  if (percentage >= 70) return { grade: 'B', label: 'Very Good', color: 'text-blue-600',    bg: 'bg-blue-500',    soft: 'bg-blue-50',    border: 'border-blue-200' }
-  if (percentage >= 60) return { grade: 'C', label: 'Good',      color: 'text-amber-600',   bg: 'bg-amber-500',   soft: 'bg-amber-50',   border: 'border-amber-200' }
-  if (percentage >= 50) return { grade: 'P', label: 'Pass',      color: 'text-orange-600',  bg: 'bg-orange-500',  soft: 'bg-orange-50',  border: 'border-orange-200' }
-  return               { grade: 'F', label: 'Fail',      color: 'text-red-600',     bg: 'bg-red-500',     soft: 'bg-red-50',     border: 'border-red-200' }
+const getGrade = (p: number): GradeStyle => {
+  if (p >= 75) return { grade: 'A1', label: 'Excellent',  text: 'text-emerald-700', textDark: 'text-emerald-300', bg: 'bg-emerald-100', bgSolid: 'bg-emerald-500', border: 'border-emerald-300', ring: 'ring-emerald-200', gradient: 'from-emerald-500 to-teal-600', shadow: 'shadow-emerald-500/25' }
+  if (p >= 70) return { grade: 'B2', label: 'Very Good',  text: 'text-blue-700',    textDark: 'text-blue-300',    bg: 'bg-blue-100',    bgSolid: 'bg-blue-500',    border: 'border-blue-300',    ring: 'ring-blue-200',    gradient: 'from-blue-500 to-indigo-600',    shadow: 'shadow-blue-500/25' }
+  if (p >= 65) return { grade: 'B3', label: 'Good',       text: 'text-sky-700',     textDark: 'text-sky-300',     bg: 'bg-sky-100',     bgSolid: 'bg-sky-500',     border: 'border-sky-300',     ring: 'ring-sky-200',     gradient: 'from-sky-500 to-blue-600',        shadow: 'shadow-sky-500/25' }
+  if (p >= 60) return { grade: 'C4', label: 'Credit',     text: 'text-cyan-700',    textDark: 'text-cyan-300',    bg: 'bg-cyan-100',    bgSolid: 'bg-cyan-500',    border: 'border-cyan-300',    ring: 'ring-cyan-200',    gradient: 'from-cyan-500 to-teal-600',       shadow: 'shadow-cyan-500/25' }
+  if (p >= 55) return { grade: 'C5', label: 'Credit',     text: 'text-teal-700',    textDark: 'text-teal-300',    bg: 'bg-teal-100',    bgSolid: 'bg-teal-500',    border: 'border-teal-300',    ring: 'ring-teal-200',    gradient: 'from-teal-500 to-emerald-600',    shadow: 'shadow-teal-500/25' }
+  if (p >= 50) return { grade: 'C6', label: 'Credit',     text: 'text-amber-700',   textDark: 'text-amber-300',   bg: 'bg-amber-100',   bgSolid: 'bg-amber-500',   border: 'border-amber-300',   ring: 'ring-amber-200',   gradient: 'from-amber-500 to-orange-600',    shadow: 'shadow-amber-500/25' }
+  if (p >= 45) return { grade: 'D7', label: 'Pass',       text: 'text-orange-700',  textDark: 'text-orange-300',  bg: 'bg-orange-100',  bgSolid: 'bg-orange-500',  border: 'border-orange-300',  ring: 'ring-orange-200',  gradient: 'from-orange-500 to-red-600',      shadow: 'shadow-orange-500/25' }
+  if (p >= 40) return { grade: 'E8', label: 'Pass',       text: 'text-yellow-700',  textDark: 'text-yellow-300',  bg: 'bg-yellow-100',  bgSolid: 'bg-yellow-500',  border: 'border-yellow-300',  ring: 'ring-yellow-200',  gradient: 'from-yellow-500 to-amber-600',    shadow: 'shadow-yellow-500/25' }
+  return       { grade: 'F9', label: 'Needs Work', text: 'text-red-700',     textDark: 'text-red-300',     bg: 'bg-red-100',     bgSolid: 'bg-red-500',     border: 'border-red-300',     ring: 'ring-red-200',     gradient: 'from-red-500 to-rose-600',        shadow: 'shadow-red-500/25' }
+}
+
+const getSimpleGrade = (p: number) => {
+  if (p >= 80) return { grade: 'A', label: 'Excellent', gradient: 'from-emerald-400 to-teal-500', text: 'text-emerald-300' }
+  if (p >= 70) return { grade: 'B', label: 'Very Good', gradient: 'from-blue-400 to-indigo-500',   text: 'text-blue-300' }
+  if (p >= 60) return { grade: 'C', label: 'Good',      gradient: 'from-amber-400 to-orange-500',  text: 'text-amber-300' }
+  if (p >= 50) return { grade: 'P', label: 'Pass',      gradient: 'from-orange-400 to-red-500',    text: 'text-orange-300' }
+  return       { grade: 'F', label: 'Needs Work', gradient: 'from-red-400 to-rose-500',      text: 'text-red-300' }
 }
 
 const formatProfileForHeader = (profile: StudentProfile | null) => {
@@ -121,288 +87,316 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
     avatar: profile.photo_url || undefined, isAuthenticated: true,
   }
 }
-
-const getInitials = (name: string): string => {
+const getInitials = (name: string) => {
   if (!name) return 'S'
-  const parts = name.split(' ')
-  return parts.length === 1 ? parts[0][0].toUpperCase() : (parts[0][0] + parts[1][0]).toUpperCase()
+  const p = name.split(' ')
+  return p.length === 1 ? p[0][0].toUpperCase() : (p[0][0] + p[1][0]).toUpperCase()
 }
+const formatDate = (d?: string) => d ? format(new Date(d), 'MMM dd, yyyy') : 'N/A'
+const formatTime = (d?: string) => d ? format(new Date(d), 'hh:mm a') : ''
 
-const formatDate = (dateString?: string) => {
-  if (!dateString) return 'N/A'
-  return format(new Date(dateString), 'MMM dd, yyyy • hh:mm a')
-}
-
-// ============================================
-// RADIAL SCORE RING
-// ============================================
-function ScoreRing({ percentage, size = 64 }: { percentage: number; size?: number }) {
-  const cfg = getWAECGradeConfig(percentage)
-  const r = (size - 8) / 2
-  const circ = 2 * Math.PI * r
-  const offset = circ - (percentage / 100) * circ
-
-  return (
-    <div className="relative flex items-center justify-center" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90" style={{ position: 'absolute' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#e2e8f0" strokeWidth={5} />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none"
-          className={cfg.bar.replace('bg-', 'stroke-')}
-          strokeWidth={5} strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={offset}
-          style={{ transition: 'stroke-dashoffset 1s ease' }}
-        />
-      </svg>
-      <span className={cn('font-bold z-10', size < 60 ? 'text-[10px]' : 'text-xs', cfg.color)}>
-        {percentage}%
-      </span>
-    </div>
-  )
-}
-
-// ============================================
-// STAT CARD
-// ============================================
-function StatCard({
-  label, value, icon: Icon, color, subtitle, delay = 0,
+// ═══════════════════════════════════════════════════
+// STAT TILE
+// ═══════════════════════════════════════════════════
+function StatTile({
+  label, value, icon: Icon, tone, subtitle, delay = 0, trend,
 }: {
   label: string; value: string | number; icon: any
-  color: string; subtitle?: string; delay?: number
+  tone: 'blue' | 'emerald' | 'red' | 'amber' | 'purple' | 'slate'
+  subtitle?: string; delay?: number; trend?: 'up' | 'down' | null
 }) {
-  return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
-      <Card className="border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-white overflow-hidden group">
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wide truncate">{label}</p>
-              <p className={cn('text-2xl font-bold mt-1 leading-none', color)}>{value}</p>
-              {subtitle && <p className="text-[10px] text-slate-400 mt-1">{subtitle}</p>}
-            </div>
-            <div className={cn(
-              'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 ml-2 transition-transform duration-200 group-hover:scale-110',
-              color.replace('text-', 'bg-').replace('-600', '-100').replace('-700', '-100')
-            )}>
-              <Icon className={cn('h-5 w-5', color)} />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  )
-}
+  const tones = {
+    blue:    { iconBg: 'bg-blue-100',    iconColor: 'text-blue-600',    valueColor: 'text-slate-900',   accent: 'bg-blue-500' },
+    emerald: { iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', valueColor: 'text-emerald-700', accent: 'bg-emerald-500' },
+    red:     { iconBg: 'bg-red-100',     iconColor: 'text-red-600',     valueColor: 'text-red-700',     accent: 'bg-red-500' },
+    amber:   { iconBg: 'bg-amber-100',   iconColor: 'text-amber-600',   valueColor: 'text-amber-700',   accent: 'bg-amber-500' },
+    purple:  { iconBg: 'bg-purple-100',  iconColor: 'text-purple-600',  valueColor: 'text-purple-700',  accent: 'bg-purple-500' },
+    slate:   { iconBg: 'bg-slate-100',   iconColor: 'text-slate-500',   valueColor: 'text-slate-700',   accent: 'bg-slate-400' },
+  }
+  const t = tones[tone]
 
-// ============================================
-// SUBJECT PERFORMANCE CARD
-// ============================================
-function SubjectCard({ perf, index }: { perf: SubjectPerformance; index: number }) {
-  const cfg = getWAECGradeConfig(perf.averageScore)
   return (
     <motion.div
-      initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.1 + index * 0.05 }}
-      className={cn(
-        'relative p-4 rounded-2xl border-2 transition-all duration-200 hover:shadow-md group overflow-hidden',
-        cfg.border, cfg.bg
-      )}
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay, duration: 0.3 }}
     >
-      {/* decorative blob */}
-      <div className={cn('absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-10', cfg.bar)} />
-
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0 pr-2">
-          <p className="font-semibold text-sm text-slate-800 truncate">{perf.subject}</p>
-          <p className="text-[10px] text-slate-500 mt-0.5">{perf.examsTaken} exam{perf.examsTaken !== 1 ? 's' : ''} taken</p>
+      <div className="relative bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200 overflow-hidden group h-full">
+        <div className={cn('h-0.5 w-full', t.accent, 'opacity-60 group-hover:opacity-100 transition-opacity')} />
+        <div className="p-4">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight flex-1 min-w-0">
+              {label}
+            </p>
+            <div className={cn(
+              'h-7 w-7 rounded-lg flex items-center justify-center shrink-0',
+              'group-hover:scale-110 group-hover:rotate-3 transition-transform duration-200',
+              t.iconBg
+            )}>
+              <Icon className={cn('w-3.5 h-3.5', t.iconColor)} />
+            </div>
+          </div>
+          <p className={cn('text-xl sm:text-2xl font-black leading-none tracking-tight', t.valueColor)}>
+            {value}
+          </p>
+          {subtitle && (
+            <div className="flex items-center gap-0.5 mt-1.5">
+              {trend === 'up' && <ArrowUpRight className="h-3 w-3 text-emerald-500" />}
+              <p className="text-[11px] text-slate-500 font-semibold truncate">{subtitle}</p>
+            </div>
+          )}
         </div>
-        <div className={cn('px-2 py-0.5 rounded-lg text-[11px] font-bold border', cfg.bg, cfg.color, cfg.border)}>
-          {perf.grade}
-        </div>
-      </div>
-
-      <div className="flex items-center justify-between mb-2">
-        <span className={cn('text-2xl font-black', cfg.color)}>{perf.averageScore}%</span>
-        <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', cfg.bg, cfg.color)}>
-          {cfg.label}
-        </span>
-      </div>
-
-      <div className="w-full bg-white/60 rounded-full h-2 mb-2 overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }} animate={{ width: `${perf.averageScore}%` }}
-          transition={{ delay: 0.3 + index * 0.05, duration: 0.8, ease: 'easeOut' }}
-          className={cn('h-full rounded-full', cfg.bar)}
-        />
-      </div>
-
-      <div className="flex justify-between text-[10px] text-slate-500">
-        <span className="flex items-center gap-0.5"><TrendingUp className="h-2.5 w-2.5 text-emerald-500" /> {perf.bestScore}%</span>
-        <span className="flex items-center gap-0.5"><TrendingDown className="h-2.5 w-2.5 text-red-400" /> {perf.lowestScore}%</span>
       </div>
     </motion.div>
   )
 }
 
-// ============================================
+// ═══════════════════════════════════════════════════
+// ✅ SUBJECT PERFORMANCE CARD (Compact)
+// ═══════════════════════════════════════════════════
+function SubjectTile({ 
+  perf, 
+  index, 
+  avgOverall,
+  onClick 
+}: { 
+  perf: SubjectPerformance; 
+  index: number;
+  avgOverall: number;
+  onClick?: () => void;
+}) {
+  const g = getGrade(perf.averageScore)
+  const isAboveAvg = perf.averageScore >= avgOverall
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 + index * 0.04, duration: 0.3 }}
+      onClick={onClick}
+      className="group cursor-pointer"
+    >
+      <div className="relative bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-lg hover:border-slate-300 transition-all duration-200 overflow-hidden h-full">
+        <div className={cn('h-1 w-full bg-gradient-to-r', g.gradient)} />
+        
+        <div className="p-3.5">
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm text-slate-900 leading-tight truncate">
+                {perf.subject}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <p className="text-[10px] text-slate-500 font-medium">
+                  {perf.examsTaken} exam{perf.examsTaken !== 1 ? 's' : ''}
+                </p>
+                <span className={cn(
+                  'text-[9px] font-bold px-1.5 py-0.5 rounded',
+                  isAboveAvg ? 'text-emerald-600 bg-emerald-50' : 'text-red-500 bg-red-50'
+                )}>
+                  {isAboveAvg ? '↑' : '↓'}
+                </span>
+              </div>
+            </div>
+            <div className={cn(
+              'shrink-0 h-8 w-8 rounded-lg flex items-center justify-center border-2 shadow-sm',
+              g.bg, g.border
+            )}>
+              <span className={cn('text-[10px] font-black', g.text)}>{g.grade}</span>
+            </div>
+          </div>
+
+          <div className="flex items-baseline gap-1 mb-2">
+            <span className={cn('text-xl font-black leading-none tracking-tight', g.text)}>
+              {perf.averageScore}
+            </span>
+            <span className={cn('text-[10px] font-bold', g.text, 'opacity-60')}>%</span>
+          </div>
+
+          <div className="relative w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mb-2">
+            <motion.div
+              initial={{ width: 0 }} animate={{ width: `${perf.averageScore}%` }}
+              transition={{ delay: 0.3 + index * 0.04, duration: 0.8, ease: 'easeOut' }}
+              className={cn('h-full rounded-full bg-gradient-to-r', g.gradient)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-[10px] font-semibold">
+            <div className="flex items-center gap-1 text-emerald-600">
+              <TrendingUp className="h-2.5 w-2.5" />
+              <span>{perf.bestScore}%</span>
+            </div>
+            <div className="flex items-center gap-1 text-red-500">
+              <TrendingDown className="h-2.5 w-2.5" />
+              <span>{perf.lowestScore}%</span>
+            </div>
+            {perf.examsTaken > 1 && (
+              <div className="flex items-center gap-1 text-slate-400">
+                {perf.bestScore > perf.lowestScore ? (
+                  <TrendingUp className="h-2.5 w-2.5 text-emerald-500" />
+                ) : (
+                  <TrendingDown className="h-2.5 w-2.5 text-red-500" />
+                )}
+                <span className="text-[9px]">
+                  {Math.round(perf.bestScore - perf.lowestScore)}%
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  )
+}
+
+// ═══════════════════════════════════════════════════
 // RESULT ROW CARD
-// ============================================
-function ResultCard({ result, index, onClick }: { result: ExamResult; index: number; onClick: () => void }) {
-  const cfg = getWAECGradeConfig(result.percentage)
+// ═══════════════════════════════════════════════════
+function ResultRow({ result, index, onClick }: { result: ExamResult; index: number; onClick: () => void }) {
+  const g = getGrade(result.percentage)
   const isPending = result.status === 'pending_theory'
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04 }}
+      initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.03, duration: 0.25 }}
     >
-      <Card
+      <div
         onClick={onClick}
-        className={cn(
-          'border-0 shadow-sm hover:shadow-lg transition-all duration-200 cursor-pointer bg-white group',
-          'hover:-translate-y-0.5'
-        )}
+        className="relative bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5 transition-all duration-200 cursor-pointer group overflow-hidden"
       >
-        <CardContent className="p-0">
-          <div className="flex items-stretch">
-            {/* Left accent bar */}
-            <div className={cn(
-              'w-1 rounded-l-xl shrink-0 transition-all duration-200 group-hover:w-1.5',
-              result.is_passed ? 'bg-emerald-500' : isPending ? 'bg-amber-400' : 'bg-red-500'
-            )} />
+        <div className="flex items-stretch">
+          <div className={cn(
+            'w-1 shrink-0 transition-all duration-200 group-hover:w-1.5',
+            isPending ? 'bg-amber-400' : result.is_passed ? 'bg-emerald-500' : 'bg-red-500'
+          )} />
 
-            <div className="flex-1 p-3 sm:p-4">
-              <div className="flex items-center gap-3">
+          <div className="flex-1 p-4 min-w-0">
+            <div className="flex items-start gap-3">
 
-                {/* Score ring */}
-                <div className="shrink-0 hidden xs:block">
-                  <ScoreRing percentage={result.percentage} size={52} />
+              <div className="shrink-0">
+                <div className={cn(
+                  'h-14 w-14 rounded-xl flex flex-col items-center justify-center border-2 shadow-sm',
+                  g.bg, g.border
+                )}>
+                  <span className={cn('text-[9px] font-bold uppercase leading-none opacity-70', g.text)}>
+                    Grade
+                  </span>
+                  <span className={cn('text-base font-black leading-none mt-0.5', g.text)}>
+                    {result.grade}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-sm text-slate-900 truncate leading-snug mb-1.5">
+                  {result.exam_title}
+                </h3>
+
+                <div className="flex items-center gap-1.5 flex-wrap mb-2">
+                  <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
+                    {result.exam_subject}
+                  </span>
+                  <span className={cn(
+                    'text-[11px] font-bold px-2 py-0.5 rounded flex items-center gap-0.5',
+                    isPending ? 'bg-amber-100 text-amber-700'
+                      : result.is_passed ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-red-100 text-red-700'
+                  )}>
+                    {isPending ? <><Clock className="h-2.5 w-2.5" />Pending</>
+                      : result.is_passed ? <><CheckCircle2 className="h-2.5 w-2.5" />Passed</>
+                      : <><XCircle className="h-2.5 w-2.5" />Failed</>}
+                  </span>
+                  {result.has_ca && (
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-purple-100 text-purple-700">
+                      CA: {result.ca1_score}+{result.ca2_score}
+                    </span>
+                  )}
                 </div>
 
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm text-slate-900 truncate leading-snug">
-                        {result.exam_title}
-                      </h3>
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        <Badge variant="outline" className="text-[10px] py-0 h-4 px-1.5 bg-slate-50">
-                          {result.exam_subject}
-                        </Badge>
-                        <Badge className={cn(
-                          'text-[10px] py-0 h-4 px-1.5 font-semibold',
-                          isPending
-                            ? 'bg-amber-100 text-amber-700 border border-amber-200'
-                            : result.is_passed
-                              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                              : 'bg-red-100 text-red-700 border border-red-200'
-                        )}>
-                          {isPending ? '⏳ Pending' : result.is_passed ? '✓ Passed' : '✗ Failed'}
-                        </Badge>
-                        <Badge className={cn(
-                          'text-[10px] py-0 h-4 px-1.5 font-bold border',
-                          cfg.bg, cfg.color, cfg.border
-                        )}>
-                          {result.grade}
-                        </Badge>
-                        {result.has_ca && (
-                          <Badge className="text-[10px] py-0 h-4 px-1.5 bg-purple-100 text-purple-700 border border-purple-200">
-                            CA: {result.ca1_score}/{result.ca2_score}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1">
-                        <Clock className="h-2.5 w-2.5" />
-                        {formatDate(result.completed_at)}
-                      </p>
-                    </div>
-
-                    {/* Score block */}
-                    <div className="shrink-0 text-right">
-                      <div className={cn('text-2xl font-black leading-none', cfg.color)}>
-                        {result.percentage}%
-                      </div>
-                      <div className="text-[10px] text-slate-400 mt-0.5">
-                        {result.total_score}/100
-                      </div>
-                      <div className={cn('text-[10px] font-semibold mt-1', cfg.color)}>
-                        {cfg.label}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Score breakdown bar */}
-                  <div className="mt-2.5 w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                    <motion.div
-                      initial={{ width: 0 }} animate={{ width: `${result.percentage}%` }}
-                      transition={{ delay: 0.2 + index * 0.04, duration: 0.6, ease: 'easeOut' }}
-                      className={cn('h-full rounded-full', cfg.bar)}
-                    />
-                  </div>
+                <div className="relative w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mb-2">
+                  <motion.div
+                    initial={{ width: 0 }} animate={{ width: `${result.percentage}%` }}
+                    transition={{ delay: 0.2 + index * 0.03, duration: 0.6, ease: 'easeOut' }}
+                    className={cn('h-full rounded-full bg-gradient-to-r', g.gradient)}
+                  />
                 </div>
 
-                {/* Arrow */}
-                <div className="shrink-0 hidden sm:flex items-center">
-                  <div className="h-7 w-7 rounded-full bg-slate-100 group-hover:bg-slate-200 flex items-center justify-center transition-all duration-200">
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-                  </div>
+                <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {formatDate(result.completed_at)}
+                  {formatTime(result.completed_at) && <span className="text-slate-300">·</span>}
+                  {formatTime(result.completed_at)}
+                </p>
+              </div>
+
+              <div className="shrink-0 text-right flex flex-col items-end gap-1">
+                <div className="flex items-baseline gap-0.5">
+                  <span className={cn('text-xl font-black leading-none', g.text)}>
+                    {result.percentage}
+                  </span>
+                  <span className={cn('text-sm font-bold', g.text, 'opacity-60')}>%</span>
+                </div>
+                <p className="text-[11px] font-semibold text-slate-500">
+                  {result.total_score}<span className="text-slate-400">/100</span>
+                </p>
+                <div className="hidden sm:flex items-center gap-0.5 mt-0.5 text-slate-400 group-hover:text-slate-700 transition-colors">
+                  <span className="text-[11px] font-semibold">View</span>
+                  <ChevronRight className="h-3 w-3 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     </motion.div>
   )
 }
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
+// ═══════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════
 export default function StudentResultsPage() {
   const router = useRouter()
-  const [loading, setLoading] = useState(true)
-  const [refreshing, setRefreshing] = useState(false)
+  const [loading, setLoading]           = useState(true)
+  const [refreshing, setRefreshing]     = useState(false)
   const [authChecking, setAuthChecking] = useState(true)
-  const [profile, setProfile] = useState<StudentProfile | null>(null)
+  const [profile, setProfile]           = useState<StudentProfile | null>(null)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [activeTab, setActiveTab] = useState('all')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [activeTab, setActiveTab]       = useState('all')
+  const [searchQuery, setSearchQuery]   = useState('')
   const [subjectFilter, setSubjectFilter] = useState<string>('all')
-  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest' | 'highest' | 'lowest'>('newest')
-
-  const [results, setResults] = useState<ExamResult[]>([])
+  const [sortOrder, setSortOrder]       = useState<'newest'|'oldest'|'highest'|'lowest'>('newest')
+  const [results, setResults]           = useState<ExamResult[]>([])
   const [filteredResults, setFilteredResults] = useState<ExamResult[]>([])
   const [subjectPerformance, setSubjectPerformance] = useState<SubjectPerformance[]>([])
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([])
-
+  const [showAllSubjects, setShowAllSubjects] = useState(false)
   const [stats, setStats] = useState({
     totalExams: 0, passedExams: 0, failedExams: 0,
     averageScore: 0, highestScore: 0, lowestScore: 100, pendingResults: 0,
   })
 
-  // ── AUTH ─────────────────────────────────────────
+  // AUTH
   useEffect(() => {
-    let isMounted = true
-    const checkAuth = async () => {
+    let m = true
+    const check = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session?.user) { if (isMounted) window.location.replace('/portal'); return }
-        const { data: profileData } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
-        if (!profileData || profileData.role !== 'student') { toast.error('Access denied'); router.push('/portal'); return }
-        if (isMounted) {
+        const { data:{session} } = await supabase.auth.getSession()
+        if (!session?.user) { if(m) window.location.replace('/portal'); return }
+        const { data:pd } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
+        if (!pd || pd.role !== 'student') { toast.error('Access denied'); router.push('/portal'); return }
+        if (m) {
           setProfile({
-            id: session.user.id, full_name: profileData.full_name || 'Student',
-            first_name: profileData.first_name, last_name: profileData.last_name,
-            email: profileData.email || '', class: profileData.class || 'Not Assigned',
-            department: profileData.department || 'General', vin_id: profileData.vin_id,
-            photo_url: profileData.photo_url,
+            id: session.user.id, full_name: pd.full_name || 'Student',
+            first_name: pd.first_name, last_name: pd.last_name,
+            email: pd.email || '', class: pd.class || 'Not Assigned',
+            department: pd.department || 'General', vin_id: pd.vin_id,
+            photo_url: pd.photo_url,
           })
           setAuthChecking(false)
         }
-      } catch (err) { console.error(err); if (isMounted) setAuthChecking(false) }
+      } catch(e){ console.error(e); if(m) setAuthChecking(false) }
     }
-    checkAuth()
-    return () => { isMounted = false }
+    check()
+    return ()=>{ m = false }
   }, [router])
 
   // ── LOAD RESULTS ─────────────────────────────────
@@ -416,92 +410,62 @@ export default function StudentResultsPage() {
         .order('created_at', { ascending: false })
 
       if (!attemptsData?.length) {
-        setResults([]); setFilteredResults([]); setSubjectPerformance([])
-        setAvailableSubjects([])
+        setResults([]); setFilteredResults([]); setSubjectPerformance([]); setAvailableSubjects([])
         setStats({ totalExams: 0, passedExams: 0, failedExams: 0, averageScore: 0, highestScore: 0, lowestScore: 100, pendingResults: 0 })
-        setLoading(false); setRefreshing(false)
-        return
+        setLoading(false); setRefreshing(false); return
       }
 
       const examIds = [...new Set(attemptsData.map(a => a.exam_id))]
-      const { data: examsData } = await supabase
-        .from('exams')
-        .select('id, title, subject, passing_percentage, objective_max, theory_max, total_marks')
-        .in('id', examIds)
-      
+      const { data: examsData } = await supabase.from('exams')
+        .select('id,title,subject,passing_percentage,objective_max,theory_max,total_marks').in('id', examIds)
       const examMap: Record<string, any> = {}
-      if (examsData) examsData.forEach(e => { examMap[e.id] = e })
+      examsData?.forEach(e => { examMap[e.id] = e })
 
-      // ✅ Get CA scores
-      const { data: caScoresData } = await supabase
-        .from('ca_scores')
-        .select('exam_id, ca1_score, ca2_score, total_score, percentage, grade, subject, term, academic_year')
+      const { data: caScoresData } = await supabase.from('ca_scores')
+        .select('exam_id,ca1_score,ca2_score,total_score,percentage,grade,subject,term,academic_year')
         .eq('student_id', profile.id)
-
-      // Build CA scores map
       const caScoresMap: Record<string, any> = {}
-      if (caScoresData) {
-        caScoresData.forEach(ca => {
-          if (ca.exam_id) {
-            caScoresMap[ca.exam_id] = ca
-          }
-          if (ca.subject) {
-            const key = `${ca.subject}_${ca.term || 'third'}_${ca.academic_year || '2025/2026'}`
-            caScoresMap[key] = ca
-          }
-        })
-      }
+      caScoresData?.forEach(ca => {
+        if (ca.exam_id) caScoresMap[ca.exam_id] = ca
+        if (ca.subject) {
+          const k = `${ca.subject}_${ca.term || 'third'}_${ca.academic_year || '2025/2026'}`
+          caScoresMap[k] = ca
+        }
+      })
 
       const completedResults: ExamResult[] = []
       const subjectScores: Record<string, number[]> = {}
       let totalPct = 0, passedCount = 0, failedCount = 0, highestScore = 0, lowestScore = 100
 
       for (const attempt of attemptsData) {
-        if (!['completed', 'graded', 'pending_theory'].includes(attempt.status)) continue
+        if (!['completed','graded','pending_theory'].includes(attempt.status)) continue
         const exam = examMap[attempt.exam_id]
-        
-        // ✅ Find CA
         let ca = caScoresMap[attempt.exam_id]
-        if (!ca && exam) {
-          const key = `${exam.subject}_third_2025/2026`
-          ca = caScoresMap[key]
-        }
+        if (!ca && exam) ca = caScoresMap[`${exam.subject}_third_2025/2026`]
         
         const hasCA = !!(ca?.ca1_score || ca?.ca2_score)
         const objectiveMax = exam?.objective_max || 30
-        const theoryMax = exam?.theory_max || 30
-        
         const objectiveScore = Number(attempt.objective_score) || 0
         const theoryScore = Number(attempt.theory_score) || 0
         const caTotal = (ca?.ca1_score || 0) + (ca?.ca2_score || 0)
-        
-        // ✅ CORRECT CALCULATION - Scale everything to 100
+
         let percentage: number
         let totalScore: number
-        let totalMarks: number = 100  // Always 100
-        let grade: string
-        
+
         if (hasCA) {
-          // ✅ Stage 3: CA + Objective + Theory = out of 100
           totalScore = caTotal + objectiveScore + theoryScore
           percentage = Math.round((totalScore / 100) * 100)
-          grade = ca?.grade || getWAECGrade(percentage)
         } else if (theoryScore > 0) {
-          // ✅ Stage 2: Objective + Theory = out of 60, scaled to 100
           const examTotal = objectiveScore + theoryScore
           totalScore = Math.round((examTotal / 60) * 100)
           percentage = totalScore
-          grade = getWAECGrade(percentage)
         } else {
-          // ✅ Stage 1: Only Objective = out of objectiveMax, scaled to 100
           totalScore = Math.round((objectiveScore / objectiveMax) * 100)
           percentage = totalScore
-          grade = getWAECGrade(percentage)
         }
         
-        // Safety cap
         if (percentage > 100) percentage = 100
-        
+        const grade = ca?.grade || getWAECGrade(percentage)
         const isPassed = percentage >= 40
 
         completedResults.push({
@@ -512,86 +476,82 @@ export default function StudentResultsPage() {
           status: attempt.status, 
           percentage, 
           total_score: totalScore, 
-          total_marks: totalMarks,  // ✅ Always 100
+          total_marks: 100,
           objective_score: objectiveScore, 
           objective_total: objectiveMax,
           theory_score: attempt.theory_score || 0, 
-          theory_total: theoryMax,
+          theory_total: exam?.theory_max || 30,
           ca1_score: ca?.ca1_score || null, 
-          ca2_score: ca?.ca2_score || null, 
-          has_ca: hasCA,
-          is_passed: isPassed, 
-          started_at: attempt.started_at || attempt.created_at,
-          completed_at: attempt.submitted_at, 
+          ca2_score: ca?.ca2_score || null,
+          has_ca: hasCA, 
+          is_passed: isPassed,
+          started_at: attempt.started_at || attempt.created_at, 
+          completed_at: attempt.submitted_at,
           attempt_number: attempt.attempt_number || 1,
           passing_percentage: exam?.passing_percentage || 40, 
-          grade: grade,
+          grade,
         })
 
         const subj = exam?.subject || 'Unknown'
         if (!subjectScores[subj]) subjectScores[subj] = []
         subjectScores[subj].push(percentage)
-
         totalPct += percentage
         if (isPassed) passedCount++; else failedCount++
         if (percentage > highestScore) highestScore = percentage
         if (percentage < lowestScore) lowestScore = percentage
       }
 
-      const performance: SubjectPerformance[] = Object.entries(subjectScores)
-        .filter(([, s]) => s.length > 0)
+      // ✅ Subject Performance - Use latest score
+      const performance = Object.entries(subjectScores)
+        .filter(([, scores]) => scores.length > 0)
         .map(([subject, scores]) => {
-          const avg = scores.reduce((a, b) => a + b, 0) / scores.length
+          const latestScore = scores[scores.length - 1]
           return {
-            subject, 
-            averageScore: Number(avg.toFixed(2)),
-            examsTaken: scores.length, 
+            subject,
+            averageScore: Number(latestScore.toFixed(2)),
+            examsTaken: scores.length,
             bestScore: Math.max(...scores),
-            lowestScore: Math.min(...scores), 
-            grade: getWAECGrade(avg),
+            lowestScore: Math.min(...scores),
+            grade: getWAECGrade(latestScore),
           }
         })
         .sort((a, b) => b.averageScore - a.averageScore)
 
-      const avgScore = completedResults.length > 0
-        ? Number((totalPct / completedResults.length).toFixed(2)) : 0
-
+      const avgScore = completedResults.length > 0 ? Number((totalPct / completedResults.length).toFixed(2)) : 0
+      
       setResults(completedResults); 
       setFilteredResults(completedResults)
       setAvailableSubjects([...new Set(Object.keys(subjectScores))].sort())
       setSubjectPerformance(performance)
-      setStats({ 
+      setStats({
         totalExams: completedResults.length, 
         passedExams: passedCount, 
-        failedExams: failedCount, 
+        failedExams: failedCount,
         averageScore: avgScore, 
         highestScore, 
         lowestScore: lowestScore === 100 ? 0 : lowestScore, 
-        pendingResults: 0 
+        pendingResults: 0,
       })
       if (showToast) toast.success('Results refreshed!')
-    } catch (error) {
-      console.error(error); toast.error('Failed to load results')
-    } finally {
-      setLoading(false); setRefreshing(false)
+    } catch(e){ 
+      console.error(e); 
+      toast.error('Failed to load results') 
+    }
+    finally { 
+      setLoading(false); 
+      setRefreshing(false) 
     }
   }, [profile?.id])
 
   useEffect(() => { if (!authChecking && profile) loadResults() }, [authChecking, profile, loadResults])
 
-  // ── REAL-TIME ─────────────────────────────────────
   useEffect(() => {
     if (!profile?.id) return
-    const ch1 = supabase.channel('results-attempts-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts', filter: `student_id=eq.${profile.id}` }, () => loadResults(true))
-      .subscribe()
-    const ch2 = supabase.channel('results-ca-sync')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ca_scores', filter: `student_id=eq.${profile.id}` }, () => loadResults(true))
-      .subscribe()
+    const ch1 = supabase.channel('r-att').on('postgres_changes', {event:'*',schema:'public',table:'exam_attempts',filter:`student_id=eq.${profile.id}`}, ()=>loadResults(true)).subscribe()
+    const ch2 = supabase.channel('r-ca').on('postgres_changes', {event:'*',schema:'public',table:'ca_scores',filter:`student_id=eq.${profile.id}`}, ()=>loadResults(true)).subscribe()
     return () => { ch1.unsubscribe(); ch2.unsubscribe() }
   }, [profile?.id, loadResults])
 
-  // ── FILTER + SORT ─────────────────────────────────
   useEffect(() => {
     let f = [...results]
     if (subjectFilter !== 'all') f = f.filter(r => r.exam_subject === subjectFilter)
@@ -612,29 +572,29 @@ export default function StudentResultsPage() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' })
-    toast.success('Logged out successfully')
+    toast.success('Logged out')
     window.location.replace('/portal')
   }
 
-  const simplifiedGrade = getSimplifiedGradeConfig(stats.averageScore)
+  const overallGrade = getSimpleGrade(stats.averageScore)
   const passRate = stats.totalExams > 0 ? Math.round((stats.passedExams / stats.totalExams) * 100) : 0
 
-  // ── LOADING ───────────────────────────────────────
+  // ── LOADING ────────────────────────────────────────
   if (authChecking || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <div className="text-center space-y-4">
-            <div className="relative">
-              <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 mx-auto flex items-center justify-center shadow-lg shadow-emerald-200">
-                <GraduationCap className="h-8 w-8 text-white" />
+          <div className="text-center space-y-3">
+            <div className="relative w-fit mx-auto">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-xl shadow-blue-500/25">
+                <GraduationCap className="h-7 w-7 text-white" />
               </div>
-              <Loader2 className="h-6 w-6 animate-spin text-emerald-600 absolute -bottom-1 -right-1 bg-white rounded-full" />
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600 absolute -bottom-1 -right-1 bg-white rounded-full p-0.5" />
             </div>
             <div>
-              <p className="font-semibold text-slate-700">Loading your results</p>
-              <p className="text-sm text-slate-400 mt-1">Please wait a moment...</p>
+              <p className="text-sm font-bold text-slate-800">Loading your results</p>
+              <p className="text-xs text-slate-500 mt-0.5">Just a moment...</p>
             </div>
           </div>
         </div>
@@ -642,147 +602,223 @@ export default function StudentResultsPage() {
     )
   }
 
+  // ── Subject display logic ──────────────────────────
+  const visibleSubjects = showAllSubjects 
+    ? subjectPerformance 
+    : subjectPerformance.slice(0, 8)
+  const hasMoreSubjects = subjectPerformance.length > 8
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
 
       <div className="flex">
-        <StudentSidebar
-          profile={profile} onLogout={handleLogout}
+        <StudentSidebar profile={profile} onLogout={handleLogout}
           collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-          activeTab="results" setActiveTab={() => {}}
-        />
+          activeTab="results" setActiveTab={() => {}} />
 
-        <main className={cn(
-          'flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300',
-          sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'
-        )}>
+        <main className={cn('flex-1 pt-16 lg:pt-20 pb-24 lg:pb-8 min-h-screen transition-all duration-300',
+          sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72')}>
           <div className="container mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-7xl">
 
-            {/* Refreshing toast */}
+            {/* Sync indicator */}
             <AnimatePresence>
               {refreshing && (
-                <motion.div
-                  initial={{ opacity: 0, y: -10, x: '-50%' }} animate={{ opacity: 1, y: 0, x: '-50%' }}
-                  exit={{ opacity: 0, y: -10, x: '-50%' }}
-                  className="fixed top-20 left-1/2 z-50 flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-full shadow-xl text-xs font-medium"
-                >
-                  <RefreshCw className="h-3 w-3 animate-spin" /> Syncing results...
+                <motion.div initial={{opacity:0,y:-10,x:'-50%'}} animate={{opacity:1,y:0,x:'-50%'}} exit={{opacity:0,y:-10,x:'-50%'}}
+                  className="fixed top-20 left-1/2 z-50 flex items-center gap-1.5 bg-slate-900 text-white px-3 py-1.5 rounded-full shadow-xl text-xs font-semibold">
+                  <RefreshCw className="h-3 w-3 animate-spin" /> Syncing...
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* ── BREADCRUMB ─────────────────────────── */}
-            <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
-              className="mb-5 flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Link href="/student" className="hover:text-slate-600 flex items-center gap-1 transition-colors">
-                  <Home className="h-3.5 w-3.5" /> Dashboard
+            {/* ═══ BREADCRUMB + ACTIONS ═══ */}
+            <motion.div initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} className="mb-4 flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-1.5 text-sm text-slate-400">
+                <Link href="/student" className="hover:text-slate-700 flex items-center gap-1 transition-colors">
+                  <Home className="h-3.5 w-3.5" /><span className="hidden xs:inline">Dashboard</span>
                 </Link>
                 <ChevronRight className="h-3.5 w-3.5" />
-                <span className="text-slate-700 font-medium">My Results</span>
+                <span className="text-slate-800 font-bold">My Results</span>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => loadResults(true)}
-                  className="h-8 text-xs gap-1.5 border-slate-200 hover:border-slate-300">
-                  <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} /> Refresh
+              <div className="flex gap-1.5">
+                <Button variant="outline" size="sm" onClick={()=>loadResults(true)}
+                  className="h-8 text-xs gap-1 border-slate-200 hover:border-slate-300 rounded-lg font-semibold px-3">
+                  <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+                  <span className="hidden sm:inline">Refresh</span>
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => router.push('/student')}
-                  className="h-8 text-xs gap-1.5 border-slate-200">
+                <Button variant="outline" size="sm" onClick={()=>router.push('/student')}
+                  className="h-8 text-xs gap-1 border-slate-200 rounded-lg font-semibold px-3">
                   <ArrowLeft className="h-3 w-3" /> Back
                 </Button>
               </div>
             </motion.div>
 
-            {/* ── HERO HEADER ────────────────────────── */}
-            <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }}
-              className="mb-6 rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-5 sm:p-6 text-white overflow-hidden relative shadow-xl">
-              {/* decorative circles */}
-              <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
-              <div className="absolute bottom-0 left-1/2 w-32 h-32 bg-blue-500/10 rounded-full translate-y-1/2" />
+            {/* ═══ HERO BANNER ═══ */}
+            <motion.div initial={{opacity:0,y:-12}} animate={{opacity:1,y:0}} className="mb-6">
+              <div className="relative rounded-2xl overflow-hidden shadow-2xl">
+                <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900" />
+                <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl" />
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
 
-              <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
-                <Avatar className="h-14 w-14 ring-2 ring-white/20 shadow-xl shrink-0">
-                  <AvatarImage src={profile?.photo_url || undefined} />
-                  <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-xl font-bold">
-                    {profile?.full_name ? getInitials(profile.full_name) : 'S'}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative p-6 sm:p-8">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-5">
 
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-xl sm:text-2xl font-bold leading-tight">
-                    {profile?.first_name || profile?.full_name?.split(' ')[0] || 'Student'}&apos;s Academic Results
-                  </h1>
-                  <p className="text-blue-200/80 text-xs sm:text-sm mt-1">
-                    {profile?.class} · {profile?.department || 'General'}
-                  </p>
-                </div>
+                    <div className="relative shrink-0">
+                      <div className={cn(
+                        'absolute -inset-1 rounded-full bg-gradient-to-r opacity-60 blur-md',
+                        overallGrade.gradient
+                      )} />
+                      <Avatar className="relative h-20 w-20 ring-4 ring-white/20 shadow-xl">
+                        <AvatarImage src={profile?.photo_url || undefined} />
+                        <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-2xl font-black">
+                          {profile?.full_name ? getInitials(profile.full_name) : 'S'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
 
-                {/* Overall grade badge */}
-                {stats.totalExams > 0 && (
-                  <div className="shrink-0 text-center bg-white/10 backdrop-blur rounded-xl px-4 py-3 border border-white/10">
-                    <p className="text-[10px] text-blue-200/70 uppercase tracking-wide font-medium">Overall</p>
-                    <p className={cn('text-3xl font-black mt-0.5', simplifiedGrade.color)}>
-                      {simplifiedGrade.grade}
-                    </p>
-                    <p className="text-[10px] text-blue-200/70 mt-0.5">{simplifiedGrade.label}</p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Sparkles className="h-4 w-4 text-amber-300" />
+                        <span className="text-xs font-bold uppercase tracking-widest text-blue-200/80">
+                          Academic Results
+                        </span>
+                      </div>
+                      <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
+                        {profile?.first_name || profile?.full_name?.split(' ')[0] || 'Hello'}&apos;s{' '}
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">Results</span>
+                      </h1>
+                      <p className="text-gray-200 text-sm sm:text-base mt-2 font-medium flex items-center gap-2 flex-wrap">
+                        {profile?.class && (
+                          <span className="flex items-center gap-1.5">
+                            <GraduationCap className="h-4 w-4 text-blue-300/60" />
+                            {profile.class}
+                          </span>
+                        )}
+                        {profile?.department && (
+                          <span className="flex items-center gap-1.5">
+                            <span className="h-1 w-1 rounded-full bg-blue-300/40" />
+                            {profile.department}
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1.5">
+                          <span className="h-1 w-1 rounded-full bg-blue-300/40" />
+                          {stats.totalExams} completed
+                        </span>
+                      </p>
+                    </div>
+
+                    {stats.totalExams > 0 && (
+                      <div className="shrink-0">
+                        <div className={cn(
+                          'relative rounded-xl bg-gradient-to-br p-[2px] shadow-2xl',
+                          overallGrade.gradient
+                        )}>
+                          <div className="bg-slate-800/95 backdrop-blur rounded-xl px-6 py-3 flex flex-col items-center min-w-[110px]">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-white/50 mb-1">Overall</p>
+                            <p className={cn('text-4xl font-black leading-none', overallGrade.text)}>
+                              {overallGrade.grade}
+                            </p>
+                            <p className={cn('text-sm font-bold mt-1', overallGrade.text, 'opacity-80')}>
+                              {stats.averageScore}%
+                            </p>
+                          </div>
+                        </div>
+                        <p className="text-center text-xs text-blue-200/70 font-semibold mt-1.5">
+                          {overallGrade.label}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {stats.totalExams > 0 && (
+                    <div className="mt-5 pt-5 border-t border-white/15">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-sm text-gray-300">Pass Rate</span>
+                        <span className="text-sm text-gray-300">{stats.passedExams}/{stats.totalExams} passed</span>
+                      </div>
+                      <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${passRate}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.3 }}
+                          className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </motion.div>
 
-            {/* ── STATS GRID ─────────────────────────── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mb-6">
-              <StatCard label="Total Exams"   value={stats.totalExams}    icon={FileText}      color="text-blue-600"    delay={0.05} />
-              <StatCard label="Passed"        value={stats.passedExams}   icon={CheckCircle}   color="text-emerald-600" delay={0.08} subtitle={`${passRate}% rate`} />
-              <StatCard label="Failed"        value={stats.failedExams}   icon={XCircle}       color="text-red-600"     delay={0.11} />
-              <StatCard label="Average"       value={`${stats.averageScore}%`} icon={Target}   color="text-amber-600"   delay={0.14} />
-              <StatCard label="Highest"       value={`${stats.highestScore}%`} icon={Trophy}   color="text-purple-600"  delay={0.17} />
-              <StatCard label="Lowest"        value={`${stats.lowestScore}%`}  icon={Activity} color="text-slate-500"   delay={0.20} />
+            {/* ═══ STATS GRID ═══ */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-6">
+              <StatTile label="Total"    value={stats.totalExams}                 icon={FileText}     tone="blue"    delay={0.05} />
+              <StatTile label="Passed"   value={stats.passedExams}                icon={CheckCircle2} tone="emerald" delay={0.08} subtitle={`${passRate}% pass rate`} trend="up" />
+              <StatTile label="Failed"   value={stats.failedExams}                icon={XCircle}      tone="red"     delay={0.11} />
+              <StatTile label="Average"  value={`${stats.averageScore}%`}         icon={Target}       tone="amber"   delay={0.14} />
+              <StatTile label="Highest"  value={`${stats.highestScore}%`}         icon={Trophy}       tone="purple"  delay={0.17} subtitle="Best score" />
+              <StatTile label="Lowest"   value={`${stats.lowestScore}%`}          icon={Activity}     tone="slate"   delay={0.20} />
             </div>
 
-            {/* ── SUBJECT PERFORMANCE ────────────────── */}
+            {/* ═══ SUBJECT PERFORMANCE ═══ */}
             {subjectPerformance.length > 0 && (
-              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }} className="mb-6">
+              <motion.div initial={{opacity:0,y:12}} animate={{opacity:1,y:0}} transition={{delay:0.22}} className="mb-6">
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
-                    <div className="h-5 w-1 rounded-full bg-emerald-500" />
-                    Subject Performance
-                    <span className="text-[10px] font-normal text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
-                      WAEC Grades
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-slate-700" />
+                    <h2 className="text-base font-bold text-slate-800">Subject Performance</h2>
+                    <span className="text-xs text-slate-400 font-medium ml-1">
+                      {subjectPerformance.length} subject{subjectPerformance.length !== 1 ? 's' : ''}
                     </span>
-                  </h2>
-                  {subjectPerformance.length > 6 && (
-                    <Button variant="ghost" size="sm" className="text-xs h-7 text-slate-500 hover:text-slate-700">
-                      View all <ChevronRight className="h-3 w-3 ml-0.5" />
+                  </div>
+                  {hasMoreSubjects && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={() => setShowAllSubjects(!showAllSubjects)}
+                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 gap-1 h-7 px-3"
+                    >
+                      {showAllSubjects ? (
+                        <>Show Less <ChevronDown className="h-3 w-3 rotate-180" /></>
+                      ) : (
+                        <>View All {subjectPerformance.length - 8} more <ChevronDown className="h-3 w-3" /></>
+                      )}
                     </Button>
                   )}
                 </div>
-                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                  {subjectPerformance.slice(0, 6).map((perf, i) => (
-                    <SubjectCard key={perf.subject} perf={perf} index={i} />
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
+                  {visibleSubjects.map((perf, i) => (
+                    <SubjectTile 
+                      key={perf.subject} 
+                      perf={perf} 
+                      index={i} 
+                      avgOverall={stats.averageScore}
+                      onClick={() => {
+                        setSubjectFilter(perf.subject)
+                        setActiveTab('all')
+                        setShowAllSubjects(false)
+                      }}
+                    />
                   ))}
                 </div>
               </motion.div>
             )}
 
-            {/* ── FILTERS ────────────────────────────── */}
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}
-              className="mb-4 space-y-3">
-              {/* Tabs */}
+            {/* ═══ FILTERS ═══ */}
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.25}} className="mb-4 space-y-3">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="bg-white border border-slate-200 shadow-sm p-1 rounded-xl h-auto gap-1">
+                <TabsList className="bg-white border border-slate-200 shadow-sm p-0.5 rounded-xl h-auto gap-0.5">
                   {[
-                    { value: 'all',    label: 'All Results', count: stats.totalExams },
-                    { value: 'passed', label: 'Passed',      count: stats.passedExams,  dot: 'bg-emerald-500' },
-                    { value: 'failed', label: 'Failed',      count: stats.failedExams,  dot: 'bg-red-500' },
+                    { value: 'all',    label: 'All',      count: stats.totalExams },
+                    { value: 'passed', label: 'Passed',   count: stats.passedExams, dot: 'bg-emerald-500' },
+                    { value: 'failed', label: 'Failed',   count: stats.failedExams, dot: 'bg-red-500' },
                   ].map(tab => (
                     <TabsTrigger key={tab.value} value={tab.value}
-                      className="rounded-lg text-xs data-[state=active]:bg-slate-900 data-[state=active]:text-white px-3 py-1.5 flex items-center gap-1.5">
+                      className="rounded-lg text-xs data-[state=active]:bg-slate-900 data-[state=active]:text-white px-3 py-1.5 flex items-center gap-1 font-bold">
                       {tab.dot && <span className={cn('h-1.5 w-1.5 rounded-full', tab.dot)} />}
                       {tab.label}
                       <span className={cn(
-                        'text-[10px] px-1.5 py-0 rounded-full font-medium',
+                        'text-[10px] px-1.5 py-0 rounded-full font-black min-w-[18px] text-center',
                         activeTab === tab.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
                       )}>
                         {tab.count}
@@ -792,18 +828,15 @@ export default function StudentResultsPage() {
                 </TabsList>
               </Tabs>
 
-              {/* Search + filters row */}
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative flex-1 min-w-[160px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input
-                    placeholder="Search exams or subjects..."
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <Input placeholder="Search exams or subjects..."
                     value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9 text-sm bg-white border-slate-200 rounded-xl"
-                  />
+                    className="pl-9 h-9 text-sm bg-white border-slate-200 rounded-lg font-medium" />
                 </div>
                 <Select value={subjectFilter} onValueChange={setSubjectFilter}>
-                  <SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200 rounded-xl gap-1">
+                  <SelectTrigger className="w-[130px] h-9 text-xs bg-white border-slate-200 rounded-lg gap-1 font-semibold">
                     <Filter className="h-3 w-3 text-slate-400 shrink-0" />
                     <SelectValue placeholder="Subject" />
                   </SelectTrigger>
@@ -813,7 +846,7 @@ export default function StudentResultsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={sortOrder} onValueChange={(v: any) => setSortOrder(v)}>
-                  <SelectTrigger className="w-[110px] h-9 text-xs bg-white border-slate-200 rounded-xl gap-1">
+                  <SelectTrigger className="w-[110px] h-9 text-xs bg-white border-slate-200 rounded-lg gap-1 font-semibold">
                     <ArrowUpDown className="h-3 w-3 text-slate-400 shrink-0" />
                     <SelectValue placeholder="Sort" />
                   </SelectTrigger>
@@ -826,19 +859,18 @@ export default function StudentResultsPage() {
                 </Select>
               </div>
 
-              {/* Active filter chips */}
               {(searchQuery || subjectFilter !== 'all') && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] text-slate-400">Filters:</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs text-slate-500 font-bold uppercase tracking-wide">Filters:</span>
                   {searchQuery && (
                     <button onClick={() => setSearchQuery('')}
-                      className="flex items-center gap-1 text-[10px] bg-slate-100 hover:bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full transition-colors">
-                      "{searchQuery}" ×
+                      className="flex items-center gap-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full transition-colors font-bold">
+                      &quot;{searchQuery}&quot; ×
                     </button>
                   )}
                   {subjectFilter !== 'all' && (
                     <button onClick={() => setSubjectFilter('all')}
-                      className="flex items-center gap-1 text-[10px] bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full transition-colors">
+                      className="flex items-center gap-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full transition-colors font-bold">
                       {subjectFilter} ×
                     </button>
                   )}
@@ -846,43 +878,42 @@ export default function StudentResultsPage() {
               )}
             </motion.div>
 
-            {/* ── RESULTS LIST ───────────────────────── */}
+            {/* ═══ RESULTS LIST ═══ */}
             <AnimatePresence mode="wait">
               {filteredResults.length === 0 ? (
-                <motion.div key="empty"
-                  initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}>
-                  <Card className="border-0 shadow-sm bg-white">
-                    <CardContent className="py-16 text-center">
-                      <div className="h-16 w-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                        <Award className="h-8 w-8 text-slate-300" />
-                      </div>
-                      <h3 className="text-base font-semibold text-slate-700 mb-2">
-                        {results.length === 0 ? 'No results yet' : 'No matching results'}
-                      </h3>
-                      <p className="text-sm text-slate-400">
-                        {results.length === 0 ? 'Complete exams to see your results here!' : 'Try adjusting your filters or search query'}
-                      </p>
-                      {results.length > 0 && (
-                        <Button variant="outline" size="sm" className="mt-4 text-xs"
-                          onClick={() => { setSearchQuery(''); setSubjectFilter('all'); setActiveTab('all') }}>
-                          Clear all filters
-                        </Button>
-                      )}
-                    </CardContent>
-                  </Card>
+                <motion.div key="empty" initial={{opacity:0,scale:0.97}} animate={{opacity:1,scale:1}} exit={{opacity:0,scale:0.97}}>
+                  <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm py-14 text-center">
+                    <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mx-auto mb-4">
+                      <Award className="h-8 w-8 text-slate-400" />
+                    </div>
+                    <h3 className="text-base font-black text-slate-800 mb-2">
+                      {results.length === 0 ? 'No results yet' : 'No matching results'}
+                    </h3>
+                    <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                      {results.length === 0 ? 'Complete some exams and your results will appear here!' : 'Try adjusting your filters or search query'}
+                    </p>
+                    {results.length > 0 && (
+                      <Button variant="outline" size="sm" className="mt-4 text-xs h-8 rounded-lg font-semibold"
+                        onClick={() => { setSearchQuery(''); setSubjectFilter('all'); setActiveTab('all') }}>
+                        Clear all filters
+                      </Button>
+                    )}
+                  </div>
                 </motion.div>
               ) : (
-                <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  className="space-y-2">
-                  {/* Results count */}
+                <motion.div key="list" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}} className="space-y-2.5">
                   <div className="flex items-center justify-between px-1 mb-2">
-                    <p className="text-[11px] text-slate-400">
-                      Showing <span className="font-semibold text-slate-600">{filteredResults.length}</span> result{filteredResults.length !== 1 ? 's' : ''}
+                    <p className="text-xs text-slate-500 font-semibold">
+                      Showing <span className="font-black text-slate-800">{filteredResults.length}</span> result{filteredResults.length !== 1 ? 's' : ''}
                     </p>
+                    {activeTab !== 'all' && (
+                      <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                        {activeTab === 'passed' ? '✓ Passed only' : '✗ Failed only'}
+                      </span>
+                    )}
                   </div>
                   {filteredResults.map((result, i) => (
-                    <ResultCard key={result.id} result={result} index={i}
+                    <ResultRow key={result.id} result={result} index={i}
                       onClick={() => router.push(`/student/results/${result.exam_id}`)} />
                   ))}
                 </motion.div>

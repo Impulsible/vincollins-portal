@@ -33,14 +33,23 @@ interface SecurityState {
   isSystemSleeping: boolean;
 }
 
-export function useExamSecurity(
-  examStarted: boolean,
-  examEndedRef: React.MutableRefObject<boolean>,
-  onViolation: () => void,
-  initialTabSwitches: number = 0,
-  initialFullscreenExits: number = 0,
-  attemptId?: string | null
-) {
+interface UseExamSecurityProps {
+  examStarted: boolean;
+  examEndedRef: React.MutableRefObject<boolean>;
+  onViolation: () => void;
+  initialTabSwitches?: number;
+  initialFullscreenExits?: number;
+  attemptId?: string | null;
+}
+
+export function useExamSecurity({
+  examStarted,
+  examEndedRef,
+  onViolation,
+  initialTabSwitches = 0,
+  initialFullscreenExits = 0,
+  attemptId = null,
+}: UseExamSecurityProps) {
   const [tabSwitches, setTabSwitches] = useState(initialTabSwitches)
   const [fullscreenExits, setFullscreenExits] = useState(initialFullscreenExits)
   const [fullscreen, setFullscreen] = useState(false)
@@ -60,17 +69,29 @@ export function useExamSecurity(
   const maxReloads = 3
   const reloadWindowMs = 60000
   
-  // System event tracking
+  // System event tracking with grace periods
   const lastVisibilityChangeRef = useRef<number>(Date.now())
   const visibilityTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isSystemSleepRef = useRef(false)
   const displayOffStartTimeRef = useRef<number | null>(null)
   const lastUserActivityRef = useRef<number>(Date.now())
   const isUserActiveRef = useRef(true)
+  const lastBlurTimeRef = useRef<number>(0)
+  const blurStartTimeRef = useRef<number>(0)
+  const isBlurCountingRef = useRef<boolean>(false)
+  const lastTabSwitchTimeRef = useRef<number>(0)
+  const lastFullscreenExitTimeRef = useRef<number>(0)
   
-  // Grace period for system events (in milliseconds)
-  const SYSTEM_EVENT_GRACE_PERIOD = 5000 // 5 seconds grace period
+  // Grace periods and limits (increased for better user experience)
+  const SYSTEM_EVENT_GRACE_PERIOD = 10000 // 10 seconds for system sleep detection
   const DISPLAY_OFF_GRACE_PERIOD = 30000 // 30 seconds for display sleep
+  const NETWORK_WARNING_LIMIT = 5 // Increased from 3
+  const DISPLAY_OFF_LIMIT = 5 // Increased from 3
+  const BLUR_GRACE_PERIOD = 3000 // 3 seconds between blurs
+  const TAB_SWITCH_GRACE_PERIOD = 5000 // 5 seconds between tab switches
+  const BLUR_DURATION_THRESHOLD = 2000 // 2 seconds before counting as violation
+  const INACTIVITY_THRESHOLD = 120000 // 2 minutes
+  const NETWORK_RECONNECT_GRACE = 60000 // 60 seconds before terminating
   
   // Use useRef for storage key since it changes with attemptId
   const getStorageKey = useCallback(() => {
@@ -237,42 +258,53 @@ export function useExamSecurity(
     triggerViolation(reason)
   }, [triggerViolation])
 
-  // --- System Sleep Detection ---
+  // --- System Sleep Detection with User Activity Check ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
 
-    // Detect system sleep using visibility API and timestamps
     const handleVisibilityChange = () => {
       const now = Date.now()
       const timeSinceLastChange = now - lastVisibilityChangeRef.current
+      const timeSinceActivity = now - lastUserActivityRef.current
       
-      // If document becomes hidden for a long time, it's likely system sleep
       if (document.hidden) {
         lastVisibilityChangeRef.current = now
         displayOffStartTimeRef.current = now
         
-        // Set a timeout - if still hidden after grace period, mark as system sleep
-        if (visibilityTimeoutRef.current) {
-          clearTimeout(visibilityTimeoutRef.current)
-        }
-        
-        visibilityTimeoutRef.current = setTimeout(() => {
-          if (document.hidden && !examEndedRef.current && !examTerminated) {
-            isSystemSleepRef.current = true
-            setIsSystemSleeping(true)
-            toast.warning("System sleep detected - Resuming exam...")
-            
-            // Track display off events
-            setDisplayOffCount(prev => {
-              const n = prev + 1
-              persistViolation('display', n)
-              if (n >= 3) {
-                handleViolation("Excessive system sleep/displays off detected")
-              }
-              return n
-            })
+        // Only mark as system sleep if user was inactive before going hidden
+        if (timeSinceActivity > INACTIVITY_THRESHOLD) {
+          if (visibilityTimeoutRef.current) {
+            clearTimeout(visibilityTimeoutRef.current)
           }
-        }, SYSTEM_EVENT_GRACE_PERIOD)
+          
+          visibilityTimeoutRef.current = setTimeout(() => {
+            if (document.hidden && !examEndedRef.current && !examTerminated) {
+              // Check if still hidden and user is inactive
+              const stillInactive = Date.now() - lastUserActivityRef.current > INACTIVITY_THRESHOLD
+              if (stillInactive) {
+                isSystemSleepRef.current = true
+                setIsSystemSleeping(true)
+                toast.warning("System sleep detected - Resuming exam...")
+                
+                // Only count if sleep was longer than grace period
+                const sleepDuration = Date.now() - (displayOffStartTimeRef.current || now)
+                if (sleepDuration > DISPLAY_OFF_GRACE_PERIOD) {
+                  setDisplayOffCount(prev => {
+                    const n = prev + 1
+                    persistViolation('display', n)
+                    if (n >= DISPLAY_OFF_LIMIT) {
+                      handleViolation("Excessive system sleep/displays off detected")
+                    }
+                    return n
+                  })
+                }
+              }
+            }
+          }, SYSTEM_EVENT_GRACE_PERIOD)
+        } else {
+          // User was active recently, likely a quick tab switch
+          console.log('Quick tab switch detected, ignoring sleep detection')
+        }
       } else {
         // Document is visible again
         if (visibilityTimeoutRef.current) {
@@ -284,19 +316,19 @@ export function useExamSecurity(
           const sleepDuration = now - displayOffStartTimeRef.current
           displayOffStartTimeRef.current = null
           
-          // If system was sleeping, resume gracefully
-          if (isSystemSleepRef.current) {
+          if (isSystemSleepRef.current && sleepDuration > 5000) {
             isSystemSleepRef.current = false
             setIsSystemSleeping(false)
-            
-            // Only warn if sleep was longer than typical display timeout
-            if (sleepDuration > 10000) {
-              toast.info(`Exam resumed after ${Math.round(sleepDuration/1000)}s of system sleep`)
-            }
+            toast.info(`Exam resumed after ${Math.round(sleepDuration/1000)}s of system sleep`)
           }
         }
         
         lastVisibilityChangeRef.current = now
+        // Reset system sleep flag if user is active
+        if (isSystemSleepRef.current) {
+          isSystemSleepRef.current = false
+          setIsSystemSleeping(false)
+        }
       }
     }
 
@@ -317,29 +349,25 @@ export function useExamSecurity(
       lastUserActivityRef.current = Date.now()
       isUserActiveRef.current = true
       
-      // If system was marked as sleeping but user is active, reset
       if (isSystemSleepRef.current) {
         isSystemSleepRef.current = false
         setIsSystemSleeping(false)
       }
     }
 
-    // Monitor mouse, keyboard, and touch events
     const activityEvents = ['mousedown', 'keydown', 'touchstart', 'scroll', 'click', 'mousemove']
     activityEvents.forEach(event => {
       document.addEventListener(event, handleUserActivity, { passive: true })
     })
 
-    // Check for inactivity (might indicate system sleep or display off)
     const inactivityCheck = setInterval(() => {
       const now = Date.now()
       const timeSinceActivity = now - lastUserActivityRef.current
       
-      // If no activity for > 2 minutes, user might be away
-      if (timeSinceActivity > 120000 && !document.hidden && !isSystemSleepRef.current) {
+      if (timeSinceActivity > INACTIVITY_THRESHOLD && !document.hidden && !isSystemSleepRef.current) {
         toast.warning("You've been inactive for a while. Please interact with the exam.")
       }
-    }, 60000) // Check every minute
+    }, 60000)
 
     return () => {
       activityEvents.forEach(event => {
@@ -349,30 +377,23 @@ export function useExamSecurity(
     }
   }, [examStarted, examTerminated, examEndedRef])
 
-  // --- Screen Sleep/Wake Detection (using Battery API and Screen Orientation) ---
+  // --- Screen Sleep/Wake Detection ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
 
-    // Use Battery API to detect power state changes
     if ('getBattery' in navigator) {
-      let battery: BatteryManager | null = null
-      
-      // Type-safe approach for getBattery
       const getBattery = (navigator as Navigator & { getBattery?: () => Promise<BatteryManager> }).getBattery
       
       if (getBattery) {
-        getBattery().then((batteryManager: BatteryManager) => {
-          battery = batteryManager
-          // Not needed for sleep detection but helps understand device state
+        getBattery().then(() => {
+          // Battery API available, but not needed for sleep detection
         }).catch(() => {
           // Battery API not available, skip
         })
       }
     }
 
-    // Detect screen wake using visibility and orientation changes
     const handleOrientationChange = () => {
-      // If orientation changes while screen was off, it's likely a wake
       if (isSystemSleepRef.current) {
         isSystemSleepRef.current = false
         setIsSystemSleeping(false)
@@ -380,13 +401,15 @@ export function useExamSecurity(
       }
     }
 
-    // Detect wake using focus events
     const handleFocus = () => {
       if (isSystemSleepRef.current) {
         isSystemSleepRef.current = false
         setIsSystemSleeping(false)
         toast.info("Exam resumed after system sleep")
       }
+      // Reset blur tracking
+      isBlurCountingRef.current = false
+      blurStartTimeRef.current = 0
     }
 
     window.addEventListener('orientationchange', handleOrientationChange)
@@ -402,9 +425,16 @@ export function useExamSecurity(
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
 
+    let reconnectTimeout: NodeJS.Timeout | null = null
+
     const handleOnline = async () => {
       setIsOnline(true)
       toast.success("Network connection restored")
+      
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+        reconnectTimeout = null
+      }
       
       await syncPendingUpdates()
     }
@@ -424,8 +454,16 @@ export function useExamSecurity(
           toast.warning("Network connection lost! Please check your internet")
         } else if (n === 2) {
           toast.error("Network issues detected! Your answers may not be saved")
-        } else if (n >= 3) {
-          handleViolation("Repeated network interruptions detected")
+        } else if (n >= NETWORK_WARNING_LIMIT) {
+          // Only terminate if network is down for extended period
+          if (reconnectTimeout) {
+            clearTimeout(reconnectTimeout)
+          }
+          reconnectTimeout = setTimeout(() => {
+            if (!navigator.onLine) {
+              handleViolation("Extended network interruption detected")
+            }
+          }, NETWORK_RECONNECT_GRACE)
         }
         return n
       })
@@ -447,18 +485,20 @@ export function useExamSecurity(
     return () => {
       window.removeEventListener('online', handleOnline)
       window.removeEventListener('offline', handleOffline)
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+      }
       clearInterval(connectionCheck)
     }
   }, [examStarted, examTerminated, examEndedRef, syncPendingUpdates, persistViolation, handleViolation])
 
-  // --- Enhanced Page Reload Handling ---
+  // --- Page Reload Handling ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
 
     const handlePageLoad = () => {
       const now = Date.now()
       
-      // Use a separate ref for tracking reset time
       const resetTimeRef = { current: now }
       
       if (now - resetTimeRef.current > reloadWindowMs) {
@@ -466,13 +506,11 @@ export function useExamSecurity(
         resetTimeRef.current = now
       }
       
-      reloadCountRef.current++
-      
-      const isUserReload = performance && 
-                          performance.navigation && 
-                          performance.navigation.type === 1
+      // Only count user-initiated reloads
+      const isUserReload = performance?.navigation?.type === 1
       
       if (isUserReload) {
+        reloadCountRef.current++
         const remaining = maxReloads - reloadCountRef.current
         if (reloadCountRef.current <= maxReloads) {
           toast.warning(`Page reload (${reloadCountRef.current}/${maxReloads}) - Please avoid refreshing`)
@@ -487,7 +525,6 @@ export function useExamSecurity(
     }
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      // Don't show warning if system is sleeping
       if (isSystemSleepRef.current) return
       
       saveSecurityState()
@@ -522,21 +559,32 @@ export function useExamSecurity(
       isSystemSleepRef.current = false
       lastUserActivityRef.current = Date.now()
       isUserActiveRef.current = true
+      lastBlurTimeRef.current = 0
+      blurStartTimeRef.current = 0
+      isBlurCountingRef.current = false
+      lastTabSwitchTimeRef.current = 0
     }
   }, [examStarted])
 
-  // --- Tab Switch Detection with System Sleep Awareness ---
+  // --- Tab Switch Detection with Grace Period ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
     
     const h = () => {
-      // Ignore tab switch events during system sleep
       if (isSystemSleepRef.current) {
         console.log('Tab switch during system sleep - ignoring')
         return
       }
       
       if (document.hidden && !examEndedRef.current && !examTerminated) {
+        const now = Date.now()
+        // Ignore if tab switches are too frequent (within grace period)
+        if (now - lastTabSwitchTimeRef.current < TAB_SWITCH_GRACE_PERIOD) {
+          console.log('Tab switch within grace period - ignoring')
+          return
+        }
+        lastTabSwitchTimeRef.current = now
+        
         setTabSwitches(prev => {
           const n = prev + 1
           persistViolation('tab', n)
@@ -551,7 +599,7 @@ export function useExamSecurity(
     return () => document.removeEventListener("visibilitychange", h)
   }, [examStarted, examTerminated, examEndedRef, persistViolation, handleViolation])
 
-  // --- Fullscreen Detection with System Sleep Awareness ---
+  // --- Fullscreen Detection with Grace Period ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
     
@@ -559,13 +607,20 @@ export function useExamSecurity(
       const fs = !!(document.fullscreenElement || (document as any).webkitFullscreenElement)
       setFullscreen(fs)
       
-      // Ignore fullscreen exits during system sleep
       if (isSystemSleepRef.current) {
         console.log('Fullscreen exit during system sleep - ignoring')
         return
       }
       
       if (!fs && !examEndedRef.current && !examTerminated) {
+        const now = Date.now()
+        // Ignore if fullscreen exits are too frequent
+        if (now - lastFullscreenExitTimeRef.current < 5000) {
+          console.log('Fullscreen exit within grace period - ignoring')
+          return
+        }
+        lastFullscreenExitTimeRef.current = now
+        
         setFullscreenExits(prev => {
           const n = prev + 1
           persistViolation('fullscreen', n)
@@ -590,40 +645,62 @@ export function useExamSecurity(
     }
   }, [examStarted, examTerminated, examEndedRef, persistViolation, handleViolation])
 
-  // --- Window Blur with System Sleep Awareness ---
+  // --- Window Blur with Duration Check ---
   useEffect(() => {
     if (!examStarted || examEndedRef.current || examTerminated) return
     
     const h = () => {
       if (examEndedRef.current || examTerminated) return
-      
-      // Ignore blur during system sleep
       if (isSystemSleepRef.current) {
         console.log('Window blur during system sleep - ignoring')
         return
       }
       
-      blurCountRef.current++
+      const now = Date.now()
       
-      if (blurCountRef.current >= 3) {
-        handleViolation("Window focus lost multiple times")
-      } else if (blurCountRef.current === 1) {
-        toast.warning("Window lost focus! Do not leave the exam")
-      } else if (blurCountRef.current === 2) {
-        toast.error("Final warning! Window focus lost again")
+      // Ignore if blurs are too frequent
+      if (now - lastBlurTimeRef.current < BLUR_GRACE_PERIOD) {
+        console.log('Blur within grace period - ignoring')
+        return
       }
+      
+      lastBlurTimeRef.current = now
+      blurStartTimeRef.current = now
+      isBlurCountingRef.current = true
+      
+      // Check after duration threshold
+      setTimeout(() => {
+        if (document.hidden && isBlurCountingRef.current) {
+          const blurDuration = Date.now() - blurStartTimeRef.current
+          if (blurDuration > BLUR_DURATION_THRESHOLD) {
+            // Only count if hidden for more than threshold
+            blurCountRef.current++
+            
+            if (blurCountRef.current >= 3) {
+              handleViolation("Window focus lost multiple times")
+            } else if (blurCountRef.current === 1) {
+              toast.warning("Window lost focus! Do not leave the exam")
+            } else if (blurCountRef.current === 2) {
+              toast.error("Final warning! Window focus lost again")
+            }
+          }
+          isBlurCountingRef.current = false
+        }
+      }, BLUR_DURATION_THRESHOLD + 100)
     }
     
     window.addEventListener("blur", h)
-    return () => window.removeEventListener("blur", h)
+    return () => {
+      window.removeEventListener("blur", h)
+      isBlurCountingRef.current = false
+    }
   }, [examStarted, examTerminated, examEndedRef, handleViolation])
 
-  // --- Keyboard Blocked with System Sleep Awareness ---
+  // --- Keyboard Blocked ---
   useEffect(() => {
     if (!examStarted || examTerminated) return
     
     const keydown = (e: KeyboardEvent) => {
-      // Don't block keys during system sleep
       if (isSystemSleepRef.current) return
       
       const essentialShortcuts = [
@@ -635,16 +712,27 @@ export function useExamSecurity(
       
       if (essentialShortcuts.some(shortcut => shortcut)) return
       
-      if (e.ctrlKey && ["c","v","x","p","a","r","w","t","n","u","i"].includes(e.key.toLowerCase())) {
-        e.preventDefault()
-        toast.warning("Keyboard shortcut blocked")
-      }
-      if (e.key === "F5" || e.key === "F12" || (e.ctrlKey && e.key === "F5")) {
+      const blockedKeys = ['F5', 'F12', 'F11']
+      const blockedCtrlKeys = ['c', 'v', 'x', 'p', 'a', 'r', 'w', 't', 'n', 'u', 'i']
+      
+      if (blockedKeys.includes(e.key)) {
         e.preventDefault()
         toast.warning("Refresh blocked during exam")
+        return
       }
-      if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      
+      if (e.ctrlKey && blockedCtrlKeys.includes(e.key.toLowerCase())) {
         e.preventDefault()
+        toast.warning("Keyboard shortcut blocked")
+        return
+      }
+      
+      // Don't block Alt key alone - it's used for alt+tab
+      // But block Alt+Tab (switching apps)
+      if (e.altKey && e.key === 'Tab') {
+        e.preventDefault()
+        toast.warning("Alt+Tab blocked during exam")
+        return
       }
     }
     
@@ -656,7 +744,6 @@ export function useExamSecurity(
   useEffect(() => {
     if (!examStarted || examTerminated) return
     const prevent = (e: Event) => {
-      // Don't block context menu during system sleep
       if (isSystemSleepRef.current) return
       e.preventDefault()
     }
