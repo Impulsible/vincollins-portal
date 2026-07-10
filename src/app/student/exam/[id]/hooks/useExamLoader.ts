@@ -1,4 +1,4 @@
-// src/app/student/exam/[id]/hooks/useExamLoader.ts
+// src/app/student/exam/[id]/hooks/useExamLoader.ts - COMPLETE FIXED VERSION
 
 "use client"
 
@@ -15,6 +15,8 @@ function shuffleArray<T>(array: T[]): T[] {
   }
   return shuffled
 }
+
+const MAX_UNLOADS = 3
 
 function calcScore(questions: any[], answers: Record<string, string>) {
   const obj = questions.filter((q: any) => q.type !== "theory")
@@ -36,20 +38,6 @@ function calcScore(questions: any[], answers: Record<string, string>) {
     }
   })
   return { score, total: tp, percentage: tp > 0 ? Math.round((score / tp) * 100) : 0, correct, incorrect, unanswered }
-}
-
-// ✅ Check if attempt is actually submitted
-const isActuallySubmitted = (attempt: any): boolean => {
-  if (attempt?.submitted_at) return true
-  if (['pending_theory', 'graded', 'completed', 'submitted', 'terminated'].includes(attempt?.status)) {
-    return true
-  }
-  return false
-}
-
-// ✅ Check if attempt can be resumed
-const canResumeAttempt = (attempt: any): boolean => {
-  return attempt?.status === 'in_progress' && !attempt?.submitted_at
 }
 
 interface UseExamLoaderReturn {
@@ -98,6 +86,7 @@ export function useExamLoader(
   const [unloadCount, setUnloadCount] = useState(0)
   const loadedRef = useRef(false)
 
+  // ✅ Calculate flexible percentage
   const calculateFlexiblePercentage = useCallback((attempt: any) => {
     const objectiveMax = attempt.objective_max || exam?.objective_max || 20
     const theoryMax = attempt.theory_max || exam?.theory_max || 40
@@ -126,6 +115,7 @@ export function useExamLoader(
     setLoading(true)
     
     try {
+      // Get session
       let { data: { session } } = await supabase.auth.getSession()
       if (!session) {
         await new Promise(resolve => setTimeout(resolve, 2000))
@@ -137,9 +127,11 @@ export function useExamLoader(
         }
       }
 
+      // Get student profile
       const { data: ud } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
       if (ud) setProfile(ud)
 
+      // Get exam details
       const { data: ed, error: ee } = await supabase.from("exams").select("*").eq("id", examId).single()
       if (ee || !ed) { 
         setLoadError("Exam not found")
@@ -148,9 +140,12 @@ export function useExamLoader(
       }
       setExam(ed)
 
+      // ── FIX: Calculate objective max from actual questions ──────────────
+      // Build questions first to get accurate counts
       const allQuestionsFromDB = ed.questions || []
       const theoryQuestionsFromDB = ed.theory_questions || []
 
+      // Separate questions
       let objectiveQuestionsRaw: any[] = []
       let theoryQuestionsRaw: any[] = []
 
@@ -164,9 +159,15 @@ export function useExamLoader(
         theoryQuestionsRaw = allQuestionsFromDB.filter((q: any) => q.type === 'theory')
       }
 
+      // ── FIX: Calculate objective max from the actual questions ──────────
       const objectiveMax = objectiveQuestionsRaw.length || ed.objective_max || 20
       const theoryMax = theoryQuestionsRaw.length > 0 ? (ed.theory_max || 40) : 0
+      
+      console.log(`📊 Actual objective questions: ${objectiveQuestionsRaw.length}`)
+      console.log(`📊 Actual theory questions: ${theoryQuestionsRaw.length}`)
+      console.log(`📊 Objective Max: ${objectiveMax}, Theory Max: ${theoryMax}`)
 
+      // Build MCQ/Objective questions
       let mcqList = objectiveQuestionsRaw.map((q: any, i: number) => ({
         id: q.id,
         question: q.question || q.question_text || '',
@@ -180,6 +181,7 @@ export function useExamLoader(
         is_theory: false,
       }))
 
+      // Build Theory questions
       let theoryList = theoryQuestionsRaw.map((q: any, i: number) => ({
         id: q.id,
         question: q.question || q.question_text || '',
@@ -196,15 +198,20 @@ export function useExamLoader(
         image_caption: q.image_caption || null,
       }))
 
+      // ✅ Respect exam shuffle setting
       const shouldShuffle = ed.shuffle_questions !== false && ed.randomize_questions !== false
       const orderedMcq = shouldShuffle ? shuffleArray(mcqList) : mcqList
       const allQ = [...orderedMcq, ...theoryList]
       setAllQuestions(allQ)
 
+      // ✅ Determine if exam has theory questions
       const hasTheoryQuestions = ed.has_theory && theoryQuestionsRaw.length > 0
       const actualTheoryTotal = hasTheoryQuestions ? theoryMax : 0
       const actualTotalMarks = objectiveMax + actualTheoryTotal
 
+      console.log(`📊 Final totals - Objective: ${objectiveMax}, Theory: ${actualTheoryTotal}, Total: ${actualTotalMarks}`)
+
+      // Check existing attempts
       const { data: existingAttempts } = await supabase
         .from("exam_attempts")
         .select("*")
@@ -213,16 +220,12 @@ export function useExamLoader(
         .order("created_at", { ascending: false })
 
       const completedAttempts = (existingAttempts || []).filter(
-        (a: any) => ['completed', 'graded', 'pending_theory', 'submitted', 'terminated'].includes(a.status)
+        (a: any) => ["completed", "pending_theory", "graded", "terminated"].includes(a.status)
       )
-      
-      const activeAttempt = (existingAttempts || []).find(
-        (a: any) => a.status === "in_progress"
-      )
-      
-      const hasActiveAttempt = !!activeAttempt
+      const hasActiveAttempt = (existingAttempts || []).some((a: any) => a.status === "in_progress")
       const completedCount = completedAttempts.length
 
+      // Check if no attempts left
       if (completedCount >= (ed.max_attempts || 1) && !hasActiveAttempt) {
         setHasCompletedAttempt(true)
         setAttemptsUsed(completedCount)
@@ -253,19 +256,17 @@ export function useExamLoader(
         return
       }
 
+      // Handle existing attempts
       if (existingAttempts && existingAttempts.length > 0) {
         const latest = existingAttempts[0]
         setAttemptsUsed(completedCount)
 
-        // ✅ CRITICAL: Check submitted_at first
-        if (latest.submitted_at) {
-          console.log('📌 Attempt has submitted_at - showing results')
+        if (latest.status === "terminated" || latest.is_auto_submitted) {
           setHasCompletedAttempt(true)
-          setShowResumeDialog(false)
-          
+          setExamTerminated(true)
           const displayPercentage = calculateFlexiblePercentage(latest)
           setExamResult({
-            score: latest.total_score || 0,
+            score: latest.total_score || 0, 
             total: latest.total_marks || actualTotalMarks,
             percentage: displayPercentage,
             correct: latest.correct_count || 0,
@@ -280,52 +281,14 @@ export function useExamLoader(
             theory_total: latest.theory_total || actualTheoryTotal,
             attempts_used: completedCount, 
             max_attempts: ed.max_attempts || 1,
-            graded_by: latest.graded_by, 
-            graded_at: latest.graded_at,
             submitted_at: latest.submitted_at,
           })
-          setLoading(false)
-          return
-        }
-
-        // ✅ Check if status is completed/submitted
-        if (isActuallySubmitted(latest)) {
-          console.log('📌 Attempt is submitted - showing results')
-          setHasCompletedAttempt(true)
-          setShowResumeDialog(false)
-          
-          const displayPercentage = calculateFlexiblePercentage(latest)
-          setExamResult({
-            score: latest.total_score || 0,
-            total: latest.total_marks || actualTotalMarks,
-            percentage: displayPercentage,
-            correct: latest.correct_count || 0,
-            incorrect: latest.incorrect_count || 0,
-            unanswered: latest.unanswered_count || 0,
-            is_passed: latest.is_passed || false,
-            passing_percentage: ed.passing_percentage || 50,
-            status: latest.status,
-            objective_score: latest.objective_score,
-            objective_total: latest.objective_total || objectiveMax,
-            theory_score: latest.theory_score,
-            theory_total: latest.theory_total || actualTheoryTotal,
-            attempts_used: completedCount, 
-            max_attempts: ed.max_attempts || 1,
-            graded_by: latest.graded_by, 
-            graded_at: latest.graded_at,
-            submitted_at: latest.submitted_at,
-          })
-          setLoading(false)
-          return
-        }
-
-        // ✅ ONLY show resume if status is in_progress AND no submitted_at
-        if (canResumeAttempt(latest)) {
-          console.log('📌 Attempt is in_progress - showing resume dialog')
+        } else if (latest.status === "in_progress") {
+          // Resume exam
           const newUnloadCount = (latest.unload_count || 0) + 1
           setUnloadCount(newUnloadCount)
 
-          if (newUnloadCount >= 3) {
+          if (newUnloadCount >= MAX_UNLOADS) {
             // Auto-submit due to excessive refreshes
             const existingAnswers = latest.answers || {}
             const result = calcScore(allQ, existingAnswers)
@@ -387,22 +350,44 @@ export function useExamLoader(
           await supabase.from('exam_attempts').update({ unload_count: newUnloadCount }).eq('id', latest.id)
 
           const elapsed = Math.floor((Date.now() - new Date(latest.started_at).getTime()) / 1000)
-          const timeLeft = Math.max(0, (ed.duration * 60) - elapsed)
-          
           setResumeData({
             attemptId: latest.id,
             answers: latest.answers || {},
-            timeLeft: timeLeft,
+            timeLeft: Math.max(0, (ed.duration * 60) - elapsed),
             tabSwitches: latest.tab_switches || 0,
             fullscreenExits: latest.fullscreen_exits || 0,
             unloadCount: newUnloadCount,
           })
           setShowResumeDialog(true)
+        } else if (["completed", "pending_theory", "graded"].includes(latest.status)) {
+          setHasCompletedAttempt(true)
+          const displayPercentage = calculateFlexiblePercentage(latest)
+          setExamResult({
+            score: latest.total_score || 0, 
+            total: latest.total_marks || actualTotalMarks,
+            percentage: displayPercentage,
+            correct: latest.correct_count || 0,
+            incorrect: latest.incorrect_count || 0,
+            unanswered: latest.unanswered_count || 0,
+            is_passed: latest.is_passed || false,
+            passing_percentage: ed.passing_percentage || 50,
+            status: latest.status,
+            objective_score: latest.objective_score,
+            objective_total: latest.objective_total || objectiveMax,
+            theory_score: latest.theory_score,
+            theory_total: latest.theory_total || actualTheoryTotal,
+            attempts_used: completedCount, 
+            max_attempts: ed.max_attempts || 1,
+            graded_by: latest.graded_by, 
+            graded_at: latest.graded_at,
+            submitted_at: latest.submitted_at,
+          })
         }
       } else {
         setAttemptsUsed(0)
         setHasCompletedAttempt(false)
         setAttemptId(null)
+        console.log('📝 No existing attempt, showing instructions')
       }
     } catch (error) {
       console.error("Load error:", error)
@@ -416,6 +401,9 @@ export function useExamLoader(
     loadExam() 
   }, [loadExam])
 
+  // ============================================
+  // ✅ START NEW ATTEMPT - DYNAMIC TOTALS
+  // ============================================
   const startNewAttempt = useCallback(async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -424,6 +412,7 @@ export function useExamLoader(
         return null
       }
 
+      // Check for existing in_progress attempt
       const { data: existingAttempt } = await supabase
         .from('exam_attempts')
         .select('id, attempt_number')
@@ -438,6 +427,7 @@ export function useExamLoader(
         return { attemptId: existingAttempt.id, isResuming: true, attemptNumber: existingAttempt.attempt_number }
       }
 
+      // Count ALL previous attempts
       const { data: previousAttempts } = await supabase
         .from('exam_attempts')
         .select('id, status')
@@ -447,6 +437,9 @@ export function useExamLoader(
 
       const attemptNumber = (previousAttempts?.length || 0) + 1
 
+      console.log(`📝 Attempt #${attemptNumber} - Previous attempts: ${previousAttempts?.length || 0}`)
+
+      // ── FIX: Calculate objective max from actual questions ──────────────
       const objectiveQuestionsCount = allQuestions.filter((q: any) => q.type !== "theory").length
       const objectiveMax = objectiveQuestionsCount || exam?.objective_max || 20
       const theoryQuestionsCount = allQuestions.filter((q: any) => q.type === "theory").length
@@ -455,19 +448,16 @@ export function useExamLoader(
       const actualTheoryTotal = theoryQuestionsCount > 0 ? theoryMax : 0
       const actualTotalMarks = objectiveMax + actualTheoryTotal
 
-      // ✅ Store questions with the attempt
-      const examQuestions = allQuestions.map((q: any) => ({
-        id: q.id,
-        question_text: q.question_text || q.question,
-        type: q.type,
-        options: q.options || [],
-        correct_answer: q.correct_answer || '',
-        marks: q.marks || q.points || 0.5,
-        points: q.points || q.marks || 0.5,
-        order_number: q.order_number || 0,
-        is_theory: q.is_theory || false,
-      }))
+      console.log(`📊 Creating attempt #${attemptNumber} with:`, {
+        objectiveQuestionsCount,
+        objectiveMax,
+        theoryQuestionsCount,
+        theoryMax,
+        actualTheoryTotal,
+        actualTotalMarks
+      })
 
+      // ✅ Create new attempt with DYNAMIC totals
       const { data: newAttempt, error: insertError } = await supabase
         .from('exam_attempts')
         .insert({
@@ -501,9 +491,7 @@ export function useExamLoader(
           is_passed: false,
           correct_count: 0,
           incorrect_count: 0,
-          unanswered_count: 0,
-          attempt_questions: examQuestions,
-          question_version: exam?.version || 1
+          unanswered_count: 0
         })
         .select('id')
         .single()
