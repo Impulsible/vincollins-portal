@@ -1290,27 +1290,87 @@ html {
 }
 
 
-/* Fix mobile browser rendering glitches with blur + gradient combinations */
+/* ═══════════════════════════════════════════════════════════════
+   MOBILE GPU RENDERING FIXES
+   Prevents static/glitch artifacts on Chrome mobile and Android
+   ═══════════════════════════════════════════════════════════════ */
+
 @layer utilities {
-  .transform-gpu {
-    transform: translateZ(0);
+  /* Force GPU layer isolation on all card-like elements */
+  [class*="rounded-xl"],
+  [class*="rounded-2xl"],
+  [class*="rounded-3xl"] {
     -webkit-transform: translateZ(0);
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    perspective: 1000;
-    -webkit-perspective: 1000;
-  }
-  
-  /* Prevent blur bleed on mobile */
-  .isolate {
+    transform: translateZ(0);
     isolation: isolate;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Force isolation on elements with blur effects (banners, glows) */
+  [class*="blur-"],
+  [class*="backdrop-blur"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+    will-change: transform;
+  }
+
+  /* Force isolation on gradient backgrounds to prevent bleed */
+  [class*="bg-gradient-to"] {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
   }
 }
 
-/* Fix for Chrome mobile blur rendering */
+/* ─── Mobile-specific fixes ─────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Disable shadow transitions on mobile - they cause GPU flicker */
+  .transition-shadow,
+  .hover\:shadow-md,
+  .hover\:shadow-lg,
+  .hover\:shadow-xl {
+    transition: none !important;
+  }
+
+  /* Prevent horizontal overflow bleed on all pages */
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Force paint containment on cards for smoother scroll */
+  [class*="border-slate-200"],
+  [class*="border-slate-100"] {
+    contain: paint;
+  }
+
+  /* Reduce blur intensity on mobile (mobile GPUs struggle with large blurs) */
+  .blur-3xl {
+    filter: blur(32px) !important;
+  }
+  .blur-2xl {
+    filter: blur(24px) !important;
+  }
+}
+
+/* ─── iOS Safari specific fixes ─────────────────────────────── */
 @supports (-webkit-touch-callout: none) {
-  .blur-2xl, .blur-3xl, .blur-xl {
-    will-change: transform;
+  [class*="blur-"],
+  [class*="bg-gradient-to"],
+  [class*="rounded-xl"],
+  [class*="rounded-2xl"] {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+/* ─── Android Chrome specific fixes ─────────────────────────── */
+@media screen and (-webkit-min-device-pixel-ratio: 0) {
+  /* Force layer promotion on scrollable areas */
+  main,
+  [role="main"] {
+    -webkit-transform: translateZ(0);
     transform: translateZ(0);
   }
 }
