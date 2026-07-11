@@ -40,6 +40,7 @@ const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   'Business Studies': 'Business',
   'Social Studies': 'Social',
   'Civic Education': 'Civic',
+  'Christian Religious Studies': 'CRS',
 }
 
 // ✅ Subject order for consistent display
@@ -64,7 +65,8 @@ const SUBJECT_ORDER: Record<string, number> = {
   'Financial Accounting': 17,
   'Business Studies': 18, 
   'Literature in English': 19, 
-  'CRS': 20, 
+  'Christian Religious Studies': 20,
+   'CRS': 20,
   'Cultural and Creative Arts': 21, 
   'Music': 22, 
   'Yoruba': 23, 
@@ -99,11 +101,11 @@ const getDisplaySubjectName = (subject: string): string => {
 const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
-  'Agricultural Science', 'Home Economics', 'Physical and Health Education', 'CRS',
+  'Agricultural Science', 'Home Economics', 'Physical and Health Education', 'Christian Religious Studies',
   'French', 'Yoruba', 'Cultural and Creative Arts', 'Music', 'Security Education',
 ]
 const SS_SUBJECTS_SCIENCE = ['English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics', 'Further Mathematics', 'Agricultural Science', 'Data Processing', 'Civic Education', 'Economics']
-const SS_SUBJECTS_ARTS = ['English Language', 'Mathematics', 'Literature in English', 'Government', 'CRS', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology']
+const SS_SUBJECTS_ARTS = ['English Language', 'Mathematics', 'Literature in English', 'Government', 'Christian Religious Studies', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology']
 const SS_SUBJECTS_COMMERCIAL = ['English Language', 'Mathematics', 'Economics', 'Commerce', 'Financial Accounting', 'Government', 'Civic Education', 'Data Processing', 'Geography', 'Literature in English']
 
 const getSubjectsForStudent = (cls: string, dept?: string | null) => {

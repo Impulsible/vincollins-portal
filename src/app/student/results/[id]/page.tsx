@@ -169,7 +169,7 @@ export default function StudentResultDetailPage() {
   const [result, setResult] = useState<ExamResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // ─── FIXED: Load result with grade progression ──
+  // ─── FIXED: Load result with dynamic calculation ──
   const loadResult = useCallback(async () => {
     if (!examId) return
     setLoading(true); setError(null)
@@ -197,6 +197,30 @@ export default function StudentResultDetailPage() {
 
       const { data: exam } = await supabase.from('exams').select('*').eq('id', att.exam_id).maybeSingle()
 
+      // ✅ DYNAMICALLY CALCULATE objective_max from exam questions
+      let objectiveMax = 0
+
+      if (exam?.questions) {
+        const questions = typeof exam.questions === 'string' 
+          ? JSON.parse(exam.questions) 
+          : exam.questions
+        
+        if (Array.isArray(questions)) {
+          questions.forEach((q: any) => {
+            const marks = Number(q.marks || q.points || 0.5)
+            if (q.type !== 'theory' && !q.is_theory) {
+              objectiveMax += marks
+            }
+          })
+        }
+      }
+
+      // ✅ If no questions found, use exam config as fallback
+      if (objectiveMax === 0) objectiveMax = exam?.objective_max || 20
+
+      // ✅ Theory max is ALWAYS 60 - objectiveMax
+      const theoryMax = 60 - objectiveMax
+
       let theoryScore: number | null = null
       let teacherFeedback: string | null = null
       if (att.theory_feedback) {
@@ -214,18 +238,10 @@ export default function StudentResultDetailPage() {
       const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
       const hasCA = ca1 !== null && ca2 !== null
-      const hasTheory = theoryScore !== null && theoryScore > 0
 
-      // ✅ Get exam configuration
-      const objectiveMax = exam?.objective_max ?? 20
-      const theoryMax = 60 - objectiveMax
-      const totalExamMax = 60
-
-      // Get scores
       const objectiveScore = Number(att.objective_score) || 0
       const theoryValue = theoryScore || 0
 
-      // Calculate CA total (out of 40)
       const ca1Value = ca1 || 0
       const ca2Value = ca2 || 0
       const caTotal = ca1Value + ca2Value
@@ -236,24 +252,22 @@ export default function StudentResultDetailPage() {
       let totalMarks: number
 
       if (hasCA) {
-        // ✅ When CA is available, total is ALWAYS out of 100
-        // Even if theory is pending, it's counted as 0
-        totalScore = caTotal + objectiveScore + theoryValue  // theoryValue is 0 if pending
+        // ✅ CA + Objective + Theory (out of 100)
+        totalScore = caTotal + objectiveScore + theoryValue
         totalMarks = 100
         percentage = Math.round((totalScore / totalMarks) * 100)
-      } else if (hasTheory) {
-        // ✅ No CA, but theory available: out of 60
+      } else if (theoryValue > 0) {
+        // ✅ Objective + Theory (out of 60)
         totalScore = objectiveScore + theoryValue
         totalMarks = 60
         percentage = Math.round((totalScore / totalMarks) * 100)
       } else {
-        // ✅ Only Objective: out of objectiveMax
+        // ✅ Only Objective (out of objectiveMax)
         totalScore = objectiveScore
         totalMarks = objectiveMax
         percentage = Math.round((totalScore / totalMarks) * 100)
       }
 
-      // ✅ Safety: Cap at 100
       if (percentage > 100) percentage = 100
 
       const finalGrade = getGradeConfig(percentage).grade
@@ -270,9 +284,9 @@ export default function StudentResultDetailPage() {
         total_score: totalScore,
         total_marks: totalMarks,
         objective_score: objectiveScore,
-        objective_total: objectiveMax,
+        objective_total: objectiveMax,  // ✅ Dynamically calculated from questions
         theory_score: theoryValue,
-        theory_total: theoryMax,
+        theory_total: theoryMax,        // ✅ Always 60 - objectiveMax
         ca1_score: ca1,
         ca2_score: ca2,
         is_passed: isPassed,
@@ -364,9 +378,6 @@ export default function StudentResultDetailPage() {
   const objectivePercentage = result.objective_total > 0 ? Math.round((result.objective_score / result.objective_total) * 100) : 0
   const theoryPercentage = result.theory_total > 0 ? Math.round((theoryScore / result.theory_total) * 100) : 0
   const caPercentage = 40 > 0 ? Math.round((caTotal / 40) * 100) : 0
-
-  // Calculate percentage of total for each section
-  const totalWeight = result.total_marks
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
@@ -544,25 +555,25 @@ export default function StudentResultDetailPage() {
                         {hasCA && (
                           <motion.div 
                             className="bg-blue-500"
-                            style={{ width: `${(caTotal / totalWeight) * 100}%` }}
+                            style={{ width: `${(caTotal / 100) * 100}%` }}
                             initial={{ width: 0 }} 
-                            animate={{ width: `${(caTotal / totalWeight) * 100}%` }}
+                            animate={{ width: `${(caTotal / 100) * 100}%` }}
                             transition={{ duration: 0.8, ease: 'easeOut' }} 
                           />
                         )}
                         <motion.div 
                           className="bg-violet-500"
-                          style={{ width: `${(result.objective_score / totalWeight) * 100}%` }}
+                          style={{ width: `${(result.objective_score / 100) * 100}%` }}
                           initial={{ width: 0 }} 
-                          animate={{ width: `${(result.objective_score / totalWeight) * 100}%` }}
+                          animate={{ width: `${(result.objective_score / 100) * 100}%` }}
                           transition={{ duration: 0.8, ease: 'easeOut', delay: 0.1 }} 
                         />
                         {!theoryPending && theoryScore > 0 && (
                           <motion.div 
                             className="bg-amber-500"
-                            style={{ width: `${(theoryScore / totalWeight) * 100}%` }}
+                            style={{ width: `${(theoryScore / 100) * 100}%` }}
                             initial={{ width: 0 }} 
-                            animate={{ width: `${(theoryScore / totalWeight) * 100}%` }}
+                            animate={{ width: `${(theoryScore / 100) * 100}%` }}
                             transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }} 
                           />
                         )}

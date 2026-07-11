@@ -53,19 +53,24 @@ const TERM_OPTIONS = [
 const SENIOR_SUBJECTS = [
   'English Language','Mathematics','Civic Education','Physics','Chemistry','Biology',
   'Agricultural Science','Economics','Geography','Government','Literature in English',
-  'CRS','Yoruba','Commerce','Financial Accounting','Data Processing','Further Mathematics'
+  'Christian Religious Studies','Yoruba','Commerce','Financial Accounting','Data Processing','Further Mathematics'
 ]
 
 const JUNIOR_SUBJECTS = [
   'English Studies','Mathematics','Basic Science','Basic Technology','Social Studies',
   'Civic Education','Agricultural Science','Business Studies','Home Economics',
-  'CRS','Yoruba','French','Information Technology','Cultural and Creative Arts',
+  'Christian Religious Studies','Yoruba','French','Information Technology','Cultural and Creative Arts',
   'Music','Physical and Health Education','History','Security Education'
 ]
 
+// Subject name mapping for display
 const SUBJECT_NAME_MAPPING: Record<string, string> = {
   'CCA': 'Cultural and Creative Arts',
   'PHE': 'Physical and Health Education',
+  'CRS': 'Christian Religious Studies',
+  'CRK': 'Christian Religious Studies',
+  'C.R.S.': 'Christian Religious Studies',
+  'C.R.K.': 'Christian Religious Studies',
 }
 
 const getAvailableSessions = (currentSession: string): string[] => { 
@@ -130,6 +135,7 @@ const STORAGE_KEYS = {
   SKIP_EXAM: 'ca_scores_skip_exam' 
 }
 
+// Subject Status Icon Component
 const SubjectStatusIcon = ({ status }: { status?: SubjectStatus }) => {
   if (!status) return null
   if (status.enteredByOther) {
@@ -220,10 +226,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const isInitialMount = useRef(true)
   const sessionOptions = getAvailableSessions(termInfo?.sessionYear || '2025/2026')
 
+  // Subject name mapping function
   const getMappedSubject = useCallback((subject: string) => {
     return SUBJECT_NAME_MAPPING[subject] || subject
   }, [])
 
+  // Check subjects status
   const checkSubjectsStatus = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear || !staffProfile?.id) return
     setCheckingSubjects(true)
@@ -255,6 +263,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setCheckingSubjects(false)
   }, [selectedClass, selectedTerm, selectedYear, staffProfile?.id])
 
+  // Restore state from localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const get = (k: string) => localStorage.getItem(k)
@@ -270,6 +279,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setMounted(true)
   }, [])
 
+  // Persist state to localStorage
   useEffect(() => { if (isInitialMount.current) isInitialMount.current = false }, [])
   useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedClass) localStorage.setItem(STORAGE_KEYS.SELECTED_CLASS, selectedClass) }, [selectedClass, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedSubject) localStorage.setItem(STORAGE_KEYS.SELECTED_SUBJECT, selectedSubject) }, [selectedSubject, isRestoring])
@@ -278,9 +288,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedExamId) localStorage.setItem(STORAGE_KEYS.SELECTED_EXAM, selectedExamId) }, [selectedExamId, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.ACTIVE_TAB, activeTab) }, [activeTab, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SKIP_EXAM, String(skipExam)) }, [skipExam, isRestoring])
+  
+  // Check subject status when selections change
   useEffect(() => { if (mounted && !isRestoring && selectedClass && staffProfile?.id) checkSubjectsStatus() }, [mounted, isRestoring, selectedClass, selectedTerm, selectedYear, staffProfile?.id, checkSubjectsStatus])
+  
+  // Update lock state
   useEffect(() => { setIsLocked(selectedSubject ? !!subjectsStatus[selectedSubject]?.enteredByOther : false) }, [selectedSubject, subjectsStatus])
 
+  // Handlers
   const handleClassChange = (v: string) => {
     setSelectedClass(v)
     setSelectedSubject('')
@@ -291,12 +306,38 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setSavedStatus({})
   }
 
-  const handleSubjectChange = (v: string) => { setSelectedSubject(v); setSelectedExamId(''); setSkipExam(false); setCAScores([]) }
-  const handleTermChange = (v: string) => { setSelectedTerm(v); setSelectedExamId(''); setSkipExam(false); setCAScores([]) }
-  const handleYearChange = (v: string) => { setSelectedYear(v); setSelectedExamId(''); setSkipExam(false); setCAScores([]) }
-  const handleExamChange = (v: string) => { setSelectedExamId(v); setSkipExam(false) }
-  const handleSkipExam = () => { setSkipExam(true); setSelectedExamId('') }
+  const handleSubjectChange = (v: string) => { 
+    setSelectedSubject(v)
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+  }
+  
+  const handleTermChange = (v: string) => { 
+    setSelectedTerm(v)
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+  }
+  
+  const handleYearChange = (v: string) => { 
+    setSelectedYear(v)
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+  }
+  
+  const handleExamChange = (v: string) => { 
+    setSelectedExamId(v)
+    setSkipExam(false)
+  }
+  
+  const handleSkipExam = () => { 
+    setSkipExam(true)
+    setSelectedExamId('')
+  }
 
+  // Load classes
   const loadClasses = useCallback(async () => {
     const { data } = await supabase.from('profiles').select('class').eq('role','student').not('class','is',null)
     const unique = [...new Set((data||[]).map((d:any) => d.class).filter(Boolean))] as string[]
@@ -308,6 +349,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
 
   useEffect(() => { if (mounted && !isRestoring) loadClasses() }, [mounted, isRestoring, loadClasses])
 
+  // Set subjects based on class
   useEffect(() => {
     if (!selectedClass || isRestoring) return
     const list = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
@@ -315,6 +357,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     if (!selectedSubject && list.length > 0) setSelectedSubject(list[0])
   }, [selectedClass, selectedSubject, isRestoring])
 
+  // Load exams
   useEffect(() => {
     if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring || skipExam) return
     const loadExams = async () => {
@@ -335,6 +378,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     loadExams()
   }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring, skipExam, selectedClass])
 
+  // Load all data for entry tab
   const loadAllData = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
     setLoading(true)
@@ -370,7 +414,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       formatted.forEach(s => { entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false } })
       let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
       ;(scoresData || []).forEach((score: any) => {
-        // ✅ Calculate exam as objective + theory ONLY
         const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
         const caTotal = (score.ca1_score || 0) + (score.ca2_score || 0)
         const total = caTotal + examTotal
@@ -407,6 +450,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }, [selectedClass, selectedSubject, selectedTerm, selectedYear, getMappedSubject])
 
+  // Load scores for view tab
   const loadScoresForViewTab = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
     setLoading(true)
@@ -483,6 +527,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }, [selectedClass, selectedSubject, selectedTerm, selectedYear, getMappedSubject])
 
+  // Auto-load data when selections change
   useEffect(() => {
     if (!isRestoring && selectedClass && selectedSubject && selectedTerm && selectedYear) {
       loadAllData()
@@ -493,6 +538,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     if (activeTab === 'view' && selectedClass && selectedSubject) loadScoresForViewTab()
   }, [activeTab, selectedClass, selectedSubject, loadScoresForViewTab])
 
+  // Update stats
   const updateStatsFromEntries = () => {
     let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
     students.forEach(student => {
@@ -529,13 +575,10 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setTimeout(updateStatsFromEntries, 50)
   }
 
-  // ✅ FIXED: Build Save Payload - separates CA and Exam
+  // Build save payload
   const buildSavePayload = (studentId: string, ca1: number, ca2: number, exam: number, studentClass: string): any => {
-    // ✅ CA Total = CA1 + CA2
     const caTotal = ca1 + ca2
-    // ✅ Exam score is what was passed in (objective + theory)
     const examScore = exam
-    // ✅ Grand Total = CA + Exam
     const total = caTotal + examScore
     
     const now = new Date().toISOString()
@@ -565,7 +608,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return d
   }
 
-  // ✅ FIXED: Auto-fetch single - calculates objective + theory ONLY
+  // Auto-fetch single exam score
   const handleAutoFetchSingle = async (studentId: string) => {
     if (!selectedSubject || !selectedTerm || !selectedYear) {
       toast.info('Please select subject, term, and year first')
@@ -605,24 +648,22 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       const exam = examsData.find(e => e.id === data.exam_id)
       const totalMax = exam?.total_marks || 60
       
-      // ✅ FIX: Calculate exam score as objective + theory ONLY
       const objScore = Number(data.objective_score) || 0
       const theoryScore = Number(data.theory_score) || 0
-      const examTotal = objScore + theoryScore  // This is the EXAM score, NOT total
+      const examTotal = objScore + theoryScore
       
       if (examTotal === 0) { 
         toast.info('No score found') 
         return 
       }
       
-      // ✅ Store ONLY the exam score (not CA)
       setScoreEntries(prev => ({
         ...prev,
         [studentId]: { 
           ...prev[studentId], 
           ca1: prev[studentId]?.ca1 || '',
           ca2: prev[studentId]?.ca2 || '',
-          exam: String(Math.round(examTotal)),  // ✅ Only exam score
+          exam: String(Math.round(examTotal)),
           is_saved: false 
         }
       }))
@@ -636,7 +677,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
-  // ✅ FIXED: Auto-fetch all - calculates objective + theory ONLY
+  // Auto-fetch all exam scores
   const handleAutoFetchAll = async () => {
     if (!selectedSubject || !selectedTerm || !selectedYear) {
       toast.info('Please select subject, term, and year first')
@@ -674,9 +715,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         return
       }
       
-      console.log(`📋 Found ${examsData.length} exams for ${selectedSubject} (${selectedTerm} ${selectedYear}):`)
-      examsData.forEach(e => console.log(`  - ${e.title} (Class: ${e.class || 'N/A'}) (${e.id})`))
-      
       const examIds = examsData.map(e => e.id)
       const { data: allAttempts, error: attemptsError } = await supabase
         .from('exam_attempts')
@@ -690,8 +728,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         return
       }
       
-      console.log(`📊 Found ${allAttempts?.length || 0} total exam attempts across ${examsData.length} exams`)
-      
       const resultsMap = new Map()
       if (allAttempts) {
         allAttempts.forEach((a: any) => {
@@ -701,9 +737,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           }
         })
       }
-      
-      console.log(`📊 ${resultsMap.size} unique students with attempts`)
-      console.log(`🎯 Looking for students in class: ${selectedClass}`)
       
       if (students.length === 0) {
         toast.warning('No students found for this class. Please refresh the page.')
@@ -721,33 +754,24 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           const exam = examsData.find(e => e.id === attempt.exam_id)
           const totalMax = exam?.total_marks || 60
           
-          // ✅ FIX: Calculate exam score as objective + theory ONLY
           const objScore = Number(attempt.objective_score) || 0
           const theoryScore = Number(attempt.theory_score) || 0
-          const examTotal = objScore + theoryScore  // This is the EXAM score, NOT total
-          
-          console.log(`📝 ${student.full_name}: Obj=${objScore}, Theory=${theoryScore}, Exam=${examTotal}/${totalMax}`)
+          const examTotal = objScore + theoryScore
           
           if (examTotal > 0) {
             newEntries[student.id] = {
               ca1: newEntries[student.id]?.ca1 || '',
               ca2: newEntries[student.id]?.ca2 || '',
-              exam: String(Math.round(examTotal)),  // ✅ Only exam score
+              exam: String(Math.round(examTotal)),
               is_saved: false
             }
             newSaved[student.id] = false
             count++
             totalFound += examTotal
             loadedStudents.push(`${student.full_name} (Exam: ${examTotal}/${totalMax})`)
-          } else {
-            console.log(`⚠️ ${student.full_name}: Score is 0, skipping`)
           }
-        } else {
-          console.log(`❌ ${student.full_name}: No attempt found`)
         }
       }
-      
-      console.log(`✅ Loaded ${count} exam scores for:`, loadedStudents)
       
       setScoreEntries(newEntries)
       setSavedStatus(newSaved)
@@ -781,6 +805,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
+  // Save single score
   const handleSaveSingle = async (studentId: string) => {
     if (!staffProfile?.id) { toast.error('Missing teacher information'); return }
     if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
@@ -816,6 +841,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     finally { setSaving(false) }
   }
 
+  // Save all scores
   const handleSaveAll = async () => {
     if (!staffProfile?.id) { toast.error('Missing teacher information'); return }
     if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
@@ -865,6 +891,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     finally { setSaving(false) }
   }
 
+  // Delete all scores
   const handleDeleteAllScores = async () => {
     if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
     setIsDeletingAll(true)
@@ -913,7 +940,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const classOrder = Object.keys(groupedStudents).sort()
   const filteredScores = caScores.filter(s => (s.student?.full_name || getStudentName(s.student_id)).toLowerCase().includes(searchQuery.toLowerCase()))
 
-  // ✅ Display helpers for the view tab
   const getExamTotal = (score: any) => (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
   const getCATotal = (score: any) => (score.ca1_score || 0) + (score.ca2_score || 0)
   const getGrandTotal = (score: any) => getCATotal(score) + getExamTotal(score)
@@ -939,7 +965,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         <StatCard label="Pass Rate" value={`${stats.passRate}%`} sub={`${stats.passCount} passed · ${stats.failCount} failed`} icon={Award} accent="bg-amber-500"/>
       </div>
 
-      {/* Subject Status */}
+      {/* Subject Status Legend */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-semibold text-slate-600 dark:text-slate-300">Subject status:</span>
         <span className="flex items-center gap-1.5"><Circle className="h-3.5 w-3.5 text-slate-400"/>Available</span>
@@ -989,7 +1015,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 </p>
               )}
             </div>
-            {/* Subject Select */}
+
+            {/* Subject Select - with mapped names and status */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Subject</Label>
               <Select value={selectedSubject} onValueChange={handleSubjectChange}>
@@ -997,7 +1024,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                   <SelectValue placeholder="Select subject">
                     {selectedSubject && (
                       <div className="flex items-center justify-between w-full gap-2">
-                        <span className="truncate">{selectedSubject}</span>
+                        <span className="truncate">{getMappedSubject(selectedSubject)}</span>
                         <SubjectStatusIcon status={subjectsStatus[selectedSubject]}/>
                       </div>
                     )}
@@ -1012,7 +1039,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                     subjects.map(sub => (
                       <SelectItem key={sub} value={sub}>
                         <div className="flex items-center justify-between w-full gap-3">
-                          <span>{sub}</span>
+                          <span>{getMappedSubject(sub)}</span>
                           <SubjectStatusIcon status={subjectsStatus[sub]}/>
                         </div>
                       </SelectItem>
@@ -1035,6 +1062,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 </p>
               )}
             </div>
+
             {/* Examination Select */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Examination</Label>
@@ -1076,6 +1104,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 </div>
               )}
             </div>
+
             {/* Term Select */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Term</Label>
@@ -1088,6 +1117,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 </SelectContent>
               </Select>
             </div>
+
             {/* Session Select */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Session</Label>
@@ -1101,6 +1131,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               </Select>
             </div>
           </div>
+
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
             <Button 
@@ -1163,7 +1194,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 </div>
                 <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-1">Score Entry Locked</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                  <strong>{selectedSubject}</strong> scores for <strong>{selectedClass}</strong> were entered by <strong>{subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}</strong>.
+                  <strong>{getMappedSubject(selectedSubject)}</strong> scores for <strong>{selectedClass}</strong> were entered by <strong>{subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}</strong>.
                 </p>
                 <Button variant="outline" size="sm" className="mt-5" onClick={() => {
                   const avail = subjects.find(s => !subjectsStatus[s]?.enteredByOther && s !== selectedSubject)
@@ -1331,7 +1362,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Published Scores</CardTitle>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
-                    {selectedClass} · {selectedSubject} · {TERM_OPTIONS.find(t => t.value === selectedTerm)?.label}
+                    {selectedClass} · {getMappedSubject(selectedSubject)} · {TERM_OPTIONS.find(t => t.value === selectedTerm)?.label}
                     {isLocked && <Badge className="ml-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs"><Lock className="h-3 w-3 mr-1"/>Locked</Badge>}
                   </p>
                 </div>
@@ -1384,12 +1415,11 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                     </TableHeader>
                     <TableBody>
                       {filteredScores.map((score, idx) => {
-                        // ✅ Calculate totals correctly
                         const ca1 = score.ca1_score || 0
                         const ca2 = score.ca2_score || 0
-                        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)  // ✅ Only exam
-                        const caTotal = ca1 + ca2  // ✅ Only CA
-                        const total = caTotal + examTotal  // ✅ Grand total
+                        const examTotal = (score.exam_objective_score || 0) + (score.exam_theory_score || 0)
+                        const caTotal = ca1 + ca2
+                        const total = caTotal + examTotal
                         const pct = total > 0 ? total : 0
                         const grade = getGrade(pct)
                         const name = score.student?.full_name || getStudentName(score.student_id)
@@ -1470,7 +1500,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </TabsContent>
       </Tabs>
 
-      {/* Delete All Dialog */}
+      {/* ✅ FIXED: Delete All Dialog - No div inside p tag */}
       <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
         <AlertDialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <AlertDialogHeader>
@@ -1480,10 +1510,11 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               </div>
               <AlertDialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">Delete All Score Records?</AlertDialogTitle>
             </div>
+            {/* ✅ FIX: Use div instead of p to avoid hydration error */}
             <AlertDialogDescription asChild>
               <div className="space-y-3 pl-11">
                 <div className="flex flex-wrap gap-1.5">
-                  {[selectedClass, selectedSubject, TERM_OPTIONS.find(t => t.value === selectedTerm)?.label, selectedYear].map((v, i) => v && (
+                  {[selectedClass, getMappedSubject(selectedSubject), TERM_OPTIONS.find(t => t.value === selectedTerm)?.label, selectedYear].map((v, i) => v && (
                     <Badge key={i} variant="secondary" className="text-xs font-medium">{v}</Badge>
                   ))}
                 </div>
