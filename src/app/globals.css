@@ -1288,3 +1288,29 @@ html {
   background-size: 200% 100%;
   animation: shimmer 2s infinite;
 }
+
+
+/* Fix mobile browser rendering glitches with blur + gradient combinations */
+@layer utilities {
+  .transform-gpu {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    perspective: 1000;
+    -webkit-perspective: 1000;
+  }
+  
+  /* Prevent blur bleed on mobile */
+  .isolate {
+    isolation: isolate;
+  }
+}
+
+/* Fix for Chrome mobile blur rendering */
+@supports (-webkit-touch-callout: none) {
+  .blur-2xl, .blur-3xl, .blur-xl {
+    will-change: transform;
+    transform: translateZ(0);
+  }
+}

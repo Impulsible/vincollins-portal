@@ -165,11 +165,11 @@ const getGrade = (p: number): GradeStyle => {
 
 const getSimpleGrade = (p: number) => {
   const percentage = Number(p) || 0
-  if (percentage >= 80) return { grade: 'A', label: 'Excellent', gradient: 'from-emerald-400 to-teal-500', text: 'text-emerald-300' }
-  if (percentage >= 70) return { grade: 'B', label: 'Very Good', gradient: 'from-blue-400 to-indigo-500', text: 'text-blue-300' }
-  if (percentage >= 60) return { grade: 'C', label: 'Good', gradient: 'from-amber-400 to-orange-500', text: 'text-amber-300' }
-  if (percentage >= 50) return { grade: 'P', label: 'Pass', gradient: 'from-orange-400 to-red-500', text: 'text-orange-300' }
-  return { grade: 'F', label: 'Needs Work', gradient: 'from-red-400 to-rose-500', text: 'text-red-300' }
+  if (percentage >= 80) return { grade: 'A', label: 'Excellent', gradient: 'from-emerald-400 to-teal-500', text: 'text-emerald-300', border: 'border-emerald-400/50' }
+  if (percentage >= 70) return { grade: 'B', label: 'Very Good', gradient: 'from-blue-400 to-indigo-500', text: 'text-blue-300', border: 'border-blue-400/50' }
+  if (percentage >= 60) return { grade: 'C', label: 'Good', gradient: 'from-amber-400 to-orange-500', text: 'text-amber-300', border: 'border-amber-400/50' }
+  if (percentage >= 50) return { grade: 'P', label: 'Pass', gradient: 'from-orange-400 to-red-500', text: 'text-orange-300', border: 'border-orange-400/50' }
+  return { grade: 'F', label: 'Needs Work', gradient: 'from-red-400 to-rose-500', text: 'text-red-300', border: 'border-red-400/50' }
 }
 
 const formatProfileForHeader = (profile: StudentProfile | null) => {
@@ -229,7 +229,6 @@ function StatTile({
         <div className={cn('h-0.5 w-full', t.accent, 'opacity-60 group-hover:opacity-100 transition-opacity')} />
         <div className="p-3 sm:p-4">
           <div className="flex items-start justify-between gap-1.5 mb-1.5">
-            {/* Label - truncated on mobile */}
             <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider leading-tight flex-1 min-w-0 truncate">
               {label}
             </p>
@@ -241,7 +240,6 @@ function StatTile({
               <Icon className={cn('w-3 h-3 sm:w-3.5 sm:h-3.5', t.iconColor)} />
             </div>
           </div>
-          {/* Value - responsive font size */}
           <p className={cn('text-lg sm:text-xl lg:text-2xl font-black leading-none tracking-tight', t.valueColor)}>
             {value}
           </p>
@@ -285,7 +283,6 @@ function SubjectTile({
         <div className="p-3">
           <div className="flex items-start justify-between gap-1.5 mb-2">
             <div className="flex-1 min-w-0">
-              {/* Subject name - prevent overflow */}
               <p className="font-bold text-xs sm:text-sm text-slate-900 leading-tight line-clamp-2 break-words">
                 {perf.subject}
               </p>
@@ -297,11 +294,10 @@ function SubjectTile({
                   'text-[9px] font-bold px-1 py-0.5 rounded whitespace-nowrap',
                   isAboveAvg ? 'text-emerald-600 bg-emerald-50' : 'text-red-500 bg-red-50'
                 )}>
-                  {isAboveAvg ? '↑ Above' : '↓ Below'}
+                  {isAboveAvg ? '↑' : '↓'}
                 </span>
               </div>
             </div>
-            {/* Grade badge - fixed size */}
             <div className={cn(
               'shrink-0 h-8 w-8 rounded-lg flex items-center justify-center border-2 shadow-sm',
               g.bg, g.border
@@ -362,16 +358,13 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
         className="relative bg-white rounded-xl border border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300 active:scale-[0.99] transition-all duration-200 cursor-pointer group overflow-hidden"
       >
         <div className="flex items-stretch">
-          {/* Status bar */}
           <div className={cn(
             'w-1 shrink-0',
             isPending ? 'bg-amber-400' : result.is_passed ? 'bg-emerald-500' : 'bg-red-500'
           )} />
 
           <div className="flex-1 p-3 sm:p-4 min-w-0">
-            {/* Mobile: stacked layout */}
             <div className="flex items-start gap-2.5 sm:gap-3">
-              {/* Grade badge */}
               <div className="shrink-0">
                 <div className={cn(
                   'h-12 w-12 sm:h-14 sm:w-14 rounded-xl flex flex-col items-center justify-center border-2 shadow-sm',
@@ -386,13 +379,11 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
                 </div>
               </div>
 
-              {/* Content */}
               <div className="flex-1 min-w-0">
                 <h3 className="font-bold text-sm text-slate-900 leading-snug mb-1 line-clamp-2 break-words pr-2">
                   {result.exam_title}
                 </h3>
 
-                {/* Tags row - wraps on mobile */}
                 <div className="flex items-center gap-1 flex-wrap mb-1.5">
                   <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap">
                     {result.exam_subject}
@@ -420,9 +411,7 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
                   )}
                 </div>
 
-                {/* Score row - mobile friendly */}
                 <div className="flex items-center justify-between gap-2 mb-1.5">
-                  {/* Score on mobile moves here */}
                   <div className="flex items-baseline gap-0.5">
                     <span className={cn('text-lg sm:text-xl font-black leading-none', g.text)}>
                       {percentage}
@@ -435,7 +424,6 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
                   </div>
                 </div>
 
-                {/* Progress bar */}
                 <div className="relative w-full bg-slate-100 rounded-full h-1.5 overflow-hidden mb-1.5">
                   <motion.div
                     initial={{ width: 0 }}
@@ -445,7 +433,6 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
                   />
                 </div>
 
-                {/* Date */}
                 <p className="text-[11px] text-slate-400 font-medium flex items-center gap-1 flex-wrap">
                   <Clock className="h-3 w-3 shrink-0" />
                   <span>{formatDate(result.completed_at)}</span>
@@ -737,7 +724,7 @@ export default function StudentResultsPage() {
   // LOADING
   if (authChecking || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-x-hidden">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center space-y-3">
@@ -761,10 +748,11 @@ export default function StudentResultsPage() {
   const hasMoreSubjects = subjectPerformance.length > 8
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
+    // ✅ FIX: overflow-x-hidden on root prevents horizontal bleed
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20 overflow-x-hidden">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
 
-      <div className="flex">
+      <div className="flex overflow-x-hidden">
         <StudentSidebar
           profile={profile}
           onLogout={handleLogout}
@@ -774,18 +762,15 @@ export default function StudentResultsPage() {
           setActiveTab={() => {}}
         />
 
-        {/* ✅ FIXED: proper mobile margin - no overlap with sidebar */}
         <main className={cn(
-          'flex-1 min-h-screen transition-all duration-300',
-          'pt-16 lg:pt-20',        // header offset
-          'pb-24 lg:pb-8',         // bottom nav offset on mobile
-          'ml-0 lg:ml-0',          // no margin on mobile (sidebar overlays)
+          'flex-1 min-h-screen transition-all duration-300 overflow-x-hidden',
+          'pt-16 lg:pt-20',
+          'pb-24 lg:pb-8',
           sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'
         )}>
-          {/* ✅ FIXED: container with proper padding */}
           <div className="w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-7xl mx-auto">
 
-            {/* ✅ FIXED: Sync indicator - no transform conflict */}
+            {/* Sync indicator */}
             <AnimatePresence>
               {refreshing && (
                 <motion.div
@@ -836,26 +821,43 @@ export default function StudentResultsPage() {
               </div>
             </motion.div>
 
-            {/* ✅ Hero Banner - Fixed mobile layout */}
+            {/* ✅ FIXED HERO BANNER - No more static/glitch */}
             <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-5 sm:mb-6">
-              <div className="relative rounded-2xl overflow-hidden shadow-xl">
+              {/* ✅ KEY FIX: isolate + transform-gpu + contain-paint prevent mobile GPU glitches */}
+              <div
+                className="relative rounded-2xl overflow-hidden shadow-xl isolate"
+                style={{
+                  transform: 'translateZ(0)',
+                  WebkitTransform: 'translateZ(0)',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden',
+                  contain: 'paint',
+                }}
+              >
+                {/* Solid gradient background - no blur */}
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900" />
-                <div className="absolute top-0 right-0 w-48 h-48 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl" />
-                <div className="absolute bottom-0 left-0 w-32 h-32 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
 
+                {/* ✅ Decorative blurs - reduced size, pointer-events-none, contained */}
+                <div
+                  className="absolute top-0 right-0 w-40 h-40 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"
+                  style={{ transform: 'translateZ(0)' }}
+                />
+                <div
+                  className="absolute bottom-0 left-0 w-28 h-28 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"
+                  style={{ transform: 'translateZ(0)' }}
+                />
+
+                {/* Content */}
                 <div className="relative p-4 sm:p-6 lg:p-8">
-                  {/* ✅ Top section: avatar + info + grade (stacks on mobile) */}
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
 
-                    {/* Avatar + info row on mobile */}
                     <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                      {/* Avatar */}
+                      {/* Avatar - simplified, no blur glow */}
                       <div className="relative shrink-0">
-                        <div className={cn(
-                          'absolute -inset-1 rounded-full bg-gradient-to-r opacity-50 blur-md',
-                          overallGrade.gradient
-                        )} />
-                        <Avatar className="relative h-14 w-14 sm:h-20 sm:w-20 ring-2 sm:ring-4 ring-white/20 shadow-xl">
+                        <Avatar className={cn(
+                          "relative h-14 w-14 sm:h-20 sm:w-20 ring-2 sm:ring-4 shadow-xl",
+                          "ring-amber-400/40"
+                        )}>
                           <AvatarImage src={profile?.photo_url || undefined} />
                           <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-lg sm:text-2xl font-black">
                             {profile?.full_name ? getInitials(profile.full_name) : 'S'}
@@ -863,7 +865,6 @@ export default function StudentResultsPage() {
                         </Avatar>
                       </div>
 
-                      {/* Name + info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 mb-1">
                           <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300 shrink-0" />
@@ -873,11 +874,10 @@ export default function StudentResultsPage() {
                         </div>
                         <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-white leading-tight">
                           {profile?.first_name || profile?.full_name?.split(' ')[0] || 'Hello'}&apos;s{' '}
-                          <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">
+                          <span className="text-amber-300">
                             Results
                           </span>
                         </h1>
-                        {/* Meta info - wraps gracefully */}
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                           {profile?.class && (
                             <span className="flex items-center gap-1 text-xs text-gray-300 font-medium">
@@ -898,14 +898,14 @@ export default function StudentResultsPage() {
                       </div>
                     </div>
 
-                    {/* ✅ Grade badge - stays on right on all sizes */}
+                    {/* ✅ Grade badge - replaced gradient p-[2px] wrapper with solid border */}
                     {stats.totalExams > 0 && (
                       <div className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-1 shrink-0">
                         <div className={cn(
-                          'relative rounded-xl bg-gradient-to-br p-[2px] shadow-xl',
-                          overallGrade.gradient
+                          "relative rounded-xl border-2 shadow-xl bg-slate-900/95",
+                          overallGrade.border
                         )}>
-                          <div className="bg-slate-800/95 backdrop-blur rounded-xl px-4 sm:px-6 py-2 sm:py-3 flex flex-col items-center min-w-[90px] sm:min-w-[110px]">
+                          <div className="rounded-xl px-4 sm:px-6 py-2 sm:py-3 flex flex-col items-center min-w-[90px] sm:min-w-[110px]">
                             <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/50 mb-0.5 sm:mb-1">
                               Overall
                             </p>
@@ -924,7 +924,7 @@ export default function StudentResultsPage() {
                     )}
                   </div>
 
-                  {/* Pass rate bar */}
+                  {/* Pass rate */}
                   {stats.totalExams > 0 && (
                     <div className="mt-4 pt-4 border-t border-white/15">
                       <div className="flex items-center justify-between mb-1.5">
@@ -947,7 +947,7 @@ export default function StudentResultsPage() {
               </div>
             </motion.div>
 
-            {/* ✅ Stats Grid - 3 cols on mobile, 6 on desktop */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 mb-5 sm:mb-6">
               <StatTile label="Total" value={stats.totalExams} icon={FileText} tone="blue" delay={0.05} />
               <StatTile
@@ -996,7 +996,6 @@ export default function StudentResultsPage() {
                     </Button>
                   )}
                 </div>
-                {/* ✅ 2 cols mobile, 3 tablet, 4 desktop */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-2.5">
                   {visibleSubjects.map((perf, i) => (
                     <SubjectTile
@@ -1015,14 +1014,13 @@ export default function StudentResultsPage() {
               </motion.div>
             )}
 
-            {/* ✅ Filters - Restructured for mobile */}
+            {/* Filters */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.25 }}
               className="mb-4 space-y-2.5"
             >
-              {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="bg-white border border-slate-200 shadow-sm p-0.5 rounded-xl h-auto gap-0.5 w-full sm:w-auto">
                   {[
@@ -1048,9 +1046,7 @@ export default function StudentResultsPage() {
                 </TabsList>
               </Tabs>
 
-              {/* Search + Selects */}
               <div className="flex items-center gap-2">
-                {/* Search - takes remaining space */}
                 <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                   <Input
@@ -1060,7 +1056,6 @@ export default function StudentResultsPage() {
                     className="pl-8 h-9 text-sm bg-white border-slate-200 rounded-lg font-medium w-full"
                   />
                 </div>
-                {/* Subject filter */}
                 <Select value={subjectFilter} onValueChange={setSubjectFilter}>
                   <SelectTrigger className="w-[100px] sm:w-[130px] h-9 text-xs bg-white border-slate-200 rounded-lg font-semibold shrink-0">
                     <Filter className="h-3 w-3 text-slate-400 shrink-0" />
@@ -1073,7 +1068,6 @@ export default function StudentResultsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                {/* Sort */}
                 <Select value={sortOrder} onValueChange={(v: any) => setSortOrder(v)}>
                   <SelectTrigger className="w-[90px] sm:w-[110px] h-9 text-xs bg-white border-slate-200 rounded-lg font-semibold shrink-0">
                     <ArrowUpDown className="h-3 w-3 text-slate-400 shrink-0" />
@@ -1088,7 +1082,6 @@ export default function StudentResultsPage() {
                 </Select>
               </div>
 
-              {/* Active filter chips */}
               {(searchQuery || subjectFilter !== 'all') && (
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Active:</span>
