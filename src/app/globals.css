@@ -1296,10 +1296,11 @@ html {
    ═══════════════════════════════════════════════════════════════ */
 
 @layer utilities {
-  /* Force GPU layer isolation on all card-like elements */
-  [class*="rounded-xl"],
-  [class*="rounded-2xl"],
-  [class*="rounded-3xl"] {
+  /* Force GPU layer isolation on card-like elements
+     ✅ EXCLUDES: dialogs, modals, popovers, tooltips, dropdowns, toasts */
+  [class*="rounded-xl"]:not([role="dialog"]):not([role="alertdialog"]):not([data-state]):not([data-radix-popper-content-wrapper]):not([data-sonner-toast]):not([data-radix-portal] *):not([data-slot="dialog-content"]):not([data-slot="dialog-overlay"]),
+  [class*="rounded-2xl"]:not([role="dialog"]):not([role="alertdialog"]):not([data-state]):not([data-radix-popper-content-wrapper]):not([data-sonner-toast]):not([data-radix-portal] *):not([data-slot="dialog-content"]):not([data-slot="dialog-overlay"]),
+  [class*="rounded-3xl"]:not([role="dialog"]):not([role="alertdialog"]):not([data-state]):not([data-radix-popper-content-wrapper]):not([data-sonner-toast]):not([data-radix-portal] *) {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     isolation: isolate;
@@ -1307,16 +1308,16 @@ html {
     backface-visibility: hidden;
   }
 
-  /* Force isolation on elements with blur effects (banners, glows) */
-  [class*="blur-"],
-  [class*="backdrop-blur"] {
+  /* Force isolation on blur effects (excluding modals/portals) */
+  [class*="blur-"]:not([role="dialog"] *):not([data-radix-portal] *),
+  [class*="backdrop-blur"]:not([role="dialog"] *):not([data-radix-portal] *) {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
     will-change: transform;
   }
 
-  /* Force isolation on gradient backgrounds to prevent bleed */
-  [class*="bg-gradient-to"] {
+  /* Force isolation on gradient backgrounds (excluding modals/portals) */
+  [class*="bg-gradient-to"]:not([role="dialog"] *):not([data-radix-portal] *) {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
   }
@@ -1332,16 +1333,17 @@ html {
     transition: none !important;
   }
 
-  /* Prevent horizontal overflow bleed on all pages */
+  /* Prevent horizontal overflow bleed */
   html,
   body {
     overflow-x: hidden;
     max-width: 100vw;
   }
 
-  /* Force paint containment on cards for smoother scroll */
-  [class*="border-slate-200"],
-  [class*="border-slate-100"] {
+  /* Force paint containment on cards for smoother scroll
+     ✅ EXCLUDES: dialogs, portals, popovers */
+  [class*="border-slate-200"]:not([role="dialog"]):not([role="alertdialog"]):not([data-radix-portal] *):not([data-state]),
+  [class*="border-slate-100"]:not([role="dialog"]):not([role="alertdialog"]):not([data-radix-portal] *):not([data-state]) {
     contain: paint;
   }
 
@@ -1356,10 +1358,10 @@ html {
 
 /* ─── iOS Safari specific fixes ─────────────────────────────── */
 @supports (-webkit-touch-callout: none) {
-  [class*="blur-"],
-  [class*="bg-gradient-to"],
-  [class*="rounded-xl"],
-  [class*="rounded-2xl"] {
+  [class*="blur-"]:not([role="dialog"] *):not([data-radix-portal] *),
+  [class*="bg-gradient-to"]:not([role="dialog"] *):not([data-radix-portal] *),
+  [class*="rounded-xl"]:not([role="dialog"]):not([data-state]):not([data-radix-portal] *),
+  [class*="rounded-2xl"]:not([role="dialog"]):not([data-state]):not([data-radix-portal] *) {
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
   }
@@ -1367,10 +1369,41 @@ html {
 
 /* ─── Android Chrome specific fixes ─────────────────────────── */
 @media screen and (-webkit-min-device-pixel-ratio: 0) {
-  /* Force layer promotion on scrollable areas */
   main,
   [role="main"] {
     -webkit-transform: translateZ(0);
     transform: translateZ(0);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ✅ CRITICAL: Preserve modal/dialog centering
+   These elements need their original transforms untouched
+   ═══════════════════════════════════════════════════════════════ */
+[role="dialog"],
+[role="alertdialog"],
+[data-radix-popper-content-wrapper],
+[data-radix-portal],
+[data-radix-portal] *,
+[data-sonner-toast],
+[data-sonner-toaster],
+[data-slot="dialog-content"],
+[data-slot="dialog-overlay"],
+[data-slot="alert-dialog-content"],
+[data-slot="alert-dialog-overlay"],
+[data-slot="popover-content"],
+[data-slot="tooltip-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="select-content"],
+[data-slot="sheet-content"] {
+  transform: none;
+  -webkit-transform: none;
+  isolation: auto;
+  contain: none;
+}
+
+/* Re-apply the original centering transform to dialog content */
+[role="dialog"][data-state="open"],
+[role="alertdialog"][data-state="open"] {
+  /* Let Radix/shadcn handle its own transforms */
 }
