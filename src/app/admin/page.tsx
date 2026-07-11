@@ -80,6 +80,13 @@ interface Exam {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CACHE_DURATION = 60000
 
+// ✅ GPU isolation style - prevents mobile static/glitch on cards
+const cardIsolationStyle = {
+  WebkitTransform: 'translateZ(0)' as const,
+  transform: 'translateZ(0)' as const,
+  contain: 'paint' as const,
+}
+
 const routeToTabMap: Record<string, string> = {
   '/admin': 'overview',
   '/admin/broad-sheet': 'broad-sheet',
@@ -147,7 +154,7 @@ const TabFallback = () => (
   </div>
 )
 
-// ── Quick Action Card ─────────────────────────────────────────────────────────
+// ── Quick Action Card - FIXED: GPU isolation + mobile-safe ──────────────────
 interface QuickActionCardProps {
   icon: React.ElementType
   label: string
@@ -170,6 +177,7 @@ function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'vio
   return (
     <button
       onClick={onClick}
+      style={cardIsolationStyle}
       className={cn(
         'group relative w-full text-left p-4 rounded-2xl border border-slate-200/80 bg-white',
         'hover:border-slate-300 hover:shadow-md transition-all duration-200',
@@ -202,7 +210,7 @@ function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'vio
   )
 }
 
-// ── Pending-exam row ──────────────────────────────────────────────────────────
+// ── Pending-exam row - FIXED: GPU isolation + mobile layout ─────────────────
 function PendingExamCard({
   exam,
   onApprove,
@@ -215,45 +223,50 @@ function PendingExamCard({
   approving: boolean
 }) {
   return (
-    <div className="group rounded-2xl border border-slate-200/80 bg-white p-5 hover:shadow-md transition-all duration-200">
+    <div 
+      style={cardIsolationStyle}
+      className="group rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 hover:shadow-md transition-all duration-200"
+    >
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Left: info */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <h3 className="font-bold text-base text-slate-800">{exam.title}</h3>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200">
-              <Clock className="h-3 w-3" /> Pending
-            </span>
-            {exam.has_theory && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-200">
-                Theory
+            <h3 className="font-bold text-sm sm:text-base text-slate-800 break-words min-w-0 flex-1">{exam.title}</h3>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                <Clock className="h-3 w-3" /> Pending
               </span>
-            )}
+              {exam.has_theory && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap">
+                  Theory
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-3 text-xs mb-3">
+          <div className="grid grid-cols-3 gap-2 sm:gap-3 text-xs mb-3">
             {[
               { label: 'Subject', value: exam.subject },
               { label: 'Class', value: exam.class },
               { label: 'Teacher', value: exam.teacher_name },
             ].map(({ label, value }) => (
-              <div key={label}>
+              <div key={label} className="min-w-0">
                 <p className="text-slate-400 mb-0.5 uppercase tracking-wider text-[10px] font-medium">{label}</p>
                 <p className="font-semibold text-slate-700 truncate">{value}</p>
               </div>
             ))}
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {[
-              `${exam.total_questions} Questions`,
+              `${exam.total_questions} Qs`,
               `${exam.total_marks} Marks`,
               `${exam.duration} min`,
               `Pass: ${exam.passing_percentage}%`,
             ].map(label => (
               <span
                 key={label}
-                className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[11px] font-medium border border-slate-200"
+                className="px-2 sm:px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] sm:text-[11px] font-medium border border-slate-200 whitespace-nowrap"
               >
                 {label}
               </span>
@@ -261,8 +274,8 @@ function PendingExamCard({
           </div>
         </div>
 
-        {/* Right: actions */}
-        <div className="flex sm:flex-col gap-2 self-end sm:self-center shrink-0">
+        {/* Right: actions - full width on mobile */}
+        <div className="flex sm:flex-col gap-2 sm:self-center shrink-0 w-full sm:w-auto">
           <Button
             onClick={() => onApprove(exam)}
             disabled={approving}
@@ -530,12 +543,12 @@ function AdminDashboardContent() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="space-y-6"
+            className="space-y-5 sm:space-y-6"
           >
             {/* Welcome */}
             <WelcomeBanner adminProfile={profile} activeTab={activeTab} />
 
-            {/* Pending-exams alert banner */}
+            {/* ✅ Pending-exams alert banner - MOBILE OPTIMIZED */}
             <AnimatePresence>
               {pendingExamsCount > 0 && !dismissedBanner && (
                 <motion.div
@@ -544,35 +557,46 @@ function AdminDashboardContent() {
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div className="relative flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 shadow-sm">
+                  <div 
+                    style={cardIsolationStyle}
+                    className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 shadow-sm"
+                  >
+                    {/* Close button - always top right */}
                     <button
                       onClick={() => setDismissedBanner(true)}
-                      className="absolute top-3 right-3 p-1 rounded-lg hover:bg-amber-100 transition-colors"
+                      className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 rounded-lg hover:bg-amber-100 transition-colors z-10"
                       aria-label="Dismiss"
                     >
                       <X className="h-3.5 w-3.5 text-amber-500" />
                     </button>
-                    <div className="flex items-center gap-3 pr-6">
-                      <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                        <Bell className="h-5 w-5 text-amber-600" />
+
+                    {/* Content - stacked on mobile, side-by-side on desktop */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-3 pr-6 sm:pr-8">
+                      {/* Icon + text */}
+                      <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+                        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                          <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-amber-800 text-xs sm:text-sm leading-tight break-words">
+                            {pendingExamsCount} Exam{pendingExamsCount !== 1 ? 's' : ''} Awaiting Approval
+                          </p>
+                          <p className="text-[11px] sm:text-xs text-amber-600 mt-0.5 break-words">
+                            Review and publish teacher-submitted exams
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="font-semibold text-amber-800 text-sm">
-                          {pendingExamsCount} Exam{pendingExamsCount !== 1 ? 's' : ''} Awaiting Approval
-                        </p>
-                        <p className="text-xs text-amber-600 mt-0.5">
-                          Review and publish teacher-submitted exams
-                        </p>
-                      </div>
+
+                      {/* Button - full width on mobile */}
+                      <Button
+                        onClick={() => handleTabChange('exams')}
+                        size="sm"
+                        className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm h-8 text-xs w-full sm:w-auto shrink-0"
+                      >
+                        Review Now
+                        <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                      </Button>
                     </div>
-                    <Button
-                      onClick={() => handleTabChange('exams')}
-                      size="sm"
-                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm h-8 text-xs shrink-0"
-                    >
-                      Review Now
-                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </motion.div>
               )}
@@ -592,9 +616,9 @@ function AdminDashboardContent() {
             {/* Quick actions */}
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-slate-700 uppercase tracking-wider">Quick Actions</h2>
+                <h2 className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">Quick Actions</h2>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3">
                 <QuickActionCard
                   icon={BookOpen} label="Broad Sheet" desc="View all results"
                   color="blue"
@@ -682,13 +706,13 @@ function AdminDashboardContent() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="space-y-6"
+            className="space-y-5 sm:space-y-6"
           >
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">Exam Approvals</h1>
-                <p className="text-sm text-slate-500 mt-0.5">
+            {/* Header - MOBILE OPTIMIZED */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Exam Approvals</h1>
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5 break-words">
                   {pendingExamsCount > 0
                     ? `${pendingExamsCount} exam${pendingExamsCount !== 1 ? 's' : ''} awaiting review`
                     : 'All exams reviewed'} · {publishedExams.length} published
@@ -699,7 +723,7 @@ function AdminDashboardContent() {
                 variant="outline"
                 size="sm"
                 disabled={refreshing}
-                className="border-slate-200 hover:bg-slate-50 h-8 text-xs"
+                className="border-slate-200 hover:bg-slate-50 h-8 text-xs w-full sm:w-auto"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
                 Refresh
@@ -707,25 +731,28 @@ function AdminDashboardContent() {
             </div>
 
             {/* Pending card */}
-            <Card className="border border-slate-200/80 shadow-sm">
-              <CardHeader className="pb-4 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                      <Clock className="h-4 w-4 text-amber-600" />
+            <Card 
+              style={cardIsolationStyle}
+              className="border border-slate-200/80 shadow-sm"
+            >
+              <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
+                <div className="flex items-center justify-between gap-2">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600" />
                     </div>
-                    Pending Approval
+                    <span className="truncate">Pending Approval</span>
                   </CardTitle>
                   {pendingExamsCount > 0 && (
-                    <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold border border-amber-200">
+                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold border border-amber-200 shrink-0">
                       {pendingExamsCount}
                     </span>
                   )}
                 </div>
               </CardHeader>
-              <CardContent className="p-5">
+              <CardContent className="p-4 sm:p-5">
                 {pendingExams.length === 0 ? (
-                  <div className="text-center py-12">
+                  <div className="text-center py-10 sm:py-12">
                     <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
                       <CheckCircle2 className="h-7 w-7 text-emerald-500" />
                     </div>
@@ -733,7 +760,7 @@ function AdminDashboardContent() {
                     <p className="text-xs text-slate-400 mt-1">No exams pending review</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5 sm:space-y-3">
                     {pendingExams.map(exam => (
                       <PendingExamCard
                         key={exam.id}
@@ -750,34 +777,38 @@ function AdminDashboardContent() {
 
             {/* Published card */}
             {publishedExams.length > 0 && (
-              <Card className="border border-slate-200/80 shadow-sm">
-                <CardHeader className="pb-4 border-b border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                      <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+              <Card 
+                style={cardIsolationStyle}
+                className="border border-slate-200/80 shadow-sm"
+              >
+                <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
+                  <div className="flex items-center justify-between gap-2">
+                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                       </div>
-                      Published Exams
+                      <span className="truncate">Published Exams</span>
                     </CardTitle>
-                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200 shrink-0">
                       {publishedExams.length}
                     </span>
                   </div>
                 </CardHeader>
-                <CardContent className="p-5">
+                <CardContent className="p-4 sm:p-5">
                   <div className="space-y-2">
                     {publishedExams.slice(0, 10).map(exam => (
                       <div
                         key={exam.id}
-                        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                        style={cardIsolationStyle}
+                        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-3 sm:p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
                       >
-                        <div className="min-w-0">
-                          <p className="font-semibold text-sm text-slate-800 truncate">{exam.title}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
+                        <div className="min-w-0 w-full sm:w-auto sm:flex-1">
+                          <p className="font-semibold text-xs sm:text-sm text-slate-800 truncate">{exam.title}</p>
+                          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">
                             {exam.subject} · {exam.class} · {exam.teacher_name}
                           </p>
                         </div>
-                        <span className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-medium border border-emerald-200">
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-medium border border-emerald-200 whitespace-nowrap">
                           <CheckCircle2 className="h-3 w-3" /> Published
                         </span>
                       </div>
@@ -813,11 +844,11 @@ function AdminDashboardContent() {
       // ── Fallback ──────────────────────────────────────────────────
       default:
         return (
-          <div className="flex flex-col items-center justify-center py-20 px-4">
+          <div className="flex flex-col items-center justify-center py-16 sm:py-20 px-4">
             <div className="w-16 h-16 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
               <School className="h-8 w-8 text-violet-400" />
             </div>
-            <h2 className="text-xl font-bold text-slate-800 capitalize">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 capitalize text-center">
               {activeTab.replace('-', ' ')}
             </h2>
             <p className="text-sm text-slate-400 mt-1">Coming soon</p>
@@ -838,7 +869,7 @@ function AdminDashboardContent() {
 
   return (
     <div className="w-full overflow-x-hidden min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
         {tabContent}
       </div>
     </div>

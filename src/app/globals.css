@@ -1318,3 +1318,29 @@ html {
     transform: translateZ(0);
   }
 }
+
+@media (max-width: 768px) {
+  /* Kill hover shadow transitions on mobile - main cause of static bands */
+  .transition-shadow,
+  .transition-all,
+  .hover\:shadow-md,
+  .hover\:shadow-lg,
+  .hover\:shadow-xl {
+    transition-property: color, background-color, border-color, opacity, transform !important;
+    transition-duration: 200ms !important;
+  }
+
+  /* Reduce heavy blurs - mobile GPUs struggle with large blur values */
+  .blur-3xl {
+    filter: blur(20px) !important;
+  }
+  .blur-2xl {
+    filter: blur(16px) !important;
+  }
+
+  /* Force GPU layer on main scrollable area only */
+  main {
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+  }
+}

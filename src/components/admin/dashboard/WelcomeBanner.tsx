@@ -1,5 +1,5 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-// components/admin/dashboard/WelcomeBanner.tsx - OPTIMIZED (Quote visible on mobile)
+// components/admin/dashboard/WelcomeBanner.tsx - OPTIMIZED (Mobile-first + GPU safe)
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -18,6 +18,14 @@ interface WelcomeBannerProps {
 }
 
 const STORAGE_KEY = 'admin_session_start'
+
+// ✅ GPU isolation - prevents mobile static/glitch on gradients + blurs
+const bannerIsolationStyle = {
+  WebkitTransform: 'translateZ(0)' as const,
+  transform: 'translateZ(0)' as const,
+  contain: 'paint' as const,
+  isolation: 'isolate' as const,
+}
 
 // ─── Personalized Quotes ──────────────────────────────
 const quotes = {
@@ -77,13 +85,11 @@ const getPersonalizedQuote = (hour: number, firstName: string): { text: string; 
 }
 
 export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: WelcomeBannerProps) {
-  // Initialize with current date immediately (no mounted state)
   const [now, setNow] = useState<Date>(() => new Date())
   const [sessionStart, setSessionStart] = useState<Date | null>(null)
-  
+
   const firstName = adminProfile?.full_name?.split(' ')[0] || 'Admin'
 
-  // Initialize session start only once
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
@@ -94,12 +100,10 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
       setSessionStart(start)
     }
 
-    // Update clock every second
     const timer = setInterval(() => setNow(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Clear session on page close
   useEffect(() => {
     const handleClear = () => localStorage.removeItem(STORAGE_KEY)
     window.addEventListener('beforeunload', handleClear)
@@ -118,11 +122,21 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
     return getPersonalizedQuote(now.getHours(), firstName)
   }, [now, firstName])
 
-  const formattedDate = useMemo(() => {
+  // ✅ Two date formats: short for mobile, full for desktop
+  const formattedDateShort = useMemo(() => {
+    return now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
+  }, [now])
+
+  const formattedDateFull = useMemo(() => {
     return now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   }, [now])
 
-  const formattedTime = useMemo(() => {
+  // ✅ Time without seconds on mobile to save space
+  const formattedTimeShort = useMemo(() => {
+    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  }, [now])
+
+  const formattedTimeFull = useMemo(() => {
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   }, [now])
 
@@ -136,58 +150,100 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard' }: Welcome
     return `${h}:${m}:${s}`
   }, [now, sessionStart])
 
-  // No loading state - render immediately
+  // ✅ Shorter duration format for mobile
+  const onlineDurationShort = useMemo(() => {
+    if (!sessionStart) return '0m'
+    const diffMs = now.getTime() - sessionStart.getTime()
+    const totalSeconds = Math.floor(diffMs / 1000)
+    const h = Math.floor(totalSeconds / 3600)
+    const m = Math.floor((totalSeconds % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m}m`
+  }, [now, sessionStart])
+
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] p-4 sm:p-6 md:p-8 shadow-2xl ring-1 ring-white/10" suppressHydrationWarning>
-      <div className="absolute inset-0">
+    <div
+      style={bannerIsolationStyle}
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] p-4 sm:p-6 md:p-8 shadow-2xl ring-1 ring-white/10"
+      suppressHydrationWarning
+    >
+      {/* Decorative radial gradients - contained inside */}
+      <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_22%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(96,165,250,0.22),transparent_28%)]" />
       </div>
-      <div className="absolute inset-0 bg-black/15" />
+      <div className="absolute inset-0 bg-black/15 pointer-events-none" />
 
-      <div className="relative z-10 space-y-4 sm:space-y-5">
-        {/* Top Row: Greeting + Time */}
-        <div className="flex flex-col gap-3 sm:gap-4 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-1 sm:space-y-2">
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <div className="rounded-lg border border-white/15 bg-white/10 p-1 sm:p-1.5">
-                <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300" />
-              </div>
-              <span className="text-xs sm:text-sm text-blue-100/80">Welcome Back, Administrator</span>
+      <div className="relative z-10 space-y-3 sm:space-y-5">
+        {/* ═══════ Top: Greeting ═══════ */}
+        <div className="space-y-1.5 sm:space-y-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="rounded-lg border border-white/15 bg-white/10 p-1 sm:p-1.5 shrink-0">
+              <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300" />
             </div>
-            <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white">
-              {greeting}, {firstName}!
-            </h1>
+            <span className="text-[11px] sm:text-sm text-blue-100/80 truncate">
+              Welcome Back, Administrator
+            </span>
+          </div>
+          <h1 className="text-lg sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight break-words">
+            {greeting}, {firstName}!
+          </h1>
+        </div>
+
+        {/* ═══════ Time Pills - Mobile-friendly layout ═══════ */}
+        {/* Mobile: 3 compact pills in a row | Desktop: full detail pills */}
+        <div className="grid grid-cols-3 gap-1.5 sm:flex sm:flex-wrap sm:gap-2 md:gap-3">
+          {/* Date pill */}
+          <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-white/15 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2 min-w-0">
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-blue-100/80 shrink-0" />
+            {/* Mobile short date, desktop full date */}
+            <span className="sm:hidden text-[10px] font-medium text-blue-50/95 truncate">
+              {formattedDateShort}
+            </span>
+            <span className="hidden sm:inline text-sm text-blue-50/95 whitespace-nowrap">
+              {formattedDateFull}
+            </span>
           </div>
 
-          <div className="flex flex-wrap gap-2 sm:gap-3">
-            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-white/15 bg-white/10 px-1.5 py-1 sm:px-3 sm:py-2">
-              <Calendar className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-100/80" />
-              <span className="text-[10px] sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedDate}</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-white/15 bg-white/10 px-1.5 py-1 sm:px-3 sm:py-2">
-              <Clock className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-blue-100/80" />
-              <span className="font-mono text-[10px] sm:text-sm text-blue-50/95 whitespace-nowrap">{formattedTime}</span>
-            </div>
-            <div className="flex items-center gap-1 sm:gap-1.5 rounded-xl border border-cyan-300/20 bg-white/10 px-1.5 py-1 sm:px-3 sm:py-2">
-              <Timer className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-cyan-300" />
-              <span className="font-mono text-[10px] sm:text-sm text-blue-50/95 whitespace-nowrap">{onlineDuration}</span>
-            </div>
+          {/* Time pill */}
+          <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-white/15 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2 min-w-0">
+            <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-blue-100/80 shrink-0" />
+            {/* Mobile: no seconds, Desktop: with seconds */}
+            <span className="sm:hidden font-mono text-[10px] font-medium text-blue-50/95 truncate">
+              {formattedTimeShort}
+            </span>
+            <span className="hidden sm:inline font-mono text-sm text-blue-50/95 whitespace-nowrap">
+              {formattedTimeFull}
+            </span>
+          </div>
+
+          {/* Session duration pill */}
+          <div className="flex items-center justify-center sm:justify-start gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl border border-cyan-300/20 bg-white/10 px-2 py-1.5 sm:px-3 sm:py-2 min-w-0">
+            <Timer className="h-3 w-3 sm:h-4 sm:w-4 text-cyan-300 shrink-0" />
+            {/* Mobile: short format (1h 30m), Desktop: full HH:MM:SS */}
+            <span className="sm:hidden font-mono text-[10px] font-medium text-blue-50/95 truncate">
+              {onlineDurationShort}
+            </span>
+            <span className="hidden sm:inline font-mono text-sm text-blue-50/95 whitespace-nowrap">
+              {onlineDuration}
+            </span>
           </div>
         </div>
 
-        {/* ✅ Quote - Visible on ALL devices (mobile, tablet, desktop) */}
+        {/* ═══════ Quote Section ═══════ */}
         {quote.text && (
           <div className="border-t border-white/10 pt-3 sm:pt-4">
             <div className="flex items-start gap-2 sm:gap-3">
               <div className="rounded-lg border border-amber-300/20 bg-amber-400/10 p-1 sm:p-1.5 shrink-0 mt-0.5">
-                <Quote className="h-2.5 w-2.5 sm:h-4 sm:w-4 text-amber-300" />
+                <Quote className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs sm:text-sm md:text-base text-blue-50/90 italic leading-relaxed">
+                <p className="text-xs sm:text-sm md:text-base text-blue-50/90 italic leading-relaxed break-words">
                   &ldquo;{quote.text}&rdquo;
                 </p>
-                <p className="text-[9px] sm:text-xs text-blue-200/60 mt-1 tracking-wide">{quote.author}</p>
+                <p className="text-[10px] sm:text-xs text-blue-200/60 mt-1 tracking-wide">
+                  {quote.author}
+                </p>
               </div>
             </div>
           </div>
