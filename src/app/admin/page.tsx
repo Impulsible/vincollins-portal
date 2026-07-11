@@ -365,28 +365,34 @@ function AdminDashboardContent() {
           .select('current_term, current_session')
           .maybeSingle()
 
-        if (!error && data && isMountedRef.current) {
+        console.log('[fetchCurrentTerm] Response:', { data, error })
+
+        if (error) {
+          console.error('[fetchCurrentTerm] Error:', error)
+          return
+        }
+
+        if (data && isMountedRef.current) {
+          console.log('[fetchCurrentTerm] Setting term:', data.current_term, 'session:', data.current_session)
           setTermInfo({
             term: data.current_term || '',
             session: data.current_session || '',
           })
-        } else if (error) {
-          console.error('Failed to fetch term:', error)
         }
       } catch (err) {
-        console.error('Failed to fetch term:', err)
+        console.error('[fetchCurrentTerm] Exception:', err)
       }
     }
 
     fetchCurrentTerm()
 
-    // Real-time subscription for term changes
     const channel = supabase
       .channel('school-settings-changes')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'school_settings' },
         (payload) => {
+          console.log('[school-settings] Real-time update:', payload)
           if (payload.new && isMountedRef.current) {
             setTermInfo({
               term: (payload.new as any).current_term || '',
@@ -586,9 +592,9 @@ function AdminDashboardContent() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="space-y-5 sm:space-y-6"
+            className="space-y-3 sm:space-y-5"
           >
-            {/* ✅ Pass termInfo to WelcomeBanner */}
+            {/* ✅ WelcomeBanner with termInfo from DB */}
             <WelcomeBanner
               adminProfile={profile}
               activeTab={activeTab}
@@ -744,7 +750,7 @@ function AdminDashboardContent() {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -16 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="space-y-5 sm:space-y-6"
+            className="space-y-3 sm:space-y-5"
           >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
@@ -883,7 +889,7 @@ function AdminDashboardContent() {
     }
   }, [
     activeTab, error, profile,
-    termInfo, // ✅ Include termInfo in dependencies
+    termInfo,
     pendingExamsCount, pendingReports, pendingInquiries,
     stats, students, staff, pendingExams, publishedExams, inquiries,
     refreshing, approvingId, dismissedBanner,
@@ -894,9 +900,10 @@ function AdminDashboardContent() {
     return <AdminLoading profile={profile} onLogout={() => {}} />
   }
 
+  // ✅ REDUCED top padding - banner sits closer to header + fills width properly
   return (
     <div className="w-full overflow-x-hidden min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-4 sm:pb-6">
         {tabContent}
       </div>
     </div>
