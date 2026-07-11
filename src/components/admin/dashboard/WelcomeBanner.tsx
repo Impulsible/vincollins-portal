@@ -1,11 +1,12 @@
 /* eslint-disable react-hooks/set-state-in-effect */
-// components/admin/dashboard/WelcomeBanner.tsx - PROFESSIONAL REDESIGN WITH DB TERM
+// components/admin/dashboard/WelcomeBanner.tsx - PROPERLY SIZED
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
 import {
   Sparkles, Calendar, Clock, Timer, Quote,
-  Shield, Activity, TrendingUp, Zap, Sun, Moon, Sunset, Sunrise
+  Shield, Activity, TrendingUp, Zap, Sun, Moon, Sunset, Sunrise,
+  BookOpen, GraduationCap
 } from 'lucide-react'
 
 interface AdminProfile {
@@ -15,7 +16,6 @@ interface AdminProfile {
   photo_url?: string
 }
 
-// ✅ Term info from database
 interface TermInfo {
   term: string
   session: string
@@ -24,12 +24,11 @@ interface TermInfo {
 interface WelcomeBannerProps {
   adminProfile: AdminProfile | null
   activeTab?: string
-  termInfo?: TermInfo | null // ✅ Term from DB
+  termInfo?: TermInfo | null
 }
 
 const STORAGE_KEY = 'admin_session_start'
 
-// ✅ GPU isolation - prevents mobile static/glitch on gradients + blurs
 const bannerIsolationStyle = {
   WebkitTransform: 'translateZ(0)' as const,
   transform: 'translateZ(0)' as const,
@@ -92,7 +91,6 @@ const getPersonalizedQuote = (hour: number, firstName: string): { text: string; 
   return { text, author: '— Educational Wisdom' }
 }
 
-// ✅ Get greeting icon based on time of day
 const getGreetingIcon = (hour: number) => {
   if (hour >= 5 && hour < 12) return Sunrise
   if (hour >= 12 && hour < 17) return Sun
@@ -100,7 +98,6 @@ const getGreetingIcon = (hour: number) => {
   return Moon
 }
 
-// ✅ Convert 24h to 12h format with AM/PM
 const format12Hour = (date: Date, withSeconds = false): { time: string; period: string } => {
   let hours = date.getHours()
   const minutes = String(date.getMinutes()).padStart(2, '0')
@@ -112,15 +109,16 @@ const format12Hour = (date: Date, withSeconds = false): { time: string; period: 
   return { time, period }
 }
 
-// ✅ Format term name nicely (handles various DB formats)
+// ✅ Improved term formatter
 const formatTermName = (term: string): string => {
   if (!term) return 'Current Term'
-  const cleaned = term.toLowerCase().replace(/_term|_/g, ' ').trim()
-  if (cleaned.includes('first') || cleaned === '1' || cleaned === 'one') return 'First Term'
-  if (cleaned.includes('second') || cleaned === '2' || cleaned === 'two') return 'Second Term'
-  if (cleaned.includes('third') || cleaned === '3' || cleaned === 'three') return 'Third Term'
-  // Capitalize each word if custom
-  return cleaned.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  const cleaned = String(term).toLowerCase().trim()
+
+  if (cleaned.includes('third') || cleaned.includes('3rd') || cleaned === '3' || cleaned === 'three') return 'Third Term'
+  if (cleaned.includes('second') || cleaned.includes('2nd') || cleaned === '2' || cleaned === 'two') return 'Second Term'
+  if (cleaned.includes('first') || cleaned.includes('1st') || cleaned === '1' || cleaned === 'one') return 'First Term'
+
+  return term.split(/[_\s-]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
 }
 
 export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo }: WelcomeBannerProps) {
@@ -157,14 +155,10 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
   }, [now])
 
   const GreetingIcon = useMemo(() => getGreetingIcon(now.getHours()), [now])
-
   const quote = useMemo(() => getPersonalizedQuote(now.getHours(), firstName), [now, firstName])
-
-  // ✅ 12-hour time formats
   const timeShort = useMemo(() => format12Hour(now, false), [now])
   const timeFull = useMemo(() => format12Hour(now, true), [now])
 
-  // Date formats
   const dateShort = useMemo(() => {
     return now.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })
   }, [now])
@@ -173,7 +167,6 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
     return now.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
   }, [now])
 
-  // Session duration
   const onlineDuration = useMemo(() => {
     if (!sessionStart) return '00:00:00'
     const diffMs = now.getTime() - sessionStart.getTime()
@@ -194,7 +187,6 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
     return `${m}m`
   }, [now, sessionStart])
 
-  // ✅ Use term from database, with fallback
   const academicInfo = useMemo(() => {
     if (termInfo?.term && termInfo?.session) {
       return {
@@ -202,63 +194,64 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
         session: termInfo.session,
       }
     }
-    // Fallback if DB doesn't return anything
     return {
-      term: 'Current Term',
-      session: `${now.getFullYear()}/${now.getFullYear() + 1}`,
+      term: 'Loading...',
+      session: '',
     }
-  }, [termInfo, now])
+  }, [termInfo])
 
   return (
     <div
       style={bannerIsolationStyle}
-      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] shadow-2xl ring-1 ring-white/10"
+      className="relative w-full overflow-hidden rounded-2xl bg-gradient-to-br from-[#06152f] via-[#0b2a5b] to-[#17479e] shadow-xl ring-1 ring-white/10"
       suppressHydrationWarning
     >
-      {/* ═══════ Decorative background layers ═══════ */}
+      {/* Background decorations */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.14),transparent_25%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(96,165,250,0.22),transparent_30%)]" />
-        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-400/5 rounded-full blur-3xl" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-amber-400/6 rounded-full blur-3xl" />
       </div>
       <div className="absolute inset-0 bg-black/10 pointer-events-none" />
 
-      {/* ═══════ Main content ═══════ */}
-      <div className="relative z-10 p-4 sm:p-6 lg:p-7">
+      {/* ✅ RESTORED sensible padding - not too big */}
+      <div className="relative z-10 p-4 sm:p-6 lg:p-6">
 
         {/* ── Row 1: Header + Live Status ── */}
         <div className="flex items-start justify-between gap-3 mb-4 sm:mb-5">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-1.5 shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
+            <div className="rounded-lg border border-white/15 bg-white/10 backdrop-blur-sm p-1.5 sm:p-2 shrink-0">
               <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-300" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-widest text-blue-200/70 truncate">
+              <p className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-blue-200/80 truncate">
                 Admin Portal
               </p>
-              <p className="text-[9px] sm:text-[10px] text-blue-300/50 truncate">
-                {academicInfo.term} · {academicInfo.session}
-              </p>
+              <div className="flex items-center gap-1 mt-0.5">
+                <GraduationCap className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-blue-300/60 shrink-0" />
+                <p className="text-[9px] sm:text-[11px] text-blue-300/70 truncate font-semibold">
+                  {academicInfo.term} {academicInfo.session && `· ${academicInfo.session}`}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Live status indicator */}
-          <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 py-1 shrink-0">
+          <div className="flex items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2 sm:px-2.5 py-1 shrink-0">
             <span className="relative flex h-1.5 w-1.5">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
             </span>
-            <span className="text-[9px] sm:text-[10px] font-semibold text-emerald-300 uppercase tracking-wider">Live</span>
+            <span className="text-[9px] sm:text-[10px] font-bold text-emerald-300 uppercase tracking-wider">Live</span>
           </div>
         </div>
 
-        {/* ── Row 2: Greeting ── */}
+        {/* ── Row 2: Greeting - REASONABLE SIZE ── */}
         <div className="mb-4 sm:mb-5">
-          <div className="flex items-center gap-2 mb-1.5">
-            <GreetingIcon className="h-4 w-4 sm:h-5 sm:w-5 text-amber-300 shrink-0" />
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5">
+            <GreetingIcon className="h-4 w-4 sm:h-4 sm:w-4 text-amber-300 shrink-0" />
             <span className="text-xs sm:text-sm text-blue-100/80 font-medium">{greeting}</span>
           </div>
-          <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-white leading-tight break-words">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-white leading-tight break-words">
             Welcome back,{' '}
             <span className="bg-gradient-to-r from-amber-300 via-amber-200 to-yellow-200 bg-clip-text text-transparent">
               {firstName}
@@ -269,22 +262,20 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
           </p>
         </div>
 
-        {/* ── Row 3: Info Tiles (fills width properly) ── */}
+        {/* ── Row 3: Info Tiles - SENSIBLE SIZE ── */}
         <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-5">
 
           {/* Date Tile */}
-          <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm px-2 py-2.5 sm:px-3 sm:py-3 hover:border-white/20 transition-colors">
+          <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm px-2.5 py-2.5 sm:px-3 sm:py-3 hover:border-white/20 transition-colors">
             <div className="flex items-center gap-1.5 mb-1">
               <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-300/80 shrink-0" />
               <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-blue-200/60 truncate">
                 Date
               </span>
             </div>
-            {/* Mobile short */}
             <p className="sm:hidden text-[11px] font-bold text-white leading-tight truncate">
               {dateShort}
             </p>
-            {/* Desktop full */}
             <p className="hidden sm:block text-sm font-bold text-white leading-tight truncate">
               {dateFull.split(',')[0]}
             </p>
@@ -293,24 +284,22 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
             </p>
           </div>
 
-          {/* Time Tile (12-hour with AM/PM) */}
-          <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm px-2 py-2.5 sm:px-3 sm:py-3 hover:border-white/20 transition-colors">
+          {/* Time Tile */}
+          <div className="group relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-sm px-2.5 py-2.5 sm:px-3 sm:py-3 hover:border-white/20 transition-colors">
             <div className="flex items-center gap-1.5 mb-1">
               <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-300/80 shrink-0" />
               <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-blue-200/60 truncate">
                 Time
               </span>
             </div>
-            {/* Mobile: time + AM/PM */}
             <div className="sm:hidden flex items-baseline gap-1">
               <p className="font-mono text-[11px] font-bold text-white leading-tight">
                 {timeShort.time}
               </p>
               <span className="text-[9px] font-bold text-amber-300">{timeShort.period}</span>
             </div>
-            {/* Desktop: time with seconds + AM/PM */}
             <div className="hidden sm:flex items-baseline gap-1.5">
-              <p className="font-mono text-base lg:text-lg font-bold text-white leading-tight tabular-nums">
+              <p className="font-mono text-base font-bold text-white leading-tight tabular-nums">
                 {timeFull.time}
               </p>
               <span className="text-xs font-bold text-amber-300">{timeFull.period}</span>
@@ -321,19 +310,17 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
           </div>
 
           {/* Session Tile */}
-          <div className="group relative overflow-hidden rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-white/5 backdrop-blur-sm px-2 py-2.5 sm:px-3 sm:py-3 hover:border-cyan-300/30 transition-colors">
+          <div className="group relative overflow-hidden rounded-xl border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-white/5 backdrop-blur-sm px-2.5 py-2.5 sm:px-3 sm:py-3 hover:border-cyan-300/30 transition-colors">
             <div className="flex items-center gap-1.5 mb-1">
               <Timer className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-cyan-300 shrink-0" />
               <span className="text-[8px] sm:text-[9px] font-bold uppercase tracking-wider text-cyan-200/70 truncate">
                 Session
               </span>
             </div>
-            {/* Mobile short */}
             <p className="sm:hidden font-mono text-[11px] font-bold text-white leading-tight">
               {onlineDurationShort}
             </p>
-            {/* Desktop full HH:MM:SS */}
-            <p className="hidden sm:block font-mono text-base lg:text-lg font-bold text-white leading-tight tabular-nums">
+            <p className="hidden sm:block font-mono text-base font-bold text-white leading-tight tabular-nums">
               {onlineDuration}
             </p>
             <p className="hidden sm:block text-[10px] text-cyan-200/70 mt-0.5">
@@ -342,7 +329,7 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
           </div>
         </div>
 
-        {/* ── Row 4: Quick Info Bar (Desktop only) ── */}
+        {/* ── Row 4: Desktop system bar - REASONABLE ── */}
         <div className="hidden md:flex items-center gap-3 lg:gap-4 py-3 px-4 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm mb-4">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-emerald-400/15 flex items-center justify-center shrink-0">
@@ -374,12 +361,12 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-200/60">Performance</p>
-              <p className="text-xs font-bold text-white">Optimal Response Time</p>
+              <p className="text-xs font-bold text-white">Optimal Response</p>
             </div>
           </div>
         </div>
 
-        {/* ── Mobile-only compact system bar ── */}
+        {/* ── Mobile system bar ── */}
         <div className="md:hidden flex items-center justify-between gap-2 py-2 px-3 rounded-xl bg-white/5 border border-white/10 backdrop-blur-sm mb-4">
           <div className="flex items-center gap-1.5 min-w-0">
             <Activity className="h-3 w-3 text-emerald-300 shrink-0" />
@@ -394,7 +381,7 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
           </div>
         </div>
 
-        {/* ── Row 5: Quote ── */}
+        {/* ── Quote - REASONABLE ── */}
         {quote.text && (
           <div className="relative pt-4 border-t border-white/10">
             <div className="flex items-start gap-2.5 sm:gap-3">
@@ -414,7 +401,7 @@ export function WelcomeBanner({ adminProfile, activeTab = 'dashboard', termInfo 
         )}
       </div>
 
-      {/* ═══════ Bottom accent bar ═══════ */}
+      {/* Bottom accent bar */}
       <div className="relative h-1 bg-gradient-to-r from-amber-400 via-amber-300 to-yellow-200" />
     </div>
   )

@@ -1,11 +1,11 @@
-// components/layout/header/UserSection.tsx - MOBILE BOTTOM SHEET (WORKING)
+// components/layout/header/UserSection.tsx - FIXED PROFILE IMAGE
 'use client'
 
 import { useState, useRef, useEffect, memo, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
-import {
-  Menu, X, Search, ChevronDown, User, Settings, LogOut,
+import { 
+  Menu, X, Search, ChevronDown, User, Settings, LogOut, 
   LayoutDashboard, ArrowRight, Home, KeyRound
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -31,18 +31,6 @@ const getInitials = (name: string) => {
   return parts[0][0]?.toUpperCase() || 'U'
 }
 
-// ✅ Detect mobile
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(false)
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
-  return isMobile
-}
-
 interface UserSectionProps {
   user: HeaderUser | null
   isAuthenticated: boolean
@@ -66,7 +54,6 @@ export const UserSection = memo(function UserSection({
 }: UserSectionProps) {
   const router = useRouter()
   const currentPathname = usePathname()
-  const isMobile = useIsMobile()
   const [profileOpen, setProfileOpen] = useState(false)
   const [avatarError, setAvatarError] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
@@ -76,20 +63,14 @@ export const UserSection = memo(function UserSection({
   const isPortalPage = pathname === '/portal'
   const isDashboardPage = !isPublicPage && !isPortalPage && !isHomePage
 
+  // ✅ CRITICAL: Close all dropdowns on route change to prevent flashing
   useEffect(() => {
     setProfileOpen(false)
     setNotificationOpen(false)
   }, [currentPathname])
 
+  // Close profile dropdown on outside click
   useEffect(() => {
-    if (isMobile && (profileOpen || notificationOpen)) {
-      document.body.style.overflow = 'hidden'
-      return () => { document.body.style.overflow = '' }
-    }
-  }, [isMobile, profileOpen, notificationOpen])
-
-  useEffect(() => {
-    if (isMobile) return
     const cb = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false)
@@ -97,10 +78,10 @@ export const UserSection = memo(function UserSection({
     }
     document.addEventListener('mousedown', cb)
     return () => document.removeEventListener('mousedown', cb)
-  }, [isMobile])
+  }, [])
 
+  // Close notification popover on outside click
   useEffect(() => {
-    if (isMobile) return
     const cb = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setNotificationOpen(false)
@@ -108,7 +89,7 @@ export const UserSection = memo(function UserSection({
     }
     document.addEventListener('mousedown', cb)
     return () => document.removeEventListener('mousedown', cb)
-  }, [isMobile])
+  }, [])
 
   const handleProfileToggle = useCallback(() => {
     setNotificationOpen(false)
@@ -137,9 +118,11 @@ export const UserSection = memo(function UserSection({
     onSignOut()
   }, [onSignOut])
 
+  // ✅ Get avatar URL from user.avatar or user.photo_url
   const getAvatarUrl = () => {
     if (avatarError) return undefined
     if (user?.avatar) return user.avatar
+    // Try to get from localStorage if available
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('user_profile')
       if (cached) {
@@ -164,114 +147,20 @@ export const UserSection = memo(function UserSection({
   const showAuthenticated = isAuthenticated || !!displayUser
   const avatarUrl = getAvatarUrl()
 
-  // ═══════════════════════════════════════════════════
-  // Shared profile menu content
-  // ═══════════════════════════════════════════════════
-  const ProfileMenuContent = () => (
-    <>
-      {/* Profile Header */}
-      <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-12 w-12 ring-2 ring-primary/20 shrink-0">
-            {avatarUrl && !avatarError ? (
-              <AvatarImage src={avatarUrl} alt={user?.name || 'User'} />
-            ) : null}
-            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
-              {user?.name ? getInitials(user.name) : displayUser?.name ? getInitials(displayUser.name) : 'U'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-gray-900 text-sm truncate">{user?.name || displayUser?.name || 'User'}</p>
-            <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
-            <Badge className={cn("mt-1 text-xs text-white", roleBadgeColors[user?.role || displayUser?.role || 'student'])}>
-              {roleDisplayNames[user?.role || displayUser?.role || 'student']}
-            </Badge>
-          </div>
-        </div>
-      </div>
-
-      {isPublicPage && (
-        <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b">
-          <button
-            onClick={goToDashboard}
-            className="w-full py-2.5 bg-[#F5A623] text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2"
-          >
-            <LayoutDashboard className="h-4 w-4 shrink-0" />
-            Go to Dashboard
-            <ArrowRight className="h-4 w-4 shrink-0" />
-          </button>
-        </div>
-      )}
-
-      {isDashboardPage && (
-        <div className="py-1">
-          <Link
-            href={user?.role === 'student' ? '/student/profile' : '/staff/settings'}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-            onClick={() => setProfileOpen(false)}
-          >
-            <User className="h-4 w-4 text-gray-400 shrink-0" />
-            My Profile
-          </Link>
-          <Link
-            href={user?.role === 'student' ? '/student/settings' : '/staff/settings'}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-            onClick={() => setProfileOpen(false)}
-          >
-            <Settings className="h-4 w-4 text-gray-400 shrink-0" />
-            Settings
-          </Link>
-        </div>
-      )}
-
-      <div className="py-1 border-t">
-        {pathname !== '/' && (
-          <Link
-            href="/"
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-            onClick={() => setProfileOpen(false)}
-          >
-            <Home className="h-4 w-4 text-gray-400 shrink-0" />
-            Home Page
-          </Link>
-        )}
-        {pathname !== '/portal' && (
-          <button
-            onClick={handlePortalClick}
-            className="w-full px-4 py-3 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
-          >
-            <KeyRound className="h-4 w-4 text-gray-400 shrink-0" />
-            Portal Page
-          </button>
-        )}
-      </div>
-
-      <div className="border-t p-2">
-        <button
-          onClick={handleSignOut}
-          className="w-full px-4 py-3 text-left text-red-600 hover:bg-red-50 rounded-lg text-sm flex items-center gap-3"
-        >
-          <LogOut className="h-4 w-4 shrink-0" />
-          Sign Out
-        </button>
-      </div>
-    </>
-  )
-
   return (
     <div className="flex items-center">
-
+      
       {/* Search Button */}
-      <Button
-        variant="ghost"
-        size="icon"
+      <Button 
+        variant="ghost" 
+        size="icon" 
         onClick={onSearchToggle}
         className="hidden sm:inline-flex h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 mx-0.5"
       >
         <Search className="h-4 w-4 sm:h-5 sm:w-5" />
       </Button>
 
-      {/* Notification Bell */}
+      {/* Notification Bell - independent */}
       {showAuthenticated && !isPortalPage && !isHomePage && (
         <div ref={notifRef} className="inline-flex">
           <NotificationPopover
@@ -287,21 +176,20 @@ export const UserSection = memo(function UserSection({
         </div>
       )}
 
-      {/* Profile / Login */}
+      {/* Profile / Login - independent */}
       <div ref={profileRef} className="inline-flex">
         {showAuthenticated ? (
-          <>
-            {/* Trigger button */}
-            <button
+          <div>
+            <button 
               onClick={handleProfileToggle}
               className="flex items-center gap-1.5 sm:gap-2 rounded-full text-white hover:bg-white/20 px-2 sm:px-3 py-1 transition-all mx-0.5"
             >
               <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-white/50">
                 {avatarUrl && !avatarError ? (
-                  <AvatarImage
-                    src={avatarUrl}
-                    alt={user?.name || 'User'}
-                    onError={() => setAvatarError(true)}
+                  <AvatarImage 
+                    src={avatarUrl} 
+                    alt={user?.name || 'User'} 
+                    onError={() => setAvatarError(true)} 
                   />
                 ) : null}
                 <AvatarFallback className="bg-white/30 text-white text-xs font-bold">
@@ -319,101 +207,101 @@ export const UserSection = memo(function UserSection({
               <ChevronDown className={cn("h-3 w-3 text-white transition-transform", profileOpen && "rotate-180")} />
             </button>
 
-            {/* ═══════ DESKTOP: Regular dropdown ═══════ */}
-            {profileOpen && !isMobile && (
+            {/* Profile Dropdown */}
+            {profileOpen && (
               <div className="absolute right-0 top-[64px] w-72 sm:w-80 bg-white rounded-xl shadow-2xl border z-[60] overflow-hidden">
-                <ProfileMenuContent />
-              </div>
-            )}
-
-            {/* ═══════ MOBILE: Bottom sheet with inline styles ═══════ */}
-            {profileOpen && isMobile && (
-              <>
-                {/* Backdrop */}
-                <div
-                  onClick={() => setProfileOpen(false)}
-                  style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 100,
-                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-                    animation: 'fadeIn 0.2s ease-out',
-                  }}
-                />
-
-                {/* Bottom sheet */}
-                <div
-                  style={{
-                    position: 'fixed',
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 101,
-                    backgroundColor: 'white',
-                    borderTopLeftRadius: '1rem',
-                    borderTopRightRadius: '1rem',
-                    boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
-                    maxHeight: '85vh',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-                    animation: 'slideUp 0.3s ease-out',
-                  }}
-                >
-                  {/* Drag handle */}
-                  <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px', paddingBottom: '4px', flexShrink: 0 }}>
-                    <div style={{ height: '4px', width: '40px', borderRadius: '9999px', backgroundColor: '#d1d5db' }} />
-                  </div>
-
-                  {/* Close button */}
-                  <button
-                    onClick={() => setProfileOpen(false)}
-                    style={{
-                      position: 'absolute',
-                      top: '12px',
-                      right: '12px',
-                      height: '32px',
-                      width: '32px',
-                      borderRadius: '9999px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      zIndex: 10,
-                      backgroundColor: 'transparent',
-                      border: 'none',
-                      cursor: 'pointer',
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
-                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4 text-gray-500" />
-                  </button>
-
-                  {/* Scrollable content */}
-                  <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
-                    <ProfileMenuContent />
+                <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-12 w-12 ring-2 ring-primary/20 shrink-0">
+                      {avatarUrl && !avatarError ? (
+                        <AvatarImage src={avatarUrl} alt={user?.name || 'User'} />
+                      ) : null}
+                      <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
+                        {user?.name ? getInitials(user.name) : displayUser?.name ? getInitials(displayUser.name) : 'U'}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 text-sm truncate">{user?.name || displayUser?.name || 'User'}</p>
+                      <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
+                      <Badge className={cn("mt-1 text-xs text-white", roleBadgeColors[user?.role || displayUser?.role || 'student'])}>
+                        {roleDisplayNames[user?.role || displayUser?.role || 'student']}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-
-                {/* Inline animation keyframes */}
-                <style jsx>{`
-                  @keyframes fadeIn {
-                    from { opacity: 0; }
-                    to { opacity: 1; }
-                  }
-                  @keyframes slideUp {
-                    from { transform: translateY(100%); }
-                    to { transform: translateY(0); }
-                  }
-                `}</style>
-              </>
+                
+                {isPublicPage && (
+                  <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b">
+                    <button 
+                      onClick={goToDashboard} 
+                      className="w-full py-2.5 bg-[#F5A623] text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2"
+                    >
+                      <LayoutDashboard className="h-4 w-4 shrink-0" />
+                      Go to Dashboard
+                      <ArrowRight className="h-4 w-4 shrink-0" />
+                    </button>
+                  </div>
+                )}
+                
+                {isDashboardPage && (
+                  <div className="py-1">
+                    <Link 
+                      href={user?.role === 'student' ? '/student/profile' : '/staff/settings'}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <User className="h-4 w-4 text-gray-400 shrink-0" />
+                      My Profile
+                    </Link>
+                    <Link 
+                      href={user?.role === 'student' ? '/student/settings' : '/staff/settings'}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <Settings className="h-4 w-4 text-gray-400 shrink-0" />
+                      Settings
+                    </Link>
+                  </div>
+                )}
+                
+                <div className="py-1 border-t">
+                  {pathname !== '/' && (
+                    <Link 
+                      href="/" 
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      onClick={() => setProfileOpen(false)}
+                    >
+                      <Home className="h-4 w-4 text-gray-400 shrink-0" />
+                      Home Page
+                    </Link>
+                  )}
+                  {pathname !== '/portal' && (
+                    <button 
+                      onClick={handlePortalClick}
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                    >
+                      <KeyRound className="h-4 w-4 text-gray-400 shrink-0" />
+                      Portal Page
+                    </button>
+                  )}
+                </div>
+                
+                <div className="border-t p-2">
+                  <button 
+                    onClick={handleSignOut}
+                    className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg text-sm flex items-center gap-3"
+                  >
+                    <LogOut className="h-4 w-4 shrink-0" />
+                    Sign Out
+                  </button>
+                </div>
+              </div>
             )}
-          </>
+          </div>
         ) : (
           !isPortalPage && (
-            <Link
-              href="/portal"
+            <Link 
+              href="/portal" 
               className="hidden sm:inline-flex items-center px-4 py-2 bg-[#F5A623] text-[#0A2472] rounded-full font-semibold text-sm mx-0.5"
             >
               <KeyRound className="mr-1.5 h-4 w-4" />
@@ -424,7 +312,7 @@ export const UserSection = memo(function UserSection({
       </div>
 
       {/* Mobile Toggle */}
-      <button
+      <button 
         onClick={onMobileToggle}
         className="lg:hidden h-10 w-10 inline-flex items-center justify-center rounded-full text-white hover:bg-white/20 ml-0.5"
       >
