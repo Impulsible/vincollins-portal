@@ -13,7 +13,7 @@ import {
   Calendar, BookOpen, Award, BarChart3, FileText, Settings,
   Download, Share2, Loader2, RefreshCw, Pencil, Trash2,
   TrendingUp, TrendingDown, GraduationCap, Target, Hash,
-  Timer, Shield, Shuffle, RotateCcw, ChevronRight,
+  Timer, Shield, Shuffle, RotateCcw, ChevronRight, MoreVertical,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -99,13 +99,13 @@ const getStatusConfig = (status?: string) => {
 const StatusBadge = ({ status }: { status?: string }) => {
   const cfg = getStatusConfig(status)
   return (
-    <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold', cfg.className)}>
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold whitespace-nowrap', cfg.className)}>
       {cfg.label}
     </span>
   )
 }
 
-// ── Stat card ──────────────────────────────────────────────────────────────────
+// ── Stat card - MOBILE FIXED ───────────────────────────────────────────────────
 interface StatCardProps {
   label: string
   value: string | number
@@ -117,26 +117,26 @@ interface StatCardProps {
 
 const StatCard = ({ label, value, sub, iconClass, icon: Icon, valueClass }: StatCardProps) => (
   <Card className="border border-slate-200/80 shadow-sm bg-white hover:shadow-md transition-shadow">
-    <CardContent className="p-4">
-      <div className="flex items-start justify-between">
+    <CardContent className="p-3 sm:p-4">
+      <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-          <p className={cn('text-2xl font-bold text-slate-900', valueClass)}>{value}</p>
-          {sub && <p className="text-[11px] text-slate-400 mt-0.5">{sub}</p>}
+          <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1 truncate">{label}</p>
+          <p className={cn('text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none', valueClass)}>{value}</p>
+          {sub && <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">{sub}</p>}
         </div>
-        <div className={cn('p-2.5 rounded-xl shrink-0 ml-3', iconClass)}>
-          <Icon className="h-4 w-4" />
+        <div className={cn('p-2 sm:p-2.5 rounded-xl shrink-0', iconClass)}>
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
         </div>
       </div>
     </CardContent>
   </Card>
 )
 
-// ── Info row ───────────────────────────────────────────────────────────────────
+// ── Info row - MOBILE FIXED ────────────────────────────────────────────────────
 const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex items-start justify-between py-2.5 border-b border-slate-100 last:border-0">
-    <span className="text-sm text-slate-500 shrink-0 w-36">{label}</span>
-    <span className="text-sm font-medium text-slate-800 text-right">{value}</span>
+  <div className="flex items-start justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0">
+    <span className="text-xs sm:text-sm text-slate-500 shrink-0">{label}</span>
+    <span className="text-xs sm:text-sm font-medium text-slate-800 text-right min-w-0 break-words">{value}</span>
   </div>
 )
 
@@ -169,6 +169,7 @@ export default function ExamDetailPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [exam, setExam] = useState<Exam | null>(null)
+  const [showMobileActions, setShowMobileActions] = useState(false)
   const [stats, setStats] = useState<SubmissionStats>({
     total: 0, completed: 0, inProgress: 0, pendingTheory: 0,
     graded: 0, averageScore: 0, passRate: 0, highestScore: 0, lowestScore: 0,
@@ -184,13 +185,11 @@ export default function ExamDetailPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { toast.error('Please log in again'); setLoading(false); return }
 
-      // Exam
       const { data: examData, error: examErr } = await supabase
         .from('exams').select('*').eq('id', examId).single()
       if (examErr) throw examErr
       setExam(examData)
 
-      // Submissions
       const { data: submissions, error: subErr } = await supabase
         .from('exam_attempts').select('*').eq('exam_id', examId)
       if (subErr) throw subErr
@@ -224,7 +223,6 @@ export default function ExamDetailPage() {
         lowestScore: lowest === Infinity ? 0 : lowest,
       })
 
-      // Recent submissions enriched with student profile
       const recent = [...(submissions || [])]
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 6)
@@ -275,7 +273,7 @@ export default function ExamDetailPage() {
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 overflow-x-hidden">
         <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
           <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
         </div>
@@ -289,13 +287,13 @@ export default function ExamDetailPage() {
 
   if (!exam) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 p-6">
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 p-6 overflow-x-hidden">
         <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
           <AlertCircle className="h-7 w-7 text-slate-400" />
         </div>
         <div className="text-center">
           <h2 className="text-lg font-semibold text-slate-800">Exam Not Found</h2>
-          <p className="text-sm text-slate-500 mt-1">This exam doesn't exist or has been removed.</p>
+          <p className="text-sm text-slate-500 mt-1">This exam doesn&apos;t exist or has been removed.</p>
         </div>
         <Button onClick={() => router.push('/staff/exams')} className="bg-slate-900 hover:bg-slate-800 text-white">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
@@ -307,87 +305,134 @@ export default function ExamDetailPage() {
   const passingScore = exam.passing_percentage ?? exam.pass_mark ?? 50
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    // ✅ overflow-x-hidden prevents horizontal bleed
+    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
 
-      {/* ── Sticky header ───────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200/80 sticky top-0 z-10 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+      {/* ── Sticky header - MOBILE OPTIMIZED ─────────────────────────────── */}
+      <div className="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
 
-            {/* Left: back + title */}
-            <div className="flex items-start gap-3 min-w-0">
-              <Button
-                variant="outline" size="sm"
-                onClick={() => router.push('/staff/exams')}
-                className="mt-0.5 shrink-0 border-slate-200 hover:bg-slate-50 h-8"
-              >
-                <ArrowLeft className="h-3.5 w-3.5" />
-              </Button>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h1 className="text-lg sm:text-xl font-bold text-slate-900 truncate">{exam.title}</h1>
+          {/* Top row: back + title + mobile menu */}
+          <div className="flex items-start gap-2 sm:gap-3 min-w-0">
+            <Button
+              variant="outline" size="sm"
+              onClick={() => router.push('/staff/exams')}
+              className="mt-0.5 shrink-0 border-slate-200 hover:bg-slate-50 h-8 w-8 p-0"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+            </Button>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2 flex-wrap">
+                <h1 className="text-sm sm:text-lg lg:text-xl font-bold text-slate-900 break-words min-w-0 flex-1 leading-tight">
+                  {exam.title}
+                </h1>
+                <div className="shrink-0">
                   <StatusBadge status={exam.status} />
                 </div>
-                <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                  {[
-                    exam.subject,
-                    exam.class,
-                    `${exam.total_questions} Qs`,
-                    `${exam.total_marks} marks`,
-                    `${exam.duration} min`,
-                  ].map((item, i, arr) => (
-                    <React.Fragment key={item}>
-                      <span className="text-xs text-slate-500">{item}</span>
-                      {i < arr.length - 1 && <span className="text-slate-300 text-xs">·</span>}
-                    </React.Fragment>
-                  ))}
-                </div>
+              </div>
+              {/* Meta pills - wrap on mobile */}
+              <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap mt-1">
+                {[
+                  exam.subject,
+                  exam.class,
+                  `${exam.total_questions} Qs`,
+                  `${exam.total_marks} marks`,
+                  `${exam.duration} min`,
+                ].map((item, i, arr) => (
+                  <React.Fragment key={String(item)}>
+                    <span className="text-[10px] sm:text-xs text-slate-500 truncate max-w-[100px]">{item}</span>
+                    {i < arr.length - 1 && <span className="text-slate-300 text-[10px] sm:text-xs">·</span>}
+                  </React.Fragment>
+                ))}
               </div>
             </div>
 
-            {/* Right: actions */}
-            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+            {/* ✅ Mobile: 3-dot menu | Desktop: inline buttons */}
+            <div className="shrink-0 flex sm:hidden">
               <Button
                 variant="outline" size="sm"
-                onClick={handleRefresh} disabled={refreshing}
-                className="border-slate-200 h-8 text-xs"
+                onClick={() => setShowMobileActions(!showMobileActions)}
+                className="border-slate-200 h-8 w-8 p-0"
+              >
+                <MoreVertical className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Desktop actions - hidden on mobile */}
+          <div className="hidden sm:flex items-center gap-2 mt-3 flex-wrap">
+            <Button
+              variant="outline" size="sm"
+              onClick={handleRefresh} disabled={refreshing}
+              className="border-slate-200 h-8 text-xs"
+            >
+              <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
+              Refresh
+            </Button>
+            <Button
+              variant="outline" size="sm"
+              onClick={() => router.push(`/staff/exams/${examId}/edit`)}
+              className="border-slate-200 h-8 text-xs"
+            >
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Edit
+            </Button>
+            <Button
+              variant="outline" size="sm"
+              onClick={handleDeleteExam}
+              className="border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs"
+            >
+              <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+              Delete
+            </Button>
+          </div>
+
+          {/* ✅ Mobile actions dropdown */}
+          {showMobileActions && (
+            <div className="sm:hidden mt-2 pt-2 border-t border-slate-100 flex gap-2 flex-wrap">
+              <Button
+                variant="outline" size="sm"
+                onClick={() => { handleRefresh(); setShowMobileActions(false) }}
+                disabled={refreshing}
+                className="border-slate-200 h-8 text-xs flex-1 min-w-[80px]"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
                 Refresh
               </Button>
               <Button
                 variant="outline" size="sm"
-                onClick={() => router.push(`/staff/exams/${examId}/edit`)}
-                className="border-slate-200 h-8 text-xs"
+                onClick={() => { router.push(`/staff/exams/${examId}/edit`); setShowMobileActions(false) }}
+                className="border-slate-200 h-8 text-xs flex-1 min-w-[80px]"
               >
                 <Pencil className="h-3.5 w-3.5 mr-1.5" />
                 Edit
               </Button>
               <Button
                 variant="outline" size="sm"
-                onClick={handleDeleteExam}
-                className="border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs"
+                onClick={() => { handleDeleteExam(); setShowMobileActions(false) }}
+                className="border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs flex-1 min-w-[80px]"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                 Delete
               </Button>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* ── Page body ───────────────────────────────────────────────────────── */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-        {/* Stats grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {/* ✅ Stats grid - 3 cols on mobile (fits 6 in 2 rows), 6 on desktop */}
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <StatCard
             label="Submissions" value={stats.total}
             icon={Users} iconClass="bg-slate-100 text-slate-600"
           />
           <StatCard
             label="Completed" value={stats.completed}
-            sub={`${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}% of total`}
+            sub={`${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%`}
             icon={CheckCircle} iconClass="bg-emerald-100 text-emerald-600"
             valueClass="text-emerald-700"
           />
@@ -397,7 +442,7 @@ export default function ExamDetailPage() {
             valueClass="text-blue-700"
           />
           <StatCard
-            label="Pending Theory" value={stats.pendingTheory}
+            label="Pending" value={stats.pendingTheory}
             icon={AlertCircle} iconClass="bg-amber-100 text-amber-600"
             valueClass="text-amber-700"
           />
@@ -408,15 +453,15 @@ export default function ExamDetailPage() {
           />
           <StatCard
             label="Pass Rate" value={`${stats.passRate}%`}
-            sub={`Avg: ${stats.averageScore} pts`}
+            sub={`Avg: ${stats.averageScore}`}
             icon={TrendingUp} iconClass="bg-teal-100 text-teal-600"
             valueClass="text-teal-700"
           />
         </div>
 
         {/* Tabs */}
-        <Tabs defaultValue="overview" className="space-y-5">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 shadow-sm">
+        <Tabs defaultValue="overview" className="space-y-4 sm:space-y-5">
+          <div className="bg-white border border-slate-200/80 rounded-2xl p-1 sm:p-1.5 shadow-sm">
             <TabsList className="w-full grid grid-cols-3 bg-transparent gap-1 h-auto">
               {[
                 { value: 'overview', label: 'Overview', icon: BarChart3 },
@@ -429,15 +474,15 @@ export default function ExamDetailPage() {
                     key={tab.value}
                     value={tab.value}
                     className={cn(
-                      'flex items-center gap-1.5 py-2 px-3 rounded-xl text-xs font-medium transition-all h-auto',
+                      'flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-medium transition-all h-auto min-w-0',
                       'data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm',
                       'data-[state=inactive]:text-slate-500 data-[state=inactive]:hover:bg-slate-50',
                     )}
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0" />
-                    {tab.label}
+                    <span className="truncate">{tab.label}</span>
                     {tab.value === 'submissions' && stats.total > 0 && (
-                      <span className="ml-1 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none">
+                      <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] sm:text-[10px] font-bold leading-none shrink-0">
                         {stats.total}
                       </span>
                     )}
@@ -448,21 +493,21 @@ export default function ExamDetailPage() {
           </div>
 
           {/* ── Overview ──────────────────────────────────────────────────── */}
-          <TabsContent value="overview" className="space-y-5">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <TabsContent value="overview" className="space-y-4 sm:space-y-5">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
 
               {/* Exam info card */}
               <Card className="lg:col-span-2 border border-slate-200/80 shadow-sm bg-white">
-                <CardHeader className="pb-3 border-b border-slate-100">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <BookOpen className="h-4 w-4 text-emerald-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                      <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                     </div>
                     Exam Information
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 lg:gap-x-8">
                     <div>
                       <InfoRow label="Subject" value={exam.subject} />
                       <InfoRow label="Class" value={exam.class} />
@@ -480,7 +525,7 @@ export default function ExamDetailPage() {
                         label="Has Theory"
                         value={
                           <span className={cn(
-                            'inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium',
+                            'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap',
                             exam.has_theory
                               ? 'bg-emerald-100 text-emerald-700'
                               : 'bg-slate-100 text-slate-500',
@@ -494,23 +539,23 @@ export default function ExamDetailPage() {
                   </div>
 
                   {/* Dates */}
-                  <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                        <Calendar className="h-4 w-4 text-blue-600" />
+                  <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="flex items-start gap-2.5 sm:gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
                       </div>
-                      <div>
-                        <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Start Date</p>
-                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{formatDate(exam.start_date)}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium uppercase tracking-wider">Start Date</p>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5 break-words">{formatDate(exam.start_date)}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
-                        <Calendar className="h-4 w-4 text-red-500" />
+                    <div className="flex items-start gap-2.5 sm:gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500" />
                       </div>
-                      <div>
-                        <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">End Date</p>
-                        <p className="text-sm font-semibold text-slate-800 mt-0.5">{formatDate(exam.end_date)}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium uppercase tracking-wider">End Date</p>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5 break-words">{formatDate(exam.end_date)}</p>
                       </div>
                     </div>
                   </div>
@@ -518,10 +563,10 @@ export default function ExamDetailPage() {
                   {/* Instructions */}
                   {exam.instructions && (
                     <div className="mt-4 pt-4 border-t border-slate-100">
-                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                      <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                         Instructions
                       </p>
-                      <p className="text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100">
+                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100 break-words">
                         {exam.instructions}
                       </p>
                     </div>
@@ -533,10 +578,10 @@ export default function ExamDetailPage() {
               <div className="space-y-4">
                 {/* Quick actions */}
                 <Card className="border border-slate-200/80 shadow-sm bg-white">
-                  <CardHeader className="pb-3 border-b border-slate-100">
+                  <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                     <CardTitle className="text-sm font-semibold text-slate-700">Quick Actions</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-4 space-y-2">
+                  <CardContent className="p-3 sm:p-4 space-y-2">
                     <button
                       onClick={handleViewSubmissions}
                       disabled={stats.total === 0}
@@ -548,9 +593,9 @@ export default function ExamDetailPage() {
                       )}
                     >
                       <Eye className="h-4 w-4 shrink-0" />
-                      <span className="flex-1 text-left">View Submissions</span>
+                      <span className="flex-1 text-left truncate">View Submissions</span>
                       {stats.total > 0 && (
-                        <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">
+                        <span className="px-2 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold shrink-0">
                           {stats.total}
                         </span>
                       )}
@@ -566,20 +611,20 @@ export default function ExamDetailPage() {
                         className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-all"
                       >
                         <Icon className="h-4 w-4 text-slate-500 shrink-0" />
-                        <span className="flex-1 text-left">{label}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                        <span className="flex-1 text-left truncate">{label}</span>
+                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                       </button>
                     ))}
 
                     <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-all">
                       <Download className="h-4 w-4 text-slate-500 shrink-0" />
-                      <span className="flex-1 text-left">Export Data</span>
-                      <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="flex-1 text-left truncate">Export Data</span>
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     </button>
                     <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-all">
                       <Share2 className="h-4 w-4 text-slate-500 shrink-0" />
-                      <span className="flex-1 text-left">Share Exam</span>
-                      <ChevronRight className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="flex-1 text-left truncate">Share Exam</span>
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
                     </button>
                   </CardContent>
                 </Card>
@@ -587,27 +632,26 @@ export default function ExamDetailPage() {
                 {/* Score summary */}
                 {stats.total > 0 && (
                   <Card className="border border-slate-200/80 shadow-sm bg-white">
-                    <CardHeader className="pb-3 border-b border-slate-100">
+                    <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                       <CardTitle className="text-sm font-semibold text-slate-700">Score Summary</CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 space-y-3">
+                    <CardContent className="p-3 sm:p-4 space-y-3">
                       {[
                         { label: 'Average', value: `${stats.averageScore} pts`, icon: TrendingUp, color: 'text-blue-600' },
                         { label: 'Highest', value: `${stats.highestScore} pts`, icon: TrendingUp, color: 'text-emerald-600' },
                         { label: 'Lowest', value: `${stats.lowestScore} pts`, icon: TrendingDown, color: 'text-red-500' },
                         { label: 'Pass Rate', value: `${stats.passRate}%`, icon: Target, color: 'text-violet-600' },
                       ].map(({ label, value, icon: Icon, color }) => (
-                        <div key={label} className="flex items-center justify-between">
-                          <span className="flex items-center gap-1.5 text-sm text-slate-600">
-                            <Icon className={cn('h-3.5 w-3.5', color)} />
-                            {label}
+                        <div key={label} className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 min-w-0">
+                            <Icon className={cn('h-3.5 w-3.5 shrink-0', color)} />
+                            <span className="truncate">{label}</span>
                           </span>
-                          <span className={cn('text-sm font-bold', color)}>{value}</span>
+                          <span className={cn('text-xs sm:text-sm font-bold shrink-0', color)}>{value}</span>
                         </div>
                       ))}
-                      {/* Progress bar */}
                       <div className="pt-2 border-t border-slate-100">
-                        <div className="flex justify-between text-[11px] text-slate-400 mb-1.5">
+                        <div className="flex justify-between text-[10px] sm:text-[11px] text-slate-400 mb-1.5">
                           <span>Grading progress</span>
                           <span>{stats.graded}/{stats.total}</span>
                         </div>
@@ -628,44 +672,44 @@ export default function ExamDetailPage() {
           {/* ── Submissions ───────────────────────────────────────────────── */}
           <TabsContent value="submissions">
             <Card className="border border-slate-200/80 shadow-sm bg-white">
-              <CardHeader className="pb-4 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                      <Users className="h-4 w-4 text-emerald-600" />
+              <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+                      <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
                     </div>
-                    Student Submissions
+                    <span className="truncate">Student Submissions</span>
                   </CardTitle>
                   <Button
                     size="sm"
                     onClick={handleViewSubmissions}
                     disabled={stats.total === 0}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs shrink-0"
                   >
                     <Eye className="h-3.5 w-3.5 mr-1.5" />
                     View All
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent className="p-5">
-                {/* Mini stat pills */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+              <CardContent className="p-4 sm:p-5">
+                {/* Mini stat pills - 2 cols mobile, 4 desktop */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-5">
                   {[
                     { label: 'Total', value: stats.total, cls: 'bg-slate-50 border-slate-200', vCls: 'text-slate-800' },
                     { label: 'Completed', value: stats.completed, cls: 'bg-emerald-50 border-emerald-200', vCls: 'text-emerald-700' },
                     { label: 'In Progress', value: stats.inProgress, cls: 'bg-blue-50 border-blue-200', vCls: 'text-blue-700' },
                     { label: 'Graded', value: stats.graded, cls: 'bg-purple-50 border-purple-200', vCls: 'text-purple-700' },
                   ].map(({ label, value, cls, vCls }) => (
-                    <div key={label} className={cn('rounded-xl border p-3', cls)}>
-                      <p className="text-[11px] font-medium text-slate-500">{label}</p>
-                      <p className={cn('text-xl font-bold mt-0.5', vCls)}>{value}</p>
+                    <div key={label} className={cn('rounded-xl border p-2.5 sm:p-3', cls)}>
+                      <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 truncate">{label}</p>
+                      <p className={cn('text-lg sm:text-xl font-bold mt-0.5', vCls)}>{value}</p>
                     </div>
                   ))}
                 </div>
 
                 {/* Recent list */}
                 {recentSubmissions.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-14 text-center">
+                  <div className="flex flex-col items-center justify-center py-12 sm:py-14 text-center">
                     <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
                       <Users className="h-7 w-7 text-slate-400" />
                     </div>
@@ -674,16 +718,16 @@ export default function ExamDetailPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Recent Submissions</p>
+                    <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Recent Submissions</p>
                     {recentSubmissions.map(sub => {
                       const statusCfg = getSubStatusConfig(sub.status)
                       const score = (sub.objective_score || 0) + (sub.theory_score || 0)
                       return (
                         <div
                           key={sub.id}
-                          className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all"
+                          className="flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all"
                         >
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                             {sub.photo_url ? (
                               <img
                                 src={sub.photo_url}
@@ -698,21 +742,28 @@ export default function ExamDetailPage() {
                                 {sub.student_name.charAt(0).toUpperCase()}
                               </div>
                             )}
-                            <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-800 truncate">{sub.student_name}</p>
-                              <p className="text-xs text-slate-400 truncate">{sub.student_class}</p>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">{sub.student_name}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                <p className="text-[10px] sm:text-xs text-slate-400 truncate">{sub.student_class}</p>
+                                {/* ✅ Status shown inline on mobile below name */}
+                                <span className={cn('sm:hidden inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium whitespace-nowrap', statusCfg.cls)}>
+                                  {statusCfg.label}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-2 shrink-0">
-                            <span className={cn('hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium', statusCfg.cls)}>
+                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                            {/* Status pill visible on desktop only */}
+                            <span className={cn('hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap', statusCfg.cls)}>
                               {statusCfg.label}
                             </span>
-                            <span className="text-xs font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg">
+                            <span className="text-[10px] sm:text-xs font-bold text-slate-700 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded-lg whitespace-nowrap">
                               {score} pts
                             </span>
                             <button
                               onClick={() => router.push(`/staff/exams/${examId}/submissions/${sub.id}`)}
-                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors shrink-0"
                             >
                               <Eye className="h-3.5 w-3.5 text-slate-600" />
                             </button>
@@ -737,19 +788,19 @@ export default function ExamDetailPage() {
 
           {/* ── Settings ──────────────────────────────────────────────────── */}
           <TabsContent value="settings">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
 
               {/* Exam options */}
               <Card className="border border-slate-200/80 shadow-sm bg-white">
-                <CardHeader className="pb-3 border-b border-slate-100">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <Settings className="h-4 w-4 text-slate-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                      <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
                     </div>
                     Exam Options
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-5">
+                <CardContent className="p-4 sm:p-5">
                   <div className="divide-y divide-slate-100">
                     {[
                       { label: 'Allow Retakes', value: 'Disabled', enabled: false, icon: RotateCcw },
@@ -757,13 +808,13 @@ export default function ExamDetailPage() {
                       { label: 'Randomise Questions', value: 'Enabled', enabled: true, icon: Shuffle },
                       { label: 'Has Theory Section', value: exam.has_theory ? 'Yes' : 'No', enabled: !!exam.has_theory, icon: FileText },
                     ].map(({ label, value, enabled, icon: Icon }) => (
-                      <div key={label} className="flex items-center justify-between py-3">
-                        <span className="flex items-center gap-2 text-sm text-slate-700">
-                          <Icon className="h-3.5 w-3.5 text-slate-400" />
-                          {label}
+                      <div key={label} className="flex items-center justify-between gap-2 py-3">
+                        <span className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 min-w-0">
+                          <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{label}</span>
                         </span>
                         <span className={cn(
-                          'text-[11px] font-semibold px-2 py-0.5 rounded-full border',
+                          'text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
                           enabled
                             ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                             : 'bg-slate-100 text-slate-500 border-slate-200',
@@ -776,17 +827,17 @@ export default function ExamDetailPage() {
                 </CardContent>
               </Card>
 
-              {/* Grading settings — populated from DB */}
+              {/* Grading settings */}
               <Card className="border border-slate-200/80 shadow-sm bg-white">
-                <CardHeader className="pb-3 border-b border-slate-100">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <div className="h-8 w-8 rounded-lg bg-violet-100 flex items-center justify-center">
-                      <GraduationCap className="h-4 w-4 text-violet-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
+                      <GraduationCap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-violet-600" />
                     </div>
                     Grading Settings
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-5">
+                <CardContent className="p-4 sm:p-5">
                   <div className="divide-y divide-slate-100">
                     {[
                       { label: 'Passing Score', value: `${passingScore}%`, icon: Target },
@@ -795,12 +846,12 @@ export default function ExamDetailPage() {
                       { label: 'Objective Max', value: `${exam.objective_max ?? '—'} marks`, icon: Hash },
                       { label: 'Theory Max', value: `${exam.theory_max ?? '—'} marks`, icon: FileText },
                     ].map(({ label, value, icon: Icon }) => (
-                      <div key={label} className="flex items-center justify-between py-3">
-                        <span className="flex items-center gap-2 text-sm text-slate-700">
-                          <Icon className="h-3.5 w-3.5 text-slate-400" />
-                          {label}
+                      <div key={label} className="flex items-center justify-between gap-2 py-3">
+                        <span className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 min-w-0">
+                          <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                          <span className="truncate">{label}</span>
                         </span>
-                        <span className="text-sm font-semibold text-slate-800">{value}</span>
+                        <span className="text-xs sm:text-sm font-semibold text-slate-800 whitespace-nowrap shrink-0">{value}</span>
                       </div>
                     ))}
                   </div>
@@ -809,33 +860,34 @@ export default function ExamDetailPage() {
 
               {/* Metadata */}
               <Card className="border border-slate-200/80 shadow-sm bg-white md:col-span-2">
-                <CardHeader className="pb-3 border-b border-slate-100">
-                  <CardTitle className="flex items-center gap-2 text-base font-semibold text-slate-800">
-                    <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                      <Calendar className="h-4 w-4 text-blue-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                      <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
                     </div>
                     Metadata
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="p-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <CardContent className="p-4 sm:p-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
                     {[
                       { label: 'Created', value: formatDate(exam.created_at) },
                       { label: 'Last Updated', value: formatDate(exam.updated_at) },
                       { label: 'Exam ID', value: exam.id },
                     ].map(({ label, value }) => (
-                      <div key={label} className="p-3 rounded-xl bg-slate-50 border border-slate-100">
-                        <p className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-                        <p className="text-xs font-medium text-slate-700 break-all">{value}</p>
+                      <div key={label} className="p-3 rounded-xl bg-slate-50 border border-slate-100 min-w-0">
+                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+                        {/* ✅ break-all for long UUIDs */}
+                        <p className="text-[11px] sm:text-xs font-medium text-slate-700 break-all">{value}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100">
-                    <Button variant="outline" size="sm" className="border-slate-200 text-xs h-8">
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 flex-wrap">
+                    <Button variant="outline" size="sm" className="border-slate-200 text-xs h-8 flex-1 sm:flex-none min-w-[120px]">
                       <FileText className="h-3.5 w-3.5 mr-1.5" />
                       Export Settings
                     </Button>
-                    <Button variant="outline" size="sm" className="border-slate-200 text-xs h-8">
+                    <Button variant="outline" size="sm" className="border-slate-200 text-xs h-8 flex-1 sm:flex-none min-w-[120px]">
                       <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                       Reset to Default
                     </Button>
