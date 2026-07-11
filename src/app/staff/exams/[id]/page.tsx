@@ -55,6 +55,13 @@ interface SubmissionStats {
   lowestScore: number
 }
 
+// ✅ GPU isolation style - fixes static/glitch on mobile
+const cardIsolationStyle = {
+  WebkitTransform: 'translateZ(0)' as const,
+  transform: 'translateZ(0)' as const,
+  contain: 'paint' as const,
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const formatDate = (date?: string) => {
   if (!date) return 'N/A'
@@ -105,7 +112,7 @@ const StatusBadge = ({ status }: { status?: string }) => {
   )
 }
 
-// ── Stat card - MOBILE FIXED ───────────────────────────────────────────────────
+// ── Stat card - MOBILE FIXED + NO GPU GLITCH ─────────────────────────────────
 interface StatCardProps {
   label: string
   value: string | number
@@ -116,7 +123,10 @@ interface StatCardProps {
 }
 
 const StatCard = ({ label, value, sub, iconClass, icon: Icon, valueClass }: StatCardProps) => (
-  <Card className="border border-slate-200/80 shadow-sm bg-white hover:shadow-md transition-shadow">
+  <Card 
+    className="border border-slate-200/80 shadow-sm bg-white"
+    style={cardIsolationStyle}
+  >
     <CardContent className="p-3 sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -305,7 +315,6 @@ export default function ExamDetailPage() {
   const passingScore = exam.passing_percentage ?? exam.pass_mark ?? 50
 
   return (
-    // ✅ overflow-x-hidden prevents horizontal bleed
     <div className="min-h-screen bg-slate-50 overflow-x-hidden">
 
       {/* ── Sticky header - MOBILE OPTIMIZED ─────────────────────────────── */}
@@ -331,7 +340,6 @@ export default function ExamDetailPage() {
                   <StatusBadge status={exam.status} />
                 </div>
               </div>
-              {/* Meta pills - wrap on mobile */}
               <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap mt-1">
                 {[
                   exam.subject,
@@ -348,7 +356,7 @@ export default function ExamDetailPage() {
               </div>
             </div>
 
-            {/* ✅ Mobile: 3-dot menu | Desktop: inline buttons */}
+            {/* Mobile: 3-dot menu | Desktop: inline buttons */}
             <div className="shrink-0 flex sm:hidden">
               <Button
                 variant="outline" size="sm"
@@ -388,7 +396,7 @@ export default function ExamDetailPage() {
             </Button>
           </div>
 
-          {/* ✅ Mobile actions dropdown */}
+          {/* Mobile actions dropdown */}
           {showMobileActions && (
             <div className="sm:hidden mt-2 pt-2 border-t border-slate-100 flex gap-2 flex-wrap">
               <Button
@@ -424,7 +432,7 @@ export default function ExamDetailPage() {
       {/* ── Page body ───────────────────────────────────────────────────────── */}
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
-        {/* ✅ Stats grid - 3 cols on mobile (fits 6 in 2 rows), 6 on desktop */}
+        {/* Stats grid - 3 cols mobile, 6 desktop */}
         <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <StatCard
             label="Submissions" value={stats.total}
@@ -497,7 +505,10 @@ export default function ExamDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
 
               {/* Exam info card */}
-              <Card className="lg:col-span-2 border border-slate-200/80 shadow-sm bg-white">
+              <Card 
+                className="lg:col-span-2 border border-slate-200/80 shadow-sm bg-white"
+                style={cardIsolationStyle}
+              >
                 <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
                     <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
@@ -577,7 +588,10 @@ export default function ExamDetailPage() {
               {/* Right column */}
               <div className="space-y-4">
                 {/* Quick actions */}
-                <Card className="border border-slate-200/80 shadow-sm bg-white">
+                <Card 
+                  className="border border-slate-200/80 shadow-sm bg-white"
+                  style={cardIsolationStyle}
+                >
                   <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                     <CardTitle className="text-sm font-semibold text-slate-700">Quick Actions</CardTitle>
                   </CardHeader>
@@ -631,7 +645,10 @@ export default function ExamDetailPage() {
 
                 {/* Score summary */}
                 {stats.total > 0 && (
-                  <Card className="border border-slate-200/80 shadow-sm bg-white">
+                  <Card 
+                    className="border border-slate-200/80 shadow-sm bg-white"
+                    style={cardIsolationStyle}
+                  >
                     <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                       <CardTitle className="text-sm font-semibold text-slate-700">Score Summary</CardTitle>
                     </CardHeader>
@@ -671,7 +688,10 @@ export default function ExamDetailPage() {
 
           {/* ── Submissions ───────────────────────────────────────────────── */}
           <TabsContent value="submissions">
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card 
+              className="border border-slate-200/80 shadow-sm bg-white"
+              style={cardIsolationStyle}
+            >
               <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
@@ -692,7 +712,7 @@ export default function ExamDetailPage() {
                 </div>
               </CardHeader>
               <CardContent className="p-4 sm:p-5">
-                {/* Mini stat pills - 2 cols mobile, 4 desktop */}
+                {/* Mini stat pills */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-5">
                   {[
                     { label: 'Total', value: stats.total, cls: 'bg-slate-50 border-slate-200', vCls: 'text-slate-800' },
@@ -746,7 +766,6 @@ export default function ExamDetailPage() {
                               <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">{sub.student_name}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
                                 <p className="text-[10px] sm:text-xs text-slate-400 truncate">{sub.student_class}</p>
-                                {/* ✅ Status shown inline on mobile below name */}
                                 <span className={cn('sm:hidden inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium whitespace-nowrap', statusCfg.cls)}>
                                   {statusCfg.label}
                                 </span>
@@ -754,7 +773,6 @@ export default function ExamDetailPage() {
                             </div>
                           </div>
                           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-                            {/* Status pill visible on desktop only */}
                             <span className={cn('hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap', statusCfg.cls)}>
                               {statusCfg.label}
                             </span>
@@ -791,7 +809,10 @@ export default function ExamDetailPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
 
               {/* Exam options */}
-              <Card className="border border-slate-200/80 shadow-sm bg-white">
+              <Card 
+                className="border border-slate-200/80 shadow-sm bg-white"
+                style={cardIsolationStyle}
+              >
                 <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
                     <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
@@ -828,7 +849,10 @@ export default function ExamDetailPage() {
               </Card>
 
               {/* Grading settings */}
-              <Card className="border border-slate-200/80 shadow-sm bg-white">
+              <Card 
+                className="border border-slate-200/80 shadow-sm bg-white"
+                style={cardIsolationStyle}
+              >
                 <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
                     <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
@@ -859,7 +883,10 @@ export default function ExamDetailPage() {
               </Card>
 
               {/* Metadata */}
-              <Card className="border border-slate-200/80 shadow-sm bg-white md:col-span-2">
+              <Card 
+                className="border border-slate-200/80 shadow-sm bg-white md:col-span-2"
+                style={cardIsolationStyle}
+              >
                 <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
                     <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
@@ -877,7 +904,6 @@ export default function ExamDetailPage() {
                     ].map(({ label, value }) => (
                       <div key={label} className="p-3 rounded-xl bg-slate-50 border border-slate-100 min-w-0">
                         <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-                        {/* ✅ break-all for long UUIDs */}
                         <p className="text-[11px] sm:text-xs font-medium text-slate-700 break-all">{value}</p>
                       </div>
                     ))}
