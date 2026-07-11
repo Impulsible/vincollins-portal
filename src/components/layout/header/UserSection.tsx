@@ -1,4 +1,4 @@
-// components/layout/header/UserSection.tsx - MOBILE BOTTOM SHEET LAYOUT
+// components/layout/header/UserSection.tsx - MOBILE BOTTOM SHEET (WORKING)
 'use client'
 
 import { useState, useRef, useEffect, memo, useCallback } from 'react'
@@ -31,17 +31,15 @@ const getInitials = (name: string) => {
   return parts[0][0]?.toUpperCase() || 'U'
 }
 
-// ✅ Hook to detect mobile
+// ✅ Detect mobile
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
-
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-
   return isMobile
 }
 
@@ -78,13 +76,11 @@ export const UserSection = memo(function UserSection({
   const isPortalPage = pathname === '/portal'
   const isDashboardPage = !isPublicPage && !isPortalPage && !isHomePage
 
-  // Close all dropdowns on route change
   useEffect(() => {
     setProfileOpen(false)
     setNotificationOpen(false)
   }, [currentPathname])
 
-  // ✅ Lock body scroll when mobile sheet is open
   useEffect(() => {
     if (isMobile && (profileOpen || notificationOpen)) {
       document.body.style.overflow = 'hidden'
@@ -92,7 +88,6 @@ export const UserSection = memo(function UserSection({
     }
   }, [isMobile, profileOpen, notificationOpen])
 
-  // Close profile dropdown on outside click (desktop only)
   useEffect(() => {
     if (isMobile) return
     const cb = (e: MouseEvent) => {
@@ -104,7 +99,6 @@ export const UserSection = memo(function UserSection({
     return () => document.removeEventListener('mousedown', cb)
   }, [isMobile])
 
-  // Close notification popover on outside click (desktop only)
   useEffect(() => {
     if (isMobile) return
     const cb = (e: MouseEvent) => {
@@ -171,7 +165,7 @@ export const UserSection = memo(function UserSection({
   const avatarUrl = getAvatarUrl()
 
   // ═══════════════════════════════════════════════════
-  // Profile Menu Content (shared between desktop dropdown & mobile sheet)
+  // Shared profile menu content
   // ═══════════════════════════════════════════════════
   const ProfileMenuContent = () => (
     <>
@@ -196,7 +190,6 @@ export const UserSection = memo(function UserSection({
         </div>
       </div>
 
-      {/* Dashboard button on public pages */}
       {isPublicPage && (
         <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b">
           <button
@@ -210,7 +203,6 @@ export const UserSection = memo(function UserSection({
         </div>
       )}
 
-      {/* Dashboard nav items */}
       {isDashboardPage && (
         <div className="py-1">
           <Link
@@ -232,7 +224,6 @@ export const UserSection = memo(function UserSection({
         </div>
       )}
 
-      {/* Navigation links */}
       <div className="py-1 border-t">
         {pathname !== '/' && (
           <Link
@@ -255,7 +246,6 @@ export const UserSection = memo(function UserSection({
         )}
       </div>
 
-      {/* Sign Out */}
       <div className="border-t p-2">
         <button
           onClick={handleSignOut}
@@ -281,7 +271,7 @@ export const UserSection = memo(function UserSection({
         <Search className="h-4 w-4 sm:h-5 sm:w-5" />
       </Button>
 
-      {/* Notification Bell - handled by NotificationPopover (already mobile-optimized) */}
+      {/* Notification Bell */}
       {showAuthenticated && !isPortalPage && !isHomePage && (
         <div ref={notifRef} className="inline-flex">
           <NotificationPopover
@@ -336,41 +326,87 @@ export const UserSection = memo(function UserSection({
               </div>
             )}
 
-            {/* ═══════ MOBILE: Bottom sheet ═══════ */}
+            {/* ═══════ MOBILE: Bottom sheet with inline styles ═══════ */}
             {profileOpen && isMobile && (
               <>
                 {/* Backdrop */}
                 <div
-                  className="fixed inset-0 z-[100] bg-black/50 animate-in fade-in duration-200"
                   onClick={() => setProfileOpen(false)}
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 100,
+                    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                    animation: 'fadeIn 0.2s ease-out',
+                  }}
                 />
 
                 {/* Bottom sheet */}
                 <div
-                  className="fixed inset-x-0 bottom-0 z-[101] bg-white rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] flex flex-col"
                   style={{
+                    position: 'fixed',
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: 101,
+                    backgroundColor: 'white',
+                    borderTopLeftRadius: '1rem',
+                    borderTopRightRadius: '1rem',
+                    boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
+                    maxHeight: '85vh',
+                    display: 'flex',
+                    flexDirection: 'column',
                     paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                    animation: 'slideUp 0.3s ease-out',
                   }}
                 >
                   {/* Drag handle */}
-                  <div className="flex justify-center pt-2 pb-1 shrink-0">
-                    <div className="h-1 w-10 rounded-full bg-gray-300" />
+                  <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px', paddingBottom: '4px', flexShrink: 0 }}>
+                    <div style={{ height: '4px', width: '40px', borderRadius: '9999px', backgroundColor: '#d1d5db' }} />
                   </div>
 
-                  {/* Close button - top right */}
+                  {/* Close button */}
                   <button
                     onClick={() => setProfileOpen(false)}
-                    className="absolute top-3 right-3 h-8 w-8 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors z-10"
+                    style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      height: '32px',
+                      width: '32px',
+                      borderRadius: '9999px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      zIndex: 10,
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#f3f4f6')}
+                    onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
                     aria-label="Close"
                   >
                     <X className="h-4 w-4 text-gray-500" />
                   </button>
 
                   {/* Scrollable content */}
-                  <div className="flex-1 overflow-y-auto overscroll-contain">
+                  <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
                     <ProfileMenuContent />
                   </div>
                 </div>
+
+                {/* Inline animation keyframes */}
+                <style jsx>{`
+                  @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                  }
+                  @keyframes slideUp {
+                    from { transform: translateY(100%); }
+                    to { transform: translateY(0); }
+                  }
+                `}</style>
               </>
             )}
           </>

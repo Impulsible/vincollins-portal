@@ -80,7 +80,7 @@ interface Exam {
 // ── Constants ─────────────────────────────────────────────────────────────────
 const CACHE_DURATION = 60000
 
-// ✅ GPU isolation style - prevents mobile static/glitch on cards
+// ✅ GPU isolation style
 const cardIsolationStyle = {
   WebkitTransform: 'translateZ(0)' as const,
   transform: 'translateZ(0)' as const,
@@ -154,7 +154,7 @@ const TabFallback = () => (
   </div>
 )
 
-// ── Quick Action Card - FIXED: GPU isolation + mobile-safe ──────────────────
+// ── Quick Action Card ─────────────────────────────────────────────────────────
 interface QuickActionCardProps {
   icon: React.ElementType
   label: string
@@ -210,12 +210,9 @@ function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'vio
   )
 }
 
-// ── Pending-exam row - FIXED: GPU isolation + mobile layout ─────────────────
+// ── Pending-exam row ──────────────────────────────────────────────────────────
 function PendingExamCard({
-  exam,
-  onApprove,
-  onReject,
-  approving,
+  exam, onApprove, onReject, approving,
 }: {
   exam: PendingExam
   onApprove: (e: PendingExam) => void
@@ -223,12 +220,11 @@ function PendingExamCard({
   approving: boolean
 }) {
   return (
-    <div 
+    <div
       style={cardIsolationStyle}
       className="group rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 hover:shadow-md transition-all duration-200"
     >
       <div className="flex flex-col sm:flex-row gap-4">
-        {/* Left: info */}
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <h3 className="font-bold text-sm sm:text-base text-slate-800 break-words min-w-0 flex-1">{exam.title}</h3>
@@ -274,7 +270,6 @@ function PendingExamCard({
           </div>
         </div>
 
-        {/* Right: actions - full width on mobile */}
         <div className="flex sm:flex-col gap-2 sm:self-center shrink-0 w-full sm:w-auto">
           <Button
             onClick={() => onApprove(exam)}
@@ -313,6 +308,9 @@ function AdminDashboardContent() {
   const [activeTab, setActiveTab] = useState(() => getTabFromPathname(pathname))
   const [error, setError] = useState<Error | null>(null)
   const [dataLoaded, setDataLoaded] = useState(false)
+
+  // ✅ Term info from database
+  const [termInfo, setTermInfo] = useState<{ term: string; session: string } | null>(null)
 
   const [students, setStudents] = useState<Student[]>([])
   const [staff, setStaff] = useState<Staff[]>([])
@@ -356,6 +354,52 @@ function AdminDashboardContent() {
   useEffect(() => {
     isMountedRef.current = true
     return () => { isMountedRef.current = false }
+  }, [])
+
+  // ✅ Fetch current term from school_settings + real-time subscription
+  useEffect(() => {
+    const fetchCurrentTerm = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('school_settings')
+          .select('current_term, current_session')
+          .maybeSingle()
+
+        if (!error && data && isMountedRef.current) {
+          setTermInfo({
+            term: data.current_term || '',
+            session: data.current_session || '',
+          })
+        } else if (error) {
+          console.error('Failed to fetch term:', error)
+        }
+      } catch (err) {
+        console.error('Failed to fetch term:', err)
+      }
+    }
+
+    fetchCurrentTerm()
+
+    // Real-time subscription for term changes
+    const channel = supabase
+      .channel('school-settings-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'school_settings' },
+        (payload) => {
+          if (payload.new && isMountedRef.current) {
+            setTermInfo({
+              term: (payload.new as any).current_term || '',
+              session: (payload.new as any).current_session || '',
+            })
+          }
+        }
+      )
+      .subscribe()
+
+    return () => {
+      channel.unsubscribe()
+    }
   }, [])
 
   const loadAllData = useCallback(async (forceRefresh = false) => {
@@ -534,7 +578,6 @@ function AdminDashboardContent() {
     }
 
     switch (activeTab) {
-      // ── Overview ──────────────────────────────────────────────────
       case 'overview':
         return (
           <motion.div
@@ -545,10 +588,14 @@ function AdminDashboardContent() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="space-y-5 sm:space-y-6"
           >
-            {/* Welcome */}
-            <WelcomeBanner adminProfile={profile} activeTab={activeTab} />
+            {/* ✅ Pass termInfo to WelcomeBanner */}
+            <WelcomeBanner
+              adminProfile={profile}
+              activeTab={activeTab}
+              termInfo={termInfo}
+            />
 
-            {/* ✅ Pending-exams alert banner - MOBILE OPTIMIZED */}
+            {/* Pending-exams alert banner */}
             <AnimatePresence>
               {pendingExamsCount > 0 && !dismissedBanner && (
                 <motion.div
@@ -557,11 +604,10 @@ function AdminDashboardContent() {
                   exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                   transition={{ duration: 0.2 }}
                 >
-                  <div 
+                  <div
                     style={cardIsolationStyle}
                     className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 shadow-sm"
                   >
-                    {/* Close button - always top right */}
                     <button
                       onClick={() => setDismissedBanner(true)}
                       className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 rounded-lg hover:bg-amber-100 transition-colors z-10"
@@ -570,9 +616,7 @@ function AdminDashboardContent() {
                       <X className="h-3.5 w-3.5 text-amber-500" />
                     </button>
 
-                    {/* Content - stacked on mobile, side-by-side on desktop */}
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 pr-6 sm:pr-8">
-                      {/* Icon + text */}
                       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
                         <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
                           <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
@@ -587,7 +631,6 @@ function AdminDashboardContent() {
                         </div>
                       </div>
 
-                      {/* Button - full width on mobile */}
                       <Button
                         onClick={() => handleTabChange('exams')}
                         size="sm"
@@ -658,7 +701,6 @@ function AdminDashboardContent() {
           </motion.div>
         )
 
-      // ── Announcements ─────────────────────────────────────────────
       case 'announcements':
         return (
           <Suspense fallback={<TabFallback />}>
@@ -666,7 +708,6 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
-      // ── Broad Sheet ───────────────────────────────────────────────
       case 'broad-sheet':
         return (
           <Suspense fallback={<TabFallback />}>
@@ -674,7 +715,6 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
-      // ── Students ──────────────────────────────────────────────────
       case 'students':
         return (
           <Suspense fallback={<TabFallback />}>
@@ -682,7 +722,6 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
-      // ── Staff ─────────────────────────────────────────────────────
       case 'staff':
         return (
           <Suspense fallback={<TabFallback />}>
@@ -697,7 +736,6 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
-      // ── Exams ─────────────────────────────────────────────────────
       case 'exams':
         return (
           <motion.div
@@ -708,7 +746,6 @@ function AdminDashboardContent() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="space-y-5 sm:space-y-6"
           >
-            {/* Header - MOBILE OPTIMIZED */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
                 <h1 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Exam Approvals</h1>
@@ -730,11 +767,7 @@ function AdminDashboardContent() {
               </Button>
             </div>
 
-            {/* Pending card */}
-            <Card 
-              style={cardIsolationStyle}
-              className="border border-slate-200/80 shadow-sm"
-            >
+            <Card style={cardIsolationStyle} className="border border-slate-200/80 shadow-sm">
               <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
@@ -775,12 +808,8 @@ function AdminDashboardContent() {
               </CardContent>
             </Card>
 
-            {/* Published card */}
             {publishedExams.length > 0 && (
-              <Card 
-                style={cardIsolationStyle}
-                className="border border-slate-200/80 shadow-sm"
-              >
+              <Card style={cardIsolationStyle} className="border border-slate-200/80 shadow-sm">
                 <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
                   <div className="flex items-center justify-between gap-2">
                     <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
@@ -825,7 +854,6 @@ function AdminDashboardContent() {
           </motion.div>
         )
 
-      // ── Report Cards ──────────────────────────────────────────────
       case 'report-cards':
         return (
           <Suspense fallback={<TabFallback />}>
@@ -833,7 +861,6 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
-      // ── Inquiries ─────────────────────────────────────────────────
       case 'inquiries':
         return (
           <Suspense fallback={<TabFallback />}>
@@ -841,7 +868,6 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
-      // ── Fallback ──────────────────────────────────────────────────
       default:
         return (
           <div className="flex flex-col items-center justify-center py-16 sm:py-20 px-4">
@@ -857,6 +883,7 @@ function AdminDashboardContent() {
     }
   }, [
     activeTab, error, profile,
+    termInfo, // ✅ Include termInfo in dependencies
     pendingExamsCount, pendingReports, pendingInquiries,
     stats, students, staff, pendingExams, publishedExams, inquiries,
     refreshing, approvingId, dismissedBanner,

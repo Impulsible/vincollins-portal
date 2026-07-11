@@ -1,4 +1,4 @@
-// components/layout/header/NotificationPopover.tsx - MOBILE-FRIENDLY BOTTOM SHEET
+// components/layout/header/NotificationPopover.tsx - MOBILE BOTTOM SHEET (WORKING)
 'use client'
 
 import { memo, useEffect, useState } from 'react'
@@ -32,17 +32,14 @@ interface NotificationPopoverProps {
   onDelete: (id: string) => void
 }
 
-// ✅ Hook to detect mobile
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(false)
-
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640)
     check()
     window.addEventListener('resize', check)
     return () => window.removeEventListener('resize', check)
   }, [])
-
   return isMobile
 }
 
@@ -53,7 +50,6 @@ export const NotificationPopover = memo(function NotificationPopover({
   const router = useRouter()
   const isMobile = useIsMobile()
 
-  // ✅ Lock body scroll when mobile sheet is open
   useEffect(() => {
     if (isMobile && open) {
       document.body.style.overflow = 'hidden'
@@ -62,7 +58,7 @@ export const NotificationPopover = memo(function NotificationPopover({
   }, [isMobile, open])
 
   // ═══════════════════════════════════════════════════
-  // Shared notification list content
+  // Shared list content
   // ═══════════════════════════════════════════════════
   const NotificationList = () => (
     <>
@@ -90,7 +86,6 @@ export const NotificationPopover = memo(function NotificationPopover({
               }}
             >
               <div className="flex gap-2.5">
-                {/* Icon */}
                 <div className={cn(
                   "h-8 w-8 rounded-full flex items-center justify-center shrink-0 mt-0.5",
                   !n.read ? "bg-blue-100" : "bg-gray-100"
@@ -98,7 +93,6 @@ export const NotificationPopover = memo(function NotificationPopover({
                   {getIcon(n.type)}
                 </div>
 
-                {/* Text */}
                 <div className="flex-1 min-w-0 pr-6">
                   <div className="flex items-start justify-between gap-2">
                     <p className={cn(
@@ -120,11 +114,10 @@ export const NotificationPopover = memo(function NotificationPopover({
                 </div>
               </div>
 
-              {/* Delete button - always visible on mobile, hover on desktop */}
               <button
                 className={cn(
                   "absolute right-2 top-2 p-1.5 rounded-full hover:bg-gray-200 transition-all",
-                  "sm:opacity-0 sm:group-hover:opacity-100" // hidden on desktop until hover
+                  "sm:opacity-0 sm:group-hover:opacity-100"
                 )}
                 onClick={(e) => { e.stopPropagation(); onDelete(n.id) }}
                 aria-label="Delete notification"
@@ -139,12 +132,11 @@ export const NotificationPopover = memo(function NotificationPopover({
   )
 
   // ═══════════════════════════════════════════════════
-  // MOBILE: Bottom sheet centered on screen
+  // MOBILE: Bottom sheet
   // ═══════════════════════════════════════════════════
   if (isMobile) {
     return (
       <>
-        {/* Trigger button */}
         <button
           onClick={() => onOpenChange(!open)}
           className="relative h-8 w-8 rounded-full text-white hover:bg-white/20 flex items-center justify-center transition-colors"
@@ -158,25 +150,42 @@ export const NotificationPopover = memo(function NotificationPopover({
           )}
         </button>
 
-        {/* Mobile bottom sheet + backdrop */}
         {open && (
           <>
             {/* Backdrop */}
             <div
-              className="fixed inset-0 z-[100] bg-black/50 animate-in fade-in duration-200"
               onClick={() => onOpenChange(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 100,
+                backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                animation: 'notifFadeIn 0.2s ease-out',
+              }}
             />
 
             {/* Bottom sheet */}
             <div
-              className="fixed inset-x-0 bottom-0 z-[101] bg-white rounded-t-2xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[85vh] flex flex-col"
               style={{
+                position: 'fixed',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 101,
+                backgroundColor: 'white',
+                borderTopLeftRadius: '1rem',
+                borderTopRightRadius: '1rem',
+                boxShadow: '0 -10px 40px rgba(0, 0, 0, 0.2)',
+                maxHeight: '85vh',
+                display: 'flex',
+                flexDirection: 'column',
                 paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+                animation: 'notifSlideUp 0.3s ease-out',
               }}
             >
               {/* Drag handle */}
-              <div className="flex justify-center pt-2 pb-1 shrink-0">
-                <div className="h-1 w-10 rounded-full bg-gray-300" />
+              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px', paddingBottom: '4px', flexShrink: 0 }}>
+                <div style={{ height: '4px', width: '40px', borderRadius: '9999px', backgroundColor: '#d1d5db' }} />
               </div>
 
               {/* Header */}
@@ -208,8 +217,8 @@ export const NotificationPopover = memo(function NotificationPopover({
                 </div>
               </div>
 
-              {/* Scrollable content */}
-              <div className="flex-1 overflow-y-auto overscroll-contain">
+              {/* Scrollable list */}
+              <div style={{ flex: 1, overflowY: 'auto', overscrollBehavior: 'contain' }}>
                 <NotificationList />
               </div>
 
@@ -229,6 +238,18 @@ export const NotificationPopover = memo(function NotificationPopover({
                 </Button>
               </div>
             </div>
+
+            {/* Inline animations */}
+            <style jsx>{`
+              @keyframes notifFadeIn {
+                from { opacity: 0; }
+                to { opacity: 1; }
+              }
+              @keyframes notifSlideUp {
+                from { transform: translateY(100%); }
+                to { transform: translateY(0); }
+              }
+            `}</style>
           </>
         )}
       </>
@@ -236,7 +257,7 @@ export const NotificationPopover = memo(function NotificationPopover({
   }
 
   // ═══════════════════════════════════════════════════
-  // DESKTOP: Regular popover
+  // DESKTOP: Popover
   // ═══════════════════════════════════════════════════
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -259,7 +280,6 @@ export const NotificationPopover = memo(function NotificationPopover({
         sideOffset={8}
         className="w-[380px] p-0 rounded-xl shadow-xl border border-gray-200/80 overflow-hidden"
       >
-        {/* Header */}
         <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
@@ -279,12 +299,10 @@ export const NotificationPopover = memo(function NotificationPopover({
           )}
         </div>
 
-        {/* Content */}
         <ScrollArea className="max-h-[400px]">
           <NotificationList />
         </ScrollArea>
 
-        {/* Footer */}
         <div className="border-t bg-gray-50/80">
           <Button
             variant="ghost"
