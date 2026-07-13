@@ -66,7 +66,7 @@ const SUBJECT_ORDER: Record<string, number> = {
   'Business Studies': 18, 
   'Literature in English': 19, 
   'Christian Religious Studies': 20,
-   'CRS': 20,
+  'CRS': 20,
   'Cultural and Creative Arts': 21, 
   'Music': 22, 
   'Yoruba': 23, 
@@ -178,8 +178,37 @@ const getFallbackPrincipalComment = (avg: number, firstName: string, gender: str
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface SubjectScore { subject: string; ca1: number; ca2: number; exam_obj: number; exam_theory: number; total: number; grade: string; status: string; teacher_name: string }
-interface StudentRecord { id: string; name: string; admission_number: string; vin_id: string; class: string; department: string | null; subjectMap: Record<string, SubjectScore>; totalScore: number; averageScore: number; grade: string; completedSubjects: number; totalSubjects: number; expectedSubjects: string[]; hasAllSubjects: boolean; meetsMinimum: boolean; allSubmitted: boolean; reportCardStatus?: string | null }
+interface SubjectScore { 
+  subject: string; 
+  ca1: number; 
+  ca2: number; 
+  exam_obj: number; 
+  exam_theory: number;
+  total: number; 
+  grade: string; 
+  status: string; 
+  teacher_name: string 
+}
+
+interface StudentRecord { 
+  id: string; 
+  name: string; 
+  admission_number: string; 
+  vin_id: string; 
+  class: string; 
+  department: string | null; 
+  subjectMap: Record<string, SubjectScore>; 
+  totalScore: number; 
+  averageScore: number; 
+  grade: string; 
+  completedSubjects: number; 
+  totalSubjects: number; 
+  expectedSubjects: string[]; 
+  hasAllSubjects: boolean; 
+  meetsMinimum: boolean; 
+  allSubmitted: boolean; 
+  reportCardStatus?: string | null 
+}
 
 const LOAD_TIMEOUT = 10000
 const AUTO_REFRESH_INTERVAL = 30000
@@ -296,6 +325,7 @@ export default function BroadSheetPage() {
     if (newScoreAlert) { const t = setTimeout(() => setNewScoreAlert(null), 5000); return () => clearTimeout(t) }
   }, [newScoreAlert])
 
+  // ── FIXED: loadBroadSheet with proper exam score handling ──────────────────
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
     setLoading(true); setLoadError(false)
@@ -322,23 +352,42 @@ export default function BroadSheetPage() {
         const subs = getSubjectsForStudent(student.class, student.department)
         const scores = (allScores || []).filter(s => s.student_id === student.id)
         const subjectMap: Record<string, SubjectScore> = {}
+        
         scores.forEach(s => {
-          const total = (s.ca1_score || 0) + (s.ca2_score || 0) + (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
+          // ✅ FIX: Get exam total from multiple possible sources
+          // Priority: exam_score > exam_objective_score + exam_theory_score
+          let examTotal = s.exam_score || 0
+          if (examTotal === 0) {
+            // If exam_score is 0, try the individual fields
+            const objScore = s.exam_objective_score || 0
+            const theoryScore = s.exam_theory_score || 0
+            examTotal = objScore + theoryScore
+          }
+          
+          // If still 0, try just exam_objective_score
+          if (examTotal === 0) {
+            examTotal = s.exam_objective_score || 0
+          }
+          
+          const total = (s.ca1_score || 0) + (s.ca2_score || 0) + examTotal
+          
           subjectMap[s.subject] = { 
             subject: s.subject, 
             ca1: s.ca1_score || 0, 
             ca2: s.ca2_score || 0, 
             exam_obj: s.exam_objective_score || 0, 
-            exam_theory: s.exam_theory_score || 0, 
+            exam_theory: s.exam_theory_score || 0,
             total, 
             grade: getSubjectGrade(Math.round((total / 100) * 100)), 
             status: s.status || 'approved', 
             teacher_name: s.teacher_name || '' 
           }
         })
+        
         const scored = Object.keys(subjectMap).length
-        const totalScore = Object.values(subjectMap).reduce((s, x) => s + x.total, 0)
+        const totalScore = Object.values(subjectMap).reduce((sum, x) => sum + x.total, 0)
         const avg = scored > 0 ? Math.round(totalScore / scored) : 0
+        
         return { 
           id: student.id, 
           name: student.display_name || student.full_name || 'Student', 
