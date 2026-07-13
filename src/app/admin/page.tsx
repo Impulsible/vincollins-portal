@@ -1,5 +1,4 @@
 // app/admin/page.tsx
-
 'use client'
 
 import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -21,7 +20,7 @@ import {
   Users, FileCheck, School, MessageSquare,
   CheckCircle2, XCircle, Clock, Bell, BookOpen,
   RefreshCw, AlertTriangle, X, Megaphone,
-  TrendingUp, ChevronRight, Sparkles
+  TrendingUp, ChevronRight, Sparkles, GraduationCap
 } from 'lucide-react'
 import AdminLoading from '@/components/admin/AdminLoading'
 import type { Student } from '@/components/admin/students/types'
@@ -46,6 +45,10 @@ const AdminInquiriesTab = dynamic(
 )
 const AnnouncementsManager = dynamic(
   () => import('@/components/admin/announcements/AnnouncementsManager').then(m => ({ default: m.AnnouncementsManager })),
+  { ssr: false }
+)
+const AdminPromotionsPage = dynamic(
+  () => import('@/app/admin/promotions/page').then(m => ({ default: m.default })),
   { ssr: false }
 )
 
@@ -97,6 +100,7 @@ const routeToTabMap: Record<string, string> = {
   '/admin/inquiries': 'inquiries',
   '/admin/monitor': 'cbt-monitor',
   '/admin/announcements': 'announcements',
+  '/admin/promotions': 'promotions',
 }
 
 const tabToRouteMap: Record<string, string> = {
@@ -109,6 +113,7 @@ const tabToRouteMap: Record<string, string> = {
   'inquiries': '/admin/inquiries',
   'cbt-monitor': '/admin/monitor',
   'announcements': '/admin/announcements',
+  'promotions': '/admin/promotions',
 }
 
 const getTabFromPathname = (pathname: string | null): string => {
@@ -170,6 +175,7 @@ const quickActionColors: Record<string, { bg: string; icon: string; ring: string
   blue: { bg: 'bg-blue-50', icon: 'text-blue-600', ring: 'hover:ring-blue-200' },
   amber: { bg: 'bg-amber-50', icon: 'text-amber-600', ring: 'hover:ring-amber-200' },
   rose: { bg: 'bg-rose-50', icon: 'text-rose-600', ring: 'hover:ring-rose-200' },
+  purple: { bg: 'bg-purple-50', icon: 'text-purple-600', ring: 'hover:ring-purple-200' },
 }
 
 function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'violet' }: QuickActionCardProps) {
@@ -324,6 +330,7 @@ function AdminDashboardContent() {
   const [pendingExamsCount, setPendingExamsCount] = useState(0)
   const [pendingReports, setPendingReports] = useState(0)
   const [pendingInquiries, setPendingInquiries] = useState(0)
+  const [pendingPromotions, setPendingPromotions] = useState(0)
 
   const [stats, setStats] = useState({
     totalStudents: 0, totalStaff: 0, activeExams: 0, pendingSubmissions: 0,
@@ -408,6 +415,23 @@ function AdminDashboardContent() {
     }
   }, [])
 
+  // ✅ Fetch pending promotions count
+  const fetchPendingPromotions = useCallback(async () => {
+    try {
+      const { count, error } = await supabase
+        .from('pending_promotions')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending')
+
+      if (error) throw error
+      if (isMountedRef.current) {
+        setPendingPromotions(count || 0)
+      }
+    } catch (err) {
+      console.error('Error fetching pending promotions:', err)
+    }
+  }, [])
+
   const loadAllData = useCallback(async (forceRefresh = false) => {
     const now = Date.now()
     if (!forceRefresh && lastLoadTimeRef.current && (now - lastLoadTimeRef.current) < CACHE_DURATION) {
@@ -421,6 +445,7 @@ function AdminDashboardContent() {
         setPendingExamsCount(cached.data.pendingExamsCount || 0)
         setPendingReports(cached.data.pendingReports || 0)
         setPendingInquiries(cached.data.pendingInquiries || 0)
+        setPendingPromotions(cached.data.pendingPromotions || 0)
         setStats(cached.data.stats || { totalStudents: 0, totalStaff: 0, activeExams: 0, pendingSubmissions: 0 })
         setDataLoaded(true)
         setLoading(false)
@@ -484,12 +509,16 @@ function AdminDashboardContent() {
         setPendingReports(newPendingReports)
       }
 
+      // ✅ Fetch pending promotions count
+      await fetchPendingPromotions()
+
       cacheRef.current.set('dashboardData', {
         data: {
           students: newStudents, staff: newStaff,
           pendingExams: newPendingExams, publishedExams: newPublishedExams,
           inquiries: newInquiries, pendingExamsCount: newPendingExams.length,
           pendingReports: newPendingReports, pendingInquiries: newInquiries.filter(i => i.status === 'pending').length,
+          pendingPromotions: pendingPromotions,
           stats: { totalStudents: newStudents.length, totalStaff: newStaff.length, activeExams: newPublishedExams.length, pendingSubmissions: 0 },
         },
         timestamp: now,
@@ -503,7 +532,7 @@ function AdminDashboardContent() {
     } finally {
       if (isMountedRef.current) { setLoading(false); setRefreshing(false) }
     }
-  }, [])
+  }, [fetchPendingPromotions, pendingPromotions])
 
   useEffect(() => {
     if (contextUser?.id && !initialLoadDoneRef.current && !dataLoaded) {
@@ -682,14 +711,6 @@ function AdminDashboardContent() {
                   alert={pendingExamsCount > 0}
                 />
                 <QuickActionCard
-                  icon={FileCheck}
-                  label="Report Cards"
-                  desc={pendingReports > 0 ? `${pendingReports} pending approval` : 'All approved'}
-                  color="emerald"
-                  onClick={() => handleTabChange('report-cards')}
-                  alert={pendingReports > 0}
-                />
-                <QuickActionCard
                   icon={MessageSquare}
                   label="Inquiries"
                   desc={pendingInquiries > 0 ? `${pendingInquiries} unanswered` : 'All answered'}
@@ -701,6 +722,14 @@ function AdminDashboardContent() {
                   icon={Megaphone} label="Announcements" desc="Send updates"
                   color="amber"
                   onClick={() => handleTabChange('announcements')}
+                />
+                <QuickActionCard
+                  icon={GraduationCap}
+                  label="Promotions"
+                  desc={pendingPromotions > 0 ? `${pendingPromotions} pending` : 'All promoted'}
+                  color="purple"
+                  onClick={() => handleTabChange('promotions')}
+                  alert={pendingPromotions > 0}
                 />
               </div>
             </div>
@@ -874,6 +903,13 @@ function AdminDashboardContent() {
           </Suspense>
         )
 
+      case 'promotions':
+        return (
+          <Suspense fallback={<TabFallback />}>
+            <AdminPromotionsPage />
+          </Suspense>
+        )
+
       default:
         return (
           <div className="flex flex-col items-center justify-center py-16 sm:py-20 px-4">
@@ -890,7 +926,7 @@ function AdminDashboardContent() {
   }, [
     activeTab, error, profile,
     termInfo,
-    pendingExamsCount, pendingReports, pendingInquiries,
+    pendingExamsCount, pendingReports, pendingInquiries, pendingPromotions,
     stats, students, staff, pendingExams, publishedExams, inquiries,
     refreshing, approvingId, dismissedBanner,
     handleTabChange, handleRefresh, handleApproveExam, handleRejectExam, handleRetry,

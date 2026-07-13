@@ -35,6 +35,7 @@ const routeToTabMap: Record<string, string> = {
   '/admin/inquiries': 'inquiries',
   '/admin/monitor': 'cbt-monitor',
   '/admin/announcements': 'announcements',
+  '/admin/promotions': 'promotions',  // ← ADDED
   '/admin/settings': 'settings',
   '/admin/help': 'help',
 }
@@ -49,6 +50,7 @@ const tabToRouteMap: Record<string, string> = {
   'inquiries': '/admin/inquiries',
   'cbt-monitor': '/admin/monitor',
   'announcements': '/admin/announcements',
+  'promotions': '/admin/promotions',  // ← ADDED
   'settings': '/admin/settings',
   'help': '/admin/help',
 }

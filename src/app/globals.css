@@ -1344,3 +1344,18 @@ html {
     transform: translateZ(0);
   }
 }
+
+/* Fix for Radix UI ref loops */
+[data-radix-popper-content-wrapper] {
+  isolation: isolate !important;
+}
+
+[data-radix-dropdown-menu-content] {
+  animation: none !important;
+}
+
+/* Prevent infinite ref loops */
+[data-radix-menu-content] {
+  will-change: transform;
+  transform: translateZ(0);
+}
