@@ -1,4 +1,3 @@
-// app/admin/broad-sheet/page.tsx
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -17,7 +16,8 @@ import {
   Users, FileDown, Sparkles, FileText, CheckCircle2,
   AlertCircle, Eye, Shield, Bell, Zap,
   TrendingUp, Award, GraduationCap, ChevronLeft, Send,
-  BarChart3, Settings2, BookOpen, AlertTriangle,
+  BarChart3, Settings2, BookOpen, AlertTriangle, User,
+  Calendar, Mail, Phone, School,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -178,37 +178,8 @@ const getFallbackPrincipalComment = (avg: number, firstName: string, gender: str
 }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface SubjectScore { 
-  subject: string; 
-  ca1: number; 
-  ca2: number; 
-  exam_obj: number; 
-  exam_theory: number;
-  total: number; 
-  grade: string; 
-  status: string; 
-  teacher_name: string 
-}
-
-interface StudentRecord { 
-  id: string; 
-  name: string; 
-  admission_number: string; 
-  vin_id: string; 
-  class: string; 
-  department: string | null; 
-  subjectMap: Record<string, SubjectScore>; 
-  totalScore: number; 
-  averageScore: number; 
-  grade: string; 
-  completedSubjects: number; 
-  totalSubjects: number; 
-  expectedSubjects: string[]; 
-  hasAllSubjects: boolean; 
-  meetsMinimum: boolean; 
-  allSubmitted: boolean; 
-  reportCardStatus?: string | null 
-}
+interface SubjectScore { subject: string; ca1: number; ca2: number; exam_obj: number; exam_theory: number; total: number; grade: string; status: string; teacher_name: string }
+interface StudentRecord { id: string; name: string; admission_number: string; vin_id: string; class: string; department: string | null; subjectMap: Record<string, SubjectScore>; totalScore: number; averageScore: number; grade: string; completedSubjects: number; totalSubjects: number; expectedSubjects: string[]; hasAllSubjects: boolean; meetsMinimum: boolean; allSubmitted: boolean; reportCardStatus?: string | null; photo_url?: string | null }
 
 const LOAD_TIMEOUT = 10000
 const AUTO_REFRESH_INTERVAL = 30000
@@ -325,14 +296,13 @@ export default function BroadSheetPage() {
     if (newScoreAlert) { const t = setTimeout(() => setNewScoreAlert(null), 5000); return () => clearTimeout(t) }
   }, [newScoreAlert])
 
-  // ── FIXED: loadBroadSheet with proper exam score handling ──────────────────
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
     setLoading(true); setLoadError(false)
     try {
       const isJSS = selectedClass.toUpperCase().includes('JSS')
       const isSS = selectedClass.toUpperCase().includes('SS')
-      let query = supabase.from('profiles').select('id, full_name, display_name, admission_number, vin_id, class, department, gender').eq('role', 'student').order('display_name').limit(500)
+      let query = supabase.from('profiles').select('id, full_name, display_name, admission_number, vin_id, class, department, gender, photo_url').eq('role', 'student').order('display_name').limit(500)
       if (isJSS) query = query.eq('class', selectedClass)
       else if (isSS) { const yp = extractYear(selectedClass); query = query.ilike('class', `%${yp}%`) }
       else query = query.eq('class', selectedClass)
@@ -355,20 +325,15 @@ export default function BroadSheetPage() {
         
         scores.forEach(s => {
           // ✅ FIX: Get exam total from multiple possible sources
-          // Priority: exam_score > exam_objective_score + exam_theory_score
           let examTotal = s.exam_score || 0
           if (examTotal === 0) {
-            // If exam_score is 0, try the individual fields
             const objScore = s.exam_objective_score || 0
             const theoryScore = s.exam_theory_score || 0
             examTotal = objScore + theoryScore
           }
-          
-          // If still 0, try just exam_objective_score
           if (examTotal === 0) {
             examTotal = s.exam_objective_score || 0
           }
-          
           const total = (s.ca1_score || 0) + (s.ca2_score || 0) + examTotal
           
           subjectMap[s.subject] = { 
@@ -376,7 +341,7 @@ export default function BroadSheetPage() {
             ca1: s.ca1_score || 0, 
             ca2: s.ca2_score || 0, 
             exam_obj: s.exam_objective_score || 0, 
-            exam_theory: s.exam_theory_score || 0,
+            exam_theory: s.exam_theory_score || 0, 
             total, 
             grade: getSubjectGrade(Math.round((total / 100) * 100)), 
             status: s.status || 'approved', 
@@ -405,7 +370,8 @@ export default function BroadSheetPage() {
           hasAllSubjects: scored >= subs.length, 
           meetsMinimum: meetsMinimumSubjects(student.class, scored), 
           allSubmitted: meetsMinimumSubjects(student.class, scored), 
-          reportCardStatus: rcMap[student.id] || null 
+          reportCardStatus: rcMap[student.id] || null,
+          photo_url: student.photo_url || null
         }
       })
 
@@ -414,6 +380,12 @@ export default function BroadSheetPage() {
       console.error(error); toast.error('Failed to load broad sheet'); setLoadError(true)
     } finally { setLoading(false) }
   }, [selectedClass, selectedTerm, selectedYear, selectedDepartment])
+
+  // ── View Report Card - opens as a page ────────────────────────────────────────
+  const handleViewReportCard = (student: StudentRecord) => {
+    // Navigate to the full report card page
+    router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
+  }
 
   const handleGenerateReportCards = async () => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted)
@@ -504,9 +476,6 @@ export default function BroadSheetPage() {
     } catch { toast.error('Failed to unpublish') }
     finally { setPublishing(false) }
   }
-
-  const handleViewReportCard = (s: StudentRecord) =>
-    router.push(`/admin/report-cards/view?student=${s.id}&term=${selectedTerm}&year=${selectedYear}`)
 
   const handleExportCSV = () => {
     if (!students.length) { toast.error('No data to export'); return }
@@ -919,10 +888,14 @@ export default function BroadSheetPage() {
                           <ReportStatusChip status={student.reportCardStatus} />
                         </td>
 
-                        {/* View button */}
+                        {/* View button - navigates to report card page */}
                         <td className="no-print px-3 py-3 text-center">
-                          <Button variant="ghost" size="sm" onClick={() => handleViewReportCard(student)}
-                            className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => handleViewReportCard(student)}
+                            className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 gap-1"
+                          >
                             <Eye className="h-3 w-3" /> View
                           </Button>
                         </td>

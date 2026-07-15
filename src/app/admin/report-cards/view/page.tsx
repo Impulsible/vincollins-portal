@@ -1,7 +1,7 @@
 // app/admin/report-cards/view/page.tsx
 'use client'
 
-import React from 'react'
+import React, { Suspense } from 'react'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
@@ -18,60 +18,41 @@ import { useReactToPrint } from 'react-to-print'
 // SUBJECT NAME NORMALIZATION
 // ============================================
 const SUBJECT_NAME_MAP: Record<string, string> = {
-  // Physical Education variations
   'Physical Education': 'PHE',
   'P.H.E.': 'PHE',
   'P H E': 'PHE',
   'Physical and Health Education': 'PHE',
   'PHE': 'PHE',
-  
-  // Security Education
   'Security Edu': 'Security Education',
   'Security Education': 'Security Education',
-  
-  // Computer/IT
   'Computer Studies': 'Information Technology',
   'ICT': 'Information Technology',
   'Information Technology': 'Information Technology',
-  
-  // Religious Studies
   'C.R.S.': 'CRS',
   'C.R.K': 'CRS',
   'Christian Religious Studies': 'CRS',
   'Christian Religious Knowledge': 'CRS',
   'CRS': 'CRS',
-  
-  // Creative Arts
   'C.C.A.': 'CCA',
   'Cultural and Creative Arts': 'CCA',
   'CCA': 'CCA',
-  
-  // Sciences
   'Agric Science': 'Agricultural Science',
   'Agricultural Science': 'Agricultural Science',
   'Basic Sci': 'Basic Science',
   'Basic Science': 'Basic Science',
   'Basic Tech': 'Basic Technology',
   'Basic Technology': 'Basic Technology',
-  
-  // Business/Commerce
   'Bus Studies': 'Business Studies',
   'Business Studies': 'Business Studies',
-  
-  // Humanities
   'Civic Edu': 'Civic Education',
   'Civic Education': 'Civic Education',
   'Social Std': 'Social Studies',
   'Social Studies': 'Social Studies',
   'Home Econ': 'Home Economics',
   'Home Economics': 'Home Economics',
-  
-  // Mathematics
   'Further Maths': 'Further Mathematics',
   'Further Mathematics': 'Further Mathematics',
   'Mathematics': 'Mathematics',
-  
-  // Languages
   'Lit in English': 'Literature in English',
   'Literature in English': 'Literature in English',
   'English': 'English Language',
@@ -79,7 +60,6 @@ const SUBJECT_NAME_MAP: Record<string, string> = {
   'English Studies': 'English Language',
 }
 
-// Main display names for subjects (these will be shown on the report card)
 const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   'English Language': 'English Language',
   'Mathematics': 'Mathematics',
@@ -112,18 +92,16 @@ const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   'Security Education': 'Security Education',
 }
 
-// Normalize subject name (convert variations to canonical form)
 const normalizeSubjectName = (name: string): string => {
   return SUBJECT_NAME_MAP[name] || name
 }
 
-// Get display name for a subject (canonical display name)
 const getSubjectDisplayName = (canonicalName: string): string => {
   return SUBJECT_DISPLAY_NAMES[canonicalName] || canonicalName
 }
 
 // ============================================
-// SUBJECT ORDERING - Use canonical names
+// SUBJECT ORDERING
 // ============================================
 const SUBJECT_ORDER: Record<string, number> = {
   'English Language': 1,
@@ -259,8 +237,8 @@ const getFallbackPrincipalComment = (avg: number, firstName: string, gender: str
 // TYPES
 // ============================================
 interface SubjectScore {
-  name: string // Canonical name used for ordering
-  displayName: string // Display name shown on report
+  name: string
+  displayName: string
   ca: number
   exam: number
   total: number
@@ -295,9 +273,9 @@ const TERM_LABELS: Record<string, string> = {
 }
 
 // ============================================
-// MAIN COMPONENT
+// MAIN COMPONENT (with Suspense support)
 // ============================================
-export default function ViewReportCardPage() {
+function ReportCardViewContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const printRef = useRef<HTMLDivElement>(null)
@@ -320,6 +298,16 @@ export default function ViewReportCardPage() {
   const [principalComment, setPrincipalComment] = useState('')
   const [classTeacher, setClassTeacher] = useState('')
   const [reportCardId, setReportCardId] = useState<string | null>(null)
+
+  // If no student ID, show error
+  if (!studentId) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-6">
+        <p className="text-red-600 font-medium">No student selected.</p>
+        <Button onClick={() => router.back()}>Go Back</Button>
+      </div>
+    )
+  }
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
@@ -399,7 +387,6 @@ export default function ViewReportCardPage() {
   }
 
   const loadScores = useCallback(async () => {
-    if (!studentId) { toast.error('No student selected'); router.back(); return }
     setLoading(true)
     try {
       const { data: sd } = await supabase.from('profiles').select('*').eq('id', studentId).single()
@@ -411,7 +398,6 @@ export default function ViewReportCardPage() {
 
       if (rc) {
         setReportCardId(rc.id)
-        // Map subjects to include display names
         const mappedSubjects = (rc.subjects_data || []).map((s: any) => ({
           ...s,
           displayName: getSubjectDisplayName(s.name)
@@ -428,7 +414,6 @@ export default function ViewReportCardPage() {
         const { data: scores } = await supabase.from('ca_scores').select('*')
           .eq('student_id', studentId).eq('term', term).eq('academic_year', year).eq('status', 'approved')
 
-        // Process scores with normalization and deduplication
         const merged = new Map<string, SubjectScore>()
         
         ;(scores || []).forEach((s: any) => {
@@ -440,7 +425,6 @@ export default function ViewReportCardPage() {
           const displayName = getSubjectDisplayName(canonicalName)
           
           if (merged.has(canonicalName)) {
-            // Keep the higher score if duplicate
             const existing = merged.get(canonicalName)!
             if (total > existing.total) {
               merged.set(canonicalName, {
@@ -466,7 +450,6 @@ export default function ViewReportCardPage() {
           }
         })
 
-        // Sort subjects by order (using canonical names)
         let processed = sortSubjectsByOrder(Array.from(merged.values()))
         setSubjects(processed)
 
@@ -474,24 +457,17 @@ export default function ViewReportCardPage() {
         const avg = processed.length > 0 ? tot / processed.length : 0
         setTotalScore(tot); setAverageScore(avg); setOverallGrade(getOverallGrade(avg))
 
-        const r = (base: number) => {
-          if (avg >= 90) return Math.min(5, base + 1)
-          if (avg >= 80) return base
-          if (avg >= 70) return Math.max(3, base)
-          if (avg >= 60) return Math.max(2, base - 1)
-          return Math.max(1, base - 2)
-        }
         setAssessmentData({
           behaviorRatings: [
-            { name: 'Honesty', rating: r(4) }, { name: 'Neatness', rating: r(4) },
-            { name: 'Obedience', rating: r(4) }, { name: 'Orderliness', rating: r(3) },
-            { name: 'Diligence', rating: r(4) }, { name: 'Punctuality', rating: r(4) },
-            { name: 'Leadership', rating: r(3) }, { name: 'Politeness', rating: r(4) },
+            { name: 'Honesty', rating: 4 }, { name: 'Neatness', rating: 4 },
+            { name: 'Obedience', rating: 4 }, { name: 'Orderliness', rating: 3 },
+            { name: 'Diligence', rating: 4 }, { name: 'Punctuality', rating: 4 },
+            { name: 'Leadership', rating: 3 }, { name: 'Politeness', rating: 4 },
           ],
           skillRatings: [
-            { name: 'Handwriting', rating: r(4) }, { name: 'Verbal Fluency', rating: r(4) },
-            { name: 'Sports', rating: r(3) }, { name: 'Handling Tools', rating: r(3) },
-            { name: 'Club Activities', rating: r(4) },
+            { name: 'Handwriting', rating: 4 }, { name: 'Verbal Fluency', rating: 4 },
+            { name: 'Sports', rating: 3 }, { name: 'Handling Tools', rating: 3 },
+            { name: 'Club Activities', rating: 4 },
           ]
         })
 
@@ -524,9 +500,12 @@ export default function ViewReportCardPage() {
           setPrincipalComment(getFallbackPrincipalComment(Math.round(avg), firstName, gender))
         }
       }
-    } catch (e) { console.error(e); toast.error('Failed to load scores') }
+    } catch (e) { 
+      console.error(e); 
+      toast.error('Failed to load scores') 
+    }
     finally { setLoading(false) }
-  }, [studentId, term, year, router])
+  }, [studentId, term, year])
 
   useEffect(() => {
     const init = async () => {
@@ -586,13 +565,10 @@ export default function ViewReportCardPage() {
   return (
     <div className="min-h-screen bg-gray-50 print:bg-white">
 
-      {/* ═══════════════════════════════════════════════
-          PAGE CONTROLS — in-page, not a fixed header
-          ═══════════════════════════════════════════════ */}
+      {/* PAGE CONTROLS */}
       <div className="no-print bg-white border-b border-gray-200">
         <div className="max-w-5xl mx-auto px-3 sm:px-6 py-3 space-y-3">
 
-          {/* Row 1: back + action buttons */}
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <Button
               variant="outline" size="sm"
@@ -630,7 +606,6 @@ export default function ViewReportCardPage() {
             </div>
           </div>
 
-          {/* Row 2: context info */}
           <div className="flex items-center gap-2 flex-wrap text-xs sm:text-sm text-gray-500">
             <span>Viewing:</span>
             <span className="font-semibold text-gray-800">{fullName}</span>
@@ -642,9 +617,7 @@ export default function ViewReportCardPage() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════
-          REPORT CARD
-          ═══════════════════════════════════════════════ */}
+      {/* REPORT CARD */}
       <div className="px-2 sm:px-4 md:px-6 py-4 sm:py-6 print:p-0">
         <div ref={printRef} className="print-container">
           <div className="
@@ -655,14 +628,9 @@ export default function ViewReportCardPage() {
             p-3 sm:p-5 md:p-6
             print:p-3 print:border-none print:rounded-none print:max-w-none
           ">
-
-            {/* ── HEADER ──────────────────────────────────────── */}
+            {/* HEADER */}
             <div className="border-b-2 border-blue-900 pb-3 mb-3 sm:mb-4">
-              {/* Mobile: logo + school centred, no photo */}
-              {/* sm+: logo | school | photo side-by-side */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 sm:gap-4 print:flex-row print-flex-row">
-
-                {/* Logo */}
                 <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 flex items-center justify-center border-2 border-blue-900 rounded bg-blue-50">
                   {school.logo_url ? (
                     <img src={school.logo_url} alt="logo" className="w-12 h-12 sm:w-16 sm:h-16 object-contain" />
@@ -671,7 +639,6 @@ export default function ViewReportCardPage() {
                   )}
                 </div>
 
-                {/* School info */}
                 <div className="flex-1 text-center min-w-0">
                   <h1 className="text-base sm:text-xl font-bold uppercase text-blue-900 tracking-wide leading-tight break-words">
                     {school.name}
@@ -703,7 +670,6 @@ export default function ViewReportCardPage() {
                   </div>
                 </div>
 
-                {/* Photo — hidden on mobile, shown sm+ */}
                 <div className="w-16 h-20 sm:w-24 sm:h-28 border-2 border-blue-900 rounded overflow-hidden shrink-0 bg-gray-50 hidden sm:block print-photo-show">
                   {student.photo_url ? (
                     <img src={student.photo_url} alt="student" className="w-full h-full object-cover" />
@@ -716,7 +682,7 @@ export default function ViewReportCardPage() {
               </div>
             </div>
 
-            {/* ── STUDENT INFO ─────────────────────────────────── */}
+            {/* STUDENT INFO */}
             <div className="
               grid grid-cols-1 sm:grid-cols-2
               gap-x-4 gap-y-0.5 sm:gap-y-1.5
@@ -745,21 +711,13 @@ export default function ViewReportCardPage() {
               </div>
             </div>
 
-            {/* ── MAIN CONTENT ─────────────────────────────────── */}
-            {/*
-              Mobile:  single column — everything stacks
-              md+:     70 / 30 side-by-side
-              Print:   always 70 / 30
-            */}
+            {/* MAIN CONTENT */}
             <div className="
               flex flex-col md:grid md:grid-cols-[2.2fr_1.2fr] gap-3 sm:gap-4
               print:grid print-grid-2col
             ">
-
-              {/* LEFT — table + comments + grade scale */}
+              {/* LEFT COLUMN */}
               <div className="min-w-0 space-y-3">
-
-                {/* Results table */}
                 <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full border-collapse text-[9px] sm:text-[11px] table-fixed min-w-[380px]">
@@ -782,7 +740,6 @@ export default function ViewReportCardPage() {
                           </tr>
                         ) : subjects.map((s, i) => (
                           <tr key={s.name} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            {/* Use displayName for the subject name shown to users */}
                             <td className="border border-gray-400 px-1.5 py-0.5 font-medium break-words">{s.displayName}</td>
                             <td className="border border-gray-400 text-center font-mono py-0.5">{s.ca}</td>
                             <td className="border border-gray-400 text-center font-mono py-0.5">{s.exam}</td>
@@ -814,11 +771,10 @@ export default function ViewReportCardPage() {
                   </div>
                 </div>
 
-                {/* Teacher remark */}
                 <div className="border border-gray-300 rounded-sm overflow-hidden">
                   <div className="bg-purple-600 text-white px-2 py-1 text-[9px] sm:text-[11px] font-bold flex items-center gap-1">
                     <Sparkles className="h-3 w-3 shrink-0" />
-                    CLASS TEACHER'S REMARK
+                    CLASS TEACHER&apos;S REMARK
                   </div>
                   <div className="p-2 sm:p-2.5 text-[9px] sm:text-[11px] italic leading-relaxed bg-purple-50 break-words">
                     {teacherComment || 'No comment available.'}
@@ -828,47 +784,19 @@ export default function ViewReportCardPage() {
                   </div>
                 </div>
 
-                {/* Principal remark */}
                 <div className="border border-gray-300 rounded-sm overflow-hidden">
                   <div className="bg-blue-600 text-white px-2 py-1 text-[9px] sm:text-[11px] font-bold flex items-center gap-1">
                     <Award className="h-3 w-3 shrink-0" />
-                    PRINCIPAL'S REMARK
+                    PRINCIPAL&apos;S REMARK
                   </div>
                   <div className="p-2 sm:p-2.5 text-[9px] sm:text-[11px] italic leading-relaxed break-words">
                     {principalComment || 'No comment available.'}
                   </div>
                 </div>
-
-                {/* Grade scale — desktop / print only */}
-                <div className="hidden md:block print:block">
-                  <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] px-2 py-1 font-bold rounded-t-sm">
-                    Grade Scale
-                  </div>
-                  <div className="border-2 border-blue-900 p-2 rounded-b-sm">
-                    <div className="grid grid-cols-3 gap-1 text-[8px] sm:text-[9px]">
-                      {([['A1','75-100'],['B2','70-74'],['B3','65-69'],['C4','60-64'],['C5','55-59'],['C6','50-54'],['D7','45-49'],['E8','40-44'],['F9','0-39']] as [string,string][]).map(([g,r]) => (
-                        <div key={g} className="flex items-center gap-1">
-                          <span className={getSubjectGradeStyle(g)}>{g}</span>
-                          <span className="text-gray-600">{r}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-1.5 pt-1.5 border-t border-blue-300 grid grid-cols-5 gap-1 text-[8px] sm:text-[9px]">
-                      {([['A','80-100'],['B','70-79'],['C','60-69'],['P','50-59'],['F','0-49']] as [string,string][]).map(([g,r]) => (
-                        <div key={g} className="flex items-center gap-0.5">
-                          <span className={cn('px-1 py-0.5 rounded font-bold text-[8px]', getOverallGradeColor(g))}>{g}</span>
-                          <span className="text-gray-600">{r}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </div>
 
-              {/* RIGHT — summary panels */}
+              {/* RIGHT COLUMN */}
               <div className="space-y-3">
-
-                {/* Performance summary */}
                 <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
                   <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 uppercase">
                     Performance Summary
@@ -911,10 +839,7 @@ export default function ViewReportCardPage() {
                   </div>
                 </div>
 
-                {/* Affective + Psychomotor — 2-col on mobile, 1-col on md+ */}
                 <div className="grid grid-cols-2 md:grid-cols-1 gap-3 print:grid-cols-1 print-1col">
-
-                  {/* Affective domain */}
                   <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
                     <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">
                       Affective Domain
@@ -938,7 +863,6 @@ export default function ViewReportCardPage() {
                     </div>
                   </div>
 
-                  {/* Psychomotor */}
                   <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
                     <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">
                       Psychomotor
@@ -962,7 +886,6 @@ export default function ViewReportCardPage() {
                   </div>
                 </div>
 
-                {/* Rating key */}
                 <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
                   <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">
                     Key To Ratings
@@ -973,33 +896,10 @@ export default function ViewReportCardPage() {
                     ))}
                   </div>
                 </div>
-
-                {/* Grade scale — mobile only (appears under right panels) */}
-                <div className="md:hidden print:hidden">
-                  <div className="bg-blue-700 text-white text-[9px] px-2 py-1 font-bold rounded-t-sm">Grade Scale</div>
-                  <div className="border-2 border-blue-900 p-2 rounded-b-sm">
-                    <div className="grid grid-cols-3 gap-1 text-[8px]">
-                      {([['A1','75-100'],['B2','70-74'],['B3','65-69'],['C4','60-64'],['C5','55-59'],['C6','50-54'],['D7','45-49'],['E8','40-44'],['F9','0-39']] as [string,string][]).map(([g,r]) => (
-                        <div key={g} className="flex items-center gap-0.5">
-                          <span className={getSubjectGradeStyle(g)}>{g}</span>
-                          <span className="text-gray-600">{r}</span>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-1 pt-1 border-t border-blue-300 grid grid-cols-5 gap-0.5 text-[7px]">
-                      {([['A','80-100'],['B','70-79'],['C','60-69'],['P','50-59'],['F','0-49']] as [string,string][]).map(([g,r]) => (
-                        <div key={g} className="flex items-center gap-0.5">
-                          <span className={cn('px-1 py-0.5 rounded font-bold text-[7px]', getOverallGradeColor(g))}>{g}</span>
-                          <span className="text-gray-600">{r}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
-            {/* ── FOOTER ──────────────────────────────────────── */}
+            {/* FOOTER */}
             <div className="border-t-2 border-blue-900 mt-3 sm:mt-4 pt-1.5 text-center text-[7px] sm:text-[9px] text-gray-500">
               Powered by Vincollins Portal | {school.motto}
             </div>
@@ -1007,5 +907,23 @@ export default function ViewReportCardPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// ============================================
+// EXPORT WITH SUSPENSE WRAPPER
+// ============================================
+export default function ViewReportCardPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-sm text-gray-500">Loading report card…</p>
+        </div>
+      </div>
+    }>
+      <ReportCardViewContent />
+    </Suspense>
   )
 }

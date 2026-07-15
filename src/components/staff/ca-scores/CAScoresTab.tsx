@@ -412,7 +412,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       formatted.forEach(s => { entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false } })
       let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
       ;(scoresData || []).forEach((score: any) => {
-        // Use exam_objective_score as the exam score (matches broad sheet)
         const examTotal = score.exam_objective_score || 0
         const caTotal = (score.ca1_score || 0) + (score.ca2_score || 0)
         const total = caTotal + examTotal
@@ -468,20 +467,18 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         scoresData.forEach((s: any) => {
           const existing = studentMap.get(s.student_id)
           if (!existing) {
-            // Use exam_objective_score for the exam total (matches broad sheet)
             const examTotal = s.exam_objective_score || 0
             const caTotal = (s.ca1_score || 0) + (s.ca2_score || 0)
             const total = caTotal + examTotal
             studentMap.set(s.student_id, { 
               ...s, 
-              exam_score: examTotal,  // Set exam_score for display
+              exam_score: examTotal,
               total_score: total,
               percentage: total,
               grade: getGrade(total),
               remark: getGradeRemark(getGrade(total))
             })
           } else {
-            // Merge scores if needed
             if (s.ca1_score > 0 && existing.ca1_score === 0) existing.ca1_score = s.ca1_score
             if (s.ca2_score > 0 && existing.ca2_score === 0) existing.ca2_score = s.ca2_score
             if (s.exam_objective_score > 0 && existing.exam_objective_score === 0) {
@@ -586,42 +583,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setTimeout(updateStatsFromEntries, 50)
   }
 
-  // ✅ FIXED: Build save payload - saves exam to exam_objective_score for broad sheet
-  const buildSavePayload = (studentId: string, ca1: number, ca2: number, exam: number, studentClass: string): any => {
-    const caTotal = ca1 + ca2
-    const examScore = exam
-    const total = caTotal + examScore
-    
-    const now = new Date().toISOString()
-    const d: any = {
-      student_id: studentId,
-      subject: getMappedSubject(selectedSubject),
-      term: selectedTerm,
-      academic_year: selectedYear,
-      ca1_score: ca1,
-      ca2_score: ca2,
-      ca_total: caTotal,
-      // ✅ Save exam score to exam_objective_score (what broad sheet uses)
-      exam_objective_score: exam,
-      exam_theory_score: 0,
-      // ✅ Also keep exam_score for backward compatibility
-      exam_score: exam,
-      total_score: total,
-      percentage: total,
-      grade: getGrade(total),
-      remark: getGradeRemark(getGrade(total)),
-      teacher_id: staffProfile.id,
-      teacher_name: staffProfile.full_name || staffProfile.display_name || 'Teacher',
-      class: studentClass,
-      status: 'approved',
-      submitted_at: now,
-      updated_at: now
-    }
-    if (selectedExamId && !skipExam) d.exam_id = selectedExamId
-    return d
-  }
-
-  // ✅ FIXED: Auto-fetch single - respects exam configuration
+  // ✅ FIXED: Auto-fetch single - ALWAYS calculate from exam_attempts (ignore existing CA scores)
   const handleAutoFetchSingle = async (studentId: string) => {
     if (!selectedSubject || !selectedTerm || !selectedYear) {
       toast.info('Please select subject, term, and year first')
@@ -629,7 +591,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
     
     try {
-      // Get exam configuration
+      // Fetch from exam_attempts - ALWAYS recalculate from source of truth
       const { data: examsData } = await supabase
         .from('exams')
         .select('id, objective_max, theory_max, total_marks')
@@ -644,10 +606,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       }
       
       const examIds = examsData.map(e => e.id)
-      const exam = examsData[0] // Use the first matching exam
       
-      // Get the attempt
-      const { data, error } = await supabase
+      const { data: attempt } = await supabase
         .from('exam_attempts')
         .select('*')
         .in('exam_id', examIds)
@@ -656,28 +616,25 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         .limit(1)
         .maybeSingle()
       
-      if (error || !data) { 
+      if (!attempt) { 
         toast.info('No attempt found') 
         return 
       }
       
-      // Get objective and theory scores from the attempt
-      const objScore = Number(data.objective_score) || 0
-      const theoryScore = Number(data.theory_score) || 0
-      const rawTotal = objScore + theoryScore
+      // ✅ Calculate exam score as raw total (objective + theory)
+      const objScore = Number(attempt.objective_score) || 0
+      const theoryScore = Number(attempt.theory_score) || 0
+      const examScore = objScore + theoryScore
       
-      // Get max marks from exam configuration
-      const totalMax = exam.total_marks || 60
-      
-      // Calculate percentage and scale to 60
-      const examPercentage = totalMax > 0 ? rawTotal / totalMax : 0
-      const scaledExamScore = Math.round(examPercentage * 60)
-      const finalExamScore = Math.min(scaledExamScore, 60)
-      
-      if (finalExamScore === 0) { 
+      if (examScore === 0) { 
         toast.info('No score found') 
         return 
       }
+      
+      // Calculate total percentage (CA1 + CA2 + raw exam score)
+      const currentCA1 = parseInt(scoreEntries[studentId]?.ca1) || 0
+      const currentCA2 = parseInt(scoreEntries[studentId]?.ca2) || 0
+      const totalScore = currentCA1 + currentCA2 + examScore
       
       setScoreEntries(prev => ({
         ...prev,
@@ -685,12 +642,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           ...prev[studentId], 
           ca1: prev[studentId]?.ca1 || '',
           ca2: prev[studentId]?.ca2 || '',
-          exam: String(finalExamScore),
+          exam: String(examScore),
           is_saved: false 
         }
       }))
       setSavedStatus(prev => ({ ...prev, [studentId]: false }))
-      toast.success(`Loaded: ${finalExamScore}/60 (${rawTotal}/${totalMax})`)
+      toast.success(`Loaded: ${examScore}/60 (Obj: ${objScore}, Theory: ${theoryScore}) → Total: ${totalScore}%`)
       setTimeout(updateStatsFromEntries, 50)
       
     } catch (error) {
@@ -699,7 +656,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     }
   }
 
-  // ✅ FIXED: Auto-fetch all - respects exam configuration
+  // ✅ FIXED: Auto-fetch all - ALWAYS calculate from exam_attempts (ignore existing CA scores)
   const handleAutoFetchAll = async () => {
     if (!selectedSubject || !selectedTerm || !selectedYear) {
       toast.info('Please select subject, term, and year first')
@@ -714,9 +671,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     setAutoFetching(true)
     let count = 0
     let totalFound = 0
+    let totalPercentages = 0
     
     try {
-      // Get all exam configurations for this subject
+      const classVariations = getClassVariations(selectedClass)
+      
+      // Get exam configurations
       const { data: examsData, error: examsError } = await supabase
         .from('exams')
         .select('id, objective_max, theory_max, total_marks, title')
@@ -740,11 +700,21 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       
       const examIds = examsData.map(e => e.id)
       
-      // Get all attempts
+      // Get all attempts for students in this class
+      const studentIds = students.map(s => s.id)
+      
+      if (studentIds.length === 0) {
+        toast.warning('No students found for this class. Please refresh the page.')
+        setAutoFetching(false)
+        return
+      }
+      
       const { data: allAttempts, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select('*')
         .in('exam_id', examIds)
+        .in('student_id', studentIds)
+        .order('created_at', { ascending: false })
       
       if (attemptsError) {
         console.error('❌ Attempts fetch error:', attemptsError)
@@ -753,33 +723,15 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         return
       }
       
-      // Build a map of exam configs
-      const examConfigMap = new Map()
-      examsData.forEach(e => {
-        examConfigMap.set(e.id, {
-          totalMax: e.total_marks || 60
-        })
-      })
-      
       // Group attempts by student (latest first)
       const resultsMap = new Map()
       if (allAttempts) {
         allAttempts.forEach((a: any) => {
           const existing = resultsMap.get(a.student_id)
           if (!existing || new Date(a.created_at) > new Date(existing.created_at)) {
-            const config = examConfigMap.get(a.exam_id)
-            resultsMap.set(a.student_id, {
-              ...a,
-              config: config
-            })
+            resultsMap.set(a.student_id, a)
           }
         })
-      }
-      
-      if (students.length === 0) {
-        toast.warning('No students found for this class. Please refresh the page.')
-        setAutoFetching(false)
-        return
       }
       
       const newEntries = { ...scoreEntries }
@@ -787,28 +739,27 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       
       for (const student of students) {
         const attempt = resultsMap.get(student.id)
-        if (attempt && attempt.config) {
+        if (attempt) {
+          // ✅ Calculate exam score as raw total (objective + theory)
           const objScore = Number(attempt.objective_score) || 0
           const theoryScore = Number(attempt.theory_score) || 0
-          const rawTotal = objScore + theoryScore
+          const examScore = objScore + theoryScore
           
-          const totalMax = attempt.config.totalMax || 60
-          
-          // Calculate percentage and scale to 60
-          const examPercentage = totalMax > 0 ? rawTotal / totalMax : 0
-          const scaledExamScore = Math.round(examPercentage * 60)
-          const finalExamScore = Math.min(scaledExamScore, 60)
-          
-          if (finalExamScore > 0) {
+          if (examScore > 0) {
+            const currentCA1 = parseInt(newEntries[student.id]?.ca1) || 0
+            const currentCA2 = parseInt(newEntries[student.id]?.ca2) || 0
+            const totalScore = currentCA1 + currentCA2 + examScore
+            
             newEntries[student.id] = {
               ca1: newEntries[student.id]?.ca1 || '',
               ca2: newEntries[student.id]?.ca2 || '',
-              exam: String(finalExamScore),
+              exam: String(examScore),
               is_saved: false
             }
             newSaved[student.id] = false
             count++
-            totalFound += finalExamScore
+            totalFound += examScore
+            totalPercentages += totalScore
           }
         }
       }
@@ -821,8 +772,9 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       }, 50)
       
       if (count > 0) {
-        const avgScore = Math.round(totalFound / count)
-        toast.success(`Loaded ${count} exam score(s) for ${selectedClass} (avg: ${avgScore}/60)`)
+        const avgExamScore = Math.round(totalFound / count)
+        const avgTotalPercentage = Math.round(totalPercentages / count)
+        toast.success(`Loaded ${count} exam score(s) (avg exam: ${avgExamScore}/60, avg total: ${avgTotalPercentage}%)`)
       } else {
         toast.info(`No exam scores found for ${selectedClass} in this subject`)
       }
@@ -832,6 +784,40 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     } finally {
       setAutoFetching(false)
     }
+  }
+
+  // Build save payload - saves raw objective + theory as exam score
+  const buildSavePayload = (studentId: string, ca1: number, ca2: number, exam: number, studentClass: string): any => {
+    const caTotal = ca1 + ca2
+    // exam is already the raw total (objective + theory)
+    const examScore = exam
+    const total = caTotal + examScore
+    
+    const now = new Date().toISOString()
+    const d: any = {
+      student_id: studentId,
+      subject: getMappedSubject(selectedSubject),
+      term: selectedTerm,
+      academic_year: selectedYear,
+      ca1_score: ca1,
+      ca2_score: ca2,
+      ca_total: caTotal,
+      exam_objective_score: exam,
+      exam_theory_score: 0,
+      exam_score: exam,
+      total_score: total,
+      percentage: total,
+      grade: getGrade(total),
+      remark: getGradeRemark(getGrade(total)),
+      teacher_id: staffProfile.id,
+      teacher_name: staffProfile.full_name || staffProfile.display_name || 'Teacher',
+      class: studentClass,
+      status: 'approved',
+      submitted_at: now,
+      updated_at: now
+    }
+    if (selectedExamId && !skipExam) d.exam_id = selectedExamId
+    return d
   }
 
   // Save single score
@@ -968,10 +954,6 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   }, {})
   const classOrder = Object.keys(groupedStudents).sort()
   const filteredScores = caScores.filter(s => (s.student?.full_name || getStudentName(s.student_id)).toLowerCase().includes(searchQuery.toLowerCase()))
-
-  const getExamTotal = (score: any) => score.exam_objective_score || 0
-  const getCATotal = (score: any) => (score.ca1_score || 0) + (score.ca2_score || 0)
-  const getGrandTotal = (score: any) => getCATotal(score) + getExamTotal(score)
 
   if (!mounted || isRestoring) {
     return (
@@ -1533,7 +1515,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </TabsContent>
       </Tabs>
 
-      {/* Delete All Dialog - Fixed: No div inside p tag */}
+      {/* Delete All Dialog */}
       <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
         <AlertDialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <AlertDialogHeader>
