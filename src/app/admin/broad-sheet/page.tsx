@@ -17,7 +17,8 @@ import {
   AlertCircle, Eye, Shield, Bell, Zap,
   TrendingUp, Award, GraduationCap, ChevronLeft, Send,
   BarChart3, Settings2, BookOpen, AlertTriangle, User,
-  Calendar, Mail, Phone, School,
+  Calendar, Mail, Phone, School, Bug,
+  CheckCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -146,6 +147,17 @@ const overallChipClass = (g: string) => ({
   C: 'bg-cyan-100 text-cyan-700', P: 'bg-amber-100 text-amber-700', F: 'bg-red-100 text-red-700',
 }[g] || 'bg-slate-100 text-slate-600')
 
+// ── Helper to extract first name ────────────────────────────────────────────
+const extractFirstName = (name: string): string => {
+  if (!name) return 'Student'
+  // Split by spaces and take the first part
+  const parts = name.trim().split(/\s+/)
+  let firstName = parts[0] || 'Student'
+  // Capitalize first letter, lowercase the rest
+  firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+  return firstName
+}
+
 // ── AI Comments ───────────────────────────────────────────────────────────────
 const generateAIComments = async (firstName: string, avg: number, subjects: any[], cls: string, gender: string) => {
   try {
@@ -179,7 +191,7 @@ const getFallbackPrincipalComment = (avg: number, firstName: string, gender: str
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SubjectScore { subject: string; ca1: number; ca2: number; exam_obj: number; exam_theory: number; total: number; grade: string; status: string; teacher_name: string }
-interface StudentRecord { id: string; name: string; admission_number: string; vin_id: string; class: string; department: string | null; subjectMap: Record<string, SubjectScore>; totalScore: number; averageScore: number; grade: string; completedSubjects: number; totalSubjects: number; expectedSubjects: string[]; hasAllSubjects: boolean; meetsMinimum: boolean; allSubmitted: boolean; reportCardStatus?: string | null; photo_url?: string | null }
+interface StudentRecord { id: string; name: string; admission_number: string; vin_id: string; class: string; department: string | null; subjectMap: Record<string, SubjectScore>; totalScore: number; averageScore: number; grade: string; completedSubjects: number; totalSubjects: number; expectedSubjects: string[]; hasAllSubjects: boolean; meetsMinimum: boolean; allSubmitted: boolean; reportCardStatus?: string | null; reportCardId?: string | null; photo_url?: string | null }
 
 const LOAD_TIMEOUT = 10000
 const AUTO_REFRESH_INTERVAL = 30000
@@ -214,6 +226,7 @@ function StatCard({ label, value, accent, icon: Icon, sub }: { label: string; va
 function ReportStatusChip({ status }: { status?: string | null }) {
   if (status === 'published') return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded-full"><CheckCircle2 className="h-2.5 w-2.5" />Published</span>
   if (status === 'generated') return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full"><FileText className="h-2.5 w-2.5" />Generated</span>
+  if (status === 'approved') return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-2 py-0.5 rounded-full"><CheckCircle className="h-2.5 w-2.5" />Approved</span>
   return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded-full">None</span>
 }
 
@@ -225,6 +238,7 @@ export default function BroadSheetPage() {
   const [loadError, setLoadError] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [publishing, setPublishing] = useState(false)
+  const [regenerating, setRegenerating] = useState(false)
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [expectedSubjects, setExpectedSubjects] = useState<string[]>(sortSubjectsByOrder(SS_SUBJECTS_SCIENCE))
   const [selectedClass, setSelectedClass] = useState('')
@@ -236,6 +250,7 @@ export default function BroadSheetPage() {
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
   const [newScoreAlert, setNewScoreAlert] = useState<string | null>(null)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+  const [debugInfo, setDebugInfo] = useState<any>(null)
 
   const autoRefreshTimerRef = useRef<NodeJS.Timeout>()
   const isRefreshingRef = useRef(false)
@@ -296,187 +311,592 @@ export default function BroadSheetPage() {
     if (newScoreAlert) { const t = setTimeout(() => setNewScoreAlert(null), 5000); return () => clearTimeout(t) }
   }, [newScoreAlert])
 
+  // ── Debug function ──────────────────────────────────────────────────────────
+  const debugReportCards = async () => {
+    try {
+      console.log('🔍 Debug: Checking report cards...')
+      console.log('📋 Current filters:', {
+        term: selectedTerm,
+        year: selectedYear,
+        class: selectedClass,
+        department: selectedDepartment
+      })
+
+      const { data: allCards, error: allError, count } = await supabase
+        .from('report_cards')
+        .select('*', { count: 'exact' })
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+
+      if (allError) throw allError
+
+      console.log(`📊 Total report cards for ${selectedTerm} ${selectedYear}:`, count)
+      console.log('📊 All report cards:', allCards)
+
+      const statusBreakdown = allCards?.reduce((acc: any, rc: any) => {
+        acc[rc.status] = (acc[rc.status] || 0) + 1
+        return acc
+      }, {})
+      console.log('📊 Status breakdown:', statusBreakdown)
+
+      const readyStudents = students.filter(s => s.meetsMinimum && s.allSubmitted)
+      console.log('📊 Students ready for report:', readyStudents.length)
+
+      setDebugInfo({
+        totalCards: count || 0,
+        statusBreakdown,
+        readyStudents: readyStudents.length,
+        allCards: allCards || []
+      })
+
+      toast.info(`Found ${count || 0} report cards. Check console for details.`)
+    } catch (error) {
+      console.error('Debug error:', error)
+      toast.error('Debug check failed')
+    }
+  }
+
+  // ── Load broad sheet ────────────────────────────────────────────────────────
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear) return
-    setLoading(true); setLoadError(false)
+    setLoading(true)
+    setLoadError(false)
+    
     try {
       const isJSS = selectedClass.toUpperCase().includes('JSS')
       const isSS = selectedClass.toUpperCase().includes('SS')
-      let query = supabase.from('profiles').select('id, full_name, display_name, admission_number, vin_id, class, department, gender, photo_url').eq('role', 'student').order('display_name').limit(500)
-      if (isJSS) query = query.eq('class', selectedClass)
-      else if (isSS) { const yp = extractYear(selectedClass); query = query.ilike('class', `%${yp}%`) }
-      else query = query.eq('class', selectedClass)
-      const { data: classStudents, error: se } = await query
-      if (se) throw se
-      if (!classStudents || classStudents.length === 0) { setStudents([]); setLoading(false); return }
+      
+      let query = supabase.from('profiles')
+        .select('id, full_name, display_name, admission_number, vin_id, class, department, gender, photo_url, first_name')
+        .eq('role', 'student')
+        .order('display_name')
+        .limit(500)
+      
+      if (isJSS) {
+        query = query.eq('class', selectedClass)
+      } else if (isSS) {
+        const yearPart = extractYear(selectedClass)
+        query = query.ilike('class', `%${yearPart}%`)
+      } else {
+        query = query.eq('class', selectedClass)
+      }
+      
+      const { data: classStudents, error: studentError } = await query
+      if (studentError) throw studentError
+      
+      if (!classStudents || classStudents.length === 0) {
+        setStudents([])
+        setLoading(false)
+        return
+      }
 
-      const ids = classStudents.map(s => s.id)
-      const { data: allScores, error: scErr } = await supabase.from('ca_scores').select('*').in('student_id', ids).eq('term', selectedTerm).eq('academic_year', selectedYear).eq('status', 'approved').limit(5000)
-      if (scErr) throw scErr
+      const studentIds = classStudents.map(s => s.id)
+      
+      const { data: allScores, error: scoreError } = await supabase
+        .from('ca_scores')
+        .select('*')
+        .in('student_id', studentIds)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .eq('status', 'approved')
+        .limit(5000)
+      
+      if (scoreError) throw scoreError
 
-      const { data: existingRC } = await supabase.from('report_cards').select('student_id, status').in('student_id', ids).eq('term', selectedTerm).eq('academic_year', selectedYear)
-      const rcMap: Record<string, string> = {}
-      ;(existingRC || []).forEach(rc => { rcMap[rc.student_id] = rc.status })
+      const { data: existingReportCards } = await supabase
+        .from('report_cards')
+        .select('student_id, status, id')
+        .in('student_id', studentIds)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+      
+      const reportCardStatusMap: Record<string, string> = {}
+      const reportCardIdMap: Record<string, string> = {}
+      ;(existingReportCards || []).forEach(rc => {
+        reportCardStatusMap[rc.student_id] = rc.status
+        reportCardIdMap[rc.student_id] = rc.id
+      })
 
       const records: StudentRecord[] = classStudents.map(student => {
-        const subs = getSubjectsForStudent(student.class, student.department)
+        const subjects = getSubjectsForStudent(student.class, student.department)
         const scores = (allScores || []).filter(s => s.student_id === student.id)
+        
         const subjectMap: Record<string, SubjectScore> = {}
         
-        scores.forEach(s => {
-          // ✅ FIX: Get exam total from multiple possible sources
-          let examTotal = s.exam_score || 0
+        scores.forEach(score => {
+          let examTotal = score.exam_score || 0
           if (examTotal === 0) {
-            const objScore = s.exam_objective_score || 0
-            const theoryScore = s.exam_theory_score || 0
+            const objScore = score.exam_objective_score || 0
+            const theoryScore = score.exam_theory_score || 0
             examTotal = objScore + theoryScore
           }
           if (examTotal === 0) {
-            examTotal = s.exam_objective_score || 0
+            examTotal = score.exam_objective_score || 0
           }
-          const total = (s.ca1_score || 0) + (s.ca2_score || 0) + examTotal
           
-          subjectMap[s.subject] = { 
-            subject: s.subject, 
-            ca1: s.ca1_score || 0, 
-            ca2: s.ca2_score || 0, 
-            exam_obj: s.exam_objective_score || 0, 
-            exam_theory: s.exam_theory_score || 0, 
-            total, 
-            grade: getSubjectGrade(Math.round((total / 100) * 100)), 
-            status: s.status || 'approved', 
-            teacher_name: s.teacher_name || '' 
+          const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
+          
+          subjectMap[score.subject] = {
+            subject: score.subject,
+            ca1: score.ca1_score || 0,
+            ca2: score.ca2_score || 0,
+            exam_obj: score.exam_objective_score || 0,
+            exam_theory: score.exam_theory_score || 0,
+            total: total,
+            grade: getSubjectGrade(Math.round((total / 100) * 100)),
+            status: score.status || 'approved',
+            teacher_name: score.teacher_name || ''
           }
         })
         
-        const scored = Object.keys(subjectMap).length
+        const completedSubjects = Object.keys(subjectMap).length
         const totalScore = Object.values(subjectMap).reduce((sum, x) => sum + x.total, 0)
-        const avg = scored > 0 ? Math.round(totalScore / scored) : 0
+        const averageScore = completedSubjects > 0 ? Math.round(totalScore / completedSubjects) : 0
         
-        return { 
-          id: student.id, 
-          name: student.display_name || student.full_name || 'Student', 
-          admission_number: student.admission_number || '—', 
-          vin_id: student.vin_id || '—', 
-          class: student.class, 
-          department: student.department || (isJSS ? 'Junior' : 'General'), 
-          subjectMap, 
-          totalScore, 
-          averageScore: avg, 
-          grade: scored > 0 ? getOverallGrade(avg) : '—', 
-          completedSubjects: scored, 
-          totalSubjects: subs.length, 
-          expectedSubjects: subs, 
-          hasAllSubjects: scored >= subs.length, 
-          meetsMinimum: meetsMinimumSubjects(student.class, scored), 
-          allSubmitted: meetsMinimumSubjects(student.class, scored), 
-          reportCardStatus: rcMap[student.id] || null,
+        const hasAllSubjects = subjects.every(sub => subjectMap[sub] !== undefined)
+        const minRequired = extractYear(student.class).startsWith('JSS') ? JSS_MIN_SUBJECTS : SS_MIN_SUBJECTS
+        const meetsMinimum = completedSubjects >= minRequired
+        
+        return {
+          id: student.id,
+          name: student.display_name || student.full_name || 'Student',
+          admission_number: student.admission_number || '—',
+          vin_id: student.vin_id || '—',
+          class: student.class,
+          department: student.department || (isJSS ? 'Junior' : 'General'),
+          subjectMap,
+          totalScore,
+          averageScore,
+          grade: completedSubjects > 0 ? getOverallGrade(averageScore) : '—',
+          completedSubjects,
+          totalSubjects: subjects.length,
+          expectedSubjects: subjects,
+          hasAllSubjects,
+          meetsMinimum,
+          allSubmitted: meetsMinimum,
+          reportCardStatus: reportCardStatusMap[student.id] || null,
+          reportCardId: reportCardIdMap[student.id] || null,
           photo_url: student.photo_url || null
         }
       })
 
-      setStudents(selectedDepartment !== 'all' ? records.filter(s => s.department === selectedDepartment) : records)
+      const filteredRecords = selectedDepartment !== 'all'
+        ? records.filter(s => s.department === selectedDepartment)
+        : records
+
+      setStudents(filteredRecords)
+      
     } catch (error) {
-      console.error(error); toast.error('Failed to load broad sheet'); setLoadError(true)
-    } finally { setLoading(false) }
+      console.error('Error loading broad sheet:', error)
+      toast.error('Failed to load broad sheet')
+      setLoadError(true)
+    } finally {
+      setLoading(false)
+    }
   }, [selectedClass, selectedTerm, selectedYear, selectedDepartment])
 
-  // ── View Report Card - opens as a page ────────────────────────────────────────
-  const handleViewReportCard = (student: StudentRecord) => {
-    // Navigate to the full report card page
-    router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
-  }
-
+  // ── Generate Report Cards ──────────────────────────────────────────────────
   const handleGenerateReportCards = async () => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted)
-    if (ready.length === 0) { toast.warning(`No students meet the minimum subject requirement.`); return }
-    setGenerating(true); setGenProgress({ current: 0, total: ready.length })
-    let count = 0
+    
+    if (ready.length === 0) {
+      toast.warning(`No students meet the minimum subject requirement.`)
+      return
+    }
+
+    setGenerating(true)
+    setGenProgress({ current: 0, total: ready.length })
+    let successCount = 0
+    let errorCount = 0
+
     try {
       for (const student of ready) {
-        const formatted = student.expectedSubjects.map(sub => {
-          const sc = student.subjectMap[sub]; if (!sc) return null
-          return { name: sub, ca: sc.ca1 + sc.ca2, exam: sc.exam_obj + sc.exam_theory, total: sc.total, grade: sc.grade, remark: getSubjectGradeRemark(sc.grade) }
-        }).filter(Boolean)
-        const allAvgs = students.map(s => s.averageScore).filter(s => s > 0)
-        const sorted = [...allAvgs].sort((a, b) => b - a)
-        const pos = sorted.findIndex(s => s === student.averageScore) + 1
-        const sortedByScore = [...formatted].sort((a, b) => (b?.total || 0) - (a?.total || 0))
-        const best = sortedByScore[0], worst = sortedByScore[sortedByScore.length - 1]
-        const { data: sp } = await supabase.from('profiles').select('gender').eq('id', student.id).single()
-        const gender = sp?.gender || 'male', firstName = student.name.split(' ')[0]
-        let teacherComment = '', principalComment = ''
         try {
-          const ai = await generateAIComments(firstName, student.averageScore, formatted, selectedClass, gender)
-          if (ai) { teacherComment = ai.teacher_comment; principalComment = ai.principal_comment }
-          else { teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender); principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender) }
-        } catch { teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender); principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender) }
+          const formattedSubjects = student.expectedSubjects.map(sub => {
+            const score = student.subjectMap[sub]
+            if (!score) return null
+            return {
+              name: sub,
+              ca: score.ca1 + score.ca2,
+              exam: score.exam_obj + score.exam_theory,
+              total: score.total,
+              grade: score.grade,
+              remark: getSubjectGradeRemark(score.grade)
+            }
+          }).filter(Boolean)
 
-        await supabase.from('report_cards').delete().eq('student_id', student.id).eq('term', selectedTerm).eq('academic_year', selectedYear)
-        const { error } = await supabase.from('report_cards').insert({ 
-          student_id: student.id, 
-          student_name: student.name, 
-          student_display_name: student.name, 
-          student_vin: student.vin_id, 
-          student_admission_number: student.admission_number, 
-          term: selectedTerm, 
-          academic_year: selectedYear, 
-          class: selectedClass, 
-          class_teacher: profile?.full_name || 'Class Teacher', 
-          principal_name: 'Principal', 
-          school_name: 'VINCOLLINS COLLEGE', 
-          total_score: student.totalScore, 
-          average_score: student.averageScore, 
-          class_highest: allAvgs.length > 0 ? Math.max(...allAvgs) : 0, 
-          class_lowest: allAvgs.length > 0 ? Math.min(...allAvgs) : 0, 
-          class_average: allAvgs.length > 0 ? Math.round(allAvgs.reduce((a, b) => a + b, 0) / allAvgs.length) : 0, 
-          position: pos, 
-          total_students: students.length, 
-          subjects_data: formatted, 
-          teacher_comments: teacherComment, 
-          principal_comments: principalComment, 
-          status: 'generated', 
-          generated_by: profile?.id, 
-          generated_at: new Date().toISOString(), 
-          session_year: selectedYear, 
-          submitted_at: new Date().toISOString(), 
-          published_at: null 
-        }).select()
-        if (error) throw error
-        count++; setGenProgress({ current: count, total: ready.length })
+          const allAverages = students.map(s => s.averageScore).filter(s => s > 0)
+          const sortedAverages = [...allAverages].sort((a, b) => b - a)
+          const position = sortedAverages.findIndex(avg => avg === student.averageScore) + 1
+          
+          const sortedByScore = [...formattedSubjects].sort((a, b) => (b?.total || 0) - (a?.total || 0))
+          const best = sortedByScore[0]
+          const worst = sortedByScore[sortedByScore.length - 1]
+
+          // ✅ Get student profile data including first_name
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('gender, first_name, full_name, display_name')
+            .eq('id', student.id)
+            .single()
+          
+          const gender = profileData?.gender || 'male'
+          
+          // ✅ Extract FIRST NAME properly
+          let firstName = ''
+          
+          // Priority: Use first_name from database
+          if (profileData?.first_name && profileData.first_name.trim() !== '') {
+            firstName = profileData.first_name
+          } else if (profileData?.display_name) {
+            // Fallback: extract first name from display_name
+            firstName = extractFirstName(profileData.display_name)
+          } else if (profileData?.full_name) {
+            // Fallback: extract first name from full_name
+            firstName = extractFirstName(profileData.full_name)
+          } else {
+            // Final fallback: extract from student.name
+            firstName = extractFirstName(student.name)
+          }
+          
+          // Capitalize properly
+          firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+          
+          console.log(`📝 Using FIRST name for ${student.name}: "${firstName}"`)
+
+          // ✅ Generate AI comments with the FIRST NAME only
+          let teacherComment = ''
+          let principalComment = ''
+          
+          try {
+            const aiResponse = await generateAIComments(
+              firstName, // ✅ Pass first name only
+              student.averageScore,
+              formattedSubjects,
+              selectedClass,
+              gender
+            )
+            
+            if (aiResponse) {
+              teacherComment = aiResponse.teacher_comment || getFallbackTeacherComment(
+                firstName, student.averageScore, best?.name || '', best?.total || 0,
+                worst?.name || '', worst?.total || 0, gender
+              )
+              principalComment = aiResponse.principal_comment || getFallbackPrincipalComment(
+                student.averageScore, firstName, gender
+              )
+            } else {
+              teacherComment = getFallbackTeacherComment(
+                firstName, student.averageScore, best?.name || '', best?.total || 0,
+                worst?.name || '', worst?.total || 0, gender
+              )
+              principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
+            }
+          } catch (error) {
+            console.error('Comment generation error:', error)
+            teacherComment = getFallbackTeacherComment(
+              firstName, student.averageScore, best?.name || '', best?.total || 0,
+              worst?.name || '', worst?.total || 0, gender
+            )
+            principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
+          }
+
+          const { data: existingCards } = await supabase
+            .from('report_cards')
+            .select('id')
+            .eq('student_id', student.id)
+            .eq('term', selectedTerm)
+            .eq('academic_year', selectedYear)
+
+          if (existingCards && existingCards.length > 0) {
+            const { error: deleteError } = await supabase
+              .from('report_cards')
+              .delete()
+              .eq('student_id', student.id)
+              .eq('term', selectedTerm)
+              .eq('academic_year', selectedYear)
+            
+            if (deleteError) {
+              console.error('Delete error:', deleteError)
+              errorCount++
+              continue
+            }
+          }
+
+          const reportCardData = {
+            student_id: student.id,
+            student_name: student.name || 'Student',
+            student_display_name: student.name || 'Student',
+            student_vin: student.vin_id || 'N/A',
+            student_admission_number: student.admission_number || 'N/A',
+            term: selectedTerm,
+            academic_year: selectedYear,
+            class: selectedClass,
+            class_teacher: profile?.full_name || 'Class Teacher',
+            principal_name: 'Principal',
+            school_name: 'VINCOLLINS COLLEGE',
+            total_score: student.totalScore || 0,
+            average_score: student.averageScore || 0,
+            class_highest: allAverages.length > 0 ? Math.max(...allAverages) : 0,
+            class_lowest: allAverages.length > 0 ? Math.min(...allAverages) : 0,
+            class_average: allAverages.length > 0 ? Math.round(allAverages.reduce((a, b) => a + b, 0) / allAverages.length) : 0,
+            position: position || 0,
+            total_students: students.length || 1,
+            subjects_data: formattedSubjects,
+            teacher_comments: teacherComment,
+            principal_comments: principalComment,
+            status: 'generated',
+            generated_by: profile?.id || null,
+            generated_at: new Date().toISOString(),
+            session_year: selectedYear,
+            submitted_at: new Date().toISOString(),
+            published_at: null
+          }
+
+          console.log(`📝 Creating report card for ${student.name} with FIRST NAME: "${firstName}"`)
+          console.log(`📝 Teacher comment: "${teacherComment}"`)
+
+          const { data: insertedData, error: insertError } = await supabase
+            .from('report_cards')
+            .insert(reportCardData)
+            .select()
+
+          if (insertError) {
+            console.error('Insert error for', student.name, ':', insertError)
+            errorCount++
+          } else {
+            console.log(`✅ Successfully created report card for ${student.name}`)
+            successCount++
+            setGenProgress({ current: successCount, total: ready.length })
+          }
+
+        } catch (studentError) {
+          console.error(`Error processing ${student.name}:`, studentError)
+          errorCount++
+        }
       }
-      toast.success(`Generated ${count} report cards. Click Publish to release to students.`)
-      await loadBroadSheet()
-    } catch (error) { console.error(error); toast.error('Failed to generate report cards') }
-    finally { setGenerating(false); setGenProgress({ current: 0, total: 0 }) }
+
+      if (successCount > 0) {
+        toast.success(`✅ Generated ${successCount} report cards successfully!`)
+        await loadBroadSheet()
+      }
+
+      if (errorCount > 0) {
+        toast.warning(`⚠️ ${errorCount} report cards failed to generate. Check console for details.`)
+      }
+
+      if (successCount === 0 && errorCount > 0) {
+        toast.error('❌ Failed to generate any report cards. Please try again.')
+      }
+
+    } catch (error) {
+      console.error('Generation error:', error)
+      toast.error('Failed to generate report cards')
+    } finally {
+      setGenerating(false)
+      setGenProgress({ current: 0, total: 0 })
+    }
   }
 
+  // ── Regenerate Comments for Existing Report Cards ──────────────────────────
+  const handleRegenerateComments = async () => {
+    const ready = students.filter(s => s.meetsMinimum && s.allSubmitted && s.reportCardId)
+    
+    if (ready.length === 0) {
+      toast.warning('No students with existing report cards found.')
+      return
+    }
+    
+    setRegenerating(true)
+    setGenProgress({ current: 0, total: ready.length })
+    let successCount = 0
+    let errorCount = 0
+    
+    try {
+      for (const student of ready) {
+        try {
+          // Get first name
+          const { data: profileData } = await supabase
+            .from('profiles')
+            .select('gender, first_name, display_name, full_name')
+            .eq('id', student.id)
+            .single()
+          
+          const gender = profileData?.gender || 'male'
+          let firstName = ''
+          
+          if (profileData?.first_name && profileData.first_name.trim() !== '') {
+            firstName = profileData.first_name
+          } else if (profileData?.display_name) {
+            firstName = extractFirstName(profileData.display_name)
+          } else if (profileData?.full_name) {
+            firstName = extractFirstName(profileData.full_name)
+          } else {
+            firstName = extractFirstName(student.name)
+          }
+          
+          firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
+          
+          // Get best and worst subjects
+          const formattedSubjects = student.expectedSubjects.map(sub => {
+            const score = student.subjectMap[sub]
+            if (!score) return null
+            return {
+              name: sub,
+              ca: score.ca1 + score.ca2,
+              exam: score.exam_obj + score.exam_theory,
+              total: score.total,
+              grade: score.grade,
+              remark: getSubjectGradeRemark(score.grade)
+            }
+          }).filter(Boolean)
+          
+          const sortedByScore = [...formattedSubjects].sort((a, b) => (b?.total || 0) - (a?.total || 0))
+          const best = sortedByScore[0]
+          const worst = sortedByScore[sortedByScore.length - 1]
+          
+          // Generate new comments
+          let teacherComment = ''
+          let principalComment = ''
+          
+          try {
+            const aiResponse = await generateAIComments(
+              firstName,
+              student.averageScore,
+              formattedSubjects,
+              selectedClass,
+              gender
+            )
+            
+            if (aiResponse) {
+              teacherComment = aiResponse.teacher_comment || getFallbackTeacherComment(
+                firstName, student.averageScore, best?.name || '', best?.total || 0,
+                worst?.name || '', worst?.total || 0, gender
+              )
+              principalComment = aiResponse.principal_comment || getFallbackPrincipalComment(
+                student.averageScore, firstName, gender
+              )
+            } else {
+              teacherComment = getFallbackTeacherComment(
+                firstName, student.averageScore, best?.name || '', best?.total || 0,
+                worst?.name || '', worst?.total || 0, gender
+              )
+              principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
+            }
+          } catch (error) {
+            console.error('Comment generation error:', error)
+            teacherComment = getFallbackTeacherComment(
+              firstName, student.averageScore, best?.name || '', best?.total || 0,
+              worst?.name || '', worst?.total || 0, gender
+            )
+            principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
+          }
+          
+          // Update the report card
+          const { error: updateError } = await supabase
+            .from('report_cards')
+            .update({ 
+              teacher_comments: teacherComment, 
+              principal_comments: principalComment 
+            })
+            .eq('id', student.reportCardId)
+          
+          if (updateError) throw updateError
+          
+          successCount++
+          setGenProgress({ current: successCount, total: ready.length })
+          
+        } catch (error) {
+          console.error(`Error regenerating for ${student.name}:`, error)
+          errorCount++
+        }
+      }
+      
+      if (successCount > 0) {
+        toast.success(`✅ Regenerated comments for ${successCount} students!`)
+        await loadBroadSheet()
+      }
+      
+      if (errorCount > 0) {
+        toast.warning(`⚠️ ${errorCount} students failed to regenerate.`)
+      }
+      
+    } catch (error) {
+      console.error('Regeneration error:', error)
+      toast.error('Failed to regenerate comments')
+    } finally {
+      setRegenerating(false)
+      setGenProgress({ current: 0, total: 0 })
+    }
+  }
+
+  // ── Publish Report Cards ──────────────────────────────────────────────────
   const handlePublishReportCards = async () => {
     const gen = students.filter(s => s.meetsMinimum && s.reportCardStatus === 'generated')
-    if (gen.length === 0) { toast.warning('No generated report cards to publish.'); return }
+    if (gen.length === 0) { 
+      toast.warning('No generated report cards to publish. Generate them first.') 
+      return 
+    }
+    
     setPublishing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({ status: 'published', published_at: new Date().toISOString() }).in('student_id', gen.map(s => s.id)).eq('term', selectedTerm).eq('academic_year', selectedYear).eq('status', 'generated')
+      const { error } = await supabase
+        .from('report_cards')
+        .update({ 
+          status: 'published', 
+          published_at: new Date().toISOString() 
+        })
+        .in('student_id', gen.map(s => s.id))
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .eq('status', 'generated')
+      
       if (error) throw error
+      
       toast.success(`Published ${gen.length} report cards! Students can now view them.`)
       await loadBroadSheet()
-    } catch { toast.error('Failed to publish report cards') }
-    finally { setPublishing(false) }
+    } catch (error) {
+      console.error('Publish error:', error)
+      toast.error('Failed to publish report cards')
+    } finally {
+      setPublishing(false)
+    }
   }
 
+  // ── Unpublish Report Cards ────────────────────────────────────────────────
   const handleUnpublishReportCards = async () => {
     const pub = students.filter(s => s.reportCardStatus === 'published')
-    if (pub.length === 0) { toast.warning('No published report cards.'); return }
+    if (pub.length === 0) { 
+      toast.warning('No published report cards.') 
+      return 
+    }
+    
     setPublishing(true)
     try {
-      const { error } = await supabase.from('report_cards').update({ status: 'generated', published_at: null }).in('student_id', pub.map(s => s.id)).eq('term', selectedTerm).eq('academic_year', selectedYear).eq('status', 'published')
+      const { error } = await supabase
+        .from('report_cards')
+        .update({ 
+          status: 'generated', 
+          published_at: null 
+        })
+        .in('student_id', pub.map(s => s.id))
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .eq('status', 'published')
+      
       if (error) throw error
+      
       toast.success(`Unpublished ${pub.length} report cards.`)
       await loadBroadSheet()
-    } catch { toast.error('Failed to unpublish') }
-    finally { setPublishing(false) }
+    } catch (error) {
+      console.error('Unpublish error:', error)
+      toast.error('Failed to unpublish')
+    } finally {
+      setPublishing(false)
+    }
   }
 
+  // ── Export CSV ─────────────────────────────────────────────────────────────
   const handleExportCSV = () => {
     if (!students.length) { toast.error('No data to export'); return }
     const headers = ['Student Name', 'Department', 'Admission No', ...expectedSubjects.map(getDisplaySubjectName), 'Total', 'Average', 'Grade', 'Report Status']
@@ -499,10 +919,43 @@ export default function BroadSheetPage() {
     toast.success('Exported!')
   }
 
+  // ── View Report Card ──────────────────────────────────────────────────────
+  const handleViewReportCard = async (student: StudentRecord) => {
+    if (student.reportCardId) {
+      router.push(`/admin/report-cards/${student.reportCardId}/view`)
+      return
+    }
+
+    try {
+      const { data: reportCard, error } = await supabase
+        .from('report_cards')
+        .select('id')
+        .eq('student_id', student.id)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedYear)
+        .maybeSingle()
+
+      if (error) throw error
+
+      if (reportCard) {
+        router.push(`/admin/report-cards/${reportCard.id}/view`)
+      } else {
+        toast.info('No report card generated for this student yet.')
+        router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
+      }
+    } catch (error) {
+      console.error('Error finding report card:', error)
+      toast.error('Failed to load report card')
+      router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
+    }
+  }
+
+  // ── Compute stats ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted)
     const generated = students.filter(s => s.reportCardStatus === 'generated')
     const published = students.filter(s => s.reportCardStatus === 'published')
+    const approved = students.filter(s => s.reportCardStatus === 'approved')
     const avgs = ready.map(s => s.averageScore).filter(a => a > 0)
     return {
       total: students.length, 
@@ -510,6 +963,7 @@ export default function BroadSheetPage() {
       readyForReport: ready.length, 
       generated: generated.length, 
       published: published.length,
+      approved: approved.length,
       incomplete: students.filter(s => !s.meetsMinimum).length,
       classAvg: avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : 0,
       topScore: ready.length ? Math.max(...ready.map(s => s.totalScore)) : 0,
@@ -599,6 +1053,11 @@ export default function BroadSheetPage() {
               onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear }); router.push(`/admin/report-cards?${p}`) }}
               className="h-8 text-xs gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Report Cards
+            </Button>
+            <Button size="sm" variant="outline"
+              onClick={debugReportCards}
+              className="h-8 text-xs gap-1.5 border-amber-200 text-amber-600 hover:bg-amber-50">
+              <Bug className="h-3.5 w-3.5" /> Debug
             </Button>
             <Button size="sm" variant={autoRefreshEnabled ? 'default' : 'outline'}
               onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
@@ -699,6 +1158,13 @@ export default function BroadSheetPage() {
                 </Button>
               )}
 
+              <Button onClick={handleRegenerateComments} disabled={regenerating || generating || publishing}
+                className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm gap-2 h-9">
+                {regenerating
+                  ? <><Loader2 className="h-4 w-4 animate-spin" /> Regenerating… {genProgress.current}/{genProgress.total}</>
+                  : <><RefreshCw className="h-4 w-4" /> Regen Comments</>}
+              </Button>
+
               <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-slate-500 hover:text-slate-700 ml-auto"
                 onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear, status: 'generated' }); router.push(`/admin/report-cards?${p}`) }}>
                 <Eye className="h-4 w-4" /> View Report Cards
@@ -706,11 +1172,16 @@ export default function BroadSheetPage() {
             </div>
 
             {/* Status pills */}
-            {(stats.generated > 0 || stats.published > 0) && (
+            {(stats.generated > 0 || stats.published > 0 || stats.approved > 0) && (
               <div className="flex flex-wrap gap-2">
                 {stats.generated > 0 && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-3 py-1.5 rounded-full">
                     <FileText className="h-3 w-3" /> {stats.generated} generated — not yet visible to students
+                  </span>
+                )}
+                {stats.approved > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 px-3 py-1.5 rounded-full">
+                    <CheckCircle className="h-3 w-3" /> {stats.approved} approved — ready to publish
                   </span>
                 )}
                 {stats.published > 0 && (
@@ -736,13 +1207,15 @@ export default function BroadSheetPage() {
 
         {/* ── Generation progress bar ──────────────────────────────────────── */}
         <AnimatePresence>
-          {generating && (
+          {(generating || regenerating) && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
               className="no-print bg-violet-50 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-800 rounded-xl p-4 overflow-hidden">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   <Loader2 className="h-4 w-4 animate-spin text-violet-600 dark:text-violet-400" />
-                  <span className="text-sm font-semibold text-violet-700 dark:text-violet-300">Generating Report Cards…</span>
+                  <span className="text-sm font-semibold text-violet-700 dark:text-violet-300">
+                    {generating ? 'Generating Report Cards…' : 'Regenerating Comments…'}
+                  </span>
                 </div>
                 <span className="text-xs font-medium text-violet-600 dark:text-violet-400 bg-violet-100 dark:bg-violet-900/30 px-2.5 py-1 rounded-full">
                   {genProgress.current} / {genProgress.total}
@@ -907,6 +1380,40 @@ export default function BroadSheetPage() {
             </table>
           </div>
         </Card>
+
+        {/* Debug info display */}
+        {debugInfo && (
+          <Card className="no-print border-0 shadow-sm bg-white dark:bg-slate-900">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-slate-700">Debug Info</h3>
+                <Button variant="ghost" size="sm" onClick={() => setDebugInfo(null)} className="h-7 text-xs">
+                  <X className="h-3 w-3" /> Close
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-2 bg-slate-50 rounded">
+                  <span className="text-slate-500">Total Cards:</span>
+                  <span className="ml-1 font-bold">{debugInfo.totalCards}</span>
+                </div>
+                <div className="p-2 bg-slate-50 rounded">
+                  <span className="text-slate-500">Ready Students:</span>
+                  <span className="ml-1 font-bold">{debugInfo.readyStudents}</span>
+                </div>
+                <div className="p-2 bg-slate-50 rounded">
+                  <span className="text-slate-500">Cards for Ready:</span>
+                  <span className="ml-1 font-bold">{debugInfo.cardsForReadyStudents}</span>
+                </div>
+                <div className="p-2 bg-slate-50 rounded">
+                  <span className="text-slate-500">Statuses:</span>
+                  <span className="ml-1 font-bold">
+                    {Object.entries(debugInfo.statusBreakdown || {}).map(([k, v]) => `${k}:${v}`).join(', ')}
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <style jsx global>{`
           @media print {
