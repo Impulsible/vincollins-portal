@@ -1,4 +1,5 @@
-// app/student/report-card/page.tsx
+// app/student/report-card/page.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import React from 'react'
@@ -65,89 +66,6 @@ const normalizeSubjectName = (name: string): string => {
   return SUBJECT_NAME_MAP[name] || name
 }
 
-// ── Subject ordering ──────────────────────────────────────────────────────────
-const SUBJECT_ORDER: Record<string, number> = {
-  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
-  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
-  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
-  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
-  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
-  'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
-  'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
-  'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
-  'PHE': 27, 'Security Education': 28,
-}
-
-const sortSubjectsByOrder = (subjects: any[]) =>
-  [...subjects].sort((a, b) =>
-    (SUBJECT_ORDER[a.subject] || 999) - (SUBJECT_ORDER[b.subject] || 999)
-  )
-
-// ── Grading ───────────────────────────────────────────────────────────────────
-const getSubjectGrade = (score: number): string => {
-  if (score >= 75) return 'A1'
-  if (score >= 70) return 'B2'
-  if (score >= 65) return 'B3'
-  if (score >= 60) return 'C4'
-  if (score >= 55) return 'C5'
-  if (score >= 50) return 'C6'
-  if (score >= 45) return 'D7'
-  if (score >= 40) return 'E8'
-  return 'F9'
-}
-
-const getSubjectGradeStyle = (grade: string): string => {
-  const base = 'text-white font-bold px-1.5 py-0.5 rounded text-[9px] inline-block'
-  switch (grade) {
-    case 'A1': return `bg-emerald-600 ${base}`
-    case 'B2': case 'B3': return `bg-blue-600 ${base}`
-    case 'C4': case 'C5': case 'C6': return `bg-cyan-600 ${base}`
-    case 'D7': case 'E8': return `bg-amber-600 ${base}`
-    case 'F9': return `bg-red-600 ${base}`
-    default: return `bg-gray-500 ${base}`
-  }
-}
-
-const getSubjectGradeRemark = (grade: string): string =>
-  ({
-    'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
-    'C4': 'Credit', 'C5': 'Credit', 'C6': 'Credit',
-    'D7': 'Pass', 'E8': 'Pass', 'F9': 'Fail',
-  }[grade] || '')
-
-const getOverallGrade = (score: number): string => {
-  if (score >= 80) return 'A'
-  if (score >= 70) return 'B'
-  if (score >= 60) return 'C'
-  if (score >= 50) return 'P'
-  return 'F'
-}
-
-const getOverallGradeColor = (grade: string): string => {
-  switch (grade) {
-    case 'A': return 'bg-emerald-100 text-emerald-700'
-    case 'B': return 'bg-blue-100 text-blue-700'
-    case 'C': return 'bg-cyan-100 text-cyan-700'
-    case 'P': return 'bg-amber-100 text-amber-700'
-    case 'F': return 'bg-red-100 text-red-700'
-    default: return 'bg-gray-100 text-gray-600'
-  }
-}
-
-const getOverallGradeTextColor = (grade: string): string => {
-  switch (grade) {
-    case 'A': return 'text-emerald-700 font-bold'
-    case 'B': return 'text-blue-700 font-bold'
-    case 'C': return 'text-cyan-700 font-bold'
-    case 'P': return 'text-amber-700 font-bold'
-    case 'F': return 'text-red-700 font-bold'
-    default: return 'text-gray-700'
-  }
-}
-
-const getOverallGradeRemark = (grade: string): string =>
-  ({ 'A': 'Excellent', 'B': 'Very Good', 'C': 'Good', 'P': 'Pass', 'F': 'Fail' }[grade] || '')
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface SubjectScore {
   subject: string
@@ -168,7 +86,18 @@ interface SchoolSettings {
   motto?: string
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+interface TermOption {
+  value: string
+  label: string
+}
+
+interface GradeScaleItem {
+  grade: string
+  min_score: number
+  max_score: number
+}
+
+// ── Default school (only fallback) ──────────────────────────────────────────
 const DEFAULT_SCHOOL: SchoolSettings = {
   name: 'VINCOLLINS COLLEGE',
   address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
@@ -177,27 +106,26 @@ const DEFAULT_SCHOOL: SchoolSettings = {
   motto: 'Geared Towards Excellence',
 }
 
-const TERMS = [
-  { value: 'first', label: 'First Term' },
-  { value: 'second', label: 'Second Term' },
-  { value: 'third', label: 'Third Term' },
+// ── Fallback grade scales ──────────────────────────────────────────────────
+const FALLBACK_WAEC_GRADES: GradeScaleItem[] = [
+  { grade: 'A1', min_score: 75, max_score: 100 },
+  { grade: 'B2', min_score: 70, max_score: 74 },
+  { grade: 'B3', min_score: 65, max_score: 69 },
+  { grade: 'C4', min_score: 60, max_score: 64 },
+  { grade: 'C5', min_score: 55, max_score: 59 },
+  { grade: 'C6', min_score: 50, max_score: 54 },
+  { grade: 'D7', min_score: 45, max_score: 49 },
+  { grade: 'E8', min_score: 40, max_score: 44 },
+  { grade: 'F9', min_score: 0, max_score: 39 },
 ]
 
-const YEARS = ['2024/2025', '2025/2026', '2026/2027', '2027/2028', '2028/2029']
-
-const getTermLabel = (term: string) =>
-  TERMS.find(t => t.value === term)?.label || 'Third Term'
-
-// ── Grade scale data ──────────────────────────────────────────────────────────
-const WAEC_GRADES = [
-  ['A1', '75-100'], ['B2', '70-74'], ['B3', '65-69'],
-  ['C4', '60-64'], ['C5', '55-59'], ['C6', '50-54'],
-  ['D7', '45-49'], ['E8', '40-44'], ['F9', '0-39'],
-] as [string, string][]
-
-const OVERALL_GRADES = [
-  ['A', '80-100'], ['B', '70-79'], ['C', '60-69'], ['P', '50-59'], ['F', '0-49'],
-] as [string, string][]
+const FALLBACK_OVERALL_GRADES: GradeScaleItem[] = [
+  { grade: 'A', min_score: 80, max_score: 100 },
+  { grade: 'B', min_score: 70, max_score: 79 },
+  { grade: 'C', min_score: 60, max_score: 69 },
+  { grade: 'P', min_score: 50, max_score: 59 },
+  { grade: 'F', min_score: 0, max_score: 49 },
+]
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
@@ -208,8 +136,13 @@ export default function StudentReportCardPage() {
 
   const [loading, setLoading] = useState(true)
   const [school, setSchool] = useState<SchoolSettings>(DEFAULT_SCHOOL)
-  const [selectedTerm, setSelectedTerm] = useState('third')
-  const [selectedYear, setSelectedYear] = useState('2025/2026')
+  
+  // ✅ DYNAMIC TERMS - from database
+  const [availableTerms, setAvailableTerms] = useState<TermOption[]>([])
+  const [availableYears, setAvailableYears] = useState<string[]>([])
+  const [selectedTerm, setSelectedTerm] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
+  
   const [nextTermDate, setNextTermDate] = useState('')
   const [student, setStudent] = useState<any>(null)
   const [subjects, setSubjects] = useState<SubjectScore[]>([])
@@ -221,6 +154,10 @@ export default function StudentReportCardPage() {
   const [teacherComment, setTeacherComment] = useState('')
   const [principalComment, setPrincipalComment] = useState('')
   const [classTeacher, setClassTeacher] = useState('')
+
+  // ✅ Grade scales with fallback
+  const [gradeScale, setGradeScale] = useState<GradeScaleItem[]>(FALLBACK_OVERALL_GRADES)
+  const [waecGradeScale, setWaecGradeScale] = useState<GradeScaleItem[]>(FALLBACK_WAEC_GRADES)
 
   // ── Print handler ─────────────────────────────────────────────────────────
   const handlePrint = useReactToPrint({
@@ -248,14 +185,95 @@ export default function StudentReportCardPage() {
     `,
   })
 
-  // ── Data loading ──────────────────────────────────────────────────────────
-  useEffect(() => {
-    loadSchoolSettings()
-    loadNextTermDate()
+  // ── Load terms from database ──────────────────────────────────────────────
+  const loadTermsAndYears = useCallback(async () => {
+    try {
+      const { data: termsData, error: termsError } = await supabase
+        .from('terms')
+        .select('term_code, term_name, session_year')
+        .order('session_year', { ascending: false })
+        .order('term_code', { ascending: true })
+
+      if (!termsError && termsData && termsData.length > 0) {
+        const termMap = new Map<string, string>()
+        termsData.forEach((t: any) => {
+          const key = t.term_code
+          if (!termMap.has(key)) {
+            termMap.set(key, t.term_name)
+          }
+        })
+        
+        const terms: TermOption[] = Array.from(termMap.entries()).map(([value, label]) => ({
+          value,
+          label
+        }))
+        setAvailableTerms(terms)
+
+        const years = [...new Set(termsData.map((t: any) => t.session_year))].sort((a, b) => b.localeCompare(a))
+        setAvailableYears(years)
+
+        const { data: settings } = await supabase
+          .from('school_settings')
+          .select('current_term, current_session')
+          .maybeSingle()
+
+        const defaultTerm = settings?.current_term || (terms.length > 0 ? terms[0].value : '')
+        const defaultYear = settings?.current_session || (years.length > 0 ? years[0] : '')
+
+        setSelectedTerm(defaultTerm)
+        setSelectedYear(defaultYear)
+      }
+    } catch (error) {
+      console.error('Error loading terms:', error)
+    }
   }, [])
 
+  // ── Load grade scales from database (with fallback) ───────────────────────
+  const loadGradeScales = useCallback(async () => {
+    try {
+      // Try to load from database
+      const { data: overall, error: overallError } = await supabase
+        .from('grade_system')
+        .select('grade, min_score, max_score')
+        .order('min_score', { ascending: false })
+
+      const { data: waec, error: waecError } = await supabase
+        .from('grade_system_waec')
+        .select('grade, min_score, max_score')
+        .order('min_score', { ascending: false })
+
+      if (!overallError && overall && overall.length > 0) {
+        setGradeScale(overall)
+      }
+
+      if (!waecError && waec && waec.length > 0) {
+        setWaecGradeScale(waec)
+      }
+    } catch (e) { 
+      console.error('Error loading grade scales, using fallback:', e)
+      // Use fallbacks
+      setGradeScale(FALLBACK_OVERALL_GRADES)
+      setWaecGradeScale(FALLBACK_WAEC_GRADES)
+    }
+  }, [])
+
+  // ── Data loading ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (selectedTerm && selectedYear) loadScores()
+    const loadInitialData = async () => {
+      await Promise.all([
+        loadSchoolSettings(),
+        loadNextTermDate(),
+        loadTermsAndYears(),
+        loadGradeScales(),
+      ])
+    }
+    loadInitialData()
+  }, [loadTermsAndYears, loadGradeScales])
+
+  useEffect(() => {
+    if (selectedTerm && selectedYear) {
+      loadScores()
+    }
   }, [selectedTerm, selectedYear])
 
   const loadSchoolSettings = async () => {
@@ -278,6 +296,27 @@ export default function StudentReportCardPage() {
         .from('system_settings').select('value').eq('key', 'next_term_date').maybeSingle()
       if (data?.value) setNextTermDate(data.value)
     } catch (e) { console.error(e) }
+  }
+
+  // ── Direct grade calculation (no DB calls) ──────────────────────────────
+  const getWAECGradeDirect = (score: number): { grade: string; color: string } => {
+    if (score >= 75) return { grade: 'A1', color: 'bg-emerald-600' }
+    if (score >= 70) return { grade: 'B2', color: 'bg-blue-600' }
+    if (score >= 65) return { grade: 'B3', color: 'bg-blue-600' }
+    if (score >= 60) return { grade: 'C4', color: 'bg-cyan-600' }
+    if (score >= 55) return { grade: 'C5', color: 'bg-cyan-600' }
+    if (score >= 50) return { grade: 'C6', color: 'bg-cyan-600' }
+    if (score >= 45) return { grade: 'D7', color: 'bg-amber-600' }
+    if (score >= 40) return { grade: 'E8', color: 'bg-amber-600' }
+    return { grade: 'F9', color: 'bg-red-600' }
+  }
+
+  const getOverallGradeDirect = (percentage: number): { grade: string; color: string } => {
+    if (percentage >= 80) return { grade: 'A', color: 'bg-emerald-100 text-emerald-700' }
+    if (percentage >= 70) return { grade: 'B', color: 'bg-blue-100 text-blue-700' }
+    if (percentage >= 60) return { grade: 'C', color: 'bg-cyan-100 text-cyan-700' }
+    if (percentage >= 50) return { grade: 'P', color: 'bg-amber-100 text-amber-700' }
+    return { grade: 'F', color: 'bg-red-100 text-red-700' }
   }
 
   const loadScores = useCallback(async () => {
@@ -324,26 +363,28 @@ export default function StudentReportCardPage() {
 
       if (!scores || scores.length === 0) { setHasReport(false); return }
 
-      // Process scores with subject name normalization and deduplication
+      // ✅ Process scores - use direct calculation (no DB calls)
       let processed: SubjectScore[] = scores.map((s: any) => {
         const ca = (s.ca1_score || 0) + (s.ca2_score || 0)
         const exam = (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
         const total = ca + exam
-        const grade = getSubjectGrade(total)
-        // Normalize subject name
         const normalizedSubject = normalizeSubjectName(s.subject)
+        
+        // ✅ Use direct calculation instead of DB query
+        const gradeResult = getWAECGradeDirect(total)
+        
         return {
           subject: normalizedSubject,
           ca,
           exam_obj: s.exam_objective_score || 0,
           exam_theory: s.exam_theory_score || 0,
           total,
-          grade,
-          remark: getSubjectGradeRemark(grade),
+          grade: gradeResult.grade,
+          remark: getSubjectGradeRemark(gradeResult.grade),
         }
       })
 
-      // Deduplicate subjects - keep the one with highest total score
+      // Deduplicate subjects
       const subjectMap = new Map<string, SubjectScore>()
       processed.forEach(s => {
         const existing = subjectMap.get(s.subject)
@@ -351,7 +392,23 @@ export default function StudentReportCardPage() {
           subjectMap.set(s.subject, s)
         }
       })
-      processed = sortSubjectsByOrder(Array.from(subjectMap.values()))
+      
+      // Sort subjects by order
+      const SUBJECT_ORDER: Record<string, number> = {
+        'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
+        'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
+        'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
+        'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
+        'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
+        'Business Studies': 18, 'Literature in English': 19, 'CRS': 20, 'CCA': 21,
+        'Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 23,
+        'Data Processing': 24, 'Information Technology': 25, 'Home Economics': 26,
+        'PHE': 27, 'Security Education': 28,
+      }
+      
+      processed = Array.from(subjectMap.values()).sort((a, b) =>
+        (SUBJECT_ORDER[a.subject] || 999) - (SUBJECT_ORDER[b.subject] || 999)
+      )
 
       setSubjects(processed)
       setHasReport(true)
@@ -360,7 +417,10 @@ export default function StudentReportCardPage() {
       const avg = processed.length > 0 ? total / processed.length : 0
       setTotalScore(total)
       setAverageScore(avg)
-      setOverallGrade(getOverallGrade(avg))
+      
+      // ✅ Use direct calculation for overall grade
+      const gradeResult = getOverallGradeDirect(avg)
+      setOverallGrade(gradeResult.grade)
 
       if (reportCard.teacher_comments || reportCard.principal_comments) {
         setTeacherComment(reportCard.teacher_comments || '')
@@ -384,8 +444,8 @@ export default function StudentReportCardPage() {
     }
   }, [selectedTerm, selectedYear, router])
 
-  // ── Generate ratings from average score ───────────────────────────────────
-  const generateRatings = () => {
+  // ── Generate ratings ──────────────────────────────────────────────────────
+  const generateRatings = useCallback(() => {
     const r = (base: number) => {
       if (averageScore >= 90) return Math.min(5, base + 1)
       if (averageScore >= 80) return base
@@ -406,7 +466,52 @@ export default function StudentReportCardPage() {
         { name: 'Club Activities', rating: r(4) },
       ],
     }
+  }, [averageScore])
+
+  // ── Helper functions ──────────────────────────────────────────────────────
+  const getSubjectGradeRemark = (grade: string): string =>
+    ({
+      'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
+      'C4': 'Credit', 'C5': 'Credit', 'C6': 'Credit',
+      'D7': 'Pass', 'E8': 'Pass', 'F9': 'Fail',
+    }[grade] || '')
+
+  const getSubjectGradeStyle = (grade: string): string => {
+    const base = 'text-white font-bold px-1.5 py-0.5 rounded text-[9px] inline-block'
+    switch (grade) {
+      case 'A1': return `bg-emerald-600 ${base}`
+      case 'B2': case 'B3': return `bg-blue-600 ${base}`
+      case 'C4': case 'C5': case 'C6': return `bg-cyan-600 ${base}`
+      case 'D7': case 'E8': return `bg-amber-600 ${base}`
+      case 'F9': return `bg-red-600 ${base}`
+      default: return `bg-gray-500 ${base}`
+    }
   }
+
+  const getOverallGradeColor = (grade: string): string => {
+    switch (grade) {
+      case 'A': return 'bg-emerald-100 text-emerald-700'
+      case 'B': return 'bg-blue-100 text-blue-700'
+      case 'C': return 'bg-cyan-100 text-cyan-700'
+      case 'P': return 'bg-amber-100 text-amber-700'
+      case 'F': return 'bg-red-100 text-red-700'
+      default: return 'bg-gray-100 text-gray-600'
+    }
+  }
+
+  const getOverallGradeTextColor = (grade: string): string => {
+    switch (grade) {
+      case 'A': return 'text-emerald-700 font-bold'
+      case 'B': return 'text-blue-700 font-bold'
+      case 'C': return 'text-cyan-700 font-bold'
+      case 'P': return 'text-amber-700 font-bold'
+      case 'F': return 'text-red-700 font-bold'
+      default: return 'text-gray-700'
+    }
+  }
+
+  const getOverallGradeRemark = (grade: string): string =>
+    ({ 'A': 'Excellent', 'B': 'Very Good', 'C': 'Good', 'P': 'Pass', 'F': 'Fail' }[grade] || '')
 
   // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
@@ -445,9 +550,9 @@ export default function StudentReportCardPage() {
     : null
   const showImprove = worstSubject && worstSubject.total < 50
   const fmtAvg = averageScore.toFixed(2)
-  const termLabel = getTermLabel(selectedTerm)
+  const termLabel = availableTerms.find(t => t.value === selectedTerm)?.label || selectedTerm
 
-  // ── Reusable grade scale component ───────────────────────────────────────
+  // ── Render grade scale ────────────────────────────────────────────────────
   const GradeScale = () => (
     <div>
       <div className="bg-blue-700 text-white text-[9px] px-2 py-1 font-bold rounded-t-sm">
@@ -455,18 +560,18 @@ export default function StudentReportCardPage() {
       </div>
       <div className="border-2 border-blue-900 p-2 rounded-b-sm">
         <div className="grid grid-cols-3 gap-1 text-[8px]">
-          {WAEC_GRADES.map(([g, r]) => (
-            <div key={g} className="flex items-center gap-1">
-              <span className={getSubjectGradeStyle(g)}>{g}</span>
-              <span className="text-gray-600">{r}</span>
+          {waecGradeScale.map((g) => (
+            <div key={g.grade} className="flex items-center gap-1">
+              <span className={getSubjectGradeStyle(g.grade)}>{g.grade}</span>
+              <span className="text-gray-600">{g.min_score}-{g.max_score}</span>
             </div>
           ))}
         </div>
         <div className="mt-1.5 pt-1.5 border-t border-blue-300 grid grid-cols-5 gap-0.5 text-[7px]">
-          {OVERALL_GRADES.map(([g, r]) => (
-            <div key={g} className="flex items-center gap-0.5">
-              <span className={cn('px-1 py-0.5 rounded font-bold text-[7px]', getOverallGradeColor(g))}>{g}</span>
-              <span className="text-gray-600">{r}</span>
+          {gradeScale.map((g) => (
+            <div key={g.grade} className="flex items-center gap-0.5">
+              <span className={cn('px-1 py-0.5 rounded font-bold text-[7px]', getOverallGradeColor(g.grade))}>{g.grade}</span>
+              <span className="text-gray-600">{g.min_score}-{g.max_score}</span>
             </div>
           ))}
         </div>
@@ -494,7 +599,6 @@ export default function StudentReportCardPage() {
         p-3 sm:p-4
         space-y-3
       ">
-        {/* Row 1: Title + nav buttons */}
         <div className="flex items-start justify-between gap-2">
           <div>
             <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 flex items-center gap-1.5">
@@ -524,17 +628,16 @@ export default function StudentReportCardPage() {
           </div>
         </div>
 
-        {/* Row 2: Filters + Print button */}
         <div className="flex flex-wrap items-end gap-2">
-          {/* Term selector */}
+          {/* ✅ DYNAMIC Term selector */}
           <div className="space-y-0.5 flex-1 min-w-[100px] max-w-[160px]">
             <label className="text-[10px] sm:text-xs font-medium text-gray-500 block">Term</label>
             <Select value={selectedTerm} onValueChange={setSelectedTerm}>
               <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white">
-                <SelectValue />
+                <SelectValue placeholder="Select term" />
               </SelectTrigger>
               <SelectContent>
-                {TERMS.map(t => (
+                {availableTerms.map(t => (
                   <SelectItem key={t.value} value={t.value} className="text-xs sm:text-sm">
                     {t.label}
                   </SelectItem>
@@ -543,22 +646,21 @@ export default function StudentReportCardPage() {
             </Select>
           </div>
 
-          {/* Session selector */}
+          {/* ✅ DYNAMIC Year selector */}
           <div className="space-y-0.5 flex-1 min-w-[90px] max-w-[140px]">
             <label className="text-[10px] sm:text-xs font-medium text-gray-500 block">Session</label>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white">
-                <SelectValue />
+                <SelectValue placeholder="Select year" />
               </SelectTrigger>
               <SelectContent>
-                {YEARS.map(y => (
+                {availableYears.map(y => (
                   <SelectItem key={y} value={y} className="text-xs sm:text-sm">{y}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Print button — only when report is available */}
           {hasReport && (
             <Button
               onClick={handlePrint}
@@ -572,8 +674,6 @@ export default function StudentReportCardPage() {
       </div>
 
       {/* ══ EMPTY STATES ══════════════════════════════════════════════════════ */}
-
-      {/* Not yet published */}
       {!hasReport && reportNotPublished && (
         <div className="bg-white rounded-xl border border-amber-200 shadow-sm py-12 sm:py-16 px-4 sm:px-6 text-center">
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
@@ -594,7 +694,6 @@ export default function StudentReportCardPage() {
         </div>
       )}
 
-      {/* No report card */}
       {!hasReport && !reportNotPublished && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-12 sm:py-16 px-4 sm:px-6 text-center">
           <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
@@ -630,7 +729,6 @@ export default function StudentReportCardPage() {
 
             {/* ── SCHOOL HEADER ── */}
             <div className="border-b-2 border-blue-900 pb-2 mb-3 print:pb-1.5 print:mb-2">
-              {/* Mobile: stacked | sm+: row */}
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-3 print:flex-row print:gap-3">
 
                 {/* Logo */}
@@ -649,7 +747,7 @@ export default function StudentReportCardPage() {
                   )}
                 </div>
 
-                {/* School info — center on mobile, flex-1 on sm+ */}
+                {/* School info */}
                 <div className="flex-1 text-center w-full min-w-0">
                   <h1 className="
                     text-xs sm:text-base md:text-lg lg:text-xl
@@ -661,7 +759,6 @@ export default function StudentReportCardPage() {
                     {school.address}
                   </p>
 
-                  {/* Contact — stacked on mobile, inline on sm */}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 mt-0.5">
                     <span className="text-[9px] sm:text-[10px] text-gray-600 flex items-center gap-0.5">
                       <Mail className="h-2.5 w-2.5 shrink-0" />
@@ -688,7 +785,7 @@ export default function StudentReportCardPage() {
                   </div>
                 </div>
 
-                {/* Student photo — hidden on mobile, visible sm+ */}
+                {/* Student photo */}
                 <div className="
                   hidden sm:block
                   w-20 h-24 sm:w-20 sm:h-24 md:w-24 md:h-28
@@ -707,7 +804,6 @@ export default function StudentReportCardPage() {
             </div>
 
             {/* ── STUDENT INFO GRID ── */}
-            {/* 1-col on mobile, 2-col on sm+ */}
             <div className="
               grid grid-cols-1 sm:grid-cols-2
               gap-x-4 gap-y-0
@@ -737,7 +833,6 @@ export default function StudentReportCardPage() {
             </div>
 
             {/* ── MAIN BODY ── */}
-            {/* Single col mobile → two-col md+ */}
             <div className="
               flex flex-col
               md:grid md:grid-cols-[2.2fr_1.2fr]
@@ -748,7 +843,7 @@ export default function StudentReportCardPage() {
               {/* ── LEFT COLUMN ── */}
               <div className="min-w-0 space-y-2 sm:space-y-3 print:space-y-2">
 
-                {/* Scores table — horizontally scrollable on mobile */}
+                {/* Scores table */}
                 <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
                   <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
                     <table className="
@@ -855,7 +950,7 @@ export default function StudentReportCardPage() {
                   </div>
                 </div>
 
-                {/* Grade scale — shown on md+ in left col, and always in print */}
+                {/* Grade scale */}
                 <div className="hidden md:block print:block">
                   <GradeScale />
                 </div>
@@ -908,7 +1003,6 @@ export default function StudentReportCardPage() {
                 </div>
 
                 {/* Affective + Psychomotor */}
-                {/* 2-col side by side on mobile (they're small) → 1-col on md+ */}
                 <div className="grid grid-cols-2 md:grid-cols-1 gap-2 print:grid-cols-1 print:gap-1.5">
 
                   {/* Affective domain */}
@@ -955,10 +1049,6 @@ export default function StudentReportCardPage() {
                   <div className="bg-blue-700 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase">
                     Key To Ratings
                   </div>
-                  {/* 
-                    Mobile: 2-col grid to save vertical space
-                    md+: single column  
-                  */}
                   <div className="p-2 text-[8px] sm:text-[9px] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-1 gap-0.5 print:grid-cols-1 print:p-1.5">
                     {['5 – Excellent', '4 – Very Good', '3 – Good', '2 – Fair', '1 – Poor'].map(r => (
                       <div key={r} className="font-medium text-gray-700">{r}</div>
@@ -966,7 +1056,7 @@ export default function StudentReportCardPage() {
                   </div>
                 </div>
 
-                {/* Grade scale — only shown on mobile (md hides it, shows in left col instead) */}
+                {/* Grade scale */}
                 <div className="block md:hidden print:hidden">
                   <GradeScale />
                 </div>

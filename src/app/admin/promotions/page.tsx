@@ -436,21 +436,46 @@ export default function AdminPromotionsPage() {
     }
   }, [])
 
+  // ✅ FIXED: fetchPromotions with deduplication
   const fetchPromotions = useCallback(async () => {
     try {
-      setLoading(true); setError(null)
-      const res  = await fetch('/api/admin/promotions')
+      setLoading(true)
+      setError(null)
+      
+      const res = await fetch('/api/admin/promotions')
       const data = await res.json()
+      
       if (data.promotions) {
-        setPromotions(data.promotions)
+        // ✅ Deduplicate by student_id (keep the first occurrence)
+        const seen = new Set()
+        const uniquePromotions = data.promotions.filter((p: Promotion) => {
+          if (seen.has(p.student_id)) {
+            return false
+          }
+          seen.add(p.student_id)
+          return true
+        })
+        
+        setPromotions(uniquePromotions)
+        
         const deptSel: Record<string, string> = {}
-        data.promotions.forEach((p: Promotion) => {
-          if (p.current_class === 'JSS 3' && p.status === 'pending') deptSel[p.student_id] = 'Science'
+        uniquePromotions.forEach((p: Promotion) => {
+          if (p.current_class === 'JSS 3' && p.status === 'pending') {
+            deptSel[p.student_id] = 'Science'
+          }
         })
         setSelectedDepartment(deptSel)
-      } else if (!res.ok) throw new Error(data.error || 'Failed to fetch')
-    } catch (err: any) { setError(err.message); toast.error('Failed to load promotions') }
-    finally { setLoading(false); setInitialLoad(false) }
+      } else if (!res.ok) {
+        throw new Error(data.error || 'Failed to fetch')
+      }
+    } catch (err: any) {
+      console.error('❌ Fetch error:', err)
+      setError(err.message || 'Failed to load promotions')
+      toast.error('Failed to load promotions')
+    } finally {
+      setLoading(false)
+      setInitialLoad(false)
+    }
   }, [])
 
   useEffect(() => { fetchPromotions(); fetchSystemStatus() }, [fetchPromotions, fetchSystemStatus])
@@ -719,9 +744,6 @@ export default function AdminPromotionsPage() {
               {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               Approve All{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </button>
-            {/* ============================================
-                UPDATED: END OF TERM PROMOTIONS BUTTON
-                ============================================ */}
             <button
               onClick={handleEndOfTermPromotions}
               disabled={processingEndOfTerm || !systemStatus?.canProcessPromotions}

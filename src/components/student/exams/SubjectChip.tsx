@@ -1,4 +1,5 @@
-// src/components/student/exams/SubjectChip.tsx
+// src/components/student/exams/SubjectChip.tsx - FIXED VERSION
+
 import { Badge } from '@/components/ui/badge'
 import { CheckCircle, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -12,6 +13,10 @@ interface SubjectChipProps {
   hasAttempt?: boolean
   config?: SubjectConfig
   onClick: () => void
+  // ✅ Dynamic truncation options
+  maxLabelLength?: number
+  showIcon?: boolean
+  showCheckmark?: boolean
 }
 
 export function SubjectChip({
@@ -22,12 +27,17 @@ export function SubjectChip({
   hasAttempt,
   config,
   onClick,
+  maxLabelLength = 12,  // ✅ Only fallback
+  showIcon = true,
+  showCheckmark = true,
 }: SubjectChipProps) {
   const SubjectIcon = config?.icon || BookOpen
+  
+  // ✅ Dynamic label truncation
   const displayLabel = subject === 'all' 
     ? label 
-    : label.length > 10 
-      ? label.substring(0, 10) + '...' 
+    : label.length > maxLabelLength 
+      ? label.substring(0, maxLabelLength) + '...' 
       : label
 
   return (
@@ -40,7 +50,7 @@ export function SubjectChip({
       )}
       onClick={onClick}
     >
-      {config && <SubjectIcon className="h-3.5 w-3.5" />}
+      {showIcon && config && <SubjectIcon className="h-3.5 w-3.5" />}
       
       <span className="hidden sm:inline">{label}</span>
       <span className="sm:hidden">{displayLabel}</span>
@@ -52,7 +62,7 @@ export function SubjectChip({
         {count}
       </span>
       
-      {hasAttempt && (
+      {showCheckmark && hasAttempt && (
         <CheckCircle className="h-3 w-3 text-green-500 ml-0.5" />
       )}
     </Badge>

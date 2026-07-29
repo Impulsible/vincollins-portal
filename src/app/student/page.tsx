@@ -1,3 +1,5 @@
+// src/app/student/page.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -58,12 +60,9 @@ function calculateGrade(percentage: number): { grade: string; color: string } {
 function extractYear(className: string | undefined | null): string {
   if (!className) return ''
   
-  // Extract SS1, SS2, SS3 from any format
   if (className.includes('SS1')) return 'SS1'
   if (className.includes('SS2')) return 'SS2'
   if (className.includes('SS3')) return 'SS3'
-  
-  // Extract JSS1, JSS2, JSS3 from any format
   if (className.includes('JSS1')) return 'JSS1'
   if (className.includes('JSS2')) return 'JSS2'
   if (className.includes('JSS3')) return 'JSS3'
@@ -93,6 +92,52 @@ const DEFAULT_STATS: DashboardStats = {
 
 // Get cached user synchronously
 const cachedHeaderUser = getCachedHeaderUser()
+
+// ============================================
+// ✅ DYNAMIC TERM FETCHING - FROM DATABASE (NO HARDCODED VALUES)
+// ============================================
+async function fetchCurrentTermAndSession(): Promise<{ term: string; session: string }> {
+  try {
+    // First try to get from terms table where is_current = true
+    const { data: termData, error: termError } = await supabase
+      .from('terms')
+      .select('term_code, session_year')
+      .eq('is_current', true)
+      .single()
+
+    if (!termError && termData) {
+      console.log('✅ Current term from terms table:', termData)
+      return {
+        term: termData.term_code,
+        session: termData.session_year
+      }
+    }
+
+    // Fallback: Get from school_settings
+    const { data: settings, error: settingsError } = await supabase
+      .from('school_settings')
+      .select('current_term, current_session')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (!settingsError && settings) {
+      if (settings.current_term && settings.current_session) {
+        console.log('✅ Current term from school_settings:', settings)
+        return {
+          term: settings.current_term,
+          session: settings.current_session
+        }
+      }
+    }
+    
+    console.warn('⚠️ No current term found in database')
+    return { term: '', session: '' }
+  } catch (error) {
+    console.error('Error fetching current term:', error)
+    return { term: '', session: '' }
+  }
+}
 
 // ============================================
 // LOADING SPINNER COMPONENT
@@ -172,6 +217,11 @@ function StudentDashboardContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
   
+  // ✅ DYNAMIC TERM STATE - FROM DATABASE
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
+  const [isLoadingTerm, setIsLoadingTerm] = useState(true)
+  
   // Load from cache
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(() => {
     if (typeof window !== 'undefined') {
@@ -213,6 +263,18 @@ function StudentDashboardContent() {
     return undefined
   }, [contextUser])
 
+  // ── Fetch current term from database ───────────────────────────────────────
+  useEffect(() => {
+    const loadTerm = async () => {
+      const { term, session } = await fetchCurrentTermAndSession()
+      console.log('📊 Loaded current term:', { term, session })
+      setCurrentTerm(term)
+      setCurrentSession(session)
+      setIsLoadingTerm(false)
+    }
+    loadTerm()
+  }, [])
+
   // Integrated auth check
   useEffect(() => {
     if (redirectCheckedRef.current) return
@@ -236,10 +298,15 @@ function StudentDashboardContent() {
     }
   }, [authLoading, isAuthenticated, contextUser, router])
 
-  // Fetch data in background
+  // ── Fetch data with dynamic term ──────────────────────────────────────────
   useEffect(() => {
-    if (authLoading) return
+    // ✅ Wait for auth and term to load
+    if (authLoading || isLoadingTerm) return
     if (!isAuthenticated || !contextUser?.id) return
+    if (!currentTerm || !currentSession) {
+      console.warn('⏳ Waiting for current term to load...')
+      return
+    }
     
     const userRole = contextUser.role?.toLowerCase()
     if (userRole !== 'student') return
@@ -264,6 +331,26 @@ function StudentDashboardContent() {
           return
         }
 
+        // ✅ Use dynamic term and session from database
+        const term = currentTerm
+        const session = currentSession
+
+        console.log('🎯 Fetching data for:', { term, session, userClass })
+
+        // ✅ Clear old cache when term changes
+        const oldCache = localStorage.getItem('student_dashboard_cache')
+        if (oldCache) {
+          try {
+            const parsed = JSON.parse(oldCache)
+            if (parsed.termProgress?.term !== term || parsed.termProgress?.session_year !== session) {
+              console.log('🔄 Clearing old cache for new term')
+              localStorage.removeItem('student_dashboard_cache')
+            }
+          } catch (e) {
+            localStorage.removeItem('student_dashboard_cache')
+          }
+        }
+
         // Fetch classmates in the same year across all departments
         const { data: allClassmates, error: classmatesError } = await supabase
           .from('profiles')
@@ -274,33 +361,101 @@ function StudentDashboardContent() {
 
         const allClassmatesList = allClassmates || []
 
-        const [
-          progressResult,
-          examsResult,
-          attemptsResult,
-          caScoresResult,
-          assignmentsResult,
-          notesResult
-        ] = await Promise.all([
-          supabase.from('student_term_progress').select('*').eq('student_id', userId).eq('term', 'third').eq('session_year', '2025/2026').maybeSingle(),
-          supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
-          supabase.from('exam_attempts').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(50),
-          supabase.from('ca_scores').select('*').eq('student_id', userId),
-          supabase.from('assignments')
-            .select('*')
-            .eq('status', 'published')
-            .or(`classes.cs.{${userClass}},class.eq.${userClass},classes.cs.{${userYear}},class.eq.${userYear}`)
-            .order('created_at', { ascending: false })
-            .limit(10),
-          supabase.from('notes').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
-        ])
+        // ✅ FIXED: Only fetch exams for the student's CURRENT class and CURRENT term
+        const { data: examsData, error: examsError } = await supabase
+          .from('exams')
+          .select('*')
+          .eq('status', 'published')
+          .eq('class', userClass)
+          .eq('term', term)
+          .eq('session_year', session)
+          .order('created_at', { ascending: false })
 
-        const progress = progressResult.data
-        const exams = examsResult.error ? [] : examsResult.data || []
-        const attempts = attemptsResult.error ? [] : attemptsResult.data || []
-        const caScores = caScoresResult.error ? [] : caScoresResult.data || []
-        const assignments = assignmentsResult.error ? [] : assignmentsResult.data || []
-        const notes = notesResult.error ? [] : notesResult.data || []
+        if (examsError) {
+          console.error('Error fetching exams:', examsError)
+        }
+
+        // ✅ FIXED: Only fetch attempts for the student's CURRENT term using session_year
+        const { data: attemptsData, error: attemptsError } = await supabase
+          .from('exam_attempts')
+          .select('*')
+          .eq('student_id', userId)
+          .eq('term', term)
+          .eq('session_year', session)
+          .order('created_at', { ascending: false })
+
+        if (attemptsError) {
+          console.error('Error fetching attempts:', attemptsError)
+        }
+
+        // ✅ FIXED: Only fetch CA scores for the student's CURRENT term (ca_scores uses academic_year)
+        const { data: caScoresData, error: caScoresError } = await supabase
+          .from('ca_scores')
+          .select('*')
+          .eq('student_id', userId)
+          .eq('term', term)
+          .eq('academic_year', session)
+          .order('created_at', { ascending: false })
+
+        if (caScoresError) {
+          console.error('Error fetching CA scores:', caScoresError)
+        }
+
+        // ✅ FIXED: Fetch assignments for student's current class (no term filters)
+        const { data: assignmentsData, error: assignmentsError } = await supabase
+          .from('assignments')
+          .select('*')
+          .eq('status', 'published')
+          .or(`classes.cs.{${userClass}},class.eq.${userClass}`)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (assignmentsError) {
+          console.warn('Error fetching assignments:', assignmentsError)
+        }
+
+        // ✅ FIXED: Fetch notes for student's current class (no term filters)
+        const { data: notesData, error: notesError } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('class', userClass)
+          .order('created_at', { ascending: false })
+          .limit(10)
+
+        if (notesError) {
+          console.warn('Error fetching notes:', notesError)
+        }
+
+        // ✅ FIXED: Only fetch term progress for the student's CURRENT term using session_year
+        const { data: progressData, error: progressError } = await supabase
+          .from('student_term_progress')
+          .select('*')
+          .eq('student_id', userId)
+          .eq('term', term)
+          .eq('session_year', session)
+          .maybeSingle()
+
+        if (progressError) {
+          console.warn('Error fetching term progress:', progressError)
+        }
+
+        const exams = examsData || []
+        const attempts = attemptsData || []
+        const caScores = caScoresData || []
+        const assignments = assignmentsData || []
+        const notes = notesData || []
+        const progress = progressData
+
+        console.log('📊 Data summary:', {
+          term,
+          session,
+          exams: exams.length,
+          attempts: attempts.length,
+          caScores: caScores.length,
+          assignments: assignments.length,
+          notes: notes.length,
+          progress: progress ? 'found' : 'not found'
+        })
 
         const caScoresMap: Record<string, any> = {}
         caScores.forEach((ca: any) => { if (ca.exam_id) caScoresMap[ca.exam_id] = ca })
@@ -394,7 +549,7 @@ function StudentDashboardContent() {
     return () => {
       if (loadingTimeoutRef.current) clearTimeout(loadingTimeoutRef.current)
     }
-  }, [contextUser?.id, contextUser?.class, authLoading, isAuthenticated, contextUser?.role, loading])
+  }, [contextUser?.id, contextUser?.class, authLoading, isAuthenticated, contextUser?.role, loading, currentTerm, currentSession, isLoadingTerm])
 
   // Reset fetch flag when user changes
   useEffect(() => {
@@ -414,9 +569,10 @@ function StudentDashboardContent() {
     window.location.reload()
   }
 
-  // Auto-refresh every 30 seconds (silent)
+  // ── Auto-refresh with dynamic term ────────────────────────────────────────
   const handleBackgroundRefresh = useCallback(async () => {
-    if (!isAuthenticated || !contextUser?.id || refreshing) return
+    if (!isAuthenticated || !contextUser?.id || refreshing || isLoadingTerm) return
+    if (!currentTerm || !currentSession) return
     
     setRefreshing(true)
     
@@ -430,6 +586,9 @@ function StudentDashboardContent() {
         return
       }
 
+      const term = currentTerm
+      const session = currentSession
+
       const { data: classmatesData, error: classmatesError } = await supabase
         .from('profiles')
         .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
@@ -439,33 +598,90 @@ function StudentDashboardContent() {
 
       const classmates = classmatesError ? [] : classmatesData || []
 
-      const [
-        progressResult,
-        examsResult,
-        attemptsResult,
-        caScoresResult,
-        assignmentsResult,
-        notesResult
-      ] = await Promise.all([
-        supabase.from('student_term_progress').select('*').eq('student_id', userId).eq('term', 'third').eq('session_year', '2025/2026').maybeSingle(),
-        supabase.from('exams').select('*').eq('status', 'published').eq('class', userClass).limit(20),
-        supabase.from('exam_attempts').select('*').eq('student_id', userId).order('created_at', { ascending: false }).limit(50),
-        supabase.from('ca_scores').select('*').eq('student_id', userId),
-        supabase.from('assignments')
-          .select('*')
-          .eq('status', 'published')
-          .or(`classes.cs.{${userClass}},class.eq.${userClass},classes.cs.{${userYear}},class.eq.${userYear}`)
-          .order('created_at', { ascending: false })
-          .limit(10),
-        supabase.from('notes').select('*').eq('class', userClass).order('created_at', { ascending: false }).limit(10),
-      ])
+      // ✅ FIXED: Only fetch exams for the student's CURRENT class and term
+      const { data: examsData, error: examsError } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('status', 'published')
+        .eq('class', userClass)
+        .eq('term', term)
+        .eq('session_year', session)
+        .order('created_at', { ascending: false })
 
-      const progress = progressResult.data
-      const exams = examsResult.error ? [] : examsResult.data || []
-      const attempts = attemptsResult.error ? [] : attemptsResult.data || []
-      const caScores = caScoresResult.error ? [] : caScoresResult.data || []
-      const assignments = assignmentsResult.error ? [] : assignmentsResult.data || []
-      const notes = notesResult.error ? [] : notesResult.data || []
+      if (examsError) {
+        console.error('Error fetching exams:', examsError)
+      }
+
+      // ✅ FIXED: Only fetch attempts for the student's CURRENT term using session_year
+      const { data: attemptsData, error: attemptsError } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .eq('student_id', userId)
+        .eq('term', term)
+        .eq('session_year', session)
+        .order('created_at', { ascending: false })
+
+      if (attemptsError) {
+        console.error('Error fetching attempts:', attemptsError)
+      }
+
+      // ✅ FIXED: Only fetch CA scores for the student's CURRENT term
+      const { data: caScoresData, error: caScoresError } = await supabase
+        .from('ca_scores')
+        .select('*')
+        .eq('student_id', userId)
+        .eq('term', term)
+        .eq('academic_year', session)
+        .order('created_at', { ascending: false })
+
+      if (caScoresError) {
+        console.error('Error fetching CA scores:', caScoresError)
+      }
+
+      // ✅ FIXED: Fetch assignments for student's current class
+      const { data: assignmentsData, error: assignmentsError } = await supabase
+        .from('assignments')
+        .select('*')
+        .eq('status', 'published')
+        .or(`classes.cs.{${userClass}},class.eq.${userClass}`)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (assignmentsError) {
+        console.warn('Error fetching assignments:', assignmentsError)
+      }
+
+      // ✅ FIXED: Fetch notes for student's current class
+      const { data: notesData, error: notesError } = await supabase
+        .from('notes')
+        .select('*')
+        .eq('class', userClass)
+        .order('created_at', { ascending: false })
+        .limit(10)
+
+      if (notesError) {
+        console.warn('Error fetching notes:', notesError)
+      }
+
+      // ✅ FIXED: Only fetch term progress for the student's CURRENT term using session_year
+      const { data: progressData, error: progressError } = await supabase
+        .from('student_term_progress')
+        .select('*')
+        .eq('student_id', userId)
+        .eq('term', term)
+        .eq('session_year', session)
+        .maybeSingle()
+
+      if (progressError) {
+        console.warn('Error fetching term progress:', progressError)
+      }
+
+      const exams = examsData || []
+      const attempts = attemptsData || []
+      const caScores = caScoresData || []
+      const assignments = assignmentsData || []
+      const notes = notesData || []
+      const progress = progressData
 
       const caScoresMap: Record<string, any> = {}
       caScores.forEach((ca: any) => { if (ca.exam_id) caScoresMap[ca.exam_id] = ca })
@@ -549,17 +765,18 @@ function StudentDashboardContent() {
     } finally {
       setRefreshing(false)
     }
-  }, [contextUser, isAuthenticated, refreshing])
+  }, [contextUser, isAuthenticated, refreshing, currentTerm, currentSession, isLoadingTerm])
 
   useEffect(() => {
-    if (!isAuthenticated || !contextUser) return
+    if (!isAuthenticated || !contextUser || isLoadingTerm) return
+    if (!currentTerm || !currentSession) return
     
     const interval = setInterval(() => {
       handleBackgroundRefresh()
     }, 30000)
     
     return () => clearInterval(interval)
-  }, [isAuthenticated, contextUser, handleBackgroundRefresh])
+  }, [isAuthenticated, contextUser, handleBackgroundRefresh, isLoadingTerm, currentTerm, currentSession])
 
   const dashboardMetrics = useMemo(() => {
     const completedExams = stats.completedExams || 0
@@ -571,7 +788,7 @@ function StudentDashboardContent() {
     return { completedExams, totalExams, availableExams, avgScore, gradeInfo }
   }, [stats.completedExams, stats.availableExams, stats.averageScore, termProgress?.total_subjects])
 
-  const showLoadingSpinner = (loading && !dashboardData && !loadingTimeout) || (authLoading && !cachedHeaderUser)
+  const showLoadingSpinner = (loading && !dashboardData && !loadingTimeout) || (authLoading && !cachedHeaderUser) || isLoadingTerm
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">

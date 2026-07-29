@@ -1,4 +1,5 @@
-// src/components/staff/exams/edit/SubQuestionItem.tsx
+// src/components/staff/exams/edit/SubQuestionItem.tsx - UPDATED WITH MARK SYSTEM
+
 'use client'
 
 import { Button } from '@/components/ui/button'
@@ -22,12 +23,28 @@ interface SubQuestionItemProps {
   index: number
   onUpdate: (data: Partial<SubQuestionData>) => void
   onDelete: () => void
+  // ✅ Added: mark configuration from database
+  defaultMark?: number
+  totalTheoryMarks?: number
+  theoryQuestionCount?: number
 }
 
-// ✅ Make sure this is exported
-export function SubQuestionItem({ subQuestion, index, onUpdate, onDelete }: SubQuestionItemProps) {
+export function SubQuestionItem({ 
+  subQuestion, 
+  index, 
+  onUpdate, 
+  onDelete,
+  defaultMark = 0,
+  totalTheoryMarks = 0,
+  theoryQuestionCount = 0,
+}: SubQuestionItemProps) {
   const [keywords, setKeywords] = useState<string[]>(subQuestion.keywords || [])
   const [keywordInput, setKeywordInput] = useState('')
+
+  // ✅ Calculate marks per sub-question
+  const marksPerSubQuestion = theoryQuestionCount > 0 && totalTheoryMarks > 0 
+    ? totalTheoryMarks / theoryQuestionCount 
+    : 0
 
   const handleAddKeyword = () => {
     const keyword = keywordInput.trim().toLowerCase()
@@ -56,9 +73,16 @@ export function SubQuestionItem({ subQuestion, index, onUpdate, onDelete }: SubQ
   return (
     <div className="border-l-4 border-purple-300 pl-4 mt-4">
       <div className="flex items-center justify-between mb-3">
-        <Label className="text-sm font-semibold text-purple-700">
-          Sub-question {String.fromCharCode(96 + index)}.
-        </Label>
+        <div className="flex items-center gap-2">
+          <Label className="text-sm font-semibold text-purple-700">
+            Sub-question {String.fromCharCode(96 + index)}.
+          </Label>
+          {marksPerSubQuestion > 0 && (
+            <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
+              {marksPerSubQuestion.toFixed(2)} marks each
+            </Badge>
+          )}
+        </div>
         <Button variant="ghost" size="sm" onClick={onDelete} className="h-7 w-7 p-0 text-red-500">
           <X className="h-4 w-4" />
         </Button>
@@ -82,7 +106,13 @@ export function SubQuestionItem({ subQuestion, index, onUpdate, onDelete }: SubQ
               min={0}
               max={30}
               className="mt-1"
+              placeholder={marksPerSubQuestion > 0 ? marksPerSubQuestion.toFixed(2) : "0"}
             />
+            {marksPerSubQuestion > 0 && (
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                Suggested: {marksPerSubQuestion.toFixed(2)} marks
+              </p>
+            )}
           </div>
           <div>
             <Label className="text-xs">Keywords</Label>

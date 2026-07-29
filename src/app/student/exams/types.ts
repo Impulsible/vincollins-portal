@@ -1,4 +1,4 @@
-// src/app/student/exams/types.ts - COMPLETE FIXED VERSION
+// src/app/student/exams/types.ts - COMPLETE FIXED VERSION (NO HARDCODED VALUES)
 
 // ============================================
 // ✅ EXAM
@@ -108,6 +108,16 @@ export interface TermProgress {
 }
 
 // ============================================
+// ✅ SUBJECT STAT
+// ============================================
+export interface SubjectStat {
+  subject: string
+  score: number
+  grade: string
+  status: 'completed' | 'pending' | 'not_started'
+}
+
+// ============================================
 // ✅ STATS STATE
 // ============================================
 export interface StatsState {
@@ -121,6 +131,7 @@ export interface StatsState {
   termName: string
   sessionYear: string
   pendingTheoryCount?: number
+  subjectStats?: SubjectStat[]
 }
 
 // ============================================
@@ -128,7 +139,9 @@ export interface StatsState {
 // ============================================
 export type ViewMode = 'grid' | 'list'
 export type TabType = 'available' | 'upcoming' | 'completed' | 'expired'
-export type ExamStatus = 'available' | 'upcoming' | 'completed' | 'expired' | 'in_progress'
+
+// ✅ FIXED: Single ExamStatus definition with all possible statuses
+export type ExamStatus = 'available' | 'upcoming' | 'completed' | 'expired' | 'in_progress' | 'graded' | 'pending_theory'
 
 // ============================================
 // ✅ SUBJECT CONFIG
@@ -147,6 +160,7 @@ export interface TermOption {
   term: string
   session_year: string
   label: string
+  is_current?: boolean
 }
 
 export interface TermSession {
@@ -167,7 +181,7 @@ export type QuestionType = 'objective' | 'theory'
 export type QuestionStatus = 'answered' | 'flagged' | 'current' | 'not-answered'
 
 // ============================================
-// ✅ EXAM RESULT - FIXED WITH time_spent
+// ✅ EXAM RESULT
 // ============================================
 export interface ExamResult {
   // Core scores
@@ -207,9 +221,9 @@ export interface ExamResult {
   graded_at?: string | null
   graded_by?: string | null
   
-  // ✅ Time tracking - FIXED
-  time_spent?: number    // Time spent in seconds
-  duration?: number      // Total exam duration in minutes
+  // Time tracking
+  time_spent?: number
+  duration?: number
   started_at?: string | null
   ended_at?: string | null
   
@@ -218,8 +232,8 @@ export interface ExamResult {
   auto_submit_reason?: string | null
   
   // Backward compatibility aliases
-  total_score?: number  // Alias for score
-  total_marks?: number  // Alias for total
+  total_score?: number
+  total_marks?: number
 }
 
 // ============================================
@@ -271,7 +285,7 @@ export interface SecurityState {
 }
 
 // ============================================
-// ✅ HELPER FUNCTIONS - Create Default States
+// ✅ HELPER FUNCTIONS - Create Default States (NO HARDCODED VALUES)
 // ============================================
 export function createDefaultExamState(): ExamState {
   return {
@@ -317,7 +331,6 @@ export function createDefaultExamResult(): ExamResult {
     max_attempts: 1,
     is_auto_submitted: false,
     auto_submit_reason: null,
-    // ✅ Time tracking defaults
     time_spent: 0,
     duration: 0,
     started_at: null,
@@ -331,12 +344,13 @@ export function createDefaultStats(): StatsState {
     completed: 0,
     upcoming: 0,
     averageScore: 0,
-    currentGrade: 'F',
-    gradeColor: 'text-red-600',
+    currentGrade: 'N/A',
+    gradeColor: 'text-gray-400',
     totalSubjects: 0,
-    termName: 'Third Term',
-    sessionYear: '2025/2026',
+    termName: '',
+    sessionYear: '',
     pendingTheoryCount: 0,
+    subjectStats: [],
   }
 }
 

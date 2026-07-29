@@ -1,4 +1,4 @@
-// components/staff/StaffExamsTab.tsx - COMPLETE FIXED VERSION
+// components/staff/StaffExamsTab.tsx - UPDATED WITH MARK SYSTEM
 
 "use client";
 
@@ -50,6 +50,7 @@ import {
   Copy,
   GraduationCap,
   BookMarked,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -85,6 +86,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useRouter } from "next/navigation";
+import { MARK_CONSTANTS } from "../exams/create/constants";
 
 // ============================================
 // TYPES - MATCHING YOUR DATABASE SCHEMA
@@ -109,6 +111,17 @@ interface Exam {
   teacher_name?: string;
   term?: string;
   session_year?: string;
+  // ✅ Mark fields from database
+  default_mark?: number;
+  objective_max?: number;
+  theory_max?: number;
+  objective_total_marks?: number;
+  theory_total_marks?: number;
+  exam_total_marks?: number;
+  ca1_max?: number;
+  ca2_max?: number;
+  ca_total_marks?: number;
+  grand_total_marks?: number;
 }
 
 interface StaffExamsTabProps {
@@ -185,7 +198,6 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
     if (mounted && staffProfile?.id) {
       loadExams();
 
-      // Real-time subscription for exams
       const subscription = supabase
         .channel("staff_exams_channel")
         .on(
@@ -213,7 +225,6 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
 
     setLoading(true);
     try {
-      // Fetch exams from your database
       const { data: examsData, error: examsError } = await supabase
         .from("exams")
         .select("*")
@@ -241,11 +252,21 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
         teacher_name: exam.teacher_name,
         term: exam.term || "third",
         session_year: exam.session_year || "2025/2026",
+        // ✅ Load mark fields from database
+        default_mark: exam.default_mark || 0.5,
+        objective_max: exam.objective_max || 0,
+        theory_max: exam.theory_max || 0,
+        objective_total_marks: exam.objective_total_marks || 0,
+        theory_total_marks: exam.theory_total_marks || 0,
+        exam_total_marks: exam.exam_total_marks || 0,
+        ca1_max: exam.ca1_max || 10,
+        ca2_max: exam.ca2_max || 10,
+        ca_total_marks: exam.ca_total_marks || 20,
+        grand_total_marks: exam.grand_total_marks || 100,
       }));
 
       setExams(formattedExams);
 
-      // Update stats
       setStats({
         total: formattedExams.length,
         published: formattedExams.filter((e) => e.status === "published")
@@ -255,7 +276,6 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
         archived: formattedExams.filter((e) => e.status === "archived").length,
       });
 
-      // Extract unique subjects, classes, and terms
       const uniqueSubjects = [
         ...new Set(
           formattedExams
@@ -300,7 +320,6 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
 
     setDeleting(true);
     try {
-      // First delete associated questions
       const { error: questionsError } = await supabase
         .from("questions")
         .delete()
@@ -309,7 +328,6 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
       if (questionsError)
         console.error("Error deleting questions:", questionsError);
 
-      // Then delete the exam
       const { error } = await supabase
         .from("exams")
         .delete()
@@ -374,6 +392,17 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
         status: "draft",
         created_by: staffProfile.id,
         teacher_name: staffProfile?.full_name || "Teacher",
+        // ✅ Copy mark configuration
+        default_mark: exam.default_mark || 0.5,
+        objective_max: exam.objective_max || 0,
+        theory_max: exam.theory_max || 0,
+        objective_total_marks: exam.objective_total_marks || 0,
+        theory_total_marks: exam.theory_total_marks || 0,
+        exam_total_marks: exam.exam_total_marks || 60,
+        ca1_max: exam.ca1_max || 10,
+        ca2_max: exam.ca2_max || 10,
+        ca_total_marks: exam.ca_total_marks || 20,
+        grand_total_marks: exam.grand_total_marks || 100,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
@@ -443,6 +472,22 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
       <Badge variant="outline" className={cn("border-0", termInfo.color)}>
         <GraduationCap className="h-3 w-3 mr-1" />
         {termInfo.label}
+      </Badge>
+    );
+  };
+
+  // ✅ Get mark summary for a badge
+  const getMarkSummaryBadge = (exam: Exam) => {
+    const examTotal = exam.exam_total_marks || exam.total_marks || 0;
+    const isBalanced = examTotal === MARK_CONSTANTS.EXAM_TOTAL;
+    return (
+      <Badge variant="outline" className={cn(
+        "text-[10px]",
+        isBalanced ? "text-emerald-600 border-emerald-200" : "text-amber-600 border-amber-200"
+      )}>
+        <Calculator className="h-2.5 w-2.5 mr-0.5" />
+        {examTotal}mk
+        {!isBalanced && " ⚠️"}
       </Badge>
     );
   };
@@ -778,9 +823,12 @@ export function StaffExamsTab({ staffProfile }: StaffExamsTabProps) {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-center text-xs hidden lg:table-cell">
-                              <Badge variant="outline" className="text-[10px]">
-                                {exam.total_marks || 0}
-                              </Badge>
+                              <div className="flex items-center justify-center gap-1">
+                                <Badge variant="outline" className="text-[10px]">
+                                  {exam.total_marks || 0}
+                                </Badge>
+                                {getMarkSummaryBadge(exam)}
+                              </div>
                             </TableCell>
                             <TableCell className="text-xs hidden xl:table-cell">
                               {getTermBadge(exam.term || "third")}

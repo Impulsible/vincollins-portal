@@ -1,4 +1,5 @@
 // app/student/types.ts
+
 export interface StudentProfile {
   id: string
   full_name: string
@@ -70,7 +71,6 @@ export interface ExamAttempt {
   has_ca?: boolean
 }
 
-// ✅ ADD THIS - StudyNote interface
 export interface StudyNote {
   id: string
   title: string
@@ -87,4 +87,34 @@ export interface StudyNote {
   created_at: string
   updated_at?: string
   status: string
+}
+
+// Term related types
+export interface TermOption {
+  term: string
+  session_year: string
+  label: string
+  is_current?: boolean
+  start_date?: string
+  end_date?: string
+}
+
+export interface TermSession {
+  term: string
+  session_year: string
+}
+
+export interface StatsState {
+  totalSubjects: number
+  completed: number
+  averageScore: number
+  currentGrade: string
+  subjectStats: SubjectStat[]
+}
+
+export interface SubjectStat {
+  subject: string
+  score: number
+  grade: string
+  status: 'completed' | 'pending' | 'not_started'
 }

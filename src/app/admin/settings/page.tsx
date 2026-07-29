@@ -1,5 +1,4 @@
 // app/admin/settings/page.tsx
-
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -22,7 +21,8 @@ import {
   Save, Camera, Key, Mail, Phone, MapPin, School,
   Globe, Lock, Eye, EyeOff, LogOut, Trash2,
   CheckCircle2, AlertTriangle, ChevronRight, Calendar,
-  Wifi, HardDrive, RefreshCw, Info
+  Wifi, HardDrive, RefreshCw, Info, GraduationCap,
+  ArrowRight, Clock, Zap
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -129,6 +129,21 @@ function PasswordInput({
   )
 }
 
+// ── Term status badge ──────────────────────────────────────────────────────────
+function TermStatusBadge({ term, currentTerm }: { term: string; currentTerm: string }) {
+  const isCurrent = term === currentTerm
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
+      isCurrent ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+    )}>
+      {isCurrent ? <Zap className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
+      {term}
+      {isCurrent && ' (current)'}
+    </span>
+  )
+}
+
 // ── Main ───────────────────────────────────────────────────────────────────────
 export default function AdminSettingsPage() {
   const [loading, setLoading] = useState(true)
@@ -161,6 +176,11 @@ export default function AdminSettingsPage() {
   })
   const [schoolLoaded, setSchoolLoaded] = useState(false)
 
+  // ✅ DYNAMIC: Current term from school_settings table
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
+  const [isLoadingTerm, setIsLoadingTerm] = useState(true)
+
   // Next-term date
   const [nextTermDate, setNextTermDate] = useState('')
   const [savingNextTerm, setSavingNextTerm] = useState(false)
@@ -178,11 +198,44 @@ export default function AdminSettingsPage() {
   // DB status
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
 
+  // ── Fetch current term from database ───────────────────────────────────────
+  const fetchCurrentTerm = async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('school_settings')
+        .select('current_term, current_session')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        console.error('Error fetching term settings:', error)
+        setCurrentTerm('third')
+        setCurrentSession('2025/2026')
+        return
+      }
+
+      if (settings) {
+        setCurrentTerm(settings.current_term || 'third')
+        setCurrentSession(settings.current_session || '2025/2026')
+      }
+    } catch (error) {
+      console.error('Error fetching current term:', error)
+      setCurrentTerm('third')
+      setCurrentSession('2025/2026')
+    } finally {
+      setIsLoadingTerm(false)
+    }
+  }
+
   // ── Initialise ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
-        // 1. Auth session
+        // 1. Fetch current term
+        await fetchCurrentTerm()
+
+        // 2. Auth session
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           const { data: profileData } = await supabase
@@ -200,7 +253,7 @@ export default function AdminSettingsPage() {
           }
         }
 
-        // 2. School settings from system_settings table
+        // 3. School settings from system_settings table
         const { data: sysRows, error: sysErr } = await supabase
           .from('system_settings')
           .select('key, value')
@@ -215,8 +268,8 @@ export default function AdminSettingsPage() {
             school_address: map['school_address'] || '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
             school_phone: map['school_phone'] || '+234 912 1155 554',
             school_email: map['school_email'] || 'vincollinscollege@gmail.com',
-            current_term: map['current_term'] || 'Third Term',
-            current_session: map['current_session'] || '2025/2026',
+            current_term: map['current_term'] || currentTerm || 'Third Term',
+            current_session: map['current_session'] || currentSession || '2025/2026',
             portal_name: map['portal_name'] || 'Vincollins Portal',
           })
 
@@ -235,7 +288,7 @@ export default function AdminSettingsPage() {
 
         setSchoolLoaded(true)
 
-        // 3. localStorage prefs
+        // 4. localStorage prefs
         try {
           const stored = localStorage.getItem('admin-notification-prefs')
           if (stored) {
@@ -308,7 +361,21 @@ export default function AdminSettingsPage() {
     try {
       const entries = Object.entries(schoolSettings) as [string, string][]
       await Promise.all(entries.map(([k, v]) => upsertSetting(k, v)))
+      
+      // Also update school_settings table if term/session changed
+      if (schoolSettings.current_term || schoolSettings.current_session) {
+        await supabase
+          .from('school_settings')
+          .update({
+            current_term: schoolSettings.current_term.toLowerCase().replace(' term', ''),
+            current_session: schoolSettings.current_session,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', (await supabase.from('school_settings').select('id').single()).data?.id)
+      }
+      
       toast.success('School settings saved to database')
+      await fetchCurrentTerm()
     } catch (err: any) {
       toast.error(err.message || 'Failed to save school settings')
     } finally { setSaving(false) }
@@ -349,14 +416,16 @@ export default function AdminSettingsPage() {
   })()
 
   // ── Loading skeleton ───────────────────────────────────────────────────────
-  if (loading) {
+  if (loading || isLoadingTerm) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
         <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
           <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-slate-700">Loading settings</p>
+          <p className="text-sm font-medium text-slate-700">
+            {isLoadingTerm ? 'Loading term settings…' : 'Loading settings…'}
+          </p>
           <p className="text-xs text-slate-400 mt-0.5">Fetching your configuration…</p>
         </div>
       </div>
@@ -378,6 +447,11 @@ export default function AdminSettingsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
             <p className="text-sm text-slate-500 mt-0.5">
               Manage your profile, school configuration, and preferences
+              {currentTerm && (
+                <span className="ml-2 text-emerald-600 text-xs font-medium">
+                  (Current term: {currentTerm.charAt(0).toUpperCase() + currentTerm.slice(1)} • {currentSession})
+                </span>
+              )}
             </p>
           </div>
           <div className={cn(
@@ -392,6 +466,28 @@ export default function AdminSettingsPage() {
             {dbConnected === true ? 'DB Connected' : dbConnected === false ? 'DB Offline' : 'Checking…'}
           </div>
         </div>
+
+        {/* Current term banner */}
+        {currentTerm && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-xl">
+                <GraduationCap className="h-4 w-4 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-emerald-800">
+                  Current Term: <span className="capitalize">{currentTerm}</span>
+                </p>
+                <p className="text-xs text-emerald-600">
+                  Session: {currentSession}
+                </p>
+              </div>
+            </div>
+            <Badge className="bg-emerald-200 text-emerald-700 border-0 text-xs font-medium px-3 py-1">
+              <CheckCircle2 className="h-3 w-3 mr-1" /> Live
+            </Badge>
+          </div>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* Tab bar */}
@@ -666,24 +762,45 @@ export default function AdminSettingsPage() {
                     />
                   </div>
 
-                  {/* Read-only session fields */}
+                  {/* ✅ DYNAMIC: Current term and session with badges */}
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-600">Current Term</Label>
-                    <div className="relative">
+                    <div className="flex items-center gap-2">
                       <Input
                         value={schoolSettings.current_term}
                         onChange={e => setSchoolSettings(s => ({ ...s, current_term: e.target.value }))}
-                        className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500"
+                        className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500 flex-1"
+                      />
+                      <TermStatusBadge 
+                        term={schoolSettings.current_term} 
+                        currentTerm={currentTerm.charAt(0).toUpperCase() + currentTerm.slice(1)} 
                       />
                     </div>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Changing this updates the system's current term
+                    </p>
                   </div>
+                  
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-600">Current Session</Label>
-                    <Input
-                      value={schoolSettings.current_session}
-                      onChange={e => setSchoolSettings(s => ({ ...s, current_session: e.target.value }))}
-                      className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500"
-                    />
+                    <div className="flex items-center gap-2">
+                      <Input
+                        value={schoolSettings.current_session}
+                        onChange={e => setSchoolSettings(s => ({ ...s, current_session: e.target.value }))}
+                        className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500 flex-1"
+                      />
+                      <Badge className={cn(
+                        'text-xs font-medium px-2 py-0.5 border',
+                        schoolSettings.current_session === currentSession 
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
+                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                      )}>
+                        {schoolSettings.current_session === currentSession ? 'current' : 'not current'}
+                      </Badge>
+                    </div>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Changing this updates the system's current session
+                    </p>
                   </div>
                 </div>
 

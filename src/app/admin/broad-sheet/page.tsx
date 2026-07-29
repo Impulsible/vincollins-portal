@@ -1,3 +1,4 @@
+// app/admin/broad-sheet/page.tsx
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -15,9 +16,8 @@ import {
   Loader2, RefreshCw, Printer, Search, X, FileSpreadsheet,
   Users, FileDown, Sparkles, FileText, CheckCircle2,
   AlertCircle, Eye, Shield, Bell, Zap,
-  TrendingUp, Award, GraduationCap, ChevronLeft, Send,
-  BarChart3, Settings2, BookOpen, AlertTriangle, User,
-  Calendar, Mail, Phone, School, Bug,
+  TrendingUp, GraduationCap, ChevronLeft, Send,
+  Settings2, BookOpen, AlertTriangle,
   CheckCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,7 +26,6 @@ import { cn } from '@/lib/utils'
 const JSS_MIN_SUBJECTS = 16
 const SS_MIN_SUBJECTS = 9
 
-// ✅ Subject name mapping for display (short names)
 const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   'Cultural and Creative Arts': 'CCA',
   'Physical and Health Education': 'PHE',
@@ -44,7 +43,6 @@ const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
   'Christian Religious Studies': 'CRS',
 }
 
-// ✅ Subject order for consistent display
 const SUBJECT_ORDER: Record<string, number> = {
   'English Language': 1, 
   'English Studies': 1, 
@@ -98,7 +96,6 @@ const getDisplaySubjectName = (subject: string): string => {
   return SUBJECT_DISPLAY_NAMES[subject] || subject
 }
 
-// ✅ Updated subject lists with FULL NAMES (match database)
 const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
@@ -147,13 +144,10 @@ const overallChipClass = (g: string) => ({
   C: 'bg-cyan-100 text-cyan-700', P: 'bg-amber-100 text-amber-700', F: 'bg-red-100 text-red-700',
 }[g] || 'bg-slate-100 text-slate-600')
 
-// ── Helper to extract first name ────────────────────────────────────────────
 const extractFirstName = (name: string): string => {
   if (!name) return 'Student'
-  // Split by spaces and take the first part
   const parts = name.trim().split(/\s+/)
   let firstName = parts[0] || 'Student'
-  // Capitalize first letter, lowercase the rest
   firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
   return firstName
 }
@@ -196,7 +190,6 @@ interface StudentRecord { id: string; name: string; admission_number: string; vi
 const LOAD_TIMEOUT = 10000
 const AUTO_REFRESH_INTERVAL = 30000
 const TERMS = [{ value: 'first', label: 'First Term' }, { value: 'second', label: 'Second Term' }, { value: 'third', label: 'Third Term' }]
-const YEARS = ['2024/2025', '2025/2026', '2026/2027']
 const DEPARTMENTS = [{ value: 'all', label: 'All Departments' }, { value: 'Science', label: 'Science' }, { value: 'Arts', label: 'Arts' }, { value: 'Commercial', label: 'Commercial' }]
 const ALL_CLASSES = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1 Science', 'SS1 Arts', 'SS1 Commercial', 'SS2 Science', 'SS2 Arts', 'SS2 Commercial', 'SS3 Science', 'SS3 Arts', 'SS3 Commercial', 'SS1', 'SS2', 'SS3']
 const getTermLabel = (t: string) => TERMS.find(x => x.value === t)?.label || 'Third Term'
@@ -242,47 +235,116 @@ export default function BroadSheetPage() {
   const [students, setStudents] = useState<StudentRecord[]>([])
   const [expectedSubjects, setExpectedSubjects] = useState<string[]>(sortSubjectsByOrder(SS_SUBJECTS_SCIENCE))
   const [selectedClass, setSelectedClass] = useState('')
-  const [selectedTerm, setSelectedTerm] = useState('third')
-  const [selectedYear, setSelectedYear] = useState('2025/2026')
+  const [selectedTerm, setSelectedTerm] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
   const [selectedDepartment, setSelectedDepartment] = useState('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [profile, setProfile] = useState<any>(null)
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
   const [newScoreAlert, setNewScoreAlert] = useState<string | null>(null)
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
-  const [debugInfo, setDebugInfo] = useState<any>(null)
+  const [isLoadingTerm, setIsLoadingTerm] = useState(true)
+  
+  // ✅ State for actual current term from database
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
 
   const autoRefreshTimerRef = useRef<NodeJS.Timeout>()
   const isRefreshingRef = useRef(false)
 
   useEffect(() => { setIsMounted(true) }, [])
 
+  // ✅ DYNAMIC: Fetch current term and session from database
+  const fetchCurrentTerm = useCallback(async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('school_settings')
+        .select('current_term, current_session')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        console.error('Error fetching term settings:', error)
+        setCurrentTerm('third')
+        setCurrentSession('2025/2026')
+        setIsLoadingTerm(false)
+        return
+      }
+
+      if (settings) {
+        const term = settings.current_term || 'third'
+        const session = settings.current_session || '2025/2026'
+        
+        setCurrentTerm(term)
+        setCurrentSession(session)
+        
+        // Only set selectedTerm/Year if they haven't been set yet
+        if (!selectedTerm) {
+          setSelectedTerm(term)
+        }
+        if (!selectedYear) {
+          setSelectedYear(session)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching current term:', error)
+      setCurrentTerm('third')
+      setCurrentSession('2025/2026')
+    } finally {
+      setIsLoadingTerm(false)
+    }
+  }, [selectedTerm, selectedYear])
+
+  // ── Mount: Fetch term from database ────────────────────────────────────────
+  useEffect(() => {
+    fetchCurrentTerm()
+  }, [fetchCurrentTerm])
+
+  // ── Init: Load profile and set default class ──────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
         const timeout = setTimeout(() => { setLoading(false); setLoadError(true) }, LOAD_TIMEOUT)
+        
         const { data: { session } } = await supabase.auth.getSession()
         clearTimeout(timeout)
-        if (!session) return
+        if (!session) {
+          setLoading(false)
+          return
+        }
+
         const { data: pd } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         if (pd) setProfile(pd)
+        
         if (ALL_CLASSES.length > 0 && !selectedClass) {
           setSelectedClass(ALL_CLASSES[0])
           setExpectedSubjects(getAllSubjectsForClass(ALL_CLASSES[0]))
         }
         setLoading(false)
-      } catch { setLoading(false); setLoadError(true) }
+      } catch { 
+        setLoading(false)
+        setLoadError(true)
+      }
     }
     init()
   }, [])
 
+  // ── Update expected subjects when class changes ────────────────────────────
   useEffect(() => {
     if (selectedClass) setExpectedSubjects(getAllSubjectsForClass(selectedClass))
-    if (isMounted && selectedClass && selectedTerm && selectedYear) loadBroadSheet()
-  }, [selectedClass, selectedTerm, selectedYear, isMounted])
+  }, [selectedClass])
 
+  // ── Load broad sheet when filters change ──────────────────────────────────
   useEffect(() => {
-    if (!autoRefreshEnabled || loading || students.length === 0) return
+    if (isMounted && !isLoadingTerm && selectedClass && selectedTerm && selectedYear) {
+      loadBroadSheet()
+    }
+  }, [selectedClass, selectedTerm, selectedYear, isMounted, isLoadingTerm])
+
+  // ── Auto-refresh ────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!autoRefreshEnabled || loading || students.length === 0 || isLoadingTerm) return
     if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current)
     autoRefreshTimerRef.current = setInterval(async () => {
       if (isRefreshingRef.current) return
@@ -290,10 +352,11 @@ export default function BroadSheetPage() {
       try { await loadBroadSheet() } catch { } finally { isRefreshingRef.current = false }
     }, AUTO_REFRESH_INTERVAL)
     return () => { if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current) }
-  }, [autoRefreshEnabled, selectedClass, selectedTerm, selectedYear, loading, students.length])
+  }, [autoRefreshEnabled, selectedClass, selectedTerm, selectedYear, loading, students.length, isLoadingTerm])
 
+  // ── Real-time score updates ────────────────────────────────────────────────
   useEffect(() => {
-    if (!selectedClass || !selectedTerm || !selectedYear) return
+    if (!selectedClass || !selectedTerm || !selectedYear || isLoadingTerm) return
     const ch = supabase.channel('broadsheet-scores')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ca_scores', filter: `term=eq.${selectedTerm},academic_year=eq.${selectedYear}` },
         async (payload) => {
@@ -305,60 +368,15 @@ export default function BroadSheetPage() {
           }
         }).subscribe()
     return () => { supabase.removeChannel(ch) }
-  }, [selectedClass, selectedTerm, selectedYear])
+  }, [selectedClass, selectedTerm, selectedYear, isLoadingTerm])
 
   useEffect(() => {
     if (newScoreAlert) { const t = setTimeout(() => setNewScoreAlert(null), 5000); return () => clearTimeout(t) }
   }, [newScoreAlert])
 
-  // ── Debug function ──────────────────────────────────────────────────────────
-  const debugReportCards = async () => {
-    try {
-      console.log('🔍 Debug: Checking report cards...')
-      console.log('📋 Current filters:', {
-        term: selectedTerm,
-        year: selectedYear,
-        class: selectedClass,
-        department: selectedDepartment
-      })
-
-      const { data: allCards, error: allError, count } = await supabase
-        .from('report_cards')
-        .select('*', { count: 'exact' })
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-
-      if (allError) throw allError
-
-      console.log(`📊 Total report cards for ${selectedTerm} ${selectedYear}:`, count)
-      console.log('📊 All report cards:', allCards)
-
-      const statusBreakdown = allCards?.reduce((acc: any, rc: any) => {
-        acc[rc.status] = (acc[rc.status] || 0) + 1
-        return acc
-      }, {})
-      console.log('📊 Status breakdown:', statusBreakdown)
-
-      const readyStudents = students.filter(s => s.meetsMinimum && s.allSubmitted)
-      console.log('📊 Students ready for report:', readyStudents.length)
-
-      setDebugInfo({
-        totalCards: count || 0,
-        statusBreakdown,
-        readyStudents: readyStudents.length,
-        allCards: allCards || []
-      })
-
-      toast.info(`Found ${count || 0} report cards. Check console for details.`)
-    } catch (error) {
-      console.error('Debug error:', error)
-      toast.error('Debug check failed')
-    }
-  }
-
   // ── Load broad sheet ────────────────────────────────────────────────────────
   const loadBroadSheet = useCallback(async () => {
-    if (!selectedClass || !selectedTerm || !selectedYear) return
+    if (!selectedClass || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
     setLoadError(false)
     
@@ -366,6 +384,7 @@ export default function BroadSheetPage() {
       const isJSS = selectedClass.toUpperCase().includes('JSS')
       const isSS = selectedClass.toUpperCase().includes('SS')
       
+      // ✅ Get ALL students in the selected class (their CURRENT class)
       let query = supabase.from('profiles')
         .select('id, full_name, display_name, admission_number, vin_id, class, department, gender, photo_url, first_name')
         .eq('role', 'student')
@@ -392,6 +411,7 @@ export default function BroadSheetPage() {
 
       const studentIds = classStudents.map(s => s.id)
       
+      // ✅ Get scores for these students (may be empty if no scores yet)
       const { data: allScores, error: scoreError } = await supabase
         .from('ca_scores')
         .select('*')
@@ -401,7 +421,10 @@ export default function BroadSheetPage() {
         .eq('status', 'approved')
         .limit(5000)
       
-      if (scoreError) throw scoreError
+      if (scoreError) {
+        console.error('Score error:', scoreError)
+        // Continue with empty scores
+      }
 
       const { data: existingReportCards } = await supabase
         .from('report_cards')
@@ -418,7 +441,8 @@ export default function BroadSheetPage() {
       })
 
       const records: StudentRecord[] = classStudents.map(student => {
-        const subjects = getSubjectsForStudent(student.class, student.department)
+        // ✅ Use the selected class for subject determination
+        const subjects = getSubjectsForStudent(selectedClass, student.department)
         const scores = (allScores || []).filter(s => s.student_id === student.id)
         
         const subjectMap: Record<string, SubjectScore> = {}
@@ -454,7 +478,7 @@ export default function BroadSheetPage() {
         const averageScore = completedSubjects > 0 ? Math.round(totalScore / completedSubjects) : 0
         
         const hasAllSubjects = subjects.every(sub => subjectMap[sub] !== undefined)
-        const minRequired = extractYear(student.class).startsWith('JSS') ? JSS_MIN_SUBJECTS : SS_MIN_SUBJECTS
+        const minRequired = extractYear(selectedClass).startsWith('JSS') ? JSS_MIN_SUBJECTS : SS_MIN_SUBJECTS
         const meetsMinimum = completedSubjects >= minRequired
         
         return {
@@ -463,7 +487,7 @@ export default function BroadSheetPage() {
           admission_number: student.admission_number || '—',
           vin_id: student.vin_id || '—',
           class: student.class,
-          department: student.department || (isJSS ? 'Junior' : 'General'),
+          department: student.department || (selectedClass.toUpperCase().includes('JSS') ? 'Junior' : 'General'),
           subjectMap,
           totalScore,
           averageScore,
@@ -493,7 +517,7 @@ export default function BroadSheetPage() {
     } finally {
       setLoading(false)
     }
-  }, [selectedClass, selectedTerm, selectedYear, selectedDepartment])
+  }, [selectedClass, selectedTerm, selectedYear, selectedDepartment, isLoadingTerm])
 
   // ── Generate Report Cards ──────────────────────────────────────────────────
   const handleGenerateReportCards = async () => {
@@ -533,7 +557,6 @@ export default function BroadSheetPage() {
           const best = sortedByScore[0]
           const worst = sortedByScore[sortedByScore.length - 1]
 
-          // ✅ Get student profile data including first_name
           const { data: profileData } = await supabase
             .from('profiles')
             .select('gender, first_name, full_name, display_name')
@@ -542,35 +565,25 @@ export default function BroadSheetPage() {
           
           const gender = profileData?.gender || 'male'
           
-          // ✅ Extract FIRST NAME properly
           let firstName = ''
-          
-          // Priority: Use first_name from database
           if (profileData?.first_name && profileData.first_name.trim() !== '') {
             firstName = profileData.first_name
           } else if (profileData?.display_name) {
-            // Fallback: extract first name from display_name
             firstName = extractFirstName(profileData.display_name)
           } else if (profileData?.full_name) {
-            // Fallback: extract first name from full_name
             firstName = extractFirstName(profileData.full_name)
           } else {
-            // Final fallback: extract from student.name
             firstName = extractFirstName(student.name)
           }
           
-          // Capitalize properly
           firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
-          
-          console.log(`📝 Using FIRST name for ${student.name}: "${firstName}"`)
 
-          // ✅ Generate AI comments with the FIRST NAME only
           let teacherComment = ''
           let principalComment = ''
           
           try {
             const aiResponse = await generateAIComments(
-              firstName, // ✅ Pass first name only
+              firstName,
               student.averageScore,
               formattedSubjects,
               selectedClass,
@@ -653,10 +666,7 @@ export default function BroadSheetPage() {
             published_at: null
           }
 
-          console.log(`📝 Creating report card for ${student.name} with FIRST NAME: "${firstName}"`)
-          console.log(`📝 Teacher comment: "${teacherComment}"`)
-
-          const { data: insertedData, error: insertError } = await supabase
+          const { error: insertError } = await supabase
             .from('report_cards')
             .insert(reportCardData)
             .select()
@@ -665,7 +675,6 @@ export default function BroadSheetPage() {
             console.error('Insert error for', student.name, ':', insertError)
             errorCount++
           } else {
-            console.log(`✅ Successfully created report card for ${student.name}`)
             successCount++
             setGenProgress({ current: successCount, total: ready.length })
           }
@@ -698,7 +707,7 @@ export default function BroadSheetPage() {
     }
   }
 
-  // ── Regenerate Comments for Existing Report Cards ──────────────────────────
+  // ── Regenerate Comments ──────────────────────────────────────────────────
   const handleRegenerateComments = async () => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted && s.reportCardId)
     
@@ -715,7 +724,6 @@ export default function BroadSheetPage() {
     try {
       for (const student of ready) {
         try {
-          // Get first name
           const { data: profileData } = await supabase
             .from('profiles')
             .select('gender, first_name, display_name, full_name')
@@ -737,7 +745,6 @@ export default function BroadSheetPage() {
           
           firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
           
-          // Get best and worst subjects
           const formattedSubjects = student.expectedSubjects.map(sub => {
             const score = student.subjectMap[sub]
             if (!score) return null
@@ -755,7 +762,6 @@ export default function BroadSheetPage() {
           const best = sortedByScore[0]
           const worst = sortedByScore[sortedByScore.length - 1]
           
-          // Generate new comments
           let teacherComment = ''
           let principalComment = ''
           
@@ -792,7 +798,6 @@ export default function BroadSheetPage() {
             principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
           }
           
-          // Update the report card
           const { error: updateError } = await supabase
             .from('report_cards')
             .update({ 
@@ -979,9 +984,16 @@ export default function BroadSheetPage() {
   }, [students, searchQuery])
 
   const minRequired = selectedClass?.toUpperCase().startsWith('JSS') ? JSS_MIN_SUBJECTS : SS_MIN_SUBJECTS
+  
+  // ── Get available sessions based on current session ───────────────────────
+  const availableSessions = useMemo(() => {
+    if (!currentSession) return ['2025/2026']
+    const year = parseInt(currentSession.split('/')[0])
+    return [`${year - 1}/${year}`, `${year}/${year + 1}`, `${year + 1}/${year + 2}`]
+  }, [currentSession])
 
   // ── Loading ───────────────────────────────────────────────────────────────
-  if (!isMounted || (loading && students.length === 0 && !loadError)) {
+  if (!isMounted || isLoadingTerm || (loading && students.length === 0 && !loadError)) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center space-y-3">
@@ -989,7 +1001,7 @@ export default function BroadSheetPage() {
             <FileSpreadsheet className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
           </div>
           <Loader2 className="h-6 w-6 animate-spin text-emerald-600 mx-auto" />
-          <p className="text-sm text-slate-500">Loading broad sheet…</p>
+          <p className="text-sm text-slate-500">{isLoadingTerm ? 'Loading term settings…' : 'Loading broad sheet…'}</p>
         </div>
       </div>
     )
@@ -1044,6 +1056,9 @@ export default function BroadSheetPage() {
             </h1>
             <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Class performance overview · {isMounted ? selectedClass : ''} · {isMounted ? getTermLabel(selectedTerm) : ''} · {isMounted ? selectedYear : ''}
+              <span className="ml-2 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                (Current term: {getTermLabel(currentTerm)})
+              </span>
             </p>
           </div>
 
@@ -1053,11 +1068,6 @@ export default function BroadSheetPage() {
               onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear }); router.push(`/admin/report-cards?${p}`) }}
               className="h-8 text-xs gap-1.5">
               <FileText className="h-3.5 w-3.5" /> Report Cards
-            </Button>
-            <Button size="sm" variant="outline"
-              onClick={debugReportCards}
-              className="h-8 text-xs gap-1.5 border-amber-200 text-amber-600 hover:bg-amber-50">
-              <Bug className="h-3.5 w-3.5" /> Debug
             </Button>
             <Button size="sm" variant={autoRefreshEnabled ? 'default' : 'outline'}
               onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
@@ -1102,8 +1112,24 @@ export default function BroadSheetPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
               {[
                 { label: 'Class', value: selectedClass, onChange: setSelectedClass, items: ALL_CLASSES.map(c => ({ value: c, label: c })) },
-                { label: 'Term', value: selectedTerm, onChange: setSelectedTerm, items: TERMS.map(t => ({ value: t.value, label: t.label })) },
-                { label: 'Session', value: selectedYear, onChange: setSelectedYear, items: YEARS.map(y => ({ value: y, label: y })) },
+                { 
+                  label: 'Term', 
+                  value: selectedTerm, 
+                  onChange: setSelectedTerm, 
+                  items: TERMS.map(t => ({ 
+                    value: t.value, 
+                    label: t.label + (t.value === currentTerm ? ' (current)' : '') 
+                  }))
+                },
+                { 
+                  label: 'Session', 
+                  value: selectedYear, 
+                  onChange: setSelectedYear, 
+                  items: availableSessions.map(y => ({ 
+                    value: y, 
+                    label: y + (y === currentSession ? ' (current)' : '') 
+                  }))
+                },
                 { label: 'Department', value: selectedDepartment, onChange: setSelectedDepartment, items: DEPARTMENTS.map(d => ({ value: d.value, label: d.label })) },
               ].map(({ label, value, onChange, items }) => (
                 <div key={label} className="space-y-1.5">
@@ -1299,7 +1325,6 @@ export default function BroadSheetPage() {
                           idx % 2 !== 0 && 'bg-slate-50/30 dark:bg-slate-800/10',
                           !student.meetsMinimum && 'bg-amber-50/40 dark:bg-amber-950/10',
                         )}>
-                        {/* Student cell */}
                         <td className="sticky left-0 z-10 bg-inherit px-4 py-3">
                           <div>
                             <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 leading-snug">{student.name}</p>
@@ -1320,10 +1345,8 @@ export default function BroadSheetPage() {
                           </div>
                         </td>
 
-                        {/* Admission number */}
                         <td className="px-3 py-3 font-mono text-xs text-slate-500 dark:text-slate-400">{student.admission_number}</td>
 
-                        {/* Subject scores */}
                         {expectedSubjects.map(subject => {
                           const score = student.subjectMap[subject]
                           const isExpected = student.expectedSubjects.includes(subject)
@@ -1345,7 +1368,6 @@ export default function BroadSheetPage() {
                           )
                         })}
 
-                        {/* Totals */}
                         <td className="px-3 py-3 text-center font-bold text-sm text-slate-800 dark:text-slate-100">{student.totalScore || '—'}</td>
                         <td className="px-3 py-3 text-center font-semibold text-sm text-slate-700 dark:text-slate-200">{student.averageScore > 0 ? `${student.averageScore}%` : '—'}</td>
                         <td className="px-3 py-3 text-center">
@@ -1356,12 +1378,10 @@ export default function BroadSheetPage() {
                           ) : <span className="text-slate-300 dark:text-slate-600">—</span>}
                         </td>
 
-                        {/* Report status */}
                         <td className="no-print px-3 py-3 text-center">
                           <ReportStatusChip status={student.reportCardStatus} />
                         </td>
 
-                        {/* View button - navigates to report card page */}
                         <td className="no-print px-3 py-3 text-center">
                           <Button 
                             variant="ghost" 
@@ -1380,40 +1400,6 @@ export default function BroadSheetPage() {
             </table>
           </div>
         </Card>
-
-        {/* Debug info display */}
-        {debugInfo && (
-          <Card className="no-print border-0 shadow-sm bg-white dark:bg-slate-900">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-slate-700">Debug Info</h3>
-                <Button variant="ghost" size="sm" onClick={() => setDebugInfo(null)} className="h-7 text-xs">
-                  <X className="h-3 w-3" /> Close
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="p-2 bg-slate-50 rounded">
-                  <span className="text-slate-500">Total Cards:</span>
-                  <span className="ml-1 font-bold">{debugInfo.totalCards}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded">
-                  <span className="text-slate-500">Ready Students:</span>
-                  <span className="ml-1 font-bold">{debugInfo.readyStudents}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded">
-                  <span className="text-slate-500">Cards for Ready:</span>
-                  <span className="ml-1 font-bold">{debugInfo.cardsForReadyStudents}</span>
-                </div>
-                <div className="p-2 bg-slate-50 rounded">
-                  <span className="text-slate-500">Statuses:</span>
-                  <span className="ml-1 font-bold">
-                    {Object.entries(debugInfo.statusBreakdown || {}).map(([k, v]) => `${k}:${v}`).join(', ')}
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         <style jsx global>{`
           @media print {

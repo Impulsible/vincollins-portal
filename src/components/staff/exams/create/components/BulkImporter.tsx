@@ -1,9 +1,9 @@
-// src/components/staff/exams/create/components/BulkImporter.tsx
+// src/components/staff/exams/create/components/BulkImporter.tsx - UPDATED WITH MARK CALCULATION
 
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Upload, Loader2, AlertCircle, Table, BarChart3, Image as ImageIcon, FileText, Check, AlertTriangle, Sparkles, Eye, EyeOff } from "lucide-react";
+import { Upload, Loader2, AlertCircle, Table, BarChart3, Image as ImageIcon, FileText, Check, AlertTriangle, Sparkles, Eye, EyeOff, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +24,12 @@ interface BulkImporterProps {
   parseButtonIcon?: React.ReactNode;
   textareaClassName?: string;
   textareaRows?: number;
+  // ✅ New props for mark calculation
+  defaultMark?: number;
+  objectiveTotal?: number;
+  theoryTotal?: number;
+  isBalanced?: boolean;
+  showMarkInfo?: boolean;
 }
 
 interface ContentAnalysis {
@@ -229,6 +235,12 @@ export function BulkImporter({
   parseButtonIcon,
   textareaClassName = "text-sm leading-relaxed",
   textareaRows = 14,
+  // ✅ New props
+  defaultMark = 0.5,
+  objectiveTotal = 0,
+  theoryTotal = 0,
+  isBalanced = true,
+  showMarkInfo = false,
 }: BulkImporterProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [analysis, setAnalysis] = useState<ContentAnalysis | null>(null);
@@ -302,6 +314,18 @@ export function BulkImporter({
         </div>
 
         <div className="flex items-center gap-1 flex-wrap">
+          {/* ✅ Mark Info */}
+          {showMarkInfo && (
+            <Badge className={cn(
+              "text-[10px]",
+              isBalanced ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+            )}>
+              <Calculator className="h-2.5 w-2.5 mr-0.5" />
+              {objectiveTotal} + {theoryTotal} = {objectiveTotal + theoryTotal}
+              {!isBalanced && " ⚠️"}
+            </Badge>
+          )}
+
           {/* Toggle rendered view */}
           {hasVisibleTable && (
             <Button
@@ -484,6 +508,16 @@ export function BulkImporter({
                 <span className="text-blue-400">· {analysis.tableCount} tables</span>
               )}
             </div>
+          )}
+          {/* ✅ Mark info in footer */}
+          {showMarkInfo && (
+            <span className={cn(
+              "text-[10px]",
+              isBalanced ? "text-emerald-600" : "text-amber-600"
+            )}>
+              {isBalanced ? "✅ " : "⚠️ "}
+              {objectiveTotal + theoryTotal}/60
+            </span>
           )}
           <p className="text-[10px] text-gray-400 leading-snug hidden sm:block">
             {value && analysis && (analysis.hasTables || analysis.hasCharts || analysis.hasImages) 

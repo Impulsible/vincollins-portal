@@ -1,16 +1,17 @@
-// src/components/staff/exams/create/steps/PreviewStep.tsx
+// src/components/staff/exams/create/steps/PreviewStep.tsx - COMPLETE
 
 "use client";
 
 import { useState, useRef, useMemo, useEffect } from "react";
-import { Clock, Eye, ChevronLeft, ChevronRight, Table, BarChart3, Image as ImageIcon, BookOpen } from "lucide-react";
+import { Clock, Eye, ChevronLeft, ChevronRight, Table, BarChart3, Image as ImageIcon, BookOpen, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
-import type { ExamDetails, Question, TheoryQuestion, TheorySubQuestion } from "../types";
+import { MARK_CONSTANTS } from "../constants";
+import type { ExamDetails, Question, TheoryQuestion, TheorySubQuestion, MarkDistribution } from "../types";
 
 interface PreviewStepProps {
   examDetails: ExamDetails;
@@ -20,6 +21,9 @@ interface PreviewStepProps {
   objectiveMax: number;
   theoryMax: number;
   passageText?: string;
+  defaultMark?: number;
+  markDistribution?: MarkDistribution;
+  theoryTotalMarks?: number;
 }
 
 // ── Helper: Detect table in content ─────────────────────────────────────────
@@ -199,12 +203,100 @@ export function PreviewStep({
   objectiveMax,
   theoryMax,
   passageText,
+  defaultMark,
+  markDistribution,
+  theoryTotalMarks,
 }: PreviewStepProps) {
-  const totalMarks = objectiveMax + theoryMax;
+  // ✅ Use MARK_CONSTANTS - NO HARDCODED VALUES
+  const EXAM_TOTAL = MARK_CONSTANTS.EXAM_TOTAL;
+  const CA1_MAX = MARK_CONSTANTS.CA1_MAX;
+  const CA2_MAX = MARK_CONSTANTS.CA2_MAX;
+  const CA_TOTAL = MARK_CONSTANTS.CA_TOTAL;
+  const GRAND_TOTAL = MARK_CONSTANTS.GRAND_TOTAL;
+  
+  // Calculate totals
+  const objectiveCount = questions.length;
+  const theoryCount = hasTheory ? theoryQuestions.length : 0;
+  const totalObjectivePoints = objectiveCount * (defaultMark || 0.5);
+  const totalTheoryPoints = theoryTotalMarks || theoryMax || 0;
+  const totalMarks = totalObjectivePoints + totalTheoryPoints;
+  const isBalanced = totalMarks === EXAM_TOTAL;
+  const isOver = totalMarks > EXAM_TOTAL;
+  const totalQuestions = objectiveCount + theoryCount;
 
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-4">
+
+        {/* ✅ Mark Distribution Summary */}
+        <div className={cn(
+          "rounded-xl border p-3 sm:p-4 space-y-3",
+          isBalanced ? "bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200" :
+          isOver ? "bg-gradient-to-br from-red-50 to-rose-50 border-red-200" :
+          "bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-200"
+        )}>
+          <div className="flex items-center gap-2">
+            <Calculator className={cn(
+              "h-4 w-4",
+              isBalanced ? "text-emerald-600" : isOver ? "text-red-600" : "text-amber-600"
+            )} />
+            <span className={cn(
+              "text-xs font-semibold uppercase tracking-wider",
+              isBalanced ? "text-emerald-700" : isOver ? "text-red-700" : "text-amber-700"
+            )}>
+              {isBalanced ? "✅ Balanced" : isOver ? "⛔ OVER LIMIT" : "⚠️ Needs Adjustment"}
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="bg-white rounded-lg p-2 text-center border border-blue-100">
+              <p className="text-[10px] text-blue-600">Objective</p>
+              <p className="text-sm font-bold text-blue-700">{totalObjectivePoints} marks</p>
+              <p className="text-[9px] text-blue-500">{objectiveCount} × {defaultMark || 0.5}</p>
+            </div>
+            <div className="bg-white rounded-lg p-2 text-center border border-purple-100">
+              <p className="text-[10px] text-purple-600">Theory</p>
+              <p className="text-sm font-bold text-purple-700">{totalTheoryPoints} marks</p>
+              <p className="text-[9px] text-purple-500">{theoryCount} questions</p>
+            </div>
+            <div className={cn(
+              "bg-white rounded-lg p-2 text-center border",
+              isBalanced ? "border-emerald-100" : isOver ? "border-red-100" : "border-amber-100"
+            )}>
+              <p className="text-[10px] text-slate-500">Total</p>
+              <p className={cn(
+                "text-sm font-bold",
+                isBalanced ? "text-emerald-700" : isOver ? "text-red-600" : "text-amber-600"
+              )}>
+                {totalMarks} / {EXAM_TOTAL}
+              </p>
+            </div>
+            <div className="bg-white rounded-lg p-2 text-center border border-amber-100">
+              <p className="text-[10px] text-amber-600">Pass Mark</p>
+              <p className="text-sm font-bold text-amber-700">{examDetails.pass_mark}%</p>
+            </div>
+          </div>
+
+          {/* CA and Grand Total */}
+          <div className="pt-2 border-t border-gray-200 grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="text-center">
+              <p className="text-[9px] text-slate-500">CA1</p>
+              <p className="text-sm font-semibold text-slate-700">{CA1_MAX} marks</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] text-slate-500">CA2</p>
+              <p className="text-sm font-semibold text-slate-700">{CA2_MAX} marks</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] text-slate-500">CA Total</p>
+              <p className="text-sm font-semibold text-slate-700">{CA_TOTAL} marks</p>
+            </div>
+            <div className="text-center">
+              <p className="text-[9px] text-slate-500">Grand Total</p>
+              <p className="text-sm font-semibold text-slate-700">{GRAND_TOTAL} marks</p>
+            </div>
+          </div>
+        </div>
 
         {/* Summary Card */}
         <div className="bg-gradient-to-br from-slate-50 to-gray-50 rounded-xl border p-3 sm:p-4 space-y-3">
@@ -220,12 +312,12 @@ export function PreviewStep({
             <Badge
               className={cn(
                 "text-[10px] flex-shrink-0",
-                examDetails.title && examDetails.subject
+                examDetails.title && examDetails.subject && isBalanced
                   ? "bg-emerald-100 text-emerald-700"
                   : "bg-amber-100 text-amber-700"
               )}
             >
-              {examDetails.title && examDetails.subject ? "✅ Ready" : "⚠️ Incomplete"}
+              {examDetails.title && examDetails.subject && isBalanced ? "✅ Ready" : "⚠️ Incomplete"}
             </Badge>
           </div>
 
@@ -254,9 +346,21 @@ export function PreviewStep({
               <p className="text-lg font-bold text-purple-700">{theoryQuestions.length}</p>
               <p className="text-[10px] text-purple-600">Theory</p>
             </div>
-            <div className="p-2 bg-emerald-50 rounded-lg border border-emerald-100 text-center">
-              <p className="text-lg font-bold text-emerald-700">{totalMarks}</p>
-              <p className="text-[10px] text-emerald-600">Total Marks</p>
+            <div className={cn(
+              "p-2 rounded-lg border text-center",
+              isBalanced ? "bg-emerald-50 border-emerald-100" : 
+              isOver ? "bg-red-50 border-red-100" : "bg-amber-50 border-amber-100"
+            )}>
+              <p className={cn(
+                "text-lg font-bold",
+                isBalanced ? "text-emerald-700" : 
+                isOver ? "text-red-600" : "text-amber-700"
+              )}>{totalMarks}</p>
+              <p className={cn(
+                "text-[10px]",
+                isBalanced ? "text-emerald-600" : 
+                isOver ? "text-red-600" : "text-amber-600"
+              )}>Total Marks</p>
             </div>
           </div>
         </div>
@@ -267,7 +371,6 @@ export function PreviewStep({
             Student View Preview
           </p>
 
-          {/* Passage Preview */}
           {passageText && (
             <div className="mb-3 bg-amber-50 border-2 border-amber-200 rounded-xl p-3 sm:p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-2">
@@ -287,6 +390,7 @@ export function PreviewStep({
             questions={questions}
             theoryQuestions={theoryQuestions}
             hasTheory={hasTheory}
+            defaultMark={defaultMark}
           />
         </div>
       </div>
@@ -304,11 +408,13 @@ function CBTPreview({
   questions,
   theoryQuestions,
   hasTheory,
+  defaultMark,
 }: {
   examDetails: ExamDetails;
   questions: Question[];
   theoryQuestions: TheoryQuestion[];
   hasTheory: boolean;
+  defaultMark?: number;
 }) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -444,6 +550,11 @@ function CBTPreview({
                 {hasImageContent && (
                   <Badge variant="outline" className="text-[10px] bg-green-50 text-green-600 border-green-200">
                     <ImageIcon className="h-2.5 w-2.5 mr-0.5" /> Image
+                  </Badge>
+                )}
+                {current._type === "objective" && (
+                  <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-600 border-blue-200">
+                    {defaultMark || 0.5} mark
                   </Badge>
                 )}
               </div>

@@ -1,4 +1,4 @@
-// app/staff/layout.tsx - COMPLETE FIXED VERSION
+// app/staff/layout.tsx - COMPLETE FIXED VERSION WITH TERM FILTERING
 
 'use client'
 
@@ -67,6 +67,8 @@ interface StaffContextType {
   handleLogout: () => Promise<void>
   activeTab: string
   setActiveTab: (tab: string) => void
+  termCode: string
+  sessionYear: string
 }
 
 const defaultStats: StaffStats = {
@@ -386,9 +388,21 @@ function MobileTopBar({
   )
 }
 
-// ── Fetch stats helper ─────────────────────────────────────────────────────────
-async function fetchStaffStats(userId: string): Promise<StaffStats> {
+// ── Fetch stats helper WITH TERM FILTERING ────────────────────────────────────
+async function fetchStaffStats(userId: string, termCode?: string, sessionYear?: string): Promise<StaffStats> {
   try {
+    // ✅ Build exam query with term filter
+    let examQuery = supabase
+      .from('exams')
+      .select('status, id')
+      .eq('created_by', userId)
+
+    if (termCode && sessionYear) {
+      examQuery = examQuery
+        .eq('term', termCode)
+        .eq('session_year', sessionYear)
+    }
+
     const [
       examsRes,
       studentsRes,
@@ -397,7 +411,7 @@ async function fetchStaffStats(userId: string): Promise<StaffStats> {
       gradingRes,
       theoryRes,
     ] = await Promise.allSettled([
-      supabase.from('exams').select('status, id').eq('created_by', userId),
+      examQuery,
       supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
@@ -479,6 +493,8 @@ export default function StaffLayout({
         handleLogout: async () => {},
         activeTab: 'exams',
         setActiveTab: () => {},
+        termCode: '',
+        sessionYear: '',
       }}>
         <div className="min-h-screen bg-slate-50">
           <div className="hidden lg:block">
@@ -489,6 +505,8 @@ export default function StaffLayout({
               onToggle={() => {}}
               activeTab="exams"
               setActiveTab={() => {}}
+              termCode=""
+              sessionYear=""
             />
             <div className="min-h-screen transition-all duration-300 ease-in-out" style={{ marginLeft: '280px' }}>
               <DesktopTopBar
@@ -534,6 +552,10 @@ export default function StaffLayout({
   )
   const [isHydrated, setIsHydrated] = useState(false)
 
+  // ✅ Term filter state
+  const [termCode, setTermCode] = useState<string>('')
+  const [sessionYear, setSessionYear] = useState<string>('')
+
   const hasLoadedRef = useRef(false)
 
   // ── Hydration ────────────────────────────────────────────────────────────────
@@ -561,6 +583,34 @@ export default function StaffLayout({
     setActiveTab(tab)
   }, [pathname])
 
+  // ── Fetch current term info ─────────────────────────────────────────────────
+  const fetchTermInfo = useCallback(async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('school_settings')
+        .select('current_term, current_session')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        console.error('Error fetching term settings:', error)
+        return
+      }
+
+      if (settings?.current_term && settings?.current_session) {
+        setTermCode(settings.current_term)
+        setSessionYear(settings.current_session)
+        console.log('✅ Layout - Current term set:', { 
+          termCode: settings.current_term, 
+          sessionYear: settings.current_session 
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching term info:', error)
+    }
+  }, [])
+
   // ── Load staff data ───────────────────────────────────────────────────────
   const loadStaffData = useCallback(
     async (showToast = false) => {
@@ -579,7 +629,6 @@ export default function StaffLayout({
 
         if (userError || !user) {
           console.warn('[StaffLayout] No authenticated user')
-          // ✅ Don't redirect to portal immediately, just show loading
           setLoading(false)
           return
         }
@@ -606,7 +655,8 @@ export default function StaffLayout({
 
         setProfile(profileData as StaffProfile)
 
-        const newStats = await fetchStaffStats(user.id)
+        // ✅ Fetch stats with term filter
+        const newStats = await fetchStaffStats(user.id, termCode, sessionYear)
         setStats(newStats)
 
         if (showToast) toast.success('Dashboard refreshed')
@@ -618,15 +668,20 @@ export default function StaffLayout({
         setIsRefreshing(false)
       }
     },
-    [router, pathname],
+    [router, pathname, termCode, sessionYear],
   )
 
   useEffect(() => {
-    if (!hasLoadedRef.current) {
-      hasLoadedRef.current = true
-      loadStaffData()
+    // First fetch term info, then load data
+    const init = async () => {
+      await fetchTermInfo()
+      if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true
+        loadStaffData()
+      }
     }
-  }, [loadStaffData])
+    init()
+  }, [fetchTermInfo, loadStaffData])
 
   // ── Auth state listener ───────────────────────────────────────────────────
   useEffect(() => {
@@ -699,6 +754,8 @@ export default function StaffLayout({
         handleLogout,
         activeTab,
         setActiveTab,
+        termCode,
+        sessionYear,
       }}
     >
       <div className="min-h-screen bg-slate-50">
@@ -712,6 +769,8 @@ export default function StaffLayout({
             onToggle={() => setSidebarCollapsed((prev) => !prev)}
             activeTab={activeTab}
             setActiveTab={handleTabChange}
+            termCode={termCode}
+            sessionYear={sessionYear}
           />
 
           <div

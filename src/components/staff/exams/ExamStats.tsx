@@ -1,9 +1,10 @@
-// src/components/staff/exams/ExamStats.tsx - FULLY RESPONSIVE
+// src/components/staff/exams/ExamStats.tsx - UPDATED
+
 'use client'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { motion } from 'framer-motion'
-import { FileText, Clock, CheckCircle2, BookOpen } from 'lucide-react'
+import { FileText, Clock, CheckCircle2, BookOpen, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface ExamStatsProps {
@@ -11,6 +12,10 @@ interface ExamStatsProps {
   draftCount: number
   pendingCount: number
   publishedCount: number
+  // ✅ Optional: mark stats from database
+  totalMarks?: number
+  averageMarks?: number
+  balancedExams?: number
 }
 
 interface StatItem {
@@ -20,9 +25,18 @@ interface StatItem {
   icon: React.ElementType
   gradientFrom: string
   gradientTo: string
+  description?: string
 }
 
-export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount }: ExamStatsProps) {
+export function ExamStats({ 
+  totalExams, 
+  draftCount, 
+  pendingCount, 
+  publishedCount,
+  totalMarks = 0,
+  averageMarks = 0,
+  balancedExams = 0,
+}: ExamStatsProps) {
   const stats: StatItem[] = [
     { 
       label: 'Total Exams', 
@@ -58,7 +72,48 @@ export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount
     }
   ]
 
-  // ✅ FIX: Use proper Framer Motion Variants type
+  // ✅ Add mark stats if available
+  const markStats: StatItem[] = []
+  
+  if (totalMarks > 0) {
+    markStats.push({
+      label: 'Total Marks',
+      value: totalMarks,
+      color: 'text-purple-600 dark:text-purple-400',
+      icon: Calculator,
+      gradientFrom: 'from-purple-500',
+      gradientTo: 'to-purple-600',
+      description: 'All exams combined'
+    })
+  }
+  
+  if (averageMarks > 0) {
+    markStats.push({
+      label: 'Avg Marks',
+      value: averageMarks,
+      color: 'text-indigo-600 dark:text-indigo-400',
+      icon: Calculator,
+      gradientFrom: 'from-indigo-500',
+      gradientTo: 'to-indigo-600',
+      description: 'Per exam average'
+    })
+  }
+  
+  if (balancedExams > 0 && totalExams > 0) {
+    markStats.push({
+      label: 'Balanced',
+      value: balancedExams,
+      color: 'text-emerald-600 dark:text-emerald-400',
+      icon: CheckCircle2,
+      gradientFrom: 'from-emerald-500',
+      gradientTo: 'to-teal-600',
+      description: `${Math.round((balancedExams / totalExams) * 100)}% of exams`
+    })
+  }
+
+  // Combine stats
+  const allStats = [...stats, ...markStats]
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -69,7 +124,6 @@ export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount
     }
   }
 
-  // ✅ FIX: Use `as const` on transition type to make it a literal type
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
     visible: { 
@@ -83,7 +137,6 @@ export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount
     }
   }
 
-  // ✅ Alternative fix: Use motion.div without variants (inline props)
   return (
     <motion.div 
       className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full"
@@ -91,7 +144,7 @@ export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount
       initial="hidden"
       animate="visible"
     >
-      {stats.map((stat, index) => {
+      {allStats.map((stat, index) => {
         const Icon = stat.icon
         return (
           <motion.div
@@ -117,6 +170,11 @@ export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount
                       )}>
                         {stat.value}
                       </p>
+                      {stat.description && (
+                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">
+                          {stat.description}
+                        </p>
+                      )}
                     </div>
                     <div className={cn(
                       "h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 ml-2",
@@ -128,7 +186,7 @@ export function ExamStats({ totalExams, draftCount, pendingCount, publishedCount
                   </div>
                   
                   {/* Optional progress bar for visual effect */}
-                  {stat.value > 0 && totalExams > 0 && (
+                  {stat.value > 0 && totalExams > 0 && stat.label !== 'Total Marks' && stat.label !== 'Avg Marks' && (
                     <div className="mt-2 sm:mt-3">
                       <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
                         <div 

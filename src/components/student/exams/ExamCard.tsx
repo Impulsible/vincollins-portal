@@ -1,17 +1,21 @@
 // src/components/student/exams/ExamCard.tsx
+
 'use client'
 
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
-  Clock, BookOpen, CheckCircle2, Lock, ChevronRight,
-  Play, Eye, RotateCcw, Timer, FileQuestion, Award,
-  TrendingUp, AlertCircle,
+  Clock, CheckCircle2, Lock, Play, Eye, RotateCcw,
+  Timer, FileQuestion, TrendingUp, AlertCircle,
+  Sparkles, BookOpen, ArrowRight, Zap,
 } from 'lucide-react'
-import type { Exam, ExamAttempt, ExamStatus, SubjectConfig, ViewMode } from '@/app/student/exams/types'
+import type {
+  Exam, ExamAttempt, ExamStatus, SubjectConfig, ViewMode,
+} from '@/app/student/exams/types'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ExamCardProps {
   exam: Exam
@@ -23,242 +27,514 @@ interface ExamCardProps {
   onViewResult: (examId: string) => void
 }
 
-const getWAECGrade = (pct: number) => {
-  if (pct >= 75) return { grade: 'A1', color: 'text-emerald-600', bg: 'bg-emerald-50', bar: 'bg-emerald-500' }
-  if (pct >= 70) return { grade: 'B2', color: 'text-blue-600',    bg: 'bg-blue-50',    bar: 'bg-blue-500' }
-  if (pct >= 65) return { grade: 'B3', color: 'text-sky-600',     bg: 'bg-sky-50',     bar: 'bg-sky-500' }
-  if (pct >= 60) return { grade: 'C4', color: 'text-cyan-600',    bg: 'bg-cyan-50',    bar: 'bg-cyan-500' }
-  if (pct >= 55) return { grade: 'C5', color: 'text-teal-600',    bg: 'bg-teal-50',    bar: 'bg-teal-500' }
-  if (pct >= 50) return { grade: 'C6', color: 'text-amber-600',   bg: 'bg-amber-50',   bar: 'bg-amber-500' }
-  if (pct >= 45) return { grade: 'D7', color: 'text-orange-600',  bg: 'bg-orange-50',  bar: 'bg-orange-500' }
-  if (pct >= 40) return { grade: 'E8', color: 'text-yellow-600',  bg: 'bg-yellow-50',  bar: 'bg-yellow-500' }
-  return           { grade: 'F9', color: 'text-red-600',     bg: 'bg-red-50',     bar: 'bg-red-500' }
+// ─── Grade System ─────────────────────────────────────────────────────────────
+
+interface GradeInfo {
+  grade: string
+  label: string
+  color: string
+  bg: string
+  border: string
+  bar: string
+  ring: string
 }
 
-function StatusChip({ status, attempt }: { status: ExamStatus; attempt?: ExamAttempt }) {
-  const isPending = attempt?.status === 'pending_theory'
-  if (status === 'completed')
-    return (
-      <span className={cn('flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full',
-        isPending ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700')}>
-        {isPending ? <AlertCircle className="h-2.5 w-2.5" /> : <CheckCircle2 className="h-2.5 w-2.5" />}
-        {isPending ? 'Theory Pending' : 'Completed'}
-      </span>
-    )
-  if (status === 'upcoming')
-    return <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700"><Clock className="h-2.5 w-2.5" />Upcoming</span>
-  if (attempt?.status === 'in_progress')
-    return <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700"><RotateCcw className="h-2.5 w-2.5" />In Progress</span>
-  return <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600"><Lock className="h-2.5 w-2.5" />Available</span>
+const getWAECGrade = (pct: number): GradeInfo => {
+  if (pct >= 75) return { grade: 'A1', label: 'Excellent',  color: 'text-emerald-700', bg: 'bg-emerald-50',  border: 'border-emerald-200', bar: 'bg-gradient-to-r from-emerald-400 to-emerald-500', ring: 'ring-emerald-400' }
+  if (pct >= 70) return { grade: 'B2', label: 'Very Good',  color: 'text-blue-700',    bg: 'bg-blue-50',     border: 'border-blue-200',    bar: 'bg-gradient-to-r from-blue-400 to-blue-500',       ring: 'ring-blue-400' }
+  if (pct >= 65) return { grade: 'B3', label: 'Good',       color: 'text-sky-700',     bg: 'bg-sky-50',      border: 'border-sky-200',     bar: 'bg-gradient-to-r from-sky-400 to-sky-500',         ring: 'ring-sky-400' }
+  if (pct >= 60) return { grade: 'C4', label: 'Credit',     color: 'text-teal-700',    bg: 'bg-teal-50',     border: 'border-teal-200',    bar: 'bg-gradient-to-r from-teal-400 to-teal-500',       ring: 'ring-teal-400' }
+  if (pct >= 55) return { grade: 'C5', label: 'Credit',     color: 'text-amber-700',   bg: 'bg-amber-50',    border: 'border-amber-200',   bar: 'bg-gradient-to-r from-amber-400 to-amber-500',     ring: 'ring-amber-400' }
+  if (pct >= 50) return { grade: 'C6', label: 'Credit',     color: 'text-orange-700',  bg: 'bg-orange-50',   border: 'border-orange-200',  bar: 'bg-gradient-to-r from-orange-400 to-orange-500',   ring: 'ring-orange-400' }
+  if (pct >= 45) return { grade: 'D7', label: 'Pass',       color: 'text-yellow-700',  bg: 'bg-yellow-50',   border: 'border-yellow-200',  bar: 'bg-gradient-to-r from-yellow-400 to-yellow-500',   ring: 'ring-yellow-400' }
+  if (pct >= 40) return { grade: 'E8', label: 'Pass',       color: 'text-red-500',     bg: 'bg-red-50',      border: 'border-red-200',     bar: 'bg-gradient-to-r from-red-300 to-red-400',         ring: 'ring-red-400' }
+  return           { grade: 'F9', label: 'Fail',       color: 'text-red-700',     bg: 'bg-red-50',      border: 'border-red-200',     bar: 'bg-gradient-to-r from-red-500 to-red-600',         ring: 'ring-red-500' }
 }
 
-function ActionBtn({ status, attempt, examId, onTakeExam, onViewResult }: {
+// ─── Score Calculation ────────────────────────────────────────────────────────
+
+interface ScoreData {
+  displayPct: number
+  displayScore: number
+  displayTotal: number
+  hasCA: boolean
+  isPending: boolean
+}
+
+const calcScore = (attempt?: ExamAttempt): ScoreData => {
+  if (!attempt) return { displayPct: 0, displayScore: 0, displayTotal: 100, hasCA: false, isPending: false }
+
+  const hasCA      = attempt.ca1_score !== undefined || attempt.ca2_score !== undefined
+  const isPending  = attempt.status === 'pending_theory'
+  const obj        = attempt.objective_score || 0
+  const theory     = attempt.theory_score    || 0
+  const ca1        = attempt.ca1_score       || 0
+  const ca2        = attempt.ca2_score       || 0
+  const caTotal    = ca1 + ca2
+  const objMax     = attempt.objective_total || 30
+
+  let displayScore = 0
+  let displayTotal = 100
+
+  if (hasCA) {
+    displayScore = caTotal + obj + theory
+    displayTotal = 100
+  } else if (theory > 0) {
+    displayScore = obj + theory
+    displayTotal = 60
+  } else if (obj > 0 && objMax > 0) {
+    displayScore = obj
+    displayTotal = objMax
+  }
+
+  const displayPct = Math.min(Math.max(Math.round((displayScore / (displayTotal || 1)) * 100), 0), 100)
+  return { displayPct, displayScore, displayTotal, hasCA, isPending }
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+// Status Badge
+const STATUS_MAP = {
+  completed_pending: {
+    icon: AlertCircle,
+    label: 'Theory Pending',
+    cls: 'bg-amber-100 text-amber-700 border-amber-200',
+  },
+  completed: {
+    icon: CheckCircle2,
+    label: 'Completed',
+    cls: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  },
+  upcoming: {
+    icon: Clock,
+    label: 'Upcoming',
+    cls: 'bg-amber-100 text-amber-700 border-amber-200',
+  },
+  in_progress: {
+    icon: Zap,
+    label: 'In Progress',
+    cls: 'bg-blue-100 text-blue-700 border-blue-200',
+  },
+  available: {
+    icon: Lock,
+    label: 'Available',
+    cls: 'bg-slate-100 text-slate-600 border-slate-200',
+  },
+} as const
+
+function StatusBadge({ status, attempt }: { status: ExamStatus; attempt?: ExamAttempt }) {
+  const key =
+    status === 'completed' && attempt?.status === 'pending_theory' ? 'completed_pending'
+    : status === 'completed' ? 'completed'
+    : status === 'upcoming'  ? 'upcoming'
+    : attempt?.status === 'in_progress' ? 'in_progress'
+    : 'available'
+
+  const { icon: Icon, label, cls } = STATUS_MAP[key]
+
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1 text-[10px] font-semibold',
+      'px-2 py-0.5 rounded-full border',
+      cls,
+    )}>
+      <Icon className="h-2.5 w-2.5" />
+      {label}
+    </span>
+  )
+}
+
+// Score Breakdown Pills
+function ScoreBreakdown({ attempt, hasCA }: { attempt: ExamAttempt; hasCA: boolean }) {
+  const parts: { label: string; value: number }[] = []
+
+  if (hasCA) {
+    const ca = (attempt.ca1_score || 0) + (attempt.ca2_score || 0)
+    if (ca > 0) parts.push({ label: 'CA', value: ca })
+  }
+  if ((attempt.objective_score || 0) > 0)
+    parts.push({ label: 'Obj', value: attempt.objective_score! })
+  if ((attempt.theory_score || 0) > 0)
+    parts.push({ label: 'Theory', value: attempt.theory_score! })
+
+  if (parts.length === 0) return null
+
+  return (
+    <div className="flex flex-wrap items-center gap-1">
+      {parts.map((p, i) => (
+        <span key={p.label} className="flex items-center gap-1">
+          {i > 0 && <span className="text-slate-300 text-[9px]">+</span>}
+          <span className="text-[9px] bg-white/70 border border-slate-200 text-slate-500 px-1.5 py-0.5 rounded-md font-medium">
+            {p.label}: {p.value}
+          </span>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// Score Ring (circular progress for grid view)
+function ScoreRing({
+  pct, gradeInfo, size = 64,
+}: {
+  pct: number; gradeInfo: GradeInfo; size?: number
+}) {
+  const r        = (size / 2) - 6
+  const circ     = 2 * Math.PI * r
+  const dashArr  = circ
+  const dashOff  = circ - (circ * pct) / 100
+  const fontSize = size < 64 ? 'text-sm' : 'text-base'
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg width={size} height={size} className="-rotate-90">
+        <circle cx={size / 2} cy={size / 2} r={r}
+          className="fill-none stroke-slate-100" strokeWidth={5} />
+        <motion.circle
+          cx={size / 2} cy={size / 2} r={r}
+          className={cn('fill-none', gradeInfo.ring)}
+          stroke="currentColor"
+          strokeWidth={5}
+          strokeLinecap="round"
+          strokeDasharray={dashArr}
+          initial={{ strokeDashoffset: dashArr }}
+          animate={{ strokeDashoffset: dashOff }}
+          transition={{ duration: 1, ease: 'easeOut', delay: 0.2 }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className={cn('font-black leading-none', fontSize, gradeInfo.color)}>
+          {pct}%
+        </span>
+        <span className={cn('text-[8px] font-bold mt-0.5', gradeInfo.color)}>
+          {gradeInfo.grade}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// Action Button
+function ActionButton({
+  status, attempt, examId, onTakeExam, onViewResult, fullWidth = false,
+}: {
   status: ExamStatus; attempt?: ExamAttempt; examId: string
   onTakeExam: (id: string) => void; onViewResult: (id: string) => void
+  fullWidth?: boolean
 }) {
-  if (status === 'completed') {
-    return (
-      <Button size="sm" onClick={() => onViewResult(examId)}
-        className="h-8 text-xs gap-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white w-full sm:w-auto">
-        <Eye className="h-3.5 w-3.5" /> View Result
-      </Button>
-    )
-  }
-  if (status === 'upcoming') {
-    return (
-      <Button size="sm" disabled variant="outline"
-        className="h-8 text-xs gap-1.5 rounded-xl border-slate-200 w-full sm:w-auto opacity-60">
-        <Clock className="h-3.5 w-3.5" /> Not Yet Open
-      </Button>
-    )
-  }
-  if (attempt?.status === 'in_progress') {
-    return (
-      <Button size="sm" onClick={() => onTakeExam(examId)}
-        className="h-8 text-xs gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white w-full sm:w-auto">
-        <RotateCcw className="h-3.5 w-3.5" /> Resume
-      </Button>
-    )
-  }
+  const base = cn(
+    'h-8 text-xs font-semibold gap-1.5 rounded-xl transition-all duration-150',
+    fullWidth && 'w-full',
+  )
+
+  if (status === 'completed') return (
+    <Button size="sm" onClick={() => onViewResult(examId)}
+      className={cn(base, 'bg-slate-900 hover:bg-slate-700 text-white shadow-sm hover:shadow')}>
+      <Eye className="h-3.5 w-3.5" /> View Result
+      <ArrowRight className="h-3 w-3 ml-0.5 opacity-60" />
+    </Button>
+  )
+
+  if (status === 'upcoming') return (
+    <Button size="sm" disabled variant="outline"
+      className={cn(base, 'border-slate-200 text-slate-400 cursor-not-allowed')}>
+      <Clock className="h-3.5 w-3.5" /> Not Yet Open
+    </Button>
+  )
+
+  if (attempt?.status === 'in_progress') return (
+    <Button size="sm" onClick={() => onTakeExam(examId)}
+      className={cn(base, 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm hover:shadow')}>
+      <Zap className="h-3.5 w-3.5" /> Resume
+    </Button>
+  )
+
   return (
     <Button size="sm" onClick={() => onTakeExam(examId)}
-      className="h-8 text-xs gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto">
+      className={cn(base, 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm hover:shadow')}>
       <Play className="h-3.5 w-3.5" /> Start Exam
     </Button>
   )
 }
 
-export function ExamCard({ exam, attempt, status, config, viewMode, onTakeExam, onViewResult }: ExamCardProps) {
-  const SubjectIcon = config.icon
-  const displayPct = attempt?.ca_percentage ?? attempt?.percentage ?? 0
-  const gradeInfo = getWAECGrade(displayPct)
-  const isPending = attempt?.status === 'pending_theory'
+// Accent colour helper
+const accentCls = (status: ExamStatus, isPending: boolean, inProgress: boolean) => {
+  if (status === 'completed') return isPending ? 'bg-amber-400' : 'bg-emerald-500'
+  if (status === 'upcoming')  return 'bg-amber-400'
+  if (inProgress)             return 'bg-blue-500'
+  return 'bg-slate-200'
+}
 
-  // ── LIST VIEW ─────────────────────────────────────
+// ─── ExamCard ─────────────────────────────────────────────────────────────────
+
+export function ExamCard({
+  exam, attempt, status, config, viewMode, onTakeExam, onViewResult,
+}: ExamCardProps) {
+  const SubjectIcon = config.icon
+  const { displayPct, displayScore, displayTotal, hasCA, isPending } = calcScore(attempt)
+  const gradeInfo    = getWAECGrade(displayPct)
+  const inProgress   = attempt?.status === 'in_progress'
+  const accent       = accentCls(status, isPending, inProgress)
+  const isCompleted  = status === 'completed' && !!attempt
+
+  // ── LIST VIEW ───────────────────────────────────────────────────────────────
   if (viewMode === 'list') {
     return (
-      <Card className={cn(
-        'border-0 shadow-sm hover:shadow-md transition-all duration-200 bg-white group overflow-hidden',
-        'hover:-translate-y-0.5'
-      )}>
-        <CardContent className="p-0">
-          <div className="flex items-stretch">
-            {/* Left accent bar */}
-            <div className={cn(
-              'w-1 shrink-0 rounded-l-xl transition-all duration-200 group-hover:w-1.5',
-              status === 'completed' ? (isPending ? 'bg-amber-400' : 'bg-emerald-500')
-                : status === 'upcoming' ? 'bg-amber-400'
-                : attempt?.status === 'in_progress' ? 'bg-blue-500'
-                : 'bg-slate-300'
-            )} />
+      <motion.div
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25 }}
+      >
+        <Card className={cn(
+          'group border border-slate-100 shadow-sm hover:shadow-md',
+          'transition-all duration-200 bg-white overflow-hidden',
+          'hover:-translate-y-0.5',
+        )}>
+          <CardContent className="p-0">
+            <div className="flex items-stretch">
 
-            <div className="flex-1 p-3 sm:p-4">
-              <div className="flex items-start gap-3">
-                {/* Subject icon */}
-                <div className={cn('h-11 w-11 rounded-xl flex items-center justify-center shrink-0', config.bgColor)}>
-                  <SubjectIcon className={cn('h-5 w-5', config.color)} />
+              {/* Accent strip */}
+              <div className={cn(
+                'w-1 shrink-0 rounded-l-xl transition-all duration-200 group-hover:w-1.5',
+                accent,
+              )} />
+
+              <div className="flex-1 px-4 py-3">
+                <div className="flex items-center gap-3">
+
+                  {/* Icon */}
+                  <div className={cn(
+                    'h-11 w-11 rounded-2xl flex items-center justify-center shrink-0',
+                    'shadow-sm ring-1 ring-black/5',
+                    config.bgColor,
+                  )}>
+                    <SubjectIcon className={cn('h-5 w-5', config.color)} />
+                  </div>
+
+                  {/* Main content */}
+                  <div className="flex-1 min-w-0">
+                    {/* Top row */}
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-sm text-slate-900 truncate leading-tight">
+                          {exam.title}
+                        </h3>
+                        <p className="text-[11px] text-slate-400 mt-0.5 truncate">
+                          {exam.subject}
+                          {exam.class ? ` · ${exam.class}` : ''}
+                          {exam.term && exam.session_year
+                            ? ` · ${exam.term} ${exam.session_year}`
+                            : ''}
+                        </p>
+                      </div>
+                      <StatusBadge status={status} attempt={attempt} />
+                    </div>
+
+                    {/* Meta pills */}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <MetaPill icon={Timer} label={`${exam.duration}m`} />
+                      <MetaPill icon={FileQuestion} label={`${exam.total_questions} Qs`} />
+                      {exam.passing_percentage && (
+                        <MetaPill icon={TrendingUp} label={`Pass ${exam.passing_percentage}%`} />
+                      )}
+                      {exam.has_theory && <TagPill label="+Theory" cls="bg-purple-50 text-purple-700 border-purple-200" />}
+                    </div>
+                  </div>
+
+                  {/* Score (desktop) */}
+                  {isCompleted && (
+                    <div className="hidden sm:flex flex-col items-center gap-1 shrink-0 px-3">
+                      <ScoreRing pct={displayPct} gradeInfo={gradeInfo} size={56} />
+                      <ScoreBreakdown attempt={attempt!} hasCA={hasCA} />
+                    </div>
+                  )}
+
+                  {/* Action (desktop) */}
+                  <div className="hidden sm:flex shrink-0 ml-1">
+                    <ActionButton
+                      status={status} attempt={attempt} examId={exam.id}
+                      onTakeExam={onTakeExam} onViewResult={onViewResult}
+                    />
+                  </div>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm text-slate-900 truncate">{exam.title}</h3>
-                      <p className="text-[11px] text-slate-400 mt-0.5">{exam.subject} · {exam.class}</p>
-                    </div>
-                    <StatusChip status={status} attempt={attempt} />
-                  </div>
-
-                  {/* Meta row */}
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2">
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                      <Timer className="h-3 w-3" /> {exam.duration}m
-                    </span>
-                    <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                      <FileQuestion className="h-3 w-3" /> {exam.total_questions} Qs
-                    </span>
-                    {exam.passing_percentage && (
-                      <span className="flex items-center gap-1 text-[11px] text-slate-500">
-                        <TrendingUp className="h-3 w-3" /> Pass: {exam.passing_percentage}%
-                      </span>
-                    )}
-                    {exam.has_theory && (
-                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">+Theory</span>
-                    )}
-                  </div>
-
-                  {/* Score bar for completed */}
-                  {status === 'completed' && attempt && (
-                    <div className="mt-3 max-w-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-slate-400">Score</span>
-                        <div className="flex items-center gap-1.5">
-                          <span className={cn('text-xs font-black', gradeInfo.color)}>{displayPct}%</span>
-                          <span className={cn('text-[10px] font-bold px-1.5 py-0 rounded-md', gradeInfo.bg, gradeInfo.color)}>
-                            {isPending ? '⏳' : gradeInfo.grade}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <motion.div
-                          className={cn('h-full rounded-full', gradeInfo.bar)}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${displayPct}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut' }}
-                        />
+                {/* Mobile: score + action */}
+                <div className="sm:hidden mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between gap-3">
+                  {isCompleted && (
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <ScoreRing pct={displayPct} gradeInfo={gradeInfo} size={44} />
+                      <div className="flex-1 space-y-1.5 min-w-0">
+                        <ScoreBreakdown attempt={attempt!} hasCA={hasCA} />
+                        <ProgressBar pct={displayPct} gradeInfo={gradeInfo} />
                       </div>
                     </div>
                   )}
-                </div>
-
-                {/* Action button */}
-                <div className="shrink-0 self-center ml-2 hidden sm:block">
-                  <ActionBtn status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} />
+                  <ActionButton
+                    status={status} attempt={attempt} examId={exam.id}
+                    onTakeExam={onTakeExam} onViewResult={onViewResult}
+                    fullWidth={!isCompleted}
+                  />
                 </div>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    )
+  }
 
-              {/* Mobile action button */}
-              <div className="sm:hidden mt-3 pt-2 border-t border-slate-100">
-                <ActionBtn status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} />
+  // ── GRID VIEW ───────────────────────────────────────────────────────────────
+  return (
+    <motion.div
+      className="h-full"
+      initial={{ opacity: 0, scale: 0.97 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ duration: 0.25 }}
+    >
+      <Card className={cn(
+        'group border border-slate-100 shadow-sm hover:shadow-lg',
+        'transition-all duration-200 bg-white h-full flex flex-col overflow-hidden',
+        'hover:-translate-y-1',
+      )}>
+        <CardContent className="p-0 flex flex-col h-full">
+
+          {/* Top accent bar */}
+          <div className={cn('h-1 w-full shrink-0', accent)} />
+
+          {/* Gradient wash when completed */}
+          {isCompleted && (
+            <div className={cn(
+              'h-16 w-full shrink-0 opacity-30',
+              isPending
+                ? 'bg-gradient-to-b from-amber-100 to-transparent'
+                : 'bg-gradient-to-b from-emerald-50 to-transparent',
+            )} />
+          )}
+
+          <div className={cn('px-4 pb-4 flex flex-col flex-1', isCompleted ? '-mt-12' : 'pt-4')}>
+
+            {/* Header row */}
+            <div className="flex items-start justify-between mb-3">
+              <div className={cn(
+                'h-10 w-10 rounded-2xl flex items-center justify-center shrink-0',
+                'shadow-sm ring-1 ring-black/5',
+                config.bgColor,
+              )}>
+                <SubjectIcon className={cn('h-5 w-5', config.color)} />
               </div>
+              <StatusBadge status={status} attempt={attempt} />
+            </div>
+
+            {/* Title & subject */}
+            <h3 className="font-bold text-sm text-slate-900 line-clamp-2 leading-snug">
+              {exam.title}
+            </h3>
+            <p className="text-[11px] text-slate-400 mt-0.5 mb-3">{exam.subject}</p>
+
+            {/* Meta */}
+            <div className="flex flex-wrap items-center gap-1.5 mb-4">
+              <MetaPill icon={Timer} label={`${exam.duration}m`} />
+              <MetaPill icon={FileQuestion} label={`${exam.total_questions} Qs`} />
+              {exam.has_theory && <TagPill label="+Theory" cls="bg-purple-50 text-purple-700 border-purple-200" />}
+              {exam.term && exam.session_year && (
+                <TagPill label={`${exam.term} ${exam.session_year}`} cls="bg-slate-50 text-slate-500 border-slate-200" />
+              )}
+            </div>
+
+            {/* Score section */}
+            {isCompleted && (
+              <div className={cn(
+                'rounded-2xl border p-3 mb-4 space-y-2.5',
+                gradeInfo.bg, gradeInfo.border,
+              )}>
+                <div className="flex items-center gap-3">
+                  <ScoreRing pct={displayPct} gradeInfo={gradeInfo} size={64} />
+                  <div className="flex-1 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-500 font-medium">Your Score</span>
+                      <span className={cn('text-xs font-bold', gradeInfo.color)}>
+                        {gradeInfo.label}
+                      </span>
+                    </div>
+                    <p className={cn('text-[11px] font-semibold', gradeInfo.color)}>
+                      {displayScore}/{displayTotal} pts
+                    </p>
+                    <ProgressBar pct={displayPct} gradeInfo={gradeInfo} />
+                  </div>
+                </div>
+
+                {isPending && (
+                  <div className="flex items-center gap-1.5 text-[10px] text-amber-700 bg-amber-100 rounded-lg px-2 py-1.5 border border-amber-200">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    Theory marking in progress — final grade pending
+                  </div>
+                )}
+
+                <ScoreBreakdown attempt={attempt!} hasCA={hasCA} />
+              </div>
+            )}
+
+            {/* In-progress nudge */}
+            {inProgress && (
+              <div className="flex items-center gap-1.5 text-[10px] text-blue-700 bg-blue-50 rounded-xl px-2.5 py-1.5 mb-3 border border-blue-200">
+                <Sparkles className="h-3 w-3 shrink-0" />
+                You have an attempt in progress
+              </div>
+            )}
+
+            {/* Spacer */}
+            <div className="flex-1" />
+
+            {/* Passing info */}
+            {exam.passing_percentage && status !== 'completed' && (
+              <p className="text-[10px] text-slate-400 mb-2 flex items-center gap-1">
+                <TrendingUp className="h-3 w-3" /> Pass mark: {exam.passing_percentage}%
+              </p>
+            )}
+
+            {/* Action */}
+            <div className="pt-3 border-t border-slate-100">
+              <ActionButton
+                status={status} attempt={attempt} examId={exam.id}
+                onTakeExam={onTakeExam} onViewResult={onViewResult}
+                fullWidth
+              />
             </div>
           </div>
         </CardContent>
       </Card>
-    )
-  }
+    </motion.div>
+  )
+}
 
-  // ── GRID VIEW ─────────────────────────────────────
+// ─── Tiny helpers ─────────────────────────────────────────────────────────────
+
+function MetaPill({ icon: Icon, label }: { icon: React.ElementType; label: string }) {
   return (
-    <Card className={cn(
-      'border-0 shadow-sm hover:shadow-lg transition-all duration-200 bg-white group h-full flex flex-col overflow-hidden',
-      'hover:-translate-y-1'
-    )}>
-      <CardContent className="p-0 flex flex-col h-full">
-        {/* Coloured top bar */}
-        <div className={cn(
-          'h-1 w-full',
-          status === 'completed' ? (isPending ? 'bg-amber-400' : 'bg-emerald-500')
-            : status === 'upcoming' ? 'bg-amber-400'
-            : attempt?.status === 'in_progress' ? 'bg-blue-500'
-            : 'bg-slate-200'
-        )} />
+    <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded-lg">
+      <Icon className="h-3 w-3 text-slate-400" />
+      {label}
+    </span>
+  )
+}
 
-        <div className="p-4 flex flex-col flex-1">
-          {/* Header: icon + status */}
-          <div className="flex items-start justify-between mb-3">
-            <div className={cn('h-10 w-10 rounded-xl flex items-center justify-center shrink-0', config.bgColor)}>
-              <SubjectIcon className={cn('h-5 w-5', config.color)} />
-            </div>
-            <StatusChip status={status} attempt={attempt} />
-          </div>
+function TagPill({ label, cls }: { label: string; cls: string }) {
+  return (
+    <span className={cn('text-[10px] font-semibold px-1.5 py-0.5 rounded-lg border', cls)}>
+      {label}
+    </span>
+  )
+}
 
-          {/* Title */}
-          <h3 className="font-bold text-sm text-slate-900 line-clamp-2 leading-snug mb-1">{exam.title}</h3>
-          <p className="text-[11px] text-slate-400 mb-3">{exam.subject}</p>
-
-          {/* Meta */}
-          <div className="flex flex-wrap gap-x-3 gap-y-1 mb-3">
-            <span className="flex items-center gap-1 text-[11px] text-slate-500">
-              <Timer className="h-3 w-3" /> {exam.duration}m
-            </span>
-            <span className="flex items-center gap-1 text-[11px] text-slate-500">
-              <FileQuestion className="h-3 w-3" /> {exam.total_questions} Qs
-            </span>
-            {exam.has_theory && (
-              <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-medium">+Theory</span>
-            )}
-          </div>
-
-          {/* Score for completed */}
-          {status === 'completed' && attempt && (
-            <div className="mb-3 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className={cn('text-lg font-black', gradeInfo.color)}>{displayPct}%</span>
-                <span className={cn('text-[11px] font-bold px-2 py-0.5 rounded-lg', gradeInfo.bg, gradeInfo.color)}>
-                  {isPending ? '⏳ Pending' : gradeInfo.grade}
-                </span>
-              </div>
-              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                <motion.div
-                  className={cn('h-full rounded-full', gradeInfo.bar)}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${displayPct}%` }}
-                  transition={{ duration: 0.8, ease: 'easeOut' }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Spacer */}
-          <div className="flex-1" />
-
-          {/* Action button */}
-          <div className="pt-3 border-t border-slate-100 mt-2">
-            <ActionBtn status={status} attempt={attempt} examId={exam.id} onTakeExam={onTakeExam} onViewResult={onViewResult} />
-          </div>
-        </div>
-      </CardContent>
-    </Card>
+function ProgressBar({ pct, gradeInfo }: { pct: number; gradeInfo: GradeInfo }) {
+  return (
+    <div className="h-1.5 bg-white/60 rounded-full overflow-hidden border border-black/5">
+      <motion.div
+        className={cn('h-full rounded-full', gradeInfo.bar)}
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.9, ease: 'easeOut', delay: 0.15 }}
+      />
+    </div>
   )
 }

@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/ExamHeader.tsx
+// src/components/staff/exams/edit/ExamHeader.tsx - NO HARDCODED VALUES
 
 'use client'
 
@@ -15,6 +15,11 @@ interface ExamHeaderProps {
   sessionYear: string
   saving: boolean
   onSave: () => void
+  // ✅ Optional: for mark summary display
+  objectiveTotal?: number
+  theoryTotal?: number
+  examTotal?: number
+  grandTotal?: number
 }
 
 export function ExamHeader({
@@ -24,7 +29,11 @@ export function ExamHeader({
   termName,
   sessionYear,
   saving,
-  onSave
+  onSave,
+  objectiveTotal,
+  theoryTotal,
+  examTotal,
+  grandTotal,
 }: ExamHeaderProps) {
 
   const handleBack = () => {
@@ -57,6 +66,17 @@ export function ExamHeader({
               <Calendar className="h-3 w-3 mr-1" />
               {termName} {sessionYear}
             </Badge>
+            {/* ✅ Optional mark summary - all from database */}
+            {examTotal !== undefined && examTotal > 0 && (
+              <Badge variant="outline" className="shrink-0 bg-emerald-50 border-emerald-200 text-emerald-700">
+                {examTotal} marks
+              </Badge>
+            )}
+            {grandTotal !== undefined && grandTotal > 0 && (
+              <Badge variant="outline" className="shrink-0 bg-blue-50 border-blue-200 text-blue-700">
+                Grand: {grandTotal}
+              </Badge>
+            )}
           </div>
         </div>
       </div>

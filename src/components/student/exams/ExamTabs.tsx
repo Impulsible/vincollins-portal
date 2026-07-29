@@ -1,9 +1,9 @@
-// src/components/student/exams/ExamTabs.tsx
+// src/components/student/exams/ExamTabs.tsx - FIXED VERSION
 
 'use client'
 
 import { motion } from 'framer-motion'
-import { Unlock, Clock, CheckCircle2, AlertCircle } from 'lucide-react'  // ✅ Add AlertCircle
+import { Unlock, Clock, CheckCircle2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { TabType } from '@/app/student/exams/types'
 
@@ -13,15 +13,37 @@ interface ExamTabsProps {
   availableCount: number
   upcomingCount: number
   completedCount: number
-  expiredCount?: number  // ✅ Add optional expired count
+  expiredCount?: number
+  // ✅ Custom labels
+  labels?: Partial<Record<TabType, string>>
 }
 
-// ✅ Add 'expired' tab
-const TABS = [
-  { value: 'available' as TabType, label: 'Available', icon: Unlock, dot: 'bg-emerald-500' },
-  { value: 'upcoming' as TabType, label: 'Upcoming', icon: Clock, dot: 'bg-amber-500' },
-  { value: 'completed' as TabType, label: 'Completed', icon: CheckCircle2, dot: 'bg-blue-500' },
-  { value: 'expired' as TabType, label: 'Expired', icon: AlertCircle, dot: 'bg-red-500' },  // ✅ Add expired
+// ✅ Dynamic tab configuration with labels
+const getTabs = (labels?: Partial<Record<TabType, string>>) => [
+  { 
+    value: 'available' as TabType, 
+    label: labels?.available || 'Available', 
+    icon: Unlock, 
+    dot: 'bg-emerald-500' 
+  },
+  { 
+    value: 'upcoming' as TabType, 
+    label: labels?.upcoming || 'Upcoming', 
+    icon: Clock, 
+    dot: 'bg-amber-500' 
+  },
+  { 
+    value: 'completed' as TabType, 
+    label: labels?.completed || 'Completed', 
+    icon: CheckCircle2, 
+    dot: 'bg-blue-500' 
+  },
+  { 
+    value: 'expired' as TabType, 
+    label: labels?.expired || 'Expired', 
+    icon: AlertCircle, 
+    dot: 'bg-red-500' 
+  },
 ]
 
 export function ExamTabs({
@@ -30,13 +52,16 @@ export function ExamTabs({
   availableCount,
   upcomingCount,
   completedCount,
-  expiredCount = 0,  // ✅ Default to 0
+  expiredCount = 0,
+  labels,
 }: ExamTabsProps) {
+  const TABS = getTabs(labels)
+  
   const counts = {
     available: availableCount,
     upcoming: upcomingCount,
     completed: completedCount,
-    expired: expiredCount,  // ✅ Include expired
+    expired: expiredCount,
   }
 
   return (
@@ -46,17 +71,17 @@ export function ExamTabs({
       transition={{ delay: 0.2 }}
       className="mb-5"
     >
-      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-sm w-full sm:w-auto sm:inline-flex">
+      <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-2xl p-1 shadow-sm w-full sm:w-auto sm:inline-flex overflow-x-auto">
         {TABS.map(tab => {
           const Icon = tab.icon
           const isActive = activeTab === tab.value
-          const count = counts[tab.value] ?? 0  // ✅ Safe access
+          const count = counts[tab.value] ?? 0
           return (
             <button
               key={tab.value}
               onClick={() => onTabChange(tab.value)}
               className={cn(
-                'relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 flex-1 sm:flex-initial justify-center sm:justify-start',
+                'relative flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 flex-1 sm:flex-initial justify-center sm:justify-start whitespace-nowrap',
                 isActive
                   ? 'bg-slate-900 text-white shadow-sm'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'

@@ -1,6 +1,7 @@
-// src/components/student/exams/ExamActionButton.tsx
+// src/components/student/exams/ExamActionButton.tsx - FIXED VERSION
+
 import { Button } from '@/components/ui/button'
-import { MonitorPlay, Award, Lock, ChevronRight, ArrowRight, RotateCcw } from 'lucide-react'
+import { MonitorPlay, Award, Lock, ChevronRight, ArrowRight, RotateCcw, AlertCircle } from 'lucide-react'
 import type { ExamAttempt, ExamStatus } from '@/app/student/exams/types'
 
 interface ExamActionButtonProps {
@@ -18,7 +19,23 @@ export function ExamActionButton({
   onTakeExam,
   onViewResult,
 }: ExamActionButtonProps) {
-  // In Progress - Show Resume
+  
+  // ✅ Pending Theory - Show View Result (same as completed but with different text)
+  if (attempt?.status === 'pending_theory') {
+    return (
+      <Button
+        onClick={() => onViewResult(examId)}
+        variant="outline"
+        className="w-full border-amber-200 text-amber-700 hover:bg-amber-50 text-sm rounded-xl"
+      >
+        <AlertCircle className="mr-2 h-4 w-4" />
+        Theory Pending
+        <ChevronRight className="ml-auto h-4 w-4" />
+      </Button>
+    )
+  }
+
+  // ✅ In Progress - Show Resume
   if (attempt?.status === 'in_progress') {
     return (
       <Button
@@ -32,7 +49,7 @@ export function ExamActionButton({
     )
   }
 
-  // Completed - View Result
+  // ✅ Completed - View Result
   if (status === 'completed') {
     return (
       <Button
@@ -47,12 +64,12 @@ export function ExamActionButton({
     )
   }
 
-  // Available - Start Exam
+  // ✅ Available - Start Exam
   if (status === 'available') {
     return (
       <Button
         onClick={() => onTakeExam(examId)}
-        className="w-full bg-gradient-to-r from-primary to-primary/90 hover:from-primary/90 hover:to-primary text-sm rounded-xl"
+        className="w-full bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white text-sm rounded-xl"
       >
         <MonitorPlay className="mr-2 h-4 w-4" />
         Start Exam
@@ -61,11 +78,11 @@ export function ExamActionButton({
     )
   }
 
-  // Upcoming or expired
+  // ✅ Upcoming or expired - Not Available
   return (
-    <Button disabled variant="outline" className="w-full text-sm rounded-xl">
+    <Button disabled variant="outline" className="w-full text-sm rounded-xl opacity-60">
       <Lock className="mr-2 h-4 w-4" />
-      Not Available
+      {status === 'upcoming' ? 'Not Yet Open' : 'Not Available'}
     </Button>
   )
 }

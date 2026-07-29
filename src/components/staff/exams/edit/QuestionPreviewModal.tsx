@@ -1,11 +1,11 @@
-// src/components/staff/exams/edit/QuestionPreviewModal.tsx - UPDATED
+// src/components/staff/exams/edit/QuestionPreviewModal.tsx - UPDATED WITH MARK SYSTEM
 
 'use client'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Eye, X, CheckCircle2, AlertCircle, BookOpen, Brain } from 'lucide-react'
+import { Eye, X, CheckCircle2, AlertCircle, BookOpen, Brain, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface QuestionPreviewModalProps {
@@ -14,6 +14,10 @@ interface QuestionPreviewModalProps {
   onOpenChange: (open: boolean) => void
   index: number
   type?: 'objective' | 'theory'
+  // ✅ Added: mark configuration from database
+  defaultMark?: number
+  totalTheoryMarks?: number
+  examTotal?: number
 }
 
 export function QuestionPreviewModal({ 
@@ -21,7 +25,10 @@ export function QuestionPreviewModal({
   open, 
   onOpenChange, 
   index,
-  type = 'objective'
+  type = 'objective',
+  defaultMark = 0.5,
+  totalTheoryMarks = 0,
+  examTotal = 60,
 }: QuestionPreviewModalProps) {
   const isObjective = type === 'objective' || question.type === 'objective'
   const isTheory = type === 'theory' || question.type === 'theory'
@@ -31,6 +38,12 @@ export function QuestionPreviewModal({
   const isComplete = isObjective 
     ? question.correct_answer && question.options?.some((opt: string) => opt.trim())
     : question.question_text?.trim()
+
+  // ✅ Get the question's marks - from question or default
+  const questionMarks = question.points || (isObjective ? defaultMark : 0)
+  
+  // ✅ For theory, show the marks breakdown
+  const theoryMarks = isTheory ? (question.points || 0) : 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,9 +70,16 @@ export function QuestionPreviewModal({
               </Badge>
             )}
           </div>
-          <Badge className="bg-purple-100 text-purple-700">
-            {question.points || 0} marks
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className="bg-purple-100 text-purple-700">
+              {questionMarks} marks
+            </Badge>
+            {isObjective && defaultMark > 0 && (
+              <Badge variant="outline" className="text-blue-600 border-blue-200 text-[10px]">
+                {defaultMark} mark each
+              </Badge>
+            )}
+          </div>
         </DialogHeader>
         
         <div className="space-y-4 mt-2">
@@ -80,7 +100,12 @@ export function QuestionPreviewModal({
           {/* Objective Question Options */}
           {isObjective && question.options && question.options.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-semibold text-slate-600">Options:</p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-600">Options:</p>
+                <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200">
+                  {questionMarks} mark{questionMarks !== 1 ? 's' : ''} each
+                </Badge>
+              </div>
               <div className="space-y-1.5">
                 {question.options.map((opt: string, idx: number) => {
                   const isCorrect = opt === question.correct_answer
@@ -121,10 +146,15 @@ export function QuestionPreviewModal({
           {/* Theory Question Sub-questions */}
           {isTheory && question.sub_questions && question.sub_questions.length > 0 && (
             <div className="space-y-3">
-              <p className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-                <Brain className="h-4 w-4 text-purple-500" />
-                Sub-questions:
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-purple-500" />
+                  Sub-questions:
+                </p>
+                <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
+                  Total: {questionMarks} marks
+                </Badge>
+              </div>
               <div className="space-y-2 ml-2">
                 {question.sub_questions.map((sq: any, sqIdx: number) => (
                   <div key={sq.id || sqIdx} className="border-l-2 border-purple-200 pl-4 py-1">
@@ -191,6 +221,30 @@ export function QuestionPreviewModal({
               </div>
             </div>
           )}
+
+          {/* Mark Summary */}
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+            <div className="flex items-center gap-2">
+              <Calculator className="h-4 w-4 text-slate-500" />
+              <span className="text-sm font-medium text-slate-600">Mark Summary:</span>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
+              <div className="text-center p-2 bg-white dark:bg-slate-900 rounded border">
+                <p className="text-xs text-slate-400">Question</p>
+                <p className="text-sm font-bold text-slate-700">{questionMarks} marks</p>
+              </div>
+              {isTheory && totalTheoryMarks > 0 && (
+                <div className="text-center p-2 bg-white dark:bg-slate-900 rounded border">
+                  <p className="text-xs text-slate-400">Theory Total</p>
+                  <p className="text-sm font-bold text-purple-700">{totalTheoryMarks} marks</p>
+                </div>
+              )}
+              <div className="text-center p-2 bg-white dark:bg-slate-900 rounded border">
+                <p className="text-xs text-slate-400">Exam Total</p>
+                <p className="text-sm font-bold text-emerald-700">{examTotal} marks</p>
+              </div>
+            </div>
+          </div>
 
           {/* Draft Warning */}
           {isDraft && (

@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/QuestionFormDialog.tsx - COMPLETE FIXED VERSION
+// src/components/staff/exams/edit/QuestionFormDialog.tsx - COMPLETE FIXED VERSION WITH DEFAULT MARK
 
 'use client'
 
@@ -26,6 +26,7 @@ interface QuestionFormDialogProps {
   initialData?: Partial<Question>
   onSave: (data: Partial<Question>) => void
   onCancel?: () => void
+  defaultMark?: number // ✅ Added
 }
 
 export function QuestionFormDialog({
@@ -33,12 +34,13 @@ export function QuestionFormDialog({
   onOpenChange,
   initialData,
   onSave,
-  onCancel
+  onCancel,
+  defaultMark = 0.5 // ✅ Added with default
 }: QuestionFormDialogProps) {
   const [questionText, setQuestionText] = useState('')
   const [options, setOptions] = useState<string[]>(['', '', '', ''])
   const [correctAnswer, setCorrectAnswer] = useState('')
-  const [points, setPoints] = useState<number>(1)
+  const [points, setPoints] = useState<number>(defaultMark)
   const [isDraft, setIsDraft] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -46,9 +48,11 @@ export function QuestionFormDialog({
   useEffect(() => {
     if (open) {
       console.log('🔵 QuestionFormDialog: Opening with initialData:', initialData)
+      console.log('🔵 QuestionFormDialog: defaultMark:', defaultMark)
       
       // ✅ Preserve the is_draft value from initialData
       const draftStatus = initialData?.is_draft !== undefined ? initialData.is_draft : true
+      const markValue = initialData?.points || defaultMark
       
       setQuestionText(initialData?.question_text || '')
       setOptions(initialData?.options && initialData.options.length > 0 
@@ -56,12 +60,13 @@ export function QuestionFormDialog({
         : ['', '', '', '']
       )
       setCorrectAnswer(initialData?.correct_answer || '')
-      setPoints(initialData?.points || 1)
-      setIsDraft(draftStatus) // ✅ Use the preserved draft status
+      setPoints(markValue) // ✅ Use defaultMark if no points provided
+      setIsDraft(draftStatus)
       
       console.log('🔵 QuestionFormDialog: isDraft set to:', draftStatus)
+      console.log('🔵 QuestionFormDialog: points set to:', markValue)
     }
-  }, [open, initialData])
+  }, [open, initialData, defaultMark])
 
   // Check if question is complete
   const isQuestionComplete = (): boolean => {
@@ -111,6 +116,7 @@ export function QuestionFormDialog({
   const handleSubmit = (saveAsDraft: boolean = false) => {
     console.log('🔵 QuestionFormDialog: Submitting with saveAsDraft:', saveAsDraft)
     console.log('🔵 QuestionFormDialog: Current isDraft:', isDraft)
+    console.log('🔵 QuestionFormDialog: Current points:', points)
     
     // Validate question text
     if (!questionText.trim()) {
@@ -126,8 +132,8 @@ export function QuestionFormDialog({
         question_text: questionText.trim(),
         options: validOptions.length > 0 ? validOptions : ['', '', '', ''],
         correct_answer: correctAnswer || '',
-        points: points,
-        is_draft: true // ✅ Always set to true for draft
+        points: points || defaultMark,
+        is_draft: true
       }
       console.log('🔵 QuestionFormDialog: Saving as draft:', data)
       setIsSubmitting(true)
@@ -156,8 +162,8 @@ export function QuestionFormDialog({
       question_text: questionText.trim(),
       options: validOptions,
       correct_answer: correctAnswer,
-      points: points,
-      is_draft: false // ✅ Explicitly set to false for complete
+      points: points || defaultMark,
+      is_draft: false
     }
     console.log('🔵 QuestionFormDialog: Saving as complete:', data)
     setIsSubmitting(true)
@@ -190,6 +196,11 @@ export function QuestionFormDialog({
             {complete && !isDraft && (
               <Badge className="bg-emerald-100 text-emerald-700 border-emerald-300">
                 Complete
+              </Badge>
+            )}
+            {!isEditing && (
+              <Badge className="bg-blue-100 text-blue-700 border-blue-300 text-[10px]">
+                {defaultMark} mark each
               </Badge>
             )}
           </DialogTitle>
@@ -344,13 +355,13 @@ export function QuestionFormDialog({
               <Input
                 type="number"
                 value={points}
-                onChange={(e) => setPoints(parseFloat(e.target.value) || 1)}
+                onChange={(e) => setPoints(parseFloat(e.target.value) || defaultMark)}
                 min={0.5}
                 step={0.5}
                 className="w-32"
                 disabled={isSubmitting}
               />
-              <span className="text-sm text-slate-500">Recommended: 1 point</span>
+              <span className="text-sm text-slate-500">Default: {defaultMark} mark</span>
             </div>
           </div>
         </div>

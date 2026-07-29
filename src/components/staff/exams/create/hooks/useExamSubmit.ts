@@ -1,4 +1,4 @@
-// src/components/staff/exams/create/hooks/useExamSubmit.ts
+// src/components/staff/exams/create/hooks/useExamSubmit.ts - UPDATED WITH MARK CALCULATION
 
 "use client";
 
@@ -11,6 +11,7 @@ import type {
   TheoryQuestion,
   ScoringRule,
   TeacherProfile,
+  MarkDistribution,
 } from "../types";
 
 interface SubmitOptions {
@@ -27,6 +28,9 @@ interface SubmitOptions {
   teacherProfile: TeacherProfile | null;
   submitForApproval: boolean;
   passageText?: string | null;
+  defaultMark: number; // ✅ Added
+  markDistribution: MarkDistribution; // ✅ Added
+  theoryTotalMarks: number; // ✅ Added
 }
 
 export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
@@ -47,6 +51,9 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
         teacherProfile,
         submitForApproval,
         passageText,
+        defaultMark,
+        markDistribution,
+        theoryTotalMarks,
       } = options;
 
       // ── Validation ─────────────────────────────────────────────────────────
@@ -67,6 +74,13 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
         (!hasTheory || theoryQuestions.length === 0)
       ) {
         toast.error("Add at least one question");
+        return false;
+      }
+
+      // ✅ Validate total marks = 60
+      const totalMarks = markDistribution.examTotal;
+      if (totalMarks !== 60) {
+        toast.error(`Exam total must be 60 marks. Current total: ${totalMarks}`);
         return false;
       }
 
@@ -104,12 +118,15 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           teacherProfile?.department ??
           "General";
 
-        // ── Calculate theory marks ─────────────────────────────────────────
-        const theoryTotalMarks = hasTheory
-          ? scoringRule !== "standard" && theoryQuestionsToAnswer
-            ? theoryQuestionsToAnswer * theoryMarksPerQuestion
-            : theoryQuestionsTotal * theoryMarksPerQuestion
-          : 0;
+        // ── Calculate objective count ──────────────────────────────────────
+        const objectiveCount = questions.length;
+        const theoryCount = theoryQuestions.length;
+
+        // ✅ Use markDistribution for all mark calculations
+        const objectiveTotal = markDistribution.objectiveTotal;
+        const theoryTotal = markDistribution.theoryTotal;
+        const examTotal = markDistribution.examTotal;
+        const marksPerTheoryQuestion = markDistribution.marksPerTheoryQuestion;
 
         // ── Build exam payload ─────────────────────────────────────────────
         const examPayload = {
@@ -119,8 +136,8 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           class: examDetails.class,
           pass_mark: examDetails.pass_mark,
           instructions: examDetails.instructions?.trim() ?? "",
-          randomize_questions: examDetails.randomize_questions,
-          randomize_options: examDetails.randomize_options,
+          shuffle_questions: examDetails.randomize_questions,
+          shuffle_options: examDetails.randomize_options,
           has_theory: hasTheory,
           status: submitForApproval ? "pending" : "draft",
           created_by: createdBy,
@@ -128,14 +145,29 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           department,
           term: examDetails.term,
           session_year: examDetails.session_year,
-          objective_max: objectiveMax,
-          theory_max: hasTheory ? theoryTotalMarks : 0,
-          theory_questions_total: theoryQuestionsTotal,
-          theory_questions_to_answer: theoryQuestionsToAnswer,
-          theory_marks_per_question: theoryMarksPerQuestion,
+          
+          // ✅ Mark distribution fields
+          default_mark: defaultMark,
+          objective_count: objectiveCount,
+          objective_max: objectiveTotal,
+          theory_max: theoryTotal,
+          theory_total_marks: theoryTotal,
+          objective_total_marks: objectiveTotal,
+          exam_total_marks: examTotal,
+          ca1_max: 10,
+          ca2_max: 10,
+          ca_total_marks: 20,
+          grand_total_marks: 100,
+          total_marks: examTotal,
+          total_points: examTotal,
+          
+          // Theory configuration
+          theory_questions_total: theoryCount,
+          theory_questions_to_answer: theoryQuestionsToAnswer || theoryCount,
+          theory_marks_per_question: marksPerTheoryQuestion,
           scoring_rule: scoringRule,
-          total_questions: 0,
-          total_marks: 0,
+          
+          total_questions: objectiveCount + theoryCount,
           passage_text: passageText || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -160,11 +192,12 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
           const objectiveRows = questions.map((q, i) => ({
             exam_id: examId,
             question_text: q.question,
-            question_type: "mcq",
-            type: "objective",
+            question_type: "objective",
+            type: "mcq",
             options: q.options ?? [],
             correct_answer: q.correct_answer,
-            points: q.marks,
+            marks: q.marks || defaultMark, // ✅ Use defaultMark
+            points: q.marks || defaultMark,
             order_number: i + 1,
             is_draft: true,
             sub_questions: [],
@@ -194,7 +227,8 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
             question_text: q.question,
             question_type: "theory",
             type: "theory",
-            points: q.marks,
+            marks: q.marks || marksPerTheoryQuestion, // ✅ Use calculated marks
+            points: q.marks || marksPerTheoryQuestion,
             order_number: questions.length + i + 1,
             is_draft: true,
             sub_questions: q.sub_questions ?? [],
@@ -227,7 +261,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
             question: q.question,
             options: q.options ?? [],
             correct_answer: q.correct_answer,
-            marks: q.marks,
+            marks: q.marks || defaultMark,
             order: i + 1,
           })),
           ...(hasTheory
@@ -235,7 +269,7 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
                 id: q.id,
                 type: "theory",
                 question: q.question,
-                marks: q.marks,
+                marks: q.marks || marksPerTheoryQuestion,
                 order: questions.length + i + 1,
                 sub_questions: q.sub_questions ?? [],
                 image_url: q.image_url ?? null,
@@ -244,20 +278,14 @@ export function useExamSubmit(onSuccess: () => void, onClose: () => void) {
             : []),
         ];
 
-        const totalMarks =
-          questions.reduce((s, q) => s + q.marks, 0) +
-          (hasTheory
-            ? theoryQuestions.reduce((s, q) => s + q.marks, 0)
-            : 0);
-
         // ── Update exam snapshot ────────────────────────────────────────────
         const { error: updateError } = await supabase
           .from("exams")
           .update({
             questions: questionsJsonb,
             total_questions: savedCount,
-            total_marks: totalMarks,
-            total_points: totalMarks,
+            total_marks: examTotal,
+            total_points: examTotal,
             updated_at: new Date().toISOString(),
           })
           .eq("id", examId);

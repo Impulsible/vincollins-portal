@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/ObjectiveQuestionsTab.tsx - FULLY FIXED with Draft Display
+// src/components/staff/exams/edit/ObjectiveQuestionsTab.tsx - UPDATED WITH MARK SYSTEM
 
 'use client'
 
@@ -40,12 +40,17 @@ interface ObjectiveQuestionsTabProps {
   onDeleteQuestion: (questionId: string) => void
   onBulkAdd?: (questions: Partial<Question>[]) => Promise<void> | void
   isSaving?: boolean
+  // ✅ Added: mark configuration from database
+  defaultMark?: number
+  objectiveTotal?: number
+  theoryTotal?: number
+  examTotal?: number
 }
 
 const QUESTIONS_PER_PAGE = 20
 const BATCH_SIZE = 20
 
-// Parse bulk MCQs
+// Parse bulk MCQs with mark support
 const parseBulkMCQs = (text: string, defaultPoints: number): Partial<Question>[] => {
   const lines = text.split(/\r?\n/)
   const questions: Partial<Question>[] = []
@@ -56,10 +61,17 @@ const parseBulkMCQs = (text: string, defaultPoints: number): Partial<Question>[]
   const questionPattern = /^(\d+)[\.\)]\s+(.*)/i
   const optionPattern = /^([A-D])[\.\)]\s+(.*)/i
   const answerPattern = /^Answer:\s*([A-D])/i
+  const marksPattern = /^Marks?:\s*([\d.]+)/i
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i].trim()
     if (!line) continue
+
+    const marksMatch = line.match(marksPattern)
+    if (marksMatch && currentQuestion) {
+      currentQuestion.points = parseFloat(marksMatch[1])
+      continue
+    }
 
     const answerMatch = line.match(answerPattern)
     if (answerMatch && currentQuestion) {
@@ -74,7 +86,7 @@ const parseBulkMCQs = (text: string, defaultPoints: number): Partial<Question>[]
           ...currentQuestion,
           options: [...currentOptions],
           correct_answer: currentCorrectAnswer,
-          points: defaultPoints
+          points: currentQuestion.points || defaultPoints
         })
       }
       
@@ -93,7 +105,7 @@ const parseBulkMCQs = (text: string, defaultPoints: number): Partial<Question>[]
       continue
     }
 
-    if (currentQuestion && !optionMatch && !answerMatch) {
+    if (currentQuestion && !optionMatch && !answerMatch && !marksMatch) {
       currentQuestion.question_text += ' ' + line
     }
   }
@@ -103,7 +115,7 @@ const parseBulkMCQs = (text: string, defaultPoints: number): Partial<Question>[]
       ...currentQuestion,
       options: [...currentOptions],
       correct_answer: currentCorrectAnswer,
-      points: defaultPoints
+      points: currentQuestion.points || defaultPoints
     })
   }
 
@@ -116,13 +128,17 @@ export function ObjectiveQuestionsTab({
   onEditQuestion,
   onDeleteQuestion,
   onBulkAdd,
-  isSaving = false
+  isSaving = false,
+  defaultMark = 0.5,
+  objectiveTotal = 0,
+  theoryTotal = 0,
+  examTotal = 0,
 }: ObjectiveQuestionsTabProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
   const [showBulkDialog, setShowBulkDialog] = useState(false)
   const [bulkText, setBulkText] = useState('')
-  const [bulkPoints, setBulkPoints] = useState(1)
+  const [bulkPoints, setBulkPoints] = useState(defaultMark)
   const [parsedQuestions, setParsedQuestions] = useState<Partial<Question>[]>([])
   const [isImporting, setIsImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
@@ -133,7 +149,6 @@ export function ObjectiveQuestionsTab({
   const filteredQuestions = useMemo(() => {
     let result = questions
     
-    // Filter by search
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       result = result.filter(q => 
@@ -142,7 +157,6 @@ export function ObjectiveQuestionsTab({
       )
     }
     
-    // ✅ Filter by draft/complete status
     if (filterType === 'draft') {
       result = result.filter(q => q.is_draft === true)
     } else if (filterType === 'complete') {
@@ -156,9 +170,13 @@ export function ObjectiveQuestionsTab({
   const startIndex = (currentPage - 1) * QUESTIONS_PER_PAGE
   const currentQuestions = filteredQuestions.slice(startIndex, startIndex + QUESTIONS_PER_PAGE)
 
-  // ✅ Count drafts and complete questions
   const draftCount = questions.filter(q => q.is_draft === true).length
   const completeCount = questions.filter(q => q.is_draft === false).length
+
+  // ✅ Calculate total points from questions
+  const totalPoints = useMemo(() => {
+    return questions.reduce((sum, q) => sum + (q.points || 0), 0)
+  }, [questions])
 
   const handleSearch = useCallback((value: string) => {
     setSearchQuery(value)
@@ -244,16 +262,14 @@ export function ObjectiveQuestionsTab({
     return pages
   }, [currentPage, totalPages])
 
-  const totalPoints = useMemo(() => {
-    return questions.reduce((sum, q) => sum + (q.points || 1), 0)
-  }, [questions])
-
-  // ✅ Check if a question is complete
   const isQuestionComplete = (q: Question) => {
     return q.question_text?.trim() && 
            q.options?.some(opt => opt.trim()) && 
            q.correct_answer?.trim()
   }
+
+  // ✅ Check if total is balanced
+  const isBalanced = examTotal === 60
 
   return (
     <TooltipProvider>
@@ -269,6 +285,10 @@ export function ObjectiveQuestionsTab({
               {completeCount > 0 && (
                 <span className="ml-2 text-emerald-600">• {completeCount} complete</span>
               )}
+              {/* ✅ Show mark info from database */}
+              {defaultMark > 0 && (
+                <span className="ml-2 text-blue-600">• {defaultMark} mark each</span>
+              )}
             </CardDescription>
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -281,7 +301,6 @@ export function ObjectiveQuestionsTab({
                 className="pl-10 h-9 text-sm"
               />
             </div>
-            {/* ✅ Filter buttons */}
             <div className="flex gap-1">
               <Button 
                 variant={filterType === 'all' ? 'default' : 'outline'} 
@@ -373,7 +392,7 @@ export function ObjectiveQuestionsTab({
                                   ⚠️ Incomplete
                                 </Badge>
                               )}
-                              <Badge variant="outline">{q.points} point(s)</Badge>
+                              <Badge variant="outline">{q.points || defaultMark} point(s)</Badge>
                             </div>
                             <p className="font-medium">{q.question_text}</p>
                             {q.options && q.options.length > 0 && (
@@ -454,6 +473,7 @@ export function ObjectiveQuestionsTab({
             <DialogTitle>Bulk Import Multiple Choice Questions</DialogTitle>
             <DialogDescription>
               Paste your questions in the format below. Each question should have 4 options and an answer.
+              Default mark is <strong>{defaultMark}</strong> per question.
             </DialogDescription>
           </DialogHeader>
 
@@ -462,12 +482,13 @@ export function ObjectiveQuestionsTab({
               <Label>Default Points per Question</Label>
               <Input
                 type="number"
+                step="0.5"
+                min="0.5"
                 value={bulkPoints}
-                onChange={(e) => setBulkPoints(parseInt(e.target.value) || 1)}
-                min={1}
-                max={10}
+                onChange={(e) => setBulkPoints(parseFloat(e.target.value) || defaultMark)}
                 className="w-32 mt-1"
               />
+              <p className="text-xs text-slate-400 mt-1">Default: {defaultMark} mark per question</p>
             </div>
 
             <div>
@@ -501,6 +522,7 @@ Answer: B`}
                       <span className="font-medium text-purple-600">{idx + 1}.</span>
                       <span className="ml-2">{q.question_text?.substring(0, 100)}...</span>
                       <Badge variant="outline" className="ml-2">Answer: {q.correct_answer}</Badge>
+                      <Badge variant="outline" className="ml-1">{q.points || defaultMark} pts</Badge>
                     </div>
                   ))}
                 </div>

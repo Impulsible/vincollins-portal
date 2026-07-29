@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - FULLY UPDATED
+// src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - UPDATED WITH MARK SYSTEM
 
 'use client'
 
@@ -26,6 +26,11 @@ interface TheoryQuestionFormDialogProps {
   initialData?: Partial<TheoryQuestion>
   onSave: (data: Partial<TheoryQuestion>) => void
   onCancel?: () => void
+  // ✅ Added: mark configuration from database
+  defaultMark?: number
+  totalTheoryMarks?: number
+  theoryQuestionCount?: number
+  examTotal?: number
 }
 
 export function TheoryQuestionFormDialog({
@@ -33,7 +38,11 @@ export function TheoryQuestionFormDialog({
   onOpenChange,
   initialData,
   onSave,
-  onCancel
+  onCancel,
+  defaultMark = 0.5,
+  totalTheoryMarks = 0,
+  theoryQuestionCount = 0,
+  examTotal = 60,
 }: TheoryQuestionFormDialogProps) {
   const [questionText, setQuestionText] = useState('')
   const [points, setPoints] = useState(10)
@@ -44,11 +53,16 @@ export function TheoryQuestionFormDialog({
   const [useSubQuestions, setUseSubQuestions] = useState(false)
   const [isDraft, setIsDraft] = useState(true)
 
+  // ✅ Calculate marks per theory question
+  const marksPerTheoryQuestion = theoryQuestionCount > 0 && totalTheoryMarks > 0 
+    ? totalTheoryMarks / theoryQuestionCount 
+    : 0
+
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setQuestionText(initialData?.question_text || '')
-      setPoints(initialData?.points || 10)
+      setPoints(initialData?.points || (marksPerTheoryQuestion > 0 ? marksPerTheoryQuestion : 10))
       setKeywords(initialData?.keywords || [])
       setModelAnswer(initialData?.model_answer || '')
       setSubQuestions(initialData?.sub_questions || [])
@@ -56,7 +70,7 @@ export function TheoryQuestionFormDialog({
       setIsDraft(initialData?.is_draft !== undefined ? initialData.is_draft : true)
       setKeywordInput('')
     }
-  }, [open, initialData])
+  }, [open, initialData, marksPerTheoryQuestion])
 
   // Check if question is complete
   const isQuestionComplete = (): boolean => {
@@ -95,10 +109,15 @@ export function TheoryQuestionFormDialog({
   }
 
   const handleAddSubQuestion = () => {
+    // ✅ Use calculated marks for sub-questions
+    const subQuestionPoints = marksPerTheoryQuestion > 0 
+      ? Math.round((marksPerTheoryQuestion / 2) * 100) / 100 // Split between 2 sub-questions
+      : 5
+    
     setSubQuestions([...subQuestions, {
       id: Date.now().toString(),
       text: '',
-      points: 5
+      points: subQuestionPoints
     }])
   }
 
@@ -191,22 +210,59 @@ export function TheoryQuestionFormDialog({
   }
 
   const complete = isQuestionComplete()
+  const totalSubQuestionPoints = subQuestions.reduce((sum, sq) => sum + sq.points, 0)
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+          <DialogTitle className="flex items-center gap-2 flex-wrap">
             {initialData?.id ? 'Edit Theory Question' : 'Add Theory Question'}
             {initialData?.is_draft && (
               <Badge variant="outline" className="text-amber-600 border-amber-300">
-                Draft
+                📝 Draft
+              </Badge>
+            )}
+            {/* ✅ Show mark info from database */}
+            {marksPerTheoryQuestion > 0 && !initialData?.id && (
+              <Badge className="bg-purple-100 text-purple-700 border-purple-300 text-[10px]">
+                {marksPerTheoryQuestion.toFixed(2)} marks each
+              </Badge>
+            )}
+            {totalTheoryMarks > 0 && (
+              <Badge variant="outline" className="text-purple-600 border-purple-200 text-[10px]">
+                Theory: {totalTheoryMarks} marks total
               </Badge>
             )}
           </DialogTitle>
         </DialogHeader>
         
         <div className="space-y-5 py-4">
+          {/* Mark Summary */}
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-xs font-medium text-slate-500">Marks:</span>
+            {marksPerTheoryQuestion > 0 && (
+              <Badge variant="outline" className="text-xs bg-purple-50 border-purple-200">
+                Per question: {marksPerTheoryQuestion.toFixed(2)}mk
+              </Badge>
+            )}
+            {totalTheoryMarks > 0 && (
+              <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200">
+                Theory total: {totalTheoryMarks}mk
+              </Badge>
+            )}
+            {examTotal > 0 && (
+              <Badge variant="outline" className="text-xs bg-emerald-50 border-emerald-200">
+                Exam total: {examTotal}mk
+              </Badge>
+            )}
+            {useSubQuestions && subQuestions.length > 0 && (
+              <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200">
+                Sub-questions: {subQuestions.length}
+              </Badge>
+            )}
+          </div>
+
           {/* Status Alert */}
           {!complete && (
             <Alert className="bg-amber-50 border-amber-200">
@@ -269,12 +325,16 @@ export function TheoryQuestionFormDialog({
                 <Input 
                   type="number" 
                   value={points} 
-                  onChange={(e) => setPoints(parseInt(e.target.value) || 10)} 
+                  onChange={(e) => setPoints(parseInt(e.target.value) || (marksPerTheoryQuestion > 0 ? marksPerTheoryQuestion : 10))} 
                   min={1}
                   max={50}
                   className="mt-1.5 w-32"
                 />
-                <p className="text-xs text-slate-400 mt-1">Recommended: 5-20 points per question</p>
+                {marksPerTheoryQuestion > 0 && (
+                  <p className="text-xs text-slate-400 mt-1">
+                    Suggested: {marksPerTheoryQuestion.toFixed(2)} marks per question
+                  </p>
+                )}
               </div>
 
               {/* Keywords */}
@@ -385,9 +445,15 @@ export function TheoryQuestionFormDialog({
                       <div className="flex justify-between text-sm">
                         <span className="font-medium">Total Points:</span>
                         <span className="font-bold text-purple-600">
-                          {subQuestions.reduce((sum, sq) => sum + sq.points, 0)} marks
+                          {totalSubQuestionPoints} marks
                         </span>
                       </div>
+                      {marksPerTheoryQuestion > 0 && (
+                        <div className="flex justify-between text-xs text-slate-400 mt-1">
+                          <span>Per question:</span>
+                          <span>{marksPerTheoryQuestion.toFixed(2)} marks</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -396,7 +462,7 @@ export function TheoryQuestionFormDialog({
           )}
         </div>
 
-        <DialogFooter className="gap-2">
+        <DialogFooter className="gap-2 flex-wrap">
           <Button variant="outline" onClick={handleClose}>Cancel</Button>
           
           <Button 

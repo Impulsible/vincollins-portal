@@ -9,7 +9,7 @@ import {
   LayoutDashboard, Users, MonitorPlay, FileCheck, Activity,
   LogOut, ChevronLeft, ChevronRight, Settings, HelpCircle,
   GraduationCap, Briefcase, MessageSquare, BookOpen, Megaphone,
-  Bell
+  Bell, School, UserCog
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +54,6 @@ export function AdminSidebar({
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [mounted, setMounted] = useState(false)
   
-  // ✅ Use refs to prevent infinite loops
   const isUpdatingRef = useRef(false)
   const previousTabRef = useRef(activeTab)
 
@@ -62,7 +61,6 @@ export function AdminSidebar({
     setMounted(true)
   }, [])
 
-  // ✅ Memoize the getTabFromPathname function
   const getTabFromPathname = useCallback((path: string): string => {
     if (!path) return 'overview'
     if (path === '/admin') return 'overview'
@@ -78,30 +76,26 @@ export function AdminSidebar({
     if (path.startsWith('/admin/inquiries')) return 'inquiries'
     if (path.startsWith('/admin/monitor')) return 'cbt-monitor'
     if (path.startsWith('/admin/promotions')) return 'promotions'
+    if (path.startsWith('/admin/teacher-classes')) return 'teacher-classes'
     return 'overview'
   }, [])
 
-  // ✅ Fixed useEffect with proper guards to prevent infinite loops
   useEffect(() => {
-    // Prevent updates if already updating
     if (isUpdatingRef.current) return
     
     const tab = getTabFromPathname(pathname || '/admin')
     
-    // Only update if tab changed and it's different from current
     if (tab !== previousTabRef.current && tab !== activeTab) {
       isUpdatingRef.current = true
       previousTabRef.current = tab
       setActiveTab(tab)
       
-      // Reset the flag after a short delay
       setTimeout(() => {
         isUpdatingRef.current = false
       }, 50)
     }
   }, [pathname, getTabFromPathname, activeTab, setActiveTab])
 
-  // ✅ Memoize navigation arrays
   const primaryNavigation = useMemo<NavigationItem[]>(() => [
     { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', routePatterns: ['/admin'] },
     { id: 'notifications', name: 'Notifications', icon: Bell, description: 'View Updates', badge: unreadNotifications || undefined, routePatterns: ['/admin/notifications'] },
@@ -109,6 +103,7 @@ export function AdminSidebar({
     { id: 'broad-sheet', name: 'Broad Sheet', icon: BookOpen, description: 'Generate Report Cards', routePatterns: ['/admin/broad-sheet'] },
     { id: 'students', name: 'Students', icon: GraduationCap, description: 'Manage Students', routePatterns: ['/admin/students'] },
     { id: 'staff', name: 'Staff', icon: Briefcase, description: 'Manage Teachers', routePatterns: ['/admin/staff'] },
+    { id: 'teacher-classes', name: 'Teacher Classes', icon: School, description: 'Assign Classes to Teachers', routePatterns: ['/admin/teacher-classes'] },
     { id: 'exams', name: 'Exam Approvals', icon: MonitorPlay, description: 'Review & Publish', badge: pendingExams || undefined, routePatterns: ['/admin/exams'] },
     { id: 'report-cards', name: 'Report Cards', icon: FileCheck, description: 'Review & Approve', badge: pendingReports || undefined, routePatterns: ['/admin/report-cards'] },
     { id: 'inquiries', name: 'Inquiries', icon: MessageSquare, description: 'Admissions & Contact', badge: pendingInquiries || undefined, routePatterns: ['/admin/inquiries'] },
@@ -120,7 +115,6 @@ export function AdminSidebar({
     { id: 'help', name: 'Help & Support', icon: HelpCircle, description: 'Get assistance', routePatterns: ['/admin/help'] },
   ], [])
 
-  // ✅ Memoize display name and initials
   const displayName = useMemo(() => 
     profile?.display_name || profile?.full_name || 'Administrator',
     [profile]
@@ -136,7 +130,6 @@ export function AdminSidebar({
     [displayName]
   )
 
-  // ✅ Memoize handlers
   const handleLogoutClick = useCallback(() => setShowSignOutConfirm(true), [])
   
   const confirmSignOut = useCallback(() => {
@@ -161,7 +154,6 @@ export function AdminSidebar({
     }, 50)
   }, [setActiveTab, pathname, router])
 
-  // ✅ Memoize renderNavItem
   const renderNavItem = useCallback((item: NavigationItem) => {
     const isActive = activeTab === item.id
     const Icon = item.icon
@@ -227,6 +219,15 @@ export function AdminSidebar({
     return buttonContent
   }, [activeTab, collapsed, handleNavClick])
 
+  // Group navigation items with a separator
+  const navigationGroups = useMemo(() => {
+    const mainGroup = primaryNavigation.slice(0, 4) // Overview, Notifications, Announcements, Broad Sheet
+    const managementGroup = primaryNavigation.slice(4, 7) // Students, Staff, Teacher Classes
+    const academicGroup = primaryNavigation.slice(7) // Exams, Report Cards, Inquiries, Live Monitor
+    
+    return { mainGroup, managementGroup, academicGroup }
+  }, [primaryNavigation])
+
   if (!mounted) return null
 
   return (
@@ -279,14 +280,38 @@ export function AdminSidebar({
             )}
           </div>
 
-          {/* Primary Navigation */}
-          <div className="px-3 py-3 space-y-1 flex-1">
+          {/* Primary Navigation - Group 1: Overview & Communications */}
+          <div className="px-3 py-3 space-y-1">
             {!collapsed && (
               <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                Main
+                Dashboard
               </p>
             )}
-            {primaryNavigation.map(renderNavItem)}
+            {navigationGroups.mainGroup.map(renderNavItem)}
+          </div>
+
+          {!collapsed && <Separator className="mx-3" />}
+
+          {/* Primary Navigation - Group 2: Management */}
+          <div className="px-3 py-3 space-y-1">
+            {!collapsed && (
+              <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                Management
+              </p>
+            )}
+            {navigationGroups.managementGroup.map(renderNavItem)}
+          </div>
+
+          {!collapsed && <Separator className="mx-3" />}
+
+          {/* Primary Navigation - Group 3: Academic */}
+          <div className="px-3 py-3 space-y-1">
+            {!collapsed && (
+              <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
+                Academic
+              </p>
+            )}
+            {navigationGroups.academicGroup.map(renderNavItem)}
           </div>
 
           {!collapsed && <Separator className="mx-3 my-2" />}
@@ -307,7 +332,7 @@ export function AdminSidebar({
               variant="ghost"
               onClick={handleLogoutClick}
               className={cn(
-                "text-red-600 hover:bg-red-50",
+                "text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20",
                 collapsed ? "w-full justify-center px-2" : "w-full justify-start"
               )}
             >
@@ -316,10 +341,10 @@ export function AdminSidebar({
                 collapsed ? "gap-0" : "gap-3"
               )}>
                 <div className={cn(
-                  "h-9 w-9 rounded-lg bg-red-50 flex items-center justify-center",
+                  "h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/20 flex items-center justify-center",
                   collapsed ? "mx-0" : ""
                 )}>
-                  <LogOut className="h-4 w-4 shrink-0" />
+                  <LogOut className="h-4 w-4 shrink-0 text-red-600" />
                 </div>
                 {!collapsed && (
                   <div className="flex-1 text-left">
@@ -337,7 +362,7 @@ export function AdminSidebar({
         {/* Collapse Toggle */}
         <button
           onClick={onToggle}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border rounded-full p-1.5 shadow-md hover:shadow-lg transition-all z-50"
+          className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 shadow-md hover:shadow-lg transition-all z-50"
         >
           {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </button>

@@ -1,14 +1,14 @@
 // src/components/student/exams/TermProgressCard.tsx
 'use client'
 
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { History, BookOpen, Award, RefreshCw, TrendingUp, CheckCircle2 } from 'lucide-react'
+import { History, Award, RefreshCw, TrendingUp, CheckCircle2, Calendar } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { StatsState, TermOption, TermSession } from '@/app/student/exams/types'
+import type { StatsState, TermOption, TermSession } from '@/app/student/types'
 
 interface TermProgressCardProps {
   stats: StatsState
@@ -16,6 +16,9 @@ interface TermProgressCardProps {
   selectedTermSession: TermSession | null
   onTermChange: (value: string) => void
   onRefresh: () => void
+  studentClass?: string
+  studentDepartment?: string
+  isLoading?: boolean
 }
 
 const getGradeStyle = (grade: string) => {
@@ -29,10 +32,71 @@ const getGradeStyle = (grade: string) => {
   }
 }
 
-export function TermProgressCard({ stats, availableTerms, selectedTermSession, onTermChange, onRefresh }: TermProgressCardProps) {
+export function TermProgressCard({ 
+  stats, 
+  availableTerms, 
+  selectedTermSession, 
+  onTermChange, 
+  onRefresh,
+  studentClass,
+  studentDepartment,
+  isLoading = false
+}: TermProgressCardProps) {
   const completionPct = stats.totalSubjects > 0 ? Math.round((stats.completed / stats.totalSubjects) * 100) : 0
   const displayGrade = stats.completed > 0 && stats.currentGrade && stats.currentGrade !== 'N/A' ? stats.currentGrade : null
   const gradeStyle = displayGrade ? getGradeStyle(displayGrade) : getGradeStyle('')
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // Auto-select the current term when availableTerms changes
+  useEffect(() => {
+    if (availableTerms.length > 0 && !selectedTermSession && !isInitialized && !isLoading) {
+      // Priority 1: Find the current term (marked as current)
+      const currentTerm = availableTerms.find(t => t.is_current === true)
+      
+      if (currentTerm) {
+        onTermChange(`${currentTerm.term}|${currentTerm.session_year}`)
+        setIsInitialized(true)
+        return
+      }
+
+      // Priority 2: Find the most recent term based on session_year
+      const sortedTerms = [...availableTerms].sort((a, b) => {
+        const aYear = parseInt(a.session_year.split('/')[0])
+        const bYear = parseInt(b.session_year.split('/')[0])
+        return bYear - aYear
+      })
+      
+      if (sortedTerms.length > 0) {
+        const mostRecent = sortedTerms[0]
+        onTermChange(`${mostRecent.term}|${mostRecent.session_year}`)
+        setIsInitialized(true)
+      }
+    }
+  }, [availableTerms, selectedTermSession, onTermChange, isInitialized, isLoading])
+
+  // Reset initialization when availableTerms changes (after refresh)
+  useEffect(() => {
+    if (availableTerms.length > 0) {
+      setIsInitialized(false)
+    }
+  }, [availableTerms.length])
+
+  // Get current term label for display
+  const getCurrentTermLabel = () => {
+    if (!selectedTermSession) return 'Select term'
+    const term = availableTerms.find(
+      t => t.term === selectedTermSession.term && t.session_year === selectedTermSession.session_year
+    )
+    return term ? term.label : `${selectedTermSession.term} ${selectedTermSession.session_year}`
+  }
+
+  // Check if a term is current
+  const isTermCurrent = (term: TermOption) => {
+    return term.is_current || 
+      (selectedTermSession && 
+       term.term === selectedTermSession.term && 
+       term.session_year === selectedTermSession.session_year)
+  }
 
   return (
     <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
@@ -53,27 +117,45 @@ export function TermProgressCard({ stats, availableTerms, selectedTermSession, o
             {/* Top row: term selector + grade + refresh */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
 
-              {/* Term selector */}
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-initial sm:min-w-[220px]">
-                <History className="h-4 w-4 text-slate-400 shrink-0" />
-                {availableTerms.length > 0 ? (
+              {/* Term selector with current term indicator */}
+              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-initial sm:min-w-[240px]">
+                <Calendar className="h-4 w-4 text-slate-400 shrink-0" />
+                {isLoading ? (
+                  <span className="text-sm text-slate-400">Loading terms...</span>
+                ) : availableTerms.length > 0 ? (
                   <Select
                     value={selectedTermSession ? `${selectedTermSession.term}|${selectedTermSession.session_year}` : ''}
-                    onValueChange={onTermChange}
+                    onValueChange={(value) => {
+                      onTermChange(value)
+                      setIsInitialized(true)
+                    }}
                   >
                     <SelectTrigger className="border-0 h-auto p-0 shadow-none focus:ring-0 text-sm font-semibold text-slate-700 bg-transparent w-full">
-                      <SelectValue placeholder="Select term" />
+                      <SelectValue placeholder="Select term">
+                        {getCurrentTermLabel()}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
-                      {availableTerms.map(t => (
-                        <SelectItem key={`${t.term}|${t.session_year}`} value={`${t.term}|${t.session_year}`}>
-                          {t.label}
-                        </SelectItem>
-                      ))}
+                      {availableTerms.map(t => {
+                        const isCurrent = isTermCurrent(t)
+                        
+                        return (
+                          <SelectItem key={`${t.term}|${t.session_year}`} value={`${t.term}|${t.session_year}`}>
+                            <div className="flex items-center gap-2">
+                              <span>{t.label}</span>
+                              {isCurrent && (
+                                <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                                  Current
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                 ) : (
-                  <span className="text-sm text-slate-400">Loading terms...</span>
+                  <span className="text-sm text-slate-400">No terms available</span>
                 )}
               </div>
 
@@ -95,9 +177,18 @@ export function TermProgressCard({ stats, availableTerms, selectedTermSession, o
                 )}
               </div>
 
-              <Button variant="ghost" size="icon" onClick={onRefresh}
-                className="h-8 w-8 rounded-xl shrink-0 hover:bg-slate-100" title="Refresh">
-                <RefreshCw className="h-3.5 w-3.5 text-slate-500" />
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => {
+                  setIsInitialized(false)
+                  onRefresh()
+                }}
+                className="h-8 w-8 rounded-xl shrink-0 hover:bg-slate-100" 
+                title="Refresh"
+                disabled={isLoading}
+              >
+                <RefreshCw className={cn('h-3.5 w-3.5 text-slate-500', isLoading && 'animate-spin')} />
               </Button>
             </div>
 
@@ -105,20 +196,27 @@ export function TermProgressCard({ stats, availableTerms, selectedTermSession, o
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-slate-600">Term Completion</span>
-                <span className={cn('font-bold', displayGrade ? gradeStyle.text : 'text-slate-500')}>{completionPct}%</span>
+                <span className={cn('font-bold', displayGrade ? gradeStyle.text : 'text-slate-500')}>
+                  {isLoading ? '...' : `${completionPct}%`}
+                </span>
               </div>
               <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <motion.div
                   className={cn('h-full rounded-full', displayGrade ? gradeStyle.bg : 'bg-blue-500')}
                   initial={{ width: 0 }}
-                  animate={{ width: `${completionPct}%` }}
+                  animate={{ width: isLoading ? 0 : `${completionPct}%` }}
                   transition={{ duration: 1.2, ease: 'easeOut', delay: 0.4 }}
                 />
               </div>
               <p className="text-[10px] text-slate-400">
-                {stats.completed} of {stats.totalSubjects} subjects completed
-                {stats.averageScore > 0 && ` · Average: ${stats.averageScore}%`}
-                {displayGrade && ` · Grade: ${displayGrade}`}
+                {isLoading ? 'Loading...' : (
+                  <>
+                    {stats.completed} of {stats.totalSubjects} subjects completed
+                    {stats.averageScore > 0 && ` · Average: ${stats.averageScore}%`}
+                    {displayGrade && ` · Grade: ${displayGrade}`}
+                    {studentClass && ` · Class: ${studentClass}`}
+                  </>
+                )}
               </p>
             </div>
           </div>

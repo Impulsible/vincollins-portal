@@ -1,5 +1,5 @@
-/* eslint-disable react/no-unescaped-entities */
-// components/staff/StaffSidebar.tsx - WITH FIXED STATS FETCHING
+// components/staff/StaffSidebar.tsx - WITH TERM FILTERING & ATTENDANCE
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,7 +11,7 @@ import {
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, User, CalendarDays,
   Bell, HelpCircle, Notebook, Megaphone,
-  CheckSquare
+  MonitorPlay, CalendarCheck
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -52,6 +52,8 @@ interface StaffSidebarProps {
   onToggle: () => void
   activeTab: string
   setActiveTab: (tab: string) => void
+  termCode?: string
+  sessionYear?: string
 }
 
 interface NavigationItem {
@@ -60,23 +62,21 @@ interface NavigationItem {
   icon: React.ElementType
   description: string
   route: string
-  badge?: string
 }
 
 interface SidebarStats {
   studentCount: number
   examCount: number
   pendingGradingCount: number
-  assignmentCount: number
+  attendanceCount: number
 }
 
-// Primary Navigation
+// Primary Navigation - WITH ATTENDANCE
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
+  { id: 'attendance', name: 'Attendance', icon: CalendarCheck, description: 'Mark Daily Attendance', route: '/staff/attendance' },
   { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'School Updates', route: '/staff/announcements' },
   { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory', route: '/staff/exams' },
-  { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Student Tasks', route: '/staff/assignments' },
-  { id: 'grade-assignments', name: 'Grade', icon: CheckSquare, description: 'Grade Submissions', route: '/staff/assignments/grade', badge: 'Pending' },
   { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
   { id: 'students', name: 'Students', icon: User, description: 'Class Roster', route: '/staff/students' },
   { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class Schedule', route: '/staff/schedule' },
@@ -138,6 +138,8 @@ export function StaffSidebar({
   onToggle, 
   activeTab, 
   setActiveTab,
+  termCode,
+  sessionYear,
 }: StaffSidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -155,11 +157,11 @@ export function StaffSidebar({
     studentCount: 0, 
     examCount: 0,
     pendingGradingCount: 0,
-    assignmentCount: 0
+    attendanceCount: 0
   })
   const [isLoading, setIsLoading] = useState(true)
 
-  // ✅ FIXED: Fetch stats with proper filtering
+  // ✅ Fetch stats with TERM FILTERING
   useEffect(() => {
     let mounted = true
     let retryTimeout: NodeJS.Timeout
@@ -168,19 +170,21 @@ export function StaffSidebar({
 
     const fetchStats = async () => {
       try {
-        console.log('📊 Fetching sidebar stats...', profile?.id ? `for user ${profile.id}` : '(general)')
+        console.log('📊 Fetching sidebar stats...', { 
+          userId: profile?.id,
+          termCode,
+          sessionYear 
+        })
         
-        // ✅ 1. Get student count (by school or all)
+        // ✅ 1. Get student count (no term filter needed)
         let studentQuery = supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
           .eq('role', 'student')
 
-        // If staff has a school_id, filter by it
         if (profile?.school_id) {
           studentQuery = studentQuery.eq('school_id', profile.school_id)
         }
-        // If staff has a class, filter by it
         if (profile?.class) {
           studentQuery = studentQuery.eq('class', profile.class)
         }
@@ -188,54 +192,59 @@ export function StaffSidebar({
         const { count: studentsCount, error: studentError } = await studentQuery
         if (studentError) console.error('Student count error:', studentError)
 
-        // ✅ 2. Get exams count
+        // ✅ 2. Get total exams count WITH TERM FILTER
         let examQuery = supabase
           .from('exams')
           .select('*', { count: 'exact', head: true })
 
-        // If staff has a school_id, filter exams by school
-        if (profile?.school_id) {
-          examQuery = examQuery.eq('school_id', profile.school_id)
+        if (profile?.id) {
+          examQuery = examQuery.eq('created_by', profile.id)
         }
-        // If staff has a class, filter by class
-        if (profile?.class) {
-          examQuery = examQuery.eq('class', profile.class)
+
+        // ✅ APPLY TERM FILTER TO EXAMS
+        if (termCode && sessionYear) {
+          examQuery = examQuery
+            .eq('term', termCode)
+            .eq('session_year', sessionYear)
         }
 
         const { count: examsCount, error: examError } = await examQuery
         if (examError) console.error('Exam count error:', examError)
 
-        // ✅ 3. Get assignments count
-        let assignmentQuery = supabase
-          .from('assignments')
-          .select('*', { count: 'exact', head: true })
-
-        // Filter assignments by staff ID if they created them
-        if (profile?.id) {
-          assignmentQuery = assignmentQuery.eq('created_by', profile.id)
-        }
-
-        const { count: assignmentsCount, error: assignmentError } = await assignmentQuery
-        if (assignmentError) console.error('Assignment count error:', assignmentError)
-
-        // ✅ 4. Get pending grading count (submitted assignments)
+        // ✅ 3. Get pending grading count WITH TERM FILTER
         let pendingCount = 0
         if (profile?.id) {
-          // First get assignments created by this staff
-          const { data: teacherAssignments, error: assignError } = await supabase
-            .from('assignments')
+          // Get teacher's exam IDs with term filter
+          let examIdQuery = supabase
+            .from('exams')
             .select('id')
             .eq('created_by', profile.id)
 
-          if (!assignError && teacherAssignments && teacherAssignments.length > 0) {
-            const assignmentIds = teacherAssignments.map(a => a.id)
+          if (termCode && sessionYear) {
+            examIdQuery = examIdQuery
+              .eq('term', termCode)
+              .eq('session_year', sessionYear)
+          }
 
-            // Then get submissions for those assignments
-            const { count, error: subError } = await supabase
-              .from('assignment_submissions')
+          const { data: teacherExams, error: examError2 } = await examIdQuery
+
+          if (!examError2 && teacherExams && teacherExams.length > 0) {
+            const examIds = teacherExams.map(e => e.id)
+
+            // Count pending theory submissions with term filter
+            let submissionQuery = supabase
+              .from('exam_attempts')
               .select('*', { count: 'exact', head: true })
-              .in('assignment_id', assignmentIds)
-              .eq('status', 'submitted')
+              .in('exam_id', examIds)
+              .eq('status', 'pending_theory')
+
+            if (termCode && sessionYear) {
+              submissionQuery = submissionQuery
+                .eq('term', termCode)
+                .eq('session_year', sessionYear)
+            }
+
+            const { count, error: subError } = await submissionQuery
             
             if (!subError) {
               pendingCount = count || 0
@@ -243,18 +252,48 @@ export function StaffSidebar({
           }
         }
 
+        // ✅ 4. Get attendance count (today's attendance)
+        let attendanceCount = 0
+        if (profile?.id) {
+          const todayStr = new Date().toISOString().split('T')[0]
+          
+          // Get teacher's classes
+          const { data: teacherClasses } = await supabase
+            .from('teacher_classes')
+            .select('class_name')
+            .eq('teacher_id', profile.id)
+
+          if (teacherClasses && teacherClasses.length > 0) {
+            const classNames = teacherClasses.map(tc => tc.class_name)
+            
+            // Get today's attendance records for these classes
+            const { count: attCount, error: attError } = await supabase
+              .from('attendance_records')
+              .select('*', { count: 'exact', head: true })
+              .in('class_name', classNames)
+              .eq('date', todayStr)
+              .eq('term_code', termCode || '')
+              .eq('session_year', sessionYear || '')
+
+            if (!attError) {
+              attendanceCount = attCount || 0
+            }
+          }
+        }
+
         if (mounted) {
-          console.log('✅ Stats fetched:', { 
+          console.log('✅ Sidebar stats fetched:', { 
             studentsCount, 
-            examsCount, 
-            assignmentsCount,
-            pendingCount 
+            examsCount,
+            pendingCount,
+            attendanceCount,
+            termFilter: termCode || 'none'
           })
           setStats({
             studentCount: studentsCount || 0,
             examCount: examsCount || 0,
-            assignmentCount: assignmentsCount || 0,
-            pendingGradingCount: pendingCount
+            pendingGradingCount: pendingCount,
+            attendanceCount: attendanceCount
           })
           setIsLoading(false)
         }
@@ -270,11 +309,9 @@ export function StaffSidebar({
       }
     }
 
-    // Only fetch if we have a profile
     if (profile?.id) {
       fetchStats()
     } else {
-      // If no profile, try to get stats anyway (fallback)
       const fetchFallbackStats = async () => {
         try {
           const { count: studentsCount } = await supabase
@@ -282,16 +319,24 @@ export function StaffSidebar({
             .select('*', { count: 'exact', head: true })
             .eq('role', 'student')
 
-          const { count: examsCount } = await supabase
+          let examQuery = supabase
             .from('exams')
             .select('*', { count: 'exact', head: true })
+
+          if (termCode && sessionYear) {
+            examQuery = examQuery
+              .eq('term', termCode)
+              .eq('session_year', sessionYear)
+          }
+
+          const { count: examsCount } = await examQuery
 
           if (mounted) {
             setStats({
               studentCount: studentsCount || 0,
               examCount: examsCount || 0,
-              assignmentCount: 0,
-              pendingGradingCount: 0
+              pendingGradingCount: 0,
+              attendanceCount: 0
             })
             setIsLoading(false)
           }
@@ -307,22 +352,18 @@ export function StaffSidebar({
       mounted = false
       clearTimeout(retryTimeout)
     }
-  }, [profile?.id, profile?.school_id, profile?.class]) // Re-fetch when these change
+  }, [profile?.id, profile?.school_id, profile?.class, termCode, sessionYear])
 
   // Sync active tab with pathname
   useEffect(() => {
     if (pathname === '/staff') {
       setActiveTab('overview')
+    } else if (pathname?.startsWith('/staff/attendance')) {
+      setActiveTab('attendance')
     } else if (pathname?.startsWith('/staff/announcements')) {
       setActiveTab('announcements')
     } else if (pathname?.startsWith('/staff/exams')) {
       setActiveTab('exams')
-    } else if (pathname?.startsWith('/staff/assignments')) {
-      if (pathname?.includes('/grade')) {
-        setActiveTab('grade-assignments')
-      } else {
-        setActiveTab('assignments')
-      }
     } else if (pathname?.startsWith('/staff/notes')) {
       setActiveTab('notes')
     } else if (pathname?.startsWith('/staff/students')) {
@@ -358,11 +399,6 @@ export function StaffSidebar({
     const isActive = activeTab === item.id
     const Icon = item.icon
     
-    // Update badge for grade-assignments with actual count
-    const displayBadge = item.id === 'grade-assignments' && stats.pendingGradingCount > 0 
-      ? stats.pendingGradingCount.toString() 
-      : item.badge
-    
     const buttonContent = (
       <button
         key={item.id}
@@ -386,19 +422,7 @@ export function StaffSidebar({
         
         {!collapsed && (
           <div className="flex-1 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium block">{item.name}</span>
-              {displayBadge && (
-                <Badge className={cn(
-                  "text-[9px] px-1.5 py-0.5",
-                  isActive 
-                    ? "bg-white/20 text-white" 
-                    : "bg-amber-100 text-amber-700 border-amber-200"
-                )}>
-                  {displayBadge}
-                </Badge>
-              )}
-            </div>
+            <span className="text-sm font-medium block">{item.name}</span>
             <span className={cn(
               "text-xs block truncate",
               isActive ? "text-emerald-100" : "text-slate-400 dark:text-slate-500"
@@ -420,9 +444,6 @@ export function StaffSidebar({
             <div>
               <p className="font-medium">{item.name}</p>
               <p className="text-xs text-slate-400">{item.description}</p>
-              {displayBadge && (
-                <p className="text-xs text-amber-500 mt-1">{displayBadge} pending</p>
-              )}
             </div>
           </TooltipContent>
         </Tooltip>
@@ -525,24 +546,30 @@ export function StaffSidebar({
                 )}
               </div>
 
-              {/* Stats - Show loading state */}
-              <div className="grid grid-cols-3 gap-2 pt-2">
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
+              {/* Stats - 4 items: Students, Exams, To Grade, Attendance */}
+              <div className="grid grid-cols-4 gap-2 pt-2">
+                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2 text-center">
                   <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Students</p>
                   <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">
                     {isLoading ? '...' : stats.studentCount}
                   </p>
                 </div>
-                <div className="bg-teal-50 dark:bg-teal-950/30 rounded-lg p-2">
-                  <p className="text-[9px] text-teal-600 dark:text-teal-400 font-medium">Exams</p>
-                  <p className="text-xs font-bold text-teal-700 dark:text-teal-300">
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-2 text-center">
+                  <p className="text-[9px] text-blue-600 dark:text-blue-400 font-medium">Exams</p>
+                  <p className="text-xs font-bold text-blue-700 dark:text-blue-300">
                     {isLoading ? '...' : stats.examCount}
                   </p>
                 </div>
-                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">
+                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2 text-center">
                   <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">To Grade</p>
                   <p className="text-xs font-bold text-amber-700 dark:text-amber-300">
                     {isLoading ? '...' : stats.pendingGradingCount}
+                  </p>
+                </div>
+                <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-2 text-center">
+                  <p className="text-[9px] text-purple-600 dark:text-purple-400 font-medium">Today</p>
+                  <p className="text-xs font-bold text-purple-700 dark:text-purple-300">
+                    {isLoading ? '...' : stats.attendanceCount}
                   </p>
                 </div>
               </div>

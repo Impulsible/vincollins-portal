@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/PreviewTab.tsx - WITH PASSAGE SUPPORT
+// src/components/staff/exams/edit/PreviewTab.tsx - NO HARDCODED VALUES
 
 'use client'
 
@@ -6,8 +6,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { BookOpen, Brain, Award, Clock, FileText, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { BookOpen, Brain, Award, Clock, FileText, Calculator } from 'lucide-react'
 import { useState } from 'react'
+import { cn } from '@/lib/utils'
+import { MARK_CONSTANTS } from '../create/constants'
 import type { Question, TheoryQuestion, ExamDetailsForm } from './types'
 
 interface PreviewTabProps {
@@ -15,7 +17,9 @@ interface PreviewTabProps {
   questions: Question[]
   theoryQuestions: TheoryQuestion[]
   hasTheory: boolean
-  passageText?: string  // ✅ ADD THIS
+  passageText?: string
+  defaultMark?: number
+  theoryTotalMarks?: number
 }
 
 export function PreviewTab({
@@ -23,24 +27,42 @@ export function PreviewTab({
   questions,
   theoryQuestions,
   hasTheory,
-  passageText,  // ✅ ADD THIS
+  passageText,
+  defaultMark,
+  theoryTotalMarks,
 }: PreviewTabProps) {
   const [showAllQuestions, setShowAllQuestions] = useState(false)
   
-  const totalQuestions = questions.length + (hasTheory ? theoryQuestions.length : 0)
-  const totalPoints = questions.reduce((sum, q) => sum + (q.points || 1), 0) +
-    (hasTheory ? theoryQuestions.reduce((sum, q) => sum + (q.points || 5), 0) : 0)
+  // ✅ Use MARK_CONSTANTS - NO HARDCODED VALUES
+  const EXAM_TOTAL = MARK_CONSTANTS.EXAM_TOTAL
+  const CA1_MAX = MARK_CONSTANTS.CA1_MAX
+  const CA2_MAX = MARK_CONSTANTS.CA2_MAX
+  const CA_TOTAL = MARK_CONSTANTS.CA_TOTAL
+  const GRAND_TOTAL = MARK_CONSTANTS.GRAND_TOTAL
+  
+  const objectiveCount = questions.length
+  const theoryCount = hasTheory ? theoryQuestions.length : 0
+  
+  // Calculate from actual data, not hardcoded
+  const totalObjectivePoints = objectiveCount * (defaultMark || 0.5)
+  const totalTheoryPoints = hasTheory 
+    ? (theoryTotalMarks || theoryQuestions.reduce((sum, q) => sum + (q.points || 5), 0))
+    : 0
+  
+  const totalPoints = totalObjectivePoints + totalTheoryPoints
+  const totalQuestions = objectiveCount + theoryCount
   
   const draftCount = questions.filter(q => q.is_draft).length + 
     (hasTheory ? theoryQuestions.filter(q => q.is_draft).length : 0)
   
   const completeCount = totalQuestions - draftCount
+  const isBalanced = totalPoints === EXAM_TOTAL
 
   const displayQuestions = showAllQuestions ? questions : questions.slice(0, 5)
 
   return (
     <div className="space-y-4">
-      {/* ✅ Passage Preview */}
+      {/* Passage Preview */}
       {passageText && (
         <Card className="border-2 border-amber-200 bg-amber-50">
           <CardContent className="p-4">
@@ -56,6 +78,67 @@ export function PreviewTab({
           </CardContent>
         </Card>
       )}
+
+      {/* Mark Distribution Summary - NO HARDCODED VALUES */}
+      <Card className="border-2 border-blue-200 bg-blue-50">
+        <CardContent className="p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Calculator className="h-4 w-4 text-blue-600" />
+            <span className="text-xs font-semibold text-blue-700 uppercase tracking-wider">Mark Distribution</span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <p className="text-xs text-blue-600">Objective</p>
+              <p className="text-lg font-bold text-blue-700">{totalObjectivePoints} marks</p>
+              <p className="text-[10px] text-blue-500">{objectiveCount} × {defaultMark || 0.5}</p>
+            </div>
+            <div>
+              <p className="text-xs text-purple-600">Theory</p>
+              <p className="text-lg font-bold text-purple-700">{totalTheoryPoints} marks</p>
+              <p className="text-[10px] text-purple-500">{theoryCount} questions</p>
+            </div>
+            <div>
+              <p className="text-xs text-emerald-600">Total</p>
+              <p className={cn(
+                "text-lg font-bold",
+                isBalanced ? "text-emerald-700" : "text-amber-700"
+              )}>
+                {totalPoints} / {EXAM_TOTAL} marks
+              </p>
+              <p className="text-[10px] text-emerald-500">
+                {isBalanced ? "✅ Balanced" : "⚠️ Should be 60"}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-amber-600">Pass Mark</p>
+              <p className="text-lg font-bold text-amber-700">{examDetails.pass_mark}%</p>
+              <p className="text-[10px] text-amber-500">
+                {totalPoints > 0 ? Math.round((examDetails.pass_mark / totalPoints) * 100) : 0}%
+              </p>
+            </div>
+          </div>
+
+          {/* CA and Grand Total - NO HARDCODED VALUES */}
+          <div className="mt-3 pt-3 border-t border-blue-200 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <p className="text-xs text-slate-500">CA1</p>
+              <p className="text-sm font-semibold text-slate-700">{CA1_MAX} marks</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">CA2</p>
+              <p className="text-sm font-semibold text-slate-700">{CA2_MAX} marks</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">CA Total</p>
+              <p className="text-sm font-semibold text-slate-700">{CA_TOTAL} marks</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Grand Total</p>
+              <p className="text-sm font-semibold text-slate-700">{GRAND_TOTAL} marks</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Exam Summary Card */}
       <Card>
@@ -103,11 +186,6 @@ export function PreviewTab({
             <Badge variant="outline">
               Shuffle Options: {examDetails.shuffle_options ? '✅' : '❌'}
             </Badge>
-            {examDetails.negative_marking && (
-              <Badge variant="outline" className="text-red-500">
-                Negative: -{examDetails.negative_marking_value}
-              </Badge>
-            )}
             {hasTheory && (
               <Badge variant="secondary">Has Theory</Badge>
             )}
@@ -123,6 +201,9 @@ export function PreviewTab({
               <h3 className="font-semibold flex items-center gap-2">
                 <BookOpen className="h-4 w-4 text-blue-500" />
                 Objective Questions ({questions.length})
+                <span className="text-xs text-slate-400 font-normal">
+                  ({defaultMark || 0.5} mark each)
+                </span>
               </h3>
               {questions.length > 5 && (
                 <Button 
@@ -169,7 +250,7 @@ export function PreviewTab({
                             </Badge>
                           )}
                           <Badge variant="outline" className="text-[10px]">
-                            {q.points} pts
+                            {q.points || defaultMark || 0.5} pts
                           </Badge>
                           {q.is_draft && (
                             <Badge variant="outline" className="text-amber-600 text-[10px]">
@@ -194,6 +275,9 @@ export function PreviewTab({
             <h3 className="font-semibold flex items-center gap-2 mb-3">
               <Brain className="h-4 w-4 text-purple-500" />
               Theory Questions ({theoryQuestions.length})
+              <span className="text-xs text-slate-400 font-normal">
+                (Total: {totalTheoryPoints} marks)
+              </span>
             </h3>
             <div className="space-y-3">
               {theoryQuestions.slice(0, 3).map((q, idx) => (

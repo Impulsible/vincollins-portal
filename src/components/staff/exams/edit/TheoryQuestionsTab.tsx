@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/TheoryQuestionsTab.tsx - COMPLETE WITH PROPER TABLE RENDERING
+// src/components/staff/exams/edit/TheoryQuestionsTab.tsx - COMPLETE
 
 'use client'
 
@@ -7,8 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -30,7 +30,8 @@ import {
   Plus, Edit, Trash2, FileText, Search,
   Copy, Upload, Loader2, CheckCircle2, XCircle,
   ChevronLeft, ChevronRight, Layers, AlertTriangle,
-  Sparkles, FileCode2, Split, Zap, Table as TableIcon
+  Sparkles, FileCode2, Split, Zap, Table as TableIcon,
+  Calculator
 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { TheoryQuestion, TheorySubQuestion } from './types'
@@ -43,6 +44,11 @@ interface TheoryQuestionsTabProps {
   onDeleteQuestion: (questionId: string) => void
   onBulkAdd?: (questions: Partial<TheoryQuestion>[]) => Promise<void> | void
   isSaving?: boolean
+  defaultMark?: number
+  totalTheoryMarks?: number
+  theoryQuestionCount?: number
+  examTotal?: number
+  grandTotal?: number
 }
 
 const QUESTIONS_PER_PAGE = 10
@@ -50,71 +56,7 @@ const BATCH_SIZE = 5
 const OPTIMAL_BATCH_SIZE = 8
 
 // ==================== RENDER CONTENT WITH PROPER TABLE HANDLING ====================
-// This function hides raw HTML and shows actual rendered tables
-const renderContent = (text: string, maxLength?: number) => {
-  if (!text) return null
-  
-  // Handle HTML tables - extract and render them as actual tables
-  if (text.includes('<table') && text.includes('</table>')) {
-    const tableMatch = text.match(/<table[\s\S]*?<\/table>/i)
-    if (tableMatch) {
-      return (
-        <div className="overflow-x-auto my-2">
-          <div 
-            className="w-full [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:p-1.5 [&_td]:p-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_table]:text-xs"
-            dangerouslySetInnerHTML={{ __html: tableMatch[0] }}
-          />
-        </div>
-      )
-    }
-  }
-  
-  // Handle markdown tables
-  if (text.includes('|') && text.includes('---') && text.match(/\|.+\|/)) {
-    const lines = text.split('\n').filter(line => line.includes('|'))
-    const tableHtml = convertMarkdownTableToHtml(lines)
-    if (tableHtml) {
-      return (
-        <div className="overflow-x-auto my-2">
-          <div 
-            className="w-full [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:p-1.5 [&_td]:p-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_table]:text-xs"
-            dangerouslySetInnerHTML={{ __html: tableHtml }}
-          />
-        </div>
-      )
-    }
-  }
-  
-  let displayText = text
-  if (maxLength && !text.includes('<table')) {
-    displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text
-  }
-  
-  // Handle markdown images
-  const imageMatch = displayText.match(/!\[(.*?)\]\((.*?)\)/)
-  if (imageMatch) {
-    return (
-      <div className="my-2">
-        <img src={imageMatch[2]} alt={imageMatch[1]} className="max-w-full max-h-[80px] rounded border" />
-        {imageMatch[1] && <p className="text-xs text-muted-foreground mt-1">{imageMatch[1]}</p>}
-      </div>
-    )
-  }
-  
-  // Handle ASCII art charts
-  if (displayText.includes('█') || displayText.includes('▓') || displayText.includes('▒') || displayText.includes('░')) {
-    return <pre className="font-mono text-xs bg-gray-100 p-2 rounded my-2 whitespace-pre-wrap overflow-x-auto">{displayText}</pre>
-  }
-  
-  // Clean up any stray HTML tags that might appear
-  let cleanText = displayText
-  cleanText = cleanText.replace(/<(?!(?:table|tr|td|th|tbody|thead)\b)[^>]*>/gi, '')
-  
-  // Regular text - preserve line breaks
-  return <span dangerouslySetInnerHTML={{ __html: cleanText.replace(/\n/g, '<br/>') }} />
-}
 
-// Helper function to convert markdown table to HTML
 const convertMarkdownTableToHtml = (tableLines: string[]): string => {
   let html = '<table style="border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 12px;">'
   let isHeader = true
@@ -140,17 +82,72 @@ const convertMarkdownTableToHtml = (tableLines: string[]): string => {
   return html
 }
 
-// Helper to check if content contains a table
 const hasTable = (text: string): boolean => {
   if (!text) return false
   return text.includes('<table') && text.includes('</table>')
 }
 
-// Helper to render sub-questions recursively with nested support
+const renderContent = (text: string, maxLength?: number) => {
+  if (!text) return null
+  
+  if (text.includes('<table') && text.includes('</table>')) {
+    const tableMatch = text.match(/<table[\s\S]*?<\/table>/i)
+    if (tableMatch) {
+      return (
+        <div className="overflow-x-auto my-2">
+          <div 
+            className="w-full [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:p-1.5 [&_td]:p-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_table]:text-xs"
+            dangerouslySetInnerHTML={{ __html: tableMatch[0] }}
+          />
+        </div>
+      )
+    }
+  }
+  
+  if (text.includes('|') && text.includes('---') && text.match(/\|.+\|/)) {
+    const lines = text.split('\n').filter(line => line.includes('|'))
+    const tableHtml = convertMarkdownTableToHtml(lines)
+    if (tableHtml) {
+      return (
+        <div className="overflow-x-auto my-2">
+          <div 
+            className="w-full [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_td]:border [&_th]:border-gray-300 [&_td]:border-gray-300 [&_th]:p-1.5 [&_td]:p-1.5 [&_th]:bg-gray-100 [&_th]:font-semibold [&_table]:text-xs"
+            dangerouslySetInnerHTML={{ __html: tableHtml }}
+          />
+        </div>
+      )
+    }
+  }
+  
+  let displayText = text
+  if (maxLength && !text.includes('<table')) {
+    displayText = text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+  }
+  
+  const imageMatch = displayText.match(/!\[(.*?)\]\((.*?)\)/)
+  if (imageMatch) {
+    return (
+      <div className="my-2">
+        <img src={imageMatch[2]} alt={imageMatch[1]} className="max-w-full max-h-[80px] rounded border" />
+        {imageMatch[1] && <p className="text-xs text-muted-foreground mt-1">{imageMatch[1]}</p>}
+      </div>
+    )
+  }
+  
+  if (displayText.includes('█') || displayText.includes('▓') || displayText.includes('▒') || displayText.includes('░')) {
+    return <pre className="font-mono text-xs bg-gray-100 p-2 rounded my-2 whitespace-pre-wrap overflow-x-auto">{displayText}</pre>
+  }
+  
+  let cleanText = displayText
+  cleanText = cleanText.replace(/<(?!(?:table|tr|td|th|tbody|thead)\b)[^>]*>/gi, '')
+  
+  return <span dangerouslySetInnerHTML={{ __html: cleanText.replace(/\n/g, '<br/>') }} />
+}
+
 const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0) => {
   if (!subQuestions || subQuestions.length === 0) return null
   
-  const startCharCode = level === 0 ? 97 : 105 // 'a' = 97, 'i' = 105
+  const startCharCode = level === 0 ? 97 : 105
   
   return (
     <div className={`space-y-2 ${level > 0 ? 'ml-6 mt-2' : 'ml-4 mt-2'}`}>
@@ -175,7 +172,12 @@ const renderSubQuestions = (subQuestions: TheorySubQuestion[], level: number = 0
   )
 }
 
-// ==================== SMART PARSER WITH NESTED SUB-QUESTIONS ====================
+// ==================== SMART PARSER ====================
+
+const escapeRegex = (str: string): string => {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
 const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<TheoryQuestion>[] => {
   const questions: Partial<TheoryQuestion>[] = []
   const normalizedText = text.replace(/\r\n/g, '\n')
@@ -191,7 +193,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
     const marksMatch = block.match(/(?:^|\n)\s*(\d+)\s*marks?|marks?:?\s*(\d+)/i)
     const points = marksMatch ? parseInt(marksMatch[1] || marksMatch[2]) : defaultPoints
     
-    // Extract additional content
     const afterMainMatch = block.match(/^(\d+)\.\s+.*?\n(.*?)(?=\n\d+\s*marks?|\nMarks?:|$)/i)
     if (afterMainMatch && afterMainMatch[2]) {
       const additionalContent = afterMainMatch[2].trim()
@@ -202,7 +203,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
       }
     }
     
-    // Extract HTML tables - keep them as HTML for rendering
     const tableMatches = block.match(/<table[\s\S]*?<\/table>/gi)
     if (tableMatches && tableMatches.length > 0) {
       for (const table of tableMatches) {
@@ -212,16 +212,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
       }
     }
     
-    // Extract any data/preface before tables
-    const dataMatch = block.match(/([\d,\s]+)(?=\n\s*<table)/)
-    if (dataMatch && dataMatch[1].trim() && !questionContent.includes(dataMatch[1])) {
-      const dataText = dataMatch[1].trim()
-      if (dataText.length > 0 && dataText.length < 500) {
-        questionContent += '\n\nData: ' + dataText
-      }
-    }
-    
-    // Extract equations
     const equationLines: string[] = []
     const lines = block.split('\n')
     for (const line of lines) {
@@ -243,7 +233,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
       }
     }
     
-    // Extract sub-questions with nested support
     const subQuestionsList: TheorySubQuestion[] = []
     const subSectionMatch = block.match(/Sub-questions:\s*\n([\s\S]*?)(?=\n\s*\d+\s*marks?|\n\s*\d+\s*part\(s\)|$)/i)
     
@@ -257,13 +246,11 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
         if (subMatch) {
           let subContent = subMatch[2].trim()
           
-          // Check for HTML tables within sub-questions
           const subTableMatch = subContent.match(/<table[\s\S]*?<\/table>/i)
           if (subTableMatch && !subContent.includes('<table')) {
             subContent = subTableMatch[0]
           }
           
-          // Check for sub-sub-questions (roman numerals)
           const subSubPattern = /\(?(i{1,3}|iv|v|vi|vii|viii|ix|x)\)?[\.\)]\s+([^\(]+?)(?=(?:\(?(?:i{1,3}|iv|v|vi|vii|viii|ix|x)\)?[\.\)]|$))/gi
           const subSubMatches: Array<{ label: string; text: string }> = []
           let subSubMatch
@@ -300,7 +287,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
               sub_sub_questions: subSubQuestions
             })
           } else {
-            // Check for sub-sub-questions on separate lines
             const subItemLines = subItem.split('\n')
             let mainText = ''
             const subSubQuestions: TheorySubQuestion[] = []
@@ -345,7 +331,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
       }
     }
     
-    // Fallback: simple sub-question detection
     if (subQuestionsList.length === 0) {
       const lines = block.split('\n')
       for (const line of lines) {
@@ -393,12 +378,6 @@ const smartParseBulkQuestions = (text: string, defaultPoints: number): Partial<T
   return questions
 }
 
-// Helper function to escape regex special characters
-const escapeRegex = (str: string): string => {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
-// Fallback parser for simpler formats
 const smartParseBulkQuestionsFallback = (text: string, defaultPoints: number): Partial<TheoryQuestion>[] => {
   const lines = text.split(/\r?\n/)
   const questions: Partial<TheoryQuestion>[] = []
@@ -537,7 +516,12 @@ export function TheoryQuestionsTab({
   onEditQuestion,
   onDeleteQuestion,
   onBulkAdd,
-  isSaving = false
+  isSaving = false,
+  defaultMark = 0.5,
+  totalTheoryMarks = 0,
+  theoryQuestionCount = 0,
+  examTotal = 60,
+  grandTotal = 100,
 }: TheoryQuestionsTabProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [searchQuery, setSearchQuery] = useState('')
@@ -553,6 +537,12 @@ export function TheoryQuestionsTab({
   const [currentBatchProgress, setCurrentBatchProgress] = useState(0)
   const [importStatus, setImportStatus] = useState<'idle' | 'processing' | 'success' | 'error'>('idle')
   const [estimatedTime, setEstimatedTime] = useState<number | null>(null)
+
+  const marksPerTheoryQuestion = theoryQuestionCount > 0 && totalTheoryMarks > 0 
+    ? totalTheoryMarks / theoryQuestionCount 
+    : 0
+
+  const isBalanced = examTotal === 60
 
   if (!hasTheory) {
     return (
@@ -753,9 +743,26 @@ export function TheoryQuestionsTab({
             </CardTitle>
             <CardDescription>
               {totalSubQuestions} sub-question{totalSubQuestions !== 1 ? 's' : ''} • {totalPoints} total points
+              {marksPerTheoryQuestion > 0 && (
+                <span className="ml-2 text-purple-600">• {marksPerTheoryQuestion.toFixed(2)} marks each</span>
+              )}
             </CardDescription>
           </div>
           <div className="flex gap-2">
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 bg-slate-50 dark:bg-slate-800 rounded-lg px-2 py-1">
+              <Calculator className="h-3 w-3 text-purple-600" />
+              <span className="font-medium text-purple-700">{totalTheoryMarks}mk</span>
+              <span className="text-slate-300">|</span>
+              <span className={isBalanced ? "text-emerald-600" : "text-amber-600"}>
+                {examTotal}/60
+              </span>
+              {grandTotal > 0 && (
+                <>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-blue-600">{grandTotal}mk</span>
+                </>
+              )}
+            </div>
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <Input
@@ -823,7 +830,6 @@ export function TheoryQuestionsTab({
                             </div>
                           </div>
                           
-                          {/* Render nested sub-questions */}
                           {q.sub_questions && q.sub_questions.length > 0 && (
                             renderSubQuestions(q.sub_questions, 0)
                           )}
@@ -854,6 +860,11 @@ export function TheoryQuestionsTab({
                               <Badge variant="outline" className="border-blue-200 text-blue-600">
                                 <TableIcon className="h-3 w-3 mr-1" />
                                 Table
+                              </Badge>
+                            )}
+                            {marksPerTheoryQuestion > 0 && (
+                              <Badge variant="outline" className="text-purple-600 border-purple-200 text-[10px]">
+                                {marksPerTheoryQuestion.toFixed(2)} mk each
                               </Badge>
                             )}
                           </div>
@@ -921,6 +932,11 @@ export function TheoryQuestionsTab({
               <span className="text-xs text-muted-foreground mt-1 block">
                 Supports format: "1. Question... Sub-questions: a. ... b. ... i. ... ii. ... 10 marks"
               </span>
+              {marksPerTheoryQuestion > 0 && (
+                <><br /><span className="text-xs text-purple-600 mt-1 block">
+                  💡 Each theory question will be {marksPerTheoryQuestion.toFixed(2)} marks based on total theory marks.
+                </span></>
+              )}
             </DialogDescription>
           </DialogHeader>
 
@@ -948,7 +964,10 @@ export function TheoryQuestionsTab({
               
               <div>
                 <Label className="text-sm">Default Marks per Question</Label>
-                <Input type="number" value={bulkPoints} onChange={(e) => setBulkPoints(parseInt(e.target.value) || 10)} min={1} max={100} className="w-24 mt-1" />
+                <Input type="number" value={bulkPoints} onChange={(e) => setBulkPoints(parseInt(e.target.value) || (marksPerTheoryQuestion > 0 ? marksPerTheoryQuestion : 10))} min={1} max={100} className="w-24 mt-1" />
+                {marksPerTheoryQuestion > 0 && (
+                  <p className="text-[10px] text-purple-500 mt-0.5">Suggested: {marksPerTheoryQuestion.toFixed(2)}</p>
+                )}
               </div>
             </div>
 

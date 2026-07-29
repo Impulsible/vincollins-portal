@@ -1,4 +1,4 @@
-// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED MERGED SCORES
+// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED UNIQUE STUDENT COUNTING
 // @ts-nocheck
 'use client'
 
@@ -15,6 +15,13 @@ import { ClassPerformance } from './ClassPerformance'
 import { SubjectPerformance } from './SubjectPerformance'
 import { GradeDistribution } from './GradeDistribution'
 import { TopStudents } from './TopStudents'
+
+interface TermOption {
+  value: string
+  label: string
+  session_year: string
+  is_current: boolean
+}
 
 function isPassing(grade: string | null | undefined): boolean {
   if (!grade) return false
@@ -39,9 +46,66 @@ export function AnalyticsDashboard() {
   const [data, setData] = useState<any>({ 
     overview: {}, classStats: [], subjectStats: [], gradeDist: [], topStudents: [], classes: [] 
   })
-  const [selectedTerm, setSelectedTerm] = useState('third')
-  const [selectedYear, setSelectedYear] = useState('2025/2026')
+  
+  // ✅ Dynamic term and session from database
+  const [termOptions, setTermOptions] = useState<TermOption[]>([])
+  const [selectedTerm, setSelectedTerm] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
   const [selectedClass, setSelectedClass] = useState('all')
+  const [isLoadingTerms, setIsLoadingTerms] = useState(true)
+
+  // ✅ Fetch terms from database
+  useEffect(() => {
+    const fetchTerms = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('terms')
+          .select('term_code, term_name, session_year')
+          .order('session_year', { ascending: false })
+          .order('term_code', { ascending: true })
+
+        if (error) {
+          console.error('Error fetching terms:', error)
+          return
+        }
+
+        if (data) {
+          // Get current term from school_settings
+          const { data: settings } = await supabase
+            .from('school_settings')
+            .select('current_term, current_session')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+          const options = data.map((t: any) => ({
+            value: t.term_code,
+            label: t.term_name,
+            session_year: t.session_year,
+            is_current: t.term_code === settings?.current_term && 
+                        t.session_year === settings?.current_session
+          }))
+          
+          setTermOptions(options)
+          
+          // Set default selection to current term
+          if (settings?.current_term && settings?.current_session) {
+            setSelectedTerm(settings.current_term)
+            setSelectedYear(settings.current_session)
+          } else if (options.length > 0) {
+            setSelectedTerm(options[0].value)
+            setSelectedYear(options[0].session_year)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching terms:', error)
+      } finally {
+        setIsLoadingTerms(false)
+      }
+    }
+
+    fetchTerms()
+  }, [])
 
   const loadData = async () => {
     setLoading(true)
@@ -78,19 +142,20 @@ export function AnalyticsDashboard() {
         .eq('role', 'student')
         .order('full_name')
 
-      const studentCount = students?.length || 0
       const classList = [...new Set((students || []).map(s => s.class).filter(Boolean))].sort()
       const studentMap: Record<string, any> = {}
       students?.forEach(s => { studentMap[s.id] = s })
 
-      // ✅ Step 3: Get scores - MERGE exam_attempts + ca_scores
+      // ✅ Step 3: Get scores - MERGE exam_attempts + ca_scores WITH TERM FILTER
       const allScores: any[] = []
 
-      if (examIds.length > 0) {
+      if (examIds.length > 0 && selectedTerm && selectedYear) {
         const [attemptsResult, caResult] = await Promise.all([
           supabase.from('exam_attempts')
             .select('*')
             .in('exam_id', examIds)
+            .eq('term', selectedTerm)
+            .eq('session_year', selectedYear)
             .neq('status', 'pending_theory')
             .order('submitted_at', { ascending: false }),
           supabase.from('ca_scores')
@@ -105,7 +170,9 @@ export function AnalyticsDashboard() {
 
         console.log('📊 [ANALYTICS] Raw data:', {
           attemptsCount: attempts.length,
-          caScoresCount: caScores.length
+          caScoresCount: caScores.length,
+          term: selectedTerm,
+          year: selectedYear
         })
 
         // ✅ Build CA map for quick lookup
@@ -189,7 +256,25 @@ export function AnalyticsDashboard() {
         validScores: validScores.length
       })
 
-      // ✅ Step 5: Calculate overview using valid scores
+      // ✅ TRACK UNIQUE STUDENTS WITH SCORES
+      const uniqueStudentIds = new Set<string>()
+      const classStudentMap: Record<string, Set<string>> = {}
+      
+      validScores.forEach(s => {
+        if (s.student_id) {
+          uniqueStudentIds.add(s.student_id)
+          const cls = s.student_class || 'Unknown Class'
+          if (!classStudentMap[cls]) {
+            classStudentMap[cls] = new Set()
+          }
+          classStudentMap[cls].add(s.student_id)
+        }
+      })
+      
+      const uniqueStudentCount = uniqueStudentIds.size
+      console.log('📊 [ANALYTICS] Unique students with scores:', uniqueStudentCount)
+
+      // ✅ Step 5: Calculate overview using UNIQUE students
       const avgScore = validScores.length > 0
         ? Math.round(validScores.reduce((sum, s) => sum + (s.percentage || s.total_score || 0), 0) / validScores.length)
         : 0
@@ -200,24 +285,25 @@ export function AnalyticsDashboard() {
         : 0
 
       const overview = {
-        totalStudents: studentCount,
+        totalStudents: uniqueStudentCount, // ✅ FIXED: Unique students with scores
         totalExams: publishedExams,
         avgScore,
         passRate,
         pendingGrading: allScores.filter(s => s.status === 'pending_theory').length,
-        activeClasses: classList.length
+        activeClasses: Object.keys(classStudentMap).length
       }
 
-      // ✅ Step 6: Subject Stats - Use valid scores only
+      // ✅ Step 6: Subject Stats with unique student counts
       const subjMap: Record<string, any> = {}
       validScores.forEach(s => {
         const subj = s.subject
         if (!subjMap[subj]) {
-          subjMap[subj] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
+          subjMap[subj] = { total: 0, count: 0, high: 0, low: 100, pass: 0, students: new Set() }
         }
         const score = s.percentage || s.total_score || 0
         subjMap[subj].total += score
         subjMap[subj].count++
+        if (s.student_id) subjMap[subj].students.add(s.student_id)
         if (score > subjMap[subj].high) subjMap[subj].high = score
         if (score < subjMap[subj].low) subjMap[subj].low = score
         if (isPassing(s.grade)) subjMap[subj].pass++
@@ -225,40 +311,34 @@ export function AnalyticsDashboard() {
 
       const subjectStats = Object.entries(subjMap).map(([name, d]: any) => ({
         name,
-        students: d.count,
+        students: d.students.size, // ✅ Unique students per subject
         avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
         passRate: d.count > 0 ? Math.round((d.pass / d.count) * 100) : 0,
         highest: d.high,
         lowest: d.low
       })).sort((a: any, b: any) => b.avgScore - a.avgScore)
 
-      console.log('📊 [ANALYTICS] Final subject stats:', subjectStats.map(s => `${s.name}: ${s.students} students, ${s.avgScore}%`))
+      console.log('📊 [ANALYTICS] Subject stats:', subjectStats.map(s => `${s.name}: ${s.students} students, ${s.avgScore}%`))
 
-      // ✅ Step 7: Class Stats
-      const classMap: Record<string, any> = {}
-      validScores.forEach(s => {
-        const cls = s.student_class || 'Unknown Class'
-        if (!classMap[cls]) {
-          classMap[cls] = { total: 0, count: 0, high: 0, low: 100, pass: 0 }
+      // ✅ Step 7: Class Stats with unique students
+      const classStats = Object.entries(classStudentMap).map(([name, studentSet]: [string, Set<string>]) => {
+        const classScores = validScores.filter(s => s.student_class === name)
+        const total = classScores.reduce((sum, s) => sum + (s.percentage || s.total_score || 0), 0)
+        const passCount = classScores.filter(s => isPassing(s.grade)).length
+        const highest = classScores.length > 0 ? Math.max(...classScores.map(s => s.percentage || s.total_score || 0)) : 0
+        const lowest = classScores.length > 0 ? Math.min(...classScores.map(s => s.percentage || s.total_score || 0)) : 0
+        
+        return {
+          name,
+          students: studentSet.size, // ✅ Unique students per class
+          avgScore: classScores.length > 0 ? Math.round(total / classScores.length) : 0,
+          passRate: classScores.length > 0 ? Math.round((passCount / classScores.length) * 100) : 0,
+          highest,
+          lowest
         }
-        const score = s.percentage || s.total_score || 0
-        classMap[cls].total += score
-        classMap[cls].count++
-        if (score > classMap[cls].high) classMap[cls].high = score
-        if (score < classMap[cls].low) classMap[cls].low = score
-        if (isPassing(s.grade)) classMap[cls].pass++
-      })
+      }).sort((a: any, b: any) => b.avgScore - a.avgScore)
 
-      const classStats = Object.entries(classMap).map(([name, d]: any) => ({
-        name,
-        students: d.count,
-        avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
-        passRate: d.count > 0 ? Math.round((d.pass / d.count) * 100) : 0,
-        highest: d.high,
-        lowest: d.low
-      })).sort((a: any, b: any) => b.avgScore - a.avgScore)
-
-      // ✅ Step 8: Top Students
+      // ✅ Step 8: Top Students (unique students only)
       const studentScores: Record<string, any> = {}
       validScores.forEach(s => {
         const key = s.student_id || s.student_name || 'unknown'
@@ -322,7 +402,12 @@ export function AnalyticsDashboard() {
     }
   }
 
-  useEffect(() => { loadData() }, [selectedTerm, selectedYear, selectedClass])
+  // Load data when term/year changes
+  useEffect(() => {
+    if (selectedTerm && selectedYear) {
+      loadData()
+    }
+  }, [selectedTerm, selectedYear, selectedClass])
 
   const handleExport = () => {
     const csv = 'Name,Class,Avg Score,Subjects\n' +
@@ -337,7 +422,7 @@ export function AnalyticsDashboard() {
     toast.success('Exported!')
   }
 
-  if (loading) {
+  if (loading || isLoadingTerms) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
@@ -351,6 +436,15 @@ export function AnalyticsDashboard() {
         </div>
       </div>
     )
+  }
+
+  // ✅ Get current term info for the overview
+  const currentTermLabel = termOptions.find(t => t.value === selectedTerm)?.label || selectedTerm
+  const currentTermInfo = {
+    termName: currentTermLabel,
+    sessionYear: selectedYear,
+    termCode: selectedTerm,
+    isCurrent: termOptions.find(t => t.value === selectedTerm)?.is_current || false
   }
 
   return (
@@ -384,27 +478,46 @@ export function AnalyticsDashboard() {
               ))}
             </SelectContent>
           </Select>
+          
+          {/* ✅ Dynamic Term Selector from Database */}
           <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-            <SelectTrigger className="h-9 text-xs w-[120px] bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 text-xs w-[130px] bg-white">
+              <SelectValue placeholder="Select Term" />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="first">First Term</SelectItem>
-              <SelectItem value="second">Second Term</SelectItem>
-              <SelectItem value="third">Third Term</SelectItem>
+              {termOptions.map((term) => (
+                <SelectItem key={`${term.value}-${term.session_year}`} value={term.value}>
+                  {term.label} {term.is_current ? '✓' : ''}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          
+          {/* ✅ Dynamic Session Selector from Database */}
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="h-9 text-xs w-[120px] bg-white"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="h-9 text-xs w-[130px] bg-white">
+              <SelectValue placeholder="Select Session" />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2025/2026">2025/2026</SelectItem>
+              {[...new Set(termOptions.map(t => t.session_year))].map((session) => (
+                <SelectItem key={session} value={session}>
+                  {session}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
+          
           <Button variant="outline" size="sm" onClick={loadData} className="h-9">
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      <AnalyticsOverview overview={data.overview} />
+      {/* ✅ Pass termInfo to AnalyticsOverview */}
+      <AnalyticsOverview 
+        overview={data.overview} 
+        termInfo={currentTermInfo}
+      />
 
       <Tabs defaultValue="classes">
         <TabsList className="bg-white border rounded-lg p-1 h-auto w-full sm:w-auto overflow-x-auto flex-nowrap shadow-sm">
@@ -413,17 +526,35 @@ export function AnalyticsDashboard() {
           <TabsTrigger value="students" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">Top Students</TabsTrigger>
           <TabsTrigger value="grades" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">Grades</TabsTrigger>
         </TabsList>
-        <TabsContent value="classes" className="mt-4"><ClassPerformance data={data.classStats} /></TabsContent>
-        <TabsContent value="subjects" className="mt-4"><SubjectPerformance data={data.subjectStats} /></TabsContent>
+        
+        {/* ✅ Pass termInfo to ClassPerformance */}
+        <TabsContent value="classes" className="mt-4">
+          <ClassPerformance 
+            data={data.classStats} 
+            termInfo={currentTermInfo}
+          />
+        </TabsContent>
+        
+        {/* ✅ Pass termInfo to SubjectPerformance */}
+        <TabsContent value="subjects" className="mt-4">
+          <SubjectPerformance 
+            data={data.subjectStats} 
+            termInfo={currentTermInfo}
+          />
+        </TabsContent>
+        
         <TabsContent value="students" className="mt-4">
           <div className="flex justify-end mb-2">
             <Button variant="outline" size="sm" onClick={handleExport}>
               <Download className="mr-1.5 h-4 w-4" />Export CSV
             </Button>
           </div>
-          <TopStudents data={data.topStudents} />
+          <TopStudents data={data.topStudents} termInfo={currentTermInfo} />
         </TabsContent>
-        <TabsContent value="grades" className="mt-4"><GradeDistribution data={data.gradeDist} /></TabsContent>
+        
+        <TabsContent value="grades" className="mt-4">
+          <GradeDistribution data={data.gradeDist} termInfo={currentTermInfo} />
+        </TabsContent>
       </Tabs>
     </div>
   )

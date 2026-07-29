@@ -18,7 +18,7 @@ import {
   Loader2, Award, CheckCircle2, XCircle, Search, TrendingUp, TrendingDown,
   Target, Trophy, ChevronRight, GraduationCap, BarChart3, Filter,
   ArrowUpDown, FileText, RefreshCw, Home, ArrowLeft, Activity, Clock,
-  Sparkles, ArrowUpRight, ChevronDown,
+  Sparkles, ArrowUpRight, ChevronDown, Calendar,
 } from 'lucide-react'
 import { format } from 'date-fns'
 import Link from 'next/link'
@@ -58,6 +58,8 @@ interface ExamResult {
   attempt_number: number
   passing_percentage?: number
   grade?: string
+  term?: string
+  academic_year?: string
 }
 
 interface SubjectPerformance {
@@ -194,9 +196,56 @@ const getInitials = (name: string) => {
 const formatDate = (d?: string) => d ? format(new Date(d), 'MMM dd, yyyy') : 'N/A'
 const formatTime = (d?: string) => d ? format(new Date(d), 'hh:mm a') : ''
 
-// ═══════════════════════════════════════════════════
-// STAT TILE - Fixed for mobile
-// ═══════════════════════════════════════════════════
+// ─── Term & Session ──────────────────────────────────
+const TERMS = [
+  { value: 'first', label: 'First Term' },
+  { value: 'second', label: 'Second Term' },
+  { value: 'third', label: 'Third Term' }
+]
+
+const getTermLabel = (value: string) => {
+  const found = TERMS.find(t => t.value === value)
+  return found ? found.label : value
+}
+
+const getAvailableSessions = (currentSession: string): string[] => {
+  if (!currentSession) return ['2025/2026', '2026/2027']
+  const year = parseInt(currentSession.split('/')[0])
+  return [`${year - 1}/${year}`, `${year}/${year + 1}`, `${year + 1}/${year + 2}`]
+}
+
+// ─── Fetch current term ──────────────────────────────
+async function fetchCurrentTermAndSession(): Promise<{ term: string; session: string }> {
+  try {
+    const { data: settings, error } = await supabase
+      .from('school_settings')
+      .select('current_term, current_session')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    if (error) {
+      console.error('Error fetching term settings:', error)
+      return { term: 'first', session: '2026/2027' }
+    }
+
+    if (settings) {
+      return {
+        term: settings.current_term || 'first',
+        session: settings.current_session || '2026/2027'
+      }
+    }
+    
+    return { term: 'first', session: '2026/2027' }
+  } catch (error) {
+    console.error('Error fetching current term:', error)
+    return { term: 'first', session: '2026/2027' }
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+// STAT TILE
+// ═══════════════════════════════════════════════════════
 function StatTile({
   label, value, icon: Icon, tone, subtitle, delay = 0, trend,
 }: {
@@ -255,9 +304,9 @@ function StatTile({
   )
 }
 
-// ═══════════════════════════════════════════════════
-// SUBJECT TILE - Fixed for mobile
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// SUBJECT TILE
+// ═══════════════════════════════════════════════════════
 function SubjectTile({
   perf, index, avgOverall, onClick,
 }: {
@@ -338,9 +387,9 @@ function SubjectTile({
   )
 }
 
-// ═══════════════════════════════════════════════════
-// RESULT ROW - Fixed mobile layout
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
+// RESULT ROW
+// ═══════════════════════════════════════════════════════
 function ResultRow({ result, index, onClick }: { result: ExamResult; index: number; onClick: () => void }) {
   const percentage = Number(result.percentage) || 0
   const grade = getWAECGrade(percentage)
@@ -409,6 +458,11 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
                       CA: {result.ca1_score}+{result.ca2_score}
                     </span>
                   )}
+                  {result.term && (
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 whitespace-nowrap">
+                      {getTermLabel(result.term)}
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -452,9 +506,9 @@ function ResultRow({ result, index, onClick }: { result: ExamResult; index: numb
   )
 }
 
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 // MAIN PAGE
-// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════
 export default function StudentResultsPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
@@ -471,6 +525,15 @@ export default function StudentResultsPage() {
   const [subjectPerformance, setSubjectPerformance] = useState<SubjectPerformance[]>([])
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([])
   const [showAllSubjects, setShowAllSubjects] = useState(false)
+  
+  // ✅ DYNAMIC TERM/SESSION
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
+  const [isLoadingTerm, setIsLoadingTerm] = useState(true)
+  const [selectedTerm, setSelectedTerm] = useState('')
+  const [selectedSession, setSelectedSession] = useState('')
+  const [availableSessions, setAvailableSessions] = useState<string[]>(['2025/2026', '2026/2027'])
+
   const [stats, setStats] = useState({
     totalExams: 0,
     passedExams: 0,
@@ -481,7 +544,21 @@ export default function StudentResultsPage() {
     pendingResults: 0,
   })
 
-  // AUTH
+  // ─── Fetch current term ──────────────────────────────
+  useEffect(() => {
+    const loadTerm = async () => {
+      const { term, session } = await fetchCurrentTermAndSession()
+      setCurrentTerm(term)
+      setCurrentSession(session)
+      setSelectedTerm(term)
+      setSelectedSession(session)
+      setAvailableSessions(getAvailableSessions(session))
+      setIsLoadingTerm(false)
+    }
+    loadTerm()
+  }, [])
+
+  // ─── AUTH ───────────────────────────────────────────
   useEffect(() => {
     let m = true
     const check = async () => {
@@ -524,20 +601,23 @@ export default function StudentResultsPage() {
     return () => { m = false }
   }, [router])
 
-  // LOAD RESULTS
+  // ─── LOAD RESULTS ──────────────────────────────────
   const loadResults = useCallback(async (showToast = false) => {
     if (!profile?.id) return
+    if (!selectedTerm || !selectedSession) return
     if (showToast) setRefreshing(true)
     else setLoading(true)
 
     try {
-      const { data: attemptsData } = await supabase
+      // ✅ Step 1: Get all exam attempts for the student
+      const { data: attemptsData, error: attemptsError } = await supabase
         .from('exam_attempts')
         .select('*')
         .eq('student_id', profile.id)
         .order('created_at', { ascending: false })
 
-      if (!attemptsData?.length) {
+      if (attemptsError) {
+        console.error('Attempts error:', attemptsError)
         setResults([])
         setFilteredResults([])
         setSubjectPerformance([])
@@ -548,37 +628,81 @@ export default function StudentResultsPage() {
         return
       }
 
-      const examIds = [...new Set(attemptsData.map((a) => a.exam_id))]
-      const { data: examsData } = await supabase
+      if (!attemptsData || attemptsData.length === 0) {
+        setResults([])
+        setFilteredResults([])
+        setSubjectPerformance([])
+        setAvailableSubjects([])
+        setStats({ totalExams: 0, passedExams: 0, failedExams: 0, averageScore: 0, highestScore: 0, lowestScore: 100, pendingResults: 0 })
+        setLoading(false)
+        setRefreshing(false)
+        return
+      }
+
+      // ✅ Step 2: Get exam details
+      const examIds = [...new Set(attemptsData.map((a) => a.exam_id).filter(Boolean))]
+      const { data: examsData, error: examsError } = await supabase
         .from('exams')
-        .select('id,title,subject,passing_percentage,objective_max,theory_max,total_marks')
+        .select('id, title, subject, passing_percentage, objective_max, theory_max, total_marks, term, session_year')
         .in('id', examIds)
+
+      if (examsError) {
+        console.error('Exams error:', examsError)
+        setResults([])
+        setFilteredResults([])
+        setSubjectPerformance([])
+        setAvailableSubjects([])
+        setStats({ totalExams: 0, passedExams: 0, failedExams: 0, averageScore: 0, highestScore: 0, lowestScore: 100, pendingResults: 0 })
+        setLoading(false)
+        setRefreshing(false)
+        return
+      }
+
+      // ✅ Step 3: Build exam map
       const examMap: Record<string, any> = {}
       examsData?.forEach((e) => { examMap[e.id] = e })
 
+      // ✅ Step 4: Filter by term/session
+      const filteredAttempts = attemptsData.filter((a) => {
+        const exam = examMap[a.exam_id]
+        return exam?.term === selectedTerm && exam?.session_year === selectedSession
+      })
+
+      if (!filteredAttempts.length) {
+        setResults([])
+        setFilteredResults([])
+        setSubjectPerformance([])
+        setAvailableSubjects([])
+        setStats({ totalExams: 0, passedExams: 0, failedExams: 0, averageScore: 0, highestScore: 0, lowestScore: 100, pendingResults: 0 })
+        setLoading(false)
+        setRefreshing(false)
+        return
+      }
+
+      // ✅ Step 5: Get CA scores
       const { data: caScoresData } = await supabase
         .from('ca_scores')
-        .select('exam_id,ca1_score,ca2_score,total_score,percentage,grade,subject,term,academic_year')
+        .select('exam_id, ca1_score, ca2_score, total_score, percentage, grade, subject, term, academic_year')
         .eq('student_id', profile.id)
+        .eq('term', selectedTerm)
+        .eq('academic_year', selectedSession)
+
       const caScoresMap: Record<string, any> = {}
       caScoresData?.forEach((ca) => {
         if (ca.exam_id) caScoresMap[ca.exam_id] = ca
-        if (ca.subject) {
-          const k = `${ca.subject}_${ca.term || 'third'}_${ca.academic_year || '2025/2026'}`
-          caScoresMap[k] = ca
-        }
       })
 
+      // ✅ Step 6: Build results
       const completedResults: ExamResult[] = []
       const subjectScores: Record<string, number[]> = {}
       let totalPct = 0, passedCount = 0, failedCount = 0, highestScore = 0, lowestScore = 100
 
-      for (const attempt of attemptsData) {
+      for (const attempt of filteredAttempts) {
         if (!['completed', 'graded', 'pending_theory'].includes(attempt.status)) continue
         const exam = examMap[attempt.exam_id]
-        let ca = caScoresMap[attempt.exam_id]
-        if (!ca && exam) ca = caScoresMap[`${exam.subject}_third_2025/2026`]
+        if (!exam) continue
 
+        const ca = caScoresMap[attempt.exam_id]
         const hasCA = !!(ca?.ca1_score || ca?.ca2_score)
         const objectiveMax = exam?.objective_max || 30
         const objectiveScore = Number(attempt.objective_score) || 0
@@ -595,9 +719,12 @@ export default function StudentResultsPage() {
           const examTotal = objectiveScore + theoryScore
           totalScore = Math.round((examTotal / 60) * 100)
           percentage = totalScore
-        } else {
+        } else if (objectiveScore > 0 && objectiveMax > 0) {
           totalScore = Math.round((objectiveScore / objectiveMax) * 100)
           percentage = totalScore
+        } else {
+          totalScore = 0
+          percentage = 0
         }
 
         percentage = Math.min(Math.max(Number(percentage) || 0, 0), 100)
@@ -625,6 +752,8 @@ export default function StudentResultsPage() {
           attempt_number: attempt.attempt_number || 1,
           passing_percentage: exam?.passing_percentage || 40,
           grade: getWAECGrade(percentage),
+          term: selectedTerm,
+          academic_year: selectedSession,
         })
 
         const subj = exam?.subject || 'Unknown'
@@ -637,6 +766,7 @@ export default function StudentResultsPage() {
         if (percentage < lowestScore) lowestScore = percentage
       }
 
+      // ✅ Step 7: Calculate performance
       const performance = Object.entries(subjectScores)
         .filter(([, scores]) => scores.length > 0)
         .map(([subject, scores]) => {
@@ -677,14 +807,18 @@ export default function StudentResultsPage() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [profile?.id])
+  }, [profile?.id, selectedTerm, selectedSession])
 
+  // ─── Load when term/session changes ────────────────
   useEffect(() => {
-    if (!authChecking && profile) loadResults()
-  }, [authChecking, profile, loadResults])
+    if (!authChecking && profile && selectedTerm && selectedSession && !isLoadingTerm) {
+      loadResults()
+    }
+  }, [authChecking, profile, selectedTerm, selectedSession, isLoadingTerm, loadResults])
 
+  // ─── Real-time subscriptions ────────────────────────
   useEffect(() => {
-    if (!profile?.id) return
+    if (!profile?.id || !selectedTerm || !selectedSession) return
     const ch1 = supabase.channel('r-att')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts', filter: `student_id=eq.${profile.id}` }, () => loadResults(true))
       .subscribe()
@@ -692,8 +826,9 @@ export default function StudentResultsPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ca_scores', filter: `student_id=eq.${profile.id}` }, () => loadResults(true))
       .subscribe()
     return () => { ch1.unsubscribe(); ch2.unsubscribe() }
-  }, [profile?.id, loadResults])
+  }, [profile?.id, selectedTerm, selectedSession, loadResults])
 
+  // ─── Filter results ─────────────────────────────────
   useEffect(() => {
     let f = [...results]
     if (subjectFilter !== 'all') f = f.filter((r) => r.exam_subject === subjectFilter)
@@ -721,8 +856,8 @@ export default function StudentResultsPage() {
   const overallGrade = getSimpleGrade(stats.averageScore)
   const passRate = stats.totalExams > 0 ? Math.round((stats.passedExams / stats.totalExams) * 100) : 0
 
-  // LOADING
-  if (authChecking || loading) {
+  // ─── Loading ────────────────────────────────────────
+  if (authChecking || loading || isLoadingTerm) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-x-hidden">
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
@@ -748,7 +883,6 @@ export default function StudentResultsPage() {
   const hasMoreSubjects = subjectPerformance.length > 8
 
   return (
-    // ✅ FIX: overflow-x-hidden on root prevents horizontal bleed
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20 overflow-x-hidden">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
 
@@ -770,7 +904,89 @@ export default function StudentResultsPage() {
         )}>
           <div className="w-full px-3 sm:px-4 lg:px-6 py-4 sm:py-6 max-w-7xl mx-auto">
 
-            {/* Sync indicator */}
+            {/* ─── Header ─────────────────────────────── */}
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 flex flex-wrap items-center justify-between gap-2"
+            >
+              <div className="flex items-center gap-1.5 text-sm text-slate-400 min-w-0">
+                <Link href="/student" className="hover:text-slate-700 flex items-center gap-1 transition-colors shrink-0">
+                  <Home className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline text-xs">Dashboard</span>
+                </Link>
+                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                <span className="text-slate-800 font-bold text-xs sm:text-sm truncate">My Results</span>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Select value={selectedTerm} onValueChange={setSelectedTerm}>
+                  <SelectTrigger className="h-8 text-xs border-slate-200 rounded-lg w-[110px] font-semibold">
+                    <Calendar className="h-3 w-3 text-slate-400 mr-1 shrink-0" />
+                    <SelectValue placeholder="Term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {TERMS.map(term => (
+                      <SelectItem key={term.value} value={term.value} className="text-xs">
+                        {term.label}
+                        {term.value === currentTerm && ' (current)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedSession} onValueChange={setSelectedSession}>
+                  <SelectTrigger className="h-8 text-xs border-slate-200 rounded-lg w-[110px] font-semibold">
+                    <Calendar className="h-3 w-3 text-slate-400 mr-1 shrink-0" />
+                    <SelectValue placeholder="Session" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableSessions.map(session => (
+                      <SelectItem key={session} value={session} className="text-xs">
+                        {session}
+                        {session === currentSession && ' (current)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => loadResults(true)}
+                  className="h-8 text-xs gap-1 border-slate-200 hover:border-slate-300 rounded-lg font-semibold px-2 sm:px-3 shrink-0"
+                >
+                  <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
+                  <span className="hidden sm:inline">Refresh</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/student')}
+                  className="h-8 text-xs gap-1 border-slate-200 rounded-lg font-semibold px-2 sm:px-3 shrink-0"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  <span className="hidden sm:inline">Back</span>
+                </Button>
+              </div>
+            </motion.div>
+
+            {/* ─── Current Term Info ─────────────────── */}
+            {currentTerm && currentSession && (
+              <div className="mb-4 flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+                <Calendar className="h-3 w-3 text-slate-400" />
+                <span className="font-medium">Current:</span>
+                <span className="font-semibold text-slate-700">{getTermLabel(currentTerm)}</span>
+                <span className="text-slate-300">·</span>
+                <span className="font-semibold text-slate-700">{currentSession}</span>
+                {selectedTerm !== currentTerm && (
+                  <span className="ml-2 text-amber-600 font-medium">
+                    (Viewing {getTermLabel(selectedTerm)})
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* ─── Sync indicator ────────────────────── */}
             <AnimatePresence>
               {refreshing && (
                 <motion.div
@@ -785,110 +1001,40 @@ export default function StudentResultsPage() {
               )}
             </AnimatePresence>
 
-            {/* Breadcrumb */}
-            <motion.div
-              initial={{ opacity: 0, y: -8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mb-4 flex items-center justify-between gap-2"
-            >
-              <div className="flex items-center gap-1.5 text-sm text-slate-400 min-w-0">
-                <Link href="/student" className="hover:text-slate-700 flex items-center gap-1 transition-colors shrink-0">
-                  <Home className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline text-xs">Dashboard</span>
-                </Link>
-                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-slate-800 font-bold text-xs sm:text-sm truncate">My Results</span>
-              </div>
-              <div className="flex gap-1.5 shrink-0">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => loadResults(true)}
-                  className="h-8 text-xs gap-1 border-slate-200 hover:border-slate-300 rounded-lg font-semibold px-2 sm:px-3"
-                >
-                  <RefreshCw className={cn('h-3 w-3', refreshing && 'animate-spin')} />
-                  <span className="hidden sm:inline">Refresh</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => router.push('/student')}
-                  className="h-8 text-xs gap-1 border-slate-200 rounded-lg font-semibold px-2 sm:px-3"
-                >
-                  <ArrowLeft className="h-3 w-3" />
-                  <span className="hidden sm:inline">Back</span>
-                </Button>
-              </div>
-            </motion.div>
-
-            {/* ✅ FIXED HERO BANNER - No more static/glitch */}
+            {/* ─── Hero Banner ───────────────────────── */}
             <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-5 sm:mb-6">
-              {/* ✅ KEY FIX: isolate + transform-gpu + contain-paint prevent mobile GPU glitches */}
               <div
                 className="relative rounded-2xl overflow-hidden shadow-xl isolate"
-                style={{
-                  transform: 'translateZ(0)',
-                  WebkitTransform: 'translateZ(0)',
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                  contain: 'paint',
-                }}
+                style={{ transform: 'translateZ(0)', WebkitTransform: 'translateZ(0)', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', contain: 'paint' }}
               >
-                {/* Solid gradient background - no blur */}
                 <div className="absolute inset-0 bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900" />
-
-                {/* ✅ Decorative blurs - reduced size, pointer-events-none, contained */}
-                <div
-                  className="absolute top-0 right-0 w-40 h-40 bg-blue-500/15 rounded-full blur-2xl pointer-events-none"
-                  style={{ transform: 'translateZ(0)' }}
-                />
-                <div
-                  className="absolute bottom-0 left-0 w-28 h-28 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"
-                  style={{ transform: 'translateZ(0)' }}
-                />
-
-                {/* Content */}
                 <div className="relative p-4 sm:p-6 lg:p-8">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-5">
-
                     <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                      {/* Avatar - simplified, no blur glow */}
                       <div className="relative shrink-0">
-                        <Avatar className={cn(
-                          "relative h-14 w-14 sm:h-20 sm:w-20 ring-2 sm:ring-4 shadow-xl",
-                          "ring-amber-400/40"
-                        )}>
+                        <Avatar className={cn("relative h-14 w-14 sm:h-20 sm:w-20 ring-2 sm:ring-4 shadow-xl ring-amber-400/40")}>
                           <AvatarImage src={profile?.photo_url || undefined} />
                           <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-lg sm:text-2xl font-black">
                             {profile?.full_name ? getInitials(profile.full_name) : 'S'}
                           </AvatarFallback>
                         </Avatar>
                       </div>
-
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1 mb-1">
                           <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-amber-300 shrink-0" />
                           <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-blue-200/80 truncate">
-                            Academic Results
+                            {getTermLabel(selectedTerm)} Results
                           </span>
                         </div>
                         <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-white leading-tight">
                           {profile?.first_name || profile?.full_name?.split(' ')[0] || 'Hello'}&apos;s{' '}
-                          <span className="text-amber-300">
-                            Results
-                          </span>
+                          <span className="text-amber-300">Results</span>
                         </h1>
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                           {profile?.class && (
                             <span className="flex items-center gap-1 text-xs text-gray-300 font-medium">
                               <GraduationCap className="h-3 w-3 text-blue-300/60 shrink-0" />
                               <span className="truncate max-w-[120px]">{profile.class}</span>
-                            </span>
-                          )}
-                          {profile?.department && (
-                            <span className="flex items-center gap-1 text-xs text-gray-300 font-medium">
-                              <span className="h-1 w-1 rounded-full bg-blue-300/40 shrink-0" />
-                              <span className="truncate max-w-[100px]">{profile.department}</span>
                             </span>
                           )}
                           <span className="text-xs text-gray-300 font-medium">
@@ -898,40 +1044,25 @@ export default function StudentResultsPage() {
                       </div>
                     </div>
 
-                    {/* ✅ Grade badge - replaced gradient p-[2px] wrapper with solid border */}
                     {stats.totalExams > 0 && (
                       <div className="flex items-center gap-3 sm:flex-col sm:items-center sm:gap-1 shrink-0">
-                        <div className={cn(
-                          "relative rounded-xl border-2 shadow-xl bg-slate-900/95",
-                          overallGrade.border
-                        )}>
+                        <div className={cn("relative rounded-xl border-2 shadow-xl bg-slate-900/95", overallGrade.border)}>
                           <div className="rounded-xl px-4 sm:px-6 py-2 sm:py-3 flex flex-col items-center min-w-[90px] sm:min-w-[110px]">
-                            <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/50 mb-0.5 sm:mb-1">
-                              Overall
-                            </p>
-                            <p className={cn('text-3xl sm:text-4xl font-black leading-none', overallGrade.text)}>
-                              {overallGrade.grade}
-                            </p>
-                            <p className={cn('text-xs sm:text-sm font-bold mt-0.5 sm:mt-1 opacity-80', overallGrade.text)}>
-                              {stats.averageScore}%
-                            </p>
+                            <p className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest text-white/50 mb-0.5 sm:mb-1">Overall</p>
+                            <p className={cn('text-3xl sm:text-4xl font-black leading-none', overallGrade.text)}>{overallGrade.grade}</p>
+                            <p className={cn('text-xs sm:text-sm font-bold mt-0.5 sm:mt-1 opacity-80', overallGrade.text)}>{stats.averageScore}%</p>
                           </div>
                         </div>
-                        <p className="text-xs text-blue-200/70 font-semibold sm:text-center">
-                          {overallGrade.label}
-                        </p>
+                        <p className="text-xs text-blue-200/70 font-semibold sm:text-center">{overallGrade.label}</p>
                       </div>
                     )}
                   </div>
 
-                  {/* Pass rate */}
                   {stats.totalExams > 0 && (
                     <div className="mt-4 pt-4 border-t border-white/15">
                       <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs sm:text-sm text-gray-300">Pass Rate</span>
-                        <span className="text-xs sm:text-sm text-gray-300">
-                          {stats.passedExams}/{stats.totalExams} passed
-                        </span>
+                        <span className="text-xs sm:text-sm text-gray-300">{stats.passedExams}/{stats.totalExams} passed</span>
                       </div>
                       <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
                         <motion.div
@@ -947,52 +1078,28 @@ export default function StudentResultsPage() {
               </div>
             </motion.div>
 
-            {/* Stats Grid */}
+            {/* ─── Stats Grid ────────────────────────── */}
             <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5 mb-5 sm:mb-6">
               <StatTile label="Total" value={stats.totalExams} icon={FileText} tone="blue" delay={0.05} />
-              <StatTile
-                label="Passed"
-                value={stats.passedExams}
-                icon={CheckCircle2}
-                tone="emerald"
-                delay={0.08}
-                subtitle={`${passRate}%`}
-                trend="up"
-              />
+              <StatTile label="Passed" value={stats.passedExams} icon={CheckCircle2} tone="emerald" delay={0.08} subtitle={`${passRate}%`} trend="up" />
               <StatTile label="Failed" value={stats.failedExams} icon={XCircle} tone="red" delay={0.11} />
               <StatTile label="Average" value={`${stats.averageScore}%`} icon={Target} tone="amber" delay={0.14} />
               <StatTile label="Highest" value={`${stats.highestScore}%`} icon={Trophy} tone="purple" delay={0.17} />
               <StatTile label="Lowest" value={`${stats.lowestScore}%`} icon={Activity} tone="slate" delay={0.2} />
             </div>
 
-            {/* Subject Performance */}
+            {/* ─── Subject Performance ────────────────── */}
             {subjectPerformance.length > 0 && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.22 }}
-                className="mb-5 sm:mb-6"
-              >
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.22 }} className="mb-5 sm:mb-6">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2 min-w-0">
                     <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-slate-700 shrink-0" />
                     <h2 className="text-sm sm:text-base font-bold text-slate-800 truncate">Subject Performance</h2>
-                    <span className="text-xs text-slate-400 font-medium shrink-0">
-                      ({subjectPerformance.length})
-                    </span>
+                    <span className="text-xs text-slate-400 font-medium shrink-0">({subjectPerformance.length})</span>
                   </div>
                   {hasMoreSubjects && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowAllSubjects(!showAllSubjects)}
-                      className="text-xs font-semibold text-slate-500 hover:text-slate-700 gap-1 h-7 px-2 sm:px-3 shrink-0"
-                    >
-                      {showAllSubjects ? (
-                        <>Less <ChevronDown className="h-3 w-3 rotate-180" /></>
-                      ) : (
-                        <>+{subjectPerformance.length - 8} more <ChevronDown className="h-3 w-3" /></>
-                      )}
+                    <Button variant="ghost" size="sm" onClick={() => setShowAllSubjects(!showAllSubjects)} className="text-xs font-semibold text-slate-500 hover:text-slate-700 gap-1 h-7 px-2 sm:px-3 shrink-0">
+                      {showAllSubjects ? <>Less <ChevronDown className="h-3 w-3 rotate-180" /></> : <>+{subjectPerformance.length - 8} more <ChevronDown className="h-3 w-3" /></>}
                     </Button>
                   )}
                 </div>
@@ -1014,13 +1121,8 @@ export default function StudentResultsPage() {
               </motion.div>
             )}
 
-            {/* Filters */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.25 }}
-              className="mb-4 space-y-2.5"
-            >
+            {/* ─── Filters ────────────────────────────── */}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }} className="mb-4 space-y-2.5">
               <Tabs value={activeTab} onValueChange={setActiveTab}>
                 <TabsList className="bg-white border border-slate-200 shadow-sm p-0.5 rounded-xl h-auto gap-0.5 w-full sm:w-auto">
                   {[
@@ -1038,9 +1140,7 @@ export default function StudentResultsPage() {
                       <span className={cn(
                         'text-[10px] px-1.5 py-0 rounded-full font-black min-w-[18px] text-center',
                         activeTab === tab.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                      )}>
-                        {tab.count}
-                      </span>
+                      )}>{tab.count}</span>
                     </TabsTrigger>
                   ))}
                 </TabsList>
@@ -1049,12 +1149,7 @@ export default function StudentResultsPage() {
               <div className="flex items-center gap-2">
                 <div className="relative flex-1 min-w-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-                  <Input
-                    placeholder="Search..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-8 h-9 text-sm bg-white border-slate-200 rounded-lg font-medium w-full"
-                  />
+                  <Input placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8 h-9 text-sm bg-white border-slate-200 rounded-lg font-medium w-full" />
                 </div>
                 <Select value={subjectFilter} onValueChange={setSubjectFilter}>
                   <SelectTrigger className="w-[100px] sm:w-[130px] h-9 text-xs bg-white border-slate-200 rounded-lg font-semibold shrink-0">
@@ -1081,39 +1176,12 @@ export default function StudentResultsPage() {
                   </SelectContent>
                 </Select>
               </div>
-
-              {(searchQuery || subjectFilter !== 'all') && (
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] text-slate-500 font-bold uppercase tracking-wide">Active:</span>
-                  {searchQuery && (
-                    <button
-                      onClick={() => setSearchQuery('')}
-                      className="flex items-center gap-1 text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full transition-colors font-bold"
-                    >
-                      &quot;{searchQuery}&quot; ×
-                    </button>
-                  )}
-                  {subjectFilter !== 'all' && (
-                    <button
-                      onClick={() => setSubjectFilter('all')}
-                      className="flex items-center gap-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 px-2 py-0.5 rounded-full transition-colors font-bold max-w-[150px] truncate"
-                    >
-                      {subjectFilter} ×
-                    </button>
-                  )}
-                </div>
-              )}
             </motion.div>
 
-            {/* Results List */}
+            {/* ─── Results List ───────────────────────── */}
             <AnimatePresence mode="wait">
               {filteredResults.length === 0 ? (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0, scale: 0.97 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.97 }}
-                >
+                <motion.div key="empty" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.97 }}>
                   <div className="bg-white rounded-2xl border border-slate-200/60 shadow-sm py-12 sm:py-14 text-center px-4">
                     <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center mx-auto mb-4">
                       <Award className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400" />
@@ -1127,33 +1195,17 @@ export default function StudentResultsPage() {
                         : 'Try adjusting your filters or search query'}
                     </p>
                     {results.length > 0 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-4 text-xs h-8 rounded-lg font-semibold"
-                        onClick={() => {
-                          setSearchQuery('')
-                          setSubjectFilter('all')
-                          setActiveTab('all')
-                        }}
-                      >
+                      <Button variant="outline" size="sm" className="mt-4 text-xs h-8 rounded-lg font-semibold" onClick={() => { setSearchQuery(''); setSubjectFilter('all'); setActiveTab('all') }}>
                         Clear all filters
                       </Button>
                     )}
                   </div>
                 </motion.div>
               ) : (
-                <motion.div
-                  key="list"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="space-y-2 sm:space-y-2.5"
-                >
+                <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="space-y-2 sm:space-y-2.5">
                   <div className="flex items-center justify-between px-1 mb-2">
                     <p className="text-xs text-slate-500 font-semibold">
-                      <span className="font-black text-slate-800">{filteredResults.length}</span> result
-                      {filteredResults.length !== 1 ? 's' : ''}
+                      <span className="font-black text-slate-800">{filteredResults.length}</span> result{filteredResults.length !== 1 ? 's' : ''}
                     </p>
                     {activeTab !== 'all' && (
                       <span className="text-xs font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">

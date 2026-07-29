@@ -1,4 +1,4 @@
-// components/staff/exams/ExamList.tsx - COMPLETE FIXED VERSION
+// components/staff/exams/ExamList.tsx - COMPLETE FIXED VERSION WITH TERM INFO
 
 'use client'
 
@@ -38,6 +38,7 @@ import {
   FileText,
   Users,
   Award,
+  Calendar,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
@@ -74,12 +75,18 @@ interface ExamListProps {
   onDeleteExam: (id: string) => Promise<void> | void
   onDuplicateExam: (id: string) => Promise<void> | void
   onSubmitForApproval: (id: string) => Promise<void> | void
-  onViewSubmissions?: (id: string) => void  // ✅ ADDED
-  onEnterScores?: (id: string) => void      // ✅ ADDED
+  onViewSubmissions?: (id: string) => void
+  onEnterScores?: (id: string) => void
   totalExams: number
   draftCount: number
   pendingCount: number
   publishedCount: number
+  termInfo?: {  // ✅ Added
+    termName: string
+    sessionYear: string
+    termCode: string
+    isCurrent: boolean
+  }
 }
 
 const getStatusBadge = (status: string) => {
@@ -115,12 +122,13 @@ export function ExamList({
   onDeleteExam,
   onDuplicateExam,
   onSubmitForApproval,
-  onViewSubmissions,    // ✅ ADDED
-  onEnterScores,        // ✅ ADDED
+  onViewSubmissions,
+  onEnterScores,
   totalExams,
   draftCount,
   pendingCount,
-  publishedCount
+  publishedCount,
+  termInfo,  // ✅ Added
 }: ExamListProps) {
   const router = useRouter()
   const [duplicating, setDuplicating] = useState<string | null>(null)
@@ -146,7 +154,6 @@ export function ExamList({
     setDuplicating(null)
   }
 
-  // ✅ Navigation handlers
   const handleViewSubmissions = (examId: string) => {
     if (onViewSubmissions) {
       onViewSubmissions(examId)
@@ -183,6 +190,22 @@ export function ExamList({
           Create Exam
         </Button>
       </div>
+
+      {/* ✅ Term Info Banner */}
+      {termInfo && termInfo.termName && (
+        <div className="flex items-center gap-2 text-xs text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 shadow-sm">
+          <Calendar className="h-3.5 w-3.5 text-emerald-600" />
+          <span className="font-medium text-slate-700 dark:text-slate-300">{termInfo.termName}</span>
+          <span className="text-slate-300">·</span>
+          <span className="font-medium text-slate-700 dark:text-slate-300">{termInfo.sessionYear}</span>
+          {termInfo.isCurrent && (
+            <Badge className="ml-1 bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">
+              Current
+            </Badge>
+          )}
+          <span className="text-slate-300 ml-auto">📚 {exams.length} exam{exams.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
@@ -241,6 +264,7 @@ export function ExamList({
               <CardTitle className="text-base sm:text-lg text-slate-900 dark:text-white">All Exams</CardTitle>
               <CardDescription className="text-xs sm:text-sm mt-0.5">
                 {exams.length} exam{exams.length !== 1 ? 's' : ''} total
+                {termInfo && termInfo.termName && ` · ${termInfo.termName}`}
               </CardDescription>
             </div>
           </div>
@@ -255,7 +279,9 @@ export function ExamList({
                 No exams found
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                Try adjusting your search or create a new exam
+                {termInfo && termInfo.termName 
+                  ? `No exams for ${termInfo.termName} ${termInfo.sessionYear}`
+                  : 'Try adjusting your search or create a new exam'}
               </p>
               <Button onClick={onCreateExam} variant="link" className="mt-3 text-emerald-600 text-sm">
                 <PlusCircle className="mr-1 h-3.5 w-3.5" />
@@ -294,7 +320,6 @@ export function ExamList({
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] sm:text-xs text-slate-400">{formatDate(exam.created_at)}</span>
                       <div className="flex items-center gap-0.5 sm:gap-1">
-                        {/* ✅ View Submissions Button */}
                         {(exam.status === 'published' || exam.status === 'pending') && (
                           <Button 
                             variant="ghost" 
@@ -403,7 +428,6 @@ export function ExamList({
                         <TableCell className="text-sm text-slate-500">{formatDate(exam.created_at)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
-                            {/* ✅ View Submissions Button */}
                             {(exam.status === 'published' || exam.status === 'pending') && (
                               <Button 
                                 variant="ghost" 

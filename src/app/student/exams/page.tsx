@@ -1,4 +1,5 @@
-// src/app/student/exams/page.tsx
+// src/app/student/exams/page.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -28,6 +29,11 @@ export default function StudentExamsPage() {
     selectedTermSession, stats, loadData, handleTermSessionChange,
   } = useExamsData(router)
 
+  const normalizedStats = {
+    ...stats,
+    subjectStats: stats.subjectStats ?? [],
+  }
+
   const {
     searchQuery, setSearchQuery, selectedSubject, setSelectedSubject,
     viewMode, setViewMode, activeTab, setActiveTab, filteredExams,
@@ -40,34 +46,58 @@ export default function StudentExamsPage() {
     const attempt = examAttempts[examId]
     router.push(attempt?.status === 'in_progress' ? `/student/exam/${examId}?resume=true` : `/student/exam/${examId}`)
   }
+  
   const handleViewResult = (examId: string) => router.push(`/student/results/${examId}`)
+  
   const handleLogout = async () => {
     await supabase.auth.signOut({ scope: 'local' })
     toast.success('Logged out successfully')
     router.push('/portal')
   }
+  
   const handleTabChange = (tab: string) => {
     if (tab === 'overview') router.push('/student')
     if (tab === 'results') router.push('/student/results')
     if (tab === 'classmates') router.push('/student/classmates')
   }
+  
   const handleRefresh = useCallback(() => {
     if (selectedTermSession) loadData(selectedTermSession.term, selectedTermSession.session_year)
     else loadData()
   }, [loadData, selectedTermSession])
 
+  // ✅ FIXED: Include all completion statuses for completed tab
   const displayedExams = filteredExams.filter((exam) => {
+    const status = getExamStatus(exam)
     switch (activeTab) {
-      case 'available': return getExamStatus(exam) === 'available'
-      case 'completed': return getExamStatus(exam) === 'completed'
-      case 'upcoming': return getExamStatus(exam) === 'upcoming'
-      default: return true
+      case 'available': 
+        return status === 'available' || status === 'in_progress'
+      case 'completed': 
+        // ✅ Include graded and pending_theory as completed
+        return status === 'completed' || status === 'graded' || status === 'pending_theory'
+      case 'upcoming': 
+        return status === 'upcoming'
+      case 'expired':
+        return status === 'expired'
+      default: 
+        return true
     }
   })
 
-  const availableCount = filteredExams.filter(e => getExamStatus(e) === 'available').length
+  // ✅ FIXED: Updated counts with all statuses
+  const availableCount = filteredExams.filter(e => {
+    const status = getExamStatus(e)
+    return status === 'available' || status === 'in_progress'
+  }).length
+
   const upcomingCount = filteredExams.filter(e => getExamStatus(e) === 'upcoming').length
-  const completedCount = filteredExams.filter(e => getExamStatus(e) === 'completed').length
+
+  const completedCount = filteredExams.filter(e => {
+    const status = getExamStatus(e)
+    return status === 'completed' || status === 'graded' || status === 'pending_theory'
+  }).length
+
+  const expiredCount = filteredExams.filter(e => getExamStatus(e) === 'expired').length
 
   if (!mounted || loading) {
     return (
@@ -106,13 +136,50 @@ export default function StudentExamsPage() {
         <div className={cn('flex-1 transition-all duration-300 overflow-x-hidden', sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72')}>
           <main className="pt-[72px] lg:pt-24 pb-20 px-3 sm:px-5 lg:px-8">
             <div className="max-w-7xl mx-auto">
-              <ExamsHeader profile={profile} stats={stats} onBackToDashboard={() => router.push('/student')} />
-              <TermProgressCard stats={stats} availableTerms={availableTerms} selectedTermSession={selectedTermSession} onTermChange={handleTermSessionChange} onRefresh={handleRefresh} />
-              <SubjectFilter availableSubjects={availableSubjects} selectedSubject={selectedSubject} onSubjectChange={setSelectedSubject} searchQuery={searchQuery} onSearchChange={setSearchQuery} viewMode={viewMode} onViewModeChange={setViewMode} exams={exams} examAttempts={examAttempts} getSubjectConfig={getSubjectConfig} />
-              <ExamTabs activeTab={activeTab} onTabChange={setActiveTab} availableCount={availableCount} upcomingCount={upcomingCount} completedCount={completedCount} />
+              <ExamsHeader profile={profile} stats={normalizedStats} onBackToDashboard={() => router.push('/student')} />
+              
+              <TermProgressCard 
+                stats={normalizedStats} 
+                availableTerms={availableTerms} 
+                selectedTermSession={selectedTermSession} 
+                onTermChange={handleTermSessionChange} 
+                onRefresh={handleRefresh} 
+              />
+              
+              <SubjectFilter 
+                availableSubjects={availableSubjects} 
+                selectedSubject={selectedSubject} 
+                onSubjectChange={setSelectedSubject} 
+                searchQuery={searchQuery} 
+                onSearchChange={setSearchQuery} 
+                viewMode={viewMode} 
+                onViewModeChange={setViewMode} 
+                exams={exams} 
+                examAttempts={examAttempts} 
+                getSubjectConfig={getSubjectConfig} 
+              />
+              
+              {/* ✅ Pass all counts including expired */}
+              <ExamTabs 
+                activeTab={activeTab} 
+                onTabChange={setActiveTab} 
+                availableCount={availableCount} 
+                upcomingCount={upcomingCount} 
+                completedCount={completedCount}
+                expiredCount={expiredCount}
+              />
+              
               {displayedExams.length === 0
-                ? <EmptyExamsState activeTab={activeTab} stats={stats} />
-                : <ExamList exams={displayedExams} examAttempts={examAttempts} viewMode={viewMode} getExamStatus={getExamStatus} getSubjectConfig={getSubjectConfig} onTakeExam={handleTakeExam} onViewResult={handleViewResult} />
+                ? <EmptyExamsState activeTab={activeTab} stats={normalizedStats} />
+                : <ExamList 
+                    exams={displayedExams} 
+                    examAttempts={examAttempts} 
+                    viewMode={viewMode} 
+                    getExamStatus={getExamStatus} 
+                    getSubjectConfig={getSubjectConfig} 
+                    onTakeExam={handleTakeExam} 
+                    onViewResult={handleViewResult} 
+                  />
               }
             </div>
           </main>

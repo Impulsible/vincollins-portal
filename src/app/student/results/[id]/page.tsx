@@ -1,8 +1,8 @@
-// app/student/results/[id]/page.tsx
+// app/student/results/[id]/page.tsx - COMPLETE FIXED VERSION
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { Header } from '@/components/layout/header'
 import { StudentSidebar } from '@/components/student/StudentSidebar'
@@ -32,6 +32,7 @@ interface ExamResult {
   is_passed: boolean; submitted_at: string; passing_percentage: number
   time_spent: number; correct_count: number; incorrect_count: number
   unanswered_count: number; teacher_feedback: string | null
+  term?: string; academic_year?: string
 }
 
 interface StudentProfile {
@@ -64,6 +65,16 @@ const fmtDate = (date?: string) => {
   if (!date) return '—'
   try { return new Date(date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) }
   catch { return '—' }
+}
+
+const getTermLabel = (value: string) => {
+  const terms = [
+    { value: 'first', label: 'First Term' },
+    { value: 'second', label: 'Second Term' },
+    { value: 'third', label: 'Third Term' }
+  ]
+  const found = terms.find(t => t.value === value)
+  return found ? found.label : value
 }
 
 // ─── Animated Score Ring ──────────────────────────────
@@ -161,6 +172,7 @@ function StatPill({ icon: Icon, label, value, color }: { icon: any; label: strin
 export default function StudentResultDetailPage() {
   const router = useRouter()
   const params = useParams()
+  const searchParams = useSearchParams()
   const examId = params.id as string
 
   const [loading, setLoading] = useState(true)
@@ -169,13 +181,17 @@ export default function StudentResultDetailPage() {
   const [result, setResult] = useState<ExamResult | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  // ─── FIXED: Load result with dynamic calculation ──
+  // ─── Load result with dynamic calculation ──
   const loadResult = useCallback(async () => {
     if (!examId) return
     setLoading(true); setError(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/portal'); return }
+
+      // ✅ Get term and session from URL query params
+      const term = searchParams.get('term') || ''
+      const sessionYear = searchParams.get('session') || ''
 
       const { data: pd } = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle()
       if (!pd) { setError('Profile not found'); setLoading(false); return }
@@ -189,41 +205,103 @@ export default function StudentResultDetailPage() {
         photo_url: pd.photo_url || undefined
       })
 
-      const { data: att } = await supabase.from('exam_attempts').select('*')
-        .eq('exam_id', examId).eq('student_id', session.user.id)
-        .order('created_at', { ascending: false }).limit(1).maybeSingle()
+      // ✅ STEP 1: Get the exam attempt (without join to avoid relationship issues)
+      let attemptQuery = supabase
+        .from('exam_attempts')
+        .select('*')
+        .eq('exam_id', examId)
+        .eq('student_id', session.user.id)
 
-      if (!att) { setError('No submission found for this exam'); setLoading(false); return }
+      // Apply term/session filters if provided (if the columns exist)
+      if (term) {
+        attemptQuery = attemptQuery.eq('term', term)
+      }
+      if (sessionYear) {
+        attemptQuery = attemptQuery.eq('academic_year', sessionYear)
+      }
 
-      const { data: exam } = await supabase.from('exams').select('*').eq('id', att.exam_id).maybeSingle()
+      let { data: att, error: attError } = await attemptQuery
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // ✅ Fallback: If no result with term/session, try without
+      if (!att) {
+        const { data: fallbackAtt, error: fallbackError } = await supabase
+          .from('exam_attempts')
+          .select('*')
+          .eq('exam_id', examId)
+          .eq('student_id', session.user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        if (fallbackError) {
+          console.error('Fallback error:', fallbackError)
+        }
+
+        if (!fallbackAtt) {
+          setError('No submission found for this exam')
+          setLoading(false)
+          return
+        }
+
+        att = fallbackAtt
+      }
+
+      if (attError && !att) {
+        console.error('Attempt error:', attError)
+        setError('Failed to load attempt data')
+        setLoading(false)
+        return
+      }
+
+      // ✅ STEP 2: Get exam details separately
+      const { data: exam, error: examError } = await supabase
+        .from('exams')
+        .select('*')
+        .eq('id', examId)
+        .maybeSingle()
+
+      if (examError) {
+        console.error('Exam error:', examError)
+      }
+
+      // ✅ STEP 3: Get CA scores
+      const { data: ca } = await supabase.from('ca_scores')
+        .select('ca1_score, ca2_score, total_score, percentage, grade')
+        .eq('student_id', session.user.id)
+        .eq('exam_id', examId)
+        .maybeSingle()
 
       // ✅ DYNAMICALLY CALCULATE objective_max from exam questions
       let objectiveMax = 0
 
       if (exam?.questions) {
-        const questions = typeof exam.questions === 'string' 
-          ? JSON.parse(exam.questions) 
-          : exam.questions
-        
-        if (Array.isArray(questions)) {
-          questions.forEach((q: any) => {
-            const marks = Number(q.marks || q.points || 0.5)
-            if (q.type !== 'theory' && !q.is_theory) {
-              objectiveMax += marks
-            }
-          })
+        try {
+          const questions = typeof exam.questions === 'string' 
+            ? JSON.parse(exam.questions) 
+            : exam.questions
+          
+          if (Array.isArray(questions)) {
+            questions.forEach((q: any) => {
+              const marks = Number(q.marks || q.points || 0.5)
+              if (q.type !== 'theory' && !q.is_theory) {
+                objectiveMax += marks
+              }
+            })
+          }
+        } catch (e) {
+          console.error('Error parsing questions:', e)
         }
       }
 
-      // ✅ If no questions found, use exam config as fallback
       if (objectiveMax === 0) objectiveMax = exam?.objective_max || 20
-
-      // ✅ Theory max is ALWAYS 60 - objectiveMax
       const theoryMax = 60 - objectiveMax
 
       let theoryScore: number | null = null
       let teacherFeedback: string | null = null
-      if (att.theory_feedback) {
+      if (att?.theory_feedback) {
         try {
           const fb = typeof att.theory_feedback === 'string' ? JSON.parse(att.theory_feedback) : att.theory_feedback
           if (fb?.total?.score !== undefined) theoryScore = Number(fb.total.score)
@@ -231,38 +309,30 @@ export default function StudentResultDetailPage() {
         } catch { /* ignore */ }
       }
 
-      const { data: ca } = await supabase.from('ca_scores')
-        .select('ca1_score, ca2_score, total_score, percentage, grade')
-        .eq('student_id', session.user.id).eq('exam_id', examId).maybeSingle()
-
       const ca1 = ca?.ca1_score != null ? Number(ca.ca1_score) : null
       const ca2 = ca?.ca2_score != null ? Number(ca.ca2_score) : null
       const hasCA = ca1 !== null && ca2 !== null
 
-      const objectiveScore = Number(att.objective_score) || 0
+      const objectiveScore = Number(att?.objective_score) || 0
       const theoryValue = theoryScore || 0
 
       const ca1Value = ca1 || 0
       const ca2Value = ca2 || 0
       const caTotal = ca1Value + ca2Value
 
-      // ✅ Grade Progression - Calculate based on what's available
       let percentage: number
       let totalScore: number
       let totalMarks: number
 
       if (hasCA) {
-        // ✅ CA + Objective + Theory (out of 100)
         totalScore = caTotal + objectiveScore + theoryValue
         totalMarks = 100
         percentage = Math.round((totalScore / totalMarks) * 100)
       } else if (theoryValue > 0) {
-        // ✅ Objective + Theory (out of 60)
         totalScore = objectiveScore + theoryValue
         totalMarks = 60
         percentage = Math.round((totalScore / totalMarks) * 100)
       } else {
-        // ✅ Only Objective (out of objectiveMax)
         totalScore = objectiveScore
         totalMarks = objectiveMax
         percentage = Math.round((totalScore / totalMarks) * 100)
@@ -274,34 +344,36 @@ export default function StudentResultDetailPage() {
       const isPassed = finalGrade !== 'F9'
 
       setResult({
-        id: att.id,
-        exam_id: att.exam_id,
+        id: att?.id || '',
+        exam_id: att?.exam_id || '',
         exam_title: exam?.title || 'Untitled Exam',
         exam_subject: exam?.subject || '—',
         exam_class: exam?.class || '—',
-        status: att.status,
+        status: att?.status || 'completed',
         percentage,
         total_score: totalScore,
         total_marks: totalMarks,
         objective_score: objectiveScore,
-        objective_total: objectiveMax,  // ✅ Dynamically calculated from questions
+        objective_total: objectiveMax,
         theory_score: theoryValue,
-        theory_total: theoryMax,        // ✅ Always 60 - objectiveMax
+        theory_total: theoryMax,
         ca1_score: ca1,
         ca2_score: ca2,
         is_passed: isPassed,
-        submitted_at: att.submitted_at,
+        submitted_at: att?.submitted_at || '',
         passing_percentage: exam?.passing_percentage || 40,
-        time_spent: att.time_spent,
-        correct_count: att.correct_count || 0,
-        incorrect_count: att.incorrect_count || 0,
-        unanswered_count: att.unanswered_count || 0,
+        time_spent: att?.time_spent || 0,
+        correct_count: att?.correct_count || 0,
+        incorrect_count: att?.incorrect_count || 0,
+        unanswered_count: att?.unanswered_count || 0,
         teacher_feedback: teacherFeedback,
+        term: exam?.term,
+        academic_year: exam?.session_year,
       })
     } catch (err) {
       console.error(err); setError('Failed to load result. Please try again.')
     } finally { setLoading(false) }
-  }, [examId, router])
+  }, [examId, router, searchParams])
 
   useEffect(() => { loadResult() }, [loadResult])
 
@@ -375,9 +447,6 @@ export default function StudentResultDetailPage() {
   const correctPct = totalQuestions > 0 ? (result.correct_count / totalQuestions) * 100 : 0
   const incorrectPct = totalQuestions > 0 ? (result.incorrect_count / totalQuestions) * 100 : 0
   const skippedPct = totalQuestions > 0 ? (result.unanswered_count / totalQuestions) * 100 : 0
-  const objectivePercentage = result.objective_total > 0 ? Math.round((result.objective_score / result.objective_total) * 100) : 0
-  const theoryPercentage = result.theory_total > 0 ? Math.round((theoryScore / result.theory_total) * 100) : 0
-  const caPercentage = 40 > 0 ? Math.round((caTotal / 40) * 100) : 0
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
@@ -419,6 +488,23 @@ export default function StudentResultDetailPage() {
                   </Button>
                 </div>
               </motion.nav>
+
+              {/* ── Term/Session Info ───────────────── */}
+              {result.term && result.academic_year && (
+                <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
+                  <Calendar className="h-3 w-3 text-slate-400" />
+                  <span className="font-medium">Term:</span>
+                  <span className="font-semibold text-slate-700 capitalize">{getTermLabel(result.term)}</span>
+                  <span className="text-slate-300">·</span>
+                  <span className="font-medium">Session:</span>
+                  <span className="font-semibold text-slate-700">{result.academic_year}</span>
+                  {searchParams.get('term') && (
+                    <Badge className="ml-2 bg-blue-100 text-blue-700 border-0 text-[10px]">
+                      Viewing: {getTermLabel(searchParams.get('term')!)}
+                    </Badge>
+                  )}
+                </div>
+              )}
 
               {/* ══════════════════════════════════════
                   HERO BANNER

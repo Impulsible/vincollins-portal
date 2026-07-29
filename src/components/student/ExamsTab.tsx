@@ -1,3 +1,5 @@
+// src/components/student/ExamsTab.tsx - FIXED IMPORT PATH
+
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -6,23 +8,91 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Search, ArrowLeft, MonitorPlay, ChevronRight, Clock, FileText, Award } from 'lucide-react'
 import { cn } from '@/lib/utils'
+// ✅ FIXED: Correct import path for ExamTabs
+import { ExamTabs } from '@/components/student/exams/ExamTabs'
+import { useExamFilters } from '@/app/student/exams/hooks/useExamFilters'
+import type { Exam, ExamAttempt } from '@/app/student/exams/types'
 
 interface ExamsTabProps {
   stats: any
   bannerStats: any
   handleTabChange: (tab: string) => void
   router: any
+  // ✅ Add these props
+  exams: Exam[]
+  examAttempts: Record<string, ExamAttempt>
+  currentTerm?: string
+  currentSession?: string
 }
 
-export function ExamsTab({ stats, bannerStats, handleTabChange, router }: ExamsTabProps) {
+export function ExamsTab({ 
+  stats, 
+  bannerStats, 
+  handleTabChange, 
+  router,
+  exams = [],
+  examAttempts = {},
+  currentTerm = '',
+  currentSession = ''
+}: ExamsTabProps) {
   const [searchQuery, setSearchQuery] = useState('')
 
-  const filteredExams = stats.availableExams.filter((exam: any) => 
+  // ✅ Use the exam filters hook
+  const {
+    activeTab,
+    setActiveTab,
+    filteredExams,
+    tabCounts,
+    getExamStatus,
+    getSubjectConfig,
+  } = useExamFilters(exams, examAttempts)
+
+  // ✅ Filter by search query on top of filtered exams
+  const searchedExams = filteredExams.filter((exam: any) => 
     exam.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     exam.subject.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const handleTakeExam = (examId: string) => router.push(`/student/exam/${examId}`)
+
+  // ✅ Show empty state if no exams
+  if (exams.length === 0) {
+    return (
+      <motion.div 
+        key="exams" 
+        initial={{ opacity: 0, y: 20 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        exit={{ opacity: 0 }} 
+        className="w-full overflow-hidden space-y-4 sm:space-y-6"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2 sm:mb-4">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Exams</h1>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => handleTabChange('overview')}
+            className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto"
+          >
+            <ArrowLeft className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            Back to Overview
+          </Button>
+        </div>
+        
+        <Card>
+          <CardContent className="p-8 sm:p-10 md:p-12 text-center">
+            <MonitorPlay className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 text-slate-400 mx-auto mb-3 sm:mb-4" />
+            <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">No Exams Available</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+              No exams available for {bannerStats?.currentTerm || currentTerm || 'this term'}.
+            </p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground/70 mt-1">
+              Check back later for new exams
+            </p>
+          </CardContent>
+        </Card>
+      </motion.div>
+    )
+  }
 
   return (
     <motion.div 
@@ -32,9 +102,16 @@ export function ExamsTab({ stats, bannerStats, handleTabChange, router }: ExamsT
       exit={{ opacity: 0 }} 
       className="w-full overflow-hidden space-y-4 sm:space-y-6"
     >
-      {/* Header - Responsive */}
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-2 sm:mb-4">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-bold">Available Exams</h1>
+        <div>
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold">My Exams</h1>
+          {currentTerm && currentSession && (
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {currentTerm} {currentSession}
+            </p>
+          )}
+        </div>
         <Button 
           variant="outline" 
           size="sm" 
@@ -46,20 +123,30 @@ export function ExamsTab({ stats, bannerStats, handleTabChange, router }: ExamsT
         </Button>
       </div>
       
-      {/* Stats Badge - Responsive */}
+      {/* Stats Badge */}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <Badge className="bg-emerald-100 text-emerald-700 text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1">
           <MonitorPlay className="h-3 w-3 mr-1" />
-          {stats.availableExams.length} available exam{stats.availableExams.length !== 1 ? 's' : ''}
+          {tabCounts.available} available, {tabCounts.completed} completed
         </Badge>
-        {bannerStats?.currentTerm && (
+        {currentTerm && (
           <Badge variant="outline" className="text-[10px] sm:text-xs">
-            {bannerStats.currentTerm}
+            {currentTerm} {currentSession}
           </Badge>
         )}
       </div>
+
+      {/* ✅ Exam Tabs with counts */}
+      <ExamTabs
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        availableCount={tabCounts.available}
+        upcomingCount={tabCounts.upcoming}
+        completedCount={tabCounts.completed}
+        expiredCount={tabCounts.expired}
+      />
       
-      {/* Search Bar - Responsive */}
+      {/* Search Bar */}
       <div className="relative">
         <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
         <Input
@@ -70,23 +157,24 @@ export function ExamsTab({ stats, bannerStats, handleTabChange, router }: ExamsT
         />
       </div>
       
-      {/* Exams Grid - Responsive */}
+      {/* Exams Grid */}
       <div className="grid gap-3 sm:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-        {filteredExams.length === 0 ? (
+        {searchedExams.length === 0 ? (
           <Card className="col-span-full">
             <CardContent className="p-8 sm:p-10 md:p-12 text-center">
               <MonitorPlay className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 text-slate-400 mx-auto mb-3 sm:mb-4" />
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">No Exams Available</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+                {activeTab === 'completed' ? 'No Completed Exams' : 'No Exams Found'}
+              </h3>
               <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-                No exams available for {bannerStats?.currentTerm || 'this term'}.
-              </p>
-              <p className="text-[10px] sm:text-xs text-muted-foreground/70 mt-1">
-                Check back later for new exams
+                {activeTab === 'completed' 
+                  ? 'Complete available exams to see your results here!'
+                  : `No ${activeTab} exams found. Try adjusting your search or filter.`}
               </p>
             </CardContent>
           </Card>
         ) : (
-          filteredExams.map((exam: any, index: number) => (
+          searchedExams.map((exam: any, index: number) => (
             <motion.div
               key={exam.id}
               initial={{ opacity: 0, y: 20 }}
@@ -139,11 +227,33 @@ export function ExamsTab({ stats, bannerStats, handleTabChange, router }: ExamsT
                       </div>
                     )}
                   </div>
+                  
+                  {/* ✅ Show status badge */}
+                  <div className="mt-2">
+                    <Badge className={cn(
+                      "text-[9px] sm:text-[10px]",
+                      getExamStatus(exam) === 'completed' ? "bg-green-100 text-green-700" :
+                      getExamStatus(exam) === 'upcoming' ? "bg-amber-100 text-amber-700" :
+                      getExamStatus(exam) === 'available' ? "bg-blue-100 text-blue-700" :
+                      "bg-slate-100 text-slate-700"
+                    )}>
+                      {getExamStatus(exam) === 'completed' ? '✓ Completed' :
+                       getExamStatus(exam) === 'upcoming' ? '⏳ Upcoming' :
+                       getExamStatus(exam) === 'available' ? '▶ Available' :
+                       '🔒 Expired'}
+                    </Badge>
+                  </div>
+                  
                   <Button 
                     onClick={() => handleTakeExam(exam.id)} 
                     className="w-full mt-3 sm:mt-4 bg-emerald-600 hover:bg-emerald-700 h-8 sm:h-9 text-xs sm:text-sm"
+                    disabled={getExamStatus(exam) !== 'available' && getExamStatus(exam) !== 'in_progress'}
                   >
-                    Take Exam <ChevronRight className="ml-1.5 sm:ml-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    {getExamStatus(exam) === 'completed' ? 'View Result' :
+                     getExamStatus(exam) === 'upcoming' ? 'Coming Soon' :
+                     getExamStatus(exam) === 'available' ? 'Take Exam' :
+                     'Not Available'}
+                    <ChevronRight className="ml-1.5 sm:ml-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
                 </CardContent>
               </Card>
@@ -153,9 +263,9 @@ export function ExamsTab({ stats, bannerStats, handleTabChange, router }: ExamsT
       </div>
       
       {/* Search Results Count */}
-      {searchQuery && filteredExams.length > 0 && (
+      {searchQuery && searchedExams.length > 0 && (
         <p className="text-[10px] sm:text-xs text-muted-foreground text-center pt-2">
-          Found {filteredExams.length} exam{filteredExams.length !== 1 ? 's' : ''}
+          Found {searchedExams.length} exam{searchedExams.length !== 1 ? 's' : ''}
         </p>
       )}
     </motion.div>

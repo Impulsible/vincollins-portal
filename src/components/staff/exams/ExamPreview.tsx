@@ -1,4 +1,5 @@
-// components/staff/exams/ExamPreview.tsx - FULLY RESPONSIVE
+// components/staff/exams/ExamPreview.tsx - UPDATED WITH MARK SYSTEM
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -11,7 +12,8 @@ import { Progress } from '@/components/ui/progress'
 import { 
   ArrowLeft, Clock, Award, BookOpen, 
   CheckCircle, XCircle, ChevronLeft, ChevronRight,
-  Flag, Shield, FileText, Brain, AlertCircle
+  Flag, Shield, FileText, Brain, AlertCircle,
+  Calculator
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -20,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { MARK_CONSTANTS } from '../exams/create/constants'
 
 interface Question {
   id: string
@@ -42,9 +45,18 @@ interface Exam {
   shuffle_options: boolean
   has_theory: boolean
   status: string
-  instructions?: string  // ✅ FIX: Add instructions property
-  description?: string   // ✅ Also add description as fallback
+  instructions?: string
+  description?: string
   questions?: Question[]
+  // ✅ Mark fields from database
+  default_mark?: number
+  objective_max?: number
+  theory_max?: number
+  total_marks?: number
+  ca1_max?: number
+  ca2_max?: number
+  ca_total_marks?: number
+  grand_total_marks?: number
 }
 
 interface ExamPreviewProps {
@@ -109,12 +121,22 @@ export function ExamPreview({ examId, onBack }: ExamPreviewProps) {
           question: q.question || q.question_text,
           options: q.options,
           correct_answer: q.correct_answer,
-          marks: q.marks || q.points || 0.5,
+          marks: q.marks || q.points || (examData.default_mark || 0.5),
           order: q.order || idx + 1
         }))
       }
 
-      setExam(examData)
+      setExam({
+        ...examData,
+        default_mark: examData.default_mark || 0.5,
+        objective_max: examData.objective_max || 0,
+        theory_max: examData.theory_max || 0,
+        total_marks: examData.total_marks || 0,
+        ca1_max: examData.ca1_max || 10,
+        ca2_max: examData.ca2_max || 10,
+        ca_total_marks: examData.ca_total_marks || 20,
+        grand_total_marks: examData.grand_total_marks || 100,
+      })
       setQuestions(extractedQuestions)
       setTimeRemaining(examData.duration * 60)
     } catch (error) {
@@ -174,9 +196,20 @@ export function ExamPreview({ examId, onBack }: ExamPreviewProps) {
 
   const objectiveQuestions = questions.filter(q => q.type === 'objective' || q.type === 'mcq')
   const theoryQuestions = questions.filter(q => q.type === 'theory')
-
-  // ✅ FIX: Get instructions with fallback to description
+  
+  const totalMarks = questions.reduce((sum, q) => sum + q.marks, 0)
   const examInstructions = exam?.instructions || exam?.description || ''
+  
+  // ✅ Get mark values from exam (from database)
+  const defaultMark = exam?.default_mark || 0.5
+  const objectiveMax = exam?.objective_max || 0
+  const theoryMax = exam?.theory_max || 0
+  const examTotal = exam?.total_marks || 0
+  const ca1Max = exam?.ca1_max || 10
+  const ca2Max = exam?.ca2_max || 10
+  const caTotal = exam?.ca_total_marks || 20
+  const grandTotal = exam?.grand_total_marks || 100
+  const isBalanced = examTotal === MARK_CONSTANTS.EXAM_TOTAL
 
   if (loading) {
     return (
@@ -216,13 +249,50 @@ export function ExamPreview({ examId, onBack }: ExamPreviewProps) {
               <p className="text-xs sm:text-sm text-muted-foreground">{exam.title}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Badge variant="outline" className="text-xs">Preview Mode</Badge>
             <Badge className={cn("text-xs", getTimerColor())}>
               <Clock className="h-3 w-3 mr-1" />
               {formatTime(timeRemaining)}
             </Badge>
           </div>
+        </div>
+
+        {/* Mark Distribution Summary */}
+        <div className="flex flex-wrap items-center gap-2 p-2 sm:p-3 bg-white rounded-lg border">
+          <Calculator className="h-3.5 w-3.5 text-slate-400" />
+          <span className="text-xs font-medium text-slate-500">Marks:</span>
+          {objectiveMax > 0 && (
+            <Badge variant="outline" className="text-[10px] bg-blue-50 border-blue-200">
+              Obj: {objectiveMax}mk
+            </Badge>
+          )}
+          {theoryMax > 0 && (
+            <Badge variant="outline" className="text-[10px] bg-purple-50 border-purple-200">
+              Theory: {theoryMax}mk
+            </Badge>
+          )}
+          <Badge className={cn(
+            "text-[10px]",
+            isBalanced ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+          )}>
+            Exam: {examTotal}/60
+          </Badge>
+          {ca1Max > 0 && ca2Max > 0 && (
+            <Badge variant="outline" className="text-[10px] bg-amber-50 border-amber-200">
+              CA: {ca1Max}+{ca2Max}={caTotal}mk
+            </Badge>
+          )}
+          {grandTotal > 0 && (
+            <Badge variant="outline" className="text-[10px] bg-emerald-50 border-emerald-200">
+              Grand: {grandTotal}mk
+            </Badge>
+          )}
+          {defaultMark > 0 && (
+            <Badge variant="outline" className="text-[10px] bg-slate-50 border-slate-200">
+              {defaultMark} mark each
+            </Badge>
+          )}
         </div>
 
         {/* Stats Cards - Responsive Grid */}
@@ -417,7 +487,7 @@ export function ExamPreview({ examId, onBack }: ExamPreviewProps) {
           )}
         </div>
 
-        {/* ✅ FIXED: Instructions - Now uses examInstructions variable with fallback */}
+        {/* Instructions */}
         {examInstructions && (
           <div className="bg-blue-50 rounded-lg p-3 sm:p-4 border border-blue-200">
             <p className="text-[11px] sm:text-sm text-blue-800 font-medium mb-1">Instructions:</p>
@@ -447,10 +517,20 @@ export function ExamPreview({ examId, onBack }: ExamPreviewProps) {
             )}
             <div>
               <span className="text-muted-foreground">Total Marks:</span>
-              <span className="font-medium ml-1">
-                {questions.reduce((sum, q) => sum + q.marks, 0)}
-              </span>
+              <span className="font-medium ml-1">{totalMarks}</span>
             </div>
+            {examTotal > 0 && (
+              <div>
+                <span className="text-muted-foreground">Exam Total:</span>
+                <span className="font-medium ml-1">{examTotal} marks</span>
+              </div>
+            )}
+            {grandTotal > 0 && (
+              <div>
+                <span className="text-muted-foreground">Grand Total:</span>
+                <span className="font-medium ml-1">{grandTotal} marks</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

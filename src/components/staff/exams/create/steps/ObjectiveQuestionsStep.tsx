@@ -1,9 +1,9 @@
-// src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx
+// src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx - UPDATED WITH MARK CALCULATION
 
 "use client";
 
-import { useState, useCallback } from "react";
-import { Plus, CheckCheck, Sparkles, BookOpen } from "lucide-react";
+import { useState, useCallback, useMemo, useEffect } from "react";
+import { Plus, CheckCheck, Sparkles, BookOpen, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,6 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { BulkImporter } from "../components/BulkImporter";
@@ -22,6 +25,22 @@ import { ObjectiveCard } from "../components/QuestionCard";
 import { parseDocument } from "../hooks/useQuestionParser";
 import { OBJECTIVE_TEMPLATE } from "../constants";
 import type { Question, ParseResult } from "../types";
+
+// ✅ Mark distribution interface
+interface MarkDistribution {
+  objectiveTotal: number;
+  theoryTotal: number;
+  examTotal: number;
+  ca1Max: number;
+  ca2Max: number;
+  caTotal: number;
+  grandTotal: number;
+  questionCount: number;
+  theoryQuestionCount: number;
+  marksPerTheoryQuestion: number;
+  isBalanced: boolean;
+  theoryMarksPerQuestion: number;
+}
 
 interface ObjectiveQuestionsStepProps {
   questions: Question[];
@@ -35,6 +54,8 @@ interface ObjectiveQuestionsStepProps {
   onPassageTextChange: (v: string) => void;
   hasPassage: boolean;
   onHasPassageChange: (v: boolean) => void;
+  markDistribution?: MarkDistribution;
+  onDefaultMarkChange?: (mark: number) => void;
 }
 
 export function ObjectiveQuestionsStep({
@@ -49,6 +70,8 @@ export function ObjectiveQuestionsStep({
   onPassageTextChange,
   hasPassage,
   onHasPassageChange,
+  markDistribution,
+  onDefaultMarkChange,
 }: ObjectiveQuestionsStepProps) {
   const [mode, setMode] = useState<"bulk" | "manual">("bulk");
   const [parseError, setParseError] = useState<string | null>(null);
@@ -60,6 +83,31 @@ export function ObjectiveQuestionsStep({
     marks: defaultMark,
   });
 
+  // ✅ Calculate objective total from questions
+  const objectiveTotal = useMemo(() => {
+    return questions.reduce((s, q) => s + q.marks, 0);
+  }, [questions]);
+
+  // ✅ Check if balanced
+  const isBalanced = useMemo(() => {
+    return markDistribution?.isBalanced ?? (objectiveTotal + 0 === 60);
+  }, [objectiveTotal, markDistribution]);
+
+  // ✅ Marks per question
+  const marksPerQuestion = useMemo(() => {
+    if (questions.length > 0) {
+      return objectiveTotal / questions.length;
+    }
+    return defaultMark;
+  }, [objectiveTotal, questions.length, defaultMark]);
+
+  // ✅ Update all questions when defaultMark changes
+  useEffect(() => {
+    if (questions.length > 0 && onDefaultMarkChange) {
+      // This will be handled by the parent via onDefaultMarkChange
+    }
+  }, [defaultMark, questions.length, onDefaultMarkChange]);
+
   const totalMarks = questions.reduce((s, q) => s + q.marks, 0);
 
   const handleParse = useCallback(() => {
@@ -70,24 +118,30 @@ export function ObjectiveQuestionsStep({
     setParseError(null);
     const result = onParse(bulkText);
 
+    // ✅ Apply default mark to parsed questions
+    const itemsWithMarks = result.items.map(q => ({
+      ...q,
+      marks: defaultMark,
+    }));
+
     if (result.warnings.length > 0) {
       result.warnings.forEach((w) => toast.warning(w, { duration: 5000 }));
     }
-    if (result.items.length === 0) {
+    if (itemsWithMarks.length === 0) {
       setParseError(
         "No valid questions found. Check the format matches the template."
       );
       return;
     }
 
-    onQuestionsChange([...questions, ...result.items]);
+    onQuestionsChange([...questions, ...itemsWithMarks]);
     onBulkTextChange("");
     toast.success(
-      `✅ Added ${result.items.length} questions${
+      `✅ Added ${itemsWithMarks.length} questions${
         result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
       }`
     );
-  }, [bulkText, onParse, questions, onQuestionsChange, onBulkTextChange]);
+  }, [bulkText, onParse, questions, onQuestionsChange, onBulkTextChange, defaultMark]);
 
   const handleFileParse = useCallback(
     async (file: File) => {
@@ -95,13 +149,18 @@ export function ObjectiveQuestionsStep({
       try {
         const text = await parseDocument(file);
         const result = onParse(text);
-        if (result.items.length > 0) {
-          onQuestionsChange([...questions, ...result.items]);
+        // ✅ Apply default mark
+        const itemsWithMarks = result.items.map(q => ({
+          ...q,
+          marks: defaultMark,
+        }));
+        if (itemsWithMarks.length > 0) {
+          onQuestionsChange([...questions, ...itemsWithMarks]);
           if (result.warnings.length > 0) {
             result.warnings.forEach((w) => toast.warning(w));
           }
           toast.success(
-            `✅ ${result.items.length} questions imported from file`
+            `✅ ${itemsWithMarks.length} questions imported from file`
           );
         } else {
           toast.warning("No questions found in file. Check the format.");
@@ -114,7 +173,7 @@ export function ObjectiveQuestionsStep({
         setIsParsingFile(false);
       }
     },
-    [onParse, questions, onQuestionsChange]
+    [onParse, questions, onQuestionsChange, defaultMark]
   );
 
   const handleAddManual = () => {
@@ -139,7 +198,7 @@ export function ObjectiveQuestionsStep({
         question: manualQ.question,
         options: manualQ.options,
         correct_answer: manualQ.correct_answer,
-        marks: manualQ.marks,
+        marks: defaultMark, // ✅ Use defaultMark
       },
     ]);
     setManualQ({
@@ -161,22 +220,67 @@ export function ObjectiveQuestionsStep({
     URL.revokeObjectURL(url);
   };
 
+  // ✅ Handle mark update for all questions
+  const handleMarkUpdate = (newMark: number) => {
+    if (onDefaultMarkChange) {
+      onDefaultMarkChange(newMark);
+    }
+    // Update all existing questions with new mark
+    onQuestionsChange(questions.map(q => ({
+      ...q,
+      marks: newMark,
+    })));
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
 
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* ── Mark Distribution Warning ── */}
+        {markDistribution && !markDistribution.isBalanced && (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 text-xs">
+              Total marks ({markDistribution.objectiveTotal + markDistribution.theoryTotal}) is not 60. 
+              Objective: {markDistribution.objectiveTotal} marks, Theory: {markDistribution.theoryTotal} marks.
+              {markDistribution.objectiveTotal + markDistribution.theoryTotal > 60 
+                ? " Reduce objective questions or marks." 
+                : " Add more objective questions or increase marks."}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* ── Stats ── */}
+        <div className="grid grid-cols-4 gap-2">
           <StatCard value={questions.length} label="Questions" color="blue" />
-          <StatCard
-            value={totalMarks.toFixed(1)}
-            label="Marks"
-            color="emerald"
-          />
+          <StatCard value={totalMarks.toFixed(1)} label="Total Marks" color="emerald" />
           <StatCard value={objectiveMax} label="Max" color="purple" />
+          <StatCard value={marksPerQuestion.toFixed(2)} label="Per Question" color="amber" />
         </div>
 
-        {/* Comprehension Passage Toggle */}
+        {/* ── Default Mark Selector ── */}
+        <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
+          <Calculator className="h-4 w-4 text-blue-600" />
+          <span className="text-xs text-blue-700 font-medium">Mark per question:</span>
+          <Select 
+            value={defaultMark.toString()} 
+            onValueChange={(v) => handleMarkUpdate(parseFloat(v))}
+          >
+            <SelectTrigger className="h-7 text-xs w-24 bg-white">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="0.5">0.5</SelectItem>
+              <SelectItem value="1">1</SelectItem>
+              <SelectItem value="2">2</SelectItem>
+            </SelectContent>
+          </Select>
+          <Badge className="bg-blue-200 text-blue-700 text-[10px] ml-auto">
+            {questions.length} questions × {defaultMark} = {totalMarks.toFixed(1)} marks
+          </Badge>
+        </div>
+
+        {/* ── Comprehension Passage Toggle ── */}
         <div className="flex items-center gap-2">
           <Button
             variant={hasPassage ? "default" : "outline"}
@@ -197,7 +301,7 @@ export function ObjectiveQuestionsStep({
           )}
         </div>
 
-        {/* Passage Text Area */}
+        {/* ── Passage Text Area ── */}
         {hasPassage && (
           <div className="space-y-1.5 p-3 bg-amber-50 rounded-lg border border-amber-200">
             <Label className="text-[10px] font-semibold text-amber-700 uppercase flex items-center gap-1">
@@ -228,7 +332,7 @@ Read the passage above and answer the following questions.`}
           </div>
         )}
 
-        {/* Mode Switcher */}
+        {/* ── Mode Switcher ── */}
         <ModeSwitcher
           modes={[
             { id: "bulk", label: "Bulk Import", icon: Sparkles },
@@ -238,7 +342,7 @@ Read the passage above and answer the following questions.`}
           onChange={(v) => setMode(v as "bulk" | "manual")}
         />
 
-        {/* Bulk Import */}
+        {/* ── Bulk Import ── */}
         {mode === "bulk" && (
           <BulkImporter
             value={bulkText}
@@ -247,7 +351,7 @@ Read the passage above and answer the following questions.`}
             onParse={handleParse}
             isParsingFile={isParsingFile}
             parseError={parseError}
-            placeholder={`1. Question?\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: 0.5`}
+            placeholder={`1. Question?\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: ${defaultMark}`}
             accentColor="emerald"
             onInsertExample={() => onBulkTextChange(OBJECTIVE_TEMPLATE)}
             onDownloadTemplate={downloadTemplate}
@@ -258,7 +362,7 @@ Read the passage above and answer the following questions.`}
           />
         )}
 
-        {/* Manual Add */}
+        {/* ── Manual Add ── */}
         {mode === "manual" && (
           <div className="space-y-3 p-3 bg-gray-50 rounded-lg border">
             <div>
@@ -331,21 +435,19 @@ Read the passage above and answer the following questions.`}
               </div>
               <div>
                 <Label className="text-[10px] font-semibold text-gray-600 uppercase">
-                  Marks
+                  Marks (Auto)
                 </Label>
                 <Input
                   type="number"
                   step="0.5"
                   min="0.5"
-                  value={manualQ.marks}
-                  onChange={(e) =>
-                    setManualQ((p) => ({
-                      ...p,
-                      marks: parseFloat(e.target.value) || defaultMark,
-                    }))
-                  }
-                  className="mt-1 h-9 text-sm sm:text-base"
+                  value={defaultMark}
+                  disabled
+                  className="mt-1 h-9 text-sm sm:text-base bg-gray-100 text-gray-600"
                 />
+                <p className="text-[9px] text-gray-400 mt-0.5">
+                  Using default mark: {defaultMark}
+                </p>
               </div>
             </div>
 
@@ -359,21 +461,26 @@ Read the passage above and answer the following questions.`}
           </div>
         )}
 
-        {/* Question List */}
+        {/* ── Question List ── */}
         {questions.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <Label className="text-[10px] font-semibold text-gray-600 uppercase">
                 Questions ({questions.length})
               </Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onQuestionsChange([])}
-                className="text-red-500 text-[10px] h-6"
-              >
-                Clear All
-              </Button>
+              <div className="flex items-center gap-2">
+                <Badge className="bg-blue-100 text-blue-700 text-[10px]">
+                  {totalMarks.toFixed(1)} marks total
+                </Badge>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onQuestionsChange([])}
+                  className="text-red-500 text-[10px] h-6"
+                >
+                  Clear All
+                </Button>
+              </div>
             </div>
             <div className="max-h-[200px] sm:max-h-[280px] lg:max-h-[400px] overflow-y-auto space-y-1.5 pr-1">
               {questions.map((q, i) => (
@@ -403,17 +510,19 @@ function StatCard({
 }: {
   value: string | number;
   label: string;
-  color: "blue" | "emerald" | "purple";
+  color: "blue" | "emerald" | "purple" | "amber";
 }) {
   const styles = {
     blue: "bg-blue-50 border-blue-100 text-blue-700",
     emerald: "bg-emerald-50 border-emerald-100 text-emerald-700",
     purple: "bg-purple-50 border-purple-100 text-purple-700",
+    amber: "bg-amber-50 border-amber-100 text-amber-700",
   }[color];
   const textSmall = {
     blue: "text-blue-600",
     emerald: "text-emerald-600",
     purple: "text-purple-600",
+    amber: "text-amber-600",
   }[color];
 
   return (

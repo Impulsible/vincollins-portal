@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/ExamDetailsTab.tsx
+// src/components/staff/exams/edit/ExamDetailsTab.tsx - FIXED
 
 'use client'
 
@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { BookOpen, Clock, GraduationCap, FileText, Settings2, HelpCircle, Calendar, Target } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'  // ✅ Added
+import { BookOpen, Clock, GraduationCap, FileText, Settings2, HelpCircle, Calendar, Target, Calculator } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { ExamDetailsForm } from './types'
@@ -22,8 +23,20 @@ interface ExamDetailsTabProps {
   currentSession: string
   hasTheory: boolean
   onHasTheoryChange: (value: boolean) => void
+  // ✅ From database - no hardcoded values
+  objectiveTotal?: number
+  theoryTotal?: number
+  examTotal?: number
+  defaultMark?: number
+  questionCount?: number
+  theoryQuestionCount?: number
+  ca1Max?: number
+  ca2Max?: number
+  caTotal?: number
+  grandTotal?: number
 }
 
+// ✅ Define termOptions inside the component or import from constants
 const termOptions = [
   { value: 'first', label: 'First Term' },
   { value: 'second', label: 'Second Term' },
@@ -74,14 +87,61 @@ export function ExamDetailsTab({
   availableSessions,
   currentSession,
   hasTheory,
-  onHasTheoryChange
+  onHasTheoryChange,
+  objectiveTotal = 0,
+  theoryTotal = 0,
+  examTotal = 0,
+  defaultMark = 0.5,
+  questionCount = 0,
+  theoryQuestionCount = 0,
+  ca1Max = 0,
+  ca2Max = 0,
+  caTotal = 0,
+  grandTotal = 0,
 }: ExamDetailsTabProps) {
   const isSeniorClass = formData.class?.startsWith('SS') || false
   const showTargetAudience = isSeniorClass && formData.class && !formData.class.includes(' ')
+  
+  const isBalanced = examTotal === 60
+  const isOver = examTotal > 60
 
   return (
     <TooltipProvider>
       <div className="space-y-4 sm:space-y-6">
+
+        {/* ✅ Simple Mark Summary - All values from database, using Badge component */}
+        {(objectiveTotal > 0 || theoryTotal > 0 || examTotal > 0) && (
+          <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
+            <span className="text-xs font-medium text-slate-500">Marks:</span>
+            <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200">
+              Obj: {objectiveTotal}mk
+              <span className="text-[9px] text-slate-400 ml-1">({questionCount}×{defaultMark})</span>
+            </Badge>
+            <Badge variant="outline" className="text-xs bg-purple-50 border-purple-200">
+              Theory: {theoryTotal}mk
+              {theoryQuestionCount > 0 && (
+                <span className="text-[9px] text-slate-400 ml-1">({theoryQuestionCount} Qs)</span>
+              )}
+            </Badge>
+            <Badge className={cn(
+              "text-xs",
+              isBalanced ? "bg-emerald-100 text-emerald-700" : 
+              isOver ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+            )}>
+              {isBalanced ? "✅" : isOver ? "⛔" : "⚠️"} Total: {examTotal}/60
+            </Badge>
+            {ca1Max > 0 && ca2Max > 0 && (
+              <Badge variant="outline" className="text-xs bg-amber-50 border-amber-200">
+                CA: {ca1Max}+{ca2Max}={caTotal}mk
+              </Badge>
+            )}
+            {grandTotal > 0 && (
+              <Badge variant="outline" className="text-xs bg-emerald-50 border-emerald-200">
+                Grand: {grandTotal}mk
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Basic Information */}
         <Card className="border-0 shadow-sm overflow-hidden">
@@ -126,10 +186,10 @@ export function ExamDetailsTab({
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent className="max-h-[400px]">
-                    <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 sticky top-0">
+                    <div className="px-2 py-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 sticky-top-0">
                       📚 All Students (General Subjects)
                     </div>
-                    {SENIOR_CLASS_OPTIONS.general.map(opt => (
+                    {SENIOR_CLASS_OPTIONS.general.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <div>
                           <div className="font-medium">{opt.label}</div>
@@ -140,7 +200,7 @@ export function ExamDetailsTab({
                     <div className="px-2 py-1.5 text-xs font-semibold text-blue-600 bg-blue-50 mt-2">
                       🔬 Science Department
                     </div>
-                    {SENIOR_CLASS_OPTIONS.science.map(opt => (
+                    {SENIOR_CLASS_OPTIONS.science.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <div>
                           <div>{opt.label}</div>
@@ -151,7 +211,7 @@ export function ExamDetailsTab({
                     <div className="px-2 py-1.5 text-xs font-semibold text-purple-600 bg-purple-50 mt-2">
                       🎨 Arts Department
                     </div>
-                    {SENIOR_CLASS_OPTIONS.arts.map(opt => (
+                    {SENIOR_CLASS_OPTIONS.arts.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <div>
                           <div>{opt.label}</div>
@@ -162,7 +222,7 @@ export function ExamDetailsTab({
                     <div className="px-2 py-1.5 text-xs font-semibold text-amber-600 bg-amber-50 mt-2">
                       💼 Commercial Department
                     </div>
-                    {SENIOR_CLASS_OPTIONS.commercial.map(opt => (
+                    {SENIOR_CLASS_OPTIONS.commercial.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <div>
                           <div>{opt.label}</div>
@@ -173,7 +233,7 @@ export function ExamDetailsTab({
                     <div className="px-2 py-1.5 text-xs font-semibold text-slate-600 bg-slate-50 mt-2">
                       📖 Junior Secondary School
                     </div>
-                    {JSS_OPTIONS.map(opt => (
+                    {JSS_OPTIONS.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <div>
                           <div>{opt.label}</div>
@@ -201,7 +261,7 @@ export function ExamDetailsTab({
                     <SelectValue placeholder={formData.class ? 'Select subject' : 'Select class first'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableSubjects.map(s => (
+                    {availableSubjects.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>
@@ -295,7 +355,7 @@ export function ExamDetailsTab({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {termOptions.map(opt => (
+                    {termOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -308,7 +368,7 @@ export function ExamDetailsTab({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableSessions.map(s => (
+                    {availableSessions.map((s) => (
                       <SelectItem key={s} value={s}>
                         {s} {s === currentSession && <span className="text-emerald-500 text-xs ml-1">(Current)</span>}
                       </SelectItem>
@@ -359,7 +419,7 @@ export function ExamDetailsTab({
           </CardContent>
         </Card>
 
-        {/* ✅ FIXED: Exam Settings with shuffle_questions and shuffle_options */}
+        {/* Exam Settings */}
         <Card className="border-0 shadow-sm overflow-hidden">
           <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6 pt-4 sm:pt-6">
             <div className="flex items-center gap-2">

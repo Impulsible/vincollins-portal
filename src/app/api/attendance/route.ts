@@ -1,247 +1,270 @@
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
 
-// Helper function to create supabase client for route handlers
-async function createRouteHandlerClient() {
-  const cookieStore = await cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        async get(name: string) {
-          const cookie = await cookieStore.get(name)
-          return cookie?.value
-        },
-        async set(name: string, value: string, options: any) {
-          await cookieStore.set({ name, value, ...options })
-        },
-        async remove(name: string, options: any) {
-          await cookieStore.set({ name, value: '', ...options })
-        },
-      },
-    }
-  )
-}
-
-// Type definitions
-interface StudentPresence {
-  id?: string
-  student_id: string
-  status: 'online' | 'offline' | 'away'
-  last_seen: string
-  updated_at?: string
-  student?: {
-    id: string
-    class?: string
-    profiles?: {
-      full_name: string
-      photo_url?: string
-    }
-  }
-}
-
-interface PresenceStats {
-  total: number
-  online: number
-  attendance_rate: number
-}
-
-export async function GET(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const supabase = await createRouteHandlerClient()
-    const { searchParams } = new URL(request.url)
-    const classParam = searchParams.get('class')
-    const status = searchParams.get('status')
+    const { data: { session } } = await supabase.auth.getSession()
     
-    let query = supabase
-      .from('student_presence')
-      .select(`*, student:students(*, profiles(*))`)
-      .order('last_seen', { ascending: false })
-    
-    if (classParam && classParam !== 'all') {
-      query = query.eq('student.class', classParam)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
-    if (status) {
-      query = query.eq('status', status)
-    }
-    
-    const { data, error } = await query
-    
-    if (error) throw error
-    
-    const presenceData = data as StudentPresence[]
-    const total = presenceData?.length || 0
-    const online = presenceData?.filter((p: StudentPresence) => p.status === 'online').length || 0
-    
-    const stats: PresenceStats = {
-      total,
-      online,
-      attendance_rate: total > 0 ? (online / total) * 100 : 0
-    }
-    
-    return NextResponse.json({
-      data: presenceData,
-      stats
-    })
-  } catch (error) {
-    console.error('Error fetching attendance:', error)
-    return NextResponse.json({ error: 'Failed to fetch attendance' }, { status: 500 })
-  }
-}
 
-export async function POST(request: NextRequest) {
-  try {
-    const supabase = await createRouteHandlerClient()
     const body = await request.json()
-    
+    const { 
+      studentId, 
+      class_name, 
+      term_code, 
+      session_year, 
+      date, 
+      status,
+      teacher_id 
+    } = body
+
     // Validate required fields
-    if (!body.student_id) {
-      return NextResponse.json({ 
-        error: 'Missing required field: student_id' 
-      }, { status: 400 })
+    if (!studentId || !class_name || !term_code || !session_year || !date || !status) {
+      return NextResponse.json(
+        { error: 'Missing required fields' },
+        { status: 400 }
+      )
     }
-    
-    const presenceData = {
-      ...body,
-      updated_at: new Date().toISOString(),
-      last_seen: body.last_seen || new Date().toISOString()
+
+    // Check if attendance already exists
+    const { data: existing } = await supabase
+      .from('attendance_records')
+      .select('id, locked')
+      .eq('student_id', studentId)
+      .eq('date', date)
+      .eq('term_code', term_code)
+      .eq('session_year', session_year)
+      .maybeSingle()
+
+    if (existing?.locked) {
+      return NextResponse.json(
+        { error: 'Attendance is locked and cannot be modified' },
+        { status: 403 }
+      )
     }
-    
-    const { data, error } = await supabase
-      .from('student_presence')
-      .upsert(presenceData, { onConflict: 'student_id' })
-      .select()
-      .single()
-    
-    if (error) throw error
-    
-    return NextResponse.json({ 
-      data, 
-      message: 'Presence updated successfully' 
-    })
+
+    let result
+    if (existing) {
+      // Update existing record
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .update({ 
+          status, 
+          teacher_id: teacher_id || session.user.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existing.id)
+        .select()
+        .single()
+
+      if (error) throw error
+      result = data
+    } else {
+      // Insert new record
+      const { data, error } = await supabase
+        .from('attendance_records')
+        .insert({
+          student_id: studentId,
+          class_name,
+          term_code,
+          session_year,
+          date,
+          status,
+          teacher_id: teacher_id || session.user.id,
+          marked_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      result = data
+    }
+
+    return NextResponse.json({ success: true, data: result })
   } catch (error) {
-    console.error('Error updating presence:', error)
-    return NextResponse.json({ error: 'Failed to update presence' }, { status: 500 })
+    console.error('Attendance POST error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to save attendance' },
+      { status: 500 }
+    )
   }
 }
 
-export async function PUT(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const supabase = await createRouteHandlerClient()
-    const body = await request.json()
+    const { data: { session } } = await supabase.auth.getSession()
     
-    if (!body.student_id) {
-      return NextResponse.json({ 
-        error: 'Missing required field: student_id' 
-      }, { status: 400 })
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
-    const { student_id, ...updates } = body
-    
-    const { data, error } = await supabase
-      .from('student_presence')
-      .update({ 
-        ...updates, 
-        updated_at: new Date().toISOString(),
-        last_seen: updates.status === 'online' ? new Date().toISOString() : undefined
+
+    const { searchParams } = new URL(request.url)
+    const class_name = searchParams.get('class')
+    const date = searchParams.get('date')
+    const term_code = searchParams.get('term')
+    const session_year = searchParams.get('session')
+
+    if (!class_name || !date || !term_code || !session_year) {
+      return NextResponse.json(
+        { error: 'Missing required parameters: class, date, term, session' },
+        { status: 400 }
+      )
+    }
+
+    // Get students with their attendance status
+    const { data: students, error } = await supabase
+      .rpc('get_class_attendance', {
+        p_class_name: class_name,
+        p_date: date,
+        p_term_code: term_code,
+        p_session_year: session_year
       })
-      .eq('student_id', student_id)
-      .select()
-      .single()
-    
-    if (error) throw error
-    
-    return NextResponse.json({ 
-      data, 
-      message: 'Presence updated successfully' 
-    })
+
+    if (error) {
+      // Fallback: If RPC fails, get data directly
+      console.warn('RPC failed, using fallback query:', error)
+      
+      // Get all students in the class
+      const { data: allStudents } = await supabase
+        .from('profiles')
+        .select('id, display_name')
+        .eq('role', 'student')
+        .eq('class', class_name)
+        .eq('is_active', true)
+        .order('display_name')
+
+      // Get attendance records
+      const { data: attendanceRecords } = await supabase
+        .from('attendance_records')
+        .select('student_id, status, locked')
+        .eq('date', date)
+        .eq('class_name', class_name)
+        .eq('term_code', term_code)
+        .eq('session_year', session_year)
+
+      // Combine data
+      const combinedData = allStudents?.map(student => {
+        const record = attendanceRecords?.find(a => a.student_id === student.id)
+        return {
+          student_id: student.id,
+          student_name: student.display_name,
+          status: record?.status || null,
+          locked: record?.locked || false
+        }
+      }) || []
+
+      return NextResponse.json({ success: true, data: combinedData })
+    }
+
+    return NextResponse.json({ success: true, data: students })
   } catch (error) {
-    console.error('Error updating presence:', error)
-    return NextResponse.json({ error: 'Failed to update presence' }, { status: 500 })
+    console.error('Attendance GET error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to fetch attendance' },
+      { status: 500 }
+    )
   }
 }
 
-export async function PATCH(request: NextRequest) {
+export async function PUT(request: Request) {
   try {
-    const supabase = await createRouteHandlerClient()
-    const { searchParams } = new URL(request.url)
-    const studentId = searchParams.get('student_id')
-    const action = searchParams.get('action')
+    const { data: { session } } = await supabase.auth.getSession()
     
-    if (!studentId) {
-      return NextResponse.json({ error: 'Student ID is required' }, { status: 400 })
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
-    let updateData: any = { updated_at: new Date().toISOString() }
-    let message = ''
-    
-    switch (action) {
-      case 'online':
-        updateData.status = 'online'
-        updateData.last_seen = new Date().toISOString()
-        message = 'Student marked as online'
-        break
-      case 'offline':
-        updateData.status = 'offline'
-        updateData.last_seen = new Date().toISOString()
-        message = 'Student marked as offline'
-        break
-      case 'away':
-        updateData.status = 'away'
-        updateData.last_seen = new Date().toISOString()
-        message = 'Student marked as away'
-        break
-      case 'heartbeat':
-        updateData.last_seen = new Date().toISOString()
-        updateData.status = 'online'
-        message = 'Heartbeat updated'
-        break
-      default:
-        return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+
+    const body = await request.json()
+    const { id, status, lock } = body
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Missing record ID' },
+        { status: 400 }
+      )
     }
-    
+
+    const updateData: any = { 
+      updated_at: new Date().toISOString()
+    }
+
+    if (status) {
+      updateData.status = status
+    }
+
+    if (lock) {
+      updateData.locked = true
+      updateData.locked_at = new Date().toISOString()
+      updateData.locked_by = session.user.id
+    }
+
     const { data, error } = await supabase
-      .from('student_presence')
+      .from('attendance_records')
       .update(updateData)
-      .eq('student_id', studentId)
+      .eq('id', id)
       .select()
       .single()
-    
+
     if (error) throw error
-    
-    return NextResponse.json({ data, message })
+
+    return NextResponse.json({ success: true, data })
   } catch (error) {
-    console.error('Error updating presence status:', error)
-    return NextResponse.json({ error: 'Failed to update presence status' }, { status: 500 })
+    console.error('Attendance PUT error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to update attendance' },
+      { status: 500 }
+    )
   }
 }
 
-export async function DELETE(request: NextRequest) {
+// Optional: DELETE endpoint if needed
+export async function DELETE(request: Request) {
   try {
-    const supabase = await createRouteHandlerClient()
-    const { searchParams } = new URL(request.url)
-    const studentId = searchParams.get('student_id')
+    const { data: { session } } = await supabase.auth.getSession()
     
-    if (!studentId) {
-      return NextResponse.json({ error: 'Student ID is required' }, { status: 400 })
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    
+
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')
+
+    if (!id) {
+      return NextResponse.json(
+        { error: 'Missing record ID' },
+        { status: 400 }
+      )
+    }
+
+    // Check if locked
+    const { data: existing } = await supabase
+      .from('attendance_records')
+      .select('locked')
+      .eq('id', id)
+      .single()
+
+    if (existing?.locked) {
+      return NextResponse.json(
+        { error: 'Cannot delete locked attendance record' },
+        { status: 403 }
+      )
+    }
+
     const { error } = await supabase
-      .from('student_presence')
+      .from('attendance_records')
       .delete()
-      .eq('student_id', studentId)
-    
+      .eq('id', id)
+
     if (error) throw error
-    
-    return NextResponse.json({ 
-      success: true, 
-      message: 'Presence record deleted successfully' 
-    })
+
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting presence:', error)
-    return NextResponse.json({ error: 'Failed to delete presence' }, { status: 500 })
+    console.error('Attendance DELETE error:', error)
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Failed to delete attendance' },
+      { status: 500 }
+    )
   }
 }

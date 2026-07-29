@@ -1,4 +1,5 @@
-// app/staff/exams/hooks/useExams.ts
+// app/staff/exams/hooks/useExams.ts - WITH TERM FILTERING
+
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -23,9 +24,11 @@ export interface Exam {
   pass_mark: number
   created_by?: string
   teacher_name?: string
+  term?: string
+  session_year?: string
 }
 
-export function useExams(teacherId?: string) {
+export function useExams(teacherId?: string, termCode?: string, sessionYear?: string) {
   const [exams, setExams] = useState<Exam[]>([])
   const [filteredExams, setFilteredExams] = useState<Exam[]>([])
   const [loading, setLoading] = useState(true)
@@ -33,14 +36,27 @@ export function useExams(teacherId?: string) {
   const [statusFilter, setStatusFilter] = useState('all')
 
   const loadExams = useCallback(async () => {
-    if (!teacherId) return
+    if (!teacherId) {
+      setLoading(false)
+      return
+    }
 
+    setLoading(true)
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('exams')
         .select('*')
         .eq('created_by', teacherId)
         .order('created_at', { ascending: false })
+
+      // ✅ Apply term filter if provided
+      if (termCode && sessionYear) {
+        query = query
+          .eq('term', termCode)
+          .eq('session_year', sessionYear)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
 
@@ -52,14 +68,16 @@ export function useExams(teacherId?: string) {
     } finally {
       setLoading(false)
     }
-  }, [teacherId])
+  }, [teacherId, termCode, sessionYear])
 
+  // Load exams when teacherId, termCode, or sessionYear changes
   useEffect(() => {
     if (teacherId) {
       loadExams()
     }
-  }, [teacherId, loadExams])
+  }, [teacherId, termCode, sessionYear, loadExams])
 
+  // Filter exams by search query and status
   useEffect(() => {
     let filtered = [...exams]
 
@@ -115,7 +133,10 @@ export function useExams(teacherId?: string) {
           status: 'draft',
           created_by: teacherId,
           total_questions: 0,
-          total_marks: 0
+          total_marks: 0,
+          // ✅ Copy term and session from original exam
+          term: exam.term || termCode,
+          session_year: exam.session_year || sessionYear
         })
 
       if (error) throw error
@@ -126,7 +147,7 @@ export function useExams(teacherId?: string) {
       console.error('Error duplicating exam:', error)
       toast.error('Failed to duplicate exam')
     }
-  }, [exams, teacherId, loadExams])
+  }, [exams, teacherId, loadExams, termCode, sessionYear])
 
   const handleSubmitForApproval = useCallback(async (examId: string) => {
     try {

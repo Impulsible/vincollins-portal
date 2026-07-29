@@ -1,9 +1,10 @@
-// src/components/staff/exams/create/steps/TheoryQuestionsStep.tsx
+// src/components/staff/exams/create/steps/TheoryQuestionsStep.tsx - COMPLETE UPDATE WITH MANUAL THEORY TOTAL
+
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import {
-  Plus, Brain, Layers, Sparkles, Loader2, ImageIcon, X,
+  Plus, Brain, Layers, Sparkles, Loader2, ImageIcon, X, Calculator,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -61,6 +62,22 @@ const uploadImage = async (file: File): Promise<string | null> => {
   }
 };
 
+// ✅ Mark distribution interface
+interface MarkDistribution {
+  objectiveTotal: number;
+  theoryTotal: number;
+  examTotal: number;
+  ca1Max: number;
+  ca2Max: number;
+  caTotal: number;
+  grandTotal: number;
+  questionCount: number;
+  theoryQuestionCount: number;
+  marksPerTheoryQuestion: number;
+  isBalanced: boolean;
+  theoryMarksPerQuestion: number;
+}
+
 interface TheoryQuestionsStepProps {
   questions: TheoryQuestion[];
   onQuestionsChange: (q: TheoryQuestion[]) => void;
@@ -70,6 +87,12 @@ interface TheoryQuestionsStepProps {
   bulkText: string;
   onBulkTextChange: (v: string) => void;
   onParse: (text: string) => ParseResult<TheoryQuestion>;
+  markDistribution?: MarkDistribution;
+  defaultMark?: number;
+  // ✅ NEW PROPS
+  theoryTotalMarks: number;
+  onTheoryTotalMarksChange: (value: number) => void;
+  objectiveTotal: number;
 }
 
 export function TheoryQuestionsStep({
@@ -81,6 +104,11 @@ export function TheoryQuestionsStep({
   bulkText,
   onBulkTextChange,
   onParse,
+  markDistribution,
+  defaultMark = 0.5,
+  theoryTotalMarks,
+  onTheoryTotalMarksChange,
+  objectiveTotal,
 }: TheoryQuestionsStepProps) {
   const [mode, setMode] = useState<"smart" | "manual">("smart");
   const [parseError, setParseError] = useState<string | null>(null);
@@ -95,7 +123,36 @@ export function TheoryQuestionsStep({
     image_caption: "",
   });
 
+  // ✅ Calculate remaining marks for theory
+  const remainingForTheory = useMemo(() => {
+    return Math.max(0, 60 - objectiveTotal);
+  }, [objectiveTotal]);
+
+  // ✅ Calculate marks per theory question
+  const calculatedTheoryMarksPerQuestion = useMemo(() => {
+    const count = questions.length || 1;
+    return theoryTotalMarks / count;
+  }, [theoryTotalMarks, questions.length]);
+
+  // ✅ Check if theory total is valid
+  const isValidTheoryTotal = theoryTotalMarks <= remainingForTheory;
+
   const totalMarks = questions.reduce((s, q) => s + q.marks, 0);
+  const isBalanced = markDistribution?.isBalanced ?? (totalMarks + objectiveTotal === 60);
+
+  // ✅ Auto-update questions when theory total changes
+  useEffect(() => {
+    if (questions.length > 0 && theoryTotalMarks > 0) {
+      const marksPerQ = theoryTotalMarks / questions.length;
+      const updatedQuestions = questions.map(q => ({
+        ...q,
+        marks: Math.round(marksPerQ * 100) / 100,
+      }));
+      if (updatedQuestions.some((q, i) => q.marks !== questions[i]?.marks)) {
+        onQuestionsChange(updatedQuestions);
+      }
+    }
+  }, [theoryTotalMarks, questions.length]);
 
   const handleParse = useCallback(() => {
     if (!bulkText.trim()) {
@@ -105,29 +162,38 @@ export function TheoryQuestionsStep({
     setParseError(null);
     const result = onParse(bulkText);
 
+    const itemsWithMarks = result.items.map(q => ({
+      ...q,
+      marks: calculatedTheoryMarksPerQuestion || q.marks || 10,
+    }));
+
     if (result.warnings.length > 0) {
       result.warnings.forEach((w) => toast.warning(w, { duration: 5000 }));
     }
-    if (result.items.length === 0) {
+    if (itemsWithMarks.length === 0) {
       setParseError(
         "No questions detected. Ensure questions start with numbers (1. 2. etc.)"
       );
       return;
     }
 
-    setParsedPreview(result.items);
+    setParsedPreview(itemsWithMarks);
     setShowPreview(true);
     toast.success(
-      `Detected ${result.items.length} question(s) — review before importing`
+      `Detected ${itemsWithMarks.length} question(s) — review before importing`
     );
-  }, [bulkText, onParse]);
+  }, [bulkText, onParse, calculatedTheoryMarksPerQuestion]);
 
   const handleImport = () => {
-    onQuestionsChange([...questions, ...parsedPreview]);
+    const questionsWithMarks = parsedPreview.map(q => ({
+      ...q,
+      marks: calculatedTheoryMarksPerQuestion || q.marks || 10,
+    }));
+    onQuestionsChange([...questions, ...questionsWithMarks]);
     onBulkTextChange("");
     setParsedPreview([]);
     setShowPreview(false);
-    toast.success(`✅ Added ${parsedPreview.length} theory questions`);
+    toast.success(`✅ Added ${questionsWithMarks.length} theory questions`);
   };
 
   const handleFileParse = useCallback(
@@ -136,11 +202,15 @@ export function TheoryQuestionsStep({
       try {
         const text = await parseDocument(file);
         const result = onParse(text);
-        if (result.items.length > 0) {
-          setParsedPreview(result.items);
+        const itemsWithMarks = result.items.map(q => ({
+          ...q,
+          marks: calculatedTheoryMarksPerQuestion || q.marks || 10,
+        }));
+        if (itemsWithMarks.length > 0) {
+          setParsedPreview(itemsWithMarks);
           setShowPreview(true);
           toast.success(
-            `${result.items.length} questions found — review before importing`
+            `${itemsWithMarks.length} questions found — review before importing`
           );
         } else {
           toast.warning("No questions found. Check the format.");
@@ -152,7 +222,7 @@ export function TheoryQuestionsStep({
         setIsParsingFile(false);
       }
     },
-    [onParse]
+    [onParse, calculatedTheoryMarksPerQuestion]
   );
 
   const handleImageUpload = async (file: File) => {
@@ -172,12 +242,13 @@ export function TheoryQuestionsStep({
       toast.error("Enter question text");
       return;
     }
+    const marks = calculatedTheoryMarksPerQuestion || manualQ.marks || 10;
     onQuestionsChange([
       ...questions,
       {
         id: crypto.randomUUID(),
         question: manualQ.question,
-        marks: manualQ.marks,
+        marks: marks,
         image_url: manualQ.image_url || undefined,
         image_caption: manualQ.image_caption || undefined,
       },
@@ -229,12 +300,77 @@ export function TheoryQuestionsStep({
     <div className="flex-1 overflow-y-auto">
       <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
 
+        {/* ── THEORY TOTAL MARKS INPUT ── */}
+        <div className={cn(
+          "p-4 rounded-lg border",
+          isValidTheoryTotal 
+            ? "bg-blue-50 border-blue-200" 
+            : "bg-red-50 border-red-200"
+        )}>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <Calculator className={cn(
+                  "h-4 w-4",
+                  isValidTheoryTotal ? "text-blue-600" : "text-red-600"
+                )} />
+                <Label className={cn(
+                  "text-sm font-semibold",
+                  isValidTheoryTotal ? "text-blue-700" : "text-red-700"
+                )}>
+                  Theory Total Marks
+                </Label>
+              </div>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Enter the total marks for the theory section
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Input
+                type="number"
+                min="0"
+                max={remainingForTheory}
+                value={theoryTotalMarks}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  onTheoryTotalMarksChange(Math.min(val, remainingForTheory));
+                }}
+                className={cn(
+                  "w-24 text-center font-bold text-lg",
+                  !isValidTheoryTotal && "border-red-500 focus-visible:ring-red-500"
+                )}
+              />
+              <span className={cn(
+                "text-sm whitespace-nowrap",
+                isValidTheoryTotal ? "text-blue-600" : "text-red-600"
+              )}>
+                / {remainingForTheory} max
+              </span>
+            </div>
+          </div>
+          
+          {!isValidTheoryTotal && (
+            <p className="text-xs text-red-600 mt-2">
+              ⚠️ Theory total cannot exceed {remainingForTheory} marks (remaining after objective)
+            </p>
+          )}
+          
+          {questions.length > 0 && theoryTotalMarks > 0 && isValidTheoryTotal && (
+            <div className="mt-3 p-2 bg-white rounded-lg border border-blue-100">
+              <p className="text-xs text-gray-600">
+                {questions.length} theory questions × {calculatedTheoryMarksPerQuestion.toFixed(2)} marks each
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* ── Stats ── */}
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-4 gap-2">
           {[
             { v: questions.length, l: "Questions", c: "purple" },
-            { v: totalMarks,       l: "Marks",     c: "emerald" },
-            { v: theoryMax,        l: "Max",        c: "blue" },
+            { v: theoryTotalMarks, l: "Theory Marks", c: "emerald" },
+            { v: remainingForTheory, l: "Available", c: "blue" },
+            { v: calculatedTheoryMarksPerQuestion.toFixed(2), l: "Per Question", c: "amber" },
           ].map(({ v, l, c }) => (
             <div
               key={l}
@@ -248,6 +384,28 @@ export function TheoryQuestionsStep({
             </div>
           ))}
         </div>
+
+        {/* ── Mark Distribution Warning ── */}
+        {!isValidTheoryTotal && (
+          <Alert className="bg-red-50 border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-700 text-xs">
+              Theory total ({theoryTotalMarks}) exceeds available ({remainingForTheory}) marks.
+              {objectiveTotal} objective + {theoryTotalMarks} theory = {objectiveTotal + theoryTotalMarks} 
+              (must equal 60)
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {markDistribution && !markDistribution.isBalanced && isValidTheoryTotal && (
+          <Alert className="bg-amber-50 border-amber-200">
+            <AlertCircle className="h-4 w-4 text-amber-600" />
+            <AlertDescription className="text-amber-700 text-xs">
+              Total: {objectiveTotal} + {theoryTotalMarks} = {objectiveTotal + theoryTotalMarks} 
+              {objectiveTotal + theoryTotalMarks !== 60 && " (must equal 60)"}
+            </AlertDescription>
+          </Alert>
+        )}
 
         {/* ── Mode switcher ── */}
         <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
@@ -274,6 +432,30 @@ export function TheoryQuestionsStep({
         {/* ══ SMART PASTE ══════════════════════════════════════════════════════ */}
         {mode === "smart" && (
           <div className="space-y-3">
+            <div className={cn(
+              "border rounded-lg p-2 flex items-center justify-between",
+              isValidTheoryTotal ? "bg-purple-50 border-purple-200" : "bg-gray-50 border-gray-200"
+            )}>
+              <div className="flex items-center gap-2">
+                <Calculator className={cn(
+                  "h-3.5 w-3.5",
+                  isValidTheoryTotal ? "text-purple-600" : "text-gray-400"
+                )} />
+                <span className={cn(
+                  "text-xs",
+                  isValidTheoryTotal ? "text-purple-700" : "text-gray-500"
+                )}>
+                  Each theory question will be {calculatedTheoryMarksPerQuestion.toFixed(2)} marks
+                </span>
+              </div>
+              <Badge className={cn(
+                "text-[10px]",
+                isValidTheoryTotal ? "bg-purple-200 text-purple-700" : "bg-gray-200 text-gray-500"
+              )}>
+                {isValidTheoryTotal ? "Auto-calculated" : "⚠️ Adjust marks"}
+              </Badge>
+            </div>
+
             <BulkImporter
               value={bulkText}
               onChange={onBulkTextChange}
@@ -282,16 +464,21 @@ export function TheoryQuestionsStep({
               isParsingFile={isParsingFile}
               parseError={showPreview ? null : parseError}
               placeholder={
-                `1. Question text here...\n\na. Sub-question a\nb. Sub-question b\n\nMarks: 10`
+                `1. Question text here...\n\na. Sub-question a\nb. Sub-question b\n\nMarks: ${calculatedTheoryMarksPerQuestion.toFixed(2)}`
               }
               accentColor="purple"
               onInsertExample={() => onBulkTextChange(THEORY_TEMPLATE)}
               onDownloadTemplate={downloadTemplate}
               parseButtonLabel="Smart Parse"
               parseButtonIcon={<Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-              // ── Larger paste area ──
               textareaClassName="text-sm sm:text-base leading-relaxed font-mono"
               textareaRows={16}
+              // ✅ Pass mark info
+              showMarkInfo={true}
+              defaultMark={defaultMark}
+              objectiveTotal={objectiveTotal}
+              theoryTotal={theoryTotalMarks}
+              isBalanced={objectiveTotal + theoryTotalMarks === 60}
             />
 
             {!showPreview && parseError && (
@@ -306,13 +493,15 @@ export function TheoryQuestionsStep({
             {/* ── Preview panel ── */}
             {showPreview && parsedPreview.length > 0 && (
               <div className="border-2 border-purple-200 rounded-lg overflow-hidden">
-                {/* Preview header */}
                 <div className="bg-purple-50 px-3 py-2 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Layers className="h-3.5 w-3.5 text-purple-600" />
                     <span className="font-semibold text-xs sm:text-sm text-purple-800">
                       Preview — {parsedPreview.length} question(s)
                     </span>
+                    <Badge className="bg-purple-200 text-purple-700 text-[10px]">
+                      {calculatedTheoryMarksPerQuestion.toFixed(2)} marks each
+                    </Badge>
                   </div>
                   <button
                     onClick={() => {
@@ -325,12 +514,10 @@ export function TheoryQuestionsStep({
                   </button>
                 </div>
 
-                {/* Preview list */}
                 <div className="max-h-[320px] overflow-y-auto divide-y">
                   {parsedPreview.map((q, idx) => (
                     <div key={idx} className="p-3 bg-white hover:bg-gray-50 transition-colors">
                       <div className="flex items-start gap-2">
-                        {/* Number bubble */}
                         <div className="w-6 h-6 bg-purple-100 rounded flex items-center justify-center text-[10px] font-bold text-purple-700 flex-shrink-0 mt-0.5">
                           {idx + 1}
                         </div>
@@ -351,7 +538,7 @@ export function TheoryQuestionsStep({
                             variant="outline"
                             className="text-[10px] h-4 mt-1"
                           >
-                            {q.marks} marks
+                            {q.marks || calculatedTheoryMarksPerQuestion} marks
                           </Badge>
                         </div>
                       </div>
@@ -359,7 +546,6 @@ export function TheoryQuestionsStep({
                   ))}
                 </div>
 
-                {/* Preview footer */}
                 <div className="bg-gray-50 px-3 py-2 flex gap-2 border-t">
                   <Button
                     variant="outline"
@@ -386,18 +572,24 @@ export function TheoryQuestionsStep({
         {/* ══ MANUAL ADD ═══════════════════════════════════════════════════════ */}
         {mode === "manual" && (
           <div className="space-y-3 p-3 sm:p-4 bg-gray-50 rounded-lg border">
-
-            {/* Question textarea */}
-            <div>
+            <div className="flex items-center justify-between">
               <Label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
-                Question
+                Manual Theory Question
               </Label>
+              <Badge className={cn(
+                "text-[10px]",
+                isValidTheoryTotal ? "bg-purple-100 text-purple-700" : "bg-red-100 text-red-700"
+              )}>
+                {calculatedTheoryMarksPerQuestion.toFixed(2)} marks each
+              </Badge>
+            </div>
+
+            <div>
               <Textarea
                 value={manualQ.question}
                 onChange={(e) =>
                   setManualQ((p) => ({ ...p, question: e.target.value }))
                 }
-                // ── Bigger: more rows, larger font ──
                 rows={8}
                 className="mt-1 resize-y text-sm sm:text-base leading-relaxed font-mono min-h-[160px]"
                 placeholder="Enter the full theory question here...
@@ -442,7 +634,6 @@ e.g.
                           image_caption: e.target.value,
                         }))
                       }
-                      // ── Bigger caption input ──
                       className="text-sm sm:text-base h-9"
                     />
                     <button
@@ -478,29 +669,37 @@ e.g.
               )}
             </div>
 
-            {/* Marks input */}
+            {/* Marks input - Auto-calculated */}
             <div>
               <Label className="text-[10px] font-semibold text-gray-600 uppercase tracking-wide">
-                Marks
+                Marks (Auto-calculated)
               </Label>
-              <Input
-                type="number"
-                min={1}
-                value={manualQ.marks}
-                onChange={(e) =>
-                  setManualQ((p) => ({
-                    ...p,
-                    marks: parseInt(e.target.value) || 10,
-                  }))
-                }
-                // ── Bigger marks input ──
-                className="mt-1 h-10 text-sm sm:text-base w-32"
-              />
+              <div className="mt-1 flex items-center gap-2">
+                <Input
+                  type="number"
+                  min={1}
+                  value={calculatedTheoryMarksPerQuestion.toFixed(2)}
+                  disabled
+                  className={cn(
+                    "h-10 text-sm sm:text-base w-32",
+                    isValidTheoryTotal ? "bg-gray-100 text-gray-600" : "bg-red-50 text-red-600"
+                  )}
+                />
+                <span className="text-xs text-gray-400">
+                  Based on {theoryTotalMarks} total marks
+                </span>
+              </div>
             </div>
 
             <Button
               onClick={handleAddManual}
-              className="w-full h-10 bg-purple-600 hover:bg-purple-700 text-sm sm:text-base"
+              disabled={!isValidTheoryTotal}
+              className={cn(
+                "w-full h-10 text-sm sm:text-base",
+                isValidTheoryTotal
+                  ? "bg-purple-600 hover:bg-purple-700"
+                  : "bg-gray-400 cursor-not-allowed"
+              )}
             >
               <Plus className="mr-1.5 h-4 w-4" />
               Add Theory Question

@@ -1,4 +1,5 @@
-// src/components/student/exams/SubjectFilter.tsx
+// src/components/student/exams/SubjectFilter.tsx - FIXED VERSION
+
 'use client'
 
 import { motion } from 'framer-motion'
@@ -20,11 +21,26 @@ interface SubjectFilterProps {
   exams: Exam[]
   examAttempts: Record<string, ExamAttempt>
   getSubjectConfig: (subject: string) => SubjectConfig
+  // ✅ Customizable options
+  searchPlaceholder?: string
+  allSubjectsLabel?: string
+  maxLabelLength?: number
 }
 
 export function SubjectFilter({
-  availableSubjects, selectedSubject, onSubjectChange, searchQuery,
-  onSearchChange, viewMode, onViewModeChange, exams, examAttempts, getSubjectConfig,
+  availableSubjects, 
+  selectedSubject, 
+  onSubjectChange, 
+  searchQuery,
+  onSearchChange, 
+  viewMode, 
+  onViewModeChange, 
+  exams, 
+  examAttempts, 
+  getSubjectConfig,
+  searchPlaceholder = 'Search exams...',  // ✅ Only fallback
+  allSubjectsLabel = 'All Subjects',      // ✅ Only fallback
+  maxLabelLength = 14,                   // ✅ Only fallback
 }: SubjectFilterProps) {
   if (availableSubjects.length === 0) return null
 
@@ -36,8 +52,9 @@ export function SubjectFilter({
         <div className="relative flex-1 min-w-[160px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <Input
-            placeholder="Search exams..."
-            value={searchQuery} onChange={e => onSearchChange(e.target.value)}
+            placeholder={searchPlaceholder}
+            value={searchQuery} 
+            onChange={e => onSearchChange(e.target.value)}
             className="pl-9 h-9 text-sm bg-white border-slate-200 rounded-xl"
           />
         </div>
@@ -61,10 +78,11 @@ export function SubjectFilter({
         <div className="flex gap-2 pb-2">
           {/* All chip */}
           <SubjectChipNew
-            label="All Subjects"
+            label={allSubjectsLabel}
             count={exams.length}
             isSelected={selectedSubject === 'all'}
             onClick={() => onSubjectChange('all')}
+            maxLabelLength={maxLabelLength}
           />
           {availableSubjects.map(subject => {
             const config = getSubjectConfig(subject)
@@ -82,6 +100,7 @@ export function SubjectFilter({
                 iconColor={config.color}
                 iconBg={config.bgColor}
                 onClick={() => onSubjectChange(subject)}
+                maxLabelLength={maxLabelLength}
               />
             )
           })}
@@ -92,12 +111,34 @@ export function SubjectFilter({
   )
 }
 
+interface SubjectChipNewProps {
+  label: string
+  count: number
+  isSelected: boolean
+  hasAttempt?: boolean
+  icon?: any
+  iconColor?: string
+  iconBg?: string
+  onClick: () => void
+  maxLabelLength?: number
+}
+
 function SubjectChipNew({
-  label, count, isSelected, hasAttempt, icon: Icon, iconColor, iconBg, onClick,
-}: {
-  label: string; count: number; isSelected: boolean; hasAttempt?: boolean
-  icon?: any; iconColor?: string; iconBg?: string; onClick: () => void
-}) {
+  label, 
+  count, 
+  isSelected, 
+  hasAttempt, 
+  icon: Icon, 
+  iconColor, 
+  iconBg, 
+  onClick,
+  maxLabelLength = 14,  // ✅ Only fallback
+}: SubjectChipNewProps) {
+  // ✅ Dynamic label truncation
+  const displayLabel = label.length > maxLabelLength 
+    ? label.substring(0, maxLabelLength) + '…' 
+    : label
+
   return (
     <button
       onClick={onClick}
@@ -114,7 +155,7 @@ function SubjectChipNew({
         </span>
       )}
       {!Icon && <BookOpen className="h-3 w-3 opacity-60" />}
-      <span>{label.length > 14 ? label.substring(0, 14) + '…' : label}</span>
+      <span>{displayLabel}</span>
       <span className={cn(
         'px-1.5 py-0 rounded-full text-[10px] font-semibold',
         isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'

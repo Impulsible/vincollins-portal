@@ -1,3 +1,5 @@
+// components/staff/ca-scores/CAScoresTab.tsx - COMPLETE FIXED VERSION
+
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -17,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Progress } from '@/components/ui/progress'
 
+// ── Constants ─────────────────────────────────────────────────────────────────
 const GRADING_SCALE = [
   { grade: 'A1', min: 75, max: 100, label: 'Excellent', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' },
   { grade: 'B2', min: 70, max: 74, label: 'Very Good', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' },
@@ -29,39 +32,32 @@ const GRADING_SCALE = [
   { grade: 'F9', min: 0, max: 39, label: 'Fail', color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
 ]
 
-const getGrade = (percentage: number): string => { 
+const getGrade = (percentage: number): string => {
   const g = GRADING_SCALE.find(g => percentage >= g.min && percentage <= g.max)
-  return g?.grade || 'F9' 
+  return g?.grade || 'F9'
 }
 
-const getGradeColor = (grade: string): string => { 
-  return GRADING_SCALE.find(g => g.grade === grade)?.color || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400' 
+const getGradeColor = (grade: string): string => {
+  return GRADING_SCALE.find(g => g.grade === grade)?.color || 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400'
 }
 
-const getGradeRemark = (grade: string): string => { 
-  return GRADING_SCALE.find(g => g.grade === grade)?.label || '' 
+const getGradeRemark = (grade: string): string => {
+  return GRADING_SCALE.find(g => g.grade === grade)?.label || ''
 }
-
-const TERM_OPTIONS = [
-  { value: 'first', label: 'First Term' }, 
-  { value: 'second', label: 'Second Term' }, 
-  { value: 'third', label: 'Third Term' }
-]
 
 const SENIOR_SUBJECTS = [
-  'English Language','Mathematics','Civic Education','Physics','Chemistry','Biology',
-  'Agricultural Science','Economics','Geography','Government','Literature in English',
-  'Christian Religious Studies','Yoruba','Commerce','Financial Accounting','Data Processing','Further Mathematics'
+  'English Language', 'Mathematics', 'Civic Education', 'Physics', 'Chemistry', 'Biology',
+  'Agricultural Science', 'Economics', 'Geography', 'Government', 'Literature in English',
+  'Christian Religious Studies', 'Yoruba', 'Commerce', 'Financial Accounting', 'Data Processing', 'Further Mathematics'
 ]
 
 const JUNIOR_SUBJECTS = [
-  'English Studies','Mathematics','Basic Science','Basic Technology','Social Studies',
-  'Civic Education','Agricultural Science','Business Studies','Home Economics',
-  'Christian Religious Studies','Yoruba','French','Information Technology','Cultural and Creative Arts',
-  'Music','Physical and Health Education','History','Security Education'
+  'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology', 'Social Studies',
+  'Civic Education', 'Agricultural Science', 'Business Studies', 'Home Economics',
+  'Christian Religious Studies', 'Yoruba', 'French', 'Information Technology', 'Cultural and Creative Arts',
+  'Music', 'Physical and Health Education', 'History', 'Security Education'
 ]
 
-// Subject name mapping for display
 const SUBJECT_NAME_MAPPING: Record<string, string> = {
   'CCA': 'Cultural and Creative Arts',
   'PHE': 'Physical and Health Education',
@@ -71,102 +67,102 @@ const SUBJECT_NAME_MAPPING: Record<string, string> = {
   'C.R.K.': 'Christian Religious Studies',
 }
 
-const getAvailableSessions = (currentSession: string): string[] => { 
-  const year = parseInt(currentSession.split('/')[0])
-  return [`${year - 1}/${year}`, `${year}/${year + 1}`, `${year + 1}/${year + 2}`] 
-}
-
-const getClassVariations = (classType: string): string[] => { 
+const getClassVariations = (classType: string): string[] => {
   if (classType === 'JSS 1') return ['JSS 1']
   if (classType === 'JSS 2') return ['JSS 2']
   if (classType === 'JSS 3') return ['JSS 3']
-  if (classType === 'SS1') return ['SS1 Science','SS1 Arts','SS1 Commercial']
-  if (classType === 'SS2') return ['SS2 Science','SS2 Arts','SS2 Commercial']
-  if (classType === 'SS3') return ['SS3 Science','SS3 Arts','SS3 Commercial']
-  return [classType] 
+  if (classType === 'SS1') return ['SS1 Science', 'SS1 Arts', 'SS1 Commercial']
+  if (classType === 'SS2') return ['SS2 Science', 'SS2 Arts', 'SS2 Commercial']
+  if (classType === 'SS3') return ['SS3 Science', 'SS3 Arts', 'SS3 Commercial']
+  return [classType]
 }
 
-const isGeneralClass = (className: string): boolean => { 
-  return ['JSS 1','JSS 2','JSS 3','SS1','SS2','SS3'].includes(className) 
+const isGeneralClass = (className: string): boolean => {
+  return ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3'].includes(className)
 }
 
-interface ScoreEntry { 
-  ca1: string; 
-  ca2: string; 
-  exam: string; 
-  is_saved?: boolean 
+interface ScoreEntry {
+  ca1: string
+  ca2: string
+  exam: string
+  is_saved?: boolean
 }
 
-interface Stats { 
+interface Stats {
   totalStudents: number
   gradedStudents: number
   classAverage: number
   highestScore: number
   passCount: number
   failCount: number
-  passRate: number 
+  passRate: number
 }
 
-interface Student { 
+interface Student {
   id: string
   full_name: string
   class: string
   admission_number: string
-  vin_id: string 
+  vin_id: string
 }
 
-interface SubjectStatus { 
+interface SubjectStatus {
   hasScores: boolean
   enteredByMe: boolean
   enteredByOther: boolean
   otherTeacherName?: string
-  studentCount: number 
+  studentCount: number
 }
 
-const STORAGE_KEYS = { 
-  SELECTED_CLASS: 'ca_scores_selected_class', 
-  SELECTED_SUBJECT: 'ca_scores_selected_subject', 
-  SELECTED_TERM: 'ca_scores_selected_term', 
-  SELECTED_YEAR: 'ca_scores_selected_year', 
-  SELECTED_EXAM: 'ca_scores_selected_exam', 
-  ACTIVE_TAB: 'ca_scores_active_tab', 
-  SKIP_EXAM: 'ca_scores_skip_exam' 
+interface TermOption {
+  value: string
+  label: string
+  is_current: boolean
 }
 
-// Subject Status Icon Component
+const STORAGE_KEYS = {
+  SELECTED_CLASS: 'ca_scores_selected_class',
+  SELECTED_SUBJECT: 'ca_scores_selected_subject',
+  SELECTED_EXAM: 'ca_scores_selected_exam',
+  ACTIVE_TAB: 'ca_scores_active_tab',
+  SKIP_EXAM: 'ca_scores_skip_exam'
+}
+
+// ── Subject Status Icon Component ────────────────────────────────────────────
 const SubjectStatusIcon = ({ status }: { status?: SubjectStatus }) => {
   if (!status) return null
   if (status.enteredByOther) {
     return (
-      <span className="flex items-center gap-1 text-red-500 dark:text-red-400" title={`Locked — ${status.otherTeacherName||'Another teacher'} entered scores for ${status.studentCount} student(s)`}>
-        <Lock className="h-3.5 w-3.5"/><span className="text-xs font-medium">Locked</span>
+      <span className="flex items-center gap-1 text-red-500 dark:text-red-400" title={`Locked — ${status.otherTeacherName || 'Another teacher'} entered scores for ${status.studentCount} student(s)`}>
+        <Lock className="h-3.5 w-3.5" /><span className="text-xs font-medium">Locked</span>
       </span>
     )
   }
   if (status.enteredByMe) {
     return (
       <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400" title={`You entered scores for ${status.studentCount} student(s)`}>
-        <CheckCircle2 className="h-3.5 w-3.5"/><span className="text-xs font-medium">You</span>
+        <CheckCircle2 className="h-3.5 w-3.5" /><span className="text-xs font-medium">You</span>
       </span>
     )
   }
   return (
     <span className="flex items-center gap-1 text-slate-400 dark:text-slate-500" title="Available">
-      <Circle className="h-3.5 w-3.5"/><span className="text-xs">Open</span>
+      <Circle className="h-3.5 w-3.5" /><span className="text-xs">Open</span>
     </span>
   )
 }
 
-function StatCard({ label, value, sub, icon: Icon, accent }: { 
+// ── Stat Card Component ──────────────────────────────────────────────────────
+function StatCard({ label, value, sub, icon: Icon, accent }: {
   label: string
   value: string | number
   sub?: string
   icon: React.ElementType
-  accent: string 
+  accent: string
 }) {
   return (
     <Card className="relative overflow-hidden border-0 shadow-sm bg-white dark:bg-slate-900">
-      <div className={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', accent)}/>
+      <div className={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', accent)} />
       <CardContent className="p-4 pl-5">
         <div className="flex items-start justify-between">
           <div>
@@ -174,8 +170,8 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
             <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{value}</p>
             {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>}
           </div>
-          <div className={cn('p-2 rounded-lg', accent.replace('bg-','bg-').replace('-500','-100'), 'dark:bg-slate-800')}>
-            <Icon className={cn('h-5 w-5', accent.replace('bg-','text-'))}/>
+          <div className={cn('p-2 rounded-lg', accent.replace('bg-', 'bg-').replace('-500', '-100'), 'dark:bg-slate-800')}>
+            <Icon className={cn('h-5 w-5', accent.replace('bg-', 'text-'))} />
           </div>
         </div>
       </CardContent>
@@ -183,16 +179,29 @@ function StatCard({ label, value, sub, icon: Icon, accent }: {
   )
 }
 
-export function CAScoresTab({ staffProfile, termInfo }: any) {
+// ── Helper: Deduplicate array by key ─────────────────────────────────────────
+function deduplicateByKey<T>(arr: T[], keyFn: (item: T) => string): T[] {
+  const seen = new Set<string>()
+  return arr.filter(item => {
+    const key = keyFn(item)
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
+export function CAScoresTab({ staffProfile }: any) {
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('entry')
   const [selectedClass, setSelectedClass] = useState('')
   const [selectedSubject, setSelectedSubject] = useState('')
-  const [selectedTerm, setSelectedTerm] = useState(termInfo?.termCode || 'third')
-  const [selectedYear, setSelectedYear] = useState(termInfo?.sessionYear || '2025/2026')
+  const [selectedTerm, setSelectedTerm] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
   const [selectedExamId, setSelectedExamId] = useState('')
   const [skipExam, setSkipExam] = useState(false)
   const [isRestoring, setIsRestoring] = useState(true)
+  const [isLoadingTerm, setIsLoadingTerm] = useState(true)
   const [students, setStudents] = useState<Student[]>([])
   const [classes, setClasses] = useState<string[]>([])
   const [subjects, setSubjects] = useState<string[]>([])
@@ -202,162 +211,226 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const [saving, setSaving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [autoFetching, setAutoFetching] = useState(false)
-  const [scoreEntries, setScoreEntries] = useState<Record<string,ScoreEntry>>({})
+  const [scoreEntries, setScoreEntries] = useState<Record<string, ScoreEntry>>({})
   const [editingScore, setEditingScore] = useState<any>(null)
   const [showEditDialog, setShowEditDialog] = useState(false)
-  const [savedStatus, setSavedStatus] = useState<Record<string,boolean>>({})
+  const [savedStatus, setSavedStatus] = useState<Record<string, boolean>>({})
   const [showDeleteAllDialog, setShowDeleteAllDialog] = useState(false)
   const [isDeletingAll, setIsDeletingAll] = useState(false)
   const [deleteProgress, setDeleteProgress] = useState(0)
-  const [stats, setStats] = useState<Stats>({ 
-    totalStudents:0,
-    gradedStudents:0,
-    classAverage:0,
-    highestScore:0,
-    passCount:0,
-    failCount:0,
-    passRate:0 
+  const [stats, setStats] = useState<Stats>({
+    totalStudents: 0,
+    gradedStudents: 0,
+    classAverage: 0,
+    highestScore: 0,
+    passCount: 0,
+    failCount: 0,
+    passRate: 0
   })
-  const [subjectsStatus, setSubjectsStatus] = useState<Record<string,SubjectStatus>>({})
+  const [subjectsStatus, setSubjectsStatus] = useState<Record<string, SubjectStatus>>({})
   const [isLocked, setIsLocked] = useState(false)
   const [checkingSubjects, setCheckingSubjects] = useState(false)
-  const isInitialMount = useRef(true)
-  const sessionOptions = getAvailableSessions(termInfo?.sessionYear || '2025/2026')
 
-  // Subject name mapping function
-  const getMappedSubject = useCallback((subject: string) => {
-    return SUBJECT_NAME_MAPPING[subject] || subject
+  // ✅ DYNAMIC TERM STATE
+  const [termOptions, setTermOptions] = useState<TermOption[]>([])
+  const [availableSessions, setAvailableSessions] = useState<string[]>([])
+
+  const isInitialMount = useRef(true)
+
+  // ✅ Fetch terms from database - DEDUPLICATED
+  const fetchTerms = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('terms')
+        .select('term_code, term_name')
+        .order('term_code', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching terms:', error)
+        return
+      }
+
+      if (data) {
+        // ✅ FIXED: Deduplicate by term_code to prevent duplicate keys
+        const deduplicated = deduplicateByKey(data, (t: any) => t.term_code)
+
+        const options: TermOption[] = deduplicated.map((t: any) => ({
+          value: t.term_code,
+          label: t.term_name,
+          is_current: false
+        }))
+        setTermOptions(options)
+      }
+    } catch (error) {
+      console.error('Error fetching terms:', error)
+    }
   }, [])
 
-  // Check subjects status
-  const checkSubjectsStatus = useCallback(async () => {
-    if (!selectedClass || !selectedTerm || !selectedYear || !staffProfile?.id) return
-    setCheckingSubjects(true)
-    const allSubjects = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
-    const classVariations = getClassVariations(selectedClass)
-    let query = supabase.from('ca_scores').select('subject,teacher_id,teacher_name,student_id,class')
-    query = classVariations.length > 1 ? query.in('class', classVariations) : query.eq('class', selectedClass)
-    const { data: allScores } = await query.eq('term', selectedTerm).eq('academic_year', selectedYear)
-    const statusMap: Record<string,SubjectStatus> = {}
-    for (const subject of allSubjects) {
-      const scores = (allScores || []).filter((s:any) => s.subject === subject)
-      if (scores.length === 0) { 
-        statusMap[subject] = { hasScores: false, enteredByMe: false, enteredByOther: false, studentCount: 0 }
-        continue 
-      }
-      const uniqueStudents = new Set(scores.map((s:any) => s.student_id))
-      const enteredByMe = scores.some((s:any) => s.teacher_id === staffProfile.id)
-      const enteredByOther = scores.some((s:any) => s.teacher_id !== staffProfile.id)
-      const otherTeacher = scores.find((s:any) => s.teacher_id !== staffProfile.id)
-      statusMap[subject] = { 
-        hasScores: true, 
-        enteredByMe: enteredByMe && !enteredByOther, 
-        enteredByOther, 
-        otherTeacherName: otherTeacher?.teacher_name, 
-        studentCount: uniqueStudents.size 
-      }
-    }
-    setSubjectsStatus(statusMap)
-    setCheckingSubjects(false)
-  }, [selectedClass, selectedTerm, selectedYear, staffProfile?.id])
+  // ✅ Fetch sessions from database - DEDUPLICATED
+  const fetchSessions = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('terms')
+        .select('session_year')
+        .not('session_year', 'is', null)
+        .order('session_year', { ascending: false })
 
-  // Restore state from localStorage
+      if (error || !data) {
+        return
+      }
+
+      // ✅ FIXED: Deduplicate sessions explicitly
+      const sessions = [...new Set(
+        data
+          .map((t: any) => t.session_year as string)
+          .filter(Boolean)
+      )]
+      setAvailableSessions(sessions)
+    } catch (error) {
+      console.error('Error fetching sessions:', error)
+    }
+  }, [])
+
+  // ✅ Fetch current term from school_settings
+  const fetchCurrentTerm = useCallback(async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('school_settings')
+        .select('current_term, current_session')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        console.error('Error fetching term settings:', error)
+        setIsLoadingTerm(false)
+        return
+      }
+
+      if (settings) {
+        setSelectedTerm(settings.current_term || '')
+        setSelectedYear(settings.current_session || '')
+
+        // Update term options with current flag
+        setTermOptions(prev => prev.map(t => ({
+          ...t,
+          is_current: t.value === settings.current_term
+        })))
+      }
+    } catch (error) {
+      console.error('Error fetching current term:', error)
+    } finally {
+      setIsLoadingTerm(false)
+    }
+  }, [])
+
+  // ── Mount: Fetch term from database ────────────────────────────────────────
   useEffect(() => {
+    const loadInitialData = async () => {
+      await Promise.all([
+        fetchTerms(),
+        fetchSessions(),
+        fetchCurrentTerm()
+      ])
+    }
+    loadInitialData()
+  }, [fetchTerms, fetchSessions, fetchCurrentTerm])
+
+  // ── Restore state from localStorage (after term is loaded) ────────────────
+  useEffect(() => {
+    if (isLoadingTerm) return
     if (typeof window !== 'undefined') {
       const get = (k: string) => localStorage.getItem(k)
       if (get(STORAGE_KEYS.SELECTED_CLASS)) setSelectedClass(get(STORAGE_KEYS.SELECTED_CLASS)!)
       if (get(STORAGE_KEYS.SELECTED_SUBJECT)) setSelectedSubject(get(STORAGE_KEYS.SELECTED_SUBJECT)!)
-      if (get(STORAGE_KEYS.SELECTED_TERM)) setSelectedTerm(get(STORAGE_KEYS.SELECTED_TERM)!)
-      if (get(STORAGE_KEYS.SELECTED_YEAR)) setSelectedYear(get(STORAGE_KEYS.SELECTED_YEAR)!)
       if (get(STORAGE_KEYS.SELECTED_EXAM)) setSelectedExamId(get(STORAGE_KEYS.SELECTED_EXAM)!)
       if (get(STORAGE_KEYS.ACTIVE_TAB)) setActiveTab(get(STORAGE_KEYS.ACTIVE_TAB)!)
       if (get(STORAGE_KEYS.SKIP_EXAM) === 'true') setSkipExam(true)
     }
     setIsRestoring(false)
     setMounted(true)
-  }, [])
+  }, [isLoadingTerm])
 
-  // Persist state to localStorage
+  // ── Persist state to localStorage ──────────────────────────────────────────
   useEffect(() => { if (isInitialMount.current) isInitialMount.current = false }, [])
   useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedClass) localStorage.setItem(STORAGE_KEYS.SELECTED_CLASS, selectedClass) }, [selectedClass, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedSubject) localStorage.setItem(STORAGE_KEYS.SELECTED_SUBJECT, selectedSubject) }, [selectedSubject, isRestoring])
-  useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SELECTED_TERM, selectedTerm) }, [selectedTerm, isRestoring])
-  useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SELECTED_YEAR, selectedYear) }, [selectedYear, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring && selectedExamId) localStorage.setItem(STORAGE_KEYS.SELECTED_EXAM, selectedExamId) }, [selectedExamId, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.ACTIVE_TAB, activeTab) }, [activeTab, isRestoring])
   useEffect(() => { if (!isInitialMount.current && !isRestoring) localStorage.setItem(STORAGE_KEYS.SKIP_EXAM, String(skipExam)) }, [skipExam, isRestoring])
-  
-  // Check subject status when selections change
-  useEffect(() => { if (mounted && !isRestoring && selectedClass && staffProfile?.id) checkSubjectsStatus() }, [mounted, isRestoring, selectedClass, selectedTerm, selectedYear, staffProfile?.id, checkSubjectsStatus])
-  
-  // Update lock state
-  useEffect(() => { setIsLocked(selectedSubject ? !!subjectsStatus[selectedSubject]?.enteredByOther : false) }, [selectedSubject, subjectsStatus])
 
-  // Handlers
-  const handleClassChange = (v: string) => {
-    setSelectedClass(v)
-    setSelectedSubject('')
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-    setScoreEntries({})
-    setSavedStatus({})
-  }
+  // ── Check subject status when selections change ────────────────────────────
+  useEffect(() => {
+    if (mounted && !isRestoring && selectedClass && selectedTerm && selectedYear && staffProfile?.id) {
+      checkSubjectsStatus()
+    }
+  }, [mounted, isRestoring, selectedClass, selectedTerm, selectedYear, staffProfile?.id])
 
-  const handleSubjectChange = (v: string) => { 
-    setSelectedSubject(v)
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-  }
-  
-  const handleTermChange = (v: string) => { 
-    setSelectedTerm(v)
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-  }
-  
-  const handleYearChange = (v: string) => { 
-    setSelectedYear(v)
-    setSelectedExamId('')
-    setSkipExam(false)
-    setCAScores([])
-  }
-  
-  const handleExamChange = (v: string) => { 
-    setSelectedExamId(v)
-    setSkipExam(false)
-  }
-  
-  const handleSkipExam = () => { 
-    setSkipExam(true)
-    setSelectedExamId('')
-  }
+  // ── Update lock state ──────────────────────────────────────────────────────
+  useEffect(() => {
+    setIsLocked(selectedSubject ? !!subjectsStatus[selectedSubject]?.enteredByOther : false)
+  }, [selectedSubject, subjectsStatus])
 
-  // Load classes
+  // ── Check subjects status ──────────────────────────────────────────────────
+  const checkSubjectsStatus = useCallback(async () => {
+    if (!selectedClass || !selectedTerm || !selectedYear || !staffProfile?.id) return
+    setCheckingSubjects(true)
+    try {
+      const allSubjects = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
+      const classVariations = getClassVariations(selectedClass)
+      let query = supabase.from('ca_scores').select('subject,teacher_id,teacher_name,student_id,class')
+      query = classVariations.length > 1 ? query.in('class', classVariations) : query.eq('class', selectedClass)
+      const { data: allScores } = await query.eq('term', selectedTerm).eq('academic_year', selectedYear)
+      const statusMap: Record<string, SubjectStatus> = {}
+      for (const subject of allSubjects) {
+        const scores = (allScores || []).filter((s: any) => s.subject === subject)
+        if (scores.length === 0) {
+          statusMap[subject] = { hasScores: false, enteredByMe: false, enteredByOther: false, studentCount: 0 }
+          continue
+        }
+        const uniqueStudents = new Set(scores.map((s: any) => s.student_id))
+        const enteredByMe = scores.some((s: any) => s.teacher_id === staffProfile.id)
+        const enteredByOther = scores.some((s: any) => s.teacher_id !== staffProfile.id)
+        const otherTeacher = scores.find((s: any) => s.teacher_id !== staffProfile.id)
+        statusMap[subject] = {
+          hasScores: true,
+          enteredByMe: enteredByMe && !enteredByOther,
+          enteredByOther,
+          otherTeacherName: otherTeacher?.teacher_name,
+          studentCount: uniqueStudents.size
+        }
+      }
+      setSubjectsStatus(statusMap)
+    } catch (error) {
+      console.error('Error checking subjects:', error)
+    } finally {
+      setCheckingSubjects(false)
+    }
+  }, [selectedClass, selectedTerm, selectedYear, staffProfile?.id])
+
+  // ── Load classes ────────────────────────────────────────────────────────────
   const loadClasses = useCallback(async () => {
-    const { data } = await supabase.from('profiles').select('class').eq('role','student').not('class','is',null)
-    const unique = [...new Set((data||[]).map((d:any) => d.class).filter(Boolean))] as string[]
-    const general = ['JSS 1','JSS 2','JSS 3','SS1','SS2','SS3']
+    const { data } = await supabase.from('profiles').select('class').eq('role', 'student').not('class', 'is', null)
+    const unique = [...new Set((data || []).map((d: any) => d.class).filter(Boolean))] as string[]
+    const general = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3']
     const all = [...new Set([...general, ...unique])].sort()
     setClasses(all)
     if (all.length > 0 && !selectedClass && !isRestoring) setSelectedClass(all[0])
   }, [selectedClass, isRestoring])
 
-  useEffect(() => { if (mounted && !isRestoring) loadClasses() }, [mounted, isRestoring, loadClasses])
+  useEffect(() => { if (mounted && !isRestoring && !isLoadingTerm) loadClasses() }, [mounted, isRestoring, isLoadingTerm, loadClasses])
 
-  // Set subjects based on class
+  // ── Set subjects based on class ────────────────────────────────────────────
   useEffect(() => {
-    if (!selectedClass || isRestoring) return
+    if (!selectedClass || isRestoring || isLoadingTerm) return
     const list = selectedClass.toUpperCase().startsWith('JSS') ? JUNIOR_SUBJECTS : SENIOR_SUBJECTS
     setSubjects(list)
     if (!selectedSubject && list.length > 0) setSelectedSubject(list[0])
-  }, [selectedClass, selectedSubject, isRestoring])
+  }, [selectedClass, selectedSubject, isRestoring, isLoadingTerm])
 
-  // Load exams
+  // ── Load exams ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring || skipExam) return
+    if (!selectedSubject || !selectedTerm || !selectedYear || isRestoring || skipExam || isLoadingTerm) return
     const loadExams = async () => {
       const { data } = await supabase
         .from('exams')
@@ -374,15 +447,20 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       }
     }
     loadExams()
-  }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring, skipExam, selectedClass])
+  }, [selectedSubject, selectedTerm, selectedYear, selectedExamId, isRestoring, skipExam, selectedClass, isLoadingTerm])
 
-  // Load all data for entry tab
+  // ── Get mapped subject ─────────────────────────────────────────────────────
+  const getMappedSubject = useCallback((subject: string) => {
+    return SUBJECT_NAME_MAPPING[subject] || subject
+  }, [])
+
+  // ── Load all data for entry tab ────────────────────────────────────────────
   const loadAllData = useCallback(async () => {
-    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
+    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
     try {
       const classVariations = getClassVariations(selectedClass)
-      let q = supabase.from('profiles').select('id,full_name,display_name,class,admission_number,vin_id').eq('role','student')
+      let q = supabase.from('profiles').select('id,full_name,display_name,class,admission_number,vin_id').eq('role', 'student')
       q = classVariations.length > 1 ? q.in('class', classVariations) : q.eq('class', selectedClass)
       const { data: profileData, error: profileError } = await q.order('display_name')
       if (profileError) throw profileError
@@ -400,37 +478,37 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         vin_id: p.vin_id || '—'
       }))
       setStudents(formatted)
-      
+
       const mappedSubject = getMappedSubject(selectedSubject)
       let sq = supabase.from('ca_scores').select('*').in('student_id', formatted.map(s => s.id)).eq('subject', mappedSubject).eq('term', selectedTerm).eq('academic_year', selectedYear)
       sq = classVariations.length > 1 ? sq.in('class', classVariations) : sq.eq('class', selectedClass)
       const { data: scoresData, error: scoresError } = await sq
       if (scoresError) throw scoresError
-      
-      const entries: Record<string,ScoreEntry> = {}
-      const savedMap: Record<string,boolean> = {}
+
+      const entries: Record<string, ScoreEntry> = {}
+      const savedMap: Record<string, boolean> = {}
       formatted.forEach(s => { entries[s.id] = { ca1: '', ca2: '', exam: '', is_saved: false } })
       let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
-      ;(scoresData || []).forEach((score: any) => {
-        const examTotal = score.exam_objective_score || 0
-        const caTotal = (score.ca1_score || 0) + (score.ca2_score || 0)
-        const total = caTotal + examTotal
-        
-        entries[score.student_id] = {
-          ca1: score.ca1_score?.toString() || '',
-          ca2: score.ca2_score?.toString() || '',
-          exam: examTotal > 0 ? examTotal.toString() : '',
-          is_saved: true
-        }
-        savedMap[score.student_id] = true
-        if (total > 0) {
-          totalSum += total
-          gradedCount++
-          if (total > highest) highest = total
-          if (getGrade(total) !== 'F9') passCount++
-          else failCount++
-        }
-      })
+        ; (scoresData || []).forEach((score: any) => {
+          const examTotal = score.exam_objective_score || 0
+          const caTotal = (score.ca1_score || 0) + (score.ca2_score || 0)
+          const total = caTotal + examTotal
+
+          entries[score.student_id] = {
+            ca1: score.ca1_score?.toString() || '',
+            ca2: score.ca2_score?.toString() || '',
+            exam: examTotal > 0 ? examTotal.toString() : '',
+            is_saved: true
+          }
+          savedMap[score.student_id] = true
+          if (total > 0) {
+            totalSum += total
+            gradedCount++
+            if (total > highest) highest = total
+            if (getGrade(total) !== 'F9') passCount++
+            else failCount++
+          }
+        })
       setScoreEntries(entries)
       setSavedStatus(savedMap)
       setStats({
@@ -448,11 +526,11 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     } finally {
       setLoading(false)
     }
-  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, getMappedSubject])
+  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, isLoadingTerm, getMappedSubject])
 
-  // Load scores for view tab
+  // ── Load scores for view tab ───────────────────────────────────────────────
   const loadScoresForViewTab = useCallback(async () => {
-    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear) return
+    if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
     try {
       const classVariations = getClassVariations(selectedClass)
@@ -461,7 +539,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
       q = classVariations.length > 1 ? q.in('class', classVariations) : q.eq('class', selectedClass)
       const { data: scoresData, error } = await q
       if (error) throw error
-      
+
       if (scoresData && scoresData.length > 0) {
         const studentMap = new Map()
         scoresData.forEach((s: any) => {
@@ -470,8 +548,8 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             const examTotal = s.exam_objective_score || 0
             const caTotal = (s.ca1_score || 0) + (s.ca2_score || 0)
             const total = caTotal + examTotal
-            studentMap.set(s.student_id, { 
-              ...s, 
+            studentMap.set(s.student_id, {
+              ...s,
               exam_score: examTotal,
               total_score: total,
               percentage: total,
@@ -496,13 +574,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             studentMap.set(s.student_id, existing)
           }
         })
-        
+
         const studentIds = Array.from(studentMap.keys())
         const { data: profiles } = await supabase
           .from('profiles')
           .select('id,full_name,display_name,admission_number')
           .in('id', studentIds)
-        
+
         const profileMap = new Map()
         profiles?.forEach((p: any) => {
           profileMap.set(p.id, {
@@ -510,7 +588,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             admission_number: p.admission_number || '—'
           })
         })
-        
+
         const mergedScores = Array.from(studentMap.values())
         const result = mergedScores
           .map((s: any) => ({
@@ -522,7 +600,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             const nameB = (b.student?.full_name || '').toLowerCase()
             return nameA.localeCompare(nameB)
           })
-        
+
         setCAScores(result)
       } else {
         setCAScores([])
@@ -533,20 +611,20 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     } finally {
       setLoading(false)
     }
-  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, getMappedSubject])
+  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, isLoadingTerm, getMappedSubject])
 
-  // Auto-load data when selections change
+  // ── Auto-load data when selections change ──────────────────────────────────
   useEffect(() => {
-    if (!isRestoring && selectedClass && selectedSubject && selectedTerm && selectedYear) {
+    if (!isRestoring && !isLoadingTerm && selectedClass && selectedSubject && selectedTerm && selectedYear) {
       loadAllData()
     }
-  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, loadAllData, isRestoring])
+  }, [selectedClass, selectedSubject, selectedTerm, selectedYear, loadAllData, isRestoring, isLoadingTerm])
 
   useEffect(() => {
-    if (activeTab === 'view' && selectedClass && selectedSubject) loadScoresForViewTab()
-  }, [activeTab, selectedClass, selectedSubject, loadScoresForViewTab])
+    if (activeTab === 'view' && selectedClass && selectedSubject && !isLoadingTerm) loadScoresForViewTab()
+  }, [activeTab, selectedClass, selectedSubject, loadScoresForViewTab, isLoadingTerm])
 
-  // Update stats
+  // ── Update stats from entries ──────────────────────────────────────────────
   const updateStatsFromEntries = () => {
     let totalSum = 0, gradedCount = 0, highest = 0, passCount = 0, failCount = 0
     students.forEach(student => {
@@ -574,24 +652,69 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     })
   }
 
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleClassChange = (v: string) => {
+    setSelectedClass(v)
+    setSelectedSubject('')
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+    setScoreEntries({})
+    setSavedStatus({})
+  }
+
+  const handleSubjectChange = (v: string) => {
+    setSelectedSubject(v)
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+  }
+
+  const handleTermChange = (v: string) => {
+    setSelectedTerm(v)
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+    setScoreEntries({})
+    setSavedStatus({})
+  }
+
+  const handleYearChange = (v: string) => {
+    setSelectedYear(v)
+    setSelectedExamId('')
+    setSkipExam(false)
+    setCAScores([])
+    setScoreEntries({})
+    setSavedStatus({})
+  }
+
+  const handleExamChange = (v: string) => {
+    setSelectedExamId(v)
+    setSkipExam(false)
+  }
+
+  const handleSkipExam = () => {
+    setSkipExam(true)
+    setSelectedExamId('')
+  }
+
   const handleScoreChange = (studentId: string, field: keyof ScoreEntry, value: string) => {
     if (isLocked || field === 'is_saved') return
-    const maxValues: Record<string,number> = { ca1: 20, ca2: 20, exam: 60 }
-    let num = Math.min(maxValues[field], Math.max(0, parseFloat(value) || 0))
+    const maxValues: Record<string, number> = { ca1: 20, ca2: 20, exam: 60 }
+    const num = Math.min(maxValues[field], Math.max(0, parseFloat(value) || 0))
     setScoreEntries(prev => ({ ...prev, [studentId]: { ...prev[studentId], [field]: num.toString(), is_saved: false } }))
     setSavedStatus(prev => ({ ...prev, [studentId]: false }))
     setTimeout(updateStatsFromEntries, 50)
   }
 
-  // ✅ FIXED: Auto-fetch single - ALWAYS calculate from exam_attempts (ignore existing CA scores)
+  // ── Auto-fetch single ──────────────────────────────────────────────────────
   const handleAutoFetchSingle = async (studentId: string) => {
     if (!selectedSubject || !selectedTerm || !selectedYear) {
       toast.info('Please select subject, term, and year first')
       return
     }
-    
+
     try {
-      // Fetch from exam_attempts - ALWAYS recalculate from source of truth
       const { data: examsData } = await supabase
         .from('exams')
         .select('id, objective_max, theory_max, total_marks')
@@ -599,14 +722,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         .eq('term', selectedTerm)
         .eq('session_year', selectedYear)
         .eq('status', 'published')
-      
+
       if (!examsData || examsData.length === 0) {
         toast.info('No published exams found')
         return
       }
-      
+
       const examIds = examsData.map(e => e.id)
-      
+
       const { data: attempt } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -615,115 +738,88 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle()
-      
-      if (!attempt) { 
-        toast.info('No attempt found') 
-        return 
+
+      if (!attempt) {
+        toast.info('No attempt found')
+        return
       }
-      
-      // ✅ Calculate exam score as raw total (objective + theory)
+
       const objScore = Number(attempt.objective_score) || 0
       const theoryScore = Number(attempt.theory_score) || 0
       const examScore = objScore + theoryScore
-      
-      if (examScore === 0) { 
-        toast.info('No score found') 
-        return 
+
+      if (examScore === 0) {
+        toast.info('No score found')
+        return
       }
-      
-      // Calculate total percentage (CA1 + CA2 + raw exam score)
-      const currentCA1 = parseInt(scoreEntries[studentId]?.ca1) || 0
-      const currentCA2 = parseInt(scoreEntries[studentId]?.ca2) || 0
-      const totalScore = currentCA1 + currentCA2 + examScore
-      
+
       setScoreEntries(prev => ({
         ...prev,
-        [studentId]: { 
-          ...prev[studentId], 
+        [studentId]: {
+          ...prev[studentId],
           ca1: prev[studentId]?.ca1 || '',
           ca2: prev[studentId]?.ca2 || '',
           exam: String(examScore),
-          is_saved: false 
+          is_saved: false
         }
       }))
       setSavedStatus(prev => ({ ...prev, [studentId]: false }))
-      toast.success(`Loaded: ${examScore}/60 (Obj: ${objScore}, Theory: ${theoryScore}) → Total: ${totalScore}%`)
+      toast.success(`Loaded: ${examScore}/60 (Obj: ${objScore}, Theory: ${theoryScore})`)
       setTimeout(updateStatsFromEntries, 50)
-      
+
     } catch (error) {
       console.error('Auto-fetch error:', error)
       toast.error('Failed to fetch exam score')
     }
   }
 
-  // ✅ FIXED: Auto-fetch all - ALWAYS calculate from exam_attempts (ignore existing CA scores)
+  // ── Auto-fetch all ──────────────────────────────────────────────────────────
   const handleAutoFetchAll = async () => {
     if (!selectedSubject || !selectedTerm || !selectedYear) {
       toast.info('Please select subject, term, and year first')
       return
     }
-    
+
     if (!selectedClass) {
       toast.info('Please select a class first')
       return
     }
-    
+
     setAutoFetching(true)
     let count = 0
     let totalFound = 0
-    let totalPercentages = 0
-    
+
     try {
-      const classVariations = getClassVariations(selectedClass)
-      
-      // Get exam configurations
-      const { data: examsData, error: examsError } = await supabase
+      const { data: examsData } = await supabase
         .from('exams')
         .select('id, objective_max, theory_max, total_marks, title')
         .eq('subject', selectedSubject)
         .eq('term', selectedTerm)
         .eq('session_year', selectedYear)
         .eq('status', 'published')
-      
-      if (examsError) {
-        console.error('❌ Exams fetch error:', examsError)
-        toast.error('Failed to fetch exam configuration')
-        setAutoFetching(false)
-        return
-      }
-      
+
       if (!examsData || examsData.length === 0) {
         toast.info('No published exams found for this subject, term, and year')
         setAutoFetching(false)
         return
       }
-      
+
       const examIds = examsData.map(e => e.id)
-      
-      // Get all attempts for students in this class
       const studentIds = students.map(s => s.id)
-      
+
       if (studentIds.length === 0) {
         toast.warning('No students found for this class. Please refresh the page.')
         setAutoFetching(false)
         return
       }
-      
-      const { data: allAttempts, error: attemptsError } = await supabase
+
+      const { data: allAttempts } = await supabase
         .from('exam_attempts')
         .select('*')
         .in('exam_id', examIds)
         .in('student_id', studentIds)
         .order('created_at', { ascending: false })
-      
-      if (attemptsError) {
-        console.error('❌ Attempts fetch error:', attemptsError)
-        toast.error('Failed to fetch exam attempts')
-        setAutoFetching(false)
-        return
-      }
-      
-      // Group attempts by student (latest first)
+
       const resultsMap = new Map()
       if (allAttempts) {
         allAttempts.forEach((a: any) => {
@@ -733,23 +829,18 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           }
         })
       }
-      
+
       const newEntries = { ...scoreEntries }
       const newSaved = { ...savedStatus }
-      
+
       for (const student of students) {
         const attempt = resultsMap.get(student.id)
         if (attempt) {
-          // ✅ Calculate exam score as raw total (objective + theory)
           const objScore = Number(attempt.objective_score) || 0
           const theoryScore = Number(attempt.theory_score) || 0
           const examScore = objScore + theoryScore
-          
+
           if (examScore > 0) {
-            const currentCA1 = parseInt(newEntries[student.id]?.ca1) || 0
-            const currentCA2 = parseInt(newEntries[student.id]?.ca2) || 0
-            const totalScore = currentCA1 + currentCA2 + examScore
-            
             newEntries[student.id] = {
               ca1: newEntries[student.id]?.ca1 || '',
               ca2: newEntries[student.id]?.ca2 || '',
@@ -759,40 +850,36 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             newSaved[student.id] = false
             count++
             totalFound += examScore
-            totalPercentages += totalScore
           }
         }
       }
-      
+
       setScoreEntries(newEntries)
       setSavedStatus(newSaved)
-      
+
       setTimeout(() => {
         updateStatsFromEntries()
       }, 50)
-      
+
       if (count > 0) {
         const avgExamScore = Math.round(totalFound / count)
-        const avgTotalPercentage = Math.round(totalPercentages / count)
-        toast.success(`Loaded ${count} exam score(s) (avg exam: ${avgExamScore}/60, avg total: ${avgTotalPercentage}%)`)
+        toast.success(`Loaded ${count} exam score(s) (avg: ${avgExamScore}/60)`)
       } else {
         toast.info(`No exam scores found for ${selectedClass} in this subject`)
       }
     } catch (error: any) {
-      console.error('❌ Auto-fetch error:', error)
+      console.error('Auto-fetch error:', error)
       toast.error(`Failed to fetch exam scores: ${error.message}`)
     } finally {
       setAutoFetching(false)
     }
   }
 
-  // Build save payload - saves raw objective + theory as exam score
+  // ── Build save payload ──────────────────────────────────────────────────────
   const buildSavePayload = (studentId: string, ca1: number, ca2: number, exam: number, studentClass: string): any => {
     const caTotal = ca1 + ca2
-    // exam is already the raw total (objective + theory)
-    const examScore = exam
-    const total = caTotal + examScore
-    
+    const total = caTotal + exam
+
     const now = new Date().toISOString()
     const d: any = {
       student_id: studentId,
@@ -820,7 +907,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     return d
   }
 
-  // Save single score
+  // ── Save single ─────────────────────────────────────────────────────────────
   const handleSaveSingle = async (studentId: string) => {
     if (!staffProfile?.id) { toast.error('Missing teacher information'); return }
     if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
@@ -856,7 +943,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     finally { setSaving(false) }
   }
 
-  // Save all scores
+  // ── Save all ────────────────────────────────────────────────────────────────
   const handleSaveAll = async () => {
     if (!staffProfile?.id) { toast.error('Missing teacher information'); return }
     if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
@@ -906,7 +993,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     finally { setSaving(false) }
   }
 
-  // Delete all scores
+  // ── Delete all ──────────────────────────────────────────────────────────────
   const handleDeleteAllScores = async () => {
     if (isLocked) { toast.error(`Locked by ${subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}`); return }
     setIsDeletingAll(true)
@@ -936,7 +1023,9 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
     finally { setIsDeletingAll(false); setDeleteProgress(0) }
   }
 
+  // ── Refresh ─────────────────────────────────────────────────────────────────
   const handleRefresh = async () => {
+    await fetchCurrentTerm()
     await checkSubjectsStatus()
     await loadAllData()
     if (activeTab === 'view') await loadScoresForViewTab()
@@ -946,7 +1035,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const getStudentName = (id: string) => students.find(s => s.id === id)?.full_name || 'Unknown'
   const getStudentAdmission = (id: string) => students.find(s => s.id === id)?.admission_number || '—'
 
-  const groupedStudents = students.reduce((acc: Record<string,Student[]>, s) => {
+  const groupedStudents = students.reduce((acc: Record<string, Student[]>, s) => {
     const cls = s.class || 'Unknown'
     if (!acc[cls]) acc[cls] = []
     acc[cls].push(s)
@@ -955,33 +1044,44 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
   const classOrder = Object.keys(groupedStudents).sort()
   const filteredScores = caScores.filter(s => (s.student?.full_name || getStudentName(s.student_id)).toLowerCase().includes(searchQuery.toLowerCase()))
 
-  if (!mounted || isRestoring) {
+  // ── Helper: Get term label safely ──────────────────────────────────────────
+  const getTermLabel = (termValue: string): string => {
+    return termOptions.find(t => t.value === termValue)?.label || termValue
+  }
+
+  const isCurrentTerm = (termValue: string): boolean => {
+    return termOptions.find(t => t.value === termValue)?.is_current || false
+  }
+
+  // ── Loading state ───────────────────────────────────────────────────────────
+  if (!mounted || isRestoring || isLoadingTerm) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto"/>
-          <p className="text-sm text-slate-500">Loading assessment data…</p>
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
+          <p className="text-sm text-slate-500">{isLoadingTerm ? 'Loading term settings…' : 'Loading assessment data…'}</p>
         </div>
       </div>
     )
   }
 
+  // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-5">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Total Students" value={stats.totalStudents} icon={Users} accent="bg-emerald-500"/>
-        <StatCard label="Graded" value={stats.gradedStudents} sub={`of ${stats.totalStudents}`} icon={GraduationCap} accent="bg-blue-500"/>
-        <StatCard label="Class Average" value={`${stats.classAverage}%`} icon={TrendingUp} accent="bg-violet-500"/>
-        <StatCard label="Pass Rate" value={`${stats.passRate}%`} sub={`${stats.passCount} passed · ${stats.failCount} failed`} icon={Award} accent="bg-amber-500"/>
+        <StatCard label="Total Students" value={stats.totalStudents} icon={Users} accent="bg-emerald-500" />
+        <StatCard label="Graded" value={stats.gradedStudents} sub={`of ${stats.totalStudents}`} icon={GraduationCap} accent="bg-blue-500" />
+        <StatCard label="Class Average" value={`${stats.classAverage}%`} icon={TrendingUp} accent="bg-violet-500" />
+        <StatCard label="Pass Rate" value={`${stats.passRate}%`} sub={`${stats.passCount} passed · ${stats.failCount} failed`} icon={Award} accent="bg-amber-500" />
       </div>
 
       {/* Subject Status Legend */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-semibold text-slate-600 dark:text-slate-300">Subject status:</span>
-        <span className="flex items-center gap-1.5"><Circle className="h-3.5 w-3.5 text-slate-400"/>Available</span>
-        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500"/>Entered by you</span>
-        <span className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-red-500"/>Locked by another teacher</span>
+        <span className="flex items-center gap-1.5"><Circle className="h-3.5 w-3.5 text-slate-400" />Available</span>
+        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />Entered by you</span>
+        <span className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-red-500" />Locked by another teacher</span>
       </div>
 
       {/* Configuration Card */}
@@ -990,12 +1090,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-emerald-100 dark:bg-emerald-900/30">
-                <Settings2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400"/>
+                <Settings2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Assessment Configuration</CardTitle>
             </div>
             <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading || checkingSubjects} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 h-8 px-3">
-              <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', (loading || checkingSubjects) && 'animate-spin')}/>
+              <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', (loading || checkingSubjects) && 'animate-spin')} />
               Refresh
             </Button>
           </div>
@@ -1007,13 +1107,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Class</Label>
               <Select value={selectedClass} onValueChange={handleClassChange}>
                 <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
-                  <SelectValue placeholder="Select class"/>
+                  <SelectValue placeholder="Select class" />
                 </SelectTrigger>
                 <SelectContent>
                   {classes.map(cls => (
-                    <SelectItem key={cls} value={cls}>
-                      {isGeneralClass(cls) ? 
-                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{cls} <span className="text-xs opacity-70">(All Streams)</span></span> : 
+                    <SelectItem key={`class-${cls}`} value={cls}>
+                      {isGeneralClass(cls) ?
+                        <span className="font-medium text-emerald-600 dark:text-emerald-400">{cls} <span className="text-xs opacity-70">(All Streams)</span></span> :
                         cls
                       }
                     </SelectItem>
@@ -1022,12 +1122,12 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               </Select>
               {isGeneralClass(selectedClass) && (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <Layers className="h-3 w-3"/>All {selectedClass} streams
+                  <Layers className="h-3 w-3" />All {selectedClass} streams
                 </p>
               )}
             </div>
 
-            {/* Subject Select - with mapped names and status */}
+            {/* Subject Select */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Subject</Label>
               <Select value={selectedSubject} onValueChange={handleSubjectChange}>
@@ -1036,7 +1136,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                     {selectedSubject && (
                       <div className="flex items-center justify-between w-full gap-2">
                         <span className="truncate">{getMappedSubject(selectedSubject)}</span>
-                        <SubjectStatusIcon status={subjectsStatus[selectedSubject]}/>
+                        <SubjectStatusIcon status={subjectsStatus[selectedSubject]} />
                       </div>
                     )}
                   </SelectValue>
@@ -1044,14 +1144,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 <SelectContent>
                   {checkingSubjects ? (
                     <div className="flex items-center gap-2 py-4 px-3 text-sm text-slate-500">
-                      <Loader2 className="h-4 w-4 animate-spin"/>Checking…
+                      <Loader2 className="h-4 w-4 animate-spin" />Checking…
                     </div>
                   ) : (
                     subjects.map(sub => (
-                      <SelectItem key={sub} value={sub}>
+                      <SelectItem key={`subject-${sub}`} value={sub}>
                         <div className="flex items-center justify-between w-full gap-3">
                           <span>{getMappedSubject(sub)}</span>
-                          <SubjectStatusIcon status={subjectsStatus[sub]}/>
+                          <SubjectStatusIcon status={subjectsStatus[sub]} />
                         </div>
                       </SelectItem>
                     ))
@@ -1060,7 +1160,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               </Select>
               {isLocked && selectedSubject && (
                 <div className="flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800/50 text-xs">
-                  <Lock className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0"/>
+                  <Lock className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-red-700 dark:text-red-400">Locked</p>
                     <p className="text-red-600 dark:text-red-500">{subjectsStatus[selectedSubject]?.otherTeacherName || 'Another teacher'} has entered scores.</p>
@@ -1069,7 +1169,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               )}
               {!isLocked && selectedSubject && subjectsStatus[selectedSubject]?.enteredByMe && (
                 <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3"/>{subjectsStatus[selectedSubject]?.studentCount} student(s) recorded
+                  <CheckCircle2 className="h-3 w-3" />{subjectsStatus[selectedSubject]?.studentCount} student(s) recorded
                 </p>
               )}
             </div>
@@ -1079,34 +1179,34 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Examination</Label>
               <Select value={selectedExamId} onValueChange={handleExamChange} disabled={skipExam || isLocked}>
                 <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
-                  <SelectValue placeholder={skipExam ? 'Skipped (CA only)' : 'Select exam'}/>
+                  <SelectValue placeholder={skipExam ? 'Skipped (CA only)' : 'Select exam'} />
                 </SelectTrigger>
                 <SelectContent>
                   {availableExams.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-slate-400">No exams available</div>
                   ) : (
                     availableExams.map(e => (
-                      <SelectItem key={e.id} value={e.id}>{e.title} {e.class ? `(${e.class})` : ''}</SelectItem>
+                      <SelectItem key={`exam-${e.id}`} value={e.id}>{e.title} {e.class ? `(${e.class})` : ''}</SelectItem>
                     ))
                   )}
                 </SelectContent>
               </Select>
               {!isLocked && (
                 <div className="flex gap-1.5">
-                  <button 
-                    onClick={handleSkipExam} 
+                  <button
+                    onClick={handleSkipExam}
                     className={cn(
                       'text-xs px-2 py-0.5 rounded border transition-colors',
-                      skipExam ? 
-                        'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700' : 
+                      skipExam ?
+                        'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700' :
                         'text-slate-500 border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
                     )}
                   >
                     {skipExam ? '✓ CA Only' : 'Skip exam'}
                   </button>
                   {skipExam && (
-                    <button 
-                      onClick={() => { setSkipExam(false); if (availableExams.length > 0) setSelectedExamId(availableExams[0].id) }} 
+                    <button
+                      onClick={() => { setSkipExam(false); if (availableExams.length > 0) setSelectedExamId(availableExams[0].id) }}
                       className="text-xs px-2 py-0.5 rounded border border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 transition-colors"
                     >
                       Cancel
@@ -1116,77 +1216,114 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
               )}
             </div>
 
-            {/* Term Select */}
+            {/* ✅ Term Select - FIXED: Deduplicated data + unique keys */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Term</Label>
               <Select value={selectedTerm} onValueChange={handleTermChange}>
                 <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
-                  <SelectValue/>
+                  <SelectValue placeholder="Select term">
+                    {selectedTerm && (
+                      <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                        {getTermLabel(selectedTerm)}
+                      </span>
+                    )}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  {TERM_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  {termOptions.length > 0 ? (
+                    termOptions.map((o, index) => (
+                      <SelectItem key={`term-opt-${o.value}-${index}`} value={o.value}>
+                        <span className={selectedTerm === o.value ? 'font-medium text-emerald-600 dark:text-emerald-400' : ''}>
+                          {o.label}
+                          {o.is_current && ' (current)'}
+                        </span>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-slate-400">Loading terms...</div>
+                  )}
                 </SelectContent>
               </Select>
+              {selectedTerm && isCurrentTerm(selectedTerm) && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />Current term
+                </p>
+              )}
             </div>
 
-            {/* Session Select */}
+            {/* ✅ Session Select - FIXED: Deduplicated data + unique keys */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Session</Label>
               <Select value={selectedYear} onValueChange={handleYearChange}>
                 <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
-                  <SelectValue/>
+                  <SelectValue placeholder="Select session" />
                 </SelectTrigger>
                 <SelectContent>
-                  {sessionOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                  {availableSessions.length > 0 ? (
+                    availableSessions.map((session, index) => (
+                      <SelectItem key={`session-opt-${session}-${index}`} value={session}>
+                        <span className={selectedYear === session ? 'font-medium text-emerald-600 dark:text-emerald-400' : ''}>
+                          {session}
+                        </span>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-sm text-slate-400">No sessions available</div>
+                  )}
                 </SelectContent>
               </Select>
+              {selectedYear && (
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3" />Current session: {selectedYear}
+                </p>
+              )}
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-            <Button 
-              onClick={handleSaveAll} 
-              disabled={saving || students.length === 0 || isLocked} 
-              size="sm" 
+            <Button
+              onClick={handleSaveAll}
+              disabled={saving || students.length === 0 || isLocked}
+              size="sm"
               className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white shadow-sm h-9"
             >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2"/> : <SaveAll className="h-4 w-4 mr-2"/>}
+              {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <SaveAll className="h-4 w-4 mr-2" />}
               {isLocked ? 'Locked' : 'Save All Scores'}
             </Button>
             {!skipExam && selectedExamId && !isLocked && (
-              <Button 
-                onClick={handleAutoFetchAll} 
-                disabled={autoFetching || students.length === 0} 
-                variant="outline" 
-                size="sm" 
+              <Button
+                onClick={handleAutoFetchAll}
+                disabled={autoFetching || students.length === 0}
+                variant="outline"
+                size="sm"
                 className="h-9"
               >
-                <RefreshCw className={cn('h-4 w-4 mr-2', autoFetching && 'animate-spin')}/>
+                <RefreshCw className={cn('h-4 w-4 mr-2', autoFetching && 'animate-spin')} />
                 Auto-Fetch Exam Scores
               </Button>
             )}
-            <Button 
-              onClick={() => setShowDeleteAllDialog(true)} 
-              disabled={caScores.length === 0 || loading || isLocked} 
-              variant="outline" 
-              size="sm" 
+            <Button
+              onClick={() => setShowDeleteAllDialog(true)}
+              disabled={caScores.length === 0 || loading || isLocked}
+              variant="outline"
+              size="sm"
               className="h-9 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30 ml-auto"
             >
-              <Trash className="h-4 w-4 mr-2"/>Delete All
+              <Trash className="h-4 w-4 mr-2" />Delete All
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Tabs */}
+      {/* ── Tabs ────────────────────────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-10 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-auto inline-flex">
           <TabsTrigger value="entry" className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 px-4">
-            <FileText className="h-4 w-4"/>Score Entry
+            <FileText className="h-4 w-4" />Score Entry
           </TabsTrigger>
           <TabsTrigger value="view" className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 px-4">
-            <BarChart3 className="h-4 w-4"/>View Scores
+            <BarChart3 className="h-4 w-4" />View Scores
             {caScores.length > 0 && (
               <span className="ml-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-1.5 py-0.5 rounded-full">
                 {caScores.length}
@@ -1195,13 +1332,13 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           </TabsTrigger>
         </TabsList>
 
-        {/* Score Entry Tab */}
+        {/* ── Score Entry Tab ────────────────────────────────────────────── */}
         <TabsContent value="entry" className="mt-4 space-y-4">
           {isLocked ? (
             <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="py-16 text-center">
                 <div className="inline-flex p-4 rounded-2xl bg-red-50 dark:bg-red-950/30 mb-4">
-                  <Lock className="h-10 w-10 text-red-400 dark:text-red-500"/>
+                  <Lock className="h-10 w-10 text-red-400 dark:text-red-500" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-800 dark:text-slate-200 mb-1">Score Entry Locked</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
@@ -1211,14 +1348,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                   const avail = subjects.find(s => !subjectsStatus[s]?.enteredByOther && s !== selectedSubject)
                   avail ? setSelectedSubject(avail) : toast.info('All subjects have scores entered.')
                 }}>
-                  Switch to Available Subject <ChevronRight className="h-4 w-4 ml-1"/>
+                  Switch to Available Subject <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </CardContent>
             </Card>
           ) : loading ? (
             <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="text-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3"/>
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
                 <p className="text-sm text-slate-500">Loading students…</p>
               </CardContent>
             </Card>
@@ -1226,17 +1363,17 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="text-center py-16">
                 <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
-                  <Users className="h-10 w-10 text-slate-400"/>
+                  <Users className="h-10 w-10 text-slate-400" />
                 </div>
                 <p className="text-sm text-slate-500">No students found in <strong>{selectedClass}</strong></p>
               </CardContent>
             </Card>
           ) : (
             classOrder.map(cls => (
-              <Card key={cls} className="border-0 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
+              <Card key={`entry-class-${cls}`} className="border-0 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
                   <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-emerald-600 dark:text-emerald-400"/>
+                    <BookOpen className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{cls}</span>
                     <Badge variant="secondary" className="text-xs font-medium ml-1">{groupedStudents[cls].length} students</Badge>
                   </div>
@@ -1265,7 +1402,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                         const hasExam = entry.exam && parseInt(entry.exam) > 0
                         const isSaved = savedStatus[student.id]
                         return (
-                          <TableRow key={student.id} className={cn(
+                          <TableRow key={`student-entry-${student.id}`} className={cn(
                             'border-slate-100 dark:border-slate-800 transition-colors',
                             idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/20',
                             isSaved && 'bg-emerald-50/30 dark:bg-emerald-950/10'
@@ -1312,7 +1449,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                   onClick={() => handleAutoFetchSingle(student.id)}
                                   className="h-8 w-20 mx-auto text-xs text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                                 >
-                                  <RefreshCw className="h-3 w-3 mr-1"/>Load
+                                  <RefreshCw className="h-3 w-3 mr-1" />Load
                                 </Button>
                               ) : (
                                 <Input
@@ -1350,7 +1487,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                   isSaved ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
                                 )}
                               >
-                                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin"/> : isSaved ? <CheckCircle2 className="h-3.5 w-3.5"/> : <Save className="h-3.5 w-3.5"/>}
+                                {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isSaved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
                                 {isSaved ? 'Saved' : 'Save'}
                               </Button>
                             </TableCell>
@@ -1365,7 +1502,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           )}
         </TabsContent>
 
-        {/* View Scores Tab */}
+        {/* ── View Scores Tab ──────────────────────────────────────────────── */}
         <TabsContent value="view" className="mt-4">
           <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
             <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
@@ -1373,17 +1510,17 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                 <div>
                   <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Published Scores</CardTitle>
                   <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 flex items-center flex-wrap gap-1">
-                    <span>{selectedClass} · {getMappedSubject(selectedSubject)} · {TERM_OPTIONS.find(t => t.value === selectedTerm)?.label}</span>
+                    <span>{selectedClass} · {getMappedSubject(selectedSubject)} · {getTermLabel(selectedTerm)}</span>
                     {isLocked && (
                       <Badge className="ml-2 bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 text-xs">
-                        <Lock className="h-3 w-3 mr-1"/>Locked
+                        <Lock className="h-3 w-3 mr-1" />Locked
                       </Badge>
                     )}
                   </div>
                 </div>
                 <div className="flex gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-64">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400"/>
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
                     <Input
                       placeholder="Search students…"
                       value={searchQuery}
@@ -1392,7 +1529,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                     />
                   </div>
                   <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading} className="h-9 w-9 p-0">
-                    <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')}/>
+                    <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                   </Button>
                 </div>
               </div>
@@ -1400,27 +1537,27 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
             <CardContent className="p-0">
               {loading ? (
                 <div className="text-center py-16">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3"/>
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
                   <p className="text-sm text-slate-500">Loading scores…</p>
                 </div>
               ) : caScores.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
-                    <FileText className="h-10 w-10 text-slate-400"/>
+                    <FileText className="h-10 w-10 text-slate-400" />
                   </div>
                   <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No scores published yet</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 mb-5">Enter scores and save them to see them here.</p>
                   <Button variant="outline" size="sm" onClick={() => setActiveTab('entry')} disabled={isLocked}>
-                    Go to Score Entry <ChevronRight className="h-4 w-4 ml-1"/>
+                    Go to Score Entry <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
-                      <TableRow className="border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-50 dark:hover:bg-slate-800/60">
-                        {['Student','Adm. No','CA1','CA2','Exam','Total','%','Grade','By','Actions'].map(h => (
-                          <TableHead key={h} className={cn(
+                      <TableRow className="border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60 hover:bg-transparent">
+                        {['Student', 'Adm. No', 'CA1', 'CA2', 'Exam', 'Total', '%', 'Grade', 'By', 'Actions'].map(h => (
+                          <TableHead key={`view-head-${h}`} className={cn(
                             'font-semibold text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide py-3',
                             h === 'Student' ? 'pl-5 min-w-[180px]' : 'text-center',
                             h === 'Actions' ? 'pr-5' : ''
@@ -1441,14 +1578,14 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                         const adm = score.student?.admission_number || getStudentAdmission(score.student_id)
                         const isOwn = score.teacher_id === staffProfile?.id
                         return (
-                          <TableRow key={score.id} className={cn(
+                          <TableRow key={`view-score-${score.id}`} className={cn(
                             'border-slate-100 dark:border-slate-800',
                             idx % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/50 dark:bg-slate-800/20'
                           )}>
                             <TableCell className="pl-5 py-3 font-medium text-sm text-slate-800 dark:text-slate-200">
                               <div className="flex items-center gap-1.5">
                                 {name}
-                                {!isOwn && <Lock className="h-3 w-3 text-red-400 flex-shrink-0"/>}
+                                {!isOwn && <Lock className="h-3 w-3 text-red-400 flex-shrink-0" />}
                               </div>
                             </TableCell>
                             <TableCell className="text-center text-xs font-mono text-slate-500 dark:text-slate-400">{adm}</TableCell>
@@ -1463,11 +1600,11 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                             <TableCell className="text-center">
                               {isOwn ? (
                                 <Badge variant="secondary" className="text-xs gap-1">
-                                  <CheckCircle2 className="h-3 w-3 text-emerald-500"/>You
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />You
                                 </Badge>
                               ) : (
                                 <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs gap-1">
-                                  <AlertTriangle className="h-3 w-3"/>{score.teacher_name || 'Other'}
+                                  <AlertTriangle className="h-3 w-3" />{score.teacher_name || 'Other'}
                                 </Badge>
                               )}
                             </TableCell>
@@ -1480,7 +1617,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                   onClick={() => { setEditingScore(score); setShowEditDialog(true) }}
                                   className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 disabled:opacity-30"
                                 >
-                                  <Edit className="h-3.5 w-3.5"/>
+                                  <Edit className="h-3.5 w-3.5" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -1499,7 +1636,7 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
                                   }}
                                   className="h-8 w-8 p-0 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-30"
                                 >
-                                  <Trash2 className="h-3.5 w-3.5"/>
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
                               </div>
                             </TableCell>
@@ -1515,25 +1652,25 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
         </TabsContent>
       </Tabs>
 
-      {/* Delete All Dialog */}
+      {/* ── Delete All Dialog ────────────────────────────────────────────────── */}
       <AlertDialog open={showDeleteAllDialog} onOpenChange={setShowDeleteAllDialog}>
         <AlertDialogContent className="max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <AlertDialogHeader>
             <div className="flex items-center gap-3 mb-1">
               <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400"/>
+                <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
               <AlertDialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">Delete All Score Records?</AlertDialogTitle>
             </div>
             <AlertDialogDescription asChild>
               <div className="space-y-3 pl-11">
                 <div className="flex flex-wrap gap-1.5">
-                  {[selectedClass, getMappedSubject(selectedSubject), TERM_OPTIONS.find(t => t.value === selectedTerm)?.label, selectedYear].map((v, i) => v && (
-                    <Badge key={i} variant="secondary" className="text-xs font-medium">{v}</Badge>
+                  {[selectedClass, getMappedSubject(selectedSubject), getTermLabel(selectedTerm), selectedYear].map((v, i) => v && (
+                    <Badge key={`delete-badge-${i}`} variant="secondary" className="text-xs font-medium">{v}</Badge>
                   ))}
                 </div>
                 <div className="flex items-center gap-2 p-2.5 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800/50">
-                  <Database className="h-4 w-4 text-red-500 flex-shrink-0"/>
+                  <Database className="h-4 w-4 text-red-500 flex-shrink-0" />
                   <span className="text-sm font-semibold text-red-700 dark:text-red-400">{caScores.length} record{caScores.length !== 1 ? 's' : ''} will be permanently deleted</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">This action cannot be undone.</p>
@@ -1543,29 +1680,29 @@ export function CAScoresTab({ staffProfile, termInfo }: any) {
           <AlertDialogFooter className="gap-2 mt-2">
             <AlertDialogCancel disabled={isDeletingAll} className="h-9">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteAllScores} disabled={isDeletingAll} className="bg-red-600 hover:bg-red-700 text-white h-9 gap-1.5">
-              {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin"/> : <Trash className="h-4 w-4"/>}
+              {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}
               Delete Permanently
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Progress Dialog */}
-      <Dialog open={isDeletingAll && deleteProgress > 0 && deleteProgress < 100} onOpenChange={() => {}}>
+      {/* ── Delete Progress Dialog ──────────────────────────────────────────── */}
+      <Dialog open={isDeletingAll && deleteProgress > 0 && deleteProgress < 100} onOpenChange={() => { }}>
         <DialogContent className="max-w-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-              <Loader2 className="h-4 w-4 animate-spin text-red-500"/>Deleting scores…
+              <Loader2 className="h-4 w-4 animate-spin text-red-500" />Deleting scores…
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2 pt-1">
-            <Progress value={deleteProgress} className="h-2"/>
+            <Progress value={deleteProgress} className="h-2" />
             <p className="text-right text-xs text-slate-500">{deleteProgress}%</p>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Edit Score Dialog */}
+      {/* ── Edit Score Dialog ────────────────────────────────────────────────── */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <DialogHeader>

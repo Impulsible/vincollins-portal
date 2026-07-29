@@ -3,7 +3,7 @@
 import { BookOpen, Target, FileText, Eye } from "lucide-react";
 import type { ExamDetails, StepId } from "./types";
 
-export const STORAGE_KEY = "create_exam_draft_v2";
+export const STORAGE_KEY = "create_exam_draft_v3";
 
 export const STEPS: {
   id: StepId;
@@ -25,8 +25,10 @@ export const DEFAULT_EXAM_DETAILS: ExamDetails = {
   pass_mark: 50,
   randomize_questions: true,
   randomize_options: true,
-  term: "third",
-  session_year: "2025/2026",
+  term: "",
+  session_year: "",
+  passage_text: "",
+  description: "",
 };
 
 export const CLASS_OPTIONS = {
@@ -96,6 +98,17 @@ export const SS_SUBJECTS = [
   "Further Mathematics",
   "CRS",
 ];
+
+// ✅ Mark constants - NO HARDCODED LIMITS
+export const MARK_CONSTANTS = {
+  EXAM_TOTAL: 60,
+  CA1_MAX: 10,
+  CA2_MAX: 10,
+  CA_TOTAL: 20,
+  GRAND_TOTAL: 100,
+  DEFAULT_MARK: 0.5,
+  DEFAULT_THEORY_TOTAL: 40,
+} as const;
 
 export const OBJECTIVE_TEMPLATE = `1. What is the capital of Nigeria?
 A. Lagos

@@ -1,6 +1,6 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-// components/student/StudentWelcomeBanner.tsx - SIMPLIFIED VERSION
+// components/student/StudentWelcomeBanner.tsx - COMPLETE FIXED VERSION
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -45,6 +45,29 @@ interface StudentWelcomeBannerProps {
 }
 
 const STORAGE_KEY = 'student_session_start'
+
+// ✅ Get subject count based on class level (JSS = 17, SS = 10)
+const getSubjectCountByClassLevel = (className: string): number => {
+  if (!className) return 0
+  
+  const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
+  
+  // JSS classes - 17 subjects
+  if (normalizedClass.includes('JSS1') || 
+      normalizedClass.includes('JSS2') || 
+      normalizedClass.includes('JSS3')) {
+    return 17
+  }
+  
+  // SS classes - 10 subjects
+  if (normalizedClass.includes('SS1') || 
+      normalizedClass.includes('SS2') || 
+      normalizedClass.includes('SS3')) {
+    return 10
+  }
+  
+  return 0
+}
 
 // ─── Personalized Quotes ──────────────────────────────
 const quotes = {
@@ -104,20 +127,74 @@ const getPersonalizedQuote = (hour: number, firstName: string) => {
   }
 }
 
-const calculateGrade = (percentage: number): { grade: string; color: string; description: string } => {
-  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
-  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
-  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
-  if (percentage >= 50) return { grade: 'P', color: 'text-purple-600', description: 'Pass' }
-  return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+// ✅ Get grade from database
+async function getGradeFromDB(percentage: number): Promise<{ grade: string; color: string; description: string }> {
+  try {
+    const { data, error } = await supabase
+      .from('grade_system')
+      .select('grade, color, description')
+      .gte('min_score', percentage)
+      .lte('max_score', percentage)
+      .single()
+
+    if (error || !data) {
+      // Fallback calculation
+      if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
+      if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
+      if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
+      if (percentage >= 50) return { grade: 'P', color: 'text-purple-600', description: 'Pass' }
+      return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+    }
+
+    return {
+      grade: data.grade,
+      color: data.color || 'text-gray-600',
+      description: data.description || ''
+    }
+  } catch (error) {
+    console.error('Error fetching grade:', error)
+    // Fallback calculation
+    if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
+    if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
+    if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
+    if (percentage >= 50) return { grade: 'P', color: 'text-purple-600', description: 'Pass' }
+    return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+  }
 }
 
-const getSubjectCountForClass = (className: string): number => {
-  if (!className) return 17
-  const normalizedClass = className.toString().toUpperCase().replace(/\s+/g, '')
-  if (normalizedClass.startsWith('JSS')) return 17
-  if (normalizedClass.startsWith('SS')) return 10
-  return 17
+// ✅ Get subject count - ALWAYS use class-level count (JSS=17, SS=10)
+async function getSubjectCountFromDB(className: string): Promise<number> {
+  if (!className) return 0
+
+  try {
+    // ✅ ALWAYS use class-level count for JSS and SS classes
+    const classCount = getSubjectCountByClassLevel(className)
+    if (classCount > 0) {
+      console.log(`📊 Using class-level count: ${classCount} for ${className}`)
+      return classCount
+    }
+
+    // Fallback: Get from exams table if class-level returns 0
+    const { data: exams, error: examsError } = await supabase
+      .from('exams')
+      .select('subject')
+      .eq('class', className)
+      .not('subject', 'is', null)
+
+    if (!examsError && exams && exams.length > 0) {
+      const uniqueSubjects = new Set(exams.map((e: any) => e.subject))
+      const dbCount = uniqueSubjects.size
+      if (dbCount > 0) {
+        console.log(`📊 Using exams count: ${dbCount} for ${className}`)
+        return dbCount
+      }
+    }
+
+    return 0
+  } catch (error) {
+    console.error('Error fetching subject count:', error)
+    return getSubjectCountByClassLevel(className)
+  }
 }
 
 export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelcomeBannerProps) {
@@ -128,11 +205,25 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
   const [avatarError, setAvatarError] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [liveStats, setLiveStats] = useState<StudentStats | null>(stats)
+  const [subjectCount, setSubjectCount] = useState<number>(0)
 
   // Update live stats when parent stats change
   useEffect(() => {
     setLiveStats(stats)
   }, [stats])
+
+  // ✅ Fetch subject count - ALWAYS uses class-level count
+  useEffect(() => {
+    if (profile?.class) {
+      getSubjectCountFromDB(profile.class).then(count => {
+        setSubjectCount(count)
+      }).catch(err => {
+        console.error('Error fetching subject count:', err)
+        const fallbackCount = getSubjectCountByClassLevel(profile.class)
+        setSubjectCount(fallbackCount)
+      })
+    }
+  }, [profile?.class])
 
   // ─── Real-time Subscriptions for Stats ─────────────────
   useEffect(() => {
@@ -278,17 +369,38 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
   const firstName = getFirstName(profile?.full_name || 'Student')
   const studentClass = profile?.class || 'Not Assigned'
   const studentDepartment = profile?.department || 'General'
-  const totalSubjects = liveStats?.totalSubjects || getSubjectCountForClass(studentClass)
+  
+  // ✅ ALWAYS use class-level subject count
+  const totalSubjects = liveStats?.totalSubjects || subjectCount || getSubjectCountByClassLevel(studentClass) || 0
   const completedExams = liveStats?.completedExams ?? 0
   const averageScore = liveStats?.averageScore ?? 0
   const availableExams = liveStats?.availableExams ?? 0
   const pendingTheoryCount = liveStats?.pendingTheoryCount ?? 0
 
-  const gradeInfo = liveStats?.currentGrade && liveStats?.gradeColor 
-    ? { grade: liveStats.currentGrade, color: liveStats.gradeColor, description: '' }
-    : calculateGrade(averageScore)
+  // ✅ Get grade from database or use provided
+  const [gradeInfo, setGradeInfo] = useState<{ grade: string; color: string; description: string }>({
+    grade: 'N/A',
+    color: 'text-gray-400',
+    description: ''
+  })
+
+  useEffect(() => {
+    if (liveStats?.currentGrade && liveStats?.gradeColor) {
+      setGradeInfo({
+        grade: liveStats.currentGrade,
+        color: liveStats.gradeColor,
+        description: ''
+      })
+    } else if (averageScore > 0) {
+      getGradeFromDB(averageScore).then(info => {
+        setGradeInfo(info)
+      }).catch(err => {
+        console.error('Error fetching grade:', err)
+      })
+    }
+  }, [liveStats?.currentGrade, liveStats?.gradeColor, averageScore])
   
-  const showGrade = completedExams > 0
+  const showGrade = completedExams > 0 && gradeInfo.grade !== 'N/A'
   const completionPercentage = totalSubjects > 0 ? Math.round((completedExams / totalSubjects) * 100) : 0
 
   const avatarLetter = firstName.charAt(0).toUpperCase()
@@ -447,7 +559,7 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
                       <span className="inline-flex"><p className={cn("text-2xl md:text-3xl font-bold", gradeInfo.color)}>{gradeInfo.grade}</p></span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{averageScore.toFixed(2)}% average - {gradeInfo.description}</p>
+                      <p>{averageScore.toFixed(2)}% average {gradeInfo.description && `- ${gradeInfo.description}`}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>

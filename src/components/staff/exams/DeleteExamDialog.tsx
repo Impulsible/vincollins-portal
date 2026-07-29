@@ -1,4 +1,5 @@
-// src/components/staff/exams/DeleteExamDialog.tsx - FULLY RESPONSIVE
+// src/components/staff/exams/DeleteExamDialog.tsx - MINOR IMPROVEMENT
+
 'use client'
 
 import {
@@ -18,9 +19,16 @@ interface DeleteExamDialogProps {
   onOpenChange: (open: boolean) => void
   examTitle?: string
   onConfirm: () => void
+  isDeleting?: boolean // ✅ Optional: for loading state
 }
 
-export function DeleteExamDialog({ open, onOpenChange, examTitle, onConfirm }: DeleteExamDialogProps) {
+export function DeleteExamDialog({ 
+  open, 
+  onOpenChange, 
+  examTitle, 
+  onConfirm,
+  isDeleting = false 
+}: DeleteExamDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent className="w-[90vw] max-w-md sm:max-w-lg p-4 sm:p-6 gap-3 sm:gap-4">
@@ -40,14 +48,18 @@ export function DeleteExamDialog({ open, onOpenChange, examTitle, onConfirm }: D
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col sm:flex-row gap-2 sm:gap-3 mt-2">
-          <AlertDialogCancel className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm">
+          <AlertDialogCancel 
+            className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+            disabled={isDeleting}
+          >
             Cancel
           </AlertDialogCancel>
           <AlertDialogAction 
             onClick={onConfirm} 
             className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm bg-red-600 hover:bg-red-700 text-white"
+            disabled={isDeleting}
           >
-            Delete
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

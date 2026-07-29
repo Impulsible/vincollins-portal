@@ -1,6 +1,7 @@
+// app/student/profile/page.tsx - COMPLETE FIXED VERSION
+
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/profile/page.tsx - WITH SUBJECTS (No Days Active)
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -11,7 +12,6 @@ import { StudentSidebar } from '@/components/student/StudentSidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Card, CardContent } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
@@ -20,7 +20,7 @@ import {
   User, Mail, Phone, MapPin, Calendar, GraduationCap,
   Camera, Loader2, Save, ChevronRight, Home, ArrowLeft,
   Hash, Fingerprint, Sparkles, Edit3, BookOpen, Users, 
-  BookMarked, School, Award
+  BookMarked, School, Award, Trophy, Target
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -106,14 +106,12 @@ export default function StudentProfilePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
-  // Real stats from database (no assignments/grades)
+  // Real stats from database
   const [stats, setStats] = useState({
     classmates: 0,
-    subjects: 0,
-    teachers: 0
+    completedExams: 0,
+    averageScore: 0
   })
-  
-  const [subjectsList, setSubjectsList] = useState<string[]>([])
   
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false)
   const [isUploadingCover, setIsUploadingCover] = useState(false)
@@ -129,6 +127,10 @@ export default function StudentProfilePage() {
     address: '',
     bio: ''
   })
+
+  // ✅ Get current term from database
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
 
   useEffect(() => {
     const storedTab = sessionStorage.getItem('studentActiveTab')
@@ -156,9 +158,40 @@ export default function StudentProfilePage() {
     }
   }
 
+  // ✅ Fetch current term
+  async function fetchCurrentTermAndSession(): Promise<{ term: string; session: string }> {
+    try {
+      const { data: settings, error } = await supabase
+        .from('school_settings')
+        .select('current_term, current_session')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error || !settings) {
+        return { term: '', session: '' }
+      }
+
+      return {
+        term: settings.current_term || '',
+        session: settings.current_session || ''
+      }
+    } catch (error) {
+      console.error('Error fetching current term:', error)
+      return { term: '', session: '' }
+    }
+  }
+
   useEffect(() => {
     loadProfile()
+    loadCurrentTerm()
   }, [])
+
+  async function loadCurrentTerm() {
+    const { term, session } = await fetchCurrentTermAndSession()
+    setCurrentTerm(term)
+    setCurrentSession(session)
+  }
 
   async function loadProfile() {
     try {
@@ -190,7 +223,7 @@ export default function StudentProfilePage() {
         })
         
         // Load real stats
-        await loadStats(session.user.id, profileData.class)
+        await loadStats(session.user.id, profileData.class, profileData.department)
       } else {
         const emailName = session.user.email?.split('@')[0] || 'Student'
         const formattedName = emailName.split('.').map((n: string) => 
@@ -243,44 +276,122 @@ export default function StudentProfilePage() {
     }
   }
 
-  async function loadStats(userId: string, studentClass: string) {
+  // ✅ Updated loadStats with only Classmates, Exams Done, Average Score
+  async function loadStats(userId: string, studentClass: string, department: string) {
     try {
-      // 1. Get classmates count (other students in same class)
-      const { count: classmatesCount } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('class', studentClass)
-        .eq('role', 'student')
-        .neq('id', userId)
-
-      // 2. Get distinct subjects from assignments for this class
-      const { data: assignments } = await supabase
-        .from('assignments')
-        .select('subject')
-        .eq('status', 'published')
-        .or(`classes.cs.{${studentClass}},class.eq.${studentClass}`)
-
-      const uniqueSubjects = [...new Set(assignments?.map(a => a.subject).filter(Boolean) || [])]
+      // 1. ✅ Get classmates count - multiple strategies
+      let classmatesCount = 0
       
-      // 3. Get teachers count (staff/teachers who created assignments for this class)
-      const { data: teachers } = await supabase
-        .from('assignments')
-        .select('created_by')
-        .eq('status', 'published')
-        .or(`classes.cs.{${studentClass}},class.eq.${studentClass}`)
+      try {
+        // Strategy 1: Exact match on class
+        const { count: exactCount, error: exactError } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('class', studentClass)
+          .eq('role', 'student')
+          .neq('id', userId)
+        
+        if (!exactError) {
+          classmatesCount = exactCount || 0
+          console.log(`📊 Exact match classmates: ${classmatesCount}`)
+        }
+        
+        // Strategy 2: If exact match returns 0, try ILIKE with the full class name
+        if (classmatesCount === 0) {
+          const { count: likeCount, error: likeError } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true })
+            .ilike('class', `%${studentClass}%`)
+            .eq('role', 'student')
+            .neq('id', userId)
+          
+          if (!likeError) {
+            classmatesCount = likeCount || 0
+            console.log(`📊 ILIKE match classmates: ${classmatesCount}`)
+          }
+        }
+        
+        // Strategy 3: Extract class level (e.g., "SS2") and match
+        if (classmatesCount === 0) {
+          const classLevelMatch = studentClass.match(/^(JSS[1-3]|SS[1-3])/i)
+          const classLevel = classLevelMatch ? classLevelMatch[0].toUpperCase() : ''
+          
+          if (classLevel) {
+            const { count: levelCount, error: levelError } = await supabase
+              .from('profiles')
+              .select('*', { count: 'exact', head: true })
+              .ilike('class', `%${classLevel}%`)
+              .eq('role', 'student')
+              .neq('id', userId)
+            
+            if (!levelError) {
+              classmatesCount = levelCount || 0
+              console.log(`📊 Class level match (${classLevel}) classmates: ${classmatesCount}`)
+            }
+          }
+        }
+        
+        // Strategy 4: Get all students in the same year (SS2) across all departments
+        if (classmatesCount === 0) {
+          const yearMatch = studentClass.match(/^(JSS[1-3]|SS[1-3])/i)
+          const year = yearMatch ? yearMatch[0].toUpperCase() : ''
+          
+          if (year) {
+            const { count: yearCount, error: yearError } = await supabase
+              .from('profiles')
+              .select('*', { count: 'exact', head: true })
+              .ilike('class', `${year}%`)
+              .eq('role', 'student')
+              .neq('id', userId)
+            
+            if (!yearError) {
+              classmatesCount = yearCount || 0
+              console.log(`📊 Year match (${year}) classmates: ${classmatesCount}`)
+            }
+          }
+        }
+      } catch (e) {
+        console.log('classmates count query failed:', e)
+      }
 
-      const uniqueTeachers = [...new Set(teachers?.map(t => t.created_by).filter(Boolean) || [])]
+      // 2. ✅ Get exam performance stats for current term
+      let completedExams = 0
+      let averageScore = 0
+
+      if (currentTerm && currentSession) {
+        try {
+          const { data: attempts, error: attemptsError } = await supabase
+            .from('exam_attempts')
+            .select('percentage, status')
+            .eq('student_id', userId)
+            .eq('term', currentTerm)
+            .eq('session_year', currentSession)
+            .in('status', ['completed', 'graded'])
+
+          if (!attemptsError && attempts && attempts.length > 0) {
+            completedExams = attempts.length
+            const totalScore = attempts.reduce((sum, a) => sum + (a.percentage || 0), 0)
+            averageScore = Math.round(totalScore / attempts.length)
+            console.log(`📊 Exams completed: ${completedExams}, Average: ${averageScore}%`)
+          }
+        } catch (e) {
+          console.log('exam attempts query failed:', e)
+        }
+      }
 
       setStats({
         classmates: classmatesCount || 0,
-        subjects: uniqueSubjects.length,
-        teachers: uniqueTeachers.length
+        completedExams: completedExams || 0,
+        averageScore: averageScore || 0
       })
-      
-      setSubjectsList(uniqueSubjects.slice(0, 8)) // Show top 8 subjects
       
     } catch (error) {
       console.error('Error loading stats:', error)
+      setStats({
+        classmates: 0,
+        completedExams: 0,
+        averageScore: 0
+      })
     }
   }
 
@@ -585,45 +696,18 @@ export default function StudentProfilePage() {
                   color="emerald"
                 />
                 <StatCard 
-                  icon={BookMarked} 
-                  label="Subjects" 
-                  value={stats.subjects.toString()} 
-                  color="blue"
+                  icon={Trophy} 
+                  label="Exams Done" 
+                  value={stats.completedExams.toString()} 
+                  color="amber"
                 />
                 <StatCard 
-                  icon={School} 
-                  label="Teachers" 
-                  value={stats.teachers.toString()} 
-                  color="purple"
+                  icon={Target} 
+                  label="Avg Score" 
+                  value={stats.completedExams > 0 ? `${stats.averageScore}%` : '-'} 
+                  color="rose"
                 />
               </div>
-
-              {/* Subjects Section */}
-              {subjectsList.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-                  <div className="px-6 py-4 border-b border-slate-100">
-                    <h2 className="text-lg font-semibold text-slate-800 flex items-center gap-2">
-                      <BookOpen className="h-5 w-5 text-emerald-600" />
-                      Your Subjects
-                    </h2>
-                    <p className="text-sm text-slate-500">Subjects available in your curriculum</p>
-                  </div>
-                  <div className="p-6">
-                    <div className="flex flex-wrap gap-2">
-                      {subjectsList.map((subject, index) => (
-                        <Badge key={index} variant="secondary" className="px-3 py-1.5 text-sm bg-slate-100 text-slate-700">
-                          {subject}
-                        </Badge>
-                      ))}
-                      {stats.subjects > 8 && (
-                        <Badge variant="outline" className="px-3 py-1.5 text-sm">
-                          +{stats.subjects - 8} more
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
 
               {/* Personal Info Card */}
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
@@ -688,8 +772,7 @@ function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType
   const colorClasses = {
     emerald: "bg-emerald-50 text-emerald-600",
     amber: "bg-amber-50 text-amber-600",
-    blue: "bg-blue-50 text-blue-600",
-    purple: "bg-purple-50 text-purple-600",
+    rose: "bg-rose-50 text-rose-600",
   }
   
   return (

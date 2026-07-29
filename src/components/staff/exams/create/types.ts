@@ -36,6 +36,7 @@ export interface ExamDetails {
   term: string
   session_year: string
   passage_text?: string
+  description?: string
 }
 
 export interface TeacherProfile {
@@ -69,6 +70,7 @@ export interface DraftData {
   passageText: string
   hasPassage: boolean
   savedAt: string
+  theoryTotalMarks: number
 }
 
 export interface ParseResult<T> {
@@ -85,4 +87,109 @@ export interface CreateExamDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess: () => void
   teacherProfile: TeacherProfile | null
+  defaultTerm?: string
+  defaultSession?: string
+}
+
+export interface TermOption {
+  value: string
+  label: string
+  session_year: string
+  is_current: boolean
+}
+
+// ✅ Mark distribution types
+export interface MarkDistribution {
+  objectiveTotal: number
+  theoryTotal: number
+  examTotal: number
+  ca1Max: number
+  ca2Max: number
+  caTotal: number
+  grandTotal: number
+  questionCount: number
+  theoryQuestionCount: number
+  marksPerTheoryQuestion: number
+  isBalanced: boolean
+  theoryMarksPerQuestion: number
+}
+
+// ✅ Step Props
+export interface ExamDetailsStepProps {
+  examDetails: ExamDetails
+  onExamDetailsChange: (details: ExamDetails) => void
+  hasTheory: boolean
+  onHasTheoryChange: (v: boolean) => void
+  objectiveMax: number
+  onObjectiveMaxChange: (v: number) => void
+  theoryMax: number
+  onTheoryMaxChange: (v: number) => void
+  defaultMark: number
+  onDefaultMarkChange: (v: number) => void
+  questionCount?: number
+  markDistribution?: MarkDistribution
+}
+
+export interface ObjectiveQuestionsStepProps {
+  questions: Question[]
+  onQuestionsChange: (q: Question[]) => void
+  objectiveMax: number
+  defaultMark: number
+  bulkText: string
+  onBulkTextChange: (v: string) => void
+  onParse: (text: string) => ParseResult<Question>
+  passageText: string
+  onPassageTextChange: (v: string) => void
+  hasPassage: boolean
+  onHasPassageChange: (v: boolean) => void
+  markDistribution?: MarkDistribution
+  onDefaultMarkChange?: (mark: number) => void
+}
+
+export interface TheoryQuestionsStepProps {
+  questions: TheoryQuestion[]
+  onQuestionsChange: (q: TheoryQuestion[]) => void
+  hasTheory: boolean
+  onHasTheoryChange: (v: boolean) => void
+  theoryMax: number
+  bulkText: string
+  onBulkTextChange: (v: string) => void
+  onParse: (text: string) => ParseResult<TheoryQuestion>
+  markDistribution?: MarkDistribution
+  defaultMark?: number
+  theoryTotalMarks: number
+  onTheoryTotalMarksChange: (value: number) => void
+  objectiveTotal: number
+}
+
+export interface PreviewStepProps {
+  examDetails: ExamDetails
+  questions: Question[]
+  theoryQuestions: TheoryQuestion[]
+  hasTheory: boolean
+  objectiveMax: number
+  theoryMax: number
+  passageText?: string
+  defaultMark?: number
+  markDistribution?: MarkDistribution
+  theoryTotalMarks?: number
+}
+
+export interface SubmitOptions {
+  examDetails: ExamDetails
+  questions: Question[]
+  theoryQuestions: TheoryQuestion[]
+  hasTheory: boolean
+  objectiveMax: number
+  theoryMax: number
+  theoryQuestionsTotal: number
+  theoryQuestionsToAnswer: number | null
+  theoryMarksPerQuestion: number
+  scoringRule: ScoringRule
+  teacherProfile: TeacherProfile | null
+  submitForApproval: boolean
+  passageText: string | null
+  defaultMark: number
+  markDistribution: MarkDistribution
+  theoryTotalMarks: number
 }

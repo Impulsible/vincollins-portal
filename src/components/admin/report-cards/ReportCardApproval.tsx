@@ -669,16 +669,19 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   const router = useRouter()
   const searchParams = useSearchParams()
 
+  // ── State ────────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true)
+  const [isLoadingTerm, setIsLoadingTerm] = useState(true)
   const [reportCards, setReportCards] = useState<ReportCard[]>([])
   const [selectedClass, setSelectedClass] = useState(searchParams?.get('class') || 'all')
-  const [selectedTerm, setSelectedTerm] = useState(() => {
-    const p = searchParams?.get('term')
-    return p === 'first' ? 'First Term' : p === 'second' ? 'Second Term' : 'Third Term'
-  })
-  const [selectedYear, setSelectedYear] = useState(searchParams?.get('year') || '2025/2026')
+  const [selectedTerm, setSelectedTerm] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
   const [selectedStatus, setSelectedStatus] = useState(searchParams?.get('status') || 'all')
   const [searchQuery, setSearchQuery] = useState('')
+
+  // ── Dynamic term state ──────────────────────────────────────────────────────
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
 
   const [selectedCard, setSelectedCard] = useState<ReportCard | null>(null)
   const [showReviewDialog, setShowReviewDialog] = useState(false)
@@ -726,6 +729,49 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   const getDisplayName = (card: ReportCard) =>
     card.student_display_name || card.student_name || 'Unknown Student'
 
+  // ── Fetch current term from database ───────────────────────────────────────
+  const fetchCurrentTerm = useCallback(async () => {
+    try {
+      const { data: settings, error } = await supabase
+        .from('school_settings')
+        .select('current_term, current_session')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        console.error('Error fetching term settings:', error)
+        setCurrentTerm('third')
+        setCurrentSession('2025/2026')
+        setIsLoadingTerm(false)
+        return
+      }
+
+      if (settings) {
+        const term = settings.current_term || 'third'
+        const session = settings.current_session || '2025/2026'
+        
+        setCurrentTerm(term)
+        setCurrentSession(session)
+        
+        // Only set selectedTerm/Year if they haven't been set yet
+        if (!selectedTerm || selectedTerm === '') {
+          const termLabel = getTermLabel(term)
+          setSelectedTerm(termLabel)
+        }
+        if (!selectedYear || selectedYear === '') {
+          setSelectedYear(session)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching current term:', error)
+      setCurrentTerm('third')
+      setCurrentSession('2025/2026')
+    } finally {
+      setIsLoadingTerm(false)
+    }
+  }, [selectedTerm, selectedYear])
+
   // ── Load profile ───────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
@@ -766,6 +812,11 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     }
     load()
   }, [])
+
+  // ── Fetch current term on mount ───────────────────────────────────────────
+  useEffect(() => {
+    fetchCurrentTerm()
+  }, [fetchCurrentTerm])
 
   // ── Load report cards ──────────────────────────────────────────────────────
   const loadReportCards = useCallback(async () => {
@@ -875,7 +926,11 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     }
   }, [selectedTerm, selectedYear, selectedClass, selectedStatus, searchQuery, nextTermDate])
 
-  useEffect(() => { loadReportCards() }, [loadReportCards])
+  useEffect(() => { 
+    if (!isLoadingTerm && selectedTerm && selectedYear) {
+      loadReportCards() 
+    }
+  }, [loadReportCards, isLoadingTerm, selectedTerm, selectedYear])
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleSaveTeacherComment = async () => {
@@ -1070,13 +1125,15 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   const unpublishedCount = stats.generated + stats.approved
 
   // ── Loading ────────────────────────────────────────────────────────────────
-  if (loading) {
+  if (isLoadingTerm || loading) {
     return (
       <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
         <div className="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center">
           <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
         </div>
-        <p className="text-sm text-slate-400 font-medium">Loading report cards…</p>
+        <p className="text-sm text-slate-400 font-medium">
+          {isLoadingTerm ? 'Loading term settings…' : 'Loading report cards…'}
+        </p>
       </div>
     )
   }
@@ -1099,7 +1156,14 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Report Card Approval</h1>
-            <p className="text-sm text-slate-500 mt-0.5">Review, approve, and publish student report cards</p>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Review, approve, and publish student report cards
+              {currentTerm && (
+                <span className="ml-2 text-emerald-600 text-xs font-medium">
+                  (Current term: {getTermLabel(currentTerm)} • {currentSession})
+                </span>
+              )}
+            </p>
             <div className="flex items-center gap-1.5 mt-1.5">
               <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
                 <Shield className="h-3 w-3" />
@@ -1167,27 +1231,77 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
               <Filter className="h-3.5 w-3.5" /> Filters
             </div>
 
+            {/* Term Select - Dynamic with current term */}
             <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[130px]"><SelectValue /></SelectTrigger>
-              <SelectContent>{TERMS.map(t => <SelectItem key={t} value={t} className="text-xs">{t}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="h-8 text-xs border-slate-200 w-[130px]">
+                <SelectValue>
+                  {selectedTerm && (
+                    <span className={cn(
+                      "font-medium",
+                      getTermValue(selectedTerm) === currentTerm ? "text-emerald-600" : "text-slate-700"
+                    )}>
+                      {selectedTerm}
+                      {getTermValue(selectedTerm) === currentTerm && " (current)"}
+                    </span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {TERMS.map(t => (
+                  <SelectItem key={t} value={t} className="text-xs">
+                    <span className={getTermValue(t) === currentTerm ? 'font-medium text-emerald-600' : ''}>
+                      {t}
+                      {getTermValue(t) === currentTerm && " (current)"}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
 
+            {/* Session Select - Dynamic with current session */}
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]"><SelectValue /></SelectTrigger>
-              <SelectContent>{ACADEMIC_YEARS.map(y => <SelectItem key={y} value={y} className="text-xs">{y}</SelectItem>)}</SelectContent>
+              <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]">
+                <SelectValue>
+                  {selectedYear && (
+                    <span className={cn(
+                      "font-medium",
+                      selectedYear === currentSession ? "text-emerald-600" : "text-slate-700"
+                    )}>
+                      {selectedYear}
+                      {selectedYear === currentSession && " (current)"}
+                    </span>
+                  )}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {ACADEMIC_YEARS.map(y => (
+                  <SelectItem key={y} value={y} className="text-xs">
+                    <span className={y === currentSession ? 'font-medium text-emerald-600' : ''}>
+                      {y}
+                      {y === currentSession && " (current)"}
+                    </span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
             </Select>
 
             <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]"><SelectValue placeholder="Class" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]">
+                <SelectValue placeholder="Class" />
+              </SelectTrigger>
               <SelectContent>
                 {CLASSES.map(c => (
-                  <SelectItem key={c} value={c} className="text-xs">{c === 'all' ? 'All Classes' : c}</SelectItem>
+                  <SelectItem key={c} value={c} className="text-xs">
+                    {c === 'all' ? 'All Classes' : c}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
 
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[120px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs border-slate-200 w-[120px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
               <SelectContent>
                 {['all', 'generated', 'pending', 'approved', 'published', 'rejected'].map(s => (
                   <SelectItem key={s} value={s} className="text-xs">

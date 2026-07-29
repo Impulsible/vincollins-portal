@@ -1,4 +1,5 @@
-// components/student/AvailableExamsList.tsx - FULLY RESPONSIVE with term locking & proper bottom spacing
+// components/student/AvailableExamsList.tsx - FULLY RESPONSIVE with dynamic term locking
+
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -219,8 +220,8 @@ export function AvailableExamsList({
   onViewAll, 
   showViewAll = false,
   compact = false,
-  currentTerm = '1st Term',
-  currentSession = '2025/2026',
+  currentTerm = '',
+  currentSession = '',
   completedExams = [],
   onTermChange,
   isLoading = false
@@ -230,10 +231,14 @@ export function AvailableExamsList({
   const normalizedCurrentTerm = normalizeTerm(currentTerm || '')
   const [selectedTerm, setSelectedTerm] = useState<string>(normalizedCurrentTerm)
   
+  // ✅ Update selected term when currentTerm changes
   useEffect(() => {
-    setSelectedTerm(normalizeTerm(currentTerm || ''))
+    if (currentTerm) {
+      setSelectedTerm(normalizeTerm(currentTerm))
+    }
   }, [currentTerm])
   
+  // ✅ Filter exams by selected term and session
   const filteredExams = exams.filter(exam => {
     const examTerm = normalizeTerm(exam.term || '')
     return examTerm === selectedTerm && exam.session_year === currentSession
@@ -283,8 +288,8 @@ export function AvailableExamsList({
               
               {/* Actions Row */}
               <div className="flex items-center gap-2">
-                {/* Term Selector */}
-                {availableTerms.length > 0 && (
+                {/* Term Selector - Only show if multiple terms available */}
+                {availableTerms.length > 1 && (
                   <Select value={selectedTerm} onValueChange={handleTermChange}>
                     <SelectTrigger className={cn(
                       "h-8 text-xs sm:h-9 sm:text-sm",
@@ -316,7 +321,7 @@ export function AvailableExamsList({
                 )}
                 
                 {/* View All Button */}
-                {showViewAll && onViewAll && (
+                {showViewAll && onViewAll && filteredExams.length > 0 && (
                   <Button 
                     variant="ghost" 
                     size="sm" 
@@ -337,7 +342,7 @@ export function AvailableExamsList({
                 <div className="flex justify-between items-center text-[10px] sm:text-xs text-muted-foreground mb-1">
                   <span className="flex items-center gap-1">
                     <Trophy className="h-3 w-3" />
-                    Term Progress
+                    {selectedTerm} Progress
                   </span>
                   <span className="font-medium">
                     {Math.round(termProgress.percentage)}% Complete

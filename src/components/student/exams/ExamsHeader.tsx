@@ -1,19 +1,40 @@
-// src/components/student/exams/ExamsHeader.tsx
+// src/components/student/exams/ExamsHeader.tsx - FIXED VERSION
+
 'use client'
 
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
-import { ChevronRight, Home, ArrowLeft, GraduationCap } from 'lucide-react'
+import { ChevronRight, Home, ArrowLeft, GraduationCap, BookOpen } from 'lucide-react'
 import Link from 'next/link'
 import type { StudentProfile } from '@/app/student/exams/types'
 
 interface ExamsHeaderProps {
   profile: StudentProfile | null
-  stats: { termName: string; sessionYear: string }
+  stats: { termName: string; sessionYear: string; availableExams?: number; completedExams?: number }
   onBackToDashboard: () => void
 }
 
 export function ExamsHeader({ profile, stats, onBackToDashboard }: ExamsHeaderProps) {
+  // ✅ Dynamic subtitle with available exams count
+  const getSubtitle = () => {
+    const parts = []
+    if (profile?.class) parts.push(profile.class)
+    if (profile?.department) parts.push(profile.department)
+    if (stats.termName && stats.sessionYear) parts.push(`${stats.termName} ${stats.sessionYear}`)
+    
+    let subtitle = parts.join(' · ')
+    
+    // ✅ Add exam counts if available
+    if (stats.availableExams !== undefined) {
+      subtitle += ` · ${stats.availableExams} Available`
+    }
+    if (stats.completedExams !== undefined && stats.completedExams > 0) {
+      subtitle += `, ${stats.completedExams} Completed`
+    }
+    
+    return subtitle || 'View and take your exams'
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
       {/* Breadcrumb */}
@@ -36,18 +57,25 @@ export function ExamsHeader({ profile, stats, onBackToDashboard }: ExamsHeaderPr
       <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-5 sm:p-6 text-white overflow-hidden relative shadow-xl">
         <div className="absolute top-0 right-0 w-48 h-48 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
         <div className="absolute bottom-0 left-1/3 w-32 h-32 bg-blue-500/10 rounded-full translate-y-1/2" />
-        <div className="relative flex items-center gap-4">
+        <div className="relative flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="h-12 w-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center shrink-0">
-            <GraduationCap className="h-6 w-6 text-blue-300" />
+            <BookOpen className="h-6 w-6 text-blue-300" />
           </div>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-xl sm:text-2xl font-bold leading-tight">My Exams</h1>
-            <p className="text-blue-200/70 text-xs sm:text-sm mt-0.5">
-              {profile?.class && <span>{profile.class} · </span>}
-              {profile?.department && <span>{profile.department} · </span>}
-              <span>{stats.termName} {stats.sessionYear}</span>
+            <p className="text-blue-200/70 text-xs sm:text-sm mt-0.5 truncate">
+              {getSubtitle()}
             </p>
           </div>
+          {/* ✅ Show exam count badge if available */}
+          {stats.availableExams !== undefined && stats.availableExams > 0 && (
+            <div className="shrink-0">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/10 text-white text-xs font-medium border border-white/10">
+                <span className="text-emerald-300 font-bold">{stats.availableExams}</span>
+                available
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>

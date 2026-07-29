@@ -1,4 +1,5 @@
-// src/components/student/exams/ExamFeatureBadges.tsx
+// src/components/student/exams/ExamFeatureBadges.tsx - FIXED VERSION
+
 import { Badge } from '@/components/ui/badge'
 import {
   Tooltip,
@@ -6,14 +7,19 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
-import { PenTool, Shield } from 'lucide-react'
+import { PenTool, Shield, Eye } from 'lucide-react'
 
 interface ExamFeatureBadgesProps {
   hasTheory?: boolean
   proctoringEnabled?: boolean
+  proctoringMessage?: string  // ✅ Optional dynamic message
 }
 
-export function ExamFeatureBadges({ hasTheory, proctoringEnabled }: ExamFeatureBadgesProps) {
+export function ExamFeatureBadges({ 
+  hasTheory, 
+  proctoringEnabled,
+  proctoringMessage = 'Camera required for this exam'  // ✅ Fallback only
+}: ExamFeatureBadgesProps) {
   if (!hasTheory && !proctoringEnabled) return null
 
   return (
@@ -41,7 +47,7 @@ export function ExamFeatureBadges({ hasTheory, proctoringEnabled }: ExamFeatureB
               </Badge>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Camera required for this exam</p>
+              <p>{proctoringMessage}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>

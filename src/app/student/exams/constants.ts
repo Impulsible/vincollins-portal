@@ -16,6 +16,8 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   // CORE SUBJECTS
   // ============================================
   'Mathematics': { icon: Hash, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  'Maths': { icon: Hash, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  'Math': { icon: Hash, color: 'text-blue-600', bgColor: 'bg-blue-50' },
   'English Language': { icon: BookOpen, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
   'English Studies': { icon: BookOpen, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
   'English': { icon: BookOpen, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
@@ -30,6 +32,7 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'Basic Technology': { icon: MonitorPlay, color: 'text-slate-600', bgColor: 'bg-slate-50' },
   'Agricultural Science': { icon: Leaf, color: 'text-green-600', bgColor: 'bg-green-50' },
   'Agric': { icon: Leaf, color: 'text-green-600', bgColor: 'bg-green-50' },
+  'Agriculture': { icon: Leaf, color: 'text-green-600', bgColor: 'bg-green-50' },
   
   // ============================================
   // SOCIAL SCIENCES
@@ -40,14 +43,17 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'Geography': { icon: Map, color: 'text-teal-600', bgColor: 'bg-teal-50' },
   'History': { icon: Clock, color: 'text-amber-600', bgColor: 'bg-amber-50' },
   'Civic Education': { icon: Shield, color: 'text-blue-600', bgColor: 'bg-blue-50' },
+  'Civic': { icon: Shield, color: 'text-blue-600', bgColor: 'bg-blue-50' },
   
   // ============================================
   // ARTS & HUMANITIES
   // ============================================
   'Literature in English': { icon: PenTool, color: 'text-pink-600', bgColor: 'bg-pink-50' },
   'Literature': { icon: PenTool, color: 'text-pink-600', bgColor: 'bg-pink-50' },
+  'Lit': { icon: PenTool, color: 'text-pink-600', bgColor: 'bg-pink-50' },
   'Christian Religious Studies': { icon: BookOpen, color: 'text-sky-600', bgColor: 'bg-sky-50' },
   'CRS': { icon: BookOpen, color: 'text-sky-600', bgColor: 'bg-sky-50' },
+  'CRK': { icon: BookOpen, color: 'text-sky-600', bgColor: 'bg-sky-50' },
   'Islamic Religious Studies': { icon: BookOpen, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
   'IRS': { icon: BookOpen, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
   'Cultural and Creative Arts': { icon: Palette, color: 'text-purple-600', bgColor: 'bg-purple-50' },
@@ -66,6 +72,7 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   // ============================================
   'Commerce': { icon: BarChart3, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
   'Business Studies': { icon: Briefcase, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
+  'Business': { icon: Briefcase, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
   'Financial Accounting': { icon: Calculator, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
   'Accounting': { icon: Calculator, color: 'text-emerald-600', bgColor: 'bg-emerald-50' },
   'Office Practice': { icon: Briefcase, color: 'text-slate-600', bgColor: 'bg-slate-50' },
@@ -77,6 +84,7 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'IT': { icon: MonitorPlay, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
   'Computer Science': { icon: MonitorPlay, color: 'text-indigo-600', bgColor: 'bg-indigo-50' },
   'Data Processing': { icon: Database, color: 'text-gray-600', bgColor: 'bg-gray-50' },
+  'Data': { icon: Database, color: 'text-gray-600', bgColor: 'bg-gray-50' },
   'ICT': { icon: Wifi, color: 'text-blue-600', bgColor: 'bg-blue-50' },
   'Programming': { icon: Code, color: 'text-violet-600', bgColor: 'bg-violet-50' },
   
@@ -116,6 +124,7 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   // ============================================
   'Further Mathematics': { icon: Hash, color: 'text-violet-600', bgColor: 'bg-violet-50' },
   'Further Maths': { icon: Hash, color: 'text-violet-600', bgColor: 'bg-violet-50' },
+  'F. Maths': { icon: Hash, color: 'text-violet-600', bgColor: 'bg-violet-50' },
   
   // ============================================
   // ADDITIONAL SUBJECTS
@@ -142,16 +151,120 @@ export const SUBJECT_CONFIG: Record<string, SubjectConfig> = {
   'Practical': { icon: Target, color: 'text-green-600', bgColor: 'bg-green-50' },
 }
 
+// ✅ DYNAMIC TERM NAMES
 export const TERM_NAMES: Record<string, string> = {
   first: 'First Term',
   second: 'Second Term',
   third: 'Third Term'
 }
 
-export const CURRENT_SESSION = '2025/2026'
-
 export const DEFAULT_SUBJECT_CONFIG: SubjectConfig = {
   icon: BookOpen,
   color: 'text-gray-600',
   bgColor: 'bg-gray-50'
+}
+
+// ✅ SUBJECTS BY DEPARTMENT - ALL 10 SUBJECTS FOR SS
+export const SUBJECTS_BY_DEPARTMENT: Record<string, string[]> = {
+  'Science': [
+    'English Language',
+    'Mathematics',
+    'Physics',
+    'Chemistry',
+    'Biology',
+    'Further Mathematics',
+    'Agricultural Science',
+    'Geography',
+    'Civic Education',
+    'Data Processing'
+  ],
+  'Arts': [
+    'English Language',
+    'Mathematics',
+    'Literature in English',
+    'Government',
+    'History',
+    'CRS',
+    'Economics',
+    'Yoruba',
+    'Civic Education',
+    'Music'
+  ],
+  'Commercial': [
+    'English Language',
+    'Mathematics',
+    'Economics',
+    'Financial Accounting',
+    'Commerce',
+    'Business Studies',
+    'Government',
+    'CRS',
+    'Civic Education',
+    'Data Processing'
+  ],
+  'General': [
+    // JSS subjects - 17 subjects
+    'English Language',
+    'Mathematics',
+    'Basic Science',
+    'Basic Technology',
+    'Social Studies',
+    'Civic Education',
+    'Christian Religious Studies',
+    'Agricultural Science',
+    'Home Economics',
+    'Business Studies',
+    'Physical and Health Education',
+    'Cultural and Creative Arts',
+    'French',
+    'Yoruba',
+    'Music',
+    'Information Technology',
+    'Security Education'
+  ]
+}
+
+// ✅ Get subjects by department
+export function getSubjectsByDepartment(department: string): string[] {
+  const normalizedDept = department?.trim().toUpperCase() || ''
+  
+  if (normalizedDept.includes('SCIENCE')) {
+    return SUBJECTS_BY_DEPARTMENT.Science
+  }
+  if (normalizedDept.includes('ART')) {
+    return SUBJECTS_BY_DEPARTMENT.Arts
+  }
+  if (normalizedDept.includes('COMMERCE') || normalizedDept.includes('COMMERCIAL')) {
+    return SUBJECTS_BY_DEPARTMENT.Commercial
+  }
+  
+  return SUBJECTS_BY_DEPARTMENT.General
+}
+
+// ✅ Get subject count by department
+export function getSubjectCountByDepartment(department: string): number {
+  return getSubjectsByDepartment(department).length
+}
+
+// ✅ Get subject count by class level (JSS = 17, SS = 10)
+export function getSubjectCountByClassLevel(className: string): number {
+  if (!className) return 0
+  
+  const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
+  
+  // JSS classes - 17 subjects
+  if (normalizedClass.includes('JSS1') || 
+      normalizedClass.includes('JSS2') || 
+      normalizedClass.includes('JSS3')) {
+    return 17
+  }
+  
+  // SS classes - 10 subjects
+  if (normalizedClass.includes('SS1') || 
+      normalizedClass.includes('SS2') || 
+      normalizedClass.includes('SS3')) {
+    return 10
+  }
+  
+  return 0
 }

@@ -1,17 +1,10 @@
-// src/app/student/exams/hooks/useExamFilters.ts - COMPLETE FIXED VERSION
+// src/app/student/exams/hooks/useExamFilters.ts - FIXED VERSION
 
 'use client'
 
 import { useState, useMemo, useCallback } from 'react'
-import type { Exam, ExamAttempt, SubjectConfig } from '../types'
+import type { Exam, ExamAttempt, SubjectConfig, TabType, ViewMode, ExamStatus } from '../types'
 import { getSubjectConfig } from '../utils'
-
-// ✅ Define types locally (don't import them)
-export type ViewMode = 'grid' | 'list'
-export type TabType = 'available' | 'completed' | 'expired' | 'upcoming'
-
-// ✅ Use the same type for status
-export type ExamStatus = 'available' | 'completed' | 'expired' | 'upcoming' | 'in_progress'
 
 export function useExamFilters(
   exams: Exam[] = [],
@@ -34,8 +27,8 @@ export function useExamFilters(
     const attempt = examAttempts[exam.id]
     const now = new Date()
     
-    // Check if there's an attempt first
     if (attempt) {
+      // ✅ Include all completion statuses
       if (attempt.status === 'completed' || 
           attempt.status === 'graded' || 
           attempt.status === 'pending_theory' ||
@@ -44,11 +37,10 @@ export function useExamFilters(
       }
       
       if (attempt.status === 'in_progress') {
-        return 'available'
+        return 'in_progress'
       }
     }
     
-    // No attempt - check dates
     if (exam.starts_at && new Date(exam.starts_at) > now) {
       return 'upcoming'
     }
@@ -65,32 +57,28 @@ export function useExamFilters(
     
     let filtered = [...exams]
 
-    // Filter by active tab
     filtered = filtered.filter(exam => {
       const status = getExamStatus(exam)
       
-      // ✅ Tab filtering logic - fixed the TypeScript error
-      if (activeTab === 'available') {
-        return status === 'available' || status === 'upcoming'
+      switch (activeTab) {
+        case 'available':
+          return status === 'available' || status === 'in_progress'
+        case 'completed':
+          // ✅ 'completed' tab shows exams with 'completed' status
+          return status === 'completed'
+        case 'expired':
+          return status === 'expired'
+        case 'upcoming':
+          return status === 'upcoming'
+        default:
+          return true
       }
-      if (activeTab === 'completed') {
-        return status === 'completed'
-      }
-      if (activeTab === 'expired') {
-        return status === 'expired'
-      }
-      if (activeTab === 'upcoming') {
-        return status === 'upcoming'
-      }
-      return true
     })
 
-    // Filter by subject
     if (selectedSubject !== 'all') {
       filtered = filtered.filter(e => e.subject === selectedSubject)
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -102,13 +90,15 @@ export function useExamFilters(
       )
     }
 
-    // Sort: Upcoming first, then available, then completed, then expired
+    // ✅ FIXED: Include all ExamStatus types
     const order: Record<ExamStatus, number> = { 
       upcoming: 0, 
       available: 1, 
+      in_progress: 1,
       completed: 2, 
       expired: 3,
-      in_progress: 1
+      graded: 2,           // ✅ Added
+      pending_theory: 2    // ✅ Added
     }
     
     return filtered.sort((a, b) => {
@@ -127,11 +117,21 @@ export function useExamFilters(
     
     exams.forEach(exam => {
       const status = getExamStatus(exam)
-      // ✅ Type-safe count increment
-      if (status === 'available') counts.available++
-      else if (status === 'completed') counts.completed++
-      else if (status === 'expired') counts.expired++
-      else if (status === 'upcoming') counts.upcoming++
+      switch (status) {
+        case 'available':
+        case 'in_progress':
+          counts.available++
+          break
+        case 'completed':
+          counts.completed++
+          break
+        case 'expired':
+          counts.expired++
+          break
+        case 'upcoming':
+          counts.upcoming++
+          break
+      }
     })
     
     return counts
@@ -143,8 +143,21 @@ export function useExamFilters(
     setActiveTab('available')
   }, [])
 
+  const getSubjectConfigWithFallback = useCallback((subject: string): SubjectConfig => {
+    try {
+      const config = getSubjectConfig(subject)
+      return config
+    } catch (error) {
+      return {
+        icon: null,
+        color: 'bg-slate-500',
+        bgColor: 'bg-slate-50',
+        label: subject
+      }
+    }
+  }, [])
+
   return {
-    // State
     searchQuery,
     setSearchQuery,
     selectedSubject,
@@ -153,15 +166,11 @@ export function useExamFilters(
     setViewMode,
     activeTab,
     setActiveTab,
-    
-    // Data
     filteredExams,
     availableSubjects,
     tabCounts,
-    
-    // Functions
     getExamStatus,
-    getSubjectConfig,
+    getSubjectConfig: getSubjectConfigWithFallback,
     resetFilters,
   }
 }
