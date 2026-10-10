@@ -1,40 +1,24 @@
 // app/api/admin/users/create/route.ts
-
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 export async function POST(req: NextRequest) {
   console.log('📦 API called: Create User')
-  console.log('🔑 Environment check:', {
-    hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-    hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY, // ✅ Changed from NEXT_SUPABASE_SERVICE_ROLE_KEY
-    url: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 20) + '...',
-  })
   
   try {
-    // Validate environment variables
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY // ✅ Changed from NEXT_SUPABASE_SERVICE_ROLE_KEY
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
     
-    if (!supabaseUrl) {
-      console.error('❌ NEXT_PUBLIC_SUPABASE_URL is missing')
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('❌ Missing database credentials')
       return NextResponse.json({ 
-        error: 'Server configuration error: Missing Supabase URL' 
-      }, { status: 500 })
-    }
-    
-    if (!supabaseServiceKey) {
-      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is missing')
-      return NextResponse.json({ 
-        error: 'Server configuration error: Missing Service Role Key' 
+        error: 'Server configuration error: Missing connection keys' 
       }, { status: 500 })
     }
     
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey)
-    
     const body = await req.json()
-    console.log('📦 Received body:', JSON.stringify(body, null, 2))
     
     const { 
       first_name, 
@@ -53,15 +37,12 @@ export async function POST(req: NextRequest) {
       join_year 
     } = body
     
-    // Validate
     if (!first_name || !last_name || !role) {
-      console.error('❌ Missing required fields:', { first_name, last_name, role })
       return NextResponse.json({ 
         error: 'First name, last name, and role are required' 
       }, { status: 400 })
     }
     
-    // Helper function to capitalize words
     const capitalizeWords = (str: string): string => {
       if (!str) return ''
       return str
@@ -70,7 +51,7 @@ export async function POST(req: NextRequest) {
         .join(' ')
     }
     
-    // Generate credentials
+    // Auto-generate credentials
     const sanitizedFirst = first_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15) || 'user'
     const sanitizedLast = last_name.toLowerCase().replace(/[^a-z]/g, '').substring(0, 15) || 'account'
     const email = `${sanitizedFirst}.${sanitizedLast}@vincollins.edu.ng`
@@ -86,7 +67,6 @@ export async function POST(req: NextRequest) {
     const prefix = prefixes[role] || 'VIN-STD'
     const vin_id = `${prefix}-${year}-${randomNum}`
     
-    // Build full name
     let fullName = last_name.trim() + ' ' + first_name.trim()
     if (middle_name && middle_name.trim()) {
       fullName += ' ' + middle_name.trim()
@@ -94,9 +74,7 @@ export async function POST(req: NextRequest) {
     fullName = capitalizeWords(fullName)
     const displayName = fullName
     
-    console.log('📧 Creating user:', { email, vin_id, fullName, displayName, role })
-    
-    // Step 1: Create auth user
+    // Step 1: Create auth user with active status in user metadata
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email: email,
       password: vin_id,
@@ -108,19 +86,19 @@ export async function POST(req: NextRequest) {
         middle_name: middle_name?.trim() ? capitalizeWords(middle_name.trim()) : '',
         last_name: capitalizeWords(last_name.trim()),
         role: role,
-        vin_id: vin_id
+        vin_id: vin_id,
+        is_active: true // 👈 Explicitly saved in auth metadata
       }
     })
     
     if (authError) {
-      console.error('❌ Auth error:', authError)
+      console.error('❌ Auth creation failed:', authError.message)
       return NextResponse.json({ error: authError.message }, { status: 500 })
     }
     
     const userId = authData.user.id
-    console.log('✅ Auth user created:', userId)
     
-    // Step 2: Insert into profiles
+    // Step 2: Insert into database profiles table
     const profileInsert: any = {
       id: userId,
       vin_id: vin_id,
@@ -133,7 +111,7 @@ export async function POST(req: NextRequest) {
       department: department || 'General',
       phone: phone || null,
       address: address || null,
-      is_active: true,
+      is_active: true, // 👈 Active by default
       password_changed: false,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -164,8 +142,6 @@ export async function POST(req: NextRequest) {
       profileInsert.next_term_begins = next_term_begins
     }
 
-    console.log('💾 Profile insert data:', JSON.stringify(profileInsert, null, 2))
-
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert(profileInsert)
@@ -173,43 +149,30 @@ export async function POST(req: NextRequest) {
       .single()
     
     if (profileError) {
-      console.error('❌ Profile insert failed:', profileError)
-      await supabaseAdmin.auth.admin.deleteUser(userId)
-      console.log('🔄 Rolled back auth user')
+      console.error('❌ Profile insert failed, rolling back Auth:', profileError.message)
+      await supabaseAdmin.auth.admin.deleteUser(userId) // Rollback Auth creation
       return NextResponse.json({ 
         error: `Failed to create profile: ${profileError.message}`
       }, { status: 500 })
     }
     
-    console.log('✅ Profile created:', profile?.id)
-    
-    // Success!
     return NextResponse.json({ 
       success: true, 
       user: { 
         id: userId, 
-        email: email, 
+        email, 
         full_name: fullName,
         display_name: displayName,
-        vin_id: vin_id,
-        role: role,
+        vin_id,
+        role,
         admission_number: admission_number?.trim() || '',
-        gender: gender || null,
         class: studentClass || null,
-        department: department || 'General',
       },
-      credentials: {
-        email: email,
-        password: vin_id,
-        vin_id: vin_id,
-        admission_number: admission_number?.trim() || '',
-      }
+      credentials: { email, password: vin_id, vin_id }
     })
     
   } catch (error: any) {
     console.error('❌ API FATAL ERROR:', error)
-    return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
-    }, { status: 500 })
+    return NextResponse.json({ error: error.message || 'Internal server error' }, { status: 500 })
   }
 }

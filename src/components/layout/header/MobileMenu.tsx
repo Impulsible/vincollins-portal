@@ -9,7 +9,7 @@ import {
   X, LayoutDashboard, Users, MonitorPlay, FileCheck, GraduationCap, Briefcase, BarChart3,
   LogOut, ArrowRight, Bell, Home, KeyRound, Calendar, BookOpen, Search,
   Mail, MapPin, Phone, Clock, Facebook, Twitter, Instagram, Linkedin, ChevronRight,
-  FileText, MessageSquare, Activity, Laptop, PhoneCall
+  FileText, MessageSquare, Activity, Laptop, PhoneCall, ClipboardList
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +54,7 @@ const dashboardNavMap: Record<string, { name: string; href: string; icon: any }[
   teacher: [
     { name: 'Overview', href: '/staff', icon: LayoutDashboard },
     { name: 'Exams', href: '/staff/exams', icon: MonitorPlay },
-    { name: 'Assignments', href: '/staff/assignments', icon: FileText },
+    { name: 'CA Scores', href: '/staff/ca-scores', icon: ClipboardList }, // ✅ changed from Assignments
     { name: 'Students', href: '/staff/students', icon: Users },
     { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
   ],
@@ -63,7 +63,7 @@ const dashboardNavMap: Record<string, { name: string; href: string; icon: any }[
     { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
     { name: 'Results', href: '/student/results', icon: GraduationCap },
     { name: 'Classmates', href: '/student/classmates', icon: Users },
-    { name: 'Profile', href: '/student/profile', icon: Users },
+    { name: 'Report Card', href: '/student/report-card', icon: FileCheck }, // ✅ changed from Profile
   ],
 }
 

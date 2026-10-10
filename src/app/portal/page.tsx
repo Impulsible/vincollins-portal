@@ -16,7 +16,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Mail, Eye, EyeOff, GraduationCap, Shield, Users,
   Loader2, AlertCircle, KeyRound, ArrowRight, Sparkles,
-  Phone, Mail as MailIcon, CheckCircle, Lock, RefreshCw,
+  Phone, Mail as MailIcon, Lock, Check,
 } from 'lucide-react'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -55,7 +55,7 @@ const ROLE_CONFIG = {
     color: '#2563EB',
     bgColor: '#EFF6FF',
     borderColor: '#BFDBFE',
-    greeting: 'Welcome back, Teacher',
+    greeting: 'Welcome back, Instructor',
     message: 'Loading your teaching dashboard...',
     tabBg: 'data-[state=active]:bg-blue-600',
     infoBg: 'bg-blue-50 border-blue-200 text-blue-700',
@@ -69,7 +69,7 @@ const ROLE_CONFIG = {
     bgColor: '#ECFDF5',
     borderColor: '#A7F3D0',
     greeting: 'Welcome back, Student',
-    message: 'Preparing your learning space...',
+    message: 'Preparing your learning workspace...',
     tabBg: 'data-[state=active]:bg-emerald-600',
     infoBg: 'bg-emerald-50 border-emerald-200 text-emerald-700',
     infoText: '🎓 Student dashboard with CBT exam access',
@@ -85,104 +85,192 @@ const DEFAULT_SETTINGS: SchoolSettings = {
   school_email: 'vincollinscollege@gmail.com',
 }
 
+// ── Helper to resolve logo and system images ─────────────────────────────
+const getImagePath = (path: string | null | undefined): string => {
+  if (!path) return '/images/logo.png'
+  if (path.startsWith('http')) return path
+  if (path.startsWith('/images/')) return path
+  if (path.startsWith('/')) return `/images${path}`
+  return `/images/${path}`
+}
+
 // ── Success Modal ─────────────────────────────────────────────────────────────
 interface SuccessModalProps {
   userName: string
   role: UserRole
   redirectPath: string
+  avatarUrl?: string | null
   onGo: () => void
 }
 
-function SuccessModal({ userName, role, redirectPath, onGo }: SuccessModalProps) {
+function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: SuccessModalProps) {
   const config = ROLE_CONFIG[role]
   const firstName = userName.split(' ')[0]
+  const [imgLoaded, setImgLoaded] = useState(false)
+  const [imgError, setImgError] = useState(false)
+  const [progress, setProgress] = useState(100)
+
+  // Subtle circular progress visual
+  useEffect(() => {
+    const duration = 3000 // 3 seconds
+    const intervalTime = 30
+    const step = (intervalTime / duration) * 100
+    const timer = setInterval(() => {
+      setProgress((prev) => Math.max(0, prev - step))
+    }, intervalTime)
+
+    return () => clearInterval(timer)
+  }, [])
+
+  // Generate modern gradient-initials placeholder if no image exists or fails
+  const getInitials = () => {
+    return userName
+      .split(' ')
+      .slice(0, 2)
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+  }
+
+  // Resolves Supabase storage avatars or full URLs
+  const resolvedAvatarUrl = (() => {
+    if (!avatarUrl) return null
+    if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
+      return avatarUrl
+    }
+    // Resolves from standard 'avatars' storage bucket
+    const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl)
+    return data?.publicUrl || null
+  })()
+
+  const isStudent = role === 'student'
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
       <motion.div
-        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 25 }}
-        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
+        exit={{ opacity: 0, scale: 0.95, y: 15 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 28 }}
+        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
       >
-        {/* Top accent bar */}
+        {/* Decorative Top Accent Gradients */}
         <div
-          className="h-1.5"
+          className="h-2 w-full transition-all duration-300"
           style={{
-            background: `linear-gradient(90deg, ${config.color}, ${config.color}88)`,
+            background: `linear-gradient(90deg, ${config.color}, #34D399, ${config.color})`,
           }}
         />
 
         <div className="p-8">
-          {/* Close / skip */}
+          {/* Close/Skip button */}
           <button
             onClick={onGo}
-            className="absolute top-4 right-4 h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors"
+            className="absolute top-5 right-5 h-8 w-8 rounded-full bg-gray-50 hover:bg-gray-100 border border-gray-100 flex items-center justify-center transition-colors group"
             aria-label="Go to dashboard"
           >
-            <svg
-              className="h-4 w-4 text-gray-500"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
           </button>
 
           <div className="flex flex-col items-center text-center">
-            {/* Icon */}
-            <div className="mb-6 relative">
+            
+            {/* ── PROFILE PHOTO / AVATAR PORT CONTAINER ─────────────────── */}
+            <div className="relative mb-6">
+              
+              {/* Outer decorative/pulsing ring */}
+              <span className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping duration-1000 pointer-events-none" />
+
               <div
-                className="w-28 h-28 rounded-full flex items-center justify-center text-6xl"
+                className="relative w-32 h-32 rounded-full p-1.5 flex items-center justify-center bg-white shadow-xl transition-all"
                 style={{
-                  background: `linear-gradient(135deg, ${config.bgColor}, white)`,
-                  border: `3px solid ${config.borderColor}`,
-                  boxShadow: `0 0 40px ${config.color}20`,
+                  background: `linear-gradient(135deg, ${config.color}, #6EE7B7)`,
                 }}
               >
-                {config.icon}
-              </div>
-              <div className="absolute -bottom-1 -right-1 h-8 w-8 bg-green-500 rounded-full flex items-center justify-center shadow-lg">
-                <CheckCircle className="h-5 w-5 text-white" />
+                <div className="relative w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
+                  {isStudent && resolvedAvatarUrl && !imgError ? (
+                    <>
+                      {/* Image loading state */}
+                      {!imgLoaded && (
+                        <div className="absolute inset-0 bg-gray-50 flex items-center justify-center animate-pulse">
+                          <Loader2 className="h-6 w-6 text-emerald-500 animate-spin" />
+                        </div>
+                      )}
+                      {/* Standard element avoiding domain-whitelist issues */}
+                      <img
+                        src={resolvedAvatarUrl}
+                        alt={userName}
+                        className={cn(
+                          "w-full h-full object-cover transition-transform duration-500 hover:scale-110",
+                          imgLoaded ? "opacity-100" : "opacity-0"
+                        )}
+                        onLoad={() => setImgLoaded(true)}
+                        onError={() => setImgError(true)}
+                      />
+                    </>
+                  ) : (
+                    // Fallback to high-end styled initials block
+                    <div 
+                      className="w-full h-full flex flex-col items-center justify-center text-white font-bold tracking-wider"
+                      style={{
+                        background: `linear-gradient(135deg, ${config.color}, #10B981)`
+                      }}
+                    >
+                      <span className="text-3xl font-extrabold">{getInitials()}</span>
+                      {isStudent && <span className="text-[10px] uppercase font-medium tracking-widest opacity-80 mt-0.5">Student</span>}
+                    </div>
+                  )}
+                </div>
+
+                {/* Highly-visible, Verified Badge */}
+                <div className="absolute bottom-1 right-1 h-8 w-8 bg-emerald-500 rounded-full border-4 border-white flex items-center justify-center shadow-md">
+                  <Check className="h-4 w-4 text-white stroke-[3px]" />
+                </div>
               </div>
             </div>
 
-            {/* Text */}
+            {/* ── CUSTOMER & ACCOUNT DETAILS ────────────────────────────── */}
             <div className="space-y-2 mb-8">
-              <h3 className="text-3xl font-bold text-gray-900">
-                Welcome! {config.emoji}
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold tracking-wide border border-emerald-100 uppercase">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                Verified Student Access
+              </div>
+
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight pt-1">
+                Welcome back, {firstName}!
               </h3>
-              <p
-                className="text-xl font-semibold"
-                style={{ color: config.color }}
-              >
-                {firstName}
+              
+              <p className="text-sm text-gray-500 font-medium max-w-xs mx-auto">
+                {config.message}
               </p>
-              <p className="text-gray-500 text-sm">{config.greeting}</p>
-              <p className="text-gray-400 text-sm">{config.message}</p>
             </div>
 
-            {/* CTA */}
+            {/* ── GO BUTTON / ACTION ────────────────────────────────────── */}
             <Button
               onClick={onGo}
-              className="w-full py-6 text-base font-semibold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+              className="w-full py-6 text-sm font-bold rounded-2xl shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/30 transition-all duration-300 relative overflow-hidden group"
               style={{
-                background: `linear-gradient(135deg, ${config.color}, ${config.color}dd)`,
+                background: `linear-gradient(135deg, ${config.color}, #047857)`,
               }}
             >
-              Go to Dashboard Now
-              <ArrowRight className="ml-2 h-5 w-5" />
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                Enter Student Portal
+                <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+              </span>
             </Button>
 
-            <p className="text-xs text-gray-400 mt-3">
-              Redirecting automatically in 3 seconds...
-            </p>
+            {/* ── AUTOREDIRECT COUNTDOWN RING ────────────────────────────── */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-emerald-500 transition-all duration-100 ease-linear"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-gray-400 font-medium">
+                Redirecting you in a moment...
+              </p>
+            </div>
+
           </div>
         </div>
       </motion.div>
@@ -245,6 +333,7 @@ export default function LoginPage() {
     userName: string
     role: UserRole
     redirectPath: string
+    avatarUrl?: string | null
   } | null>(null)
 
   // Refs to prevent double-submission and manage redirect timer
@@ -275,7 +364,6 @@ export default function LoginPage() {
       }
     } catch {}
 
-    // Handle bfcache restore
     const handlePageShow = (e: PageTransitionEvent) => {
       if (e.persisted) window.location.reload()
     }
@@ -287,7 +375,6 @@ export default function LoginPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        // Show cached immediately
         const cached = localStorage.getItem('school_settings')
         if (cached) {
           try {
@@ -360,7 +447,6 @@ export default function LoginPage() {
     async (e: React.FormEvent) => {
       e.preventDefault()
 
-      // Rate limit check
       if (isLocked) {
         setError(
           `Too many failed attempts. Please wait ${Math.ceil(remainingSeconds / 60)} minute(s).`,
@@ -368,7 +454,6 @@ export default function LoginPage() {
         return
       }
 
-      // Prevent double submission
       if (loginInProgressRef.current || loading) return
       loginInProgressRef.current = true
       setLoading(true)
@@ -428,10 +513,10 @@ export default function LoginPage() {
           return
         }
 
-        // ── Fetch profile ────────────────────────────────────────────────
+        // ── Fetch Profile & Avatar Photo (added avatar_url and photo_url queries) ────
         const { data: profile } = await supabase
           .from('profiles')
-          .select('role, full_name, first_name, last_name')
+          .select('role, full_name, first_name, last_name, avatar_url, photo_url')
           .eq('id', signInData.user.id)
           .maybeSingle()
 
@@ -440,7 +525,6 @@ export default function LoginPage() {
           signInData.user.user_metadata?.role?.toLowerCase() ??
           'student'
 
-        // Normalise 'staff' → 'teacher' for UI
         const userRole: UserRole =
           rawRole === 'staff'
             ? 'teacher'
@@ -456,14 +540,14 @@ export default function LoginPage() {
             `This account is registered as ${displayName}. Please select the correct tab above.`,
           )
           await supabase.auth.signOut()
-          checkAndRecord(false) // counts as failed attempt
+          checkAndRecord(false)
           loginInProgressRef.current = false
           setLoading(false)
           return
         }
 
         // ── Success ──────────────────────────────────────────────────────
-        checkAndRecord(true) // clears rate limit
+        checkAndRecord(true)
 
         // Build display name
         let userName =
@@ -481,6 +565,7 @@ export default function LoginPage() {
           .join(' ')
 
         const redirectPath = ROLE_CONFIG[userRole].redirect
+        const databaseAvatar = profile?.avatar_url || profile?.photo_url || signInData.user.user_metadata?.avatar_url || null
 
         // Persist minimal auth info locally
         try {
@@ -497,15 +582,20 @@ export default function LoginPage() {
               first_name: userName.split(' ')[0],
               email: cleanEmail,
               role: userRole,
+              avatar_url: databaseAvatar,
               timestamp: Date.now(),
             }),
           )
         } catch {}
 
-        setSuccessData({ userName, role: userRole, redirectPath })
+        setSuccessData({ 
+          userName, 
+          role: userRole, 
+          redirectPath, 
+          avatarUrl: databaseAvatar 
+        })
         setLoading(false)
 
-        // Refresh user context in background — non-blocking
         refreshUser().catch(console.warn)
 
         setTimeout(() => {
@@ -548,7 +638,6 @@ export default function LoginPage() {
 
             {/* ── LEFT: Hero Image ──────────────────────────────────────── */}
             <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]">
-              {/* ✅ FIX: Added min-h-[calc(100vh-80px)] to parent container */}
               <div className="relative w-full min-h-[calc(100vh-80px)]">
                 {!imageError && (
                   <>
@@ -593,7 +682,7 @@ export default function LoginPage() {
                       {schoolSettings.logo_path ? (
                         <div className="relative h-16 w-16 xl:h-20 xl:w-20 flex-shrink-0">
                           <Image
-                            src={schoolSettings.logo_path}
+                            src={getImagePath(schoolSettings.logo_path)}
                             alt="School Logo"
                             fill
                             sizes="80px"
@@ -652,7 +741,7 @@ export default function LoginPage() {
                       {schoolSettings.logo_path ? (
                         <div className="relative h-20 w-20 mx-auto mb-3">
                           <Image
-                            src={schoolSettings.logo_path}
+                            src={getImagePath(schoolSettings.logo_path)}
                             alt="Logo"
                             fill
                             sizes="80px"
@@ -931,6 +1020,7 @@ export default function LoginPage() {
           <SuccessModal
             userName={successData.userName}
             role={successData.role}
+            avatarUrl={successData.avatarUrl}
             redirectPath={successData.redirectPath}
             onGo={goToDashboard}
           />

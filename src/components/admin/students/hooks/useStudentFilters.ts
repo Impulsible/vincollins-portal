@@ -1,10 +1,8 @@
 // components/admin/students/hooks/useStudentFilters.ts
-
 'use client'
 
 import { useState, useMemo } from 'react'
 import { Student, ClassGroup, ViewMode } from '../types'
-import { CLASSES } from '../constants'
 import { normalizeClass } from '../utils'
 
 interface UseStudentFiltersReturn {
@@ -59,15 +57,17 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
       )
   }, [students])
 
-  // Group students by class
+  // Group active students by class (EXCLUDES INACTIVE students)
   const classGroups = useMemo(() => {
-    // Initialize ALL groups upfront so they always appear
     const groups: Record<string, ClassGroup> = {}
     ALL_CLASS_KEYS.forEach(cls => {
       groups[cls] = { students: [], count: 0, onlineCount: 0 }
     })
 
     sortedStudents.forEach(student => {
+      // 🚫 CRITICAL: Inactive students do NOT count in classes
+      if (student.is_active === false) return
+
       const className = student.class
 
       // Add to the specific class group
@@ -93,10 +93,11 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
     return groups
   }, [sortedStudents])
 
-  // Filter students based on search and class
+  // Filter students based on search, status, and class
   const filteredStudents = useMemo(() => {
     let filtered = sortedStudents
 
+    // Filter by search query
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(
@@ -109,11 +110,9 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
     }
 
     const filterByClass = (filterValue: string) => {
-      // If selecting a general SS class (SS1, SS2, SS3), show all departments
       if (filterValue === 'SS1' || filterValue === 'SS2' || filterValue === 'SS3') {
         return filtered.filter(s => isSSYear(s.class, filterValue))
       }
-      // For all other classes (JSS or specific departments), exact match
       return filtered.filter(s => s.class === filterValue)
     }
 
@@ -121,6 +120,15 @@ export function useStudentFilters(students: Student[]): UseStudentFiltersReturn 
       filtered = filterByClass(selectedClass)
     } else if (classFilter !== 'all') {
       filtered = filterByClass(classFilter)
+    }
+
+    // 🚫 CRITICAL: By default, never show inactive students in lists unless explicitly searching/filtering for them
+    // If we're looking at a specific class or doing a general search, filter out inactive students.
+    if (classFilter !== 'inactive') {
+      filtered = filtered.filter(s => s.is_active !== false)
+    } else {
+      // If the admin explicitly selects the 'inactive' archive filter, show only inactive
+      filtered = filtered.filter(s => s.is_active === false)
     }
 
     return filtered

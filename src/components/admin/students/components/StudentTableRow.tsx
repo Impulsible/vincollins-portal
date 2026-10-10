@@ -1,5 +1,4 @@
 // components/admin/students/components/StudentTableRow.tsx
-
 'use client'
 
 import { memo } from 'react'
@@ -24,6 +23,8 @@ import {
   Trash2,
   BookOpen,
   Shield,
+  ShieldAlert, // 👈 Added
+  ShieldCheck, // 👈 Added
 } from 'lucide-react'
 import { Student, PresenceStatus } from '../types'
 import { GENDERS } from '../constants'
@@ -39,9 +40,9 @@ interface StudentTableRowProps {
   onEdit: (student: Student) => void
   onResetPassword: (student: Student) => void
   onDelete: (student: Student) => void
+  onToggleStatus: (student: Student) => void // 👈 Added status toggler prop
 }
 
-// ✅ Use memo to prevent unnecessary re-renders
 export const StudentTableRow = memo(function StudentTableRow({
   student,
   index,
@@ -51,6 +52,7 @@ export const StudentTableRow = memo(function StudentTableRow({
   onEdit,
   onResetPassword,
   onDelete,
+  onToggleStatus, // 👈 Destructure
 }: StudentTableRowProps) {
   const genderEmoji = GENDERS.find(g => g.value === student.gender)?.emoji || ''
 
@@ -137,6 +139,23 @@ export const StudentTableRow = memo(function StudentTableRow({
             <DropdownMenuItem onClick={() => onEdit(student)} className="cursor-pointer">
               <Edit className="mr-2 h-4 w-4 text-emerald-600" /> Edit Profile
             </DropdownMenuItem>
+            
+            {/* ✅ Added Quick Switch: Mark as Left/Active */}
+            <DropdownMenuItem 
+              onClick={() => onToggleStatus(student)} 
+              className="cursor-pointer font-medium"
+            >
+              {student.is_active ? (
+                <>
+                  <ShieldAlert className="mr-2 h-4 w-4 text-amber-600" /> Set Inactive (Left)
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="mr-2 h-4 w-4 text-emerald-600" /> Reactivate Student
+                </>
+              )}
+            </DropdownMenuItem>
+
             <DropdownMenuItem onClick={() => onResetPassword(student)} className="cursor-pointer">
               <KeyRound className="mr-2 h-4 w-4 text-amber-600" /> Reset Password
             </DropdownMenuItem>
@@ -154,5 +173,4 @@ export const StudentTableRow = memo(function StudentTableRow({
   )
 })
 
-// ✅ Default export for compatibility
 export default StudentTableRow

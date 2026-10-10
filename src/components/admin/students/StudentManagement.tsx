@@ -1,5 +1,4 @@
-// components/admin/students/StudentManagement.tsx - READY TO RENDER
-
+// components/admin/students/StudentManagement.tsx
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -19,6 +18,7 @@ import { BulkUploadDialog } from './components/dialogs/BulkUploadDialog'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Users, Shield, Circle, Building, School } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -26,13 +26,15 @@ import { cn } from '@/lib/utils'
 interface StudentManagementProps {
   students: Student[]
   onRefresh: () => void
+  onToggleStatus: (studentId: string, currentStatus: boolean) => Promise<void>
   loading?: boolean
 }
 
-export function StudentManagement({
-  students,
-  onRefresh,
-  loading = false,
+export function StudentManagement({ 
+  students, 
+  onRefresh, 
+  onToggleStatus, 
+  loading = false 
 }: StudentManagementProps) {
   const filters = useStudentFilters(students)
   const actions = useStudentActions(onRefresh)
@@ -45,12 +47,18 @@ export function StudentManagement({
 
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null)
   const [credentials, setCredentials] = useState<Credentials | null>(null)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
 
-  // Stats
   const totalStudents = students.length
   const activeCount = students.filter(s => s.is_active !== false).length
   const inactiveCount = students.filter(s => s.is_active === false).length
-  const classCount = new Set(students.map(s => s.class).filter(Boolean)).size
+  
+  const classCount = new Set(
+    students
+      .filter(s => s.is_active !== false)
+      .map(s => s.class)
+      .filter(Boolean)
+  ).size
 
   const handleCredentialsGenerated = useCallback((creds: Credentials) => {
     setCredentials(creds)
@@ -63,7 +71,6 @@ export function StudentManagement({
       if (result) {
         handleCredentialsGenerated(result)
         onRefresh()
-        toast.success('Student created successfully!')
         return result
       }
       return null
@@ -79,10 +86,6 @@ export function StudentManagement({
       const result = await actions.bulkUploadStudents(file)
       if (result) {
         onRefresh()
-        const successCount = (result as any).successCount || (result as any).success || 0
-        if (successCount > 0) {
-          toast.success(`Successfully uploaded ${successCount} student${successCount !== 1 ? 's' : ''}`)
-        }
         return result
       }
       return null
@@ -113,15 +116,50 @@ export function StudentManagement({
     setShowDelete(true)
   }, [])
 
+  // ✅ Direct, verified save in database
   const handleSaveEdit = useCallback(async () => {
     if (!selectedStudent) return
-    const success = await actions.updateStudent(selectedStudent)
-    if (success) {
+    setIsSavingEdit(true)
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          first_name: selectedStudent.first_name,
+          middle_name: selectedStudent.middle_name,
+          last_name: selectedStudent.last_name,
+          full_name: selectedStudent.full_name,
+          display_name: selectedStudent.display_name,
+          class: selectedStudent.class,
+          department: selectedStudent.department,
+          admission_number: selectedStudent.admission_number,
+          gender: selectedStudent.gender,
+          date_of_birth: selectedStudent.date_of_birth,
+          phone: selectedStudent.phone,
+          address: selectedStudent.address,
+          next_term_begins: selectedStudent.next_term_begins,
+          is_active: selectedStudent.is_active === false ? false : true // 👈 Explicit persistence
+        })
+        .eq('id', selectedStudent.id)
+        .select()
+
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        throw new Error('Update failed. Ensure admin RLS policy is enabled in Supabase.')
+      }
+
+      toast.success('Student profile updated successfully!')
       setShowEdit(false)
       setSelectedStudent(null)
-      toast.success('Student updated successfully!')
+      onRefresh()
+    } catch (error: any) {
+      console.error('Database update error:', error)
+      toast.error(error.message || 'Failed to save changes')
+    } finally {
+      setIsSavingEdit(false)
     }
-  }, [selectedStudent, actions])
+  }, [selectedStudent, onRefresh])
 
   const handleConfirmDelete = useCallback(async () => {
     if (!selectedStudent) return
@@ -129,10 +167,14 @@ export function StudentManagement({
     if (success) {
       setShowDelete(false)
       setSelectedStudent(null)
-      onRefresh()
-      toast.success('Student deleted successfully!')
+    } else {
+      toast.error('Failed to delete student')
     }
-  }, [selectedStudent, actions, onRefresh])
+  }, [selectedStudent, actions])
+
+  const handleFastToggleStatus = useCallback(async (student: Student) => {
+    await onToggleStatus(student.id, student.is_active)
+  }, [onToggleStatus])
 
   const handleClassClick = useCallback((className: string) => {
     filters.setSelectedClass(className)
@@ -165,19 +207,13 @@ export function StudentManagement({
             <div key={i} className="h-24 bg-slate-200 animate-pulse rounded-xl" />
           ))}
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-32 bg-slate-200 animate-pulse rounded-xl" />
-          ))}
-        </div>
       </div>
     )
   }
 
   return (
     <div className="space-y-6">
-      {/* Header Section with Buttons */}
-      <motion.div 
+      <motion.div
         className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -190,24 +226,20 @@ export function StudentManagement({
           </h1>
           <p className="text-slate-500 mt-1">Manage student profiles, credentials, and class assignments</p>
         </div>
-        
-        {/* ✅ BUTTONS RENDER HERE - Add Student and Bulk Upload */}
+
         <div className="flex gap-3">
           <AddStudentDialog
             onCreateStudent={handleCreateStudent}
             onCredentialsGenerated={handleCredentialsGenerated}
             isSubmitting={actions.isSubmitting}
           />
-          <BulkUploadDialog
-            onBulkUpload={handleBulkUpload}
-            isSubmitting={actions.isSubmitting}
-          />
+          <BulkUploadDialog onBulkUpload={handleBulkUpload} isSubmitting={actions.isSubmitting} />
         </div>
       </motion.div>
 
-      {/* Stats Cards */}
+      {/* Stats Board */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-all duration-200">
+        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -220,8 +252,8 @@ export function StudentManagement({
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-all duration-200">
+
+        <Card className="border-l-4 border-l-green-500 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -234,8 +266,8 @@ export function StudentManagement({
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="border-l-4 border-l-slate-500 shadow-sm hover:shadow-md transition-all duration-200">
+
+        <Card className="border-l-4 border-l-slate-500 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -248,8 +280,8 @@ export function StudentManagement({
             </div>
           </CardContent>
         </Card>
-        
-        <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-all duration-200">
+
+        <Card className="border-l-4 border-l-purple-500 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -264,16 +296,12 @@ export function StudentManagement({
         </Card>
       </div>
 
-      {/* View Toggle Buttons */}
       <div className="flex gap-2">
         <Button
           variant={filters.viewMode === 'classes' ? 'default' : 'outline'}
           size="sm"
           onClick={() => filters.setViewMode('classes')}
-          className={cn(
-            "transition-all",
-            filters.viewMode === 'classes' && "bg-emerald-600 hover:bg-emerald-700"
-          )}
+          className={cn('transition-all', filters.viewMode === 'classes' && 'bg-emerald-600 hover:bg-emerald-700')}
         >
           Class View
         </Button>
@@ -281,10 +309,7 @@ export function StudentManagement({
           variant={filters.viewMode === 'list' ? 'default' : 'outline'}
           size="sm"
           onClick={() => filters.setViewMode('list')}
-          className={cn(
-            "transition-all",
-            filters.viewMode === 'list' && "bg-emerald-600 hover:bg-emerald-700"
-          )}
+          className={cn('transition-all', filters.viewMode === 'list' && 'bg-emerald-600 hover:bg-emerald-700')}
         >
           List View
         </Button>
@@ -295,7 +320,6 @@ export function StudentManagement({
         )}
       </div>
 
-      {/* Search and Filter */}
       {(filters.viewMode === 'list' || filters.selectedClass) && (
         <StudentSearchFilter
           searchQuery={filters.searchQuery}
@@ -311,12 +335,8 @@ export function StudentManagement({
         />
       )}
 
-      {/* Main Content */}
       {filters.viewMode === 'classes' && !filters.selectedClass && (
-        <StudentClassCards
-          classGroups={filters.classGroups}
-          onClassClick={handleClassClick}
-        />
+        <StudentClassCards classGroups={filters.classGroups} onClassClick={handleClassClick} />
       )}
 
       {(filters.viewMode === 'list' || filters.selectedClass) && (
@@ -329,24 +349,16 @@ export function StudentManagement({
           onEdit={handleEdit}
           onResetPassword={handleResetPassword}
           onDelete={handleDelete}
+          onToggleStatus={handleFastToggleStatus}
         />
       )}
 
-      {/* Dialogs */}
       {showCredentials && (
-        <CredentialsDialog
-          open={showCredentials}
-          onOpenChange={setShowCredentials}
-          credentials={credentials}
-        />
+        <CredentialsDialog open={showCredentials} onOpenChange={setShowCredentials} credentials={credentials} />
       )}
 
       {showResetPassword && (
-        <ResetPasswordDialog
-          open={showResetPassword}
-          onOpenChange={setShowResetPassword}
-          student={selectedStudent}
-        />
+        <ResetPasswordDialog open={showResetPassword} onOpenChange={setShowResetPassword} student={selectedStudent} />
       )}
 
       {showDelete && (
@@ -366,7 +378,7 @@ export function StudentManagement({
           student={selectedStudent}
           onStudentChange={handleStudentChange}
           onSave={handleSaveEdit}
-          isSubmitting={actions.isSubmitting}
+          isSubmitting={isSavingEdit}
         />
       )}
 

@@ -1,4 +1,4 @@
-// app/student/layout.tsx
+// app/student/layout.tsx - NAVIGATION ENFORCEMENT & BLOCKS FOR INACTIVE PROFILES
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -20,9 +20,10 @@ interface StudentProfile {
   class?: string
   department?: string
   vin_id?: string
+  is_active?: boolean // 👈 Added
 }
 
-// Tab ↔ path mapping — single source of truth
+// Tab ↔ path mapping
 const PATH_TO_TAB: Record<string, string> = {
   '/student': 'overview',
   '/student/announcements': 'announcements',
@@ -39,9 +40,7 @@ const PATH_TO_TAB: Record<string, string> = {
 }
 
 function getTabFromPath(pathname: string): string {
-  // Exact match first
   if (PATH_TO_TAB[pathname]) return PATH_TO_TAB[pathname]
-  // Prefix match
   for (const [path, tab] of Object.entries(PATH_TO_TAB)) {
     if (path !== '/student' && pathname.startsWith(path)) return tab
   }
@@ -64,7 +63,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     setActiveTab(getTabFromPath(pathname || '/student'))
   }, [pathname])
 
-  // Load profile
+  // Load profile with active status check
   const loadProfile = useCallback(async () => {
     setLoading(true)
     try {
@@ -83,20 +82,20 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
       setUserId(session.user.id)
 
+      // Fetch profile and include is_active state
       const { data, error: profileError } = await supabase
         .from('profiles')
-        .select('id, full_name, display_name, first_name, email, photo_url, class, department, vin_id')
+        .select('id, full_name, display_name, first_name, email, photo_url, class, department, vin_id, is_active')
         .eq('id', session.user.id)
         .single()
 
       if (profileError) {
         console.error('[StudentLayout] Profile error:', profileError)
-        // Profile missing — might be first login, show empty state
         toast.error('Failed to load profile. Please try again.')
         return
       }
 
-      // Verify they're actually a student
+      // Verify they are a student
       const { data: roleData } = await supabase
         .from('profiles')
         .select('role')
@@ -123,18 +122,27 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     loadProfile()
   }, [loadProfile])
 
-  // Listen for auth changes (session expiry, logout from another tab)
+  // 🚫 CRITICAL ENFORCEMENT: Block inactive students from live system pages
+  useEffect(() => {
+    if (profile && profile.is_active === false) {
+      const allowedTabs = ['overview', 'results', 'profile']
+      const currentTab = getTabFromPath(pathname || '/student')
+
+      if (!allowedTabs.includes(currentTab)) {
+        toast.error('This section is disabled for archived student accounts.')
+        router.replace('/student')
+      }
+    }
+  }, [pathname, profile, router])
+
+  // Listen for auth changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
-        // Clear local storage auth data
         localStorage.removeItem('auth_user')
         localStorage.removeItem('auth_role')
         localStorage.removeItem('user_profile')
         router.replace('/portal')
-      }
-      if (event === 'TOKEN_REFRESHED') {
-        console.log('[StudentLayout] Token refreshed')
       }
     })
 
@@ -143,7 +151,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   const handleLogout = useCallback(async () => {
     try {
-      // Mark offline in presence
       if (userId) {
         try {
           const channel = supabase.channel('online-students')
@@ -159,7 +166,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         }
       }
 
-      // Clear all local auth data
       localStorage.removeItem('auth_user')
       localStorage.removeItem('auth_role')
       localStorage.removeItem('user_profile')
@@ -170,12 +176,20 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
       router.replace('/portal')
     } catch (err) {
       console.error('[StudentLayout] Logout error:', err)
-      // Force redirect anyway
       router.replace('/portal')
     }
   }, [userId, router])
 
   const handleTabChange = useCallback((tab: string) => {
+    // Block inactive tab changes manually
+    if (profile && profile.is_active === false) {
+      const allowedTabs = ['overview', 'results', 'profile']
+      if (!allowedTabs.includes(tab)) {
+        toast.error('This action is disabled for archived accounts.')
+        return
+      }
+    }
+
     setActiveTab(tab)
     const pathMap: Record<string, string> = {
       overview: '/student',
@@ -193,14 +207,19 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     }
     const path = pathMap[tab]
     if (path) router.push(path)
-  }, [router])
+  }, [router, profile])
 
   if (loading) {
     return <StudentLoading profile={profile} onLogout={handleLogout} />
   }
 
-  // Exam pages — no nav, no presence, full focus mode
   if (isExamPage) {
+    // Prevent inactive students from launching the Exam CBT module
+    if (profile && profile.is_active === false) {
+      router.replace('/student')
+      return null
+    }
+
     return (
       <ErrorBoundary variant="student">
         {children}
@@ -210,7 +229,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   return (
     <ErrorBoundary variant="student">
-      {userId && <StudentPresence userId={userId} />}
+      {userId && profile?.is_active !== false && <StudentPresence userId={userId} />}
       {children}
       <MobileBottomNav
         role="student"

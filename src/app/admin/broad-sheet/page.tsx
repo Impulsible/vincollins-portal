@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx
+// app/admin/broad-sheet/page.tsx - UPDATED WITH ACTIVE STATUS ROSTER ISOLATION
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -215,7 +215,6 @@ function StatCard({ label, value, accent, icon: Icon, sub }: { label: string; va
   )
 }
 
-// ── Report status chip ────────────────────────────────────────────────────────
 function ReportStatusChip({ status }: { status?: string | null }) {
   if (status === 'published') return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-2 py-0.5 rounded-full"><CheckCircle2 className="h-2.5 w-2.5" />Published</span>
   if (status === 'generated') return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full"><FileText className="h-2.5 w-2.5" />Generated</span>
@@ -223,7 +222,6 @@ function ReportStatusChip({ status }: { status?: string | null }) {
   return <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 px-2 py-0.5 rounded-full">None</span>
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
 export default function BroadSheetPage() {
   const router = useRouter()
   const [isMounted, setIsMounted] = useState(false)
@@ -245,7 +243,6 @@ export default function BroadSheetPage() {
   const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
   const [isLoadingTerm, setIsLoadingTerm] = useState(true)
   
-  // ✅ State for actual current term from database
   const [currentTerm, setCurrentTerm] = useState('')
   const [currentSession, setCurrentSession] = useState('')
 
@@ -254,7 +251,6 @@ export default function BroadSheetPage() {
 
   useEffect(() => { setIsMounted(true) }, [])
 
-  // ✅ DYNAMIC: Fetch current term and session from database
   const fetchCurrentTerm = useCallback(async () => {
     try {
       const { data: settings, error } = await supabase
@@ -279,7 +275,6 @@ export default function BroadSheetPage() {
         setCurrentTerm(term)
         setCurrentSession(session)
         
-        // Only set selectedTerm/Year if they haven't been set yet
         if (!selectedTerm) {
           setSelectedTerm(term)
         }
@@ -296,12 +291,10 @@ export default function BroadSheetPage() {
     }
   }, [selectedTerm, selectedYear])
 
-  // ── Mount: Fetch term from database ────────────────────────────────────────
   useEffect(() => {
     fetchCurrentTerm()
   }, [fetchCurrentTerm])
 
-  // ── Init: Load profile and set default class ──────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
@@ -330,19 +323,16 @@ export default function BroadSheetPage() {
     init()
   }, [])
 
-  // ── Update expected subjects when class changes ────────────────────────────
   useEffect(() => {
     if (selectedClass) setExpectedSubjects(getAllSubjectsForClass(selectedClass))
   }, [selectedClass])
 
-  // ── Load broad sheet when filters change ──────────────────────────────────
   useEffect(() => {
     if (isMounted && !isLoadingTerm && selectedClass && selectedTerm && selectedYear) {
       loadBroadSheet()
     }
   }, [selectedClass, selectedTerm, selectedYear, isMounted, isLoadingTerm])
 
-  // ── Auto-refresh ────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!autoRefreshEnabled || loading || students.length === 0 || isLoadingTerm) return
     if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current)
@@ -354,7 +344,6 @@ export default function BroadSheetPage() {
     return () => { if (autoRefreshTimerRef.current) clearInterval(autoRefreshTimerRef.current) }
   }, [autoRefreshEnabled, selectedClass, selectedTerm, selectedYear, loading, students.length, isLoadingTerm])
 
-  // ── Real-time score updates ────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedClass || !selectedTerm || !selectedYear || isLoadingTerm) return
     const ch = supabase.channel('broadsheet-scores')
@@ -374,7 +363,7 @@ export default function BroadSheetPage() {
     if (newScoreAlert) { const t = setTimeout(() => setNewScoreAlert(null), 5000); return () => clearTimeout(t) }
   }, [newScoreAlert])
 
-  // ── Load broad sheet ────────────────────────────────────────────────────────
+  // ── LOAD BROAD SHEET DATA (STRICT ACTIVE ISOLATION) ────────────────────────
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
@@ -384,10 +373,11 @@ export default function BroadSheetPage() {
       const isJSS = selectedClass.toUpperCase().includes('JSS')
       const isSS = selectedClass.toUpperCase().includes('SS')
       
-      // ✅ Get ALL students in the selected class (their CURRENT class)
+      // ✅ Get active students in class (exclude students who have left the school)
       let query = supabase.from('profiles')
         .select('id, full_name, display_name, admission_number, vin_id, class, department, gender, photo_url, first_name')
         .eq('role', 'student')
+        .eq('is_active', true) // 🚫 CRITICAL: Exclude inactive/withdrawn student profiles
         .order('display_name')
         .limit(500)
       
@@ -411,7 +401,6 @@ export default function BroadSheetPage() {
 
       const studentIds = classStudents.map(s => s.id)
       
-      // ✅ Get scores for these students (may be empty if no scores yet)
       const { data: allScores, error: scoreError } = await supabase
         .from('ca_scores')
         .select('*')
@@ -423,7 +412,6 @@ export default function BroadSheetPage() {
       
       if (scoreError) {
         console.error('Score error:', scoreError)
-        // Continue with empty scores
       }
 
       const { data: existingReportCards } = await supabase
@@ -441,7 +429,6 @@ export default function BroadSheetPage() {
       })
 
       const records: StudentRecord[] = classStudents.map(student => {
-        // ✅ Use the selected class for subject determination
         const subjects = getSubjectsForStudent(selectedClass, student.department)
         const scores = (allScores || []).filter(s => s.student_id === student.id)
         
@@ -985,7 +972,6 @@ export default function BroadSheetPage() {
 
   const minRequired = selectedClass?.toUpperCase().startsWith('JSS') ? JSS_MIN_SUBJECTS : SS_MIN_SUBJECTS
   
-  // ── Get available sessions based on current session ───────────────────────
   const availableSessions = useMemo(() => {
     if (!currentSession) return ['2025/2026']
     const year = parseInt(currentSession.split('/')[0])
@@ -1027,7 +1013,7 @@ export default function BroadSheetPage() {
     <div className="w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 min-h-screen print:bg-white">
       <div className="px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-4 max-w-[1800px] mx-auto">
 
-        {/* ── Live alert banner ───────────────────────────────────────────── */}
+        {/* Live alert banner */}
         <AnimatePresence>
           {newScoreAlert && (
             <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
@@ -1044,7 +1030,7 @@ export default function BroadSheetPage() {
           )}
         </AnimatePresence>
 
-        {/* ── Page header ─────────────────────────────────────────────────── */}
+        {/* Page header */}
         <div className="no-print flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
             <button onClick={() => router.back()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-2 transition-colors">
@@ -1062,7 +1048,6 @@ export default function BroadSheetPage() {
             </p>
           </div>
 
-          {/* Utility actions */}
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline"
               onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear }); router.push(`/admin/report-cards?${p}`) }}
@@ -1087,7 +1072,7 @@ export default function BroadSheetPage() {
           </div>
         </div>
 
-        {/* ── Stat cards ──────────────────────────────────────────────────── */}
+        {/* Stat cards */}
         <div className="no-print grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Total Students" value={stats.total} icon={Users} accent="bg-slate-500" />
           <StatCard label="Ready for Report" value={stats.readyForReport} icon={CheckCircle2} accent="bg-emerald-500" sub={`min ${minRequired} subjects`} />
@@ -1097,7 +1082,7 @@ export default function BroadSheetPage() {
           <StatCard label="Published" value={stats.published} icon={Send} accent="bg-teal-500" sub="visible to students" />
         </div>
 
-        {/* ── Config + actions card ────────────────────────────────────────── */}
+        {/* Config + actions card */}
         <Card className="no-print border-0 shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
@@ -1231,7 +1216,7 @@ export default function BroadSheetPage() {
           </CardContent>
         </Card>
 
-        {/* ── Generation progress bar ──────────────────────────────────────── */}
+        {/* Generation progress bar */}
         <AnimatePresence>
           {(generating || regenerating) && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
@@ -1256,7 +1241,7 @@ export default function BroadSheetPage() {
           )}
         </AnimatePresence>
 
-        {/* ── Broad sheet table ────────────────────────────────────────────── */}
+        {/* Broad sheet table */}
         <Card className="border-0 shadow-sm bg-white dark:bg-slate-900 overflow-hidden print:shadow-none">
           {/* Print header */}
           <div className="hidden print:block p-6 text-center border-b border-slate-200">
@@ -1311,7 +1296,7 @@ export default function BroadSheetPage() {
                       <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-3">
                         <Users className="h-8 w-8 text-slate-400" />
                       </div>
-                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No students found</p>
+                      <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No active students found</p>
                     </td>
                   </tr>
                 ) : (

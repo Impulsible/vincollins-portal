@@ -1,5 +1,4 @@
 // components/admin/students/components/StudentTable.tsx
-
 'use client'
 
 import { Card } from '@/components/ui/card'
@@ -24,6 +23,7 @@ interface StudentTableProps {
   onEdit: (student: Student) => void
   onResetPassword: (student: Student) => void
   onDelete: (student: Student) => void
+  onToggleStatus: (student: Student) => void // 👈 New toggle event listener
 }
 
 export function StudentTable({
@@ -35,6 +35,7 @@ export function StudentTable({
   onEdit,
   onResetPassword,
   onDelete,
+  onToggleStatus, // 👈 Destructure
 }: StudentTableProps) {
   return (
     <Card className="border shadow-sm rounded-xl overflow-hidden">
@@ -70,6 +71,7 @@ export function StudentTable({
                   onEdit={onEdit}
                   onResetPassword={onResetPassword}
                   onDelete={onDelete}
+                  onToggleStatus={onToggleStatus} // 👈 Forward here
                 />
               ))
             )}
@@ -80,5 +82,4 @@ export function StudentTable({
   )
 }
 
-// Add default export
 export default StudentTable

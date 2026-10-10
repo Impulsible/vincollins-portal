@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/dashboard/StatsCards.tsx - FIXED FOR YOUR DATABASE
+// components/admin/dashboard/StatsCards.tsx - UPDATED WITH ACTIVE STATUS SUBTITLES
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -54,7 +54,6 @@ const StatCard = memo(({
             </span>
           </div>
         )}
-        {/* ✅ Removed dot pattern overlay that caused moiré/static lines on mobile */}
         <CardContent className="relative p-5 lg:p-6">
           <div className="flex items-start justify-between gap-3 lg:gap-4">
             <div className="flex-1 space-y-2 lg:space-y-3">
@@ -124,11 +123,7 @@ export function StatsCards({
 }: StatsCardsProps) {
   const [liveStats] = useState(initialStats)
   const [onlineCounts, setOnlineCounts] = useState({ students: 0, staff: 0 })
-  
-  // ✅ Fetch active exams from exam_attempts (your actual table)
   const [activeExamsCount, setActiveExamsCount] = useState(initialStats.activeExams)
-  
-  // ✅ Fetch pending report cards
   const [pendingReportsCount, setPendingReportsCount] = useState(initialStats.pendingReports || 0)
 
   // Real-time presence tracking
@@ -151,7 +146,7 @@ export function StatsCards({
     return () => { presenceChannel.unsubscribe() }
   }, [])
 
-  // ✅ Fetch active exams from exam_attempts where status = 'in_progress'
+  // Fetch active exams
   useEffect(() => {
     const fetchActiveExams = async () => {
       const { count } = await supabase
@@ -162,7 +157,6 @@ export function StatsCards({
     }
     fetchActiveExams()
 
-    // Real-time subscription to exam_attempts
     const channel = supabase
       .channel('stats-active-exams')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exam_attempts' }, () => {
@@ -173,7 +167,7 @@ export function StatsCards({
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // ✅ Fetch pending report cards
+  // Fetch pending report cards
   useEffect(() => {
     const fetchPendingReports = async () => {
       const { count } = await supabase
@@ -194,7 +188,7 @@ export function StatsCards({
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // ✅ Fetch pending exams (for submissions count)
+  // Fetch pending exams (for submissions count)
   const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(initialStats.pendingSubmissions)
   
   useEffect(() => {
@@ -219,12 +213,12 @@ export function StatsCards({
 
   const cards = useMemo(() => [
     {
-      title: 'Total Students',
+      title: 'Active Students', // 👈 Changed from Total Students
       value: liveStats.totalStudents || 0,
       trend: 12,
       color: 'bg-emerald-500',
       bgGradient: 'from-emerald-500 via-emerald-600 to-teal-600',
-      subtitle: onlineCounts.students > 0 ? `${onlineCounts.students} online now` : 'Currently enrolled',
+      subtitle: onlineCounts.students > 0 ? `${onlineCounts.students} online now` : 'Active students', // 👈 Changed description
       delay: 0,
       onClick: onStudentClick,
       live: onlineCounts.students > 0,

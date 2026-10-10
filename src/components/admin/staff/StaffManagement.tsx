@@ -1,10 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/staff/StaffManagement.tsx - PROFESSIONALLY STYLED
+// components/admin/staff/StaffManagement.tsx
 
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -15,29 +15,30 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, 
+  Dialog, DialogContent, DialogDescription, DialogFooter,
   DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, 
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   UserPlus, MoreVertical, Edit, Trash2, KeyRound, Copy, CheckCircle,
   Shield, RefreshCw, Loader2, Users, Search, X, Eye,
-  Phone, Mail, Calendar, MapPin, Building, AlertCircle, Circle
+  Phone, Mail, Building, AlertCircle, Circle
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { supabase } from '@/lib/supabase'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 
+// ─── TYPES ───────────────────────────────────────────────────────
 interface Staff {
   id: string
   vin_id: string
   email: string
   full_name: string
+  display_name?: string
   first_name?: string
   last_name?: string
   department: string
@@ -50,25 +51,22 @@ interface Staff {
 }
 
 interface StaffManagementProps {
-  staff: Staff[]
-  onAddStaff: (staffData: any) => Promise<{ email: string; password: string; vin_id: string } | void>
-  onUpdateStaff: (updatedStaff: Staff) => Promise<void>
-  onDeleteStaff: (staffMember: Staff) => Promise<void>
-  onResetPassword: (staffMember: Staff) => Promise<void>
-  onRefresh?: () => void
+  staff?: Staff[]           // Optional: pass from parent OR self-fetch
+  onRefresh?: () => void    // Optional: notify parent after mutations
 }
 
-const departments = ['Administration', 'Academic', 'Science', 'Arts', 'Commercial', 'Technology', 'Finance', 'HR']
+// ─── CONSTANTS ───────────────────────────────────────────────────
+const departments = [
+  'Administration', 'Academic', 'Science', 'Arts',
+  'Commercial', 'Technology', 'Finance', 'HR'
+]
 const currentYear = new Date().getFullYear()
 
 const generateJoinYears = (): number[] => {
-  const startYear = 2022
-  const endYear = currentYear + 10
   const years: number[] = []
-  for (let year = startYear; year <= endYear; year++) years.push(year)
+  for (let y = 2022; y <= currentYear + 10; y++) years.push(y)
   return years
 }
-
 const joinYears = generateJoinYears()
 
 const copyToClipboard = (text: string, label: string) => {
@@ -76,19 +74,107 @@ const copyToClipboard = (text: string, label: string) => {
   toast.success(`${label} copied to clipboard!`)
 }
 
-export function StaffManagement({ 
-  staff, onAddStaff, onUpdateStaff, onDeleteStaff, onResetPassword, onRefresh 
-}: StaffManagementProps) {
+// ─── API HELPERS ─────────────────────────────────────────────────
+const API = {
+  listStaff: async (): Promise<Staff[]> => {
+    const res = await fetch('/api/admin/users?role=staff&limit=500')
+    if (!res.ok) throw new Error('Failed to fetch staff')
+    const data = await res.json()
+    return data.users || []
+  },
+
+  createStaff: async (payload: any) => {
+    const res = await fetch('/api/admin/users/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to create staff')
+    return data
+  },
+
+  updateStaff: async (payload: any) => {
+    const res = await fetch('/api/admin/users/update', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to update staff')
+    return data
+  },
+
+  deleteStaff: async (id: string) => {
+    const res = await fetch('/api/admin/users/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to delete staff')
+    return data
+  },
+
+  resetPassword: async (id: string, password: string) => {
+    const res = await fetch('/api/admin/users/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, reset_password: true, password }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to reset password')
+    return data
+  },
+}
+
+// ─── COMPONENT ───────────────────────────────────────────────────
+export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManagementProps) {
+  // Internal state for self-fetching (used when no external staff prop)
+  const [internalStaff, setInternalStaff] = useState<Staff[]>([])
+  const [isLoading, setIsLoading] = useState(!externalStaff)
+
+  // Use external staff if provided, otherwise use internal
+  const staffList = externalStaff ?? internalStaff
+
+  // Self-fetch on mount if no external data
+  const fetchStaff = useCallback(async () => {
+    if (externalStaff) return // Parent handles fetching
+    try {
+      setIsLoading(true)
+      const data = await API.listStaff()
+      setInternalStaff(data)
+    } catch (err: any) {
+      toast.error('Failed to load staff list')
+      console.error(err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [externalStaff])
+
+  useEffect(() => {
+    fetchStaff()
+  }, [fetchStaff])
+
+  // Refresh handler: re-fetch internally + notify parent
+  const handleRefresh = useCallback(async () => {
+    await fetchStaff()
+    onRefresh?.()
+  }, [fetchStaff, onRefresh])
+
+  // ─── DIALOG STATE ────────────────────────────────────────────
   const [showAddDialog, setShowAddDialog] = useState(false)
   const [showEditDialog, setShowEditDialog] = useState(false)
   const [showCredentialsDialog, setShowCredentialsDialog] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showViewDetailsDialog, setShowViewDetailsDialog] = useState(false)
   const [selectedStaff, setSelectedStaff] = useState<Staff | null>(null)
-  const [newCredentials, setNewCredentials] = useState<{ email: string; password: string; vin_id: string } | null>(null)
+  const [newCredentials, setNewCredentials] = useState<{
+    email: string; password: string; vin_id: string
+  } | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  
+
   const [newStaff, setNewStaff] = useState({
     first_name: '',
     last_name: '',
@@ -98,25 +184,27 @@ export function StaffManagement({
     join_year: currentYear,
   })
 
+  // ─── FILTERING & SORTING ─────────────────────────────────────
   const sortedStaff = useMemo(() => {
-    return [...staff].sort((a, b) => {
+    return [...staffList].sort((a, b) => {
       const nameA = a.full_name?.toLowerCase() || ''
       const nameB = b.full_name?.toLowerCase() || ''
       return nameA.localeCompare(nameB)
     })
-  }, [staff])
+  }, [staffList])
 
   const filteredStaff = useMemo(() => {
     if (!searchQuery) return sortedStaff
-    const query = searchQuery.toLowerCase()
-    return sortedStaff.filter(member =>
-      member.full_name?.toLowerCase().includes(query) ||
-      member.email?.toLowerCase().includes(query) ||
-      member.vin_id?.toLowerCase().includes(query) ||
-      member.department?.toLowerCase().includes(query)
+    const q = searchQuery.toLowerCase()
+    return sortedStaff.filter(m =>
+      m.full_name?.toLowerCase().includes(q) ||
+      m.email?.toLowerCase().includes(q) ||
+      m.vin_id?.toLowerCase().includes(q) ||
+      m.department?.toLowerCase().includes(q)
     )
   }, [sortedStaff, searchQuery])
 
+  // ─── CREATE ──────────────────────────────────────────────────
   const handleAddStaffClick = async () => {
     if (!newStaff.first_name || !newStaff.last_name || !newStaff.department) {
       toast.error('Please fill in all required fields')
@@ -125,117 +213,124 @@ export function StaffManagement({
 
     setIsSubmitting(true)
     try {
-      const year = newStaff.join_year || currentYear
-      
-      const response = await fetch('/api/admin/users/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          first_name: newStaff.first_name.trim(),
-          middle_name: '',
-          last_name: newStaff.last_name.trim(),
-          role: 'staff',
-          department: newStaff.department,
-          join_year: year,
-          phone: newStaff.phone || '',
-          address: newStaff.address || ''
-        })
+      const result = await API.createStaff({
+        first_name: newStaff.first_name.trim(),
+        middle_name: '',
+        last_name: newStaff.last_name.trim(),
+        role: 'staff',
+        department: newStaff.department,
+        join_year: newStaff.join_year || currentYear,
+        phone: newStaff.phone || '',
+        address: newStaff.address || '',
       })
-      
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to create staff member')
-      }
-      
-      const result = await response.json()
-      
+
       setNewCredentials({
         email: result.credentials.email,
         password: result.credentials.password,
-        vin_id: result.credentials.vin_id
+        vin_id: result.credentials.vin_id,
       })
-      
+
       setNewStaff({
-        first_name: '',
-        last_name: '',
-        department: '',
-        phone: '',
-        address: '',
-        join_year: currentYear,
+        first_name: '', last_name: '', department: '',
+        phone: '', address: '', join_year: currentYear,
       })
-      
+
       setShowAddDialog(false)
       toast.success(`${result.user.full_name} added successfully!`)
-      
-      setTimeout(() => {
-        if (onRefresh) onRefresh()
-      }, 200)
-      
-      setTimeout(() => {
-        setShowCredentialsDialog(true)
-      }, 600)
-      
+
+      await handleRefresh()
+
+      setTimeout(() => setShowCredentialsDialog(true), 500)
     } catch (error: any) {
-      console.error('Error adding staff:', error)
+      console.error('Create error:', error)
       toast.error(error.message || 'Failed to add staff member')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // ─── UPDATE ──────────────────────────────────────────────────
   const handleUpdateStaffClick = async () => {
     if (!selectedStaff) return
     setIsSubmitting(true)
     try {
-      await onUpdateStaff(selectedStaff)
+      await API.updateStaff({
+        id: selectedStaff.id,
+        full_name: selectedStaff.full_name,
+        department: selectedStaff.department,
+        phone: selectedStaff.phone,
+        address: selectedStaff.address,
+        is_active: selectedStaff.is_active,
+      })
+
       setShowEditDialog(false)
       setSelectedStaff(null)
       toast.success('Staff updated successfully!')
-      if (onRefresh) onRefresh()
+      await handleRefresh()
     } catch (error: any) {
-      console.error('Error updating staff:', error)
+      console.error('Update error:', error)
       toast.error(error.message || 'Failed to update staff')
     } finally {
       setIsSubmitting(false)
     }
   }
 
+  // ─── DELETE ──────────────────────────────────────────────────
   const handleDeleteStaffClick = async () => {
     if (!selectedStaff) return
     setIsSubmitting(true)
     try {
-      await onDeleteStaff(selectedStaff)
+      const result = await API.deleteStaff(selectedStaff.id)
+
+      if (result.warning) {
+        toast.warning(result.warning)
+      } else {
+        toast.success('Staff member permanently deleted!')
+      }
+
       setShowDeleteConfirm(false)
       setSelectedStaff(null)
-      toast.success('Staff deleted successfully!')
-      if (onRefresh) onRefresh()
+      await handleRefresh()
     } catch (error: any) {
-      console.error('Error deleting staff:', error)
+      console.error('Delete error:', error)
       toast.error(error.message || 'Failed to delete staff')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const handleResetPasswordClick = async (staffMember: Staff) => {
+  // ─── RESET PASSWORD ──────────────────────────────────────────
+  const handleResetPasswordClick = async (member: Staff) => {
     try {
-      await onResetPassword(staffMember)
-      toast.success(`Password reset to: ${staffMember.vin_id}`)
-      navigator.clipboard?.writeText(staffMember.vin_id)
-    } catch (error) {
-      toast.error('Failed to reset password')
+      await API.resetPassword(member.id, member.vin_id)
+      toast.success(`Password reset to: ${member.vin_id}`)
+      navigator.clipboard?.writeText(member.vin_id)
+    } catch (error: any) {
+      console.error('Reset error:', error)
+      toast.error(error.message || 'Failed to reset password')
     }
   }
 
-  // Stats for summary cards
-  const activeCount = staff.filter(s => s.is_active).length
-  const inactiveCount = staff.filter(s => !s.is_active).length
-  const departmentCount = new Set(staff.map(s => s.department).filter(Boolean)).size
+  // ─── STATS ───────────────────────────────────────────────────
+  const activeCount = staffList.filter(s => s.is_active).length
+  const inactiveCount = staffList.filter(s => !s.is_active).length
+  const departmentCount = new Set(staffList.map(s => s.department).filter(Boolean)).size
 
+  // ─── LOADING STATE ───────────────────────────────────────────
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <span className="ml-3 text-slate-500">Loading staff...</span>
+      </div>
+    )
+  }
+
+  // ─── RENDER ──────────────────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Header Section */}
-      <motion.div 
+      {/* Header */}
+      <motion.div
         className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -245,10 +340,11 @@ export function StaffManagement({
             <Users className="h-7 w-7 text-emerald-600" />
             Staff Management
           </h1>
-          <p className="text-slate-500 mt-1">Manage staff profiles, credentials, and department assignments</p>
+          <p className="text-slate-500 mt-1">
+            Manage staff profiles, credentials, and department assignments
+          </p>
         </div>
-        
-        <Button 
+        <Button
           onClick={() => setShowAddDialog(true)}
           className="bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all h-10"
         >
@@ -256,14 +352,14 @@ export function StaffManagement({
         </Button>
       </motion.div>
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-slate-500 font-medium">Total Staff</p>
-                <p className="text-2xl font-bold text-slate-800">{staff.length}</p>
+                <p className="text-2xl font-bold text-slate-800">{staffList.length}</p>
               </div>
               <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
                 <Users className="h-5 w-5 text-emerald-600" />
@@ -271,7 +367,6 @@ export function StaffManagement({
             </div>
           </div>
         </Card>
-        
         <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
           <div className="p-4">
             <div className="flex items-center justify-between">
@@ -285,7 +380,6 @@ export function StaffManagement({
             </div>
           </div>
         </Card>
-        
         <Card className="border-l-4 border-l-slate-500 shadow-sm hover:shadow-md transition-shadow">
           <div className="p-4">
             <div className="flex items-center justify-between">
@@ -299,7 +393,6 @@ export function StaffManagement({
             </div>
           </div>
         </Card>
-        
         <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
           <div className="p-4">
             <div className="flex items-center justify-between">
@@ -315,14 +408,14 @@ export function StaffManagement({
         </Card>
       </div>
 
-      {/* Search Bar */}
+      {/* Search */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-          <Input 
-            placeholder="Search by name, email, VIN ID, or department..." 
-            value={searchQuery} 
-            onChange={(e) => setSearchQuery(e.target.value)} 
+          <Input
+            placeholder="Search by name, email, VIN ID, or department..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9 pr-8 h-10"
           />
           {searchQuery && (
@@ -331,12 +424,12 @@ export function StaffManagement({
             </button>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={() => onRefresh?.()} className="h-10">
+        <Button variant="outline" size="sm" onClick={handleRefresh} className="h-10">
           <RefreshCw className="mr-2 h-4 w-4" /> Refresh
         </Button>
       </div>
 
-      {/* Add Staff Dialog */}
+      {/* ─── ADD DIALOG ──────────────────────────────────────── */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto p-0">
           <div className="sticky top-0 bg-white dark:bg-slate-950 z-10 border-b px-6 py-4">
@@ -348,7 +441,6 @@ export function StaffManagement({
             </DialogHeader>
             <p className="text-sm text-slate-500 mt-1">Email and VIN ID will be auto-generated</p>
           </div>
-          
           <div className="space-y-5 px-6 py-5">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
@@ -358,25 +450,24 @@ export function StaffManagement({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-xs text-slate-500">First Name *</Label>
-                  <Input 
-                    value={newStaff.first_name} 
-                    onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })} 
+                  <Input
+                    value={newStaff.first_name}
+                    onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })}
                     placeholder="First name"
                     className="mt-1 h-9"
                   />
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500">Last Name *</Label>
-                  <Input 
-                    value={newStaff.last_name} 
-                    onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })} 
+                  <Input
+                    value={newStaff.last_name}
+                    onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })}
                     placeholder="Last name"
                     className="mt-1 h-9"
                   />
                 </div>
               </div>
             </div>
-
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Building className="h-4 w-4 text-blue-600" />
@@ -386,9 +477,7 @@ export function StaffManagement({
                 <div>
                   <Label className="text-xs text-slate-500">Department *</Label>
                   <Select value={newStaff.department} onValueChange={(v) => setNewStaff({ ...newStaff, department: v })}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select department" />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select department" /></SelectTrigger>
                     <SelectContent>
                       {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
@@ -397,17 +486,14 @@ export function StaffManagement({
                 <div>
                   <Label className="text-xs text-slate-500">Join Year</Label>
                   <Select value={newStaff.join_year?.toString()} onValueChange={(v) => setNewStaff({ ...newStaff, join_year: parseInt(v) })}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select join year" />
-                    </SelectTrigger>
+                    <SelectTrigger className="h-9"><SelectValue placeholder="Select join year" /></SelectTrigger>
                     <SelectContent className="max-h-[200px]">
-                      {joinYears.map(year => <SelectItem key={year} value={year.toString()}>{year}</SelectItem>)}
+                      {joinYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
             </div>
-
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Mail className="h-4 w-4 text-purple-600" />
@@ -415,13 +501,12 @@ export function StaffManagement({
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
                 <p className="font-mono text-sm text-emerald-600">
-                  {newStaff.first_name && newStaff.last_name 
+                  {newStaff.first_name && newStaff.last_name
                     ? `${newStaff.first_name.toLowerCase().replace(/[^a-z]/g, '')}.${newStaff.last_name.toLowerCase().replace(/[^a-z]/g, '')}@vincollins.edu.ng`
                     : 'first.last@vincollins.edu.ng'}
                 </p>
               </div>
             </div>
-
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Phone className="h-4 w-4 text-slate-500" />
@@ -431,18 +516,18 @@ export function StaffManagement({
               <div className="space-y-3">
                 <div>
                   <Label className="text-xs text-slate-500">Phone Number</Label>
-                  <Input 
-                    value={newStaff.phone} 
-                    onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} 
+                  <Input
+                    value={newStaff.phone}
+                    onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
                     placeholder="+234 XXX XXX XXXX"
                     className="mt-1 h-9"
                   />
                 </div>
                 <div>
                   <Label className="text-xs text-slate-500">Address</Label>
-                  <Input 
-                    value={newStaff.address} 
-                    onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })} 
+                  <Input
+                    value={newStaff.address}
+                    onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })}
                     placeholder="Staff address"
                     className="mt-1 h-9"
                   />
@@ -450,11 +535,8 @@ export function StaffManagement({
               </div>
             </div>
           </div>
-          
           <DialogFooter className="sticky bottom-0 bg-white dark:bg-slate-950 border-t px-6 py-4 gap-2">
-            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="h-9">
-              Cancel
-            </Button>
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="h-9">Cancel</Button>
             <Button onClick={handleAddStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 h-9">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
               {isSubmitting ? 'Creating...' : 'Add Staff'}
@@ -463,7 +545,7 @@ export function StaffManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Staff Table */}
+      {/* ─── STAFF TABLE ─────────────────────────────────────── */}
       <Card className="border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
@@ -527,8 +609,8 @@ export function StaffManagement({
                     <TableCell className="py-3 px-4">
                       <Badge className={cn(
                         "text-xs font-medium px-2 py-0.5",
-                        member.is_active 
-                          ? "bg-emerald-100 text-emerald-700" 
+                        member.is_active
+                          ? "bg-emerald-100 text-emerald-700"
                           : "bg-slate-100 text-slate-600"
                       )}>
                         {member.is_active ? 'Active' : 'Inactive'}
@@ -554,7 +636,10 @@ export function StaffManagement({
                             <KeyRound className="mr-2 h-4 w-4" /> Reset Password
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }} className="text-red-600">
+                          <DropdownMenuItem
+                            onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }}
+                            className="text-red-600 focus:text-red-700"
+                          >
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -568,7 +653,7 @@ export function StaffManagement({
         </div>
       </Card>
 
-      {/* Credentials Dialog */}
+      {/* ─── CREDENTIALS DIALOG ──────────────────────────────── */}
       <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -577,7 +662,7 @@ export function StaffManagement({
               Staff Account Created
             </DialogTitle>
             <DialogDescription>
-              Save these credentials for the staff member. Password = VIN ID
+              Save these credentials. Password = VIN ID
             </DialogDescription>
           </DialogHeader>
           {newCredentials && (
@@ -616,28 +701,29 @@ export function StaffManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Edit Dialog */}
+      {/* ─── EDIT DIALOG ─────────────────────────────────────── */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>Edit Staff Member</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5 text-blue-600" />
+              Edit Staff Member
+            </DialogTitle>
           </DialogHeader>
           {selectedStaff && (
             <div className="space-y-4 py-2">
               <div>
                 <Label className="text-sm">Full Name</Label>
-                <Input 
-                  value={selectedStaff.full_name} 
-                  onChange={(e) => setSelectedStaff({ ...selectedStaff, full_name: e.target.value })} 
+                <Input
+                  value={selectedStaff.full_name}
+                  onChange={(e) => setSelectedStaff({ ...selectedStaff, full_name: e.target.value })}
                   className="mt-1 h-9"
                 />
               </div>
               <div>
                 <Label className="text-sm">Department</Label>
                 <Select value={selectedStaff.department} onValueChange={(v) => setSelectedStaff({ ...selectedStaff, department: v })}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
+                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                   </SelectContent>
@@ -645,17 +731,17 @@ export function StaffManagement({
               </div>
               <div>
                 <Label className="text-sm">Phone</Label>
-                <Input 
-                  value={selectedStaff.phone || ''} 
-                  onChange={(e) => setSelectedStaff({ ...selectedStaff, phone: e.target.value })} 
+                <Input
+                  value={selectedStaff.phone || ''}
+                  onChange={(e) => setSelectedStaff({ ...selectedStaff, phone: e.target.value })}
                   className="mt-1 h-9"
                 />
               </div>
               <div>
                 <Label className="text-sm">Address</Label>
-                <Input 
-                  value={selectedStaff.address || ''} 
-                  onChange={(e) => setSelectedStaff({ ...selectedStaff, address: e.target.value })} 
+                <Input
+                  value={selectedStaff.address || ''}
+                  onChange={(e) => setSelectedStaff({ ...selectedStaff, address: e.target.value })}
                   className="mt-1 h-9"
                 />
               </div>
@@ -686,32 +772,43 @@ export function StaffManagement({
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
+      {/* ─── DELETE DIALOG ───────────────────────────────────── */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
               <AlertCircle className="h-5 w-5" />
-              Confirm Deletion
+              Confirm Permanent Deletion
             </DialogTitle>
           </DialogHeader>
           {selectedStaff && (
-            <div className="py-4">
-              <p className="text-base font-medium">Delete {selectedStaff.full_name}?</p>
-              <p className="text-sm text-slate-500 mt-1">This action cannot be undone.</p>
+            <div className="py-4 space-y-3">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-base font-semibold text-red-900">
+                  Delete {selectedStaff.full_name}?
+                </p>
+                <p className="text-sm text-red-700 mt-1">
+                  This will permanently remove their account from the authentication system and all database records.
+                </p>
+              </div>
+              <div className="text-sm text-slate-600 space-y-1">
+                <p>• Login credentials will be erased</p>
+                <p>• All associated records will be removed</p>
+                <p>• This action <strong>cannot</strong> be undone</p>
+              </div>
             </div>
           )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="h-9">Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteStaffClick} disabled={isSubmitting} className="h-9">
-              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Delete
+              {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              {isSubmitting ? 'Deleting...' : 'Delete Permanently'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* View Details Dialog */}
+      {/* ─── VIEW DETAILS DIALOG ─────────────────────────────── */}
       <Dialog open={showViewDetailsDialog} onOpenChange={setShowViewDetailsDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -721,6 +818,7 @@ export function StaffManagement({
             <div className="space-y-4 py-2">
               <div className="flex items-center gap-4 pb-2 border-b">
                 <Avatar className="h-14 w-14">
+                  <AvatarImage src={selectedStaff.photo_url} />
                   <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-lg font-semibold">
                     {selectedStaff.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)}
                   </AvatarFallback>
@@ -730,7 +828,6 @@ export function StaffManagement({
                   <p className="text-sm text-slate-500">{selectedStaff.email}</p>
                 </div>
               </div>
-              
               <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-lg p-4">
                 <div>
                   <p className="text-xs text-slate-500">VIN ID</p>
@@ -754,7 +851,6 @@ export function StaffManagement({
                   </Badge>
                 </div>
               </div>
-              
               {selectedStaff.address && (
                 <div>
                   <p className="text-xs text-slate-500">Address</p>

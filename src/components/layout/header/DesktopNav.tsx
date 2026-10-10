@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import { 
   ChevronDown, Home, BookOpen, Laptop, Phone, FileText,
   LayoutDashboard, Users, MonitorPlay, GraduationCap,
-  Briefcase, MessageSquare, FileCheck, Activity, BarChart3
+  Briefcase, MessageSquare, FileCheck, Activity, BarChart3, ClipboardList
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -25,13 +25,13 @@ const studentNavigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/student', icon: LayoutDashboard },
   { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
   { name: 'Results', href: '/student/results', icon: GraduationCap },
-  { name: 'Profile', href: '/student/profile', icon: Users },
+  { name: 'Report Card', href: '/student/report-card', icon: FileCheck }, // ✅ changed from Profile
 ]
 
 const teacherNavigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/staff', icon: LayoutDashboard },
   { name: 'Exams', href: '/staff/exams', icon: MonitorPlay },
-  { name: 'Assignments', href: '/staff/assignments', icon: FileText },
+  { name: 'CA Scores', href: '/staff/ca-scores', icon: ClipboardList }, // ✅ changed from Assignments
   { name: 'Students', href: '/staff/students', icon: Users },
   { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
 ]
@@ -184,7 +184,10 @@ export const DesktopNav = memo(function DesktopNav({ userRole, pathname, isPubli
                 {item.name === 'CBT Platform' ? 'CBT' : 
                  item.name === 'Exam Approvals' ? 'Exams' :
                  item.name === 'User Management' ? 'Users' :
-                 item.name === 'My Exams' ? 'Exams' : item.name.substring(0, 4)}
+                 item.name === 'My Exams' ? 'Exams' :
+                 item.name === 'CA Scores' ? 'CA' :           // ✅ new
+                 item.name === 'Report Card' ? 'Report' :     // ✅ new
+                 item.name.substring(0, 4)}
               </span>
               {item.isCbt && (
                 <Badge className="text-[8px] px-1 py-0 bg-[#F5A623] text-[#0A2472] font-bold">CBT</Badge>

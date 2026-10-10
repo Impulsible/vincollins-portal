@@ -1,4 +1,4 @@
-// components/admin/report-cards/ReportCardApproval.tsx
+// components/admin/report-cards/ReportCardApproval.tsx - UPDATED WITH ACTIVE STUDENT ISOLATION
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -253,7 +253,6 @@ function ReportCardPreview({
   onEditTeacher, onSaveTeacher, onEditPrincipal, onSavePrincipal,
   onTeacherChange, onPrincipalChange,
 }: PreviewProps) {
-  // Normalize and deduplicate subjects
   const rawSubjects = card.subjects_data || []
   const normalizedMap = new Map<string, any>()
   
@@ -261,7 +260,6 @@ function ReportCardPreview({
     const name = normalizeSubjectName(s.name || s.subject || '')
     if (normalizedMap.has(name)) {
       const existing = normalizedMap.get(name)!
-      // Keep the entry with higher total score
       if ((s.total || 0) > (existing.total || 0)) {
         normalizedMap.set(name, { ...s, name, subject: name })
       }
@@ -290,8 +288,6 @@ function ReportCardPreview({
 
   return (
     <div className="bg-white w-full text-black border border-gray-200 md:border-2 md:border-blue-900 rounded-lg md:rounded-none p-3 sm:p-5 print:p-3 print:border-2 print:border-blue-900 print:rounded-none">
-
-      {/* Published banner */}
       {isPublishedToStudent(card.status) && (
         <div className="no-print mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-700 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -373,10 +369,8 @@ function ReportCardPreview({
 
       {/* Main content */}
       <div className="flex flex-col md:grid md:grid-cols-[2.2fr_1.2fr] gap-3 sm:gap-4 print:grid print:grid-cols-[2.2fr_1.2fr] print:gap-3">
-
         {/* Left */}
         <div className="min-w-0 space-y-3">
-          {/* Results table */}
           <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-[9px] sm:text-[11px] table-fixed min-w-[380px] print:min-w-0 print:text-[9px]">
@@ -431,7 +425,6 @@ function ReportCardPreview({
             </div>
           </div>
 
-          {/* Teacher remark */}
           <div className="border border-gray-300 rounded-sm overflow-hidden">
             <div className="bg-purple-600 text-white px-2 py-1 text-[9px] sm:text-[11px] font-bold flex items-center justify-between gap-1">
               <span className="flex items-center gap-1">
@@ -470,12 +463,11 @@ function ReportCardPreview({
                 {teacherComment || 'No comment.'}
               </div>
             )}
-            <div className="px-2 pb-1 text-[8px] sm:text-[9px] text-gray-500 border-t border-purple-200 pt-0.5">
+            <div className="bg-white border-t border-purple-200 px-2 py-1 text-[8px] sm:text-[9px] text-gray-500">
               Signed: {card.class_teacher || 'Class Teacher'}
             </div>
           </div>
 
-          {/* Principal remark */}
           <div className="border border-gray-300 rounded-sm overflow-hidden">
             <div className="bg-blue-600 text-white px-2 py-1 text-[9px] sm:text-[11px] font-bold flex items-center justify-between gap-1">
               <span className="flex items-center gap-1">
@@ -516,10 +508,10 @@ function ReportCardPreview({
             )}
           </div>
 
-          {/* Grade scale — desktop/print */}
+          {/* Grade scale */}
           <div className="hidden md:block print:block">
             <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] px-2 py-1 font-bold rounded-t-sm">Grade Scale</div>
-            <div className="border-2 border-blue-900 p-2 rounded-b-sm">
+            <div className="border-2 border-blue-900 p-2 rounded-b-sm bg-white">
               <div className="grid grid-cols-3 gap-1 text-[8px] sm:text-[9px]">
                 {(['A1|75-100','B2|70-74','B3|65-69','C4|60-64','C5|55-59','C6|50-54','D7|45-49','E8|40-44','F9|0-39']).map(item => {
                   const [g, r] = item.split('|')
@@ -548,7 +540,7 @@ function ReportCardPreview({
 
         {/* Right */}
         <div className="space-y-3">
-          <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+          <div className="border-2 border-blue-900 rounded-sm overflow-hidden bg-white">
             <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 uppercase">Performance Summary</div>
             <div className="p-2 sm:p-2.5 text-[10px] sm:text-[11px] space-y-1">
               <div className="flex justify-between">
@@ -585,7 +577,7 @@ function ReportCardPreview({
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-1 gap-3 print:grid-cols-1">
-            <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+            <div className="border-2 border-blue-900 rounded-sm overflow-hidden bg-white">
               <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">Affective Domain</div>
               <div className="p-1.5 sm:p-2">
                 <table className="w-full border-collapse border border-gray-300 text-[8px] sm:text-[10px]">
@@ -600,7 +592,7 @@ function ReportCardPreview({
                 </table>
               </div>
             </div>
-            <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+            <div className="border-2 border-blue-900 rounded-sm overflow-hidden bg-white">
               <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">Psychomotor</div>
               <div className="p-1.5 sm:p-2">
                 <table className="w-full border-collapse border border-gray-300 text-[8px] sm:text-[10px]">
@@ -617,47 +609,18 @@ function ReportCardPreview({
             </div>
           </div>
 
-          <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+          <div className="border-2 border-blue-900 rounded-sm overflow-hidden bg-white">
             <div className="bg-blue-700 text-white text-[8px] sm:text-[10px] font-bold px-2 py-1 uppercase">Key To Ratings</div>
-            <div className="p-2 text-[8px] sm:text-[10px] grid grid-cols-5 md:grid-cols-1 gap-0.5 print:grid-cols-1">
+            <div className="p-2 text-[8px] sm:text-[10px] grid grid-cols-5 md:grid-cols-1 gap-0.5 print:grid-cols-1 bg-white">
               {['5 – Excellent','4 – Very Good','3 – Good','2 – Fair','1 – Poor'].map(r => (
                 <div key={r} className="font-medium text-gray-800">{r}</div>
               ))}
             </div>
           </div>
-
-          {/* Grade scale — mobile */}
-          <div className="md:hidden print:hidden">
-            <div className="bg-blue-700 text-white text-[9px] px-2 py-1 font-bold rounded-t-sm">Grade Scale</div>
-            <div className="border-2 border-blue-900 p-2 rounded-b-sm">
-              <div className="grid grid-cols-3 gap-1 text-[8px]">
-                {(['A1|75-100','B2|70-74','B3|65-69','C4|60-64','C5|55-59','C6|50-54','D7|45-49','E8|40-44','F9|0-39']).map(item => {
-                  const [g, r] = item.split('|')
-                  return (
-                    <div key={g} className="flex items-center gap-0.5">
-                      <span className={getSubjectGradeStyle(g)}>{g}</span>
-                      <span className="text-gray-600">{r}</span>
-                    </div>
-                  )
-                })}
-              </div>
-              <div className="mt-1 pt-1 border-t border-blue-300 grid grid-cols-5 gap-0.5 text-[7px]">
-                {(['A|80-100','B|70-79','C|60-69','P|50-59','F|0-49']).map(item => {
-                  const [g, r] = item.split('|')
-                  return (
-                    <div key={g} className="flex items-center gap-0.5">
-                      <span className={cn('px-1 py-0.5 rounded font-bold text-[7px]', getOverallGradeColor(g))}>{g}</span>
-                      <span className="text-gray-600">{r}</span>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          </div>
         </div>
       </div>
 
-      <div className="border-t-2 border-blue-900 mt-3 sm:mt-4 pt-1.5 text-center text-[7px] sm:text-[9px] text-gray-500">
+      <div className="border-t-2 border-blue-900 mt-3 sm:mt-4 pt-1.5 text-center text-[7px] sm:text-[9px] text-gray-500 bg-white">
         Powered by Vincollins Portal | {schoolSettings.motto || 'Geared Towards Excellence'}
       </div>
     </div>
@@ -669,7 +632,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  // ── State ────────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(true)
   const [isLoadingTerm, setIsLoadingTerm] = useState(true)
   const [reportCards, setReportCards] = useState<ReportCard[]>([])
@@ -679,7 +641,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   const [selectedStatus, setSelectedStatus] = useState(searchParams?.get('status') || 'all')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // ── Dynamic term state ──────────────────────────────────────────────────────
   const [currentTerm, setCurrentTerm] = useState('')
   const [currentSession, setCurrentSession] = useState('')
 
@@ -729,7 +690,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   const getDisplayName = (card: ReportCard) =>
     card.student_display_name || card.student_name || 'Unknown Student'
 
-  // ── Fetch current term from database ───────────────────────────────────────
   const fetchCurrentTerm = useCallback(async () => {
     try {
       const { data: settings, error } = await supabase
@@ -754,7 +714,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         setCurrentTerm(term)
         setCurrentSession(session)
         
-        // Only set selectedTerm/Year if they haven't been set yet
         if (!selectedTerm || selectedTerm === '') {
           const termLabel = getTermLabel(term)
           setSelectedTerm(termLabel)
@@ -772,7 +731,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     }
   }, [selectedTerm, selectedYear])
 
-  // ── Load profile ───────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -784,7 +742,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     load()
   }, [])
 
-  // ── Load school settings ───────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       const { data } = await supabase.from('school_settings').select('*').maybeSingle()
@@ -802,7 +759,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     load()
   }, [])
 
-  // ── Load next term date ────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       try {
@@ -813,12 +769,11 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     load()
   }, [])
 
-  // ── Fetch current term on mount ───────────────────────────────────────────
   useEffect(() => {
     fetchCurrentTerm()
   }, [fetchCurrentTerm])
 
-  // ── Load report cards ──────────────────────────────────────────────────────
+  // ── LOAD REPORT CARDS (STRICT ACTIVE ISOLATION) ───────────────────────────
   const loadReportCards = useCallback(async () => {
     setLoading(true)
     try {
@@ -835,11 +790,15 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
       const studentIds = data?.map((rc: any) => rc.student_id).filter(Boolean) || []
       let studentData: Record<string, any> = {}
+      
       if (studentIds.length > 0) {
+        // 🚫 CRITICAL: Exclude students who are inactive (marked as left)
         const { data: students } = await supabase
           .from('profiles')
-          .select('id, email, photo_url, admission_number, display_name, full_name')
+          .select('id, email, photo_url, admission_number, display_name, full_name, is_active')
           .in('id', studentIds)
+          .eq('is_active', true) // 👈 Safe active-only filter
+        
         studentData = (students || []).reduce((acc: any, s: any) => {
           acc[s.id] = {
             email: s.email || '',
@@ -851,51 +810,53 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         }, {})
       }
 
-      const cards: ReportCard[] = (data || []).map((rc: any) => {
-        // Normalize and deduplicate subjects in each card
-        const rawSubjects = rc.subjects_data || []
-        const normalizedSubjectsMap = new Map<string, any>()
-        
-        rawSubjects.forEach((s: any) => {
-          const name = normalizeSubjectName(s.name || s.subject || '')
-          if (normalizedSubjectsMap.has(name)) {
-            const existing = normalizedSubjectsMap.get(name)!
-            if ((s.total || 0) > (existing.total || 0)) {
+      // Filter out report cards of inactive/withdrawn students
+      const cards: ReportCard[] = (data || [])
+        .filter((rc: any) => studentData[rc.student_id] !== undefined) // 👈 Drop left student records
+        .map((rc: any) => {
+          const rawSubjects = rc.subjects_data || []
+          const normalizedSubjectsMap = new Map<string, any>()
+          
+          rawSubjects.forEach((s: any) => {
+            const name = normalizeSubjectName(s.name || s.subject || '')
+            if (normalizedSubjectsMap.has(name)) {
+              const existing = normalizedSubjectsMap.get(name)!
+              if ((s.total || 0) > (existing.total || 0)) {
+                normalizedSubjectsMap.set(name, { ...s, name, subject: name })
+              }
+            } else {
               normalizedSubjectsMap.set(name, { ...s, name, subject: name })
             }
-          } else {
-            normalizedSubjectsMap.set(name, { ...s, name, subject: name })
+          })
+          
+          const dedupedSubjects = Array.from(normalizedSubjectsMap.values())
+
+          return {
+            id: rc.id,
+            student_id: rc.student_id,
+            student_name: rc.student_name || 'Unknown',
+            student_display_name: studentData[rc.student_id]?.display_name || rc.student_display_name || rc.student_name,
+            student_vin: rc.student_vin || 'N/A',
+            student_admission_number: studentData[rc.student_id]?.admission_number || rc.student_admission_number || '',
+            student_photo_url: studentData[rc.student_id]?.photo_url || rc.student_photo_url || '',
+            class: rc.class,
+            term: rc.term,
+            academic_year: rc.academic_year,
+            subjects_data: dedupedSubjects,
+            teacher_comments: rc.teacher_comments || 'No comment available.',
+            principal_comments: rc.principal_comments || 'No comment available.',
+            class_teacher: rc.class_teacher || 'Unknown',
+            average_score: rc.average_score || 0,
+            total_score: rc.total_score || 0,
+            status: rc.status || 'pending',
+            submitted_at: rc.submitted_at || rc.generated_at || new Date().toISOString(),
+            school_name: rc.school_name || '',
+            student_email: studentData[rc.student_id]?.email || '',
+            student_phone: rc.student_phone || '',
+            next_term_date: rc.next_term_date || nextTermDate || '',
+            published_at: rc.published_at || null,
           }
         })
-        
-        const dedupedSubjects = Array.from(normalizedSubjectsMap.values())
-
-        return {
-          id: rc.id,
-          student_id: rc.student_id,
-          student_name: rc.student_name || 'Unknown',
-          student_display_name: studentData[rc.student_id]?.display_name || rc.student_display_name || rc.student_name,
-          student_vin: rc.student_vin || 'N/A',
-          student_admission_number: studentData[rc.student_id]?.admission_number || rc.student_admission_number || '',
-          student_photo_url: studentData[rc.student_id]?.photo_url || rc.student_photo_url || '',
-          class: rc.class,
-          term: rc.term,
-          academic_year: rc.academic_year,
-          subjects_data: dedupedSubjects,
-          teacher_comments: rc.teacher_comments || 'No comment available.',
-          principal_comments: rc.principal_comments || 'No comment available.',
-          class_teacher: rc.class_teacher || 'Unknown',
-          average_score: rc.average_score || 0,
-          total_score: rc.total_score || 0,
-          status: rc.status || 'pending',
-          submitted_at: rc.submitted_at || rc.generated_at || new Date().toISOString(),
-          school_name: rc.school_name || '',
-          student_email: studentData[rc.student_id]?.email || '',
-          student_phone: rc.student_phone || '',
-          next_term_date: rc.next_term_date || nextTermDate || '',
-          published_at: rc.published_at || null,
-        }
-      })
 
       const filtered = searchQuery
         ? cards.filter(c => {
@@ -1051,7 +1012,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           status: 'approved', approved_by: profile?.id, approved_at: new Date().toISOString(),
         }).eq('id', card.id)
         ok++
-      } catch { /* continue */ }
+      } catch { }
     }
     toast.success(`Approved ${ok} report cards`)
     loadReportCards(); onRefresh?.()
@@ -1079,7 +1040,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           })
         }
         ok++
-      } catch { /* continue */ }
+      } catch { }
     }
     toast.success(`Published ${ok} report cards`)
     loadReportCards(); onRefresh?.()
@@ -1107,7 +1068,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           })
         }
         ok++
-      } catch { /* continue */ }
+      } catch { }
     }
     toast.success(`Published ${ok} report cards!`)
     loadReportCards(); onRefresh?.()
@@ -1124,7 +1085,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
   const unpublishedCount = stats.generated + stats.approved
 
-  // ── Loading ────────────────────────────────────────────────────────────────
   if (isLoadingTerm || loading) {
     return (
       <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
@@ -1172,7 +1132,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
             </div>
           </div>
 
-          {/* Bulk action buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             {stats.generated > 0 && (
               <Button onClick={handleBulkApprove} disabled={processingAction} size="sm"
@@ -1231,7 +1190,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
               <Filter className="h-3.5 w-3.5" /> Filters
             </div>
 
-            {/* Term Select - Dynamic with current term */}
             <Select value={selectedTerm} onValueChange={setSelectedTerm}>
               <SelectTrigger className="h-8 text-xs border-slate-200 w-[130px]">
                 <SelectValue>
@@ -1258,7 +1216,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
               </SelectContent>
             </Select>
 
-            {/* Session Select - Dynamic with current session */}
             <Select value={selectedYear} onValueChange={setSelectedYear}>
               <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]">
                 <SelectValue>
@@ -1322,7 +1279,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
         {/* Table */}
         <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          {/* Table header */}
           <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
@@ -1335,7 +1291,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                 <p className="text-xs text-slate-400">{reportCards.length} report card{reportCards.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
-            {/* Progress bar */}
             {stats.total > 0 && (
               <div className="hidden sm:flex items-center gap-2">
                 <div className="h-1.5 w-28 rounded-full bg-slate-100 overflow-hidden">
@@ -1485,7 +1440,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
             </div>
           )}
 
-          {/* Table footer */}
           {reportCards.length > 0 && (
             <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
               <p className="text-xs text-slate-400">
@@ -1505,7 +1459,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           )}
         </div>
 
-        {/* ── Review dialog ────────────────────────────────────────────────── */}
+        {/* Review dialog */}
         <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
           <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] overflow-y-auto p-0">
             {selectedCard && (
@@ -1526,7 +1480,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   </DialogDescription>
                 </DialogHeader>
 
-                {/* Status bar */}
                 <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
                   <div className="flex items-center gap-2 flex-wrap">
                     <StatusPill status={selectedCard.status} />
@@ -1546,7 +1499,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   </Button>
                 </div>
 
-                {/* Preview */}
                 <div ref={reportRef}>
                   <ReportCardPreview
                     card={selectedCard} schoolSettings={schoolSettings} nextTermDate={nextTermDate}
@@ -1562,7 +1514,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   />
                 </div>
 
-                {/* Footer actions */}
                 <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-100">
                   <div className="flex gap-2 flex-1">
                     {(selectedCard.status === 'generated' || selectedCard.status === 'pending') && (
@@ -1606,7 +1557,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           </DialogContent>
         </Dialog>
 
-        {/* ── Reject dialog ────────────────────────────────────────────────── */}
+        {/* Reject dialog */}
         <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
           <AlertDialogContent className="max-w-md mx-4">
             <AlertDialogHeader>
@@ -1637,7 +1588,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* ── Unpublish dialog ─────────────────────────────────────────────── */}
+        {/* Unpublish dialog */}
         <AlertDialog open={showUnpublishDialog} onOpenChange={setShowUnpublishDialog}>
           <AlertDialogContent className="max-w-md mx-4">
             <AlertDialogHeader>

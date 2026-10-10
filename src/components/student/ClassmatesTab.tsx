@@ -1,4 +1,4 @@
-// components/student/ClassmatesTab.tsx - FIXED VERSION (Shows classmates across departments)
+// components/student/ClassmatesTab.tsx - UPDATED WITH ACTIVE STATUS CHECK
 'use client'
 
 import React from 'react'
@@ -9,29 +9,22 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Search, ArrowLeft, Users, Grid3x3, List, ExternalLink, GraduationCap, BookOpen } from 'lucide-react'
+import { Search, ArrowLeft, Users, Grid3x3, List, GraduationCap, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { Skeleton } from '@/components/ui/skeleton'
 
-// ✅ Helper to extract year from class name
 function extractYear(className: string | undefined | null): string {
   if (!className) return ''
-  
-  // Extract SS1, SS2, SS3 from any format
   if (className.includes('SS1')) return 'SS1'
   if (className.includes('SS2')) return 'SS2'
   if (className.includes('SS3')) return 'SS3'
-  
-  // Extract JSS1, JSS2, JSS3 from any format
   if (className.includes('JSS1')) return 'JSS1'
   if (className.includes('JSS2')) return 'JSS2'
   if (className.includes('JSS3')) return 'JSS3'
-  
   return className
 }
 
-// Helper functions
 const getInitials = (firstName?: string | null, lastName?: string | null, fullName?: string): string => {
   if (firstName && lastName) {
     return (firstName[0] + lastName[0]).toUpperCase()
@@ -61,9 +54,8 @@ const getAvatarColor = (name: string): string => {
   return colors[index % colors.length]
 }
 
-// Types - REMOVED sensitive fields
 interface Classmate {
-  id: string  // Still needed internally but NOT displayed
+  id: string
   full_name: string
   display_name?: string | null
   class: string
@@ -96,32 +88,21 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
     
     setLoading(true)
     try {
-      // ✅ FIXED: Extract the year from the student's class
       const userClass = profile.class
       const userYear = extractYear(userClass)
-      
-      console.log('🔍 ClassmatesTab - Loading classmates for:', {
-        userClass,
-        userYear,
-        searchPattern: `%${userYear}%`
-      })
 
-      // ✅ FIXED: Fetch students in the same YEAR, not exact class
-      // This will find "SS1 Science" students when user is in "SS1 Arts"
+      // ✅ FIXED: Filter for Active Students only (`.eq('is_active', true)`)
+      // This prevents ex-students who left the school from appearing to current classmates.
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, display_name, class, photo_url, department')
         .eq('role', 'student')
+        .eq('is_active', true) // 👈 CRITICAL: Exclude students who left
         .neq('id', profile.id)
-        .ilike('class', `%${userYear}%`)  // Match any class containing "SS1"
+        .ilike('class', `%${userYear}%`)
         .order('full_name', { ascending: true })
 
       if (error) throw error
-      
-      console.log('✅ ClassmatesTab - Found classmates:', {
-        count: data?.length || 0,
-        classmates: data?.map(c => ({ name: c.full_name, class: c.class, department: c.department }))
-      })
       
       const formattedClassmates = (data || []).map((c: any) => ({
         id: c.id,
@@ -145,7 +126,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
     return classmate.full_name || 'Student'
   }
 
-  // Search by name only
   const filteredClassmates = classmates.filter((classmate) => {
     const displayName = getBestDisplayName(classmate)
     return displayName.toLowerCase().includes(searchQuery.toLowerCase())
@@ -158,7 +138,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
     setDisplayCount(prev => prev + 8)
   }
 
-  // Get the year group for display
   const displayYear = extractYear(profile?.class)
 
   if (loading) {
@@ -189,36 +168,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
         <CardContent className="py-12 text-center">
           <Users className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
           <p className="text-muted-foreground">No class assigned</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            Please contact your administrator to assign a class.
-          </p>
-          {handleTabChange && (
-            <Button variant="link" size="sm" onClick={() => handleTabChange('overview')} className="mt-3">
-              <ArrowLeft className="h-3.5 w-3.5 mr-1" />
-              Back to Dashboard
-            </Button>
-          )}
-        </CardContent>
-      </Card>
-    )
-  }
-
-  if (classmates.length === 0) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <Users className="h-5 w-5 text-emerald-600" />
-            My Classmates
-            <Badge variant="secondary" className="ml-2">0</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center py-8">
-          <Users className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="text-muted-foreground">No classmates found</p>
-          <p className="text-xs text-muted-foreground mt-1">
-            You're the only student in {displayYear}
-          </p>
           {handleTabChange && (
             <Button variant="link" size="sm" onClick={() => handleTabChange('overview')} className="mt-3">
               <ArrowLeft className="h-3.5 w-3.5 mr-1" />
@@ -237,7 +186,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
       exit={{ opacity: 0 }} 
       className="w-full overflow-hidden space-y-4 sm:space-y-6"
     >
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900">My Classmates</h2>
@@ -258,7 +206,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
         )}
       </div>
 
-      {/* Stats Badge */}
       <div className="flex flex-wrap items-center gap-2">
         <Badge className="bg-emerald-100 text-emerald-700 text-[10px] sm:text-xs">
           <Users className="h-3 w-3 mr-1" />
@@ -270,7 +217,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
         </Badge>
       </div>
 
-      {/* Search and View Toggle */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400" />
@@ -300,13 +246,9 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
               <List className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>
           </div>
-          <p className="text-[10px] sm:text-xs text-muted-foreground">
-            {displayedClassmates.length} of {filteredClassmates.length}
-          </p>
         </div>
       </div>
 
-      {/* Grid View */}
       {viewMode === 'grid' ? (
         <div className="grid gap-3 sm:gap-4 grid-cols-1 xs:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {displayedClassmates.map((classmate) => {
@@ -341,7 +283,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
           })}
         </div>
       ) : (
-        // List View
         <Card className="overflow-hidden">
           <CardContent className="p-0">
             <div className="divide-y divide-slate-100">
@@ -365,12 +306,6 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
                             <GraduationCap className="h-2.5 w-2.5 mr-0.5" />
                             {classmate.class}
                           </Badge>
-                          {classmate.department && (
-                            <Badge variant="outline" className="text-[9px] sm:text-[10px]">
-                              <BookOpen className="h-2.5 w-2.5 mr-0.5" />
-                              {classmate.department}
-                            </Badge>
-                          )}
                         </div>
                       </div>
                     </div>
@@ -382,25 +317,13 @@ export function ClassmatesTab({ profile, handleTabChange, router }: ClassmatesTa
         </Card>
       )}
 
-      {/* Load More Button */}
       {hasMore && (
         <div className="flex justify-center pt-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={loadMore}
-            className="h-8 sm:h-9 text-xs sm:text-sm"
-          >
-            Load More ({displayedClassmates.length} of {filteredClassmates.length})
+          <Button variant="outline" size="sm" onClick={loadMore}>
+            Load More
           </Button>
         </div>
       )}
-
-      <div className="text-center pt-2">
-        <p className="text-[10px] sm:text-xs text-muted-foreground">
-          Showing all {displayYear} students across all departments
-        </p>
-      </div>
     </motion.div>
   )
 }

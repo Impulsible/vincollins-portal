@@ -1,13 +1,10 @@
 // app/admin/students/page.tsx
-
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
 import { StudentManagement } from '@/components/admin/students/StudentManagement'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
-
-// ✅ Use the shared Student type from the component
 import type { Student } from '@/components/admin/students/types'
 
 export default function StudentsPage() {
@@ -15,7 +12,6 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true)
 
   const fetchStudents = useCallback(async () => {
-    console.log('🔄 Fetching students...')
     setLoading(true)
     try {
       const { data, error } = await supabase
@@ -24,23 +20,9 @@ export default function StudentsPage() {
         .eq('role', 'student')
         .order('full_name', { ascending: true })
 
-      if (error) {
-        console.error('❌ Fetch error:', error)
-        throw error
-      }
+      if (error) throw error
 
-      console.log(`✅ Fetched ${data?.length || 0} students`)
-      
-      if (data && data.length > 0) {
-        console.log('📋 Students:', data.map((s: any) => ({
-          name: s.full_name,
-          class: s.class,
-          admission: s.admission_number,
-          role: s.role
-        })))
-      }
-
-      // ✅ Map all fields from database
+      // Strict boolean mapping: only default to true if is_active is null/undefined
       const mappedStudents: Student[] = (data || []).map((profile: any) => ({
         id: profile.id,
         vin_id: profile.vin_id || '',
@@ -53,7 +35,7 @@ export default function StudentsPage() {
         last_name: profile.last_name || '',
         class: profile.class || 'Not Assigned',
         department: profile.department || 'General',
-        is_active: profile.is_active ?? true,
+        is_active: profile.is_active === false ? false : true, // 👈 Strictly preserves false
         password_changed: profile.password_changed ?? false,
         created_at: profile.created_at || '',
         photo_url: profile.photo_url || profile.avatar_url || '',
@@ -75,6 +57,41 @@ export default function StudentsPage() {
     }
   }, [])
 
+  // ✅ Verified database status toggle
+  const handleToggleStatus = async (studentId: string, currentStatus: boolean) => {
+    const nextStatus = !currentStatus
+
+    try {
+      // 1. Send update and demand returned record via .select()
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ is_active: nextStatus })
+        .eq('id', studentId)
+        .select()
+
+      if (error) throw error
+
+      // 2. If data is empty, RLS silently blocked the update
+      if (!data || data.length === 0) {
+        throw new Error('Database rejected update. Ensure your admin user has permission in Supabase RLS.')
+      }
+
+      // 3. Update local state upon confirmed DB write
+      setStudents(prev =>
+        prev.map(s => (s.id === studentId ? { ...s, is_active: nextStatus } : s))
+      )
+
+      toast.success(
+        nextStatus
+          ? 'Student reactivated and visible in class lists.'
+          : 'Student marked inactive (hidden across system rosters).'
+      )
+    } catch (err: any) {
+      console.error('❌ Error toggling status:', err)
+      toast.error(err.message || 'Failed to update status in database')
+    }
+  }
+
   useEffect(() => {
     fetchStudents()
   }, [fetchStudents])
@@ -84,6 +101,7 @@ export default function StudentsPage() {
       <StudentManagement
         students={students}
         onRefresh={fetchStudents}
+        onToggleStatus={handleToggleStatus}
         loading={loading}
       />
     </div>

@@ -71,15 +71,17 @@ interface SidebarStats {
   attendanceCount: number
 }
 
-// Primary Navigation - WITH ATTENDANCE
+// Primary Navigation - WITH ATTENDANCE + ASSIGNMENTS + CA SCORES
 const primaryNavigation: NavigationItem[] = [
   { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', route: '/staff' },
   { id: 'attendance', name: 'Attendance', icon: CalendarCheck, description: 'Mark Daily Attendance', route: '/staff/attendance' },
   { id: 'announcements', name: 'Announcements', icon: Megaphone, description: 'School Updates', route: '/staff/announcements' },
   { id: 'exams', name: 'Exams', icon: BookOpen, description: 'Manage CBT & Theory', route: '/staff/exams' },
+  { id: 'assignments', name: 'Assignments', icon: FileText, description: 'Homework & Projects', route: '/staff/assignments' },
+  { id: 'ca-scores', name: 'CA Scores', icon: GraduationCap, description: 'Continuous Assessment', route: '/staff/ca-scores' }, // ✅ ADDED
   { id: 'notes', name: 'Study Notes', icon: Notebook, description: 'Learning Materials', route: '/staff/notes' },
   { id: 'students', name: 'Students', icon: User, description: 'Class Roster', route: '/staff/students' },
-  { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class Schedule', route: '/staff/schedule' },
+  // ❌ REMOVED: { id: 'schedule', name: 'Schedule', icon: CalendarDays, description: 'Class Schedule', route: '/staff/schedule' },
 ]
 
 const secondaryNavigation: NavigationItem[] = [
@@ -364,12 +366,16 @@ export function StaffSidebar({
       setActiveTab('announcements')
     } else if (pathname?.startsWith('/staff/exams')) {
       setActiveTab('exams')
+    } else if (pathname?.startsWith('/staff/assignments')) {
+      setActiveTab('assignments')
+    } else if (pathname?.startsWith('/staff/ca-scores')) {   // ✅ ADDED
+      setActiveTab('ca-scores')
     } else if (pathname?.startsWith('/staff/notes')) {
       setActiveTab('notes')
     } else if (pathname?.startsWith('/staff/students')) {
       setActiveTab('students')
-    } else if (pathname?.startsWith('/staff/schedule')) {
-      setActiveTab('schedule')
+    // ❌ REMOVED: } else if (pathname?.startsWith('/staff/schedule')) {
+    // ❌ REMOVED:   setActiveTab('schedule')
     } else if (pathname?.startsWith('/staff/notifications')) {
       setActiveTab('notifications')
     } else if (pathname?.startsWith('/staff/profile')) {

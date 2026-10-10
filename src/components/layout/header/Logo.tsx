@@ -3,35 +3,47 @@
 import { memo } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { GraduationCap } from 'lucide-react'
 import { SchoolSettings } from './types'
 
 export const Logo = memo(function Logo({ schoolSettings }: { schoolSettings: SchoolSettings | null }) {
+  // Get the correct image path
+  const getLogoPath = (): string => {
+    const path = schoolSettings?.logo_path;
+    
+    if (!path) return '/images/logo.png';
+    
+    // If full URL, return as is
+    if (path.startsWith('http')) return path;
+    
+    // If it already has /images/, return as is
+    if (path.startsWith('/images/')) return path;
+    
+    // If it starts with /, add images/ folder
+    if (path.startsWith('/')) return `/images${path}`;
+    
+    // Default: add /images/ prefix
+    return `/images/${path}`;
+  };
+
+  const logoSrc = getLogoPath();
+
   return (
     <Link href="/" className="flex items-center gap-1.5 sm:gap-2 lg:gap-3 group flex-shrink-0">
       <div className="relative group-hover:scale-105 transition-all duration-300">
-        {schoolSettings?.logo_path ? (
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12">
-            <Image 
-              src={schoolSettings.logo_path} 
-              alt={schoolSettings.school_name || 'Vincollins College Logo'} 
-              width={48} height={48} 
-              className="object-contain" 
-              priority 
-            />
-          </div>
-        ) : (
-          // ✅ ADD YOUR LOCAL LOGO HERE AS FALLBACK
-          <div className="relative h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12">
-            <Image 
-              src="/images/logo.png" 
-              alt="Vincollins College Logo" 
-              width={48} height={48} 
-              className="object-contain" 
-              priority 
-            />
-          </div>
-        )}
+        <div className="relative h-10 w-10 sm:h-11 sm:w-11 lg:h-12 lg:w-12">
+          <Image 
+            src={logoSrc}
+            alt={schoolSettings?.school_name || 'Vincollins College Logo'} 
+            width={48} 
+            height={48} 
+            className="object-contain" 
+            priority 
+            onError={(e) => {
+              // Fallback if image fails to load
+              (e.target as HTMLImageElement).src = '/images/logo.png';
+            }}
+          />
+        </div>
       </div>
       <div className="flex flex-col">
         <div className="flex items-baseline gap-1">

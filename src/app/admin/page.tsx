@@ -1,4 +1,4 @@
-// app/admin/page.tsx
+// app/admin/page.tsx - FULLY CORRECTED WITH PERSISTENT DEACTIVATION & ROSTER EXCLUSIONS
 'use client'
 
 import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -25,7 +25,7 @@ import {
 import AdminLoading from '@/components/admin/AdminLoading'
 import type { Student } from '@/components/admin/students/types'
 
-// ── Lazy-loaded heavy components ──────────────────────────────────────────────
+// Lazy-loaded heavy components
 const StudentManagement = dynamic(
   () => import('@/components/admin/students/StudentManagement').then(m => ({ default: m.StudentManagement })),
   { ssr: false }
@@ -52,7 +52,6 @@ const AdminPromotionsPage = dynamic(
   { ssr: false }
 )
 
-// ── Types ─────────────────────────────────────────────────────────────────────
 interface PendingExam {
   id: string; title: string; subject: string; class: string
   duration: number; total_questions: number; total_marks: number
@@ -80,10 +79,8 @@ interface Exam {
   department?: string; created_at: string; created_by: string
 }
 
-// ── Constants ─────────────────────────────────────────────────────────────────
 const CACHE_DURATION = 60000
 
-// ✅ GPU isolation style
 const cardIsolationStyle = {
   WebkitTransform: 'translateZ(0)' as const,
   transform: 'translateZ(0)' as const,
@@ -149,7 +146,6 @@ function mapToStaff(p: Record<string, unknown>): Staff {
   }
 }
 
-// ── Suspense fallback ─────────────────────────────────────────────────────────
 const TabFallback = () => (
   <div className="flex flex-col items-center justify-center py-20 gap-3">
     <div className="w-10 h-10 rounded-2xl bg-white shadow-md flex items-center justify-center">
@@ -159,7 +155,6 @@ const TabFallback = () => (
   </div>
 )
 
-// ── Quick Action Card ─────────────────────────────────────────────────────────
 interface QuickActionCardProps {
   icon: React.ElementType
   label: string
@@ -216,7 +211,6 @@ function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'vio
   )
 }
 
-// ── Pending-exam row ──────────────────────────────────────────────────────────
 function PendingExamCard({
   exam, onApprove, onReject, approving,
 }: {
@@ -303,7 +297,6 @@ function PendingExamCard({
   )
 }
 
-// ── Main dashboard content ────────────────────────────────────────────────────
 function AdminDashboardContent() {
   const router = useRouter()
   const pathname = usePathname()
@@ -315,7 +308,6 @@ function AdminDashboardContent() {
   const [error, setError] = useState<Error | null>(null)
   const [dataLoaded, setDataLoaded] = useState(false)
 
-  // ✅ Term info from database
   const [termInfo, setTermInfo] = useState<{ term: string; session: string } | null>(null)
 
   const [students, setStudents] = useState<Student[]>([])
@@ -363,7 +355,6 @@ function AdminDashboardContent() {
     return () => { isMountedRef.current = false }
   }, [])
 
-  // ✅ Fetch current term from school_settings + real-time subscription
   useEffect(() => {
     const fetchCurrentTerm = async () => {
       try {
@@ -372,22 +363,16 @@ function AdminDashboardContent() {
           .select('current_term, current_session')
           .maybeSingle()
 
-        console.log('[fetchCurrentTerm] Response:', { data, error })
-
-        if (error) {
-          console.error('[fetchCurrentTerm] Error:', error)
-          return
-        }
+        if (error) return
 
         if (data && isMountedRef.current) {
-          console.log('[fetchCurrentTerm] Setting term:', data.current_term, 'session:', data.current_session)
           setTermInfo({
             term: data.current_term || '',
             session: data.current_session || '',
           })
         }
       } catch (err) {
-        console.error('[fetchCurrentTerm] Exception:', err)
+        console.error(err)
       }
     }
 
@@ -399,7 +384,6 @@ function AdminDashboardContent() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'school_settings' },
         (payload) => {
-          console.log('[school-settings] Real-time update:', payload)
           if (payload.new && isMountedRef.current) {
             setTermInfo({
               term: (payload.new as any).current_term || '',
@@ -415,7 +399,6 @@ function AdminDashboardContent() {
     }
   }, [])
 
-  // ✅ Fetch pending promotions count
   const fetchPendingPromotions = useCallback(async () => {
     try {
       const { count, error } = await supabase
@@ -476,7 +459,10 @@ function AdminDashboardContent() {
         newStaff = profiles.filter(p => p.role === 'staff').map(mapToStaff)
         setStudents(newStudents)
         setStaff(newStaff)
-        setStats(prev => ({ ...prev, totalStudents: newStudents.length, totalStaff: newStaff.length }))
+        
+        // 🚫 CRITICAL: Exclude inactive/withdrawn students from metric calculations
+        const activeStudentsCount = newStudents.filter(s => s.is_active !== false).length
+        setStats(prev => ({ ...prev, totalStudents: activeStudentsCount, totalStaff: newStaff.length }))
       }
 
       if (examsRes.status === 'fulfilled' && !examsRes.value.error && examsRes.value.data) {
@@ -509,8 +495,10 @@ function AdminDashboardContent() {
         setPendingReports(newPendingReports)
       }
 
-      // ✅ Fetch pending promotions count
       await fetchPendingPromotions()
+
+      // Calculate active student metric count for caching
+      const activeStudentsCountForCache = newStudents.filter(s => s.is_active !== false).length
 
       cacheRef.current.set('dashboardData', {
         data: {
@@ -519,7 +507,7 @@ function AdminDashboardContent() {
           inquiries: newInquiries, pendingExamsCount: newPendingExams.length,
           pendingReports: newPendingReports, pendingInquiries: newInquiries.filter(i => i.status === 'pending').length,
           pendingPromotions: pendingPromotions,
-          stats: { totalStudents: newStudents.length, totalStaff: newStaff.length, activeExams: newPublishedExams.length, pendingSubmissions: 0 },
+          stats: { totalStudents: activeStudentsCountForCache, totalStaff: newStaff.length, activeExams: newPublishedExams.length, pendingSubmissions: 0 },
         },
         timestamp: now,
       })
@@ -546,6 +534,41 @@ function AdminDashboardContent() {
     await loadAllData(true)
     toast.success('Dashboard refreshed')
   }, [loadAllData])
+
+  // ✅ Toggle Active / Inactive state inside database with guaranteed select confirmation
+  const handleToggleStatus = useCallback(async (studentId: string, currentStatus: boolean) => {
+    const nextStatus = !currentStatus
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ is_active: nextStatus })
+        .eq('id', studentId)
+        .select()
+
+      if (error) throw error
+
+      if (!data || data.length === 0) {
+        throw new Error('Database denied update. Verify Row-Level Security policies.')
+      }
+
+      // Synchronize the complete student array & active metrics atomically
+      setStudents(prev => {
+        const updated = prev.map(s => (s.id === studentId ? { ...s, is_active: nextStatus } : s))
+        const activeCount = updated.filter(s => s.is_active !== false).length
+        setStats(prevStats => ({ ...prevStats, totalStudents: activeCount }))
+        return updated
+      })
+
+      toast.success(
+        nextStatus 
+          ? 'Student reactivated! They now appear in class rosters.' 
+          : 'Student marked inactive. Hidden from rosters across the system.'
+      )
+    } catch (err: any) {
+      console.error('Error toggling status:', err)
+      toast.error(err.message || 'Failed to update student status')
+    }
+  }, [])
 
   const handleTabChange = useCallback((tab: string) => {
     setActiveTab(tab)
@@ -623,14 +646,12 @@ function AdminDashboardContent() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="space-y-3 sm:space-y-5"
           >
-            {/* ✅ WelcomeBanner with termInfo from DB */}
             <WelcomeBanner
               adminProfile={profile}
               activeTab={activeTab}
               termInfo={termInfo}
             />
 
-            {/* Pending-exams alert banner */}
             <AnimatePresence>
               {pendingExamsCount > 0 && !dismissedBanner && (
                 <motion.div
@@ -680,7 +701,6 @@ function AdminDashboardContent() {
               )}
             </AnimatePresence>
 
-            {/* Stats */}
             <StatsCards
               stats={{ ...stats, pendingReports }}
               onStudentClick={() => handleTabChange('students')}
@@ -691,7 +711,6 @@ function AdminDashboardContent() {
               onReportCardsClick={() => handleTabChange('report-cards')}
             />
 
-            {/* Quick actions */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">Quick Actions</h2>
@@ -753,7 +772,13 @@ function AdminDashboardContent() {
       case 'students':
         return (
           <Suspense fallback={<TabFallback />}>
-            <StudentManagement students={students} onRefresh={handleRefresh} loading={refreshing} />
+            {/* ✅ FIXED: Passed handleToggleStatus callback here */}
+            <StudentManagement 
+              students={students} 
+              onRefresh={handleRefresh} 
+              onToggleStatus={handleToggleStatus} 
+              loading={refreshing} 
+            />
           </Suspense>
         )
 
@@ -763,10 +788,6 @@ function AdminDashboardContent() {
             <StaffManagement
               staff={staff}
               onRefresh={handleRefresh}
-              onAddStaff={async () => {}}
-              onUpdateStaff={async () => {}}
-              onDeleteStaff={async () => {}}
-              onResetPassword={async () => {}}
             />
           </Suspense>
         )
@@ -929,14 +950,13 @@ function AdminDashboardContent() {
     pendingExamsCount, pendingReports, pendingInquiries, pendingPromotions,
     stats, students, staff, pendingExams, publishedExams, inquiries,
     refreshing, approvingId, dismissedBanner,
-    handleTabChange, handleRefresh, handleApproveExam, handleRejectExam, handleRetry,
+    handleTabChange, handleRefresh, handleApproveExam, handleRejectExam, handleRetry, handleToggleStatus,
   ])
 
   if (authLoading || (loading && !dataLoaded && !error)) {
     return <AdminLoading profile={profile} onLogout={() => {}} />
   }
 
-  // ✅ REDUCED top padding - banner sits closer to header + fills width properly
   return (
     <div className="w-full overflow-x-hidden min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-4 sm:pb-6">
@@ -946,7 +966,6 @@ function AdminDashboardContent() {
   )
 }
 
-// ── Export ────────────────────────────────────────────────────────────────────
 export default function AdminDashboard() {
   return (
     <AuthGuard allowedRoles={['admin']}>

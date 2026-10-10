@@ -1,4 +1,4 @@
-// components/student/StudentClassRoster.tsx - FULLY CORRECTED WITH PROPER JSS/SS FILTERING
+// components/student/StudentClassRoster.tsx - FULLY CORRECTED WITH ACTIVE STATUS FILTER
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
@@ -63,20 +63,16 @@ const AVATAR_COLORS = [
 function extractYear(className: string): string {
   if (!className) return ''
   
-  // Normalize: remove spaces and convert to uppercase
   const normalized = className.trim().toUpperCase().replace(/\s/g, '')
   
-  // Handle JSS classes
   if (normalized === 'JSS1') return 'JSS1'
   if (normalized === 'JSS2') return 'JSS2'
   if (normalized === 'JSS3') return 'JSS3'
   
-  // Handle SS classes
   if (normalized === 'SS1') return 'SS1'
   if (normalized === 'SS2') return 'SS2'
   if (normalized === 'SS3') return 'SS3'
   
-  // Handle subject-specific SS classes (SS1SCIENCE -> SS1)
   if (normalized.startsWith('SS1')) return 'SS1'
   if (normalized.startsWith('SS2')) return 'SS2'
   if (normalized.startsWith('SS3')) return 'SS3'
@@ -439,19 +435,20 @@ export function StudentClassRoster({
           .from('profiles')
           .select('id, first_name, last_name, full_name, display_name, class, photo_url, cover_photo_url, department, admission_year, phone, address')
           .eq('role', 'student')
+          .eq('is_active', true) // 🚫 CRITICAL: Never show inactive students (students who left school)
           .neq('id', studentId || '')
           .order('first_name')
 
-        // ✅ FIXED: JSS students see ONLY their exact class
+        // ✅ JSS students see ONLY their exact class
         // ✅ SS students see ALL students in the same year (across departments)
         if (isJSS) {
           // JSS: Exact match (JSS 1 only sees JSS 1)
           query = query.eq('class', studentClass)
-          console.log(`🔍 JSS Student - Fetching exact class: ${studentClass}`)
+          console.log(`🔍 JSS Student - Fetching exact class: ${studentClass} (active only)`)
         } else if (isSS) {
           // SS: Match by year (SS1 Arts sees SS1 Science, SS1 Commercial)
           query = query.ilike('class', `%${yearGroup}%`)
-          console.log(`🔍 SS Student - Fetching year group: ${yearGroup}%`)
+          console.log(`🔍 SS Student - Fetching year group: ${yearGroup}% (active only)`)
         } else {
           // Fallback: Exact match
           query = query.eq('class', studentClass)
@@ -460,7 +457,7 @@ export function StudentClassRoster({
         const { data, error } = await query
         if (error) throw error
 
-        console.log(`✅ Found ${data?.length || 0} classmates`)
+        console.log(`✅ Found ${data?.length || 0} active classmates (inactive students excluded)`)
 
         if (data) {
           const mappedClassmates = data.map((student: any) => ({
