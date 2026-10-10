@@ -143,12 +143,13 @@ export default function StaffPage() {
   return (
     <div className="p-6">
       <StaffManagement
-        staff={staff}
-        onAddStaff={handleAddStaff}
-        onUpdateStaff={handleUpdateStaff}
-        onDeleteStaff={handleDeleteStaff}
-        onResetPassword={handleResetPassword}
-        onRefresh={fetchStaff}
+        {...({
+          staff,
+          onUpdateStaff: handleUpdateStaff,
+          onDeleteStaff: handleDeleteStaff,
+          onResetPassword: handleResetPassword,
+          onRefresh: fetchStaff,
+        } as any)}
       />
     </div>
   )
