@@ -13,64 +13,53 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { useRouter, usePathname } from 'next/navigation'
 import {
-  GraduationCap,
-  BookOpen,
-  Award,
   ArrowRight,
+  ShieldCheck,
+  QrCode,
   LogIn,
   Home,
-  CheckCircle,
-  Clock,
-  School,
-  Globe,
-  Key,
-  Lock,
+  CheckCircle2,
+  BookOpen,
+  Award,
+  Laptop,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const DARK    = '#060D1F'
-const VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '2.0.0'
+const DARK_THEME = '#050B18'
+const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION ?? '2.4.0'
 
-const TRUST = [
-  { icon: Lock,        label: 'Secure' },
-  { icon: CheckCircle, label: 'Trusted' },
-  { icon: Clock,       label: '24/7 Support' },
-  { icon: Award,       label: 'Excellence' },
-] as const
-
-const FEATURES = [
-  { icon: School,        title: 'Nursery', sub: 'Ages 1 – 5' },
-  { icon: BookOpen,      title: 'Primary', sub: 'Ages 5 – 11' },
-  { icon: GraduationCap, title: 'College', sub: 'Ages 11 – 17' },
-] as const
-
-type Stage      = 'logo' | 'bridge' | 'main' | 'exit' | 'done'
+type Stage = 'intro' | 'bridge' | 'card' | 'exit' | 'done'
 type ExitTarget = 'home' | 'portal'
 
-interface Props {
-  children:  ReactNode
-  onLogin?:  () => void
+interface TwoStageSplashProps {
+  children: ReactNode
+  onLogin?: () => void
   onGoHome?: () => void
 }
 
-function lockDark() {
-  document.documentElement.style.backgroundColor = DARK
-  document.body.style.backgroundColor            = DARK
+function lockDarkScreen() {
+  if (typeof window === 'undefined') return
+  document.documentElement.style.backgroundColor = DARK_THEME
+  document.body.style.backgroundColor = DARK_THEME
 }
 
-function unlockDark() {
+function unlockDarkScreen() {
+  if (typeof window === 'undefined') return
   document.documentElement.style.backgroundColor = ''
-  document.body.style.backgroundColor            = ''
+  document.body.style.backgroundColor = ''
 }
 
-function hasFreshLaunch(): boolean {
+function isFreshAppLaunch(): boolean {
+  if (typeof window === 'undefined') return false
   try {
     return new URLSearchParams(window.location.search).get('launch') === 'app'
-  } catch { return false }
+  } catch {
+    return false
+  }
 }
 
-function removeLaunchParam() {
+function clearLaunchParam() {
+  if (typeof window === 'undefined') return
   try {
     const url = new URL(window.location.href)
     url.searchParams.delete('launch')
@@ -78,395 +67,312 @@ function removeLaunchParam() {
   } catch {}
 }
 
-function isPWAStandalone(): boolean {
+function isPWA(): boolean {
+  if (typeof window === 'undefined') return false
   try {
     return (
       window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as Navigator & { standalone?: boolean }).standalone === true
     )
-  } catch { return false }
+  } catch {
+    return false
+  }
 }
 
-export function TwoStageSplashScreen({ children, onLogin, onGoHome }: Props) {
-  const router   = useRouter()
+export function TwoStageSplashScreen({
+  children,
+  onLogin,
+  onGoHome,
+}: TwoStageSplashProps) {
+  const router = useRouter()
   const pathname = usePathname()
 
-  // null = not decided yet, true = show splash, false = skip
-  const [show,       setShow]       = useState<boolean | null>(null)
-  const [stage,      setStage]      = useState<Stage>('logo')
-  const [spinDone,   setSpinDone]   = useState(false)
-  const [progress,   setProgress]   = useState(0)
-  const [activeTab,  setActiveTab]  = useState<'home' | 'portal'>('home')
+  const [show, setShow] = useState<boolean | null>(null)
+  const [stage, setStage] = useState<Stage>('intro')
+  const [spinDone, setSpinDone] = useState(false)
+  const [progress, setProgress] = useState(0)
   const [routeReady, setRouteReady] = useState(false)
+  const [year, setYear] = useState<number>(2026)
+  const [logoLoaded, setLogoLoaded] = useState(false)
 
-  // Refs that are always current — no stale closure issues
   const exitTargetRef = useRef<ExitTarget | null>(null)
-  const navigated     = useRef(false)
-  const alive         = useRef(true)
-  const decided       = useRef(false)
-
-  const year = new Date().getFullYear()
+  const isNavigating = useRef(false)
+  const isMounted = useRef(true)
+  const isDecided = useRef(false)
 
   useEffect(() => {
-    alive.current = true
-    return () => { alive.current = false }
+    setYear(new Date().getFullYear())
+    isMounted.current = true
+    return () => {
+      isMounted.current = false
+    }
   }, [])
 
-  // ── 1. Decide once on mount ───────────────────────────────────────────────
   useEffect(() => {
-    if (decided.current) return
-    decided.current = true
+    if (isDecided.current) return
+    isDecided.current = true
 
-    if (!isPWAStandalone()) {
+    const isStandalone = isPWA()
+    const freshLaunch = isFreshAppLaunch()
+
+    if (!isStandalone || !freshLaunch) {
       setShow(false)
       return
     }
 
-    if (!hasFreshLaunch()) {
-      setShow(false)
-      return
-    }
-
-    // Fresh launch from app icon
-    removeLaunchParam()
-    lockDark()
+    clearLaunchParam()
+    lockDarkScreen()
     setShow(true)
   }, [])
 
-  // ── 2. Spin flag ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!show || stage !== 'logo') return
-    const t = setTimeout(() => { if (alive.current) setSpinDone(true) }, 1800)
-    return () => clearTimeout(t)
+    if (!show || stage !== 'intro') return
+    const spinTimer = setTimeout(() => {
+      if (isMounted.current) setSpinDone(true)
+    }, 1600)
+
+    const stageTimer = setTimeout(() => {
+      if (isMounted.current) setStage('bridge')
+    }, 2800)
+
+    return () => {
+      clearTimeout(spinTimer)
+      clearTimeout(stageTimer)
+    }
   }, [show, stage])
 
-  // ── 3. Logo → Bridge ──────────────────────────────────────────────────────
-  useEffect(() => {
-    if (!show || stage !== 'logo') return
-    const t = setTimeout(() => { if (alive.current) setStage('bridge') }, 3400)
-    return () => clearTimeout(t)
-  }, [show, stage])
-
-  // ── 4. Bridge → Main ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!show || stage !== 'bridge') return
-    const t = setTimeout(() => { if (alive.current) setStage('main') }, 550)
-    return () => clearTimeout(t)
+    const bridgeTimer = setTimeout(() => {
+      if (isMounted.current) setStage('card')
+    }, 400)
+    return () => clearTimeout(bridgeTimer)
   }, [show, stage])
 
-  // ── 5. Progress bar ───────────────────────────────────────────────────────
   useEffect(() => {
-    if (!show || stage !== 'main') return
-    let cur = 0
-    const id = setInterval(() => {
-      if (!alive.current) { clearInterval(id); return }
-      cur += Math.random() * 8 + 2
-      if (cur >= 100) { cur = 100; clearInterval(id) }
-      setProgress(Math.min(cur, 100))
-    }, 150)
-    return () => clearInterval(id)
+    if (!show || stage !== 'card') return
+    let currentProgress = 0
+    const interval = setInterval(() => {
+      if (!isMounted.current) {
+        clearInterval(interval)
+        return
+      }
+      currentProgress += Math.random() * 15 + 5
+      if (currentProgress >= 100) {
+        currentProgress = 100
+        clearInterval(interval)
+      }
+      setProgress(Math.min(currentProgress, 100))
+    }, 100)
+    return () => clearInterval(interval)
   }, [show, stage])
 
-  // ── 6. Navigate after exit ────────────────────────────────────────────────
   useEffect(() => {
-    if (stage !== 'done' || navigated.current) return
+    if (stage !== 'done' || isNavigating.current) return
 
     const target = exitTargetRef.current
     if (!target) return
-
-    navigated.current = true
+    isNavigating.current = true
 
     if (target === 'portal') {
-      if (onLogin) {
-        onLogin()
-      } else {
-        router.push('/portal')
-      }
+      if (onLogin) onLogin()
+      else router.push('/portal')
     } else {
-      // home
       if (pathname === '/') {
-        // Already on home — no navigation needed, just reveal
-        unlockDark()
+        unlockDarkScreen()
         setRouteReady(true)
+      } else if (onGoHome) {
+        onGoHome()
       } else {
-        if (onGoHome) {
-          onGoHome()
-        } else {
-          router.replace('/')
-        }
+        router.replace('/')
       }
     }
   }, [stage, pathname, onLogin, onGoHome, router])
 
-  // ── 7. Detect route arrival → reveal children ─────────────────────────────
   useEffect(() => {
     if (stage !== 'done') return
-
     const target = exitTargetRef.current
     if (!target) return
 
     if (target === 'home' && pathname === '/') {
-      unlockDark()
+      unlockDarkScreen()
       setRouteReady(true)
     } else if (target === 'portal' && pathname?.startsWith('/portal')) {
-      unlockDark()
+      unlockDarkScreen()
       setRouteReady(true)
     }
   }, [stage, pathname])
 
-  // ── startExit ─────────────────────────────────────────────────────────────
-  function startExit(target: ExitTarget) {
-    if (!alive.current || stage === 'exit' || stage === 'done') return
-
-    // Write to ref synchronously so effects always see the current value
+  const startExit = (target: ExitTarget) => {
+    if (!isMounted.current || stage === 'exit' || stage === 'done') return
     exitTargetRef.current = target
     setRouteReady(false)
-    navigated.current = false
+    isNavigating.current = false
     setStage('exit')
 
     setTimeout(() => {
-      if (alive.current) setStage('done')
-    }, 460)
+      if (isMounted.current) setStage('done')
+    }, 450)
   }
 
-  // ── Image error handlers ──────────────────────────────────────────────────
-  const onImgErr = (e: SyntheticEvent<HTMLImageElement>) => {
+  const onImageError = (e: SyntheticEvent<HTMLImageElement>) => {
     e.currentTarget.src = '/favicon.png'
   }
-  const onBgErr = (e: SyntheticEvent<HTMLImageElement>) => {
-    const p = e.currentTarget.parentElement
-    if (p) p.style.background = DARK
+
+  const onBgError = (e: SyntheticEvent<HTMLImageElement>) => {
+    const parent = e.currentTarget.parentElement
+    if (parent) parent.style.background = DARK_THEME
     e.currentTarget.style.display = 'none'
   }
 
-  /* ── Render gates ─────────────────────────────────────────────────────── */
-  if (show === null) return null          // still deciding
-  if (!show)         return <>{children}</> // not a fresh PWA launch
+  if (show === null) return null
+  if (!show) return <>{children}</>
 
   if (stage === 'done') {
     if (!routeReady) {
-      // Hold a dark screen while the route change is in flight
       return (
         <div
-          aria-hidden
-          style={{
-            position: 'fixed', inset: 0,
-            backgroundColor: DARK, zIndex: 9999,
-          }}
+          aria-hidden="true"
+          className="fixed inset-0 z-[9999]"
+          style={{ backgroundColor: DARK_THEME }}
         />
       )
     }
     return <>{children}</>
   }
 
-  /* ── Splash screens ───────────────────────────────────────────────────── */
   return (
     <AnimatePresence mode="wait">
-
-      {/* ── LOGO STAGE ── */}
-      {stage === 'logo' && (
+      {/* ── STAGE 1: LOGO IGNITION ── */}
+      {stage === 'intro' && (
         <motion.div
-          key="logo"
+          key="intro-stage"
           initial={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden"
-          style={{ backgroundColor: DARK }}
+          exit={{ opacity: 0, scale: 0.98, filter: 'blur(8px)' }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          className="fixed inset-0 z-[9999] flex flex-col items-center justify-center overflow-hidden font-sans select-none"
+          style={{ backgroundColor: DARK_THEME }}
         >
-          {/* Background decorations */}
-          <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <div className="absolute inset-0 pointer-events-none" aria-hidden="true">
             <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 0.18, scale: 1 }}
-              transition={{ duration: 1.5, ease: 'easeOut' }}
-              className="absolute inset-0 flex items-center justify-center"
-            >
-              <div
-                className="w-[500px] h-[500px] rounded-full"
-                style={{ background: 'radial-gradient(circle,#1E4FD8 0%,#0A2472 45%,transparent 70%)' }}
-              />
-            </motion.div>
-            <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full opacity-[0.06] blur-3xl bg-blue-600" />
-            <div className="absolute -bottom-40 -right-40 w-96 h-96 rounded-full opacity-[0.06] blur-3xl bg-blue-800" />
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1.2, opacity: 0.3 }}
+              transition={{ duration: 2, ease: 'easeOut' }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[550px] h-[550px] rounded-full blur-[130px] bg-gradient-to-tr from-emerald-500/20 via-blue-600/20 to-teal-400/20"
+            />
             <div
-              className="absolute inset-0 opacity-[0.02]"
+              className="absolute inset-0 opacity-[0.03]"
               style={{
-                backgroundImage: 'linear-gradient(rgba(255,255,255,.4) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.4) 1px,transparent 1px)',
-                backgroundSize: '48px 48px',
+                backgroundImage:
+                  'radial-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px)',
+                backgroundSize: '28px 28px',
               }}
             />
           </div>
 
-          <div className="relative z-10 flex flex-col items-center select-none">
-            {/* Orbiting rings */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1, rotate: 360 }}
-              transition={{
-                opacity: { duration: 0.4 },
-                scale:   { duration: 0.8, type: 'spring', bounce: 0.3 },
-                rotate:  { duration: 20, repeat: Infinity, ease: 'linear' },
-              }}
-              className="absolute w-56 h-56 md:w-72 md:h-72 rounded-full border border-white/[0.04]"
-              aria-hidden
-            >
-              <motion.span
-                className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-blue-400/40"
-                animate={{ opacity: [0.2, 0.7, 0.2] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              />
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1, rotate: -360 }}
-              transition={{
-                opacity: { duration: 0.4, delay: 0.15 },
-                scale:   { duration: 0.8, type: 'spring', bounce: 0.3, delay: 0.15 },
-                rotate:  { duration: 14, repeat: Infinity, ease: 'linear' },
-              }}
-              className="absolute w-40 h-40 md:w-52 md:h-52 rounded-full border border-white/[0.06]"
-              aria-hidden
-            >
-              <motion.span
-                className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-300/30"
-                animate={{ opacity: [0.15, 0.6, 0.15] }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-            </motion.div>
-
-            {/* Logo with 3-D flip */}
-            <motion.div
-              initial={{ rotateY: 0, scale: 0.3, opacity: 0 }}
-              animate={{ rotateY: 720, scale: 1, opacity: 1 }}
-              transition={{
-                rotateY: { duration: 1.8, ease: [0.25, 0.46, 0.45, 0.94] },
-                scale:   { duration: 0.8, type: 'spring', bounce: 0.4 },
-                opacity: { duration: 0.3 },
-              }}
-              className="relative z-10"
-              style={{ perspective: 800, transformStyle: 'preserve-3d' }}
-            >
+          <div className="relative z-10 flex flex-col items-center px-4 max-w-sm">
+            <div className="relative w-56 h-56 flex items-center justify-center">
               <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.5, 0.25] }}
-                transition={{ duration: 2, delay: 0.5 }}
-                className="absolute inset-[-24px] rounded-full pointer-events-none"
-                style={{ background: 'radial-gradient(circle,rgba(59,130,246,.25) 0%,transparent 70%)', filter: 'blur(16px)' }}
-                aria-hidden
-              />
-              <motion.div
-                initial={{ x: '-100%' }}
-                animate={{ x: '200%' }}
-                transition={{ duration: 1, delay: 1.9, ease: 'easeInOut' }}
-                className="absolute inset-0 z-20 overflow-hidden rounded-full pointer-events-none"
-                aria-hidden
+                animate={{ rotate: 360 }}
+                transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-0 rounded-full border border-emerald-500/20"
               >
-                <div
-                  className="w-1/3 h-full"
-                  style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.2),transparent)' }}
+                <span className="absolute top-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_12px_#34d399]" />
+              </motion.div>
+
+              <motion.div
+                animate={{ rotate: -360 }}
+                transition={{ duration: 12, repeat: Infinity, ease: 'linear' }}
+                className="absolute inset-4 rounded-full border border-blue-500/20"
+              >
+                <span className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-blue-400 shadow-[0_0_10px_#60a5fa]" />
+              </motion.div>
+
+              <motion.div
+                initial={{ scale: 0.2, rotateY: 180, opacity: 0 }}
+                animate={{ scale: 1, rotateY: 0, opacity: 1 }}
+                transition={{ duration: 1.2, type: 'spring', damping: 14 }}
+                className="relative z-10 w-24 h-24 rounded-3xl bg-white/[0.04] border border-white/20 backdrop-blur-2xl p-4 shadow-[0_0_40px_rgba(16,185,129,0.25)] flex items-center justify-center transform-gpu"
+              >
+                <Image
+                  src="/favicon.png"
+                  alt="Vincollins Logo"
+                  width={80}
+                  height={80}
+                  className="w-full h-full object-contain drop-shadow-2xl"
+                  priority
+                  onError={onImageError}
                 />
               </motion.div>
-              <Image
-                src="/favicon.png"
-                alt="Vincollins College"
-                width={88} height={88}
-                className="w-20 h-20 md:w-24 md:h-24 object-contain drop-shadow-2xl relative z-10"
-                priority
-                onError={onImgErr}
-              />
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={spinDone ? { opacity: 1, y: 0 } : {}}
+              transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              className="text-center mt-4"
+            >
+              <span className="text-emerald-400 text-[10px] font-extrabold uppercase tracking-[0.35em] block mb-1">
+                Welcome to
+              </span>
+              <h1 className="text-3xl font-black text-white uppercase tracking-tight">
+                Vincollins College
+              </h1>
+              <p className="text-white/40 text-[11px] font-medium tracking-[0.25em] uppercase mt-2 italic">
+                &ldquo;Geared towards excellence&rdquo;
+              </p>
             </motion.div>
 
-            {/* ✅ FIX 1: Name + tagline - REMOVED "App" */}
-            <motion.div
-              initial={{ opacity: 0, y: 40 }}
-              animate={spinDone ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="mt-6 text-center"
-            >
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={spinDone ? { opacity: 1 } : {}}
-                transition={{ delay: 0.05 }}
-                className="text-white/40 text-xs font-medium tracking-[0.3em] uppercase mb-2"
-              >Welcome to</motion.p>
-
-              <motion.h1
-                initial={{ opacity: 0, y: 12 }}
-                animate={spinDone ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: 0.1, duration: 0.5 }}
-                className="text-3xl md:text-4xl font-extrabold text-white tracking-tight leading-none"
-              >Vincollins College</motion.h1>
-
-              {/* ✅ "App" text REMOVED */}
-
-              <motion.p
-                initial={{ opacity: 0 }}
-                animate={spinDone ? { opacity: 1 } : {}}
-                transition={{ delay: 0.4 }}
-                className="mt-3 text-white/40 text-[11px] font-light tracking-[0.25em] uppercase"
-              >Geared towards excellence</motion.p>
-            </motion.div>
-
-            {/* Loading bars */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={spinDone ? { opacity: 1, y: 0 } : {}}
-              transition={{ delay: 0.5, duration: 0.4 }}
-              className="mt-10 flex items-center gap-1.5"
-              aria-label="Loading"
-            >
-              {[0,1,2,3,4].map(i => (
+            <div className="mt-8 flex items-center gap-1.5" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
                 <motion.span
                   key={i}
-                  animate={{ scaleY: [0.35,1,0.35], opacity: [0.3,1,0.3] }}
-                  transition={{ duration: 0.9, repeat: Infinity, delay: i*0.12, ease: 'easeInOut' }}
-                  className="block w-[3px] rounded-full"
-                  style={{ height: 20, background: 'linear-gradient(to top,#3B82F6,#93C5FD)' }}
-                  aria-hidden
+                  animate={{ scaleY: [0.3, 1, 0.3], opacity: [0.3, 1, 0.3] }}
+                  transition={{
+                    duration: 0.8,
+                    repeat: Infinity,
+                    delay: i * 0.15,
+                    ease: 'easeInOut',
+                  }}
+                  className="w-1 h-5 rounded-full bg-gradient-to-t from-emerald-500 to-teal-300"
                 />
               ))}
-            </motion.div>
+            </div>
           </div>
 
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={spinDone ? { opacity: 1 } : {}}
-            transition={{ delay: 0.6 }}
-            className="absolute bottom-8 text-white/15 text-[10px] tracking-widest"
-            aria-hidden
-          >v{VERSION} &bull; {year}</motion.p>
+          <p className="absolute bottom-6 text-white/20 text-[9px] tracking-widest font-mono">
+            PORTAL ENGINE v{APP_VERSION} &bull; {year}
+          </p>
         </motion.div>
       )}
 
-      {/* ── BRIDGE STAGE ── */}
+      {/* ── STAGE 2: BRIDGE ── */}
       {stage === 'bridge' && (
         <motion.div
-          key="bridge"
+          key="bridge-stage"
           initial={{ opacity: 1 }}
-          animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           className="fixed inset-0 z-[9999]"
-          style={{ backgroundColor: DARK }}
+          style={{ backgroundColor: DARK_THEME }}
         />
       )}
 
-      {/* ── MAIN STAGE ── */}
-      {stage === 'main' && (
+      {/* ── STAGE 3: CAMPUS BACKGROUND + SMART CARD ── */}
+      {stage === 'card' && (
         <motion.div
-          key="main"
+          key="card-stage"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-[9999] flex flex-col overflow-y-auto"
-          style={{ backgroundColor: DARK }}
+          transition={{ duration: 0.5, ease: 'easeInOut' }}
+          className="fixed inset-0 z-[9999] flex flex-col justify-between items-center p-4 sm:p-6 overflow-y-auto font-sans"
+          style={{ backgroundColor: DARK_THEME }}
         >
-          {/* Hero background */}
+          {/* ── CLEAR, VISIBLE CAMPUS BACKGROUND ── */}
           <div className="absolute inset-0 overflow-hidden">
             <motion.div
-              initial={{ scale: 1.12, opacity: 0 }}
+              initial={{ scale: 1.08, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
               className="absolute inset-0"
@@ -475,282 +381,185 @@ export function TwoStageSplashScreen({ children, onLogin, onGoHome }: Props) {
                 src="/images/app.jpg"
                 alt="Vincollins College Campus"
                 fill
-                className="object-cover"
+                className="object-cover object-center"
                 priority
-                onError={onBgErr}
+                sizes="100vw"
+                onError={onBgError}
               />
             </motion.div>
-            <div className="absolute inset-0 bg-gradient-to-b from-black/65 via-black/45 to-black/80" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+
+            {/* Light vignette only — keeps campus clearly visible */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/45 via-black/25 to-black/55" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-black/30" />
           </div>
 
-          {/* Top shimmer line */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ duration: 0.9, delay: 0.3, ease: 'easeOut' }}
-            className="absolute top-0 left-0 right-0 h-[2px] z-20 origin-left"
-            style={{ background: 'linear-gradient(90deg,transparent,#3B82F6,transparent)' }}
-          />
-
-          <div className="relative z-10 flex-1 flex flex-col min-h-screen w-full">
-            {/* Header */}
-            <motion.div
-              initial={{ y: -28, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="flex items-center justify-between px-6 pt-6"
-            >
-              <div className="flex items-center gap-3">
+          {/* Top bar */}
+          <div className="relative z-10 w-full max-w-sm flex items-center justify-between pt-2">
+            <div className="flex items-center gap-2.5">
+              <div className="p-1 rounded-lg bg-white/15 border border-white/25 backdrop-blur-md shadow-lg">
                 <Image
                   src="/favicon.png"
-                  alt="Vincollins College"
-                  width={28} height={28}
-                  className="w-7 h-7 object-contain"
-                  onError={onImgErr}
+                  alt="Logo"
+                  width={20}
+                  height={20}
+                  className="w-5 h-5 object-contain"
+                  onError={onImageError}
                 />
-                <div>
-                  <p className="text-white font-semibold text-sm">Vincollins College</p>
-                  <p className="text-white/40 text-[10px] tracking-wider uppercase">Geared towards excellence</p>
-                </div>
               </div>
-              <button
-                onClick={() => startExit('home')}
-                className="text-white/40 hover:text-white/80 text-xs font-medium tracking-wide uppercase transition-colors px-3 py-1.5 rounded-lg hover:bg-white/5"
-              >Skip</button>
-            </motion.div>
-
-            {/* Body */}
-            <div className="flex-1 flex flex-col items-center justify-center px-6 py-4">
-              {/* Logo */}
-              <motion.div
-                initial={{ scale: 0, rotate: -180, opacity: 0 }}
-                animate={{ scale: 1, rotate: 0, opacity: 1 }}
-                transition={{ duration: 0.8, delay: 0.3, type: 'spring', bounce: 0.45 }}
-              >
-                <Image
-                  src="/favicon.png"
-                  alt="Vincollins College"
-                  width={72} height={72}
-                  className="w-16 h-16 md:w-20 md:h-20 object-contain drop-shadow-2xl"
-                  onError={onImgErr}
-                />
-              </motion.div>
-
-              <motion.h1
-                initial={{ y: 30, opacity: 0, filter: 'blur(8px)' }}
-                animate={{ y: 0, opacity: 1, filter: 'blur(0px)' }}
-                transition={{ delay: 0.5, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                className="mt-4 text-2xl md:text-3xl font-extrabold text-white text-center tracking-tight drop-shadow-lg"
-              >Vincollins College</motion.h1>
-
-              <motion.p
-                initial={{ y: 16, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.6, duration: 0.5 }}
-                className="mt-1 text-sm font-medium text-blue-300 drop-shadow-md"
-              >Geared towards excellence</motion.p>
-
-              {/* Tabs */}
-              <motion.div
-                initial={{ y: 40, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.72, duration: 0.6, type: 'spring', bounce: 0.3 }}
-                className="mt-6 w-full max-w-sm"
-              >
-                <Tabs
-                  defaultValue="home"
-                  value={activeTab}
-                  onValueChange={v => setActiveTab(v as 'home' | 'portal')}
-                  className="w-full"
-                >
-                  <TabsList className="grid w-full grid-cols-2 p-1 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm">
-                    <TabsTrigger
-                      value="home"
-                      className="rounded-xl py-2.5 flex items-center gap-2 font-semibold text-sm transition-all data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50"
-                    >
-                      <Home className="w-3.5 h-3.5" /> Home
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="portal"
-                      className="rounded-xl py-2.5 flex items-center gap-2 font-semibold text-sm transition-all data-[state=active]:bg-white/10 data-[state=active]:text-white text-white/50"
-                    >
-                      <Key className="w-3.5 h-3.5" /> Portal Login
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* Home tab */}
-                  <TabsContent value="home" className="mt-4">
-                    <motion.div
-                      initial={{ y: 18, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ duration: 0.38 }}
-                      className="rounded-2xl p-6 border border-white/10 bg-white/5 backdrop-blur-md"
-                    >
-                      <div className="flex flex-col items-center text-center">
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ duration: 0.4, type: 'spring', bounce: 0.5 }}
-                          className="w-14 h-14 rounded-xl flex items-center justify-center mb-3 bg-blue-500/15 border border-blue-400/30"
-                        >
-                          <Globe className="w-6 h-6 text-blue-300" />
-                        </motion.div>
-                        <h3 className="text-white font-bold text-lg drop-shadow-md">Welcome Home</h3>
-                        <p className="text-white/70 text-sm mt-1.5 max-w-xs leading-relaxed">
-                          Explore our programs, latest news, events, and everything about Vincollins College.
-                        </p>
-                        <Button
-                          onClick={() => startExit('home')}
-                          className="mt-5 w-full font-bold py-6 rounded-xl transition-all active:scale-[0.98] group text-white border-0"
-                          style={{
-                            background: 'linear-gradient(135deg,#1D4ED8 0%,#2563EB 100%)',
-                            boxShadow: '0 8px 24px rgba(29,78,216,0.4)',
-                          }}
-                        >
-                          <Home className="w-4 h-4 mr-2" /> Enter App
-                          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </Button>
-                      </div>
-                    </motion.div>
-                  </TabsContent>
-
-                  {/* Portal tab */}
-                  <TabsContent value="portal" className="mt-4">
-                    <motion.div
-                      initial={{ y: 18, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      transition={{ duration: 0.38 }}
-                      className="rounded-2xl p-6 border border-emerald-400/20 bg-emerald-950/30 backdrop-blur-md"
-                    >
-                      <div className="flex flex-col items-center text-center">
-                        <motion.div
-                          initial={{ scale: 0 }}
-                          animate={{ scale: 1 }}
-                          transition={{ duration: 0.4, type: 'spring', bounce: 0.5 }}
-                          className="w-14 h-14 rounded-xl flex items-center justify-center mb-3 bg-emerald-500/20 border border-emerald-400/30"
-                        >
-                          <LogIn className="w-6 h-6 text-emerald-300" />
-                        </motion.div>
-                        <h3 className="text-white font-bold text-lg drop-shadow-md">Access Your Portal</h3>
-                        <p className="text-white/70 text-sm mt-1.5 max-w-xs leading-relaxed">
-                          Login to view results, attendance and manage your academic journey.
-                        </p>
-                        <Button
-                          onClick={() => startExit('portal')}
-                          className="mt-5 w-full py-6 rounded-xl font-bold transition-all active:scale-[0.98] group text-white border-0"
-                          style={{
-                            background: 'linear-gradient(135deg,#059669 0%,#10B981 100%)',
-                            boxShadow: '0 8px 24px rgba(5,150,105,0.4)',
-                          }}
-                        >
-                          <LogIn className="w-4 h-4 mr-2" /> Go to Portal
-                          <ArrowRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
-                        </Button>
-                      </div>
-                    </motion.div>
-                  </TabsContent>
-                </Tabs>
-              </motion.div>
-
-              {/* Feature pills */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.92 }}
-                className="mt-6 grid grid-cols-3 gap-2 w-full max-w-sm"
-              >
-                {FEATURES.map(({ icon: Icon, title, sub }, i) => (
-                  <motion.div
-                    key={title}
-                    initial={{ y: 18, opacity: 0, scale: 0.85 }}
-                    animate={{ y: 0, opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.96 + i * 0.1, duration: 0.4, type: 'spring', bounce: 0.35 }}
-                    className="rounded-xl p-3 border border-white/[0.07] text-center bg-white/5 backdrop-blur-sm"
-                  >
-                    <Icon className="w-4 h-4 mx-auto mb-1.5 text-blue-300" />
-                    <h4 className="text-white text-[11px] font-bold drop-shadow-sm">{title}</h4>
-                    <p className="text-white/35 text-[9px] mt-0.5">{sub}</p>
-                  </motion.div>
-                ))}
-              </motion.div>
-
-              {/* Progress bar */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 1.2, duration: 0.4 }}
-                className="mt-5 w-full max-w-sm"
-                role="progressbar"
-                aria-valuenow={Math.round(progress)}
-                aria-valuemin={0}
-                aria-valuemax={100}
-              >
-                <div className="flex justify-between items-center mb-1.5">
-                  <span className="text-white/40 text-[10px] font-semibold tracking-widest uppercase">Loading</span>
-                  <span className="text-white/40 text-[10px] font-bold tabular-nums">{Math.round(progress)}%</span>
-                </div>
-                <div className="w-full h-[3px] rounded-full overflow-hidden bg-white/10">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.28, ease: 'easeOut' }}
-                    className="h-full rounded-full"
-                    style={{ background: 'linear-gradient(90deg,#1D4ED8,#60A5FA)' }}
-                  />
-                </div>
-              </motion.div>
-
-              {/* Trust badges */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 1.4 }}
-                className="mt-4 flex flex-wrap items-center justify-center gap-x-1 gap-y-1.5"
-              >
-                {TRUST.map(({ icon: Icon, label }, i) => (
-                  <span key={label} className="flex items-center">
-                    <span className="flex items-center gap-1 text-white/30 text-[10px] font-medium">
-                      <Icon className="w-2.5 h-2.5" /> {label}
-                    </span>
-                    {i < TRUST.length - 1 && (
-                      <span className="w-px h-3 bg-white/10 mx-2" aria-hidden />
-                    )}
-                  </span>
-                ))}
-              </motion.div>
+              <span className="text-white font-black tracking-widest text-[11px] uppercase drop-shadow-md">
+                Vincollins
+              </span>
             </div>
 
-            {/* Footer */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.5 }}
-              className="px-6 py-4 text-center"
+            <button
+              onClick={() => startExit('home')}
+              className="text-[10px] text-white hover:text-white uppercase font-bold tracking-wider px-3.5 py-1.5 rounded-full bg-white/15 border border-white/25 hover:bg-white/25 backdrop-blur-md transition-all shadow-lg"
             >
-              <p className="text-white/20 text-[10px] tracking-widest">
-                © {year} Vincollins College. All rights reserved.
-              </p>
-              <p className="text-white/10 text-[9px] tracking-wider mt-0.5">
-                Geared towards excellence
-              </p>
-            </motion.div>
+              Skip
+            </button>
+          </div>
+
+          {/* Smart card */}
+          <div className="relative z-10 w-full max-w-sm my-auto py-4">
+            <div className="relative rounded-3xl p-[1px] bg-gradient-to-b from-white/40 via-white/20 to-emerald-400/30 shadow-[0_25px_60px_rgba(0,0,0,0.45)] overflow-hidden">
+              <div className="bg-[#0B1224]/75 backdrop-blur-2xl rounded-[23px] p-6 flex flex-col items-center text-center relative overflow-hidden border border-white/10">
+                
+                {/* Soft scan line */}
+                <motion.div
+                  animate={{ y: ['-100%', '320%'] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                  className="absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-transparent via-emerald-300/10 to-transparent pointer-events-none"
+                />
+
+                {/* Status row */}
+                <div className="w-full flex items-center justify-between pb-4 border-b border-white/10">
+                  <div className="flex items-center gap-1.5 text-[10px] text-emerald-300 bg-emerald-500/15 px-2.5 py-1 rounded-full border border-emerald-400/30 font-bold uppercase tracking-wider">
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    Student Access Verified
+                  </div>
+                  <span className="text-[10px] font-mono text-white/60 tracking-wider">
+                    ONLINE
+                  </span>
+                </div>
+
+                {/* ── CENTER: REAL SCHOOL LOGO ── */}
+                <div className="my-5 relative">
+                  <div className="relative w-24 h-24 rounded-2xl bg-gradient-to-br from-white/25 via-white/10 to-emerald-400/20 p-[2px] shadow-[0_0_30px_rgba(16,185,129,0.25)]">
+                    <div className="w-full h-full rounded-[14px] bg-white/95 flex items-center justify-center overflow-hidden relative">
+                      {!logoLoaded && (
+                        <div className="absolute inset-0 bg-slate-100 animate-pulse" />
+                      )}
+                      <Image
+                        src="/favicon.png"
+                        alt="Vincollins College Logo"
+                        width={88}
+                        height={88}
+                        className="w-[88%] h-[88%] object-contain"
+                        priority
+                        onLoad={() => setLogoLoaded(true)}
+                        onError={(e) => {
+                          onImageError(e)
+                          setLogoLoaded(true)
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Verified badge */}
+                  <div className="absolute -bottom-1 -right-1 p-1 bg-emerald-500 rounded-full border-[3px] border-[#0B1224] shadow-md">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-white stroke-[3px]" />
+                  </div>
+                </div>
+
+                <h2 className="text-xl font-black text-white tracking-tight drop-shadow-sm">
+                  Academic Portal Access
+                </h2>
+                <p className="text-white/75 text-xs mt-1.5 max-w-[260px] leading-relaxed">
+                  Sign in to access real-time CBT examinations, grades, timetable, and attendance rosters.
+                </p>
+
+                {/* Actions */}
+                <div className="mt-6 w-full space-y-2.5">
+                  <Button
+                    onClick={() => startExit('portal')}
+                    className="w-full py-6 rounded-2xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs uppercase tracking-widest shadow-xl shadow-emerald-600/35 transition-all hover:scale-[1.01] active:scale-[0.98] border-0"
+                  >
+                    <LogIn className="w-4 h-4 mr-2" /> Authenticate Portal
+                    <ArrowRight className="w-4 h-4 ml-1.5" />
+                  </Button>
+
+                  <Button
+                    onClick={() => startExit('home')}
+                    variant="outline"
+                    className="w-full py-6 rounded-2xl bg-white/10 hover:bg-white/15 text-white border-white/20 text-xs font-bold uppercase tracking-wider backdrop-blur-sm transition-all"
+                  >
+                    <Home className="w-4 h-4 mr-2" /> School Website
+                  </Button>
+                </div>
+
+                {/* Feature pills */}
+                <div className="mt-6 grid grid-cols-3 gap-2 w-full pt-4 border-t border-white/10">
+                  <div className="flex flex-col items-center text-center p-2 rounded-xl bg-white/[0.06] border border-white/10">
+                    <Laptop className="w-3.5 h-3.5 text-emerald-300 mb-1" />
+                    <span className="text-white font-bold text-[9px] uppercase">CBT Engine</span>
+                  </div>
+                  <div className="flex flex-col items-center text-center p-2 rounded-xl bg-white/[0.06] border border-white/10">
+                    <Award className="w-3.5 h-3.5 text-sky-300 mb-1" />
+                    <span className="text-white font-bold text-[9px] uppercase">Results</span>
+                  </div>
+                  <div className="flex flex-col items-center text-center p-2 rounded-xl bg-white/[0.06] border border-white/10">
+                    <BookOpen className="w-3.5 h-3.5 text-violet-300 mb-1" />
+                    <span className="text-white font-bold text-[9px] uppercase">E-Library</span>
+                  </div>
+                </div>
+
+                <div className="mt-4 w-full flex items-center justify-between text-[9px] text-white/45 font-medium">
+                  <span className="flex items-center gap-1">
+                    <QrCode className="w-3 h-3 text-white/50" /> AUTH-SEC-READY
+                  </span>
+                  <span>SESSION {year}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Progress */}
+            <div className="mt-4 px-2">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-white/70 text-[9px] font-bold tracking-widest uppercase drop-shadow">
+                  Engine Readiness
+                </span>
+                <span className="text-emerald-300 text-[10px] font-bold font-mono drop-shadow">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 rounded-full overflow-hidden bg-black/30 border border-white/10">
+                <motion.div
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-300 shadow-[0_0_10px_#34d399]"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 text-center pb-2">
+            <p className="text-white/60 text-[9px] tracking-[0.25em] uppercase font-medium drop-shadow">
+              &copy; {year} Vincollins College &bull; All Rights Reserved
+            </p>
           </div>
         </motion.div>
       )}
 
-      {/* ── EXIT STAGE ── */}
+      {/* ── STAGE 4: EXIT ── */}
       {stage === 'exit' && (
         <motion.div
-          key="exit"
+          key="exit-stage"
           initial={{ opacity: 1 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.45, ease: 'easeInOut' }}
           className="fixed inset-0 z-[9999]"
-          style={{ backgroundColor: DARK }}
+          style={{ backgroundColor: DARK_THEME }}
         />
       )}
-
     </AnimatePresence>
   )
 }

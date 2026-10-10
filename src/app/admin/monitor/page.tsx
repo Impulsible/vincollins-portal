@@ -1,4 +1,4 @@
-// app/admin/monitor/page.tsx - LIVE CBT MONITOR FROM DATABASE
+// app/admin/monitor/page.tsx - LIVE CBT MONITOR + CLEAR TERM RECORDS
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -7,21 +7,20 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
-  Loader2, AlertTriangle, MonitorPlay, User, Clock,
-  Eye, RefreshCw, Search, Wifi, WifiOff, StopCircle,
-  AlertCircle, Activity, Shield, XCircle, CheckCircle2,
-  Users, ExternalLink, Timer, ArrowLeft, ArrowRight,
-  Zap, ZapOff, MousePointer, Minimize2, Monitor
+  Loader2, AlertTriangle, MonitorPlay, Activity, Shield, XCircle, CheckCircle2,
+  Users, RefreshCw, Search, Zap, ZapOff, MousePointer, Minimize2, StopCircle, Eye,
+  Archive, Trash2, Database
 } from 'lucide-react'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 
 // ─── Types ────────────────────────────────────────────
@@ -78,6 +77,17 @@ interface ViolationEvent {
   created_at: string
 }
 
+// ─── Helpers ────────────────────────────────────────────
+const getCurrentSession = (): string => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth() + 1
+  // Academic year starts September
+  return month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
+}
+
+const terms = ['First Term', 'Second Term', 'Third Term']
+
 // ─── Main Component ───────────────────────────────────
 export default function LiveCbtMonitorPage() {
   const [loading, setLoading] = useState(true)
@@ -93,12 +103,20 @@ export default function LiveCbtMonitorPage() {
   const [isMounted, setIsMounted] = useState(false)
   const refreshRef = useRef<NodeJS.Timeout | null>(null)
 
+  // Clear Term Records Dialog State
+  const [showClearDialog, setShowClearDialog] = useState(false)
+  const [clearTerm, setClearTerm] = useState('First Term')
+  const [clearSession, setClearSession] = useState(getCurrentSession())
+  const [clearBeforeDate, setClearBeforeDate] = useState('')
+  const [clearAction, setClearAction] = useState<'archive' | 'delete' | 'archive_and_delete'>('archive_and_delete')
+  const [clearConfirmText, setClearConfirmText] = useState('')
+  const [isClearing, setIsClearing] = useState(false)
+
   useEffect(() => { setIsMounted(true) }, [])
 
   // ─── Load Live Data ──────────────────────────────────
   const loadLiveData = useCallback(async () => {
     try {
-      // Get ALL exam attempts (not just violations)
       const { data: attempts, error } = await supabase
         .from('exam_attempts')
         .select('*')
@@ -115,7 +133,6 @@ export default function LiveCbtMonitorPage() {
         return
       }
 
-      // Get exam details
       const examIds = [...new Set(attempts.map(a => a.exam_id))]
       const { data: exams } = await supabase
         .from('exams')
@@ -125,7 +142,6 @@ export default function LiveCbtMonitorPage() {
       const examMap: Record<string, any> = {}
       exams?.forEach(e => { examMap[e.id] = e })
 
-      // Build live student list
       const students: LiveStudent[] = attempts.map((a: any) => {
         const exam = examMap[a.exam_id] || {}
         const startedAt = new Date(a.started_at || a.created_at)
@@ -169,7 +185,6 @@ export default function LiveCbtMonitorPage() {
 
       setLiveStudents(students)
 
-      // Build exam sessions summary
       const sessionMap: Record<string, ExamSession> = {}
       students.forEach(s => {
         const key = s.exam_id
@@ -191,7 +206,6 @@ export default function LiveCbtMonitorPage() {
         if (s.is_auto_submitted) sessionMap[key].auto_submitted_count++
       })
 
-      // Calculate avg scores
       Object.values(sessionMap).forEach(session => {
         const sessionStudents = students.filter(s => s.exam_id === session.exam_id && (s.status === 'completed' || s.status === 'submitted'))
         if (sessionStudents.length > 0) {
@@ -201,7 +215,6 @@ export default function LiveCbtMonitorPage() {
 
       setExamSessions(Object.values(sessionMap))
 
-      // Build violation events feed
       const violations: ViolationEvent[] = []
       students.forEach(s => {
         if (s.tab_switches > 0) {
@@ -253,11 +266,9 @@ export default function LiveCbtMonitorPage() {
   useEffect(() => {
     if (!isMounted) return
     loadLiveData()
-    
     if (autoRefresh) {
       refreshRef.current = setInterval(loadLiveData, 3000)
     }
-    
     return () => {
       if (refreshRef.current) clearInterval(refreshRef.current)
     }
@@ -271,7 +282,6 @@ export default function LiveCbtMonitorPage() {
         loadLiveData()
       })
       .subscribe()
-
     return () => {
       supabase.removeChannel(channel)
     }
@@ -298,7 +308,7 @@ export default function LiveCbtMonitorPage() {
     autoSubmitted: liveStudents.filter(s => s.is_auto_submitted).length,
     violations: liveStudents.filter(s => s.tab_switches > 2 || s.fullscreen_exits > 1 || s.is_auto_submitted).length,
     avgScore: liveStudents.filter(s => s.status === 'completed' || s.status === 'submitted').length > 0
-      ? Math.round(liveStudents.filter(s => s.status === 'completed' || s.status === 'submitted').reduce((sum, s) => sum + s.percentage, 0) / 
+      ? Math.round(liveStudents.filter(s => s.status === 'completed' || s.status === 'submitted').reduce((sum, s) => sum + s.percentage, 0) /
           liveStudents.filter(s => s.status === 'completed' || s.status === 'submitted').length)
       : 0
   }
@@ -353,6 +363,47 @@ export default function LiveCbtMonitorPage() {
     }
   }
 
+  // ─── Handle Clear Term Records ───────────────────────
+  const handleClearTermRecords = async () => {
+    if (clearConfirmText !== 'CLEAR') {
+      toast.error('Please type CLEAR to confirm')
+      return
+    }
+
+    setIsClearing(true)
+    try {
+      const response = await fetch('/api/admin/monitor/clear-term', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: clearAction,
+          term: clearTerm,
+          session: clearSession,
+          before_date: clearBeforeDate || null,
+          confirmation: 'CLEAR_TERM_RECORDS'
+        })
+      })
+
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Clearance failed')
+
+      toast.success(
+        `✅ ${data.message} • Archived: ${data.archived} • Deleted: ${data.deleted}`,
+        { duration: 6000 }
+      )
+
+      setShowClearDialog(false)
+      setClearConfirmText('')
+      setClearBeforeDate('')
+      await loadLiveData()
+    } catch (error: any) {
+      console.error('Clear error:', error)
+      toast.error(error.message || 'Failed to clear term records')
+    } finally {
+      setIsClearing(false)
+    }
+  }
+
   // ─── Loading ─────────────────────────────────────────
   if (!isMounted || loading) {
     return (
@@ -361,12 +412,6 @@ export default function LiveCbtMonitorPage() {
           <MonitorPlay className="h-12 w-12 text-red-500" />
         </motion.div>
         <p className="text-slate-500 font-medium">Loading live monitor...</p>
-        <div className="flex gap-1">
-          {[0, 1, 2].map(i => (
-            <motion.div key={i} className="h-1.5 w-1.5 rounded-full bg-red-400"
-              animate={{ y: [0, -6, 0] }} transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }} />
-          ))}
-        </div>
       </div>
     )
   }
@@ -385,7 +430,7 @@ export default function LiveCbtMonitorPage() {
             {stats.active} active • {stats.total} total • {stats.violations} with violations
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={autoRefresh ? "default" : "outline"}
             size="sm"
@@ -397,6 +442,14 @@ export default function LiveCbtMonitorPage() {
           </Button>
           <Button variant="outline" size="sm" onClick={loadLiveData} className="h-8 text-xs">
             <RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowClearDialog(true)}
+            className="h-8 text-xs border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+          >
+            <Archive className="h-3.5 w-3.5 mr-1" />Clear Term Records
           </Button>
         </div>
       </div>
@@ -444,8 +497,6 @@ export default function LiveCbtMonitorPage() {
 
       {/* Two Column Layout: Students Table + Violation Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        
-        {/* Students Table - Takes 2/3 width */}
         <Card className="lg:col-span-2 border-0 shadow-sm overflow-hidden">
           <CardContent className="p-0">
             {filteredStudents.length === 0 ? (
@@ -542,7 +593,7 @@ export default function LiveCbtMonitorPage() {
           </CardContent>
         </Card>
 
-        {/* Violation Feed - Takes 1/3 width */}
+        {/* Violation Feed */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
@@ -631,6 +682,145 @@ export default function LiveCbtMonitorPage() {
         </Card>
       )}
 
+      {/* ─── CLEAR TERM RECORDS DIALOG (Fixed Scrolling & Layout) ─── */}
+      <Dialog open={showClearDialog} onOpenChange={(open) => {
+        setShowClearDialog(open)
+        if (!open) setClearConfirmText('')
+      }}>
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
+          {/* Sticky Header */}
+          <div className="shrink-0 px-6 pt-6 pb-4 border-b">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <Archive className="h-5 w-5" />
+                Clear Term Records
+              </DialogTitle>
+              <DialogDescription>
+                Archive and/or delete previous term&apos;s exam records when a new term begins.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          {/* Scrollable Body */}
+          <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+            {/* Term */}
+            <div>
+              <Label className="text-xs text-slate-600">Term Being Cleared</Label>
+              <Select value={clearTerm} onValueChange={setClearTerm}>
+                <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {terms.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Session */}
+            <div>
+              <Label className="text-xs text-slate-600">Academic Session</Label>
+              <Input
+                value={clearSession}
+                onChange={e => setClearSession(e.target.value)}
+                placeholder="e.g. 2024/2025"
+                className="h-9 mt-1"
+              />
+            </div>
+
+            {/* Date cutoff */}
+            <div>
+              <Label className="text-xs text-slate-600">Clear Records Before (Optional)</Label>
+              <Input
+                type="date"
+                value={clearBeforeDate}
+                onChange={e => setClearBeforeDate(e.target.value)}
+                className="h-9 mt-1"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                Leave empty to clear ALL exam attempt records
+              </p>
+            </div>
+
+            {/* Action */}
+            <div>
+              <Label className="text-xs text-slate-600">Action</Label>
+              <Select value={clearAction} onValueChange={(v: any) => setClearAction(v)}>
+                <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="archive">
+                    <div className="flex items-center gap-2">
+                      <Archive className="h-3.5 w-3.5 text-blue-500" />
+                      Archive Only (keep original)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="archive_and_delete">
+                    <div className="flex items-center gap-2">
+                      <Database className="h-3.5 w-3.5 text-purple-500" />
+                      Archive & Delete (recommended)
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="delete">
+                    <div className="flex items-center gap-2">
+                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      Delete Only (permanent!)
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Warning */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-red-700">
+                  <p className="font-semibold">This action cannot be undone!</p>
+                  <p className="mt-1">
+                    All exam attempt records {clearBeforeDate ? `before ${clearBeforeDate}` : '(ALL time)'} will be processed.
+                    {clearAction !== 'archive' && ' Deleted records cannot be recovered.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Confirmation */}
+            <div>
+              <Label className="text-xs text-slate-600">
+                Type <span className="font-mono font-bold text-red-600">CLEAR</span> to confirm
+              </Label>
+              <Input
+                value={clearConfirmText}
+                onChange={e => setClearConfirmText(e.target.value)}
+                placeholder="CLEAR"
+                className="h-9 mt-1 font-mono"
+              />
+            </div>
+          </div>
+
+          {/* Sticky Footer — always visible */}
+          <div className="shrink-0 border-t bg-white dark:bg-slate-950 px-6 py-4 flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setShowClearDialog(false); setClearConfirmText('') }}
+              className="h-9"
+              disabled={isClearing}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleClearTermRecords}
+              disabled={isClearing || clearConfirmText !== 'CLEAR'}
+              className="h-9"
+            >
+              {isClearing ? (
+                <><Loader2 className="h-4 w-4 animate-spin mr-2" />Processing...</>
+              ) : (
+                <><Archive className="h-4 w-4 mr-2" />Clear Records</>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Student Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
         <DialogContent className="max-w-lg">
@@ -649,34 +839,13 @@ export default function LiveCbtMonitorPage() {
           {selectedStudent && (
             <div className="space-y-3 py-2">
               <div className="bg-slate-50 rounded-lg p-3 space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Name:</span>
-                  <span className="font-medium">{selectedStudent.student_name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">VIN:</span>
-                  <span className="font-mono">{selectedStudent.vin_id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Email:</span>
-                  <span className="text-xs">{selectedStudent.student_email}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Class:</span>
-                  <span>{selectedStudent.student_class}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Exam:</span>
-                  <span>{selectedStudent.exam_title}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Subject:</span>
-                  <span>{selectedStudent.exam_subject}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Status:</span>
-                  {getStatusBadge(selectedStudent.status)}
-                </div>
+                <div className="flex justify-between"><span className="text-slate-500">Name:</span><span className="font-medium">{selectedStudent.student_name}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">VIN:</span><span className="font-mono">{selectedStudent.vin_id}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-xs">{selectedStudent.student_email}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Class:</span><span>{selectedStudent.student_class}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Exam:</span><span>{selectedStudent.exam_title}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Subject:</span><span>{selectedStudent.exam_subject}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500">Status:</span>{getStatusBadge(selectedStudent.status)}</div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
@@ -703,9 +872,9 @@ export default function LiveCbtMonitorPage() {
                   { label: 'Warnings', value: selectedStudent.warnings, color: 'amber' },
                   { label: 'Unloads', value: selectedStudent.unload_count, color: 'purple' },
                 ].map((v, i) => (
-                  <div key={i} className={cn("rounded-lg p-2 text-center", 
+                  <div key={i} className={cn("rounded-lg p-2 text-center",
                     v.color === 'red' ? "bg-red-50" : v.color === 'orange' ? "bg-orange-50" : v.color === 'amber' ? "bg-amber-50" : "bg-purple-50")}>
-                    <p className={cn("text-[9px]", 
+                    <p className={cn("text-[9px]",
                       v.color === 'red' ? "text-red-600" : v.color === 'orange' ? "text-orange-600" : v.color === 'amber' ? "text-amber-600" : "text-purple-600")}>{v.label}</p>
                     <p className={cn("text-lg font-bold",
                       v.color === 'red' ? "text-red-700" : v.color === 'orange' ? "text-orange-700" : v.color === 'amber' ? "text-amber-700" : "text-purple-700")}>{v.value}</p>
