@@ -21,14 +21,13 @@ export function ThemeToggle({ className, align = 'end' }: ThemeToggleProps) {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
 
-  // Prevent hydration mismatch
   React.useEffect(() => {
     setMounted(true)
   }, [])
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className={cn('h-9 w-9 rounded-xl', className)} aria-label="Toggle theme">
+      <Button variant="ghost" size="icon" className={cn('h-8 w-8 sm:h-9 sm:w-9 rounded-xl shrink-0', className)} aria-label="Toggle theme">
         <Sun className="h-4 w-4 text-slate-400" />
       </Button>
     )
@@ -41,13 +40,13 @@ export function ThemeToggle({ className, align = 'end' }: ThemeToggleProps) {
           variant="ghost"
           size="icon"
           className={cn(
-            'h-9 w-9 rounded-xl border border-slate-200/50 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm hover:bg-slate-100 dark:hover:bg-slate-850 transition-all text-slate-800 dark:text-slate-200',
+            'h-8 w-8 sm:h-9 sm:w-9 rounded-xl border border-slate-200/50 dark:border-slate-800 bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm hover:bg-slate-100 dark:hover:bg-slate-850 transition-all text-slate-800 dark:text-slate-200 shrink-0',
             className
           )}
           aria-label="Toggle theme"
         >
-          <Sun className="h-[1.1rem] w-[1.1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-amber-500" />
-          <Moon className="absolute h-[1.1rem] w-[1.1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
+          <Sun className="h-[1rem] w-[1rem] sm:h-[1.1rem] sm:w-[1.1rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0 text-amber-500" />
+          <Moon className="absolute h-[1rem] w-[1rem] sm:h-[1.1rem] sm:w-[1.1rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100 text-blue-400" />
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>

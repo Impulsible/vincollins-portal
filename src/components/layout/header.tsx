@@ -33,11 +33,12 @@ interface HeaderProps {
 // ✅ Simple loading shell
 const HeaderShell = memo(() => (
   <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 py-2 sm:py-3 border-b dark:border-slate-800/40">
-    <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
-      <div className="flex items-center justify-between">
-        <div className="h-8 w-32 bg-white/20 rounded animate-pulse" />
-        <div className="flex items-center gap-2">
-          <div className="h-8 w-8 sm:h-10 sm:w-10 bg-white/20 rounded-full animate-pulse" />
+    <div className="max-w-[1440px] mx-auto px-2.5 sm:px-4 lg:px-6">
+      <div className="flex items-center justify-between gap-1.5 min-w-0">
+        <div className="h-8 w-28 sm:w-32 bg-white/20 rounded animate-pulse shrink min-w-0" />
+        <div className="flex items-center gap-1.5 shrink-0">
+          <div className="h-8 w-8 bg-white/20 rounded-full animate-pulse" />
+          <div className="h-8 w-8 bg-white/20 rounded-full animate-pulse" />
         </div>
       </div>
     </div>
@@ -135,12 +136,15 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
           ? "bg-[#0A2472]/95 dark:bg-slate-950/95 backdrop-blur-md shadow-2xl py-1.5 sm:py-2 border-b border-white/5 dark:border-slate-800/60" 
           : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 py-2 sm:py-3 lg:py-4 border-b border-transparent dark:border-slate-800/20"
       )}>
-        <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
-          <div className="flex items-center justify-between gap-3">
+        {/* ✅ Tighter padding on mobile so hamburger fits */}
+        <div className="max-w-[1440px] mx-auto px-2.5 sm:px-4 lg:px-6 xl:px-8">
+          {/* ✅ min-w-0 + smaller gap prevents overflow clipping the menu button */}
+          <div className="flex items-center justify-between gap-1.5 sm:gap-3 min-w-0">
             
+            {/* Logo can shrink; right actions cannot */}
             <Logo schoolSettings={schoolSettings} />
 
-            <div className="hidden lg:flex flex-1 justify-center">
+            <div className="hidden lg:flex flex-1 justify-center min-w-0">
               <DesktopNav 
                 userRole={showDashboardNav ? user?.role : undefined}
                 pathname={pathname} 
@@ -149,9 +153,9 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Theme Selector for Quick access */}
-              <ThemeToggle align="end" />
+            {/* ✅ shrink-0 locks theme + user + hamburger on screen */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+              <ThemeToggle align="end" className="h-8 w-8 sm:h-9 sm:w-9 shrink-0" />
               
               <UserSection
                 user={user}

@@ -1,4 +1,3 @@
-// components/layout/header/UserSection.tsx - FIXED PROFILE IMAGE
 'use client'
 
 import { useState, useRef, useEffect, memo, useCallback } from 'react'
@@ -143,21 +142,21 @@ export const UserSection = memo(function UserSection({
   const avatarUrl = getAvatarUrl()
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
       
       {/* Search Button */}
       <Button 
         variant="ghost" 
         size="icon" 
         onClick={onSearchToggle}
-        className="hidden sm:inline-flex h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 mx-0.5"
+        className="hidden sm:inline-flex h-8 w-8 sm:h-9 sm:w-9 lg:h-10 lg:w-10 rounded-full text-white hover:bg-white/20 shrink-0"
       >
         <Search className="h-4 w-4 sm:h-5 sm:w-5" />
       </Button>
 
-      {/* Notification Bell - independent */}
+      {/* Notification Bell */}
       {showAuthenticated && !isPortalPage && !isHomePage && (
-        <div ref={notifRef} className="inline-flex">
+        <div ref={notifRef} className="inline-flex shrink-0">
           <NotificationPopover
             open={notificationOpen}
             onOpenChange={handleNotificationToggle}
@@ -171,15 +170,15 @@ export const UserSection = memo(function UserSection({
         </div>
       )}
 
-      {/* Profile / Login - independent */}
-      <div ref={profileRef} className="inline-flex">
+      {/* Profile / Login */}
+      <div ref={profileRef} className="inline-flex shrink-0">
         {showAuthenticated ? (
           <div>
             <button 
               onClick={handleProfileToggle}
-              className="flex items-center gap-1.5 sm:gap-2 rounded-full text-white hover:bg-white/20 px-2 sm:px-3 py-1 transition-all mx-0.5"
+              className="flex items-center gap-1 sm:gap-2 rounded-full text-white hover:bg-white/20 p-1 sm:px-3 sm:py-1 transition-all"
             >
-              <Avatar className="h-8 w-8 sm:h-9 sm:w-9 ring-2 ring-white/50">
+              <Avatar className="h-7 w-7 sm:h-9 sm:w-9 ring-2 ring-white/50 shrink-0">
                 {avatarUrl && !avatarError ? (
                   <AvatarImage 
                     src={avatarUrl} 
@@ -199,7 +198,7 @@ export const UserSection = memo(function UserSection({
                   {roleDisplayNames[user?.role || displayUser?.role || 'student']}
                 </p>
               </div>
-              <ChevronDown className={cn("h-3 w-3 text-white transition-transform", profileOpen && "rotate-180")} />
+              <ChevronDown className={cn("hidden sm:block h-3 w-3 text-white transition-transform", profileOpen && "rotate-180")} />
             </button>
 
             {/* Profile Dropdown */}
@@ -318,10 +317,11 @@ export const UserSection = memo(function UserSection({
         )}
       </div>
 
-      {/* Mobile Toggle */}
+      {/* Mobile Toggle Button */}
       <button 
         onClick={onMobileToggle}
-        className="lg:hidden h-10 w-10 inline-flex items-center justify-center rounded-full text-white hover:bg-white/20 ml-0.5"
+        className="lg:hidden h-8 w-8 sm:h-9 sm:w-9 inline-flex items-center justify-center rounded-full text-white hover:bg-white/20 shrink-0"
+        aria-label="Toggle navigation menu"
       >
         {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </button>
