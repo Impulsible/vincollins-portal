@@ -1,4 +1,4 @@
-// app/student/classmates/page.tsx - PROFESSIONAL VERSION
+// app/student/classmates/page.tsx - PROFESSIONAL VERSION WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -102,7 +102,7 @@ export default function StudentClassmatesPage() {
   const userYear = extractYear(userClass)
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
       <Header user={headerUser} onLogout={handleLogout} />
       
       <div className="flex">
@@ -124,24 +124,33 @@ export default function StudentClassmatesPage() {
               <div className="max-w-6xl mx-auto">
                 
                 {/* Breadcrumb */}
-                <div className="flex items-center gap-2 text-sm text-slate-500 mb-6">
-                  <Link href="/student" className="hover:text-emerald-600 transition-colors">
-                    Dashboard
+                <nav 
+                  className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4 sm:mb-6"
+                  aria-label="Breadcrumb"
+                >
+                  <Link 
+                    href="/student" 
+                    className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1"
+                  >
+                    <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                    <span className="hidden sm:inline">Dashboard</span>
                   </Link>
-                  <ChevronRight className="h-3 w-3" />
-                  <span className="text-slate-800 font-medium">Classmates</span>
-                </div>
+                  <ChevronRight className="h-3 w-3 text-slate-400 dark:text-slate-500 shrink-0" />
+                  <span className="text-slate-800 dark:text-slate-200 font-medium">Classmates</span>
+                </nav>
 
                 {/* Page Header */}
-                <div className="mb-8">
+                <div className="mb-6 sm:mb-8">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                      <h1 className="text-2xl sm:text-3xl font-semibold text-slate-800 flex items-center gap-2">
-                        <GraduationCap className="h-7 w-7 text-emerald-600" />
+                      <h1 className="text-2xl sm:text-3xl font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                        <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                          <GraduationCap className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400" />
+                        </div>
                         Classmates
                       </h1>
                       {userClass && (
-                        <p className="text-sm text-slate-500 mt-1">
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 sm:ml-12">
                           {userYear} • All departments
                         </p>
                       )}
@@ -150,7 +159,7 @@ export default function StudentClassmatesPage() {
                       variant="outline" 
                       size="sm" 
                       onClick={() => router.push('/student')}
-                      className="h-9 text-sm"
+                      className="h-9 text-sm border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer w-full sm:w-auto"
                     >
                       <ArrowLeft className="mr-2 h-3.5 w-3.5" />
                       Back to Dashboard

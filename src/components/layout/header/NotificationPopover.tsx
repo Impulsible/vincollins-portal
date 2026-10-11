@@ -13,11 +13,11 @@ import { Notification } from './types'
 
 const getIcon = (type: string) => {
   switch (type) {
-    case 'exam_graded': return <Award className="h-3.5 w-3.5 text-green-500" />
-    case 'new_exam': return <BookOpen className="h-3.5 w-3.5 text-blue-500" />
-    case 'needs_grading': return <AlertCircle className="h-3.5 w-3.5 text-orange-500" />
-    case 'new_student': return <CheckCircle2 className="h-3.5 w-3.5 text-purple-500" />
-    default: return <Bell className="h-3.5 w-3.5 text-gray-500" />
+    case 'exam_graded': return <Award className="h-3.5 w-3.5 text-green-500 dark:text-green-400" />
+    case 'new_exam': return <BookOpen className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
+    case 'needs_grading': return <AlertCircle className="h-3.5 w-3.5 text-orange-500 dark:text-orange-400" />
+    case 'new_student': return <CheckCircle2 className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
+    default: return <Bell className="h-3.5 w-3.5 text-gray-500 dark:text-slate-400" />
   }
 }
 
@@ -54,18 +54,23 @@ export const NotificationPopover = memo(function NotificationPopover({
       <PopoverContent 
         align="end" 
         sideOffset={8}
-        className="w-[340px] sm:w-[380px] p-0 rounded-xl shadow-xl border border-gray-200/80 overflow-hidden"
+        className="w-[340px] sm:w-[380px] p-0 rounded-xl shadow-xl border border-gray-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden"
       >
         {/* Header */}
-        <div className="px-4 py-3 border-b bg-white flex items-center justify-between">
+        <div className="px-4 py-3 border-b border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex items-center justify-between">
           <div>
-            <h3 className="text-sm font-semibold text-gray-900">Notifications</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-slate-100">Notifications</h3>
             {unreadCount > 0 && (
-              <p className="text-[11px] text-gray-500 mt-0.5">{unreadCount} unread</p>
+              <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">{unreadCount} unread</p>
             )}
           </div>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={onMarkAllAsRead} className="text-[11px] h-7 px-2 hover:bg-gray-100">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={onMarkAllAsRead} 
+              className="text-[11px] h-7 px-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-800"
+            >
               Mark all read
             </Button>
           )}
@@ -75,20 +80,21 @@ export const NotificationPopover = memo(function NotificationPopover({
         <ScrollArea className="max-h-[320px]">
           {notifications.length === 0 ? (
             <div className="py-10 text-center px-4">
-              <div className="h-10 w-10 rounded-full bg-gray-100 mx-auto mb-2 flex items-center justify-center">
-                <Bell className="h-5 w-5 text-gray-400" />
+              <div className="h-10 w-10 rounded-full bg-gray-100 dark:bg-slate-800 mx-auto mb-2 flex items-center justify-center">
+                <Bell className="h-5 w-5 text-gray-400 dark:text-slate-500" />
               </div>
-              <p className="text-sm text-gray-500">No notifications</p>
-              <p className="text-[11px] text-gray-400 mt-0.5">You're all caught up!</p>
+              <p className="text-sm text-gray-500 dark:text-slate-400">No notifications</p>
+              <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">You're all caught up!</p>
             </div>
           ) : (
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-gray-50 dark:divide-slate-800">
               {notifications.map((n) => (
                 <div
                   key={n.id}
                   className={cn(
-                    "px-4 py-2.5 hover:bg-gray-50 cursor-pointer group relative transition-colors",
-                    !n.read && "bg-blue-50/30 hover:bg-blue-50/50"
+                    "px-4 py-2.5 cursor-pointer group relative transition-colors",
+                    "hover:bg-gray-50 dark:hover:bg-slate-800/60",
+                    !n.read && "bg-blue-50/30 dark:bg-blue-950/20 hover:bg-blue-50/50 dark:hover:bg-blue-950/30"
                   )}
                   onClick={() => { onMarkAsRead(n.id); onOpenChange(false); if (n.link) router.push(n.link) }}
                 >
@@ -96,7 +102,9 @@ export const NotificationPopover = memo(function NotificationPopover({
                     {/* Icon */}
                     <div className={cn(
                       "h-7 w-7 rounded-full flex items-center justify-center shrink-0 mt-0.5",
-                      !n.read ? "bg-blue-100" : "bg-gray-100"
+                      !n.read 
+                        ? "bg-blue-100 dark:bg-blue-950/40" 
+                        : "bg-gray-100 dark:bg-slate-800"
                     )}>
                       {getIcon(n.type)}
                     </div>
@@ -106,7 +114,9 @@ export const NotificationPopover = memo(function NotificationPopover({
                       <div className="flex items-start justify-between gap-2">
                         <p className={cn(
                           "text-[13px] font-medium leading-snug line-clamp-1",
-                          !n.read ? "text-gray-900" : "text-gray-600"
+                          !n.read 
+                            ? "text-gray-900 dark:text-slate-100" 
+                            : "text-gray-600 dark:text-slate-400"
                         )}>
                           {n.title}
                         </p>
@@ -115,10 +125,10 @@ export const NotificationPopover = memo(function NotificationPopover({
                           <span className="h-1.5 w-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5" />
                         )}
                       </div>
-                      <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5 leading-relaxed">
+                      <p className="text-[11px] text-gray-500 dark:text-slate-400 line-clamp-2 mt-0.5 leading-relaxed">
                         {n.message}
                       </p>
-                      <p className="text-[10px] text-gray-400 mt-1">
+                      <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
                         {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
                       </p>
                     </div>
@@ -126,10 +136,10 @@ export const NotificationPopover = memo(function NotificationPopover({
 
                   {/* Delete button */}
                   <button
-                    className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-200 transition-opacity"
+                    className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-opacity"
                     onClick={(e) => { e.stopPropagation(); onDelete(n.id) }}
                   >
-                    <Trash2 className="h-3 w-3 text-gray-400 hover:text-red-500" />
+                    <Trash2 className="h-3 w-3 text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400" />
                   </button>
                 </div>
               ))}
@@ -138,11 +148,11 @@ export const NotificationPopover = memo(function NotificationPopover({
         </ScrollArea>
 
         {/* Footer */}
-        <div className="border-t bg-gray-50/80">
+        <div className="border-t border-gray-200 dark:border-slate-800 bg-gray-50/80 dark:bg-slate-900/60">
           <Button
             variant="ghost"
             size="sm"
-            className="w-full text-[12px] h-8 font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-none"
+            className="w-full text-[12px] h-8 font-medium text-gray-600 dark:text-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-slate-800 rounded-none"
             onClick={() => { onOpenChange(false); router.push(userRole === 'student' ? '/student/notifications' : '/staff/notifications') }}
           >
             View All Notifications

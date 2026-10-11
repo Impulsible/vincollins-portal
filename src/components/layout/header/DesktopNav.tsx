@@ -25,13 +25,13 @@ const studentNavigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/student', icon: LayoutDashboard },
   { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
   { name: 'Results', href: '/student/results', icon: GraduationCap },
-  { name: 'Report Card', href: '/student/report-card', icon: FileCheck }, // ✅ changed from Profile
+  { name: 'Report Card', href: '/student/report-card', icon: FileCheck },
 ]
 
 const teacherNavigation: NavigationItem[] = [
   { name: 'Dashboard', href: '/staff', icon: LayoutDashboard },
   { name: 'Exams', href: '/staff/exams', icon: MonitorPlay },
-  { name: 'CA Scores', href: '/staff/ca-scores', icon: ClipboardList }, // ✅ changed from Assignments
+  { name: 'CA Scores', href: '/staff/ca-scores', icon: ClipboardList },
   { name: 'Students', href: '/staff/students', icon: Users },
   { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
 ]
@@ -47,7 +47,7 @@ const adminNavigation: NavigationItem[] = [
     ]
   },
   { name: 'Exam Approvals', href: '/admin/exams', icon: MonitorPlay },
-  { name: 'Reports', href: '/admin/report-cards', icon: FileCheck },
+  // ❌ REMOVED: { name: 'Reports', href: '/admin/report-cards', icon: FileCheck },
   { name: 'Monitor', href: '/admin/monitor', icon: Activity },
 ]
 
@@ -185,8 +185,8 @@ export const DesktopNav = memo(function DesktopNav({ userRole, pathname, isPubli
                  item.name === 'Exam Approvals' ? 'Exams' :
                  item.name === 'User Management' ? 'Users' :
                  item.name === 'My Exams' ? 'Exams' :
-                 item.name === 'CA Scores' ? 'CA' :           // ✅ new
-                 item.name === 'Report Card' ? 'Report' :     // ✅ new
+                 item.name === 'CA Scores' ? 'CA' :
+                 item.name === 'Report Card' ? 'Report' :
                  item.name.substring(0, 4)}
               </span>
               {item.isCbt && (

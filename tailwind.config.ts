@@ -7,6 +7,9 @@ const config: Config = {
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+    './app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     container: {
@@ -82,28 +85,31 @@ const config: Config = {
           foreground: "hsl(var(--info-foreground))",
         },
         
-        // Portal specific colors with Dark Blue theme
+        /* 
+         * ✅ Unified Dynamic Portal Colors
+         * Maps automatically to your soft dark mode system HSL CSS variables!
+         */
         portal: {
           blue: {
-            DEFAULT: "hsl(220, 85%, 35%)",
-            dark: "hsl(220, 85%, 25%)",
-            light: "hsl(220, 85%, 45%)",
-            deep: "hsl(220, 85%, 18%)",
+            DEFAULT: "hsl(var(--portal-blue))",
+            dark: "hsl(var(--portal-blue-dark))",
+            light: "hsl(var(--portal-blue-light))",
+            deep: "hsl(var(--portal-blue-deep))",
           },
           red: {
-            DEFAULT: "hsl(15, 85%, 55%)",
-            dark: "hsl(15, 85%, 45%)",
-            light: "hsl(15, 85%, 65%)",
+            DEFAULT: "hsl(var(--portal-red))",
+            dark: "hsl(var(--portal-red-dark))",
+            light: "hsl(var(--portal-red-light))",
           },
           gold: {
-            DEFAULT: "hsl(35, 85%, 55%)",
-            dark: "hsl(35, 85%, 45%)",
-            light: "hsl(35, 85%, 65%)",
+            DEFAULT: "hsl(var(--portal-gold))",
+            dark: "hsl(var(--portal-gold-dark))",
+            light: "hsl(var(--portal-gold-light))",
           },
           earth: {
-            DEFAULT: "hsl(30, 15%, 35%)",
-            dark: "hsl(30, 15%, 25%)",
-            light: "hsl(30, 15%, 45%)",
+            DEFAULT: "hsl(var(--portal-earth))",
+            dark: "hsl(var(--portal-earth-dark))",
+            light: "hsl(var(--portal-earth-light))",
           },
         },
       },
@@ -164,11 +170,11 @@ const config: Config = {
         "glow-blue": "glow-blue 2s ease-in-out infinite",
       },
       boxShadow: {
-        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
-        'soft-lg': '0 10px 40px -3px rgba(0, 0, 0, 0.1), 0 20px 25px -5px rgba(0, 0, 0, 0.05)',
-        'blue': '0 10px 25px -5px hsl(220, 85%, 35% / 0.2)',
-        'blue-lg': '0 20px 35px -8px hsl(220, 85%, 35% / 0.25)',
-        'glow-blue': '0 0 20px hsl(220, 85%, 35% / 0.3)',
+        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.04), 0 10px 20px -2px rgba(0, 0, 0, 0.02)',
+        'soft-lg': '0 10px 40px -3px rgba(0, 0, 0, 0.06), 0 20px 25px -5px rgba(0, 0, 0, 0.03)',
+        'blue': '0 10px 25px -5px hsl(var(--portal-blue) / 0.12)',
+        'blue-lg': '0 20px 35px -8px hsl(var(--portal-blue) / 0.18)',
+        'glow-blue': '0 0 20px hsl(var(--portal-blue) / 0.15)',
       },
     },
   },

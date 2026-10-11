@@ -1,5 +1,3 @@
-// src/app/student/exams/hooks/useExamsData.ts - COMPLETE FIXED VERSION
-
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
@@ -19,6 +17,18 @@ import { getSubjectCountForClass, getTermLabel } from "../utils"
 import { TERM_NAMES } from "../constants"
 
 type LocalStatsState = StatsState & { pendingTheoryCount: number }
+
+// ✅ Flexible term matcher - handles 'third' vs 'Third Term' vs '3rd Term'
+const isTermMatch = (term1?: string, term2?: string) => {
+  if (!term1 || !term2) return false
+  const t1 = term1.toLowerCase().trim()
+  const t2 = term2.toLowerCase().trim()
+  if (t1 === t2) return true
+  if (t1.includes('third') || t1.includes('3rd') || t1 === '3') return t2.includes('third') || t2.includes('3rd') || t2 === '3'
+  if (t1.includes('second') || t1.includes('2nd') || t1 === '2') return t2.includes('second') || t2.includes('2nd') || t2 === '2'
+  if (t1.includes('first') || t1.includes('1st') || t1 === '1') return t2.includes('first') || t2.includes('1st') || t2 === '1'
+  return false
+}
 
 // ✅ Extract year from class name
 const extractYear = (className: string): string => {
@@ -42,24 +52,24 @@ const extractYear = (className: string): string => {
 // ✅ Get subject count based on class level (JSS = 17, SS = 10)
 const getSubjectCountByClassLevel = (className: string): number => {
   if (!className) return 0
-  
   const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
-  
-  // JSS classes - 17 subjects
-  if (normalizedClass.includes('JSS1') || 
-      normalizedClass.includes('JSS2') || 
-      normalizedClass.includes('JSS3')) {
-    return 17
-  }
-  
-  // SS classes - 10 subjects
-  if (normalizedClass.includes('SS1') || 
-      normalizedClass.includes('SS2') || 
-      normalizedClass.includes('SS3')) {
-    return 10
-  }
-  
+  if (normalizedClass.includes('JSS1') || normalizedClass.includes('JSS2') || normalizedClass.includes('JSS3')) return 17
+  if (normalizedClass.includes('SS1') || normalizedClass.includes('SS2') || normalizedClass.includes('SS3')) return 10
   return 0
+}
+
+// ✅ WAEC Grade Calculator
+const getWAECGrade = (p: number): string => {
+  const percentage = Number(p) || 0
+  if (percentage >= 75) return 'A1'
+  if (percentage >= 70) return 'B2'
+  if (percentage >= 65) return 'B3'
+  if (percentage >= 60) return 'C4'
+  if (percentage >= 55) return 'C5'
+  if (percentage >= 50) return 'C6'
+  if (percentage >= 45) return 'D7'
+  if (percentage >= 40) return 'E8'
+  return 'F9'
 }
 
 // ✅ Grade color mapping
@@ -74,11 +84,6 @@ const getGradeColor = (grade: string): string => {
   }
 }
 
-// ✅ Calculate CA total from CA scores
-const calculateCATotal = (ca1: number, ca2: number): number => {
-  return (ca1 || 0) + (ca2 || 0)
-}
-
 // ✅ Get current term from database
 async function fetchCurrentTermFromDB(): Promise<{ term: string; session: string } | null> {
   try {
@@ -86,13 +91,10 @@ async function fetchCurrentTermFromDB(): Promise<{ term: string; session: string
       .from('terms')
       .select('term_code, session_year')
       .eq('is_current', true)
-      .single()
+      .maybeSingle()
 
     if (!termError && termData) {
-      return {
-        term: termData.term_code,
-        session: termData.session_year
-      }
+      return { term: termData.term_code, session: termData.session_year }
     }
 
     const { data: settings, error: settingsError } = await supabase
@@ -100,17 +102,11 @@ async function fetchCurrentTermFromDB(): Promise<{ term: string; session: string
       .select('current_term, current_session')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    if (!settingsError && settings) {
-      if (settings.current_term && settings.current_session) {
-        return {
-          term: settings.current_term,
-          session: settings.current_session
-        }
-      }
+    if (!settingsError && settings?.current_term && settings?.current_session) {
+      return { term: settings.current_term, session: settings.current_session }
     }
-    
     return null
   } catch (error) {
     console.error('Error fetching current term:', error)
@@ -196,7 +192,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
   }, [])
 
   const loadData = useCallback(async (term?: string, session?: string) => {
-    // ✅ Prevent multiple simultaneous fetches
     if (isFetching.current) {
       console.log('⏳ Already fetching, skipping...')
       return
@@ -209,6 +204,10 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       console.log('⏳ Waiting for term to load...')
       return
     }
+
+    // Normalized keyword for .ilike queries ("third" / "second" / "first")
+    const termKeyword = targetTerm.toLowerCase().includes('third') ? 'third' : 
+                        targetTerm.toLowerCase().includes('second') ? 'second' : 'first'
 
     isFetching.current = true
     setLoading(true)
@@ -242,7 +241,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         return 
       }
 
-      // ✅ Get subject count - use class-level fallback if subject_count is 0
       const profileSubjectCount = profileData.subject_count || 0
       const classLevelCount = getSubjectCountByClassLevel(profileData.class || "")
       const totalSubjects = profileSubjectCount || classLevelCount || 0
@@ -262,7 +260,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         setProfile(sp)
       }
 
-      const isCurrentTerm = targetTerm === currentTerm.term && targetSession === currentTerm.session
+      const isCurrentTerm = isTermMatch(targetTerm, currentTerm.term) && targetSession === currentTerm.session
       console.log('🎯 Target term:', { targetTerm, targetSession, isCurrentTerm })
 
       // ✅ Load available terms (only once)
@@ -271,55 +269,73 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         try {
           const termsMap = new Map<string, TermOption>()
           
-          const { data: progressData, error: progressError } = await supabase
+          const { data: progressData } = await supabase
             .from("student_term_progress")
             .select("term, session_year")
             .eq("student_id", sp.id)
           
-          if (!progressError && progressData) {
-            progressData.forEach((p: any) => {
-              if (p.term && p.session_year) {
-                const key = `${p.term}|${p.session_year}`
-                if (!termsMap.has(key)) {
-                  const isCurrent = p.term === currentTerm.term && p.session_year === currentTerm.session
-                  termsMap.set(key, { 
-                    term: p.term, 
-                    session_year: p.session_year, 
-                    label: getTermLabel(p.term, p.session_year),
-                    is_current: isCurrent
-                  })
-                }
+          progressData?.forEach((p: any) => {
+            if (p.term && p.session_year) {
+              const key = `${p.term}|${p.session_year}`
+              if (!termsMap.has(key)) {
+                const isCurrent = isTermMatch(p.term, currentTerm.term) && p.session_year === currentTerm.session
+                termsMap.set(key, { 
+                  term: p.term, 
+                  session_year: p.session_year, 
+                  label: getTermLabel(p.term, p.session_year),
+                  is_current: isCurrent
+                })
               }
-            })
-          }
+            }
+          })
           
-          const { data: examTerms, error: examTermsError } = await supabase
+          const { data: examTerms } = await supabase
             .from("exams")
             .select("term, session_year, class")
             .eq("status", "published")
             .not("term", "is", null)
             .not("session_year", "is", null)
           
-          if (!examTermsError && examTerms) {
-            const studentYear = extractYear(sp.class)
-            examTerms.forEach((t: any) => {
-              if (t.term && t.session_year) {
-                const examYear = extractYear(t.class)
-                if (examYear === studentYear) {
-                  const key = `${t.term}|${t.session_year}`
-                  if (!termsMap.has(key)) {
-                    const isCurrent = t.term === currentTerm.term && t.session_year === currentTerm.session
-                    termsMap.set(key, { 
-                      term: t.term, 
-                      session_year: t.session_year, 
-                      label: getTermLabel(t.term, t.session_year),
-                      is_current: isCurrent
-                    })
-                  }
+          const studentYear = extractYear(sp.class)
+          examTerms?.forEach((t: any) => {
+            if (t.term && t.session_year) {
+              const examYear = extractYear(t.class)
+              if (examYear === studentYear) {
+                const key = `${t.term}|${t.session_year}`
+                if (!termsMap.has(key)) {
+                  const isCurrent = isTermMatch(t.term, currentTerm.term) && t.session_year === currentTerm.session
+                  termsMap.set(key, { 
+                    term: t.term, 
+                    session_year: t.session_year, 
+                    label: getTermLabel(t.term, t.session_year),
+                    is_current: isCurrent
+                  })
                 }
               }
-            })
-          }
+            }
+          })
+          
+          // Also populate dropdown from report_cards (so previous terms show up)
+          const { data: reportCardTerms } = await supabase
+            .from("report_cards")
+            .select("term, academic_year, session_year, class")
+            .eq("student_id", sp.id)
+
+          reportCardTerms?.forEach((rc: any) => {
+            const session = rc.academic_year || rc.session_year
+            if (rc.term && session) {
+              const key = `${rc.term}|${session}`
+              if (!termsMap.has(key)) {
+                const isCurrent = isTermMatch(rc.term, currentTerm.term) && session === currentTerm.session
+                termsMap.set(key, {
+                  term: rc.term,
+                  session_year: session,
+                  label: getTermLabel(rc.term, session),
+                  is_current: isCurrent
+                })
+              }
+            }
+          })
           
           if (currentTerm.term && currentTerm.session) {
             const currentKey = `${currentTerm.term}|${currentTerm.session}`
@@ -366,7 +382,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         }
       }
 
-      // ✅ Fetch attempts
+      // ✅ Fetch Online Exam Attempts
       const { data: attemptsData, error: attemptsError } = await supabase
         .from("exam_attempts")
         .select("*")
@@ -376,31 +392,29 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         console.error("Error fetching attempts:", attemptsError)
       }
 
-      // ✅ Fetch exams
+      // ✅ Fetch Online Exams (flexible term matching via ilike)
       const { data: examsData, error: examsError } = await supabase
         .from("exams")
         .select("*")
         .eq("status", "published")
-        .eq("term", targetTerm)
+        .ilike("term", `%${termKeyword}%`)
         .eq("session_year", targetSession)
         .order("created_at", { ascending: false })
 
       if (examsError) {
         console.error("Error fetching exams:", examsError)
-        toast.error("Failed to load exams")
       }
 
-      // ✅ Filter exams - SINGLE PASS with deduplication
+      // Build exam map so we can read objective_max / theory_max from the exam definition
+      const examDefMap: Record<string, any> = {}
+      ;(examsData || []).forEach((e: any) => { examDefMap[e.id] = e })
+
       const studentYear = extractYear(sp.class)
       const seenIds = new Set<string>()
       
-      const filteredExams = (examsData || []).filter((exam: any) => {
+      const filteredExams: Exam[] = (examsData || []).filter((exam: any) => {
         if (!exam.class) return false
-        
-        // ✅ Skip duplicates
-        if (seenIds.has(exam.id)) {
-          return false
-        }
+        if (seenIds.has(exam.id)) return false
         seenIds.add(exam.id)
         
         const examYear = extractYear(exam.class)
@@ -409,67 +423,59 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           return studentYear === examYear
         }
         
-        // ✅ For past terms: show exams the student has attempted
         const hasAttempt = attemptsData?.some((a: any) => a.exam_id === exam.id) || false
         return hasAttempt
       })
 
-      console.log('📚 Filtered exams:', {
-        studentYear,
-        isCurrentTerm,
-        totalExams: examsData?.length || 0,
-        filteredCount: filteredExams.length,
-        uniqueCount: seenIds.size
-      })
+      console.log('📚 Filtered online exams:', filteredExams.length)
       
-      // ✅ Replace exams, don't append
-      setExams(filteredExams)
-
-      // ✅ Build CA scores map first
-      const { data: caScoresData, error: caError } = await supabase
+      // ✅ Fetch CA Scores
+      const { data: caScoresData } = await supabase
         .from("ca_scores")
         .select("*")
         .eq("student_id", sp.id)
-        .eq("term", targetTerm)
-        .eq("academic_year", targetSession)
-
-      if (caError) {
-        console.warn("Error fetching CA scores:", caError)
-      }
+        .ilike("term", `%${termKeyword}%`)
 
       const caMap: Record<string, any> = {}
-      caScoresData?.forEach((ca: any) => { 
-        if (ca.exam_id) caMap[ca.exam_id] = ca 
-      })
+      caScoresData?.filter(c => c.academic_year === targetSession || c.session_year === targetSession)
+        .forEach((ca: any) => { 
+          if (ca.exam_id) caMap[ca.exam_id] = ca 
+        })
 
-      // ✅ Process attempts with proper percentage calculation (matching results page)
+      // ✅ Process Online CBT Attempts
+      // RULE: Exam total = 60. Theory Max = 60 - Objective Max (set by teacher).
       const am: Record<string, ExamAttempt> = {}
       const attemptsForTerm = attemptsData?.filter((a: any) => 
-        a.term === targetTerm && a.session_year === targetSession
+        isTermMatch(a.term, targetTerm) && 
+        (a.session_year === targetSession || a.academic_year === targetSession)
       ) || []
 
       attemptsForTerm.forEach((a: any) => {
+        const examDef = examDefMap[a.exam_id]
         const ca = caMap[a.exam_id]
-        const hasCA = ca && (ca.ca1_score || ca.ca2_score)
-        
-        // ✅ Get scores
-        const objectiveMax = a.objective_total || 30
+        const hasCA = ca && (ca.ca1_score || ca.ca2_score || ca.ca_total)
+
+        // ── Dynamic Objective / Theory max ──
+        // Prefer values stored on the exam definition, then the attempt, then safe defaults.
+        let objectiveMax = Number(examDef?.objective_max) || Number(a.objective_total) || 0
+        if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 30 // sensible default
+        const theoryMax = Math.max(0, 60 - objectiveMax) // ← Theory Max = 60 − Obj Max
+
         const objectiveScore = Number(a.objective_score) || 0
         const theoryScore = Number(a.theory_score) || 0
         const ca1 = ca?.ca1_score || 0
         const ca2 = ca?.ca2_score || 0
-        const caTotal = ca1 + ca2
+        const caTotal = ca?.ca_total || (ca1 + ca2)
 
-        // ✅ Calculate percentage using the SAME logic as results page
         let percentage: number
         let totalScore: number
 
         if (hasCA) {
-          // With CA: CA1 + CA2 + Objective + Theory (max 100)
+          // CA (40) + Obj + Theory = out of 100
           totalScore = caTotal + objectiveScore + theoryScore
           percentage = Math.round((totalScore / 100) * 100)
-        } else if (theoryScore > 0) {
-          // Without CA but with Theory: Objective + Theory (max 60)
+        } else if (theoryScore > 0 || theoryMax > 0) {
+          // No CA yet: Obj + Theory = out of 60
           const examTotal = objectiveScore + theoryScore
           totalScore = Math.round((examTotal / 60) * 100)
           percentage = totalScore
@@ -482,10 +488,8 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           percentage = 0
         }
 
-        // ✅ Clamp percentage
         percentage = Math.min(Math.max(Number(percentage) || 0, 0), 100)
 
-        // ✅ Store the correct values
         const attemptObj: any = { 
           id: a.id, 
           exam_id: a.exam_id, 
@@ -494,9 +498,9 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           total_score: totalScore,
           total_marks: 100,
           objective_score: objectiveScore,
-          objective_total: objectiveMax,
+          objective_total: objectiveMax,       // dynamic
           theory_score: theoryScore,
-          theory_total: a.theory_total || 30,
+          theory_total: theoryMax,             // = 60 - objectiveMax
           theory_feedback: a.theory_feedback || null,
           term: a.term || targetTerm,
           session_year: a.session_year || targetSession,
@@ -507,52 +511,145 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           attempt_number: a.attempt_number || 1,
           is_auto_submitted: a.is_auto_submitted || false,
           auto_submit_reason: a.auto_submit_reason || null,
-          // ✅ Store CA info
           ca1_score: ca1,
           ca2_score: ca2,
           ca_total_score: caTotal,
-          ca_percentage: hasCA ? Math.round(((ca1 + ca2) / 40) * 100) : 0,
+          ca_percentage: hasCA ? Math.round((caTotal / 40) * 100) : 0,
+          hasCA,
+          has_ca: hasCA,
+          grade: getWAECGrade(percentage),
+          is_passed: percentage >= 40,
         }
-        // attach non-typed helper flag without violating ExamAttempt type
-        attemptObj.hasCA = hasCA
         am[a.exam_id] = attemptObj as ExamAttempt
       })
-      
+
+      // ✅ FALLBACK: Fetch Report Cards for offline/uploaded subjects
+      // Offline report cards store a single "Exam" score out of 60 (obj+theory combined).
+      // So: objective_total = 60, theory_total = 0 (no separate theory row).
+      const { data: reportCards } = await supabase
+        .from('report_cards')
+        .select('*')
+        .eq('student_id', sp.id)
+
+      if (reportCards && reportCards.length > 0) {
+        const matchingReport = reportCards.find(r => 
+          isTermMatch(r.term, targetTerm) && 
+          (r.academic_year === targetSession || r.session_year === targetSession)
+        )
+
+        if (matchingReport) {
+          const subjects = (matchingReport.subject_scores?.length > 0 
+            ? matchingReport.subject_scores 
+            : matchingReport.subjects_data) || []
+          
+          subjects.forEach((subj: any, index: number) => {
+            const subjectName = subj.name || subj.subject || 'Subject'
+            
+            // Skip if an online CBT exam already covered this subject
+            if (filteredExams.some((e: any) => e.subject?.toLowerCase() === subjectName.toLowerCase())) return
+            
+            const total = Number(subj.total || subj.score || 0)
+            const caScore = Number(subj.ca || subj.ca_score || 0)
+            const examScore = Number(subj.exam || subj.exam_score || 0) // out of 60
+            const dummyExamId = `rc-exam-${matchingReport.id}-${index}`
+
+            // Add complete exam object (prevents undefined on card)
+            filteredExams.push({
+              id: dummyExamId,
+              title: `${subjectName} Assessment`,
+              subject: subjectName,
+              class: sp.class,
+              term: targetTerm,
+              session_year: targetSession,
+              status: 'published',
+              duration: 0,
+              duration_minutes: 0,
+              total_questions: 0,
+              questions_count: 0,
+              question_count: 0,
+              num_questions: 0,
+              total_marks: 100,
+              passing_percentage: 40,
+              objective_max: 60,   // full exam portion
+              theory_max: 0,      // no separate theory for offline uploads
+              exam_type: 'offline',
+              is_offline: true,
+              created_at: matchingReport.created_at || new Date().toISOString(),
+            } as any)
+
+            // Add complete attempt object
+            // CA out of 40 + Exam out of 60 = Total out of 100
+            am[dummyExamId] = {
+              id: `rc-att-${matchingReport.id}-${index}`,
+              exam_id: dummyExamId,
+              status: 'graded',
+              percentage: total,
+              total_score: total,
+              total_marks: 100,
+              objective_score: examScore,
+              objective_total: 60,   // exam portion is out of 60
+              theory_score: 0,
+              theory_total: 0,      // hide theory row (combined into exam score)
+              theory_feedback: null,
+              term: targetTerm,
+              session_year: targetSession,
+              attempted_at: matchingReport.created_at || new Date().toISOString(),
+              started_at: matchingReport.created_at || new Date().toISOString(),
+              submitted_at: matchingReport.created_at || new Date().toISOString(),
+              completed_at: matchingReport.created_at || new Date().toISOString(),
+              attempt_number: 1,
+              is_auto_submitted: false,
+              auto_submit_reason: null,
+              ca1_score: caScore,
+              ca2_score: 0,
+              ca_total_score: caScore,
+              ca_percentage: Math.round((caScore / 40) * 100),
+              hasCA: true,
+              has_ca: true,
+              grade: subj.grade || getWAECGrade(total),
+              is_passed: total >= 40,
+            } as any
+          })
+        }
+      }
+
+      setExams(filteredExams)
       setExamAttempts(am)
 
-      // ✅ Get term progress
-      const { data: termProgressData, error: progressFetchError } = await supabase
+      // ✅ Get term progress stats
+      const { data: termProgressData } = await supabase
         .from("student_term_progress")
         .select("total_subjects, completed_exams, average_score, grade, pending_theory_count")
         .eq("student_id", sp.id)
-        .eq("term", targetTerm)
+        .ilike("term", `%${termKeyword}%`)
         .eq("session_year", targetSession)
         .maybeSingle()
 
-      if (progressFetchError) {
-        console.warn("Error fetching term progress:", progressFetchError)
-      }
-
-      // ✅ Calculate stats
       const pendingTheoryAttempts = Object.values(am).filter(a => a.status === 'pending_theory')
       const pendingTheoryCount = pendingTheoryAttempts.length
 
-      const dbGrade = termProgressData?.grade || 'N/A'
-      const dbAverageScore = termProgressData?.average_score ?? 0
-      const dbCompleted = termProgressData?.completed_exams ?? 0
-      
-      // ✅ Use totalSubjects from profile (which includes class-level fallback)
+      const subjectStats = buildSubjectStats(filteredExams, am)
+      const completedCount = filteredExams.filter((e: any) => {
+        const att = am[e.id]
+        return att && ['completed', 'graded', 'pending_theory'].includes(att.status)
+      }).length
+
+      const dbGrade = termProgressData?.grade || (subjectStats.length > 0 ? subjectStats[0].grade : 'N/A')
+      const dbAverageScore = termProgressData?.average_score ?? (
+        subjectStats.length > 0 
+          ? Math.round(subjectStats.reduce((acc, s) => acc + s.score, 0) / subjectStats.length)
+          : 0
+      )
+      const dbCompleted = termProgressData?.completed_exams ?? completedCount
       const dbTotalSubjects = termProgressData?.total_subjects ?? totalSubjects
 
-      const subjectStats = buildSubjectStats(filteredExams, am)
-
-      const availableCount = filteredExams.filter((e: Exam) => {
+      const availableCount = filteredExams.filter((e: any) => {
         const a = am[e.id]
         if (!a) return true
         return a.status === 'in_progress'
       }).length
 
-      const upcomingCount = filteredExams.filter((e: Exam) => 
+      const upcomingCount = filteredExams.filter((e: any) => 
         e.starts_at && new Date(e.starts_at) > new Date()
       ).length
 
@@ -570,7 +667,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         subjectStats: subjectStats,
       }
 
-      console.log('📊 Stats from DB:', newStats)
+      console.log('📊 Stats:', newStats)
       setStats(newStats)
 
     } catch (e) { 
@@ -582,14 +679,12 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
     }
   }, [router, selectedTermSession, currentTerm, buildSubjectStats, profile])
 
-  // ✅ Load data once when current term is available
   useEffect(() => {
     if (currentTerm.term && currentTerm.session && !isFetching.current) {
       loadData()
     }
   }, [currentTerm, loadData])
 
-  // ✅ Handle term/session change
   const handleTermSessionChange = async (value: string) => {
     const [term, session_year] = value.split("|")
     if (term && session_year) {

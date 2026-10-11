@@ -1,16 +1,14 @@
-// components/staff/StaffWelcomeBanner.tsx - NO INTERNAL LOADING (Parent handles it)
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   GraduationCap, Quote, Calendar, Flame, 
-  Clock, CheckCircle2, Users, Award,
-  FileText, BookOpen, FileCheck, Sparkles, Timer
+  Clock, CheckCircle2, Users, Award, Sparkles, Timer, Globe2
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 interface StaffProfile {
   id?: string
@@ -53,53 +51,187 @@ interface StaffWelcomeBannerProps {
 
 const STORAGE_KEY = 'staff_session_start'
 
-// Personalized Quotes
-const quotes = {
-  morning: [
-    { text: "Every student can learn, just not on the same day, or in the same way.", author: "George Evans" },
-    { text: "The art of teaching is the art of assisting discovery.", author: "Mark Van Doren" },
-    { text: "The influence of a good teacher can never be erased.", author: "Unknown" },
-    { text: "Your work today shapes the leaders of tomorrow.", author: "Educational Wisdom" },
-    { text: "Start where you are. Use what you have. Do what you can.", author: "Arthur Ashe" },
-  ],
-  afternoon: [
-    { text: "Education is not the filling of a pail, but the lighting of a fire.", author: "William Butler Yeats" },
-    { text: "Teaching is the one profession that creates all other professions.", author: "Unknown" },
-    { text: "The roots of education are bitter, but the fruit is sweet.", author: "Aristotle" },
-    { text: "Intelligence plus character — that is the goal of true education.", author: "Martin Luther King Jr." },
-    { text: "The great teacher inspires.", author: "William Arthur Ward" },
-  ],
-  evening: [
-    { text: "What we learn with pleasure we never forget.", author: "Alfred Mercier" },
-    { text: "The dream begins with a teacher who believes in you.", author: "Dan Rather" },
-    { text: "An investment in knowledge pays the best interest.", author: "Benjamin Franklin" },
-    { text: "Learning never exhausts the mind.", author: "Leonardo da Vinci" },
-    { text: "Develop a passion for learning. If you do, you will never cease to grow.", author: "Anthony J. D'Angelo" },
-  ],
-}
-
-const getPersonalizedQuote = (hour: number, firstName: string) => {
-  let quoteSet = quotes.morning
-  if (hour >= 12 && hour < 17) quoteSet = quotes.afternoon
-  if (hour >= 17) quoteSet = quotes.evening
-
-  const dayOfMonth = new Date().getDate()
-  const index = dayOfMonth % quoteSet.length
-  const quote = quoteSet[index]
-  
-  return {
-    text: quote.text.replace(/you/g, firstName),
-    author: quote.author
+// Nigerian Language Pack — Greetings + Culturally Relevant Quotes
+interface LanguagePack {
+  language: string
+  flag: string
+  morning: string
+  afternoon: string
+  evening: string
+  emoji: string
+  quote: {
+    text: string
+    translation: string
+    author: string
   }
 }
+
+const NIGERIAN_LANGUAGES: LanguagePack[] = [
+  {
+    language: 'English',
+    flag: '🇳🇬',
+    morning: 'Good morning',
+    afternoon: 'Good afternoon',
+    evening: 'Good evening',
+    emoji: '🌅',
+    quote: {
+      text: 'A good teacher is like a candle — it consumes itself to light the way for others.',
+      translation: '',
+      author: 'Mustafa Kemal Atatürk'
+    }
+  },
+  {
+    language: 'Yoruba',
+    flag: '🪘',
+    morning: 'Ẹ káàrọ̀',
+    afternoon: 'Ẹ káàsán',
+    evening: 'Ẹ káalẹ́',
+    emoji: '🙌🏾',
+    quote: {
+      text: 'Bí a bá ń gun igi, à máa wo ìsàlẹ̀.',
+      translation: 'When climbing a tree, always look down to maintain balance.',
+      author: 'Yoruba Proverb'
+    }
+  },
+  {
+    language: 'Igbo',
+    flag: '🥁',
+    morning: 'Ụtụtụ ọma',
+    afternoon: 'Ehihie ọma',
+    evening: 'Mgbede ọma',
+    emoji: '☀️',
+    quote: {
+      text: 'Onye kwe, Chi ya ekwe.',
+      translation: 'If one agrees, their personal god agrees too.',
+      author: 'Igbo Proverb'
+    }
+  },
+  {
+    language: 'Hausa',
+    flag: '🕌',
+    morning: 'Ina kwana',
+    afternoon: 'Barka da rana',
+    evening: 'Barka da yamma',
+    emoji: '🌙',
+    quote: {
+      text: 'Ilimi gishirin zuciya ne.',
+      translation: 'Knowledge is the salt of the mind.',
+      author: 'Hausa Proverb'
+    }
+  },
+  {
+    language: 'Pidgin',
+    flag: '🤝🏾',
+    morning: 'How body this morning?',
+    afternoon: 'How afternoon dey go?',
+    evening: 'How evening dey run?',
+    emoji: '🤜🏾',
+    quote: {
+      text: 'No condition is permanent, better days dey come.',
+      translation: 'Nothing lasts forever; better days are ahead.',
+      author: 'Nigerian Street Wisdom'
+    }
+  },
+  {
+    language: 'Efik/Ibibio',
+    flag: '🌴',
+    morning: 'Mmesiere',
+    afternoon: 'Idem mfo?',
+    evening: 'Amesiere',
+    emoji: '🌴',
+    quote: {
+      text: 'Ifiọk edi inyene oro owo mîkemeke ndibô.',
+      translation: 'Wisdom is a wealth that cannot be stolen.',
+      author: 'Efik Proverb'
+    }
+  },
+  {
+    language: 'Edo (Bini)',
+    flag: '👑',
+    morning: 'Vbènyà ówiè',
+    afternoon: 'Kóyo ùghọ̀nvbé',
+    evening: 'Kóyo ótá',
+    emoji: '👑',
+    quote: {
+      text: 'Ẹbẹ ne ọ yan ne ọ gha ló.',
+      translation: 'What is written on your palm, you will experience in life.',
+      author: 'Benin (Edo) Proverb'
+    }
+  },
+  {
+    language: 'Fulfulde (Fulani)',
+    flag: '🐄',
+    morning: 'Jam waali',
+    afternoon: 'Jam weeti',
+    evening: 'Jam hiiri',
+    emoji: '🪔',
+    quote: {
+      text: 'Ganndal ɓuri jawdi.',
+      translation: 'Knowledge is better than wealth.',
+      author: 'Fulfulde Proverb'
+    }
+  },
+  {
+    language: 'Tiv',
+    flag: '🌾',
+    morning: 'M sugh u iyange',
+    afternoon: 'M sugh u iyange na mimi',
+    evening: 'M sugh u ityôgh',
+    emoji: '🌾',
+    quote: {
+      text: 'Fan kwagh ka ngu i i vihi ga.',
+      translation: 'Wisdom is something that never spoils.',
+      author: 'Tiv Proverb'
+    }
+  },
+  {
+    language: 'Nupe',
+    flag: '🎋',
+    morning: 'A gaba o',
+    afternoon: 'A chenchin',
+    evening: 'A kyeta o',
+    emoji: '🎋',
+    quote: {
+      text: 'Agbara kpata zhi efo gan.',
+      translation: 'Patience is the key to a peaceful life.',
+      author: 'Nupe Proverb'
+    }
+  },
+  {
+    language: 'Kanuri',
+    flag: '🐫',
+    morning: 'Ndaro',
+    afternoon: 'Ndaro kaure',
+    evening: 'Ndaro bariga',
+    emoji: '🐫',
+    quote: {
+      text: 'Karangenyi ye tanda-ro.',
+      translation: 'Learning has no end.',
+      author: 'Kanuri Proverb'
+    }
+  },
+  {
+    language: 'Ijaw',
+    flag: '🚣🏾',
+    morning: 'Ebi mienemi',
+    afternoon: 'Ebi mien seimi',
+    evening: 'Ebi mien koromo',
+    emoji: '🌊',
+    quote: {
+      text: 'Beni oyinbo kiri timi ye ye.',
+      translation: 'The one who knows the river never drowns.',
+      author: 'Ijaw Proverb'
+    }
+  }
+]
 
 export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBannerProps) {
   const [currentTime, setCurrentTime] = useState<Date>(new Date())
   const [sessionStart, setSessionStart] = useState<Date | null>(null)
+  const [langIndex, setLangIndex] = useState<number>(0)
 
-  // ✅ No mounted state - just initialize immediately
+  // Track session timer & dynamic clock
   useEffect(() => {
-    // Session timer
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       setSessionStart(new Date(stored))
@@ -109,24 +241,42 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
       setSessionStart(start)
     }
 
-    // Live clock — updates every second
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
 
-  // Clear session on logout/page close
+  // Rotate through Nigerian languages every 6 seconds
+  useEffect(() => {
+    const rotator = setInterval(() => {
+      setLangIndex((prev) => (prev + 1) % NIGERIAN_LANGUAGES.length)
+    }, 6000)
+    return () => clearInterval(rotator)
+  }, [])
+
+  // Clear session on page close
   useEffect(() => {
     const handleClear = () => localStorage.removeItem(STORAGE_KEY)
     window.addEventListener('beforeunload', handleClear)
     return () => window.removeEventListener('beforeunload', handleClear)
   }, [])
 
-  const getGreeting = useCallback(() => {
+  // Current Active Language Pack
+  const activeLang = NIGERIAN_LANGUAGES[langIndex]
+
+  // Match time of day to proper greeting phrase
+  const currentGreeting = useMemo(() => {
     const hour = currentTime.getHours()
-    if (hour < 12) return { text: 'Good morning', emoji: '🌅' }
-    if (hour < 17) return { text: 'Good afternoon', emoji: '☀️' }
-    return { text: 'Good evening', emoji: '🌙' }
-  }, [currentTime])
+    let phrase = activeLang.morning
+    if (hour >= 12 && hour < 17) phrase = activeLang.afternoon
+    if (hour >= 17) phrase = activeLang.evening
+
+    return {
+      phrase,
+      language: activeLang.language,
+      flag: activeLang.flag,
+      emoji: activeLang.emoji
+    }
+  }, [currentTime, activeLang])
 
   const firstName = (profile?.full_name || profile?.name || 'Teacher').split(' ')[0]
 
@@ -159,184 +309,204 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
     return `${h}:${m}:${s}`
   }, [currentTime, sessionStart])
 
-  const quote = useMemo(() => {
-    return getPersonalizedQuote(currentTime.getHours(), firstName)
-  }, [currentTime, firstName])
-
   const pendingGrading = stats?.pendingGrading || 0
-  const greeting = getGreeting()
   const weekDisplay = termInfo?.displayWeek || (termInfo ? `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}` : '')
   const roleDisplay = profile?.role === 'admin' ? 'Administrator' : profile?.role === 'staff' || profile?.role === 'teacher' ? 'Teacher' : profile?.role || 'Staff'
-
-  // ✅ No loading check - render immediately with default/empty values
-  // The parent component handles all loading states
 
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-4 sm:p-5 md:p-6 lg:p-8 text-white shadow-2xl mb-6 sm:mb-8"
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-4 sm:p-5 md:p-6 lg:p-8 text-white shadow-2xl mb-6 sm:mb-8 border border-slate-800"
       suppressHydrationWarning
     >
-      {/* Background Accents */}
-      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-amber-500/10 to-orange-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
+      {/* Background Neon Glow Accents */}
+      <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-3xl" />
+      <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-3xl" />
 
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
-        <div className="flex-1">
-          {/* Date & Week Badge Row */}
-          <div className="flex flex-wrap items-center gap-2 mb-2 sm:mb-3">
-            <span className="text-xl sm:text-2xl">{greeting.emoji}</span>
-            <span className="text-xs sm:text-sm font-medium bg-white/15 px-2 sm:px-3 py-1 rounded-full backdrop-blur-sm text-white">
+        <div className="flex-1 w-full">
+          {/* Top Info Badges Row */}
+          <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
+            <span className="text-sm font-medium bg-white/10 dark:bg-white/5 px-3 py-1 rounded-full backdrop-blur-sm text-slate-200 border border-white/10">
               {formattedDate}
             </span>
-            {/* Live Clock */}
-            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-cyan-400/10 px-2 sm:px-3 py-1 rounded-full text-cyan-200 border border-cyan-400/20">
-              <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-blue-500/10 px-3 py-1 rounded-full text-blue-300 border border-blue-500/20">
+              <Clock className="h-3.5 w-3.5" />
               {formattedTime}
             </span>
-            {/* Session Timer */}
-            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/10 px-2 sm:px-3 py-1 rounded-full text-blue-200">
-              <Timer className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/5 px-3 py-1 rounded-full text-indigo-300 border border-white/5">
+              <Timer className="h-3.5 w-3.5" />
               {onlineDuration}
             </span>
-            {/* Week Badge */}
             {weekDisplay && (
-              <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium bg-amber-400/10 px-2 sm:px-3 py-1 rounded-full text-amber-200 border border-amber-400/20">
-                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+              <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium bg-amber-500/10 px-3 py-1 rounded-full text-amber-300 border border-amber-500/20">
+                <Calendar className="h-3.5 w-3.5" />
                 {weekDisplay}
               </span>
             )}
           </div>
 
-          {/* Main Greeting */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-1 sm:mb-2 text-white drop-shadow-sm">
-            {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
-          </h1>
+          {/* Dynamic Multi-Language Greeting */}
+          <div className="min-h-[50px] sm:min-h-[60px] flex flex-col justify-center mb-3">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={langIndex}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex items-center flex-wrap gap-2 sm:gap-3"
+              >
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white">
+                  <span>{currentGreeting.phrase}</span>,{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-amber-200">
+                    {firstName}
+                  </span>
+                  <span className="ml-2 inline-block animate-bounce">{currentGreeting.emoji}</span>
+                </h1>
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-semibold tracking-wider uppercase text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md self-center">
+                  <Globe2 className="h-3 w-3" />
+                  {currentGreeting.language}
+                </span>
+              </motion.div>
+            </AnimatePresence>
+          </div>
 
-          {/* Personalized Quote */}
-          {quote.text && (
-            <div className="flex items-start gap-2 mb-3 sm:mb-4 max-w-2xl">
-              <Quote className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-400/60 shrink-0 mt-0.5 sm:mt-1" />
+          {/* Dynamic Culturally Relevant Proverb Quote */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`quote-${langIndex}`}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="flex items-start gap-2 mb-4 max-w-2xl"
+            >
+              <Quote className="h-4 w-4 text-amber-400/70 shrink-0 mt-1" />
               <div>
-                <p className="text-gray-200 text-xs sm:text-sm md:text-base italic leading-relaxed line-clamp-2">
-                  &ldquo;{quote.text}&rdquo;
+                <p className="text-gray-200 text-xs sm:text-sm italic leading-relaxed font-medium">
+                  &ldquo;{activeLang.quote.text}&rdquo;
                 </p>
-                <p className="text-[10px] sm:text-xs text-slate-400 mt-0.5 sm:mt-1 font-medium">
-                  — {quote.author}
+                {activeLang.quote.translation && (
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1 italic">
+                    &rarr; {activeLang.quote.translation}
+                  </p>
+                )}
+                <p className="text-[10px] text-amber-300/60 mt-1 font-medium">
+                  — {activeLang.quote.author}
                 </p>
               </div>
-            </div>
-          )}
+            </motion.div>
+          </AnimatePresence>
 
-          {/* Badges */}
-          <div className="flex flex-wrap gap-1.5 sm:gap-2">
-            <Badge className="bg-white/15 text-white border-0 text-xs sm:text-sm">
-              <GraduationCap className="h-3 w-3 mr-1" />
+          {/* Secondary Role and Department Badges */}
+          <div className="flex flex-wrap gap-2">
+            <Badge className="bg-slate-800 text-slate-200 border border-slate-700 text-xs px-2.5 py-1">
+              <GraduationCap className="h-3.5 w-3.5 mr-1 text-blue-400" />
               {profile?.department || 'General Department'}
             </Badge>
-            <Badge className="bg-white/15 text-white border-0 text-xs sm:text-sm">
-              <Sparkles className="h-3 w-3 mr-1" />
+            <Badge className="bg-slate-800 text-slate-200 border border-slate-700 text-xs px-2.5 py-1">
+              <Sparkles className="h-3.5 w-3.5 mr-1 text-amber-400" />
               {roleDisplay}
             </Badge>
           </div>
         </div>
 
-        {/* Avatar */}
-        <div className="relative group hidden sm:block">
-          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 ring-4 ring-white/20 shadow-xl">
-            <AvatarImage src={profile?.photo_url || profile?.avatar_url || undefined} />
-            <AvatarFallback className="bg-gradient-to-br from-amber-500 to-orange-600 text-white text-2xl sm:text-3xl font-bold">
+        {/* Profile Avatar Card */}
+        <div className="relative group hidden sm:block shrink-0">
+          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 ring-4 ring-slate-800/80 shadow-2xl transition-transform duration-300 group-hover:scale-105">
+            <AvatarImage src={profile?.photo_url || profile?.avatar_url || undefined} className="object-cover" />
+            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-800 text-white text-2xl sm:text-3xl font-bold">
               {getInitials()}
             </AvatarFallback>
           </Avatar>
-          <div className="absolute -bottom-2 -right-2 w-5 h-5 sm:w-6 sm:h-6 bg-emerald-500 rounded-full ring-2 ring-white flex items-center justify-center">
-            <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 bg-white rounded-full animate-pulse" />
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-emerald-500 rounded-full ring-4 ring-slate-900 flex items-center justify-center">
+            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white rounded-full animate-pulse" />
           </div>
         </div>
       </div>
 
       {/* Pending Grading Alert */}
       {pendingGrading > 0 && (
-        <div className="relative z-10 mt-3 sm:mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-2.5 sm:p-3 flex items-center gap-2 sm:gap-3">
-          <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400 shrink-0" />
+        <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3">
+          <Flame className="h-5 w-5 text-amber-400 shrink-0 animate-pulse" />
           <div>
             <p className="text-xs sm:text-sm text-amber-200 font-medium">
-              {pendingGrading} submission{pendingGrading !== 1 ? 's' : ''} waiting for grading
+              You have {pendingGrading} submission{pendingGrading !== 1 ? 's' : ''} awaiting grading.
             </p>
-            <p className="text-[10px] sm:text-xs text-amber-300/80">Review and grade pending theory submissions</p>
+            <p className="text-[10px] sm:text-xs text-amber-300/60">Take a moment to review and submit student grades.</p>
           </div>
         </div>
       )}
 
-      {/* Stats Section */}
-      <div className="relative z-10 mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-white/15">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-
-          <div className="group cursor-default bg-white/5 rounded-xl p-2.5 sm:p-3 hover:bg-white/10 transition-colors">
+      {/* Mini Dashboard Metrics Stats Row */}
+      <div className="relative z-10 mt-6 pt-4 border-t border-slate-800/80">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-blue-300 transition-colors">
                 {stats?.publishedExams || 0}
               </p>
-              <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-300 opacity-60" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 opacity-80" />
             </div>
-            <p className="text-[10px] sm:text-xs md:text-sm text-gray-300">Published Exams</p>
+            <p className="text-xs text-slate-400">Published Exams</p>
           </div>
 
-          <div className="group cursor-default bg-white/5 rounded-xl p-2.5 sm:p-3 hover:bg-white/10 transition-colors">
+          <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-blue-300 transition-colors">
                 {stats?.activeStudents || stats?.totalStudents || 0}
               </p>
-              <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-300 opacity-60" />
+              <Users className="h-5 w-5 text-blue-400 opacity-80" />
             </div>
-            <p className="text-[10px] sm:text-xs md:text-sm text-gray-300">Active Students</p>
+            <p className="text-xs text-slate-400">Active Students</p>
           </div>
 
-          <div className="group cursor-default bg-white/5 rounded-xl p-2.5 sm:p-3 hover:bg-white/10 transition-colors">
+          <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               <p className={cn(
                 "text-xl sm:text-2xl md:text-3xl font-bold transition-colors",
-                pendingGrading > 0 ? "text-amber-300" : "text-white group-hover:text-amber-200"
+                pendingGrading > 0 ? "text-amber-300" : "text-white group-hover:text-blue-300"
               )}>
                 {pendingGrading}
               </p>
               {pendingGrading > 0 ? (
-                <Flame className="h-4 w-4 sm:h-5 sm:w-5 text-amber-300 opacity-60" />
+                <Flame className="h-5 w-5 text-amber-400 opacity-80 animate-pulse" />
               ) : (
-                <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-slate-400 opacity-60" />
+                <CheckCircle2 className="h-5 w-5 text-slate-500 opacity-80" />
               )}
             </div>
             <p className={cn(
-              "text-[10px] sm:text-xs md:text-sm",
-              pendingGrading > 0 ? "text-amber-200" : "text-gray-300"
+              "text-xs",
+              pendingGrading > 0 ? "text-amber-400" : "text-slate-400"
             )}>
               Pending Grading
             </p>
           </div>
 
-          <div className="group cursor-default bg-white/5 rounded-xl p-2.5 sm:p-3 hover:bg-white/10 transition-colors">
+          <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-blue-300 transition-colors">
                 {stats?.averagePerformance || 0}%
               </p>
-              <Award className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-300 opacity-60" />
+              <Award className="h-5 w-5 text-amber-300 opacity-80" />
             </div>
-            <p className="text-[10px] sm:text-xs md:text-sm text-gray-300">Avg Performance</p>
+            <p className="text-xs text-slate-400">Avg Performance</p>
           </div>
         </div>
 
-        {/* Term Progress Bar */}
+        {/* Dynamic Week Progress Bar */}
         {termInfo && termInfo.currentWeek > 0 && (
-          <div className="mt-3 sm:mt-4">
+          <div className="mt-4">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] sm:text-xs text-gray-300">{termInfo.termName} Progress</span>
-              <span className="text-[10px] sm:text-xs text-gray-300">{weekDisplay}</span>
+              <span className="text-xs text-slate-400">{termInfo.termName} Progress</span>
+              <span className="text-xs text-slate-300">{weekDisplay}</span>
             </div>
-            <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-amber-400 to-amber-500 rounded-full transition-all duration-700"
+                className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-indigo-600 rounded-full transition-all duration-700"
                 style={{ width: `${termInfo.weekProgress}%` }}
               />
             </div>

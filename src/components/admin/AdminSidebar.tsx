@@ -1,4 +1,4 @@
-// components/admin/AdminSidebar.tsx
+/* eslint-disable react/no-unescaped-entities */
 'use client'
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
@@ -9,12 +9,14 @@ import {
   LayoutDashboard, Users, MonitorPlay, FileCheck, Activity,
   LogOut, ChevronLeft, ChevronRight, Settings, HelpCircle,
   GraduationCap, Briefcase, MessageSquare, BookOpen, Megaphone,
-  Bell, School, UserCog
+  Bell, School, Globe2
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
   AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
@@ -163,43 +165,47 @@ export function AdminSidebar({
         key={item.id}
         onClick={() => handleNavClick(item.id, item.routePatterns)}
         className={cn(
-          "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full group relative overflow-hidden",
+          "flex items-center gap-3 px-3 py-3 rounded-xl transition-all w-full group relative overflow-hidden my-0.5",
           isActive 
-            ? "bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-500/25" 
-            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800",
+            ? "bg-gradient-to-r from-purple-600 via-purple-500 to-indigo-500 text-white shadow-md shadow-purple-500/10 font-semibold" 
+            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60",
           collapsed ? "justify-center" : ""
         )}
       >
+        {isActive && !collapsed && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full" />
+        )}
+
+        {!isActive && (
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500/0 to-indigo-500/0 group-hover:from-purple-500/5 group-hover:to-indigo-500/5 transition-all duration-500" />
+        )}
+        
         <Icon className={cn(
-          "h-5 w-5 shrink-0 transition-all duration-300",
-          isActive ? "text-white" : "group-hover:scale-110 group-hover:text-purple-600"
+          "h-5 w-5 shrink-0 transition-transform duration-300",
+          isActive ? "text-white" : "text-slate-500 dark:text-slate-400 group-hover:scale-110 group-hover:text-purple-600 dark:group-hover:text-purple-400"
         )} />
         
         {!collapsed && (
           <div className="flex-1 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium block">{item.name}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium tracking-wide block">{item.name}</span>
               {item.badge && item.badge > 0 && (
-                <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 animate-pulse">
+                <Badge className="bg-red-500 text-white text-[9px] px-1.5 py-0.5 animate-pulse border-none">
                   {item.badge}
                 </Badge>
               )}
             </div>
             <span className={cn(
-              "text-xs block truncate",
-              isActive ? "text-purple-100" : "text-slate-400 dark:text-slate-500"
+              "text-[10px] block truncate mt-0.5 tracking-tight",
+              isActive ? "text-purple-50/80" : "text-slate-400 dark:text-slate-500"
             )}>
               {item.description}
             </span>
           </div>
         )}
         
-        {collapsed && isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-white rounded-r-full" />
-        )}
-        
         {collapsed && item.badge && item.badge > 0 && (
-          <div className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-[9px] rounded-full flex items-center justify-center">
+          <div className="absolute top-1 right-1 h-4 w-4 bg-red-500 text-white text-[8px] rounded-full flex items-center justify-center animate-pulse font-bold">
             {item.badge}
           </div>
         )}
@@ -208,22 +214,28 @@ export function AdminSidebar({
 
     if (collapsed) {
       return (
-        <div key={item.id} className="relative">
-          <div className="tooltip-wrapper" data-tip={`${item.name} - ${item.description}`}>
+        <Tooltip key={item.id} delayDuration={0}>
+          <TooltipTrigger asChild>
             {buttonContent}
-          </div>
-        </div>
+          </TooltipTrigger>
+          <TooltipContent side="right" className="ml-2 bg-slate-900 text-white border border-slate-800">
+            <div>
+              <p className="font-semibold text-xs">{item.name}</p>
+              <p className="text-[10px] text-slate-400">{item.description}</p>
+            </div>
+          </TooltipContent>
+        </Tooltip>
       )
     }
 
-    return buttonContent
+    return buttonContent;
   }, [activeTab, collapsed, handleNavClick])
 
   // Group navigation items with a separator
   const navigationGroups = useMemo(() => {
-    const mainGroup = primaryNavigation.slice(0, 4) // Overview, Notifications, Announcements, Broad Sheet
-    const managementGroup = primaryNavigation.slice(4, 7) // Students, Staff, Teacher Classes
-    const academicGroup = primaryNavigation.slice(7) // Exams, Report Cards, Inquiries, Live Monitor
+    const mainGroup = primaryNavigation.slice(0, 4) 
+    const managementGroup = primaryNavigation.slice(4, 7) 
+    const academicGroup = primaryNavigation.slice(7) 
     
     return { mainGroup, managementGroup, academicGroup }
   }, [primaryNavigation])
@@ -233,154 +245,182 @@ export function AdminSidebar({
   return (
     <>
       <aside className={cn(
-        "hidden lg:flex flex-col fixed left-0 top-[4.5rem] z-30 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800",
-        "h-[calc(100vh-4.5rem)] overflow-y-auto",
+        "hidden lg:flex flex-col fixed left-0 top-[4.5rem] z-30 transition-all duration-300 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-r border-slate-200 dark:border-slate-800/80 shadow-sm",
+        "h-[calc(100vh-4.5rem)]",
         collapsed ? "w-20" : "w-72"
       )}>
-        <div className="flex flex-col h-full">
-          {/* Profile Section */}
-          <div className={cn(
-            "shrink-0 border-b border-slate-200 dark:border-slate-800",
-            "bg-gradient-to-b from-purple-50/50 via-white to-transparent dark:from-purple-950/20 dark:via-slate-900",
-            collapsed ? "px-2 py-4 flex justify-center" : "px-5 py-5"
-          )}>
-            {collapsed ? (
-              <Avatar className="h-12 w-12 ring-2 ring-white shadow-xl cursor-pointer" title={displayName}>
-                <AvatarImage src={profile?.photo_url} />
-                <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white">
-                  {initials}
-                </AvatarFallback>
-              </Avatar>
-            ) : (
-              <div className="space-y-4 w-full">
-                <div className="flex items-center gap-4">
-                  <Avatar className="h-16 w-16 ring-3 ring-white shadow-xl">
-                    <AvatarImage src={profile?.photo_url} />
-                    <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white text-xl">
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase tracking-wide">
-                      Welcome back,
-                    </p>
-                    <h3 className="font-bold text-slate-900 dark:text-white text-lg truncate">
-                      {firstName}!
-                    </h3>
-                  </div>
+        <TooltipProvider>
+          <ScrollArea className="h-full scrollbar-none">
+            <div className="flex flex-col h-full justify-between pb-4">
+              <div>
+                {/* Profile Section */}
+                <div className={cn(
+                  "shrink-0 border-b border-slate-100 dark:border-slate-800/80",
+                  "bg-gradient-to-b from-purple-50/30 via-transparent to-transparent dark:from-purple-950/10 dark:via-transparent dark:to-transparent",
+                  collapsed ? "px-2 py-4 flex justify-center" : "px-5 py-5"
+                )}>
+                  {collapsed ? (
+                    <Avatar className="h-12 w-12 ring-2 ring-purple-500/20 dark:ring-purple-500/10 shadow-md cursor-pointer" title={displayName}>
+                      <AvatarImage src={profile?.photo_url} />
+                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-bold text-base">
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                  ) : (
+                    <div className="space-y-4 w-full">
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-14 w-14 ring-2 ring-purple-500/20 dark:ring-purple-500/10 shadow-lg">
+                          <AvatarImage src={profile?.photo_url} />
+                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-indigo-600 text-white font-bold text-lg">
+                            {initials}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 uppercase tracking-wider">
+                            Welcome back,
+                          </p>
+                          <h3 className="font-bold text-slate-800 dark:text-white text-base leading-tight truncate mt-0.5">
+                            {firstName}!
+                          </h3>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{profile?.email}</p>
+                        <Badge className="mt-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-[9px] shadow-sm font-semibold">
+                          Administrator
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{profile?.email}</p>
-                  <Badge className="mt-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-                    Administrator
-                  </Badge>
+
+                {/* Primary Navigation - Group 1: Overview & Communications */}
+                <div className="px-3 py-3 space-y-0.5">
+                  {!collapsed && (
+                    <p className="px-3 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                      Dashboard
+                    </p>
+                  )}
+                  {navigationGroups.mainGroup.map(renderNavItem)}
+                </div>
+
+                {!collapsed && <Separator className="mx-3 my-2 bg-slate-100 dark:bg-slate-800/80" />}
+
+                {/* Primary Navigation - Group 2: Management */}
+                <div className="px-3 py-1 space-y-0.5">
+                  {!collapsed && (
+                    <p className="px-3 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                      Management
+                    </p>
+                  )}
+                  {navigationGroups.managementGroup.map(renderNavItem)}
+                </div>
+
+                {!collapsed && <Separator className="mx-3 my-2 bg-slate-100 dark:bg-slate-800/80" />}
+
+                {/* Primary Navigation - Group 3: Academic */}
+                <div className="px-3 py-1 space-y-0.5">
+                  {!collapsed && (
+                    <p className="px-3 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                      Academic
+                    </p>
+                  )}
+                  {navigationGroups.academicGroup.map(renderNavItem)}
+                </div>
+
+                {!collapsed && <Separator className="mx-3 my-2 bg-slate-100 dark:bg-slate-800/80" />}
+
+                {/* Secondary Navigation */}
+                <div className="px-3 py-1 space-y-0.5">
+                  {!collapsed && (
+                    <p className="px-3 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+                      Account
+                    </p>
+                  )}
+                  {secondaryNavigation.map(renderNavItem)}
                 </div>
               </div>
-            )}
-          </div>
 
-          {/* Primary Navigation - Group 1: Overview & Communications */}
-          <div className="px-3 py-3 space-y-1">
-            {!collapsed && (
-              <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                Dashboard
-              </p>
-            )}
-            {navigationGroups.mainGroup.map(renderNavItem)}
-          </div>
-
-          {!collapsed && <Separator className="mx-3" />}
-
-          {/* Primary Navigation - Group 2: Management */}
-          <div className="px-3 py-3 space-y-1">
-            {!collapsed && (
-              <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                Management
-              </p>
-            )}
-            {navigationGroups.managementGroup.map(renderNavItem)}
-          </div>
-
-          {!collapsed && <Separator className="mx-3" />}
-
-          {/* Primary Navigation - Group 3: Academic */}
-          <div className="px-3 py-3 space-y-1">
-            {!collapsed && (
-              <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                Academic
-              </p>
-            )}
-            {navigationGroups.academicGroup.map(renderNavItem)}
-          </div>
-
-          {!collapsed && <Separator className="mx-3 my-2" />}
-
-          {/* Secondary Navigation */}
-          <div className="px-3 py-3 space-y-1">
-            {!collapsed && (
-              <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">
-                Account
-              </p>
-            )}
-            {secondaryNavigation.map(renderNavItem)}
-          </div>
-
-          {/* Sign Out Button */}
-          <div className="shrink-0 p-3 mt-2 border-t border-slate-200 dark:border-slate-800">
-            <Button
-              variant="ghost"
-              onClick={handleLogoutClick}
-              className={cn(
-                "text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20",
-                collapsed ? "w-full justify-center px-2" : "w-full justify-start"
-              )}
-            >
-              <div className={cn(
-                "flex items-center",
-                collapsed ? "gap-0" : "gap-3"
-              )}>
-                <div className={cn(
-                  "h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/20 flex items-center justify-center",
-                  collapsed ? "mx-0" : ""
-                )}>
-                  <LogOut className="h-4 w-4 shrink-0 text-red-600" />
-                </div>
-                {!collapsed && (
-                  <div className="flex-1 text-left">
-                    <span className="text-sm font-medium block">Sign Out</span>
-                    <span className="text-[10px] text-slate-400 block">End your session</span>
-                  </div>
+              {/* Sign Out Button */}
+              <div className="shrink-0 p-3 mt-4 border-t border-slate-100 dark:border-slate-800/80">
+                {collapsed ? (
+                  <Tooltip delayDuration={0}>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        onClick={handleLogoutClick}
+                        className="w-full justify-center h-10 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 group rounded-xl transition-all"
+                      >
+                        <LogOut className="h-5 w-5 shrink-0 transition-transform group-hover:scale-110" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="ml-2 bg-slate-900 text-white border border-slate-800">
+                      <p className="font-semibold text-xs">Sign Out</p>
+                      <p className="text-[10px] text-slate-400">End secure session</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    onClick={handleLogoutClick}
+                    className="w-full justify-start h-12 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 group rounded-xl transition-all p-2"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/20 flex items-center justify-center group-hover:bg-red-100 dark:group-hover:bg-red-950/40 transition-colors shrink-0">
+                        <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <span className="text-sm font-semibold block leading-none">Sign Out</span>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate mt-1">
+                          End secure session
+                        </span>
+                      </div>
+                    </div>
+                  </Button>
                 )}
               </div>
-            </Button>
-          </div>
+            </div>
+          </ScrollArea>
 
-          <div className="h-4" />
-        </div>
-
-        {/* Collapse Toggle */}
-        <button
-          onClick={onToggle}
-          className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 shadow-md hover:shadow-lg transition-all z-50"
-        >
-          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
-        </button>
+          {/* Collapse Toggle */}
+          <button
+            onClick={onToggle}
+            className="absolute -right-3.5 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full p-2 shadow-md hover:shadow-lg transition-all flex items-center justify-center hover:scale-105 group z-50 ring-2 ring-purple-500/10"
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full opacity-0 group-hover:opacity-10 transition-opacity" />
+            {collapsed ? (
+              <ChevronRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-purple-600 transition-colors" />
+            ) : (
+              <ChevronLeft className="h-3.5 w-3.5 text-slate-500 group-hover:text-purple-600 transition-colors" />
+            )}
+          </button>
+        </TooltipProvider>
       </aside>
 
       {/* Sign Out Confirmation Dialog */}
       <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-2xl max-w-md border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <AlertDialogHeader>
-            <AlertDialogTitle>Sign Out?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to sign out of your account?
+            <AlertDialogTitle className="text-xl flex items-center gap-2.5 font-bold">
+              <div className="h-9 w-9 rounded-full bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+                <LogOut className="h-5 w-5 text-red-600 dark:text-red-400" />
+              </div>
+              Sign Out?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-slate-500 dark:text-slate-400 text-sm">
+              Are you sure you want to sign out of your account? You will need to re-authenticate to review system diagnostics or approve report cards.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSignOut} className="bg-red-600 hover:bg-red-700">
-              Sign Out
+          <AlertDialogFooter className="gap-2 pt-2">
+            <AlertDialogCancel className="rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmSignOut} 
+              className="rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-md shadow-red-500/10 font-medium"
+            >
+              <LogOut className="mr-2 h-4 w-4" />Sign Out
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

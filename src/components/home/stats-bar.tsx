@@ -2,8 +2,8 @@
 
 import { Container } from '@/components/layout/container'
 import { Award, Users, GraduationCap, CheckCircle2, Star, Heart, LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-// Define strict types
 type AccentType = 'gold' | 'red'
 
 interface StatItem {
@@ -78,18 +78,18 @@ const accentStyles: Record<AccentType, {
 
 export function StatsBar() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-[#081B5C] via-[#0A2472] to-[#153E90] py-16 text-white sm:py-20 lg:py-24">
+    <section className="relative overflow-hidden bg-gradient-to-br from-[#081B5C] via-[#0A2472] to-[#153E90] dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 py-16 text-white sm:py-20 lg:py-24 transition-colors duration-300">
       {/* Background texture */}
-      <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-[0.035]" />
+      <div className="absolute inset-0 bg-[url('/images/grid.svg')] opacity-[0.035] dark:opacity-[0.05]" />
 
       {/* Premium soft glows */}
-      <div className="absolute -top-24 right-0 h-80 w-80 rounded-full bg-amber-300/10 blur-3xl" />
-      <div className="absolute -bottom-24 left-0 h-80 w-80 rounded-full bg-rose-300/10 blur-3xl" />
-      <div className="absolute inset-x-1/3 top-1/3 h-72 w-72 rounded-full bg-white/5 blur-3xl" />
+      <div className="absolute -top-24 right-0 h-80 w-80 rounded-full bg-amber-300/10 blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-24 left-0 h-80 w-80 rounded-full bg-rose-300/10 blur-3xl pointer-events-none" />
+      <div className="absolute inset-x-1/3 top-1/3 h-72 w-72 rounded-full bg-white/5 blur-3xl pointer-events-none" />
 
-      {/* Elegant border accents */}
-      <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 to-transparent" />
-      <div className="absolute left-0 right-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      {/* Border accents */}
+      <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/35 dark:via-slate-700 to-transparent" />
+      <div className="absolute left-0 right-0 bottom-0 h-px bg-gradient-to-r from-transparent via-white/10 dark:via-slate-800 to-transparent" />
 
       <Container className="relative px-4 sm:px-6">
         {/* Header */}
@@ -106,7 +106,7 @@ export function StatsBar() {
             Excellence You Can Measure
           </h3>
 
-          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-white/80 dark:text-slate-300 sm:text-base">
             A legacy of academic strength, trusted leadership, and student success that
             continues to shape the future.
           </p>
@@ -116,7 +116,7 @@ export function StatsBar() {
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 lg:gap-6">
           {stats.map((stat, index) => {
             const Icon = stat.icon
-            const style = accentStyles[stat.accent] // Now TypeScript knows stat.accent is 'gold' | 'red'
+            const style = accentStyles[stat.accent]
 
             return (
               <div
@@ -126,18 +126,16 @@ export function StatsBar() {
               >
                 <article
                   className={cn(
-                    'relative h-full overflow-hidden rounded-2xl border border-white/12 bg-white/[0.08] p-6 text-center backdrop-blur-md transition-all duration-300',
+                    'relative h-full overflow-hidden rounded-2xl border border-white/12 dark:border-slate-800 bg-white/[0.08] dark:bg-slate-900/60 p-6 text-center backdrop-blur-md transition-all duration-300',
                     'shadow-[0_10px_30px_rgba(0,0,0,0.18)]',
-                    'hover:-translate-y-1.5 hover:border-white/20 hover:bg-white/[0.11]',
+                    'hover:-translate-y-1.5 hover:border-white/20 dark:hover:border-slate-700 hover:bg-white/[0.11] dark:hover:bg-slate-800/80',
                     'ring-1 ring-transparent',
                     style.ring,
                     style.glow
                   )}
                 >
-                  {/* top shine */}
-                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent opacity-70" />
+                  <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 dark:via-slate-700 to-transparent opacity-70" />
 
-                  {/* icon */}
                   <div
                     className={cn(
                       'mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border shadow-md transition-all duration-300',
@@ -148,22 +146,18 @@ export function StatsBar() {
                     <Icon className={cn('h-7 w-7 transition-transform duration-300 group-hover:scale-110', style.icon)} />
                   </div>
 
-                  {/* value */}
                   <p className="mb-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">
                     {stat.value}
                   </p>
 
-                  {/* label */}
                   <p className="mb-1 text-sm font-semibold uppercase tracking-[0.14em] text-white">
                     {stat.label}
                   </p>
 
-                  {/* description */}
                   <p className={cn('text-xs leading-5 sm:text-sm', style.badge)}>
                     {stat.description}
                   </p>
 
-                  {/* accent divider */}
                   <div
                     className={cn(
                       'mx-auto mt-5 h-0.5 w-10 rounded-full bg-gradient-to-r transition-all duration-300 group-hover:w-16',
@@ -171,7 +165,6 @@ export function StatsBar() {
                     )}
                   />
 
-                  {/* subtle hover overlay */}
                   <div className="pointer-events-none absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                     <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] to-transparent" />
                   </div>
@@ -182,23 +175,21 @@ export function StatsBar() {
         </div>
 
         {/* Trust pill */}
-        <div className="mt-12 border-t border-white/10 pt-8 text-center">
-          <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-white/12 bg-white/[0.08] px-5 py-3 backdrop-blur-md shadow-[0_8px_24px_rgba(0,0,0,0.16)]">
+        <div className="mt-12 border-t border-white/10 dark:border-slate-800 pt-8 text-center">
+          <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-full border border-white/12 dark:border-slate-800 bg-white/[0.08] dark:bg-slate-900/60 px-5 py-3 backdrop-blur-md shadow-[0_8px_24px_rgba(0,0,0,0.16)]">
             <div className="flex items-center gap-1">
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              {[1, 2, 3, 4, 5].map((i) => (
+                <Star key={i} className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+              ))}
             </div>
 
-            <div className="hidden h-4 w-px bg-white/20 sm:block" />
+            <div className="hidden h-4 w-px bg-white/20 dark:bg-slate-700 sm:block" />
 
-            <p className="text-sm text-white/85">
+            <p className="text-sm text-white/85 dark:text-slate-300">
               <span className="font-bold text-amber-200">98%</span> of parents recommend Vincollins
             </p>
 
-            <div className="hidden h-4 w-px bg-white/20 sm:block" />
+            <div className="hidden h-4 w-px bg-white/20 dark:bg-slate-700 sm:block" />
 
             <Heart className="h-4 w-4 text-rose-300" />
           </div>
@@ -206,8 +197,4 @@ export function StatsBar() {
       </Container>
     </section>
   )
-}
-
-function cn(...classes: (string | boolean | undefined)[]) {
-  return classes.filter(Boolean).join(' ')
 }

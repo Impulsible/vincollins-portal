@@ -1,5 +1,4 @@
-// src/components/student/exams/ExamDetails.tsx - FIXED VERSION
-
+// src/components/student/exams/ExamDetails.tsx - DARK MODE READY
 import { Clock, FileText, Award, Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -18,14 +17,12 @@ export function ExamDetails({
   passingPercentage,
   className,
 }: ExamDetailsProps) {
-  // ✅ Only show passing percentage if provided
   const details = [
     { icon: Clock, label: 'Duration', value: `${duration} min` },
     { icon: FileText, label: 'Questions', value: `${totalQuestions} Qs` },
     { icon: Award, label: 'Points', value: `${totalMarks} pts` },
   ]
 
-  // ✅ Add passing percentage only if it exists
   if (passingPercentage !== undefined && passingPercentage !== null) {
     details.push({ 
       icon: Target, 
@@ -40,8 +37,8 @@ export function ExamDetails({
       className
     )}>
       {details.map(({ icon: Icon, label, value }) => (
-        <div key={label} className="flex items-center gap-1.5 text-muted-foreground">
-          <Icon className="h-3.5 w-3.5 shrink-0" />
+        <div key={label} className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
+          <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400 dark:text-slate-500" />
           <span>{value}</span>
         </div>
       ))}

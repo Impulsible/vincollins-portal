@@ -1,4 +1,5 @@
-// app/student/announcements/page.tsx - CLEAN, NO REDUNDANCY (UPDATED)
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// app/student/announcements/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
@@ -20,17 +21,17 @@ const cachedHeaderUser = getCachedHeaderUser()
 // Loading Component
 function AnnouncementsLoadingScreen() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
       {/* Header placeholder */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] h-16 sm:h-[72px] flex items-center px-4 sm:px-6 lg:px-8">
+      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 border-b border-transparent dark:border-slate-800/80 h-16 sm:h-[72px] flex items-center px-4 sm:px-6 lg:px-8 transition-colors duration-300">
         <div className="flex items-center justify-between w-full max-w-[1440px] mx-auto">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/20 rounded animate-pulse" />
-            <div className="h-4 w-24 sm:h-5 sm:w-32 bg-white/20 rounded animate-pulse hidden sm:block" />
+            <div className="h-6 w-6 sm:h-8 sm:w-8 bg-white/20 dark:bg-slate-800/80 rounded animate-pulse" />
+            <div className="h-4 w-24 sm:h-5 sm:w-32 bg-white/20 dark:bg-slate-800/80 rounded animate-pulse hidden sm:block" />
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            <div className="h-8 w-8 sm:h-9 sm:w-9 bg-white/20 rounded-full animate-pulse" />
-            <div className="h-8 w-8 sm:h-9 sm:w-9 bg-white/20 rounded-full animate-pulse hidden sm:block" />
+            <div className="h-8 w-8 sm:h-9 sm:w-9 bg-white/20 dark:bg-slate-800/80 rounded-full animate-pulse" />
+            <div className="h-8 w-8 sm:h-9 sm:w-9 bg-white/20 dark:bg-slate-800/80 rounded-full animate-pulse hidden sm:block" />
           </div>
         </div>
       </div>
@@ -38,15 +39,15 @@ function AnnouncementsLoadingScreen() {
       <div className="flex items-center justify-center min-h-screen px-4 pt-16 sm:pt-[72px]">
         <div className="text-center">
           <div className="relative">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 border-3 sm:border-4 border-emerald-200 rounded-full animate-spin" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 border-3 sm:border-4 border-emerald-200 dark:border-emerald-900/60 rounded-full animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Megaphone className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-600" />
+              <Megaphone className="h-6 w-6 sm:h-7 sm:w-7 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="mt-3 sm:mt-4 text-slate-600 text-base sm:text-lg font-medium">
+          <p className="mt-3 sm:mt-4 text-slate-600 dark:text-slate-300 text-base sm:text-lg font-medium">
             Loading Announcements...
           </p>
-          <p className="mt-1 sm:mt-2 text-slate-500 text-xs sm:text-sm">
+          <p className="mt-1 sm:mt-2 text-slate-500 dark:text-slate-500 text-xs sm:text-sm">
             Fetching latest updates 📢
           </p>
         </div>
@@ -146,7 +147,7 @@ export default function StudentAnnouncementsPage() {
   if (contextUser.role?.toLowerCase() !== 'student') return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
       <Header user={headerUser} onLogout={handleLogout} />
       
       <div className="flex">
@@ -170,16 +171,16 @@ export default function StudentAnnouncementsPage() {
               <div className="max-w-6xl mx-auto">
                 
                 {/* Breadcrumb Navigation */}
-                <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
+                <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4 sm:mb-6">
                   <Link 
                     href="/student" 
-                    className="hover:text-emerald-600 transition-colors flex items-center gap-1"
+                    className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1"
                   >
                     <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     <span className="hidden sm:inline">Dashboard</span>
                   </Link>
-                  <ChevronRight className="h-3 w-3" />
-                  <span className="text-foreground font-medium">Announcements</span>
+                  <ChevronRight className="h-3 w-3 text-slate-400" />
+                  <span className="text-slate-800 dark:text-slate-200 font-medium">Announcements</span>
                 </nav>
 
                 {/* Back Button */}
@@ -188,7 +189,7 @@ export default function StudentAnnouncementsPage() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => router.push('/student')}
-                    className="h-8 text-xs"
+                    className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
                   >
                     <ArrowLeft className="mr-1.5 h-3 w-3" />
                     Back to Dashboard

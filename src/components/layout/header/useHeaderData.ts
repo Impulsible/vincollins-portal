@@ -1,7 +1,7 @@
-// components/layout/header/useHeaderData.ts - FINAL VERSION
+// components/layout/header/useHeaderData.ts - FINAL VERSION (FIXED GREETING)
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useUser } from '@/contexts/UserContext'
 import { HeaderUser, SchoolSettings, Notification, UserRole } from './types'
@@ -19,13 +19,25 @@ export function useHeaderData() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [mounted, setMounted] = useState(false)
   
-  // ✅ Use context user when available, otherwise use cached user (loaded synchronously)
+  // ✅ Extract first name correctly
   const user: HeaderUser | null = useMemo(() => {
     if (contextUser) {
-      const displayName = contextUser.full_name || contextUser.first_name || 'User'
-      const nameParts = displayName.split(' ')
-      const firstName = nameParts.length >= 2 ? nameParts[1] : nameParts[0]
-      
+      const displayName =
+        contextUser.full_name ||
+        contextUser.first_name ||
+        'User'
+
+      // ✅ Priority: explicit first_name field → first word of full_name → 'User'
+      const rawFirstName =
+        (contextUser.first_name && contextUser.first_name.trim()) ||
+        displayName.trim().split(/\s+/)[0] ||
+        'User'
+
+      // ✅ Capitalize nicely ("esther" → "Esther", "ESTHER" → "Esther")
+      const firstName =
+        rawFirstName.charAt(0).toUpperCase() +
+        rawFirstName.slice(1).toLowerCase()
+
       let role: UserRole = 'student'
       const contextRole = contextUser.role?.toLowerCase()
       if (contextRole === 'admin') role = 'admin'
@@ -35,7 +47,7 @@ export function useHeaderData() {
       return {
         id: contextUser.id,
         name: displayName,
-        firstName,
+        firstName,                        // ✅ "Esther", "Asher"
         email: contextUser.email || '',
         role,
         avatar: contextUser.avatar_url || contextUser.photo_url || undefined,
@@ -154,7 +166,6 @@ export function useHeaderData() {
     }
   }, [notifications])
 
-  // ✅ Header is ready immediately if we have cached user
   const isLoading = !mounted || (authLoading && !cachedHeaderUser)
 
   return { 

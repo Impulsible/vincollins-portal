@@ -1,5 +1,4 @@
-// src/components/student/exams/EmptyExamsState.tsx - FIXED VERSION
-
+// src/components/student/exams/EmptyExamsState.tsx
 'use client'
 
 import { motion } from 'framer-motion'
@@ -12,41 +11,18 @@ interface EmptyExamsStateProps {
   stats: StatsState
 }
 
-// ✅ Dynamic config - uses stats for dynamic messages
 const getConfig = (activeTab: TabType, stats: StatsState) => {
   const baseConfigs = {
-    available: {
-      icon: MonitorPlay,
-      color: 'text-blue-500', 
-      bg: 'bg-blue-50',
-    },
-    completed: {
-      icon: Award,
-      color: 'text-emerald-500', 
-      bg: 'bg-emerald-50',
-    },
-    upcoming: {
-      icon: Clock,
-      color: 'text-amber-500', 
-      bg: 'bg-amber-50',
-    },
-    expired: {
-      icon: Clock,
-      color: 'text-slate-500', 
-      bg: 'bg-slate-50',
-    },
+    available: { icon: MonitorPlay, color: 'text-blue-500 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/40' },
+    completed: { icon: Award, color: 'text-emerald-500 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
+    upcoming: { icon: Clock, color: 'text-amber-500 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/40' },
+    expired: { icon: Clock, color: 'text-slate-500 dark:text-slate-400', bg: 'bg-slate-50 dark:bg-slate-800/60' },
   }
-
   const base = baseConfigs[activeTab] || baseConfigs.available
-
-  // ✅ Dynamic titles and descriptions based on stats
   const titles = {
-    available: 'No exams available',
-    completed: 'No completed exams',
-    upcoming: 'No upcoming exams',
-    expired: 'No expired exams',
+    available: 'No exams available', completed: 'No completed exams',
+    upcoming: 'No upcoming exams', expired: 'No expired exams',
   }
-
   const descriptions = {
     available: stats.termName && stats.sessionYear 
       ? `No exams are available for ${stats.termName} ${stats.sessionYear} yet. Check back soon!`
@@ -55,32 +31,22 @@ const getConfig = (activeTab: TabType, stats: StatsState) => {
     upcoming: 'No upcoming exams are scheduled at the moment.',
     expired: 'There are no exams that have expired.',
   }
-
-  return {
-    ...base,
-    title: titles[activeTab] || titles.available,
-    description: descriptions[activeTab] || descriptions.available,
-  }
+  return { ...base, title: titles[activeTab] || titles.available, description: descriptions[activeTab] || descriptions.available }
 }
 
 export function EmptyExamsState({ activeTab, stats }: EmptyExamsStateProps) {
   const { icon: Icon, title, description, color, bg } = getConfig(activeTab, stats)
 
   return (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.97 }} 
-      animate={{ opacity: 1, scale: 1 }}
-      className="flex items-center justify-center py-20"
-    >
+    <motion.div initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center justify-center py-20">
       <div className="text-center max-w-sm">
         <div className={cn('h-20 w-20 rounded-3xl flex items-center justify-center mx-auto mb-5', bg)}>
           <Icon className={cn('h-10 w-10', color)} />
         </div>
-        <h3 className="text-base font-bold text-slate-800 mb-2">{title}</h3>
-        <p className="text-sm text-slate-400 leading-relaxed">{description}</p>
-        {/* ✅ Show current term info if available */}
+        <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-2">{title}</h3>
+        <p className="text-sm text-slate-400 dark:text-slate-500 leading-relaxed">{description}</p>
         {stats.termName && stats.sessionYear && activeTab === 'available' && (
-          <p className="text-xs text-slate-400 mt-3">
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-3">
             Current term: {stats.termName} {stats.sessionYear}
           </p>
         )}

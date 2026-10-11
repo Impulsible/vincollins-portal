@@ -1,4 +1,4 @@
-// components/student/ClassmatesPreviewCard.tsx - CLEAN VERSION
+// components/student/ClassmatesPreviewCard.tsx - DARK MODE READY
 'use client'
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,10 +32,10 @@ interface ClassmatesPreviewCardProps {
 // CONSTANTS
 // ============================================
 const DEPARTMENT_BADGES: Record<string, { label: string; color: string }> = {
-  Science: { label: '🔬 Science', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-  Arts: { label: '🎨 Arts', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-  Commercial: { label: '💼 Commercial', color: 'bg-amber-50 text-amber-700 border-amber-200' },
-  General: { label: '🌟 Student', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  Science: { label: '🔬 Science', color: 'bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800' },
+  Arts: { label: '🎨 Arts', color: 'bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800' },
+  Commercial: { label: '💼 Commercial', color: 'bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800' },
+  General: { label: '🌟 Student', color: 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800' },
 }
 
 const AVATAR_COLORS = [
@@ -100,7 +100,7 @@ function getDepartmentBadge(department?: string) {
 // ============================================
 function ClassmateAvatar({ classmate, displayName }: { classmate: Classmate; displayName: string }) {
   return (
-    <Avatar className="h-14 w-14 sm:h-16 sm:w-16 ring-2 ring-white shadow-md">
+    <Avatar className="h-14 w-14 sm:h-16 sm:w-16 ring-2 ring-white dark:ring-slate-900 shadow-md">
       <AvatarImage src={classmate.photo_url || undefined} />
       <AvatarFallback className={cn("bg-gradient-to-br text-white text-base font-bold", getAvatarColor(displayName))}>
         {getInitials(classmate.first_name, classmate.last_name, displayName)}
@@ -115,15 +115,15 @@ function ClassmateCard({ classmate, onClick }: { classmate: Classmate; onClick: 
   
   return (
     <div 
-      className="flex flex-col items-center p-3 rounded-xl hover:bg-emerald-50/50 transition-all duration-200 cursor-pointer border border-transparent hover:border-emerald-200"
+      className="flex flex-col items-center p-3 rounded-xl hover:bg-emerald-50/50 dark:hover:bg-emerald-950/20 transition-all duration-200 cursor-pointer border border-transparent hover:border-emerald-200 dark:hover:border-emerald-800/50"
       onClick={onClick}
     >
       <ClassmateAvatar classmate={classmate} displayName={displayName} />
       <div className="mt-2 text-center">
-        <p className="font-medium text-sm text-slate-700 truncate max-w-[100px]" title={displayName}>
+        <p className="font-medium text-sm text-slate-700 dark:text-slate-200 truncate max-w-[100px]" title={displayName}>
           {displayName.length > 15 ? displayName.substring(0, 12) + '...' : displayName}
         </p>
-        <Badge className={cn("text-[10px] mt-1", deptBadge.color)}>
+        <Badge className={cn("text-[10px] mt-1 border", deptBadge.color)}>
           {deptBadge.label}
         </Badge>
       </div>
@@ -134,11 +134,11 @@ function ClassmateCard({ classmate, onClick }: { classmate: Classmate; onClick: 
 function EmptyState() {
   return (
     <div className="text-center py-8 sm:py-10">
-      <div className="h-14 w-14 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
-        <Users className="h-7 w-7 text-slate-400" />
+      <div className="h-14 w-14 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
+        <Users className="h-7 w-7 text-slate-400 dark:text-slate-500" />
       </div>
-      <p className="text-sm text-slate-500">No classmates yet</p>
-      <p className="text-xs text-slate-400 mt-1">Check back soon!</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">No classmates yet</p>
+      <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Check back soon!</p>
     </div>
   )
 }
@@ -152,18 +152,18 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
   const yearGroup = extractYear(studentClass)
 
   return (
-    <Card className="border-0 shadow-sm bg-white overflow-hidden w-full">
+    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden w-full rounded-2xl transition-colors duration-300">
       <CardHeader className="pb-2 px-4 sm:px-5 pt-4 sm:pt-5">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
-              <Users className="h-4 w-4 text-emerald-600" />
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2 text-slate-800 dark:text-slate-100">
+              <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               <span>{yearGroup} Classmates</span>
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
                 {classmates.length}
               </Badge>
             </CardTitle>
-            <CardDescription className="text-xs mt-1">
+            <CardDescription className="text-xs mt-1 text-slate-500 dark:text-slate-400">
               <GraduationCap className="h-3 w-3 inline mr-1" />
               {classmates.length} student{classmates.length !== 1 ? 's' : ''} in {yearGroup}
             </CardDescription>
@@ -172,7 +172,7 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
             variant="outline" 
             size="sm" 
             onClick={onViewAll}
-            className="h-8 text-xs"
+            className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
           >
             View All
             <ArrowRight className="ml-1 h-3 w-3" />
@@ -199,7 +199,7 @@ export function ClassmatesPreviewCard({ classmates, studentClass, onViewAll }: C
               <Button 
                 variant="ghost" 
                 size="sm" 
-                className="w-full mt-4 text-emerald-600 hover:text-emerald-700 h-8 text-xs"
+                className="w-full mt-4 text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 h-8 text-xs cursor-pointer"
                 onClick={onViewAll}
               >
                 <Sparkles className="h-3 w-3 mr-1" />

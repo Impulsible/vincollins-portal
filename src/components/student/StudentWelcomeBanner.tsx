@@ -1,5 +1,4 @@
-// components/student/StudentWelcomeBanner.tsx - COMPLETE FIXED VERSION
-
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 'use client'
 
@@ -8,9 +7,9 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { 
   GraduationCap, Award, TrendingUp, Clock, CheckCircle2, BookOpen,
-  Wifi, WifiOff, AlertCircle, Timer, Quote, Sparkles, RefreshCw
+  Wifi, WifiOff, AlertCircle, Timer, Quote, RefreshCw, Globe2
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from '@/components/ui/tooltip'
@@ -46,30 +45,14 @@ interface StudentWelcomeBannerProps {
 
 const STORAGE_KEY = 'student_session_start'
 
-// ✅ Get subject count based on class level (JSS = 17, SS = 10)
 const getSubjectCountByClassLevel = (className: string): number => {
   if (!className) return 0
-  
   const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
-  
-  // JSS classes - 17 subjects
-  if (normalizedClass.includes('JSS1') || 
-      normalizedClass.includes('JSS2') || 
-      normalizedClass.includes('JSS3')) {
-    return 17
-  }
-  
-  // SS classes - 10 subjects
-  if (normalizedClass.includes('SS1') || 
-      normalizedClass.includes('SS2') || 
-      normalizedClass.includes('SS3')) {
-    return 10
-  }
-  
+  if (normalizedClass.includes('JSS1') || normalizedClass.includes('JSS2') || normalizedClass.includes('JSS3')) return 17
+  if (normalizedClass.includes('SS1') || normalizedClass.includes('SS2') || normalizedClass.includes('SS3')) return 10
   return 0
 }
 
-// ─── Personalized Quotes ──────────────────────────────
 const quotes = {
   morning: [
     { text: "The beautiful thing about learning is that no one can take it away from {name}.", author: "B.B. King" },
@@ -103,7 +86,79 @@ const quotes = {
   ],
 }
 
-// Helper to get first name from "Surname FirstName Other" format
+interface LanguagePack {
+  language: string
+  flag: string
+  morning: string
+  afternoon: string
+  evening: string
+  emoji: string
+  quote: { text: string; translation: string; author: string }
+}
+
+const NIGERIAN_LANGUAGES: LanguagePack[] = [
+  {
+    language: 'English', flag: '🇳🇬',
+    morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening', emoji: '🌅',
+    quote: { text: 'The beautiful thing about learning is that no one can take it away from {name}.', translation: '', author: 'B.B. King' }
+  },
+  {
+    language: 'Yoruba', flag: '🪘',
+    morning: 'Ẹ káàrọ̀', afternoon: 'Ẹ káàsán', evening: 'Ẹ káalẹ́', emoji: '🙌🏾',
+    quote: { text: 'Ìmọ̀ bí kò bá kà, á dẹ rẹ́rẹ́ fún {name}.', translation: 'Knowledge, if not put to work or studied, diminishes.', author: 'Yoruba Wisdom' }
+  },
+  {
+    language: 'Igbo', flag: '🥁',
+    morning: 'Ụtụtụ ọma', afternoon: 'Ehihie ọma', evening: 'Mgbede ọma', emoji: '☀️',
+    quote: { text: 'Onye ajụjụ anaghị efu ụzọ, {name}.', translation: 'He who asks questions never gets lost.', author: 'Igbo Proverb' }
+  },
+  {
+    language: 'Hausa', flag: '🕌',
+    morning: 'Ina kwana', afternoon: 'Barka da rana', evening: 'Barka da yamma', emoji: '🌙',
+    quote: { text: 'Neman ilimi daga kogi yake, ya {name}.', translation: 'Seeking knowledge is like drawing from an endless ocean.', author: 'Hausa Proverb' }
+  },
+  {
+    language: 'Pidgin', flag: '🤝🏻',
+    morning: 'How body this morning?', afternoon: 'How afternoon dey go?', evening: 'How evening dey run?', emoji: '🤜🏻',
+    quote: { text: 'School na light, ignorance na dark. Book no dey lie, {name}.', translation: 'Education is light, ignorance is darkness. Hard study never fails.', author: 'Nigerian Student Proverb' }
+  },
+  {
+    language: 'Efik/Ibibio', flag: '🌴',
+    morning: 'Mmesiere', afternoon: 'Idem mfo?', evening: 'Amesiere', emoji: '🌴',
+    quote: { text: 'Ifiọk ekama kpukpru ntiñe uwem fọ, {name}.', translation: 'Wisdom and knowledge hold up all the pillars of your life.', author: 'Efik Proverb' }
+  },
+  {
+    language: 'Edo (Bini)', flag: '👑',
+    morning: 'Vbènyà ówiè', afternoon: 'Kóyo ùghọ̀nvbé', evening: 'Kóyo ótá', emoji: '👑',
+    quote: { text: 'Uhùmwu nọ rhiẹna ọ mwan a na gha zẹ, {name}.', translation: 'It is a prepared mind that receives wisdom and shines.', author: 'Edo Proverb' }
+  },
+  {
+    language: 'Fulfulde (Fulani)', flag: '🐄',
+    morning: 'Jam waali', afternoon: 'Jam weeti', evening: 'Jam hiiri', emoji: '🪔',
+    quote: { text: 'Ganndal ko gural joomum, ya {name}.', translation: 'Knowledge is the shield of its owner.', author: 'Fulfulde Proverb' }
+  },
+  {
+    language: 'Tiv', flag: '🌾',
+    morning: 'M sugh u iyange', afternoon: 'M sugh u iyange na mimi', evening: 'M sugh u ityôgh', emoji: '🌾',
+    quote: { text: 'Fankwagh ngu a mgbian ga, ka i kpa gbilin ga fán gba {name}.', translation: 'Wisdom has no sibling; it is earned through dedication.', author: 'Tiv Proverb' }
+  },
+  {
+    language: 'Nupe', flag: '🎋',
+    morning: 'A gaba o', afternoon: 'A chenchin', evening: 'A kyeta o', emoji: '🎋',
+    quote: { text: 'Iye chin kpan gbaragbata e gba {name}.', translation: 'Knowledge lights up the dark paths of your future.', author: 'Nupe Proverb' }
+  },
+  {
+    language: 'Kanuri', flag: '🐫',
+    morning: 'Ndaro', afternoon: 'Ndaro kaure', evening: 'Ndaro bariga', emoji: '🐫',
+    quote: { text: 'Karanganyi daji dunya ye nzeroro, {name}.', translation: 'Your studies will pave a bright highway to your world.', author: 'Kanuri Proverb' }
+  },
+  {
+    language: 'Ijaw', flag: '🛶',
+    morning: 'Ebi mienemi', afternoon: 'Ebi mien seimi', evening: 'Ebi mien koromo', emoji: '🌊',
+    quote: { text: 'Gbori diri gho gbele, gbori nengi wari, {name}.', translation: 'A child who studies books builds a house of honor.', author: 'Ijaw Proverb' }
+  }
+]
+
 const getFirstName = (fullName: string): string => {
   if (!fullName) return 'Student'
   const parts = fullName.trim().split(/\s+/)
@@ -111,23 +166,6 @@ const getFirstName = (fullName: string): string => {
   return parts[0] || 'Student'
 }
 
-// Fixed quote personalization - only replaces {name}
-const getPersonalizedQuote = (hour: number, firstName: string) => {
-  let quoteSet = quotes.morning
-  if (hour >= 12 && hour < 17) quoteSet = quotes.afternoon
-  if (hour >= 17) quoteSet = quotes.evening
-
-  const dayOfMonth = new Date().getDate()
-  const index = dayOfMonth % quoteSet.length
-  const quote = quoteSet[index]
-  
-  return {
-    text: quote.text.replace(/\{name\}/g, firstName),
-    author: quote.author
-  }
-}
-
-// ✅ Get grade from database
 async function getGradeFromDB(percentage: number): Promise<{ grade: string; color: string; description: string }> {
   try {
     const { data, error } = await supabase
@@ -138,43 +176,34 @@ async function getGradeFromDB(percentage: number): Promise<{ grade: string; colo
       .single()
 
     if (error || !data) {
-      // Fallback calculation
-      if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
-      if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
-      if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
-      if (percentage >= 50) return { grade: 'P', color: 'text-purple-600', description: 'Pass' }
-      return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+      if (percentage >= 80) return { grade: 'A', color: 'text-emerald-400', description: 'Excellent' }
+      if (percentage >= 70) return { grade: 'B', color: 'text-blue-400', description: 'Very Good' }
+      if (percentage >= 60) return { grade: 'C', color: 'text-amber-400', description: 'Good' }
+      if (percentage >= 50) return { grade: 'P', color: 'text-purple-400', description: 'Pass' }
+      return { grade: 'F', color: 'text-red-400', description: 'Fail' }
     }
 
     return {
       grade: data.grade,
-      color: data.color || 'text-gray-600',
+      color: data.color || 'text-slate-400',
       description: data.description || ''
     }
   } catch (error) {
     console.error('Error fetching grade:', error)
-    // Fallback calculation
-    if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600', description: 'Excellent' }
-    if (percentage >= 70) return { grade: 'B', color: 'text-blue-600', description: 'Very Good' }
-    if (percentage >= 60) return { grade: 'C', color: 'text-amber-600', description: 'Good' }
-    if (percentage >= 50) return { grade: 'P', color: 'text-purple-600', description: 'Pass' }
-    return { grade: 'F', color: 'text-red-600', description: 'Fail' }
+    if (percentage >= 80) return { grade: 'A', color: 'text-emerald-400', description: 'Excellent' }
+    if (percentage >= 70) return { grade: 'B', color: 'text-blue-400', description: 'Very Good' }
+    if (percentage >= 60) return { grade: 'C', color: 'text-amber-400', description: 'Good' }
+    if (percentage >= 50) return { grade: 'P', color: 'text-purple-400', description: 'Pass' }
+    return { grade: 'F', color: 'text-red-400', description: 'Fail' }
   }
 }
 
-// ✅ Get subject count - ALWAYS use class-level count (JSS=17, SS=10)
 async function getSubjectCountFromDB(className: string): Promise<number> {
   if (!className) return 0
-
   try {
-    // ✅ ALWAYS use class-level count for JSS and SS classes
     const classCount = getSubjectCountByClassLevel(className)
-    if (classCount > 0) {
-      console.log(`📊 Using class-level count: ${classCount} for ${className}`)
-      return classCount
-    }
+    if (classCount > 0) return classCount
 
-    // Fallback: Get from exams table if class-level returns 0
     const { data: exams, error: examsError } = await supabase
       .from('exams')
       .select('subject')
@@ -183,13 +212,8 @@ async function getSubjectCountFromDB(className: string): Promise<number> {
 
     if (!examsError && exams && exams.length > 0) {
       const uniqueSubjects = new Set(exams.map((e: any) => e.subject))
-      const dbCount = uniqueSubjects.size
-      if (dbCount > 0) {
-        console.log(`📊 Using exams count: ${dbCount} for ${className}`)
-        return dbCount
-      }
+      if (uniqueSubjects.size > 0) return uniqueSubjects.size
     }
-
     return 0
   } catch (error) {
     console.error('Error fetching subject count:', error)
@@ -206,73 +230,58 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
   const [refreshing, setRefreshing] = useState(false)
   const [liveStats, setLiveStats] = useState<StudentStats | null>(stats)
   const [subjectCount, setSubjectCount] = useState<number>(0)
+  const [langIndex, setLangIndex] = useState<number>(0)
 
-  // Update live stats when parent stats change
-  useEffect(() => {
-    setLiveStats(stats)
-  }, [stats])
+  const firstName = getFirstName(profile?.full_name || 'Student')
+  const studentClass = profile?.class || 'Not Assigned'
+  const studentDepartment = profile?.department || 'General'
 
-  // ✅ Fetch subject count - ALWAYS uses class-level count
+  useEffect(() => { setLiveStats(stats) }, [stats])
+
   useEffect(() => {
     if (profile?.class) {
-      getSubjectCountFromDB(profile.class).then(count => {
-        setSubjectCount(count)
-      }).catch(err => {
-        console.error('Error fetching subject count:', err)
-        const fallbackCount = getSubjectCountByClassLevel(profile.class)
-        setSubjectCount(fallbackCount)
+      getSubjectCountFromDB(profile.class).then(setSubjectCount).catch(() => {
+        setSubjectCount(getSubjectCountByClassLevel(profile.class))
       })
     }
   }, [profile?.class])
 
-  // ─── Real-time Subscriptions for Stats ─────────────────
+  // Real-time subscriptions for exam_attempts, ca_scores AND report_cards
   useEffect(() => {
     if (!profile?.id) return
 
-    console.log('📡 Setting up real-time subscriptions for student stats...')
-
     const attemptsChannel = supabase
       .channel(`student-stats-attempts-${profile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'exam_attempts',
-          filter: `student_id=eq.${profile.id}`
-        },
-        (payload) => {
-          console.log('🔄 Exam attempt changed, refreshing stats...', payload.eventType)
-          if (onRefresh) onRefresh()
-        }
-      )
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'exam_attempts',
+        filter: `student_id=eq.${profile.id}`
+      }, () => { if (onRefresh) onRefresh() })
       .subscribe()
 
     const caScoresChannel = supabase
       .channel(`student-stats-ca-${profile.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ca_scores',
-          filter: `student_id=eq.${profile.id}`
-        },
-        (payload) => {
-          console.log('🔄 CA scores changed, refreshing stats...', payload.eventType)
-          if (onRefresh) onRefresh()
-        }
-      )
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'ca_scores',
+        filter: `student_id=eq.${profile.id}`
+      }, () => { if (onRefresh) onRefresh() })
+      .subscribe()
+
+    // ✅ ADDED: Listen to report_cards table changes
+    const reportCardsChannel = supabase
+      .channel(`student-stats-rc-${profile.id}`)
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'report_cards',
+        filter: `student_id=eq.${profile.id}`
+      }, () => { if (onRefresh) onRefresh() })
       .subscribe()
 
     return () => {
-      console.log('📡 Cleaning up stats subscriptions')
       attemptsChannel.unsubscribe()
       caScoresChannel.unsubscribe()
+      reportCardsChannel.unsubscribe()
     }
   }, [profile?.id, onRefresh])
 
-  // Manual refresh handler
   const handleRefresh = () => {
     if (onRefresh && !refreshing) {
       setRefreshing(true)
@@ -284,7 +293,6 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
   useEffect(() => {
     setMounted(true)
     setCurrentTime(new Date())
-
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       setSessionStart(new Date(stored))
@@ -293,9 +301,15 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
       localStorage.setItem(STORAGE_KEY, start.toISOString())
       setSessionStart(start)
     }
-
     const timer = setInterval(() => setCurrentTime(new Date()), 1000)
     return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const rotator = setInterval(() => {
+      setLangIndex((prev) => (prev + 1) % NIGERIAN_LANGUAGES.length)
+    }, 6000)
+    return () => clearInterval(rotator)
   }, [])
 
   useEffect(() => {
@@ -340,11 +354,25 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
     return { text: 'Good Night', emoji: '🌙', message: 'Rest well and prepare for tomorrow!' }
   }, [currentTime])
 
-  const quote = useMemo(() => {
-    if (!currentTime) return { text: '', author: '' }
-    const firstName = getFirstName(profile?.full_name || 'Student')
-    return getPersonalizedQuote(currentTime.getHours(), firstName)
-  }, [currentTime, profile?.full_name])
+  const currentGreeting = useMemo(() => {
+    if (!currentTime) return { phrase: 'Welcome', language: 'English', emoji: '👋', quote: { text: '', translation: '', author: '' } }
+    const hour = currentTime.getHours()
+    const activeLang = NIGERIAN_LANGUAGES[langIndex]
+    let phrase = activeLang.morning
+    if (hour >= 12 && hour < 17) phrase = activeLang.afternoon
+    if (hour >= 17) phrase = activeLang.evening
+    return {
+      phrase,
+      language: activeLang.language,
+      flag: activeLang.flag,
+      emoji: activeLang.emoji,
+      quote: {
+        text: activeLang.quote.text.replace(/\{name\}/g, firstName),
+        translation: activeLang.quote.translation,
+        author: activeLang.quote.author
+      }
+    }
+  }, [currentTime, langIndex, firstName])
 
   const formattedDate = useMemo(() => {
     if (!currentTime) return ''
@@ -366,54 +394,37 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
     return `${h}:${m}:${s}`
   }, [currentTime, sessionStart])
 
-  const firstName = getFirstName(profile?.full_name || 'Student')
-  const studentClass = profile?.class || 'Not Assigned'
-  const studentDepartment = profile?.department || 'General'
-  
-  // ✅ ALWAYS use class-level subject count
   const totalSubjects = liveStats?.totalSubjects || subjectCount || getSubjectCountByClassLevel(studentClass) || 0
   const completedExams = liveStats?.completedExams ?? 0
   const averageScore = liveStats?.averageScore ?? 0
   const availableExams = liveStats?.availableExams ?? 0
   const pendingTheoryCount = liveStats?.pendingTheoryCount ?? 0
 
-  // ✅ Get grade from database or use provided
   const [gradeInfo, setGradeInfo] = useState<{ grade: string; color: string; description: string }>({
-    grade: 'N/A',
-    color: 'text-gray-400',
-    description: ''
+    grade: 'N/A', color: 'text-slate-400', description: ''
   })
 
   useEffect(() => {
     if (liveStats?.currentGrade && liveStats?.gradeColor) {
-      setGradeInfo({
-        grade: liveStats.currentGrade,
-        color: liveStats.gradeColor,
-        description: ''
-      })
+      setGradeInfo({ grade: liveStats.currentGrade, color: liveStats.gradeColor, description: '' })
     } else if (averageScore > 0) {
-      getGradeFromDB(averageScore).then(info => {
-        setGradeInfo(info)
-      }).catch(err => {
-        console.error('Error fetching grade:', err)
-      })
+      getGradeFromDB(averageScore).then(setGradeInfo).catch(console.error)
     }
   }, [liveStats?.currentGrade, liveStats?.gradeColor, averageScore])
-  
+
   const showGrade = completedExams > 0 && gradeInfo.grade !== 'N/A'
   const completionPercentage = totalSubjects > 0 ? Math.round((completedExams / totalSubjects) * 100) : 0
-
   const avatarLetter = firstName.charAt(0).toUpperCase()
   const avatarUrl = profile?.photo_url || undefined
 
-  const statusDisplay = isOnline 
+  const statusDisplay = isOnline
     ? { icon: Wifi, color: 'bg-emerald-500', text: 'Online' }
-    : { icon: WifiOff, color: 'bg-gray-400', text: 'Offline' }
+    : { icon: WifiOff, color: 'bg-slate-400', text: 'Offline' }
   const StatusIcon = statusDisplay.icon
 
   if (!mounted) {
     return (
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 shadow-2xl mb-8">
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-6 md:p-8 shadow-2xl mb-8 border border-slate-700/50 dark:border-slate-800">
         <div className="h-[280px] sm:h-[320px] animate-pulse bg-white/5 rounded-xl" />
       </div>
     )
@@ -424,84 +435,144 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
-      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-800 via-slate-700 to-slate-900 p-6 md:p-8 text-white shadow-2xl mb-8"
+      className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 p-5 sm:p-6 md:p-8 text-white shadow-2xl mb-8 border border-slate-700/40 dark:border-slate-800/80"
       suppressHydrationWarning
     >
-      {/* Refresh button */}
       <button
         onClick={handleRefresh}
         disabled={refreshing}
-        className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors disabled:opacity-50"
+        className="absolute top-4 right-4 z-20 p-2 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 transition-colors disabled:opacity-50 cursor-pointer"
         title="Refresh stats"
       >
-        <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
+        <RefreshCw className={cn("h-4 w-4 text-slate-300", refreshing && "animate-spin")} />
       </button>
 
-      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-48 h-48 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-2xl" />
+      <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
       
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-        <div className="flex-1">
+        <div className="flex-1 w-full">
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="text-2xl">{greeting.emoji}</span>
-            <span className="text-xs sm:text-sm font-medium bg-white/15 px-3 py-1 rounded-full backdrop-blur-sm text-white">{formattedDate}</span>
-            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-cyan-400/10 px-3 py-1 rounded-full text-cyan-200 border border-cyan-400/20">
+            <span className="text-xs sm:text-sm font-medium bg-white/10 px-3 py-1 rounded-full backdrop-blur-sm text-slate-200 border border-white/10">
+              {formattedDate}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-emerald-500/10 px-3 py-1 rounded-full text-emerald-300 border border-emerald-500/20">
               <Clock className="h-3.5 w-3.5" />{formattedTime}
             </span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/10 px-3 py-1 rounded-full text-blue-200">
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/5 px-3 py-1 rounded-full text-indigo-300 border border-white/5">
               <Timer className="h-3.5 w-3.5" />{onlineDuration}
             </span>
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="inline-flex">
-                    <Badge className={cn("text-[10px] gap-1 cursor-help", isOnline ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/30" : "bg-gray-500/20 text-gray-300 border-gray-500/30")}>
+                    <Badge className={cn(
+                      "text-[10px] gap-1 cursor-help border",
+                      isOnline
+                        ? "bg-emerald-500/20 text-emerald-200 border-emerald-500/30"
+                        : "bg-slate-500/20 text-slate-300 border-slate-500/30"
+                    )}>
                       <StatusIcon className="h-3 w-3" />{statusDisplay.text}
                     </Badge>
                   </span>
                 </TooltipTrigger>
-                <TooltipContent><p>{isOnline ? 'You are online' : 'You are offline'}</p></TooltipContent>
+                <TooltipContent>
+                  <p>{isOnline ? 'You are online' : 'You are offline'}</p>
+                </TooltipContent>
               </Tooltip>
             </TooltipProvider>
           </div>
           
-          <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white drop-shadow-sm">
-            {greeting.text}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-yellow-200">{firstName}</span>!
-          </h1>
+          <div className="min-h-[50px] sm:min-h-[60px] flex flex-col justify-center mb-2">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={langIndex}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.4, ease: "easeOut" }}
+                className="flex items-center flex-wrap gap-2 sm:gap-3"
+              >
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white drop-shadow-sm">
+                  <span>{currentGreeting.phrase}</span>,{' '}
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 via-teal-200 to-amber-200">
+                    {firstName}
+                  </span>
+                  <span className="ml-2 inline-block animate-bounce">{currentGreeting.emoji}</span>
+                </h1>
+                <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-semibold tracking-wider uppercase text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-md self-center">
+                  <Globe2 className="h-3 w-3" />
+                  {currentGreeting.language}
+                </span>
+              </motion.div>
+            </AnimatePresence>
+          </div>
           
-          <p className="text-gray-200 text-sm md:text-base mb-3 max-w-md">{greeting.message}</p>
+          <p className="text-slate-300 text-sm md:text-base mb-3 max-w-md">{greeting.message}</p>
 
-          {quote.text && (
-            <div className="flex items-start gap-2 mb-3 max-w-xl">
-              <Quote className="h-4 w-4 text-amber-400/60 shrink-0 mt-0.5" />
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={`student-quote-${langIndex}`}
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 8 }}
+              transition={{ duration: 0.5, delay: 0.1 }}
+              className="flex items-start gap-2 mb-4 max-w-xl"
+            >
+              <Quote className="h-4 w-4 text-amber-400/70 shrink-0 mt-1" />
               <div>
-                <p className="text-gray-200 text-xs sm:text-sm italic leading-relaxed line-clamp-2">
-                  &ldquo;{quote.text}&rdquo;
+                <p className="text-slate-200 text-xs sm:text-sm italic leading-relaxed font-medium">
+                  &ldquo;{currentGreeting.quote.text}&rdquo;
                 </p>
-                <p className="text-[10px] text-slate-400 mt-0.5 font-medium">— {quote.author}</p>
+                {currentGreeting.quote.translation && (
+                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1 italic">
+                    &rarr; {currentGreeting.quote.translation}
+                  </p>
+                )}
+                <p className="text-[10px] text-amber-300/60 mt-1 font-medium">
+                  — {currentGreeting.quote.author}
+                </p>
               </div>
-            </div>
-          )}
+            </motion.div>
+          </AnimatePresence>
           
           <div className="flex flex-wrap gap-2">
-            <Badge className="bg-white/15 text-white border-0"><GraduationCap className="h-3 w-3 mr-1" />{studentClass}</Badge>
+            <Badge className="bg-slate-800/80 text-slate-200 border border-slate-700 text-xs px-2.5 py-1">
+              <GraduationCap className="h-3.5 w-3.5 mr-1 text-emerald-400" />
+              {studentClass}
+            </Badge>
             {studentDepartment !== 'General' && (
-              <Badge className="bg-white/15 text-white border-0"><BookOpen className="h-3 w-3 mr-1" />{studentDepartment}</Badge>
+              <Badge className="bg-slate-800/80 text-slate-200 border border-slate-700 text-xs px-2.5 py-1">
+                <BookOpen className="h-3.5 w-3.5 mr-1 text-teal-400" />
+                {studentDepartment}
+              </Badge>
             )}
-            <Badge className="bg-white/15 text-white border-0"><Award className="h-3 w-3 mr-1" />{totalSubjects} Subjects</Badge>
+            <Badge className="bg-slate-800/80 text-slate-200 border border-slate-700 text-xs px-2.5 py-1">
+              <Award className="h-3.5 w-3.5 mr-1 text-amber-400" />
+              {totalSubjects} Subjects
+            </Badge>
           </div>
         </div>
         
-        <div className="relative group">
-          <div className={cn("absolute -inset-1 bg-gradient-to-r rounded-full opacity-60 group-hover:opacity-100 blur-md transition duration-300", isOnline ? "from-emerald-400 to-teal-400" : "from-gray-400 to-gray-500")} />
+        <div className="relative group shrink-0 hidden sm:block">
+          <div className={cn(
+            "absolute -inset-1 bg-gradient-to-r rounded-full opacity-60 group-hover:opacity-100 blur-md transition duration-300",
+            isOnline ? "from-emerald-400 to-teal-400" : "from-slate-500 to-slate-600"
+          )} />
           <div className="relative">
-            <Avatar className="h-24 w-24 md:h-28 md:w-28 ring-4 ring-white/20 shadow-xl">
+            <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 ring-4 ring-slate-800/80 shadow-2xl transition-transform duration-300 group-hover:scale-105">
               {avatarUrl && !avatarError ? (
                 <AvatarImage src={avatarUrl} alt={firstName} onError={() => setAvatarError(true)} className="object-cover" />
               ) : null}
-              <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-800 text-white text-3xl font-bold">{avatarLetter}</AvatarFallback>
+              <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-800 text-white text-2xl sm:text-3xl font-bold">
+                {avatarLetter}
+              </AvatarFallback>
             </Avatar>
-            <span className={cn("absolute -bottom-2 -right-2 rounded-full p-1.5 ring-2 ring-white inline-block", statusDisplay.color, isOnline && "animate-pulse")}>
+            <span className={cn(
+              "absolute -bottom-1 -right-1 rounded-full p-1.5 ring-4 ring-slate-900 inline-block",
+              statusDisplay.color,
+              isOnline && "animate-pulse"
+            )}>
               <StatusIcon className="h-2.5 w-2.5 text-white" />
             </span>
           </div>
@@ -509,76 +580,84 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
       </div>
       
       {pendingTheoryCount > 0 && (
-        <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+        <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
           <div className="flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-amber-400 shrink-0 mt-0.5 animate-pulse" />
             <div>
               <p className="text-sm text-amber-200 font-medium">
                 {pendingTheoryCount} exam{pendingTheoryCount !== 1 ? 's' : ''} pending theory grading
               </p>
-              <p className="text-xs text-amber-300/80">
-                Your current score includes CA and objective marks. Theory answers will increase your final score.
+              <p className="text-xs text-amber-300/70">
+                Your current score includes CA and objective marks. Theory answers will increase your final score once graded.
               </p>
             </div>
           </div>
         </div>
       )}
       
-      <div className="relative z-10 mt-4 pt-4 border-t border-white/15">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+      <div className="relative z-10 mt-5 pt-4 border-t border-slate-700/60">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="group cursor-default bg-white/5 border border-slate-700/50 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">{availableExams}</p>
-              <Clock className="h-5 w-5 text-blue-300 opacity-60" />
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-emerald-300 transition-colors">{availableExams}</p>
+              <Clock className="h-5 w-5 text-blue-400 opacity-80" />
             </div>
-            <p className="text-xs md:text-sm text-gray-300">Available Exams</p>
+            <p className="text-xs text-slate-400">Available Exams</p>
           </div>
-          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+
+          <div className="group cursor-default bg-white/5 border border-slate-700/50 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-green-200 transition-colors">{completedExams}</p>
-              <CheckCircle2 className="h-5 w-5 text-green-300 opacity-60" />
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-emerald-300 transition-colors">{completedExams}</p>
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 opacity-80" />
             </div>
-            <p className="text-xs md:text-sm text-gray-300">Completed</p>
-            <p className="text-[10px] text-gray-400 mt-0.5">{completionPercentage}% of term</p>
+            <p className="text-xs text-slate-400">Completed</p>
+            <p className="text-[10px] text-emerald-400/80 mt-0.5">{completionPercentage}% of term</p>
           </div>
-          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+
+          <div className="group cursor-default bg-white/5 border border-slate-700/50 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-amber-200 transition-colors">
+              <p className="text-2xl md:text-3xl font-bold text-white group-hover:text-emerald-300 transition-colors">
                 {averageScore.toFixed(2)}%
               </p>
-              <TrendingUp className="h-5 w-5 text-amber-300 opacity-60" />
+              <TrendingUp className="h-5 w-5 text-teal-400 opacity-80" />
             </div>
-            <p className="text-xs md:text-sm text-gray-300">Average Score</p>
+            <p className="text-xs text-slate-400">Average Score</p>
           </div>
-          <div className="group cursor-default bg-white/5 rounded-xl p-3 hover:bg-white/10 transition-colors">
+
+          <div className="group cursor-default bg-white/5 border border-slate-700/50 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
               {showGrade ? (
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="inline-flex"><p className={cn("text-2xl md:text-3xl font-bold", gradeInfo.color)}>{gradeInfo.grade}</p></span>
+                      <span className="inline-flex">
+                        <p className={cn("text-2xl md:text-3xl font-bold", gradeInfo.color)}>{gradeInfo.grade}</p>
+                      </span>
                     </TooltipTrigger>
                     <TooltipContent>
-                      <p>{averageScore.toFixed(2)}% average {gradeInfo.description && `- ${gradeInfo.description}`}</p>
+                      <p>{averageScore.toFixed(2)}% average {gradeInfo.description && `– ${gradeInfo.description}`}</p>
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               ) : (
-                <p className="text-2xl md:text-3xl font-bold text-gray-400">-</p>
+                <p className="text-2xl md:text-3xl font-bold text-slate-500">–</p>
               )}
-              <Award className="h-5 w-5 text-yellow-300 opacity-60" />
+              <Award className="h-5 w-5 text-amber-400 opacity-80" />
             </div>
-            <p className="text-xs md:text-sm text-gray-300">Current Grade</p>
+            <p className="text-xs text-slate-400">Current Grade</p>
           </div>
         </div>
         
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-xs text-gray-300">Term Subject Progress</span>
-            <span className="text-xs text-gray-300">{completedExams}/{totalSubjects}</span>
+            <span className="text-xs text-slate-400">Term Subject Progress</span>
+            <span className="text-xs text-slate-300">{completedExams}/{totalSubjects}</span>
           </div>
-          <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-emerald-400 to-emerald-500 rounded-full transition-all duration-500" style={{ width: `${completionPercentage}%` }} />
+          <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-emerald-400 to-teal-500 rounded-full transition-all duration-500"
+              style={{ width: `${completionPercentage}%` }}
+            />
           </div>
         </div>
       </div>

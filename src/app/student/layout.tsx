@@ -1,4 +1,4 @@
-// app/student/layout.tsx - NAVIGATION ENFORCEMENT & BLOCKS FOR INACTIVE PROFILES
+// src/app/student/layout.tsx - NAVIGATION ENFORCEMENT & BLOCKS FOR INACTIVE PROFILES
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -20,7 +20,7 @@ interface StudentProfile {
   class?: string
   department?: string
   vin_id?: string
-  is_active?: boolean // 👈 Added
+  is_active?: boolean
 }
 
 // Tab ↔ path mapping
@@ -122,7 +122,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     loadProfile()
   }, [loadProfile])
 
-  // 🚫 CRITICAL ENFORCEMENT: Block inactive students from live system pages
+  // CRITICAL ENFORCEMENT: Block inactive students from live system pages
   useEffect(() => {
     if (profile && profile.is_active === false) {
       const allowedTabs = ['overview', 'results', 'profile']

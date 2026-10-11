@@ -1,4 +1,6 @@
-// components/student/StudentAnnouncements.tsx - UPDATED WITH SCROLLAREA FIX
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// components/student/StudentAnnouncements.tsx - WITH DARK MODE & SCROLLAREA FIX
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -12,8 +14,8 @@ import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { 
   Megaphone, Pin, Bell, Calendar, Filter, Search, 
-  AlertCircle, Loader2, RefreshCw, Eye, ChevronRight, 
-  Home, X, Sparkles
+  AlertCircle, Loader2, RefreshCw, ChevronRight, 
+  Home, X, Sparkles, User
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -77,17 +79,17 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-500 text-white border-red-600'
-      case 'high': return 'bg-orange-500 text-white border-orange-600'
-      default: return 'bg-blue-500 text-white border-blue-600'
+      case 'urgent': return 'bg-red-500 text-white border-red-600 dark:border-red-900'
+      case 'high': return 'bg-orange-500 text-white border-orange-600 dark:border-orange-900'
+      default: return 'bg-blue-500 text-white border-blue-600 dark:border-blue-900'
     }
   }
 
   const getPriorityBgLight = (priority: string) => {
     switch (priority) {
-      case 'urgent': return 'bg-red-50 border-red-200'
-      case 'high': return 'bg-orange-50 border-orange-200'
-      default: return 'bg-blue-50 border-blue-200'
+      case 'urgent': return 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50'
+      case 'high': return 'bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-900/50'
+      default: return 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-900/50'
     }
   }
 
@@ -121,10 +123,10 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
   const normalAnnouncements = filteredAnnouncements.filter(a => !a.is_pinned)
 
   const priorityFilters = [
-    { key: 'all', label: 'All', color: 'bg-emerald-600' },
-    { key: 'urgent', label: 'Urgent', color: 'bg-red-600' },
-    { key: 'high', label: 'High', color: 'bg-orange-600' },
-    { key: 'normal', label: 'Normal', color: 'bg-blue-600' },
+    { key: 'all', label: 'All', color: 'bg-emerald-600 hover:bg-emerald-700' },
+    { key: 'urgent', label: 'Urgent', color: 'bg-red-600 hover:bg-red-700' },
+    { key: 'high', label: 'High', color: 'bg-orange-600 hover:bg-orange-700' },
+    { key: 'normal', label: 'Normal', color: 'bg-blue-600 hover:bg-blue-700' },
   ]
 
   if (loading) {
@@ -132,12 +134,12 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
       <div className="flex items-center justify-center min-h-[300px] sm:min-h-[400px]">
         <div className="text-center">
           <div className="relative">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 border-3 sm:border-4 border-emerald-200 rounded-full animate-spin" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 border-3 sm:border-4 border-emerald-200 dark:border-emerald-900/60 rounded-full animate-spin" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+              <Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="mt-3 sm:mt-4 text-slate-600 text-sm sm:text-base font-medium">
+          <p className="mt-3 sm:mt-4 text-slate-600 dark:text-slate-300 text-sm sm:text-base font-medium">
             Loading announcements...
           </p>
         </div>
@@ -149,16 +151,16 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
     <div className={cn("space-y-5 sm:space-y-6 md:space-y-8", className)}>
       {/* Breadcrumb - Optional */}
       {showBreadcrumb && (
-        <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground">
+        <nav className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
           <Link 
             href="/student" 
-            className="hover:text-emerald-600 transition-colors flex items-center gap-1"
+            className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1 shrink-0"
           >
             <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             <span className="hidden sm:inline">Dashboard</span>
           </Link>
-          <ChevronRight className="h-3 w-3" />
-          <span className="text-foreground font-medium">Announcements</span>
+          <ChevronRight className="h-3 w-3 shrink-0" />
+          <span className="text-slate-800 dark:text-slate-200 font-medium truncate">Announcements</span>
         </nav>
       )}
 
@@ -166,13 +168,13 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
       {!hideHeader && (
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 flex items-center gap-2">
-              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
-                <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600" />
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+              <div className="h-8 w-8 sm:h-10 sm:w-10 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                <Megaphone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
               Announcements
             </h1>
-            <p className="text-sm text-slate-500 mt-1 ml-0 sm:ml-12">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 ml-0 sm:ml-12">
               Stay updated with important information from the school
             </p>
           </div>
@@ -180,7 +182,7 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
             variant="outline" 
             size="sm" 
             onClick={loadAnnouncements}
-            className="h-9 sm:h-10 text-sm w-full sm:w-auto border-slate-200 hover:border-emerald-300 hover:bg-emerald-50"
+            className="h-9 sm:h-10 text-sm w-full sm:w-auto border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 cursor-pointer"
           >
             <RefreshCw className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-2" />
             Refresh
@@ -190,32 +192,32 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
 
       {/* Stats Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-white to-slate-50 hover:shadow-md transition-shadow">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 rounded-2xl hover:shadow-md transition-shadow cursor-default">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-xs text-slate-500 font-medium">Total</p>
-            <p className="text-2xl sm:text-3xl font-bold text-slate-700">{announcements.length}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">Total</p>
+            <p className="text-2xl sm:text-3xl font-bold text-slate-700 dark:text-white mt-0.5">{announcements.length}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-white hover:shadow-md transition-shadow">
+        <Card className="border border-emerald-200/60 dark:border-emerald-900/40 shadow-sm bg-emerald-50/60 dark:bg-emerald-950/20 rounded-2xl hover:shadow-md transition-shadow cursor-default">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-xs text-emerald-600 font-medium">Pinned</p>
-            <p className="text-2xl sm:text-3xl font-bold text-emerald-700">
+            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium uppercase tracking-wider">Pinned</p>
+            <p className="text-2xl sm:text-3xl font-bold text-emerald-700 dark:text-emerald-300 mt-0.5">
               {announcements.filter(a => a.is_pinned).length}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-red-50 to-white hover:shadow-md transition-shadow">
+        <Card className="border border-red-200/60 dark:border-red-900/40 shadow-sm bg-red-50/60 dark:bg-red-950/20 rounded-2xl hover:shadow-md transition-shadow cursor-default">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-xs text-red-600 font-medium">Urgent</p>
-            <p className="text-2xl sm:text-3xl font-bold text-red-700">
+            <p className="text-xs text-red-600 dark:text-red-400 font-medium uppercase tracking-wider">Urgent</p>
+            <p className="text-2xl sm:text-3xl font-bold text-red-700 dark:text-red-300 mt-0.5">
               {announcements.filter(a => a.priority === 'urgent').length}
             </p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-orange-50 to-white hover:shadow-md transition-shadow">
+        <Card className="border border-orange-200/60 dark:border-orange-900/40 shadow-sm bg-orange-50/60 dark:bg-orange-950/20 rounded-2xl hover:shadow-md transition-shadow cursor-default">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-xs text-orange-600 font-medium">High Priority</p>
-            <p className="text-2xl sm:text-3xl font-bold text-orange-700">
+            <p className="text-xs text-orange-600 dark:text-orange-400 font-medium uppercase tracking-wider">High</p>
+            <p className="text-2xl sm:text-3xl font-bold text-orange-700 dark:text-orange-300 mt-0.5">
               {announcements.filter(a => a.priority === 'high').length}
             </p>
           </CardContent>
@@ -225,12 +227,12 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
       {/* Search and Filter Section */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Search announcements by title or content..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-10 sm:h-11 text-sm border-slate-200 focus:border-emerald-300 focus:ring-emerald-200"
+            className="pl-10 h-10 sm:h-11 text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-400 dark:focus:border-emerald-500 focus:ring-emerald-400/20 rounded-xl"
           />
         </div>
         
@@ -243,10 +245,10 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
               size="sm"
               onClick={() => setFilterPriority(filter.key)}
               className={cn(
-                "h-9 px-4 text-sm font-medium transition-all",
+                "h-10 sm:h-11 px-4 text-sm font-medium transition-all rounded-xl cursor-pointer",
                 filterPriority === filter.key 
-                  ? filter.color + " text-white shadow-md hover:opacity-90" 
-                  : "border-slate-200 hover:border-emerald-300 hover:bg-emerald-50"
+                  ? filter.color + " text-white shadow-md border-0" 
+                  : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-emerald-300 dark:hover:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 bg-white dark:bg-slate-900"
               )}
             >
               {filter.label}
@@ -260,13 +262,13 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
             variant="outline"
             size="sm"
             onClick={() => setMobileFilterOpen(!mobileFilterOpen)}
-            className="w-full h-9 justify-between border-slate-200"
+            className="w-full h-10 justify-between border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 rounded-xl"
           >
             <span className="flex items-center gap-2">
-              <Filter className="h-3.5 w-3.5" />
+              <Filter className="h-4 w-4 text-slate-500" />
               Filter: {priorityFilters.find(f => f.key === filterPriority)?.label || 'All'}
             </span>
-            <ChevronRight className={cn("h-3.5 w-3.5 transition-transform", mobileFilterOpen && "rotate-90")} />
+            <ChevronRight className={cn("h-4 w-4 text-slate-400 transition-transform", mobileFilterOpen && "rotate-90")} />
           </Button>
           
           <AnimatePresence>
@@ -275,9 +277,9 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 right-0 mt-1 bg-white rounded-xl shadow-lg border border-slate-100 p-2 z-10"
+                className="absolute top-full left-0 right-0 mt-2 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 p-2 z-10"
               >
-                <div className="grid grid-cols-2 gap-1">
+                <div className="grid grid-cols-2 gap-1.5">
                   {priorityFilters.map((filter) => (
                     <button
                       key={filter.key}
@@ -286,10 +288,10 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
                         setMobileFilterOpen(false)
                       }}
                       className={cn(
-                        "px-3 py-2 rounded-lg text-sm text-left transition-all",
+                        "px-3 py-2.5 rounded-lg text-sm text-left transition-all font-medium",
                         filterPriority === filter.key 
-                          ? "bg-emerald-50 text-emerald-700 font-medium" 
-                          : "text-slate-600 hover:bg-slate-50"
+                          ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400" 
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
                       )}
                     >
                       {filter.label}
@@ -302,90 +304,98 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
         </div>
       </div>
 
-      {/* ✅ Announcements List - WRAPPED with relative positioning to fix ScrollArea warning */}
-      <div className="relative w-full">
-        <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
-          {filteredAnnouncements.length === 0 ? (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="text-center py-12 sm:py-16">
-                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                  <Megaphone className="h-8 w-8 text-slate-300" />
-                </div>
-                <p className="text-slate-500 font-medium">No announcements found</p>
-                <p className="text-sm text-slate-400 mt-1">
-                  {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
-                </p>
-                {searchQuery && (
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    onClick={() => setSearchQuery('')}
-                    className="mt-3 text-emerald-600"
-                  >
-                    Clear search
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4 sm:space-y-5 pb-4">
+      {/* Announcements List */}
+      {filteredAnnouncements.length === 0 ? (
+        /* ✅ Empty state — normal flow, no forced height */
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 rounded-2xl">
+          <CardContent className="text-center py-12 sm:py-16">
+            <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-slate-700">
+              <Megaphone className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+            </div>
+            <p className="text-slate-800 dark:text-slate-200 font-semibold text-base sm:text-lg">
+              No announcements found
+            </p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto px-4">
+              {searchQuery ? `No results matching "${searchQuery}"` : 'Check back later for updates'}
+            </p>
+            {searchQuery && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchQuery('')}
+                className="mt-4 text-emerald-600 dark:text-emerald-400 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+              >
+                Clear search
+              </Button>
+            )}
+          </CardContent>
+        </Card>
+      ) : (
+        /* ✅ Only use ScrollArea when there's content */
+        <div className="relative w-full">
+          <ScrollArea className="h-[calc(100vh-480px)] sm:h-[calc(100vh-520px)] lg:h-[calc(100vh-560px)]">
+            <div className="space-y-6 pb-6 pr-3">
               {/* Pinned Announcements */}
               {pinnedAnnouncements.length > 0 && (
                 <div>
-                  <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                    <div className="h-6 w-6 rounded-full bg-amber-100 flex items-center justify-center">
-                      <Pin className="h-3 w-3 text-amber-600" />
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-6 w-6 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+                      <Pin className="h-3 w-3 text-amber-600 dark:text-amber-400" />
                     </div>
-                    <h3 className="text-sm font-semibold text-slate-600">Pinned Announcements</h3>
-                    <Badge className="bg-amber-100 text-amber-700 text-xs">{pinnedAnnouncements.length}</Badge>
+                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Pinned</h3>
+                    <Badge className="bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-[10px] border-0 px-2 py-0">{pinnedAnnouncements.length}</Badge>
                   </div>
-                  {pinnedAnnouncements.map((announcement, idx) => (
-                    <AnnouncementCard
-                      key={announcement.id}
-                      announcement={announcement}
-                      index={idx}
-                      getPriorityBgLight={getPriorityBgLight}
-                      getPriorityIcon={getPriorityIcon}
-                      formatDate={formatDate}
-                      onViewDetails={() => {
-                        setSelectedAnnouncement(announcement)
-                        setShowDetails(true)
-                      }}
-                    />
-                  ))}
+                  <div className="space-y-3">
+                    {pinnedAnnouncements.map((announcement, idx) => (
+                      <AnnouncementCard
+                        key={announcement.id}
+                        announcement={announcement}
+                        index={idx}
+                        getPriorityBgLight={getPriorityBgLight}
+                        getPriorityIcon={getPriorityIcon}
+                        formatDate={formatDate}
+                        onViewDetails={() => {
+                          setSelectedAnnouncement(announcement)
+                          setShowDetails(true)
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
 
               {/* Recent Announcements */}
-              <div>
-                <div className="flex items-center gap-2 mb-3 sm:mb-4">
-                  <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
-                    <Sparkles className="h-3 w-3 text-emerald-600" />
+              {normalAnnouncements.length > 0 && (
+                <div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="h-6 w-6 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">Recent</h3>
+                    <Badge className="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-[10px] border-0 px-2 py-0">{normalAnnouncements.length}</Badge>
                   </div>
-                  <h3 className="text-sm font-semibold text-slate-600">Recent Announcements</h3>
-                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">{normalAnnouncements.length}</Badge>
+                  <div className="space-y-3">
+                    {normalAnnouncements.map((announcement, idx) => (
+                      <AnnouncementCard
+                        key={announcement.id}
+                        announcement={announcement}
+                        index={idx}
+                        getPriorityBgLight={getPriorityBgLight}
+                        getPriorityIcon={getPriorityIcon}
+                        formatDate={formatDate}
+                        onViewDetails={() => {
+                          setSelectedAnnouncement(announcement)
+                          setShowDetails(true)
+                        }}
+                      />
+                    ))}
+                  </div>
                 </div>
-                <div className="space-y-3 sm:space-y-4">
-                  {normalAnnouncements.map((announcement, idx) => (
-                    <AnnouncementCard
-                      key={announcement.id}
-                      announcement={announcement}
-                      index={idx}
-                      getPriorityBgLight={getPriorityBgLight}
-                      getPriorityIcon={getPriorityIcon}
-                      formatDate={formatDate}
-                      onViewDetails={() => {
-                        setSelectedAnnouncement(announcement)
-                        setShowDetails(true)
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
-          )}
-        </ScrollArea>
-      </div>
+          </ScrollArea>
+        </div>
+      )}
 
       {/* Announcement Details Modal */}
       <AnimatePresence>
@@ -394,83 +404,93 @@ export function StudentAnnouncements({ showBreadcrumb = true, hideHeader = false
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 bg-black/60 dark:bg-black/80 backdrop-blur-sm"
             onClick={() => setShowDetails(false)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-[90%] sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-hidden"
+              initial={{ scale: 0.95, opacity: 0, y: 10 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 10 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl shadow-2xl w-full max-w-[90%] sm:max-w-lg md:max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b px-5 sm:px-6 py-4 flex justify-between items-center">
-                <div className="flex items-center gap-2 min-w-0">
+              <div className="shrink-0 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-5 sm:px-6 py-4 flex justify-between items-start gap-4">
+                <div className="flex gap-3 min-w-0 flex-1">
                   <div className={cn(
-                    "h-8 w-8 rounded-full flex items-center justify-center",
-                    selectedAnnouncement.priority === 'urgent' ? "bg-red-100" :
-                    selectedAnnouncement.priority === 'high' ? "bg-orange-100" : "bg-blue-100"
+                    "h-10 w-10 sm:h-12 sm:w-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-sm",
+                    selectedAnnouncement.priority === 'urgent' ? "bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50" :
+                    selectedAnnouncement.priority === 'high' ? "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/50" : "bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50"
                   )}>
                     {getPriorityIcon(selectedAnnouncement.priority)}
                   </div>
-                  <h2 className="font-bold text-lg sm:text-xl truncate text-slate-800">
-                    {selectedAnnouncement.title}
-                  </h2>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="font-bold text-lg sm:text-xl text-slate-900 dark:text-white leading-tight break-words">
+                      {selectedAnnouncement.title}
+                    </h2>
+                    <div className="flex flex-wrap items-center gap-2 mt-2">
+                      <Badge className={cn(
+                        getPriorityColor(selectedAnnouncement.priority),
+                        "text-[10px] px-2 py-0.5 border-0 font-bold uppercase tracking-wider"
+                      )}>
+                        {selectedAnnouncement.priority}
+                      </Badge>
+                      {selectedAnnouncement.is_pinned && (
+                        <Badge variant="outline" className="flex items-center gap-1 text-[10px] px-2 py-0.5 border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400">
+                          <Pin className="h-3 w-3" /> Pinned
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <Button 
                   variant="ghost" 
-                  size="sm" 
+                  size="icon" 
                   onClick={() => setShowDetails(false)}
-                  className="h-8 w-8 rounded-full hover:bg-slate-100 p-0"
+                  className="h-8 w-8 rounded-full hover:bg-slate-200 dark:hover:bg-slate-800 p-0 text-slate-500 shrink-0 cursor-pointer"
                 >
-                  <X className="h-4 w-4 text-slate-500" />
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
               
               {/* Modal Content */}
-              <div className="p-5 sm:p-6 space-y-4 overflow-y-auto max-h-[calc(85vh-70px)]">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge className={cn(
-                    getPriorityColor(selectedAnnouncement.priority),
-                    "text-xs px-2 py-0.5"
-                  )}>
-                    {selectedAnnouncement.priority.toUpperCase()}
-                  </Badge>
-                  {selectedAnnouncement.is_pinned && (
-                    <Badge variant="secondary" className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700">
-                      <Pin className="h-3 w-3" /> Pinned
-                    </Badge>
+              <ScrollArea className="flex-1 p-5 sm:p-6 bg-white dark:bg-slate-950">
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 p-3 rounded-xl border border-slate-100 dark:border-slate-800">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <span className="h-5 w-5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                        <span className="text-emerald-700 dark:text-emerald-400 font-bold text-[10px]">A</span>
+                      </span>
+                      By: <span className="text-slate-700 dark:text-slate-200">{selectedAnnouncement.created_by_name || 'Administrator'}</span>
+                    </span>
+                    <span className="hidden sm:inline text-slate-300 dark:text-slate-600">|</span>
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Calendar className="h-4 w-4" />
+                      {new Date(selectedAnnouncement.created_at).toLocaleDateString('en-NG', {
+                        weekday: 'short', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                  
+                  <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
+                    <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">
+                      {selectedAnnouncement.content}
+                    </p>
+                  </div>
+                  
+                  {selectedAnnouncement.expires_at && (
+                    <div className="bg-amber-50 dark:bg-amber-950/30 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800/60 flex items-start gap-2 sm:gap-3">
+                      <Bell className="h-4 w-4 sm:h-5 sm:w-5 shrink-0 mt-0.5" />
+                      <p>
+                        This announcement is temporary and will expire on <strong className="font-semibold">{new Date(selectedAnnouncement.expires_at).toLocaleDateString('en-NG', {
+                          weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'
+                        })}</strong>.
+                      </p>
+                    </div>
                   )}
                 </div>
-                
-                <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <span className="font-medium">By:</span> {selectedAnnouncement.created_by_name || 'Administrator'}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3.5 w-3.5" />
-                    {formatDate(selectedAnnouncement.created_at)}
-                  </span>
-                </div>
-                
-                <div className="border-t pt-4">
-                  <p className="text-slate-700 text-sm sm:text-base whitespace-pre-wrap leading-relaxed">
-                    {selectedAnnouncement.content}
-                  </p>
-                </div>
-                
-                {selectedAnnouncement.expires_at && (
-                  <div className="bg-amber-50 rounded-xl p-3 text-sm text-amber-700 border border-amber-200">
-                    <Bell className="h-4 w-4 inline mr-2" />
-                    This announcement will expire on {new Date(selectedAnnouncement.expires_at).toLocaleDateString('en-NG', {
-                      day: 'numeric',
-                      month: 'long',
-                      year: 'numeric'
-                    })}
-                  </div>
-                )}
-              </div>
+              </ScrollArea>
             </motion.div>
           </motion.div>
         )}
@@ -499,15 +519,15 @@ function AnnouncementCard({
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.05 }}
+      transition={{ delay: index * 0.04, duration: 0.3 }}
     >
       <Card 
         className={cn(
-          "group cursor-pointer transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 border",
+          "group cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 border rounded-2xl overflow-hidden bg-white dark:bg-slate-900",
           priorityBgLight,
-          announcement.is_pinned && "border-amber-200 shadow-sm"
+          announcement.is_pinned && "border-amber-200 dark:border-amber-800/60 shadow-sm"
         )}
         onClick={onViewDetails}
       >
@@ -515,9 +535,10 @@ function AnnouncementCard({
           <div className="flex items-start gap-3 sm:gap-4">
             {/* Icon */}
             <div className={cn(
-              "h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-colors group-hover:scale-105",
-              announcement.priority === 'urgent' ? "bg-red-100 text-red-600" :
-              announcement.priority === 'high' ? "bg-orange-100 text-orange-600" : "bg-blue-100 text-blue-600"
+              "h-10 w-10 sm:h-12 sm:w-12 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 shadow-sm border",
+              announcement.priority === 'urgent' ? "bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50" :
+              announcement.priority === 'high' ? "bg-orange-100 dark:bg-orange-950/40 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-900/50" : 
+              "bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-900/50"
             )}>
               {getPriorityIcon(announcement.priority)}
             </div>
@@ -525,18 +546,21 @@ function AnnouncementCard({
             {/* Content */}
             <div className="flex-1 min-w-0">
               <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                <h3 className="font-semibold text-slate-800 text-sm sm:text-base">
+                <h3 className="font-bold text-slate-800 dark:text-slate-100 text-sm sm:text-base leading-snug">
                   {announcement.title}
                 </h3>
                 {announcement.is_pinned && (
-                  <Pin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <Pin className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400 shrink-0" />
                 )}
               </div>
-              <p className="text-slate-500 text-xs sm:text-sm line-clamp-2">
+              <p className="text-slate-600 dark:text-slate-400 text-xs sm:text-sm line-clamp-2 leading-relaxed">
                 {announcement.content}
               </p>
-              <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
-                <span>By: {announcement.created_by_name || 'Administrator'}</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 font-medium">
+                <span className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/60 px-2 py-0.5 rounded-md border border-slate-100 dark:border-slate-800">
+                  <User className="h-3 w-3" />
+                  {announcement.created_by_name || 'Administrator'}
+                </span>
                 <span className="flex items-center gap-1">
                   <Calendar className="h-3 w-3" />
                   {formatDate(announcement.created_at)}
@@ -545,7 +569,9 @@ function AnnouncementCard({
             </div>
             
             {/* Arrow indicator */}
-            <ChevronRight className="h-4 w-4 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+            <div className="h-8 w-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+              <ChevronRight className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
+            </div>
           </div>
         </CardContent>
       </Card>

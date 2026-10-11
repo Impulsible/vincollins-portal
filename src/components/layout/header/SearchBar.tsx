@@ -35,10 +35,13 @@ export const SearchBar = memo(function SearchBar({ open, query, onChange, onClos
             placeholder="Search..."
             value={query}
             onChange={(e) => onChange(e.target.value)}
-            className="w-full bg-white shadow-2xl border-2 border-primary/30 rounded-full py-4 text-sm"
+            className="w-full bg-white dark:bg-slate-900 shadow-2xl dark:shadow-slate-950/50 border-2 border-primary/30 dark:border-slate-700 rounded-full py-4 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
             autoFocus
           />
-          <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-primary text-white">
+          <button 
+            type="submit" 
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-full bg-primary dark:bg-emerald-600 text-white hover:bg-primary/90 dark:hover:bg-emerald-700 transition-colors"
+          >
             <Search className="h-4 w-4" />
           </button>
         </div>

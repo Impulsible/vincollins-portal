@@ -1,5 +1,3 @@
-// src/app/layout.tsx
-
 import type { Metadata, Viewport } from 'next';
 import { Inter, Dancing_Script, Playfair_Display } from 'next/font/google';
 import { GeistSans } from 'geist/font/sans';
@@ -12,6 +10,7 @@ import { VersionBanner } from '@/components/VersionBanner';
 import { SessionProvider } from '@/components/SessionProvider';
 import { PWAProvider } from '@/components/PWAProvider';
 import { TwoStageSplashScreen } from '@/components/TwoStageSplashScreen';
+import { ThemeProvider } from '@/components/theme-provider';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -44,7 +43,7 @@ export const viewport: Viewport = {
   userScalable: true,
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#0A2472' },
-    { media: '(prefers-color-scheme: dark)', color: '#0A2472' },
+    { media: '(prefers-color-scheme: dark)', color: '#090d16' },
   ],
 };
 
@@ -236,33 +235,28 @@ export default function RootLayout({
       <body
         className={cn(
           GeistSans.className,
-          'antialiased bg-background text-foreground',
-          'min-h-screen flex flex-col',
+          'antialiased bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100',
+          'min-h-screen flex flex-col transition-colors duration-300',
         )}
         suppressHydrationWarning
       >
         <SessionProvider>
-          {/*
-            PWAProvider wraps TwoStageSplashScreen so that:
-            - PWA detection (isInstalled) is available to the splash
-            - Service worker, offline/online banners, install prompt
-              and reload button all work correctly
-            - The reload button only appears in installed PWA mode
-          */}
-          <PWAProvider>
-            <TwoStageSplashScreen>
-              {/*
-                ProgressBar inside splash wrapper:
-                prevents it rendering/flashing during splash stages.
-                It only appears once children are revealed.
-              */}
-              <ProgressBar />
-              <ClientLayout>
-                {children}
-                <VersionBanner />
-              </ClientLayout>
-            </TwoStageSplashScreen>
-          </PWAProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <PWAProvider>
+              <TwoStageSplashScreen>
+                <ProgressBar />
+                <ClientLayout>
+                  {children}
+                  <VersionBanner />
+                </ClientLayout>
+              </TwoStageSplashScreen>
+            </PWAProvider>
+          </ThemeProvider>
         </SessionProvider>
       </body>
     </html>

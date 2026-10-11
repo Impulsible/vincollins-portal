@@ -1,4 +1,4 @@
-// app/student/notifications/page.tsx - STUDENT NOTIFICATIONS (FULLY RESPONSIVE)
+// app/student/notifications/page.tsx - STUDENT NOTIFICATIONS WITH DARK MODE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Loader2, CheckCircle, Award, BookOpen, Bell, Trash2, ChevronRight, Home, GraduationCap, Clock, AlertCircle } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
+import { getFirstName, getDisplayName } from '@/lib/get-display-name'   // ✅ ADDED
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,6 +20,9 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface Profile {
   id: string
   full_name?: string
+  first_name?: string | null      // ✅ ADDED
+  last_name?: string | null       // ✅ ADDED
+  display_name?: string | null    // ✅ ADDED
   email?: string
   role?: string
   class?: string
@@ -169,25 +173,25 @@ export default function StudentNotificationsPage() {
   const getNotificationIcon = (type?: string) => {
     switch (type) {
       case 'assignment':
-        return { icon: BookOpen, color: 'text-emerald-600', bgColor: 'bg-emerald-100', label: 'New Assignment' }
+        return { icon: BookOpen, color: 'text-emerald-600 dark:text-emerald-400', bgColor: 'bg-emerald-100 dark:bg-emerald-950/40', label: 'New Assignment' }
       case 'exam':
-        return { icon: GraduationCap, color: 'text-blue-600', bgColor: 'bg-blue-100', label: 'Exam' }
+        return { icon: GraduationCap, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-100 dark:bg-blue-950/40', label: 'Exam' }
       case 'grade':
-        return { icon: Award, color: 'text-green-600', bgColor: 'bg-green-100', label: 'Grade Posted' }
+        return { icon: Award, color: 'text-green-600 dark:text-green-400', bgColor: 'bg-green-100 dark:bg-green-950/40', label: 'Grade Posted' }
       case 'announcement':
-        return { icon: Bell, color: 'text-purple-600', bgColor: 'bg-purple-100', label: 'Announcement' }
+        return { icon: Bell, color: 'text-purple-600 dark:text-purple-400', bgColor: 'bg-purple-100 dark:bg-purple-950/40', label: 'Announcement' }
       default:
-        return { icon: Bell, color: 'text-gray-600', bgColor: 'bg-gray-100', label: 'General' }
+        return { icon: Bell, color: 'text-slate-600 dark:text-slate-400', bgColor: 'bg-slate-100 dark:bg-slate-800', label: 'General' }
     }
   }
 
+  // ✅ FIXED: Uses shared helpers → "Esther" not "Soga"
   const formatProfileForHeader = (profile: Profile | null): HeaderUser | undefined => {
     if (!profile) return undefined
-    
     return {
       id: profile.id,
-      name: profile.full_name || 'Student',
-      firstName: profile.full_name?.split(' ')[0] || 'User',
+      name: getDisplayName(profile, 'Student'),
+      firstName: getFirstName(profile),
       email: profile.email || '',
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -199,16 +203,16 @@ export default function StudentNotificationsPage() {
     return (
       <>
         <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
-        <div className="min-h-screen flex items-center justify-center pt-20 bg-gradient-to-br from-slate-50 via-white to-emerald-50">
+        <div className="min-h-screen flex items-center justify-center pt-20 bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
           <div className="text-center">
             <motion.div
               animate={{ rotate: 360 }}
               transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             >
-              <Loader2 className="h-12 w-12 sm:h-14 sm:w-14 text-emerald-600 mx-auto" />
+              <Loader2 className="h-12 w-12 sm:h-14 sm:w-14 text-emerald-600 dark:text-emerald-400 mx-auto" />
             </motion.div>
-            <p className="mt-4 text-muted-foreground text-base sm:text-lg">Loading notifications...</p>
-            <p className="text-xs sm:text-sm text-muted-foreground/70 mt-1">Checking for updates</p>
+            <p className="mt-4 text-slate-500 dark:text-slate-400 text-base sm:text-lg">Loading notifications...</p>
+            <p className="text-xs sm:text-sm text-slate-400 dark:text-slate-500 mt-1">Checking for updates</p>
           </div>
         </div>
       </>
@@ -233,24 +237,24 @@ export default function StudentNotificationsPage() {
           "flex-1 transition-all duration-300",
           sidebarCollapsed ? "lg:ml-20" : "lg:ml-72"
         )}>
-          <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 pt-20 lg:pt-24 pb-8 sm:pb-12">
+          <main className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 pt-20 lg:pt-24 pb-8 sm:pb-12 transition-colors duration-300">
             <div className="container max-w-4xl mx-auto px-3 sm:px-4 lg:px-6">
               
-              {/* Breadcrumb Navigation */}
+              {/* Breadcrumb */}
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mb-3 sm:mb-5 flex items-center gap-2 text-xs sm:text-sm text-muted-foreground"
+                className="mb-3 sm:mb-5 flex items-center gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400"
               >
-                <Link href="/student" className="hover:text-emerald-600 flex items-center gap-1">
+                <Link href="/student" className="hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1">
                   <Home className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   <span className="hidden xs:inline">Dashboard</span>
                 </Link>
-                <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                <span className="text-foreground font-medium">Notifications</span>
+                <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400 dark:text-slate-500" />
+                <span className="text-slate-800 dark:text-slate-200 font-medium">Notifications</span>
               </motion.div>
 
-              {/* Header Section */}
+              {/* Header */}
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -258,27 +262,26 @@ export default function StudentNotificationsPage() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                   <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-                      <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+                    <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center">
+                      <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <div>
-                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
+                      <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-slate-800 dark:text-white">
                         Notifications
                       </h1>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                      <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
                         Stay updated with assignments, grades, and announcements
                       </p>
                     </div>
                   </div>
                   
-                  {/* Action Buttons */}
                   <div className="flex items-center gap-1.5 sm:gap-2">
                     {unreadCount > 0 && (
                       <Button 
                         variant="outline" 
                         size="sm" 
                         onClick={markAllAsRead}
-                        className="h-8 sm:h-9 text-xs sm:text-sm border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300"
+                        className="h-8 sm:h-9 text-xs sm:text-sm border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700"
                       >
                         <CheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
                         <span className="hidden xs:inline">Mark all read</span>
@@ -290,7 +293,7 @@ export default function StudentNotificationsPage() {
                         variant="outline" 
                         size="sm" 
                         onClick={clearAll}
-                        className="h-8 sm:h-9 text-xs sm:text-sm text-red-500 hover:text-red-600 hover:bg-red-50 border-red-200"
+                        className="h-8 sm:h-9 text-xs sm:text-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 border-red-200 dark:border-red-800"
                       >
                         <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1 sm:mr-1.5" />
                         <span className="hidden xs:inline">Clear all</span>
@@ -300,10 +303,9 @@ export default function StudentNotificationsPage() {
                   </div>
                 </div>
                 
-                {/* Unread Summary */}
                 {unreadCount > 0 && (
-                  <div className="mt-3 sm:mt-4 p-2.5 sm:p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <p className="text-xs sm:text-sm text-emerald-800">
+                  <div className="mt-3 sm:mt-4 p-2.5 sm:p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-lg border border-emerald-200 dark:border-emerald-900/50">
+                    <p className="text-xs sm:text-sm text-emerald-800 dark:text-emerald-300">
                       You have <span className="font-bold">{unreadCount}</span> unread notification{unreadCount !== 1 ? 's' : ''}
                     </p>
                   </div>
@@ -318,28 +320,28 @@ export default function StudentNotificationsPage() {
                 className="mb-5 sm:mb-6"
               >
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="bg-white p-1 rounded-xl shadow-sm border w-full sm:w-auto">
+                  <TabsList className="bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 w-full sm:w-auto">
                     <TabsTrigger 
                       value="all" 
-                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm py-2 flex-1 sm:flex-initial px-3 sm:px-4"
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-xs sm:text-sm py-2 flex-1 sm:flex-initial px-3 sm:px-4"
                     >
                       All
-                      <Badge variant="secondary" className="ml-1.5 sm:ml-2 bg-gray-100 text-gray-600 text-[10px] sm:text-xs">
+                      <Badge variant="secondary" className="ml-1.5 sm:ml-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] sm:text-xs">
                         {notifications.length}
                       </Badge>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="unread" 
-                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm py-2 flex-1 sm:flex-initial px-3 sm:px-4"
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-xs sm:text-sm py-2 flex-1 sm:flex-initial px-3 sm:px-4"
                     >
                       Unread
-                      <Badge variant="secondary" className="ml-1.5 sm:ml-2 bg-gray-100 text-gray-600 text-[10px] sm:text-xs">
+                      <Badge variant="secondary" className="ml-1.5 sm:ml-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] sm:text-xs">
                         {unreadCount}
                       </Badge>
                     </TabsTrigger>
                     <TabsTrigger 
                       value="read" 
-                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-xs sm:text-sm py-2 flex-1 sm:flex-initial px-3 sm:px-4"
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-xs sm:text-sm py-2 flex-1 sm:flex-initial px-3 sm:px-4"
                     >
                       Read
                     </TabsTrigger>
@@ -355,17 +357,17 @@ export default function StudentNotificationsPage() {
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
                   >
-                    <Card className="border-0 shadow-lg bg-white">
+                    <Card className="border border-slate-200 dark:border-slate-800 shadow-lg bg-white dark:bg-slate-900">
                       <CardContent className="p-8 sm:p-12 lg:p-16 text-center">
-                        <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                          <Bell className="h-7 w-7 sm:h-8 sm:w-8 text-gray-400" />
+                        <div className="h-14 w-14 sm:h-16 sm:w-16 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                          <Bell className="h-7 w-7 sm:h-8 sm:w-8 text-slate-400 dark:text-slate-500" />
                         </div>
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1 sm:mb-2">
+                        <h3 className="text-base sm:text-lg font-semibold text-slate-800 dark:text-slate-200 mb-1 sm:mb-2">
                           {activeTab === 'all' ? 'No notifications' : 
                            activeTab === 'unread' ? 'No unread notifications' : 
                            'No read notifications'}
                         </h3>
-                        <p className="text-xs sm:text-sm text-gray-500 max-w-sm mx-auto">
+                        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                           {activeTab === 'all' 
                             ? 'You\'re all caught up! New notifications will appear here when teachers post assignments or grades.' 
                             : activeTab === 'unread' 
@@ -394,15 +396,14 @@ export default function StudentNotificationsPage() {
                         >
                           <Card 
                             className={cn(
-                              "group relative overflow-hidden transition-all duration-300 hover:shadow-md border-0 shadow-sm cursor-pointer",
-                              !notification.read && "border-l-4 border-l-emerald-500 bg-gradient-to-r from-emerald-50/50 to-white"
+                              "group relative overflow-hidden transition-all duration-300 hover:shadow-md dark:hover:shadow-slate-950/50 border-0 shadow-sm cursor-pointer bg-white dark:bg-slate-900",
+                              !notification.read && "border-l-4 border-l-emerald-500 dark:border-l-emerald-400 bg-gradient-to-r from-emerald-50/50 to-white dark:from-emerald-950/30 dark:to-slate-900"
                             )}
                             onClick={() => {
                               if (!notification.read) markAsRead(notification.id)
                               if (notification.link) window.location.href = notification.link
                             }}
                           >
-                            {/* Unread Indicator Dot */}
                             {!notification.read && (
                               <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
                                 <span className="flex h-2 w-2 sm:h-2.5 sm:w-2.5">
@@ -414,7 +415,6 @@ export default function StudentNotificationsPage() {
                             
                             <CardContent className="p-3 sm:p-4 lg:p-5">
                               <div className="flex items-start gap-3 sm:gap-4">
-                                {/* Icon */}
                                 <div className={cn(
                                   "h-10 w-10 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105",
                                   bgColor
@@ -422,41 +422,38 @@ export default function StudentNotificationsPage() {
                                   <IconComponent className={cn("h-5 w-5", color)} />
                                 </div>
                                 
-                                {/* Content */}
                                 <div className="flex-1 min-w-0">
                                   <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-2">
                                     <div className="flex-1">
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <h3 className={cn(
-                                          "font-semibold text-sm sm:text-base",
-                                          !notification.read && "font-bold",
-                                          "text-gray-900"
+                                          "font-semibold text-sm sm:text-base text-slate-800 dark:text-slate-100",
+                                          !notification.read && "font-bold"
                                         )}>
                                           {notification.title}
                                         </h3>
-                                        <Badge variant="outline" className="text-[10px] sm:text-xs font-normal">
+                                        <Badge variant="outline" className="text-[10px] sm:text-xs font-normal border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
                                           {label}
                                         </Badge>
                                       </div>
-                                      <p className="text-xs sm:text-sm text-gray-600 mt-1 sm:mt-1.5 line-clamp-2">
+                                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 sm:mt-1.5 line-clamp-2">
                                         {notification.message}
                                       </p>
                                       {notification.metadata?.due_date && (
                                         <div className="flex items-center gap-1 mt-1.5">
-                                          <Clock className="h-3 w-3 text-amber-500" />
-                                          <span className="text-[10px] text-amber-600">
+                                          <Clock className="h-3 w-3 text-amber-500 dark:text-amber-400" />
+                                          <span className="text-[10px] text-amber-600 dark:text-amber-400">
                                             Due: {new Date(notification.metadata.due_date).toLocaleDateString()}
                                           </span>
                                         </div>
                                       )}
                                     </div>
-                                    <span className="text-[10px] sm:text-xs text-gray-400 whitespace-nowrap">
+                                    <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
                                       {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                                     </span>
                                   </div>
                                   
-                                  {/* Action Buttons */}
-                                  <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3 pt-1 sm:pt-2 border-t border-gray-100">
+                                  <div className="flex items-center gap-1.5 sm:gap-2 mt-2 sm:mt-3 pt-1 sm:pt-2 border-t border-slate-100 dark:border-slate-800">
                                     {!notification.read && (
                                       <Button 
                                         variant="ghost" 
@@ -465,7 +462,7 @@ export default function StudentNotificationsPage() {
                                           e.stopPropagation()
                                           markAsRead(notification.id)
                                         }}
-                                        className="h-7 sm:h-8 text-[10px] sm:text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+                                        className="h-7 sm:h-8 text-[10px] sm:text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
                                       >
                                         <CheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1" />
                                         Mark as read
@@ -474,7 +471,7 @@ export default function StudentNotificationsPage() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm"
-                                      className="h-7 sm:h-8 text-[10px] sm:text-xs text-red-500 hover:text-red-600 hover:bg-red-50"
+                                      className="h-7 sm:h-8 text-[10px] sm:text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         deleteNotification(notification.id)
@@ -495,7 +492,6 @@ export default function StudentNotificationsPage() {
                 )}
               </AnimatePresence>
               
-              {/* Footer Info */}
               {filteredNotifications.length > 0 && (
                 <motion.div 
                   initial={{ opacity: 0 }}
@@ -503,7 +499,7 @@ export default function StudentNotificationsPage() {
                   transition={{ delay: 0.2 }}
                   className="mt-5 sm:mt-6 text-center"
                 >
-                  <p className="text-[10px] sm:text-xs text-gray-400">
+                  <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">
                     Showing {filteredNotifications.length} of {notifications.length} notification{notifications.length !== 1 ? 's' : ''}
                   </p>
                 </motion.div>

@@ -1,4 +1,3 @@
-// components/layout/header/MobileMenu.tsx - FIXED WITH PROFILE IMAGE
 'use client'
 
 import { memo, useState } from 'react'
@@ -48,13 +47,12 @@ const dashboardNavMap: Record<string, { name: string; href: string; icon: any }[
     { name: 'Students', href: '/admin/students', icon: GraduationCap },
     { name: 'Staff', href: '/admin/staff', icon: Briefcase },
     { name: 'Exam Approvals', href: '/admin/exams', icon: MonitorPlay },
-    { name: 'Reports', href: '/admin/report-cards', icon: FileCheck },
     { name: 'Live Monitor', href: '/admin/monitor', icon: Activity },
   ],
   teacher: [
     { name: 'Overview', href: '/staff', icon: LayoutDashboard },
     { name: 'Exams', href: '/staff/exams', icon: MonitorPlay },
-    { name: 'CA Scores', href: '/staff/ca-scores', icon: ClipboardList }, // ✅ changed from Assignments
+    { name: 'CA Scores', href: '/staff/ca-scores', icon: ClipboardList },
     { name: 'Students', href: '/staff/students', icon: Users },
     { name: 'Analytics', href: '/staff/analytics', icon: BarChart3 },
   ],
@@ -63,14 +61,14 @@ const dashboardNavMap: Record<string, { name: string; href: string; icon: any }[
     { name: 'My Exams', href: '/student/exams', icon: MonitorPlay },
     { name: 'Results', href: '/student/results', icon: GraduationCap },
     { name: 'Classmates', href: '/student/classmates', icon: Users },
-    { name: 'Report Card', href: '/student/report-card', icon: FileCheck }, // ✅ changed from Profile
+    { name: 'Report Card', href: '/student/report-card', icon: FileCheck },
   ],
 }
 
 const roleBadgeColors: Record<string, string> = {
-  admin: 'bg-purple-500 text-white',
-  teacher: 'bg-blue-500 text-white',
-  student: 'bg-emerald-500 text-white',
+  admin: 'bg-purple-500 text-white border-none',
+  teacher: 'bg-blue-500 text-white border-none',
+  student: 'bg-emerald-500 text-white border-none',
 }
 
 const roleDisplayNames: Record<string, string> = {
@@ -155,42 +153,43 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
       {open && (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40 lg:hidden" onClick={onClose} />
+            className="fixed inset-0 bg-black/50 dark:bg-black/70 backdrop-blur-sm z-40 lg:hidden transition-colors" onClick={onClose} />
           
           <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed top-0 right-0 h-full w-full xs:w-[320px] sm:w-[380px] bg-white z-50 shadow-2xl lg:hidden flex flex-col">
+            className="fixed top-0 right-0 h-full w-full xs:w-[320px] sm:w-[380px] bg-white dark:bg-slate-950 z-50 shadow-2xl border-l border-transparent dark:border-slate-800/80 lg:hidden flex flex-col transition-colors duration-300">
             
             {/* Header */}
-            <div className="flex-shrink-0 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] p-4 sm:p-6 flex items-center justify-between">
+            <div className="flex-shrink-0 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 border-b border-transparent dark:border-slate-800/80 p-4 sm:p-6 flex items-center justify-between transition-colors duration-300">
               <div className="flex items-center gap-3 min-w-0">
                 {schoolSettings?.logo_path ? (
                   <Image src={schoolSettings.logo_path} alt="Logo" width={40} height={40} className="rounded-lg flex-shrink-0" />
                 ) : (
-                  <div className="h-10 w-10 bg-white/20 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <GraduationCap className="h-5 w-5 text-white" />
+                  <div className="h-10 w-10 bg-white/20 dark:bg-slate-800/80 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <GraduationCap className="h-5 w-5 text-white dark:text-blue-400" />
                   </div>
                 )}
                 <div className="min-w-0">
                   <p className="text-white font-semibold text-sm truncate">Vincollins College</p>
-                  {isAuthenticated && <p className="text-white/70 text-xs truncate">Hi, {user?.firstName || 'User'}!</p>}
+                  {isAuthenticated && <p className="text-white/70 dark:text-slate-400 text-xs truncate">Hi, {user?.firstName || 'User'}!</p>}
                 </div>
               </div>
-              <button onClick={onClose} className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center text-white">
+              <button onClick={onClose} className="h-8 w-8 rounded-full bg-white/20 dark:bg-slate-800 hover:bg-white/30 dark:hover:bg-slate-700 flex items-center justify-center text-white transition-colors cursor-pointer">
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* User Info - with Profile Image */}
             {isDashboardPage && isAuthenticated && (
-              <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-b">
+              <div className="flex-shrink-0 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-900 dark:to-slate-900/80 border-b border-slate-200/60 dark:border-slate-800/80 transition-colors duration-300">
                 <div className="flex items-center gap-3">
-                  <Avatar className="h-12 w-12 ring-2 ring-primary/20 flex-shrink-0">
+                  <Avatar className="h-12 w-12 ring-2 ring-primary/20 dark:ring-blue-500/20 flex-shrink-0 bg-slate-100 dark:bg-slate-800">
                     {avatarUrl && !avatarError ? (
                       <AvatarImage 
                         src={avatarUrl} 
                         alt={user?.name || 'User'} 
                         onError={() => setAvatarError(true)}
+                        className="object-cover"
                       />
                     ) : null}
                     <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-600 text-white font-bold">
@@ -198,16 +197,16 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 text-sm truncate">{user?.name || 'User'}</p>
-                    <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
-                    <Badge className={cn("mt-1 text-xs", roleBadgeColors[user?.role || 'student'])}>
+                    <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">{user?.name || 'User'}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 truncate">{user?.email || ''}</p>
+                    <Badge className={cn("mt-1 text-[10px] uppercase font-bold tracking-wider", roleBadgeColors[user?.role || 'student'])}>
                       {roleDisplayNames[user?.role || 'student']}
                     </Badge>
                   </div>
                 </div>
                 {/* Show "Go to Dashboard" on public pages */}
                 {!isDashboardPage && (
-                  <button onClick={goToDashboard} className="mt-3 w-full py-2.5 bg-[#F5A623] text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2">
+                  <button onClick={goToDashboard} className="mt-3 w-full py-2.5 bg-[#F5A623] hover:bg-[#e09612] text-[#0A2472] rounded-lg font-bold text-sm flex items-center justify-center gap-2 transition-colors cursor-pointer">
                     <LayoutDashboard className="h-4 w-4" />Go to Dashboard<ArrowRight className="h-4 w-4" />
                   </button>
                 )}
@@ -217,7 +216,7 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
             <ScrollArea className="flex-1">
               <nav className="p-4">
                 {/* Section label changes based on context */}
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">
+                <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-2">
                   {isDashboardPage ? 'Dashboard' : 'Navigation'}
                 </p>
                 
@@ -230,19 +229,19 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                         key={item.name}
                         onClick={() => handleNav(item.href)}
                         className={cn(
-                          "flex items-center gap-3 w-full px-3 py-3 rounded-lg text-sm font-medium transition-all",
+                          "flex items-center gap-3 w-full px-3 py-3 rounded-xl text-sm font-medium transition-all cursor-pointer",
                           active
-                            ? 'bg-primary/10 text-primary shadow-sm font-semibold'
-                            : 'text-gray-700 hover:bg-gray-50'
+                            ? 'bg-primary/10 dark:bg-primary/20 text-primary dark:text-blue-400 shadow-sm font-semibold'
+                            : 'text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-900'
                         )}
                       >
                         <item.icon className={cn(
-                          "h-5 w-5 flex-shrink-0",
-                          active ? 'text-primary' : 'text-gray-400'
+                          "h-5 w-5 flex-shrink-0 transition-colors",
+                          active ? 'text-primary dark:text-blue-400' : 'text-gray-400 dark:text-slate-500'
                         )} />
                         <span className="flex-1 text-left">{item.name}</span>
                         {active && (
-                          <span className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                          <span className="h-2 w-2 rounded-full bg-primary dark:bg-blue-400 flex-shrink-0" />
                         )}
                       </button>
                     )
@@ -252,16 +251,16 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                 {/* Quick Links - Portal & Home for dashboard users */}
                 {isDashboardPage && (
                   <>
-                    <div className="my-4 border-t border-gray-100" />
-                    <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2">Quick Links</p>
+                    <div className="my-4 border-t border-gray-100 dark:border-slate-800/80" />
+                    <p className="text-xs font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-2">Quick Links</p>
                     <div className="space-y-1">
-                      <button onClick={() => handleNav('/')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm text-gray-600 hover:bg-gray-50">
-                        <Home className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <button onClick={() => handleNav('/')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-900 cursor-pointer transition-colors">
+                        <Home className="h-4 w-4 text-gray-400 dark:text-slate-500 flex-shrink-0" />
                         <span>Home Page</span>
                       </button>
                       {!isPortalPage && (
-                        <button onClick={() => handleNav('/portal')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 bg-amber-50/50">
-                          <KeyRound className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                        <button onClick={() => handleNav('/portal')} className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl text-sm font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 bg-amber-50/50 dark:bg-amber-950/20 cursor-pointer transition-colors border border-amber-100 dark:border-amber-900/30">
+                          <KeyRound className="h-4 w-4 text-amber-500 dark:text-amber-400 flex-shrink-0" />
                           <span>Portal page</span>
                         </button>
                       )}
@@ -270,12 +269,12 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                 )}
 
                 {/* Contact Info + Social + Footer */}
-                <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-slate-800/80">
                   <div className="space-y-2 mb-4">
-                    <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 px-2">Contact Info</p>
+                    <p className="text-[10px] font-semibold text-gray-400 dark:text-slate-500 uppercase tracking-wider mb-1 px-2">Contact Info</p>
                     {contactInfoData.map((info, idx) => (
-                      <div key={idx} className="flex items-start gap-2 px-2 text-xs text-gray-500">
-                        <info.icon className="h-3.5 w-3.5 text-gray-400 flex-shrink-0 mt-0.5" />
+                      <div key={idx} className="flex items-start gap-2 px-2 text-xs text-gray-500 dark:text-slate-400">
+                        <info.icon className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500 flex-shrink-0 mt-0.5" />
                         <span className="break-words">{info.text}</span>
                       </div>
                     ))}
@@ -284,20 +283,20 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                   <div className="flex items-center justify-center gap-3 mb-4">
                     {socialLinks.map((s, idx) => (
                       <a key={idx} href={s.href} target="_blank" rel="noopener noreferrer"
-                        className="h-9 w-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-[#0A2472] hover:text-white transition-colors flex-shrink-0">
+                        className="h-9 w-9 rounded-full bg-gray-100 dark:bg-slate-900 flex items-center justify-center text-gray-500 dark:text-slate-400 hover:bg-[#0A2472] dark:hover:bg-blue-600 hover:text-white dark:hover:text-white transition-colors flex-shrink-0 border border-transparent dark:border-slate-800">
                         <s.icon className="h-4 w-4" />
                       </a>
                     ))}
                   </div>
 
                   <div className="text-center mb-4">
-                    <p className="text-[10px] text-gray-400">© {currentYear} Vincollins College</p>
-                    <p className="text-[9px] text-gray-300">Geared Towards Excellence</p>
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500">© {currentYear} Vincollins College</p>
+                    <p className="text-[9px] text-gray-400/80 dark:text-slate-500/80 mt-0.5">Geared Towards Excellence</p>
                   </div>
 
                   {/* Portal Login for public pages */}
                   {!isAuthenticated && !isPortalPage && (
-                    <button onClick={() => handleNav('/portal')} className="flex items-center justify-center gap-2 w-full py-3 bg-[#F5A623] text-[#0A2472] rounded-xl font-semibold shadow-md text-sm mb-3">
+                    <button onClick={() => handleNav('/portal')} className="flex items-center justify-center gap-2 w-full py-3 bg-[#F5A623] hover:bg-[#e09612] text-[#0A2472] rounded-xl font-bold shadow-md text-sm mb-3 transition-colors cursor-pointer">
                       <KeyRound className="h-4 w-4" />Portal Login
                     </button>
                   )}
@@ -305,7 +304,7 @@ export const MobileMenu = memo(function MobileMenu({ open, onClose, user, school
                   {/* Sign Out for authenticated users */}
                   {isAuthenticated && (
                     <button onClick={() => { onClose(); onSignOut() }}
-                      className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium text-sm">
+                      className="flex items-center justify-center gap-2 w-full py-3 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/60 rounded-xl font-semibold text-sm transition-colors cursor-pointer border border-red-100 dark:border-red-900/30">
                       <LogOut className="h-4 w-4" />Sign Out
                     </button>
                   )}

@@ -1,5 +1,4 @@
 /* eslint-disable react/no-unescaped-entities */
-// components/student/StudentSidebar.tsx - WITH ANNOUNCEMENTS
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -11,7 +10,7 @@ import {
   LogOut, ChevronLeft, ChevronRight, GraduationCap,
   Sparkles, MonitorPlay, User,
   Bell, HelpCircle, Wifi, WifiOff, FileCheck, Users,
-  Megaphone
+  Megaphone, Globe2
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -153,7 +152,6 @@ export function StudentSidebar({
     isMountedRef.current = true
     return () => {
       isMountedRef.current = false
-      // Clean up channel subscription properly
       const cleanupChannel = async () => {
         if (channelRef.current) {
           try {
@@ -170,14 +168,11 @@ export function StudentSidebar({
 
   // ✅ SINGLE EFFECT: Fetch profile THEN set up subscription
   useEffect(() => {
-    // Reset subscription flag when component mounts
     subscriptionAttemptedRef.current = false
     
     const setupProfileAndSubscription = async () => {
       try {
         setProfileLoading(true)
-        
-        // Get current user
         const { data: { user }, error: userError } = await supabase.auth.getUser()
         
         if (userError || !user) {
@@ -188,7 +183,6 @@ export function StudentSidebar({
 
         console.log('🔍 Fetching student profile for sidebar...')
         
-        // Fetch profile data
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select(`
@@ -217,13 +211,6 @@ export function StudentSidebar({
         }
 
         if (profileData && isMountedRef.current) {
-          console.log('✅ Profile loaded:', {
-            full_name: profileData.full_name,
-            display_name: profileData.display_name,
-            first_name: profileData.first_name,
-          })
-
-          // Set local profile state
           setLocalProfile({
             id: profileData.id,
             first_name: profileData.first_name,
@@ -242,7 +229,6 @@ export function StudentSidebar({
           setProfileLoading(false)
         }
 
-        // ✅ CRITICAL FIX: Clean up previous channel before creating new one
         if (channelRef.current) {
           try {
             await supabase.removeChannel(channelRef.current)
@@ -252,13 +238,9 @@ export function StudentSidebar({
           channelRef.current = null
         }
 
-        // ✅ Create unique channel ID with timestamp to prevent conflicts
         const channelId = `profile-updates-${user.id}-${Date.now()}`
-        
-        // ✅ Create channel and add listeners BEFORE subscribing
         const newChannel = supabase.channel(channelId)
         
-        // ✅ Add the postgres_changes listener
         newChannel.on(
           'postgres_changes',
           {
@@ -295,21 +277,13 @@ export function StudentSidebar({
           }
         )
         
-        // ✅ NOW subscribe (AFTER adding all listeners)
-        const subscription = newChannel.subscribe((status) => {
+        newChannel.subscribe((status) => {
           if (status === 'SUBSCRIBED') {
             console.log('✅ Successfully subscribed to profile updates for channel:', channelId)
             subscriptionAttemptedRef.current = true
-          } else if (status === 'CHANNEL_ERROR') {
-            console.error('❌ Failed to subscribe to profile updates')
-          } else if (status === 'TIMED_OUT') {
-            console.error('❌ Subscription timed out')
-          } else if (status === 'CLOSED') {
-            console.log('Channel closed')
           }
         })
         
-        // Store channel reference
         channelRef.current = newChannel
 
       } catch (error) {
@@ -320,7 +294,6 @@ export function StudentSidebar({
 
     setupProfileAndSubscription()
 
-    // ✅ Cleanup function for this effect
     return () => {
       const cleanup = async () => {
         if (channelRef.current) {
@@ -334,7 +307,7 @@ export function StudentSidebar({
       }
       cleanup()
     }
-  }, []) // Empty dependency array - run once on mount
+  }, [])
 
   // Track online/offline status
   useEffect(() => {
@@ -420,29 +393,41 @@ export function StudentSidebar({
       <button
         onClick={() => handleNavClick(item.id, item.route)}
         className={cn(
-          "flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all w-full group relative overflow-hidden",
+          "flex items-center gap-3 px-3 py-3 rounded-xl transition-all w-full group relative overflow-hidden my-0.5",
           isActive 
-            ? "bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-500/25" 
-            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800",
+            ? "bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-500 text-white shadow-md shadow-emerald-500/10 font-semibold" 
+            : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800/60",
           collapsed ? "justify-center" : ""
         )}
       >
+        {/* Dynamic active line bar */}
+        {isActive && !collapsed && (
+          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full" />
+        )}
+        
         {!isActive && (
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/0 to-teal-500/0 group-hover:from-emerald-500/5 group-hover:to-teal-500/5 transition-all duration-500" />
         )}
+        
         <Icon className={cn(
-          "h-5 w-5 shrink-0 transition-all duration-300",
-          isActive ? "text-white" : "group-hover:scale-110 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
+          "h-5 w-5 shrink-0 transition-transform duration-300",
+          isActive ? "text-white" : "text-slate-500 dark:text-slate-400 group-hover:scale-110 group-hover:text-emerald-600 dark:group-hover:text-emerald-400"
         )} />
+        
         {!collapsed && (
           <div className="flex-1 text-left">
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium block">{item.name}</span>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium tracking-wide block">{item.name}</span>
               {item.badge && (
-                <Badge className="bg-amber-100 text-amber-700 text-[9px] px-1.5 py-0.5 border-amber-200">{item.badge}</Badge>
+                <Badge className="bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 text-[9px] px-1.5 py-0.5 border-amber-200 border">
+                  {item.badge}
+                </Badge>
               )}
             </div>
-            <span className={cn("text-xs block truncate", isActive ? "text-emerald-100" : "text-slate-400 dark:text-slate-500")}>
+            <span className={cn(
+              "text-[10px] block truncate mt-0.5 tracking-tight", 
+              isActive ? "text-emerald-50/80" : "text-slate-400 dark:text-slate-500"
+            )}>
               {item.description}
             </span>
           </div>
@@ -454,10 +439,10 @@ export function StudentSidebar({
       return (
         <Tooltip key={item.id} delayDuration={0}>
           <TooltipTrigger asChild>{buttonContent}</TooltipTrigger>
-          <TooltipContent side="right" className="ml-2">
+          <TooltipContent side="right" className="ml-2 bg-slate-900 text-white border border-slate-800">
             <div>
-              <p className="font-medium">{item.name}</p>
-              <p className="text-xs text-slate-400">{item.description}</p>
+              <p className="font-semibold text-xs">{item.name}</p>
+              <p className="text-[10px] text-slate-400">{item.description}</p>
             </div>
           </TooltipContent>
         </Tooltip>
@@ -468,23 +453,28 @@ export function StudentSidebar({
   }
 
   const statusDisplay = isOnline 
-    ? { icon: Wifi, color: 'bg-green-500', text: 'Online', textColor: 'text-green-600' }
-    : { icon: WifiOff, color: 'bg-gray-400', text: 'Offline', textColor: 'text-gray-500' }
+    ? { icon: Wifi, color: 'bg-emerald-500', text: 'Online', textColor: 'text-emerald-600' }
+    : { icon: WifiOff, color: 'bg-slate-400', text: 'Offline', textColor: 'text-slate-500' }
   const StatusIcon = statusDisplay.icon
 
   if (profileLoading) {
     return (
       <aside className={cn(
-        "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800",
+        "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 shadow-sm",
         collapsed ? "w-20" : "w-72"
       )}>
-        <div className="p-5 space-y-4">
+        <div className="p-5 space-y-6">
           <div className="flex items-center gap-4">
-            <div className="h-12 w-12 rounded-full bg-muted animate-pulse" />
+            <div className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 animate-pulse" />
             <div className="space-y-2 flex-1">
-              <div className="h-4 w-24 bg-muted animate-pulse rounded" />
-              <div className="h-3 w-32 bg-muted animate-pulse rounded" />
+              <div className="h-4 w-24 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-full" />
+              <div className="h-3 w-32 bg-slate-100 dark:bg-slate-800 animate-pulse rounded-full" />
             </div>
+          </div>
+          <div className="space-y-4 pt-10">
+            {[1, 2, 3, 4, 5].map(i => (
+              <div key={i} className="h-9 w-full bg-slate-100 dark:bg-slate-800 animate-pulse rounded-xl" />
+            ))}
           </div>
         </div>
       </aside>
@@ -492,161 +482,183 @@ export function StudentSidebar({
   }
 
   const sidebarContent = (
-    <>
-      <div className="pt-6" />
-      
-      {/* Logo Section */}
-      <div className={cn("relative px-5 pb-4 border-b border-slate-200 dark:border-slate-800", collapsed ? "flex justify-center" : "")}>
-        <div className="relative flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl blur opacity-30" />
-            <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center shadow-lg">
-              <GraduationCap className="h-5 w-5 text-white" />
+    <div className="flex flex-col h-full justify-between">
+      <div>
+        <div className="pt-5" />
+        
+        {/* Brand Banner */}
+        <div className={cn("relative px-5 pb-5 border-b border-slate-100 dark:border-slate-800/80", collapsed ? "flex justify-center" : "")}>
+          <div className="relative flex items-center gap-3">
+            <div className="relative shrink-0">
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl blur opacity-25" />
+              <div className="relative h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/10">
+                <GraduationCap className="h-5.5 w-5.5 text-white" />
+              </div>
             </div>
+            {!collapsed && (
+              <div className="overflow-hidden">
+                <h2 className="font-bold text-sm tracking-tight text-slate-900 dark:text-white uppercase">Vincollins College</h2>
+                <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5">
+                  <Sparkles className="h-3 w-3 text-amber-500 animate-pulse" />Student Portal
+                </p>
+              </div>
+            )}
           </div>
-          {!collapsed && (
-            <div className="overflow-hidden">
-              <h2 className="font-bold text-base text-slate-900 dark:text-white">Vincollins College</h2>
-              <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                <Sparkles className="h-3 w-3 text-amber-500" />Student Portal
-              </p>
+        </div>
+
+        {/* Dynamic Card for Profile details */}
+        <div className={cn(
+          "relative px-5 py-5 border-b border-slate-100 dark:border-slate-800/80",
+          "bg-gradient-to-b from-emerald-50/30 via-transparent to-transparent dark:from-emerald-950/10 dark:via-transparent dark:to-transparent",
+          collapsed ? "flex justify-center" : ""
+        )}>
+          {collapsed ? (
+            <div className="relative group cursor-pointer">
+              <Avatar className="h-12 w-12 ring-2 ring-emerald-500/20 dark:ring-emerald-500/10 shadow-md">
+                <AvatarImage src={avatarUrl} alt={displayName} />
+                <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-base">{initials}</AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={cn("relative h-3 w-3 rounded-full ring-2 ring-white dark:ring-slate-950", statusDisplay.color, isOnline && "animate-pulse")} />
+                  </TooltipTrigger>
+                  <TooltipContent side="right"><p>{isOnline ? 'Online' : 'Offline'}</p></TooltipContent>
+                </Tooltip>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 w-full">
+              <div className="flex items-center gap-3">
+                <div className="relative shrink-0">
+                  <Avatar className="h-14 w-14 ring-2 ring-emerald-500/20 dark:ring-emerald-500/10 shadow-lg">
+                    <AvatarImage src={avatarUrl} alt={displayName} />
+                    <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-lg">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -right-1">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className={cn("relative h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-950", statusDisplay.color, isOnline && "animate-pulse")} />
+                      </TooltipTrigger>
+                      <TooltipContent><p>{isOnline ? 'Online' : 'Offline'}</p></TooltipContent>
+                    </Tooltip>
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Welcome back,</p>
+                    <Badge className={cn("text-[8px] border py-0 px-1 leading-none", isOnline ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" : "bg-slate-500/10 text-slate-600 border-slate-500/20")}>
+                      {statusDisplay.text}
+                    </Badge>
+                  </div>
+                  <h3 className="font-bold text-slate-800 dark:text-white text-base leading-tight truncate mt-0.5">{firstName}!</h3>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{localProfile?.email || 'student@vincollins.edu.ng'}</p>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[9px] shadow-sm font-semibold">{vinId}</Badge>
+                  {localProfile?.admission_number && (
+                    <Badge variant="outline" className="text-[9px] border-emerald-300 text-emerald-700 bg-emerald-50/30 dark:bg-emerald-950/10 dark:text-emerald-400">{localProfile.admission_number}</Badge>
+                  )}
+                  {localProfile?.department && (
+                    <Badge variant="outline" className="text-[9px] border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400">{localProfile.department}</Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 pt-1.5">
+                  <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/60 rounded-xl p-2 text-center">
+                    <p className="text-[9px] text-slate-400 uppercase font-semibold">Class</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">{localProfile?.class || 'N/A'}</p>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-900/60 border border-slate-100 dark:border-slate-800/60 rounded-xl p-2 text-center">
+                    <p className="text-[9px] text-slate-400 uppercase font-semibold">Year</p>
+                    <p className="text-xs font-bold text-slate-700 dark:text-slate-300 mt-0.5">{admissionYear}</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
+
+        {/* Primary Nav Links */}
+        <div className="px-3 py-3 space-y-0.5">
+          {!collapsed && (
+            <p className="px-3 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+              Main Dashboard
+            </p>
+          )}
+          {primaryNavigation.map(renderNavItem)}
+        </div>
+
+        {!collapsed && <Separator className="mx-3 my-2 bg-slate-100 dark:bg-slate-800/80" />}
+
+        {/* Secondary Nav Links */}
+        <div className="px-3 py-1 space-y-0.5">
+          {!collapsed && (
+            <p className="px-3 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">
+              Account Management
+            </p>
+          )}
+          {secondaryNavigation.map(renderNavItem)}
+        </div>
       </div>
 
-      {/* Profile Section */}
-      <div className={cn(
-        "relative px-5 py-5 border-b border-slate-200 dark:border-slate-800",
-        "bg-gradient-to-b from-emerald-50/50 via-white to-transparent dark:from-emerald-950/20 dark:via-slate-900 dark:to-transparent",
-        collapsed ? "flex justify-center" : ""
-      )}>
-        {collapsed ? (
-          <div className="relative">
-            <Avatar className="h-12 w-12 ring-3 ring-white dark:ring-slate-900 shadow-xl">
-              <AvatarImage src={avatarUrl} alt={displayName} />
-              <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-lg">{initials}</AvatarFallback>
-            </Avatar>
-            <div className="absolute -bottom-1 -right-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className={cn("relative h-3 w-3 rounded-full ring-2 ring-white dark:ring-slate-900", statusDisplay.color, isOnline && "animate-pulse")} />
-                </TooltipTrigger>
-                <TooltipContent side="right"><p>{isOnline ? 'Online' : 'Offline'}</p></TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 w-full">
-            <div className="flex items-center gap-4">
-              <div className="relative">
-                <Avatar className="h-16 w-16 ring-3 ring-white dark:ring-slate-900 shadow-xl">
-                  <AvatarImage src={avatarUrl} alt={displayName} />
-                  <AvatarFallback className="bg-gradient-to-br from-emerald-600 to-teal-600 text-white font-bold text-xl">{initials}</AvatarFallback>
-                </Avatar>
-                <div className="absolute -bottom-1 -right-1">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className={cn("relative h-3.5 w-3.5 rounded-full ring-2 ring-white dark:ring-slate-900", statusDisplay.color, isOnline && "animate-pulse")} />
-                    </TooltipTrigger>
-                    <TooltipContent><p>{isOnline ? 'Online' : 'Offline'}</p></TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wide">Welcome back,</p>
-                  <Badge className={cn("text-[9px]", isOnline ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600")}>
-                    <StatusIcon className="h-3 w-3 mr-0.5" />{statusDisplay.text}
-                  </Badge>
-                </div>
-                <h3 className="font-bold text-slate-900 dark:text-white text-lg leading-tight truncate">{firstName}!</h3>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div>
-                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{displayName}</p>
-                <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{localProfile?.email || 'student@vincollins.edu.ng'}</p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <Badge className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[10px] shadow-sm">{vinId}</Badge>
-                {localProfile?.admission_number && (
-                  <Badge variant="outline" className="text-[10px] border-emerald-300 text-emerald-700">{localProfile.admission_number}</Badge>
-                )}
-                {localProfile?.department && (
-                  <Badge variant="outline" className="text-[10px]">{localProfile.department}</Badge>
-                )}
-              </div>
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <div className="bg-emerald-50 dark:bg-emerald-950/30 rounded-lg p-2">
-                  <p className="text-[9px] text-emerald-600 dark:text-emerald-400 font-medium">Class</p>
-                  <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{localProfile?.class || 'N/A'}</p>
-                </div>
-                <div className="bg-amber-50 dark:bg-amber-950/30 rounded-lg p-2">
-                  <p className="text-[9px] text-amber-600 dark:text-amber-400 font-medium">Year</p>
-                  <p className="text-xs font-bold text-amber-700 dark:text-amber-300">{admissionYear}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Primary Navigation */}
-      <div className="px-3 py-3 space-y-1">
-        {!collapsed && <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Main</p>}
-        {primaryNavigation.map(renderNavItem)}
-      </div>
-
-      {!collapsed && <Separator className="mx-3 my-2 bg-slate-200 dark:bg-slate-800" />}
-
-      {/* Secondary Navigation */}
-      <div className="px-3 py-3 space-y-1">
-        {!collapsed && <p className="px-3 text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">Account</p>}
-        {secondaryNavigation.map(renderNavItem)}
-      </div>
-
-      {/* Sign Out Button */}
-      <div className="p-3 mt-2 border-t border-slate-200 dark:border-slate-800">
+      {/* Footer / Log out Section */}
+      <div className="p-3 mb-4 mt-auto border-t border-slate-100 dark:border-slate-800/80">
         {collapsed ? (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <Button variant="ghost" onClick={handleLogoutClick} className="w-full justify-center h-9 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 group rounded-lg transition-all">
-                <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
+              <Button 
+                variant="ghost" 
+                onClick={handleLogoutClick} 
+                className="w-full justify-center h-10 px-2 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 group rounded-xl transition-all"
+              >
+                <LogOut className="h-5 w-5 shrink-0 transition-transform group-hover:scale-110" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent side="right" className="ml-2">
-              <p className="font-medium">Sign Out</p>
-              <p className="text-xs text-slate-400">End your session</p>
+            <TooltipContent side="right" className="ml-2 bg-slate-900 text-white border border-slate-800">
+              <p className="font-semibold text-xs">Sign Out</p>
+              <p className="text-[10px] text-slate-400">End secure session</p>
             </TooltipContent>
           </Tooltip>
         ) : (
-          <Button variant="ghost" onClick={handleLogoutClick} className="w-full justify-start h-11 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 group rounded-xl transition-all">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/30 flex items-center justify-center group-hover:bg-red-100 dark:group-hover:bg-red-950/50 transition-colors">
+          <Button 
+            variant="ghost" 
+            onClick={handleLogoutClick} 
+            className="w-full justify-start h-12 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 group rounded-xl transition-all p-2"
+          >
+            <div className="flex items-center gap-3 w-full">
+              <div className="h-9 w-9 rounded-lg bg-red-50 dark:bg-red-950/20 flex items-center justify-center group-hover:bg-red-100 dark:group-hover:bg-red-950/40 transition-colors shrink-0">
                 <LogOut className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
               </div>
-              <div className="flex-1 text-left">
-                <span className="text-sm font-medium block">Sign Out</span>
-                <span className="text-[10px] text-slate-400 dark:text-slate-500 block">End your session</span>
+              <div className="flex-1 text-left min-w-0">
+                <span className="text-sm font-semibold block leading-none">Sign Out</span>
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 block truncate mt-1">End secure session</span>
               </div>
             </div>
           </Button>
         )}
       </div>
-      <div className="h-4" />
-    </>
+    </div>
   )
 
   return (
     <>
       <aside className={cn(
-        "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800",
+        "hidden lg:flex flex-col h-screen fixed left-0 top-0 z-40 transition-all duration-300 bg-white/95 dark:bg-slate-950/95 backdrop-blur-md border-r border-slate-200 dark:border-slate-800/80 shadow-sm",
         collapsed ? "w-20" : "w-72"
       )}>
         <TooltipProvider>
-          <ScrollArea className="h-full">{sidebarContent}</ScrollArea>
-          <button onClick={onToggle} className="absolute -right-3 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-full p-1.5 shadow-md hover:shadow-lg transition-all flex items-center justify-center hover:scale-110 group z-50">
+          <ScrollArea className="h-full scrollbar-none">{sidebarContent}</ScrollArea>
+          
+          {/* Dynamic Floating Sidebar Toggle Button */}
+          <button 
+            onClick={onToggle} 
+            className="absolute -right-3.5 top-1/2 -translate-y-1/2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-full p-2 shadow-md hover:shadow-lg transition-all flex items-center justify-center hover:scale-105 group z-50 ring-2 ring-emerald-500/10"
+          >
             <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full opacity-0 group-hover:opacity-10 transition-opacity" />
             {collapsed ? (
               <ChevronRight className="h-3.5 w-3.5 text-slate-500 group-hover:text-emerald-600 transition-colors" />
@@ -657,22 +669,28 @@ export function StudentSidebar({
         </TooltipProvider>
       </aside>
 
+      {/* Confirmation Modal dialog for Sign out */}
       <AlertDialog open={showSignOutConfirm} onOpenChange={setShowSignOutConfirm}>
-        <AlertDialogContent className="rounded-2xl max-w-md">
+        <AlertDialogContent className="rounded-2xl max-w-md border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <LogOut className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDialogTitle className="text-xl flex items-center gap-2.5 font-bold">
+              <div className="h-9 w-9 rounded-full bg-red-100 dark:bg-red-950/40 flex items-center justify-center">
+                <LogOut className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
-              Sign Out?
+              Are you sure?
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-slate-500">
-              Are you sure you want to sign out of your account? You'll need to log in again to access your dashboard.
+            <AlertDialogDescription className="text-slate-500 dark:text-slate-400 text-sm">
+              You will be signed out from your student portal session. You will need to re-authenticate to view grades or participate in examinations.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmSignOut} className="rounded-xl bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-md shadow-red-500/25">
+          <AlertDialogFooter className="gap-2 pt-2">
+            <AlertDialogCancel className="rounded-xl border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmSignOut} 
+              className="rounded-xl bg-gradient-to-r from-red-600 to-red-500 hover:from-red-700 hover:to-red-600 text-white shadow-md shadow-red-500/10 font-medium"
+            >
               <LogOut className="mr-2 h-4 w-4" />Sign Out
             </AlertDialogAction>
           </AlertDialogFooter>

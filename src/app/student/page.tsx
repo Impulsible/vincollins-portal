@@ -1,4 +1,4 @@
-// src/app/student/page.tsx - ENFORCED ARCHIVE AND INACTIVE COMPLIANCE
+// src/app/student/page.tsx - ENFORCED ARCHIVE AND INACTIVE COMPLIANCE WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -48,11 +48,11 @@ interface DashboardData {
 const LOADING_TIMEOUT_MS = 10000
 
 function calculateGrade(percentage: number): { grade: string; color: string } {
-  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600' }
-  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600' }
-  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600' }
-  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600' }
-  return { grade: 'F', color: 'text-red-600' }
+  if (percentage >= 80) return { grade: 'A', color: 'text-emerald-600 dark:text-emerald-400' }
+  if (percentage >= 70) return { grade: 'B', color: 'text-blue-600 dark:text-blue-400' }
+  if (percentage >= 60) return { grade: 'C', color: 'text-amber-600 dark:text-amber-400' }
+  if (percentage >= 50) return { grade: 'P', color: 'text-orange-600 dark:text-orange-400' }
+  return { grade: 'F', color: 'text-red-600 dark:text-red-400' }
 }
 
 // Extract year from class name (JSS1, JSS2, JSS3, SS1, SS2, SS3)
@@ -134,7 +134,7 @@ async function fetchCurrentTermAndSession(): Promise<{ term: string; session: st
 }
 
 // ============================================
-// LOADING SPINNER COMPONENT
+// LOADING SPINNER COMPONENT WITH DARK MODE
 // ============================================
 function LoadingSpinner() {
   const loadingMessages = [
@@ -153,12 +153,12 @@ function LoadingSpinner() {
   }, [])
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center z-40">
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center z-40 transition-colors duration-300">
       <div className="text-center">
         <div className="relative">
-          <div className="w-20 h-20 border-4 border-emerald-200 rounded-full animate-spin" />
+          <div className="w-20 h-20 border-4 border-emerald-200 dark:border-emerald-900/60 rounded-full animate-spin" />
           <div className="absolute inset-0 flex items-center justify-center">
-            <GraduationCap className="h-8 w-8 text-emerald-600" />
+            <GraduationCap className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
           </div>
         </div>
         <motion.p 
@@ -166,7 +166,7 @@ function LoadingSpinner() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
-          className="mt-6 text-slate-600 text-lg font-medium"
+          className="mt-6 text-slate-600 dark:text-slate-300 text-lg font-medium"
         >
           {loadingMessages[messageIndex].text}
         </motion.p>
@@ -174,7 +174,7 @@ function LoadingSpinner() {
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="h-2 w-2 rounded-full bg-emerald-400"
+              className="h-2 w-2 rounded-full bg-emerald-500 dark:bg-emerald-400"
               animate={{ y: [0, -8, 0] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
@@ -187,12 +187,12 @@ function LoadingSpinner() {
 
 function LoadingTimeoutError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex items-center justify-center transition-colors duration-300">
       <div className="text-center px-4">
-        <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-3" />
-        <h3 className="text-lg font-semibold text-slate-700 mb-2">Taking too long</h3>
-        <p className="text-sm text-slate-500 mb-4">Tap retry to load faster</p>
-        <Button onClick={onRetry} className="bg-emerald-600 hover:bg-emerald-700">
+        <AlertTriangle className="h-12 w-12 text-amber-500 dark:text-amber-400 mx-auto mb-3" />
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">Taking too long</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Tap retry to load faster</p>
+        <Button onClick={onRetry} className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-md cursor-pointer">
           <RefreshCw className="h-4 w-4 mr-2" />
           Retry
         </Button>
@@ -202,7 +202,7 @@ function LoadingTimeoutError({ onRetry }: { onRetry: () => void }) {
 }
 
 // ============================================
-// MAIN COMPONENT
+// MAIN DASHBOARD PAGE
 // ============================================
 function StudentDashboardContent() {
   const router = useRouter()
@@ -210,7 +210,7 @@ function StudentDashboardContent() {
   
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeSection, setActiveSection] = useState('overview')
-  const [isActiveAccount, setIsActiveAccount] = useState(true) // 👈 Track if user has left school
+  const [isActiveAccount, setIsActiveAccount] = useState(true) // Track if user has left school
   
   // DYNAMIC TERM STATE
   const [currentTerm, setCurrentTerm] = useState('')
@@ -357,7 +357,7 @@ function StudentDashboardContent() {
             .from('profiles')
             .select('id, full_name, email, photo_url, class, department, first_name, last_name, display_name, vin_id')
             .eq('role', 'student')
-            .eq('is_active', true) // 👈 Active peers only
+            .eq('is_active', true)
             .neq('id', userId)
             .ilike('class', `%${userYear}%`)
 
@@ -397,7 +397,7 @@ function StudentDashboardContent() {
           notes = notesData || []
         }
 
-        // 📝 HISTORICAL ATTEMPTS (Allowed for inactive students so they can view results)
+        // HISTORICAL ATTEMPTS (Allowed for inactive students so they can view past results)
         const { data: attemptsData } = await supabase
           .from('exam_attempts')
           .select('*')
@@ -750,7 +750,7 @@ function StudentDashboardContent() {
   const showLoadingSpinner = (loading && !dashboardData && !loadingTimeout) || (authLoading && !cachedHeaderUser) || isLoadingTerm
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 overflow-x-hidden w-full transition-colors duration-300">
       <Header user={headerUser} onLogout={handleLogout} />
       
       {showLoadingSpinner ? (
@@ -760,8 +760,8 @@ function StudentDashboardContent() {
       ) : (
         <>
           {refreshing && (
-            <div className="fixed bottom-4 right-4 z-50 bg-white rounded-full shadow-lg px-3 py-1.5 flex items-center gap-2 text-xs text-slate-500">
-              <Loader2 className="h-3 w-3 animate-spin" />
+            <div className="fixed bottom-4 right-4 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-full shadow-lg px-3.5 py-2 flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-500" />
               Updating...
             </div>
           )}
@@ -783,7 +783,7 @@ function StudentDashboardContent() {
               <main className="min-h-[calc(100vh-64px)] pt-[72px] lg:pt-24 pb-12 px-3 sm:px-4 lg:px-8 w-full overflow-x-hidden">
                 <div className="w-full max-w-7xl mx-auto">
                   
-                  {/* 🚫 CRITICAL: Warning banner for Inactive/Archived Students */}
+                  {/* Warning banner for Inactive/Archived Students */}
                   {!isActiveAccount && (
                     <motion.div 
                       initial={{ opacity: 0, scale: 0.95 }}
@@ -791,7 +791,7 @@ function StudentDashboardContent() {
                       className="bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-200 px-4 py-3 rounded-xl mb-6 flex items-center justify-between shadow-sm"
                     >
                       <div className="flex items-center gap-3">
-                        <ShieldAlert className="h-5 w-5 text-amber-600 shrink-0 animate-pulse" />
+                        <ShieldAlert className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 animate-pulse" />
                         <div>
                           <p className="font-semibold text-sm">Archived Account (Read-Only Mode)</p>
                           <p className="text-xs opacity-80 mt-0.5">
@@ -799,7 +799,7 @@ function StudentDashboardContent() {
                           </p>
                         </div>
                       </div>
-                      <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-200 text-amber-900 shrink-0">
+                      <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-200 dark:bg-amber-900/60 text-amber-900 dark:text-amber-200 shrink-0">
                         Archived
                       </span>
                     </motion.div>
@@ -838,13 +838,13 @@ function StudentDashboardContent() {
                       )}
                       
                       {activeSection === 'exams' && (
-                        <Card className="border-0 shadow-sm mt-2">
+                        <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm mt-2">
                           <CardContent className="py-12 sm:py-20 text-center">
-                            <div className="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-emerald-50 flex items-center justify-center mb-4">
-                              <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600" />
+                            <div className="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 flex items-center justify-center mb-4">
+                              <BookOpen className="h-6 w-6 sm:h-8 sm:w-8 text-emerald-600 dark:text-emerald-400" />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-semibold text-slate-800 mb-2">My Exams</h3>
-                            <p className="text-sm text-slate-500 max-w-md mx-auto">
+                            <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">My Exams</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                               Your exams will appear here
                             </p>
                           </CardContent>
@@ -852,13 +852,13 @@ function StudentDashboardContent() {
                       )}
                       
                       {activeSection === 'results' && (
-                        <Card className="border-0 shadow-sm mt-2">
+                        <Card className="border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm mt-2">
                           <CardContent className="py-12 sm:py-20 text-center">
-                            <div className="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-purple-50 flex items-center justify-center mb-4">
-                              <Award className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600" />
+                            <div className="mx-auto h-12 w-12 sm:h-16 sm:w-16 rounded-full bg-purple-50 dark:bg-purple-950/40 flex items-center justify-center mb-4">
+                              <Award className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 dark:text-purple-400" />
                             </div>
-                            <h3 className="text-lg sm:text-xl font-semibold text-slate-800 mb-2">My Results</h3>
-                            <p className="text-sm text-slate-500 max-w-md mx-auto">
+                            <h3 className="text-lg sm:text-xl font-semibold text-slate-800 dark:text-slate-100 mb-2">My Results</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mx-auto">
                               Your results will appear here
                             </p>
                           </CardContent>

@@ -63,13 +63,11 @@ export const UserSection = memo(function UserSection({
   const isPortalPage = pathname === '/portal'
   const isDashboardPage = !isPublicPage && !isPortalPage && !isHomePage
 
-  // ✅ CRITICAL: Close all dropdowns on route change to prevent flashing
   useEffect(() => {
     setProfileOpen(false)
     setNotificationOpen(false)
   }, [currentPathname])
 
-  // Close profile dropdown on outside click
   useEffect(() => {
     const cb = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
@@ -80,7 +78,6 @@ export const UserSection = memo(function UserSection({
     return () => document.removeEventListener('mousedown', cb)
   }, [])
 
-  // Close notification popover on outside click
   useEffect(() => {
     const cb = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
@@ -118,11 +115,9 @@ export const UserSection = memo(function UserSection({
     onSignOut()
   }, [onSignOut])
 
-  // ✅ Get avatar URL from user.avatar or user.photo_url
   const getAvatarUrl = () => {
     if (avatarError) return undefined
     if (user?.avatar) return user.avatar
-    // Try to get from localStorage if available
     if (typeof window !== 'undefined') {
       const cached = localStorage.getItem('user_profile')
       if (cached) {
@@ -209,8 +204,8 @@ export const UserSection = memo(function UserSection({
 
             {/* Profile Dropdown */}
             {profileOpen && (
-              <div className="absolute right-0 top-[64px] w-72 sm:w-80 bg-white rounded-xl shadow-2xl border z-[60] overflow-hidden">
-                <div className="p-4 border-b bg-gradient-to-r from-blue-50 to-indigo-50">
+              <div className="absolute right-0 top-[64px] w-72 sm:w-80 bg-white dark:bg-slate-900 rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 z-[60] overflow-hidden">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-800">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12 ring-2 ring-primary/20 shrink-0">
                       {avatarUrl && !avatarError ? (
@@ -221,8 +216,12 @@ export const UserSection = memo(function UserSection({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm truncate">{user?.name || displayUser?.name || 'User'}</p>
-                      <p className="text-xs text-gray-500 truncate">{user?.email || ''}</p>
+                      <p className="font-semibold text-gray-900 dark:text-slate-100 text-sm truncate">
+                        {user?.name || displayUser?.name || 'User'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 truncate">
+                        {user?.email || ''}
+                      </p>
                       <Badge className={cn("mt-1 text-xs text-white", roleBadgeColors[user?.role || displayUser?.role || 'student'])}>
                         {roleDisplayNames[user?.role || displayUser?.role || 'student']}
                       </Badge>
@@ -231,7 +230,7 @@ export const UserSection = memo(function UserSection({
                 </div>
                 
                 {isPublicPage && (
-                  <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border-b">
+                  <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border-b border-slate-200 dark:border-slate-800">
                     <button 
                       onClick={goToDashboard} 
                       className="w-full py-2.5 bg-[#F5A623] text-[#0A2472] rounded-lg font-semibold text-sm flex items-center justify-center gap-2"
@@ -246,50 +245,58 @@ export const UserSection = memo(function UserSection({
                 {isDashboardPage && (
                   <div className="py-1">
                     <Link 
-                      href={user?.role === 'student' ? '/student/profile' : '/staff/settings'}
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      href={
+                        user?.role === 'admin'   ? '/admin/settings' :
+                        user?.role === 'student' ? '/student/profile' :
+                                                   '/staff/profile'
+                      }
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3"
                       onClick={() => setProfileOpen(false)}
                     >
-                      <User className="h-4 w-4 text-gray-400 shrink-0" />
+                      <User className="h-4 w-4 text-gray-400 dark:text-slate-500 shrink-0" />
                       My Profile
                     </Link>
                     <Link 
-                      href={user?.role === 'student' ? '/student/settings' : '/staff/settings'}
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      href={
+                        user?.role === 'admin'   ? '/admin/settings' :
+                        user?.role === 'student' ? '/student/settings' :
+                                                   '/staff/settings'
+                      }
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3"
                       onClick={() => setProfileOpen(false)}
                     >
-                      <Settings className="h-4 w-4 text-gray-400 shrink-0" />
+                      <Settings className="h-4 w-4 text-gray-400 dark:text-slate-500 shrink-0" />
                       Settings
                     </Link>
                   </div>
                 )}
                 
-                <div className="py-1 border-t">
+                <div className="py-1 border-t border-slate-200 dark:border-slate-800">
                   {pathname !== '/' && (
                     <Link 
                       href="/" 
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3"
                       onClick={() => setProfileOpen(false)}
                     >
-                      <Home className="h-4 w-4 text-gray-400 shrink-0" />
+                      <Home className="h-4 w-4 text-gray-400 dark:text-slate-500 shrink-0" />
                       Home Page
                     </Link>
                   )}
                   {pathname !== '/portal' && (
                     <button 
                       onClick={handlePortalClick}
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 flex items-center gap-3"
                     >
-                      <KeyRound className="h-4 w-4 text-gray-400 shrink-0" />
+                      <KeyRound className="h-4 w-4 text-gray-400 dark:text-slate-500 shrink-0" />
                       Portal Page
                     </button>
                   )}
                 </div>
                 
-                <div className="border-t p-2">
+                <div className="border-t border-slate-200 dark:border-slate-800 p-2">
                   <button 
                     onClick={handleSignOut}
-                    className="w-full px-4 py-2.5 text-left text-red-600 hover:bg-red-50 rounded-lg text-sm flex items-center gap-3"
+                    className="w-full px-4 py-2.5 text-left text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg text-sm flex items-center gap-3"
                   >
                     <LogOut className="h-4 w-4 shrink-0" />
                     Sign Out

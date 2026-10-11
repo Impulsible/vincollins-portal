@@ -1,5 +1,5 @@
-// app/student/report-card/page.tsx - COMPLETE FIXED VERSION
-
+/* eslint-disable react/no-unescaped-entities */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client'
 
 import React from 'react'
@@ -137,7 +137,6 @@ export default function StudentReportCardPage() {
   const [loading, setLoading] = useState(true)
   const [school, setSchool] = useState<SchoolSettings>(DEFAULT_SCHOOL)
   
-  // ✅ DYNAMIC TERMS - from database
   const [availableTerms, setAvailableTerms] = useState<TermOption[]>([])
   const [availableYears, setAvailableYears] = useState<string[]>([])
   const [selectedTerm, setSelectedTerm] = useState('')
@@ -155,7 +154,6 @@ export default function StudentReportCardPage() {
   const [principalComment, setPrincipalComment] = useState('')
   const [classTeacher, setClassTeacher] = useState('')
 
-  // ✅ Grade scales with fallback
   const [gradeScale, setGradeScale] = useState<GradeScaleItem[]>(FALLBACK_OVERALL_GRADES)
   const [waecGradeScale, setWaecGradeScale] = useState<GradeScaleItem[]>(FALLBACK_WAEC_GRADES)
 
@@ -167,20 +165,22 @@ export default function StudentReportCardPage() {
       @page { size: A4 portrait; margin: 0.3cm; }
       @media print {
         * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-        html, body { height: auto !important; overflow: visible !important; }
+        html, body { height: auto !important; overflow: visible !important; background: white !important; }
         body { background: white !important; margin: 0 !important; padding: 0 !important; font-size: 10px !important; }
         .no-print { display: none !important; }
-        .print-card { page-break-inside: avoid !important; break-inside: avoid !important; }
+        .print-card { page-break-inside: avoid !important; break-inside: avoid !important; background: white !important; color: black !important; }
         table { table-layout: fixed !important; width: 100% !important; border-collapse: collapse !important; font-size: 9px !important; }
-        th, td { padding: 2px 3px !important; border-color: #000 !important; border-width: 1px !important; }
+        th, td { padding: 2px 3px !important; border-color: #000 !important; border-width: 1px !important; color: black !important; }
         th { font-weight: 700 !important; background-color: #1e40af !important; color: white !important; }
-        .bg-blue-700 { background-color: #1d4ed8 !important; }
-        .bg-purple-600 { background-color: #9333ea !important; }
-        .bg-blue-600 { background-color: #2563eb !important; }
-        .bg-emerald-600 { background-color: #059669 !important; }
-        .bg-cyan-600 { background-color: #0891b2 !important; }
-        .bg-amber-600 { background-color: #d97706 !important; }
-        .bg-red-600 { background-color: #dc2626 !important; }
+        .bg-blue-700 { background-color: #1d4ed8 !important; color: white !important; }
+        .bg-purple-600 { background-color: #9333ea !important; color: white !important; }
+        .bg-blue-600 { background-color: #2563eb !important; color: white !important; }
+        .bg-emerald-600 { background-color: #059669 !important; color: white !important; }
+        .bg-cyan-600 { background-color: #0891b2 !important; color: white !important; }
+        .bg-amber-600 { background-color: #d97706 !important; color: white !important; }
+        .bg-red-600 { background-color: #dc2626 !important; color: white !important; }
+        /* Force text colors to print black regardless of dark mode */
+        .print-text-black { color: black !important; }
       }
     `,
   })
@@ -231,7 +231,6 @@ export default function StudentReportCardPage() {
   // ── Load grade scales from database (with fallback) ───────────────────────
   const loadGradeScales = useCallback(async () => {
     try {
-      // Try to load from database
       const { data: overall, error: overallError } = await supabase
         .from('grade_system')
         .select('grade, min_score, max_score')
@@ -251,7 +250,6 @@ export default function StudentReportCardPage() {
       }
     } catch (e) { 
       console.error('Error loading grade scales, using fallback:', e)
-      // Use fallbacks
       setGradeScale(FALLBACK_OVERALL_GRADES)
       setWaecGradeScale(FALLBACK_WAEC_GRADES)
     }
@@ -312,11 +310,11 @@ export default function StudentReportCardPage() {
   }
 
   const getOverallGradeDirect = (percentage: number): { grade: string; color: string } => {
-    if (percentage >= 80) return { grade: 'A', color: 'bg-emerald-100 text-emerald-700' }
-    if (percentage >= 70) return { grade: 'B', color: 'bg-blue-100 text-blue-700' }
-    if (percentage >= 60) return { grade: 'C', color: 'bg-cyan-100 text-cyan-700' }
-    if (percentage >= 50) return { grade: 'P', color: 'bg-amber-100 text-amber-700' }
-    return { grade: 'F', color: 'bg-red-100 text-red-700' }
+    if (percentage >= 80) return { grade: 'A', color: 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400' }
+    if (percentage >= 70) return { grade: 'B', color: 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400' }
+    if (percentage >= 60) return { grade: 'C', color: 'bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400' }
+    if (percentage >= 50) return { grade: 'P', color: 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400' }
+    return { grade: 'F', color: 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400' }
   }
 
   const loadScores = useCallback(async () => {
@@ -363,14 +361,12 @@ export default function StudentReportCardPage() {
 
       if (!scores || scores.length === 0) { setHasReport(false); return }
 
-      // ✅ Process scores - use direct calculation (no DB calls)
       let processed: SubjectScore[] = scores.map((s: any) => {
         const ca = (s.ca1_score || 0) + (s.ca2_score || 0)
         const exam = (s.exam_objective_score || 0) + (s.exam_theory_score || 0)
         const total = ca + exam
         const normalizedSubject = normalizeSubjectName(s.subject)
         
-        // ✅ Use direct calculation instead of DB query
         const gradeResult = getWAECGradeDirect(total)
         
         return {
@@ -384,7 +380,6 @@ export default function StudentReportCardPage() {
         }
       })
 
-      // Deduplicate subjects
       const subjectMap = new Map<string, SubjectScore>()
       processed.forEach(s => {
         const existing = subjectMap.get(s.subject)
@@ -393,7 +388,6 @@ export default function StudentReportCardPage() {
         }
       })
       
-      // Sort subjects by order
       const SUBJECT_ORDER: Record<string, number> = {
         'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
         'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
@@ -418,7 +412,6 @@ export default function StudentReportCardPage() {
       setTotalScore(total)
       setAverageScore(avg)
       
-      // ✅ Use direct calculation for overall grade
       const gradeResult = getOverallGradeDirect(avg)
       setOverallGrade(gradeResult.grade)
 
@@ -444,7 +437,6 @@ export default function StudentReportCardPage() {
     }
   }, [selectedTerm, selectedYear, router])
 
-  // ── Generate ratings ──────────────────────────────────────────────────────
   const generateRatings = useCallback(() => {
     const r = (base: number) => {
       if (averageScore >= 90) return Math.min(5, base + 1)
@@ -468,7 +460,6 @@ export default function StudentReportCardPage() {
     }
   }, [averageScore])
 
-  // ── Helper functions ──────────────────────────────────────────────────────
   const getSubjectGradeRemark = (grade: string): string =>
     ({
       'A1': 'Excellent', 'B2': 'Very Good', 'B3': 'Good',
@@ -490,36 +481,35 @@ export default function StudentReportCardPage() {
 
   const getOverallGradeColor = (grade: string): string => {
     switch (grade) {
-      case 'A': return 'bg-emerald-100 text-emerald-700'
-      case 'B': return 'bg-blue-100 text-blue-700'
-      case 'C': return 'bg-cyan-100 text-cyan-700'
-      case 'P': return 'bg-amber-100 text-amber-700'
-      case 'F': return 'bg-red-100 text-red-700'
-      default: return 'bg-gray-100 text-gray-600'
+      case 'A': return 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400'
+      case 'B': return 'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400'
+      case 'C': return 'bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-400'
+      case 'P': return 'bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400'
+      case 'F': return 'bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400'
+      default: return 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400'
     }
   }
 
   const getOverallGradeTextColor = (grade: string): string => {
     switch (grade) {
-      case 'A': return 'text-emerald-700 font-bold'
-      case 'B': return 'text-blue-700 font-bold'
-      case 'C': return 'text-cyan-700 font-bold'
-      case 'P': return 'text-amber-700 font-bold'
-      case 'F': return 'text-red-700 font-bold'
-      default: return 'text-gray-700'
+      case 'A': return 'text-emerald-700 dark:text-emerald-400 font-bold'
+      case 'B': return 'text-blue-700 dark:text-blue-400 font-bold'
+      case 'C': return 'text-cyan-700 dark:text-cyan-400 font-bold'
+      case 'P': return 'text-amber-700 dark:text-amber-400 font-bold'
+      case 'F': return 'text-red-700 dark:text-red-400 font-bold'
+      default: return 'text-gray-700 dark:text-slate-300'
     }
   }
 
   const getOverallGradeRemark = (grade: string): string =>
     ({ 'A': 'Excellent', 'B': 'Very Good', 'C': 'Good', 'P': 'Pass', 'F': 'Fail' }[grade] || '')
 
-  // ── Loading state ─────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] p-4">
+      <div className="flex items-center justify-center min-h-[60vh] p-4 bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">Loading report card…</p>
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
+          <p className="text-sm text-gray-500 dark:text-slate-400">Loading report card…</p>
         </div>
       </div>
     )
@@ -527,14 +517,13 @@ export default function StudentReportCardPage() {
 
   if (!student) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 min-h-[60vh] p-4">
-        <p className="text-red-600 font-medium text-sm text-center">Student profile not found.</p>
+      <div className="flex flex-col items-center justify-center gap-4 min-h-[60vh] p-4 bg-slate-50 dark:bg-slate-950">
+        <p className="text-red-600 dark:text-red-400 font-medium text-sm text-center">Student profile not found.</p>
         <Button onClick={() => router.back()} size="sm">Go Back</Button>
       </div>
     )
   }
 
-  // ── Derived values ────────────────────────────────────────────────────────
   const fullName = student.display_name || student.full_name || 'Student'
   const ratings = generateRatings()
   const fmtNextTerm = nextTermDate
@@ -552,26 +541,25 @@ export default function StudentReportCardPage() {
   const fmtAvg = averageScore.toFixed(2)
   const termLabel = availableTerms.find(t => t.value === selectedTerm)?.label || selectedTerm
 
-  // ── Render grade scale ────────────────────────────────────────────────────
   const GradeScale = () => (
     <div>
-      <div className="bg-blue-700 text-white text-[9px] px-2 py-1 font-bold rounded-t-sm">
+      <div className="bg-blue-700 dark:bg-blue-900 text-white text-[9px] px-2 py-1 font-bold rounded-t-sm">
         Grade Scale
       </div>
-      <div className="border-2 border-blue-900 p-2 rounded-b-sm">
+      <div className="border-2 border-blue-900 dark:border-blue-800 p-2 rounded-b-sm bg-white dark:bg-slate-900">
         <div className="grid grid-cols-3 gap-1 text-[8px]">
           {waecGradeScale.map((g) => (
             <div key={g.grade} className="flex items-center gap-1">
               <span className={getSubjectGradeStyle(g.grade)}>{g.grade}</span>
-              <span className="text-gray-600">{g.min_score}-{g.max_score}</span>
+              <span className="text-gray-600 dark:text-slate-400 print-text-black">{g.min_score}-{g.max_score}</span>
             </div>
           ))}
         </div>
-        <div className="mt-1.5 pt-1.5 border-t border-blue-300 grid grid-cols-5 gap-0.5 text-[7px]">
+        <div className="mt-1.5 pt-1.5 border-t border-blue-300 dark:border-blue-800 grid grid-cols-5 gap-0.5 text-[7px]">
           {gradeScale.map((g) => (
             <div key={g.grade} className="flex items-center gap-0.5">
               <span className={cn('px-1 py-0.5 rounded font-bold text-[7px]', getOverallGradeColor(g.grade))}>{g.grade}</span>
-              <span className="text-gray-600">{g.min_score}-{g.max_score}</span>
+              <span className="text-gray-600 dark:text-slate-400 print-text-black">{g.min_score}-{g.max_score}</span>
             </div>
           ))}
         </div>
@@ -579,9 +567,6 @@ export default function StudentReportCardPage() {
     </div>
   )
 
-  // ══════════════════════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════════════════════
   return (
     <div className="
       w-full max-w-5xl mx-auto
@@ -590,21 +575,22 @@ export default function StudentReportCardPage() {
       pb-24 sm:pb-6
       space-y-3 sm:space-y-4
       print:p-0 print:max-w-none print:space-y-0
+      bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors duration-300
     ">
 
       {/* ══ CONTROLS BAR ══════════════════════════════════════════════════════ */}
       <div className="
         no-print
-        bg-white rounded-xl border border-gray-200 shadow-sm
+        bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm
         p-3 sm:p-4
         space-y-3
       ">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 flex items-center gap-1.5">
+            <h1 className="text-base sm:text-lg md:text-xl font-bold text-gray-800 dark:text-slate-100 flex items-center gap-1.5">
               📄 <span>My Report Card</span>
             </h1>
-            <p className="text-[10px] sm:text-xs text-gray-500 mt-0.5">
+            <p className="text-[10px] sm:text-xs text-gray-500 dark:text-slate-400 mt-0.5">
               View &amp; print your performance report
             </p>
           </div>
@@ -612,7 +598,7 @@ export default function StudentReportCardPage() {
             <Button
               variant="outline" size="sm"
               onClick={() => router.push('/student/dashboard')}
-              className="h-8 text-xs px-2 sm:px-3 gap-1"
+              className="h-8 text-xs px-2 sm:px-3 gap-1 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <LayoutDashboard className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">Dashboard</span>
@@ -620,7 +606,7 @@ export default function StudentReportCardPage() {
             <Button
               variant="ghost" size="sm"
               onClick={() => router.back()}
-              className="h-8 text-xs px-2 sm:px-3 gap-1"
+              className="h-8 text-xs px-2 sm:px-3 gap-1 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <ArrowLeft className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden sm:inline">Back</span>
@@ -629,16 +615,15 @@ export default function StudentReportCardPage() {
         </div>
 
         <div className="flex flex-wrap items-end gap-2">
-          {/* ✅ DYNAMIC Term selector */}
           <div className="space-y-0.5 flex-1 min-w-[100px] max-w-[160px]">
-            <label className="text-[10px] sm:text-xs font-medium text-gray-500 block">Term</label>
+            <label className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-slate-400 block">Term</label>
             <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white">
+              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
                 <SelectValue placeholder="Select term" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                 {availableTerms.map(t => (
-                  <SelectItem key={t.value} value={t.value} className="text-xs sm:text-sm">
+                  <SelectItem key={t.value} value={t.value} className="text-xs sm:text-sm text-slate-800 dark:text-slate-200">
                     {t.label}
                   </SelectItem>
                 ))}
@@ -646,16 +631,15 @@ export default function StudentReportCardPage() {
             </Select>
           </div>
 
-          {/* ✅ DYNAMIC Year selector */}
           <div className="space-y-0.5 flex-1 min-w-[90px] max-w-[140px]">
-            <label className="text-[10px] sm:text-xs font-medium text-gray-500 block">Session</label>
+            <label className="text-[10px] sm:text-xs font-medium text-gray-500 dark:text-slate-400 block">Session</label>
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white">
+              <SelectTrigger className="h-8 sm:h-9 text-xs sm:text-sm w-full bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
                 <SelectValue placeholder="Select year" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                 {availableYears.map(y => (
-                  <SelectItem key={y} value={y} className="text-xs sm:text-sm">{y}</SelectItem>
+                  <SelectItem key={y} value={y} className="text-xs sm:text-sm text-slate-800 dark:text-slate-200">{y}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -664,7 +648,7 @@ export default function StudentReportCardPage() {
           {hasReport && (
             <Button
               onClick={handlePrint}
-              className="h-8 sm:h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 gap-1.5 ml-auto shrink-0"
+              className="h-8 sm:h-9 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm px-3 gap-1.5 ml-auto shrink-0 shadow-sm"
             >
               <Printer className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden xs:inline">Print / </span>Download
@@ -675,41 +659,41 @@ export default function StudentReportCardPage() {
 
       {/* ══ EMPTY STATES ══════════════════════════════════════════════════════ */}
       {!hasReport && reportNotPublished && (
-        <div className="bg-white rounded-xl border border-amber-200 shadow-sm py-12 sm:py-16 px-4 sm:px-6 text-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-            <Lock className="h-8 w-8 sm:h-10 sm:w-10 text-amber-500" />
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-amber-200 dark:border-amber-900/50 shadow-sm py-12 sm:py-16 px-4 sm:px-6 text-center transition-colors">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-amber-100 dark:bg-amber-950/40 flex items-center justify-center mx-auto mb-4 border border-amber-200 dark:border-amber-800">
+            <Lock className="h-8 w-8 sm:h-10 sm:w-10 text-amber-500 dark:text-amber-400" />
           </div>
-          <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-2">
+          <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">
             Report Card Not Yet Released
           </h2>
-          <p className="text-xs sm:text-sm text-gray-500 leading-relaxed max-w-xs sm:max-w-sm mx-auto">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 leading-relaxed max-w-xs sm:max-w-sm mx-auto">
             Your report card for{' '}
-            <span className="font-semibold text-gray-700">{termLabel}</span>,{' '}
-            <span className="font-semibold text-blue-700">{selectedYear}</span>{' '}
+            <span className="font-semibold text-gray-700 dark:text-slate-300">{termLabel}</span>,{' '}
+            <span className="font-semibold text-blue-700 dark:text-blue-400">{selectedYear}</span>{' '}
             has been prepared but not yet released by the school.
           </p>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-3">
+          <p className="text-[10px] sm:text-xs text-gray-400 dark:text-slate-500 mt-3">
             Please check back later or contact your school.
           </p>
         </div>
       )}
 
       {!hasReport && !reportNotPublished && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm py-12 sm:py-16 px-4 sm:px-6 text-center">
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-            <FileX className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400" />
+        <div className="bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-800 shadow-sm py-12 sm:py-16 px-4 sm:px-6 text-center transition-colors">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gray-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4 border border-gray-200 dark:border-slate-700">
+            <FileX className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 dark:text-slate-500" />
           </div>
-          <h2 className="text-base sm:text-lg font-bold text-gray-800 mb-2">
+          <h2 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100 mb-2">
             No Report Card Available
           </h2>
-          <p className="text-xs sm:text-sm text-gray-500 leading-relaxed max-w-xs sm:max-w-sm mx-auto">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 leading-relaxed max-w-xs sm:max-w-sm mx-auto">
             No approved report card found for{' '}
-            <span className="font-semibold text-gray-700">{fullName}</span>{' '}
+            <span className="font-semibold text-gray-700 dark:text-slate-300">{fullName}</span>{' '}
             for{' '}
-            <span className="font-semibold text-blue-700">{termLabel}</span>,{' '}
-            <span className="font-semibold text-blue-700">{selectedYear}</span>.
+            <span className="font-semibold text-blue-700 dark:text-blue-400">{termLabel}</span>,{' '}
+            <span className="font-semibold text-blue-700 dark:text-blue-400">{selectedYear}</span>.
           </p>
-          <p className="text-[10px] sm:text-xs text-gray-400 mt-3">
+          <p className="text-[10px] sm:text-xs text-gray-400 dark:text-slate-500 mt-3">
             Try a different term / session, or contact your school.
           </p>
         </div>
@@ -717,25 +701,25 @@ export default function StudentReportCardPage() {
 
       {/* ══ REPORT CARD ═══════════════════════════════════════════════════════ */}
       {hasReport && (
-        <div ref={printRef} className="print-card">
+        <div ref={printRef} className="print-card bg-white dark:bg-slate-900 transition-colors">
           <div className="
-            bg-white w-full
-            border border-gray-200
-            sm:border-2 sm:border-blue-900
+            w-full
+            border border-gray-200 dark:border-slate-800
+            sm:border-2 sm:border-blue-900 dark:sm:border-blue-800
             rounded-lg sm:rounded-none
             p-2.5 sm:p-4 md:p-5
-            print:p-2.5 print:border-2 print:border-blue-900 print:rounded-none
+            print:p-2.5 print:border-2 print:border-blue-900 print:rounded-none print:bg-white
           ">
 
             {/* ── SCHOOL HEADER ── */}
-            <div className="border-b-2 border-blue-900 pb-2 mb-3 print:pb-1.5 print:mb-2">
+            <div className="border-b-2 border-blue-900 dark:border-blue-800 pb-2 mb-3 print:pb-1.5 print:mb-2 print:border-blue-900">
               <div className="flex flex-col sm:flex-row items-center sm:items-start gap-2 sm:gap-3 print:flex-row print:gap-3">
 
-                {/* Logo */}
                 <div className="
                   w-14 h-14 sm:w-18 sm:h-18 shrink-0
                   flex items-center justify-center
-                  border-2 border-blue-900 rounded bg-blue-50
+                  border-2 border-blue-900 dark:border-blue-800 rounded bg-blue-50 dark:bg-blue-950/30
+                  print:border-blue-900 print:bg-blue-50
                 ">
                   {school.logo_url ? (
                     <img
@@ -743,59 +727,59 @@ export default function StudentReportCardPage() {
                       className="w-10 h-10 sm:w-14 sm:h-14 object-contain"
                     />
                   ) : (
-                    <School className="h-6 w-6 sm:h-10 sm:w-10 text-blue-900" />
+                    <School className="h-6 w-6 sm:h-10 sm:w-10 text-blue-900 dark:text-blue-400 print-text-black" />
                   )}
                 </div>
 
-                {/* School info */}
                 <div className="flex-1 text-center w-full min-w-0">
                   <h1 className="
                     text-xs sm:text-base md:text-lg lg:text-xl
-                    font-bold uppercase text-blue-900 tracking-wide leading-tight
+                    font-bold uppercase text-blue-900 dark:text-blue-400 tracking-wide leading-tight
+                    print-text-black
                   ">
                     {school.name}
                   </h1>
-                  <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-700 mt-0.5 leading-snug px-1">
+                  <p className="text-[9px] sm:text-[10px] md:text-xs text-gray-700 dark:text-slate-300 mt-0.5 leading-snug px-1 print-text-black">
                     {school.address}
                   </p>
 
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 mt-0.5">
-                    <span className="text-[9px] sm:text-[10px] text-gray-600 flex items-center gap-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-gray-600 dark:text-slate-400 flex items-center gap-0.5 print-text-black">
                       <Mail className="h-2.5 w-2.5 shrink-0" />
                       <span className="break-all">{school.email}</span>
                     </span>
-                    <span className="hidden sm:inline text-gray-400 text-[9px]">|</span>
-                    <span className="text-[9px] sm:text-[10px] text-gray-600 flex items-center gap-0.5">
+                    <span className="hidden sm:inline text-gray-400 dark:text-slate-600 text-[9px]">|</span>
+                    <span className="text-[9px] sm:text-[10px] text-gray-600 dark:text-slate-400 flex items-center gap-0.5 print-text-black">
                       <Phone className="h-2.5 w-2.5 shrink-0" />
                       {school.phone}
                     </span>
                   </div>
 
-                  <p className="text-[9px] sm:text-[10px] italic text-amber-700 mt-0.5 font-medium">
+                  <p className="text-[9px] sm:text-[10px] italic text-amber-700 dark:text-amber-500 mt-0.5 font-medium print-text-black">
                     "{school.motto}"
                   </p>
 
-                  <div className="mt-1 pt-1 border-t border-blue-200">
-                    <h2 className="font-bold text-[10px] sm:text-xs md:text-sm text-blue-900 leading-tight">
+                  <div className="mt-1 pt-1 border-t border-blue-200 dark:border-blue-900/50 print:border-blue-200">
+                    <h2 className="font-bold text-[10px] sm:text-xs md:text-sm text-blue-900 dark:text-blue-400 leading-tight print-text-black">
                       {termLabel} Student's Performance Report
                     </h2>
-                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-700 mt-0.5">
+                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-700 dark:text-slate-300 mt-0.5 print-text-black">
                       Academic Session: {selectedYear}
                     </p>
                   </div>
                 </div>
 
-                {/* Student photo */}
                 <div className="
                   hidden sm:block
                   w-20 h-24 sm:w-20 sm:h-24 md:w-24 md:h-28
-                  border-2 border-blue-900 rounded overflow-hidden
-                  shrink-0 bg-gray-50
+                  border-2 border-blue-900 dark:border-blue-800 rounded overflow-hidden
+                  shrink-0 bg-gray-50 dark:bg-slate-800
+                  print:border-blue-900 print:bg-gray-50
                 ">
                   {student.photo_url ? (
                     <img src={student.photo_url} alt="Student" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="w-full h-full flex items-center justify-center text-gray-400 dark:text-slate-500">
                       <User className="h-8 w-8 sm:h-10 sm:w-10" />
                     </div>
                   )}
@@ -818,15 +802,15 @@ export default function StudentReportCardPage() {
                 ['Term', termLabel],
                 ['Session', selectedYear],
               ] as [string, string][]).map(([label, value]) => (
-                <div key={label} className="flex items-baseline gap-1 py-0.5 border-b border-gray-100 sm:border-0">
-                  <span className="font-bold text-gray-600 shrink-0 w-20 sm:w-28 md:w-32">{label}:</span>
-                  <span className="font-medium text-gray-900 break-words">{value}</span>
+                <div key={label} className="flex items-baseline gap-1 py-0.5 border-b border-gray-100 dark:border-slate-800 sm:border-0 print:border-b print:border-gray-100">
+                  <span className="font-bold text-gray-600 dark:text-slate-400 shrink-0 w-20 sm:w-28 md:w-32 print-text-black">{label}:</span>
+                  <span className="font-medium text-gray-900 dark:text-slate-100 break-words print-text-black">{value}</span>
                 </div>
               ))}
-              <div className="flex items-baseline gap-1 py-0.5 border-b border-gray-100 sm:border-0">
-                <span className="font-bold text-gray-600 shrink-0 w-20 sm:w-28 md:w-32">Next Term:</span>
-                <span className="flex items-center gap-1 font-medium text-gray-900">
-                  <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-blue-600 shrink-0" />
+              <div className="flex items-baseline gap-1 py-0.5 border-b border-gray-100 dark:border-slate-800 sm:border-0 print:border-b print:border-gray-100">
+                <span className="font-bold text-gray-600 dark:text-slate-400 shrink-0 w-20 sm:w-28 md:w-32 print-text-black">Next Term:</span>
+                <span className="flex items-center gap-1 font-medium text-gray-900 dark:text-slate-100 print-text-black">
+                  <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-blue-600 dark:text-blue-400 shrink-0 print-text-black" />
                   <span className="break-words text-[9px] sm:text-[11px]">{fmtNextTerm}</span>
                 </span>
               </div>
@@ -844,7 +828,7 @@ export default function StudentReportCardPage() {
               <div className="min-w-0 space-y-2 sm:space-y-3 print:space-y-2">
 
                 {/* Scores table */}
-                <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
+                <div className="border-2 border-blue-900 dark:border-blue-800 rounded-sm overflow-hidden print:border-blue-900">
                   <div className="overflow-x-auto -webkit-overflow-scrolling-touch">
                     <table className="
                       w-full border-collapse
@@ -853,62 +837,62 @@ export default function StudentReportCardPage() {
                       min-w-[320px] sm:min-w-[420px]
                       print:min-w-0 print:text-[9px]
                     ">
-                      <thead className="bg-blue-700 text-white">
+                      <thead className="bg-blue-700 dark:bg-blue-900 text-white print:bg-blue-700">
                         <tr>
-                          <th className="border border-blue-500 px-1 sm:px-1.5 py-1 text-left w-[32%]">
+                          <th className="border border-blue-500 dark:border-blue-700 px-1 sm:px-1.5 py-1 text-left w-[32%] print-text-black">
                             Subject
                           </th>
-                          <th className="border border-blue-500 px-0.5 sm:px-1 py-1 text-center w-[10%]">
+                          <th className="border border-blue-500 dark:border-blue-700 px-0.5 sm:px-1 py-1 text-center w-[10%] print-text-black">
                             CA
                           </th>
-                          <th className="border border-blue-500 px-0.5 sm:px-1 py-1 text-center w-[11%]">
+                          <th className="border border-blue-500 dark:border-blue-700 px-0.5 sm:px-1 py-1 text-center w-[11%] print-text-black">
                             Exam
                           </th>
-                          <th className="border border-blue-500 px-0.5 sm:px-1 py-1 text-center w-[11%]">
+                          <th className="border border-blue-500 dark:border-blue-700 px-0.5 sm:px-1 py-1 text-center w-[11%] print-text-black">
                             Total
                           </th>
-                          <th className="border border-blue-500 px-0.5 sm:px-1 py-1 text-center w-[12%]">
+                          <th className="border border-blue-500 dark:border-blue-700 px-0.5 sm:px-1 py-1 text-center w-[12%] print-text-black">
                             Grade
                           </th>
-                          <th className="border border-blue-500 px-1 sm:px-1.5 py-1 text-left w-[24%]">
+                          <th className="border border-blue-500 dark:border-blue-700 px-1 sm:px-1.5 py-1 text-left w-[24%] print-text-black">
                             Remark
                           </th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="bg-white dark:bg-slate-900">
                         {subjects.map((s, i) => (
-                          <tr key={s.subject} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="border border-gray-300 px-1 sm:px-1.5 py-0.5 font-medium break-words leading-tight">
+                          <tr key={s.subject} className={i % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-gray-50 dark:bg-slate-800/50 print:bg-gray-50'}>
+                            <td className="border border-gray-300 dark:border-slate-700 px-1 sm:px-1.5 py-0.5 font-medium break-words leading-tight text-slate-800 dark:text-slate-200 print-text-black">
                               {s.subject}
                             </td>
-                            <td className="border border-gray-300 text-center font-mono py-0.5">{s.ca}</td>
-                            <td className="border border-gray-300 text-center font-mono py-0.5">
+                            <td className="border border-gray-300 dark:border-slate-700 text-center font-mono py-0.5 text-slate-800 dark:text-slate-200 print-text-black">{s.ca}</td>
+                            <td className="border border-gray-300 dark:border-slate-700 text-center font-mono py-0.5 text-slate-800 dark:text-slate-200 print-text-black">
                               {s.exam_obj + s.exam_theory}
                             </td>
-                            <td className="border border-gray-300 text-center font-bold font-mono py-0.5">
+                            <td className="border border-gray-300 dark:border-slate-700 text-center font-bold font-mono py-0.5 text-slate-900 dark:text-white print-text-black">
                               {s.total}
                             </td>
-                            <td className="border border-gray-300 text-center py-0.5">
+                            <td className="border border-gray-300 dark:border-slate-700 text-center py-0.5">
                               <span className={getSubjectGradeStyle(s.grade)}>{s.grade}</span>
                             </td>
-                            <td className="border border-gray-300 px-1 sm:px-1.5 py-0.5 text-[7px] sm:text-[9px] leading-tight">
+                            <td className="border border-gray-300 dark:border-slate-700 px-1 sm:px-1.5 py-0.5 text-[7px] sm:text-[9px] leading-tight text-slate-600 dark:text-slate-300 print-text-black">
                               {s.remark}
                             </td>
                           </tr>
                         ))}
                       </tbody>
-                      <tfoot className="bg-blue-50 font-bold">
+                      <tfoot className="bg-blue-50 dark:bg-blue-950/30 font-bold print:bg-blue-50">
                         <tr>
                           <td
                             colSpan={3}
-                            className="border border-gray-300 px-1 sm:px-1.5 py-1 text-right text-[8px] sm:text-[10px]"
+                            className="border border-gray-300 dark:border-slate-700 px-1 sm:px-1.5 py-1 text-right text-[8px] sm:text-[10px] text-slate-800 dark:text-slate-200 print-text-black"
                           >
                             TOTAL / AVERAGE:
                           </td>
-                          <td className="border border-gray-300 text-center py-1 text-[8px] sm:text-[10px]">
+                          <td className="border border-gray-300 dark:border-slate-700 text-center py-1 text-[8px] sm:text-[10px] text-slate-900 dark:text-white print-text-black">
                             {totalScore}
                           </td>
-                          <td className="border border-gray-300 text-center py-1">
+                          <td className="border border-gray-300 dark:border-slate-700 text-center py-1">
                             <span className={cn(
                               'px-1 py-0.5 rounded text-[8px] sm:text-[9px] font-bold',
                               getOverallGradeColor(overallGrade)
@@ -916,7 +900,7 @@ export default function StudentReportCardPage() {
                               {overallGrade}
                             </span>
                           </td>
-                          <td className="border border-gray-300 text-center py-1 text-[8px] sm:text-[10px]">
+                          <td className="border border-gray-300 dark:border-slate-700 text-center py-1 text-[8px] sm:text-[10px] text-slate-900 dark:text-white print-text-black">
                             {fmtAvg}%
                           </td>
                         </tr>
@@ -926,26 +910,26 @@ export default function StudentReportCardPage() {
                 </div>
 
                 {/* Teacher remark */}
-                <div className="border border-gray-300 rounded-sm overflow-hidden">
-                  <div className="bg-purple-600 text-white px-2 py-1 text-[9px] sm:text-[10px] font-bold flex items-center gap-1">
+                <div className="border border-gray-300 dark:border-slate-700 rounded-sm overflow-hidden bg-white dark:bg-slate-900 print:border-gray-300">
+                  <div className="bg-purple-600 dark:bg-purple-800 text-white px-2 py-1 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 print:bg-purple-600 print-text-black">
                     <Sparkles className="h-3 w-3 shrink-0" />
                     CLASS TEACHER'S REMARK
                   </div>
-                  <div className="p-2 sm:p-2.5 text-[9px] sm:text-[10px] italic leading-relaxed bg-purple-50 break-words">
+                  <div className="p-2 sm:p-2.5 text-[9px] sm:text-[10px] italic leading-relaxed bg-purple-50 dark:bg-purple-950/20 text-slate-800 dark:text-slate-200 break-words print:bg-purple-50 print-text-black">
                     {teacherComment || '—'}
                   </div>
-                  <div className="px-2 pb-1 pt-0.5 text-[8px] sm:text-[9px] text-gray-500 border-t border-purple-200">
+                  <div className="px-2 pb-1 pt-0.5 text-[8px] sm:text-[9px] text-gray-500 dark:text-slate-400 border-t border-purple-200 dark:border-purple-900/50 print:border-purple-200 print-text-black">
                     Signed: {classTeacher}
                   </div>
                 </div>
 
                 {/* Principal remark */}
-                <div className="border border-gray-300 rounded-sm overflow-hidden">
-                  <div className="bg-blue-600 text-white px-2 py-1 text-[9px] sm:text-[10px] font-bold flex items-center gap-1">
+                <div className="border border-gray-300 dark:border-slate-700 rounded-sm overflow-hidden bg-white dark:bg-slate-900 print:border-gray-300">
+                  <div className="bg-blue-600 dark:bg-blue-800 text-white px-2 py-1 text-[9px] sm:text-[10px] font-bold flex items-center gap-1 print:bg-blue-600 print-text-black">
                     <Award className="h-3 w-3 shrink-0" />
                     PRINCIPAL'S REMARK
                   </div>
-                  <div className="p-2 sm:p-2.5 text-[9px] sm:text-[10px] italic leading-relaxed break-words">
+                  <div className="p-2 sm:p-2.5 text-[9px] sm:text-[10px] italic leading-relaxed text-slate-800 dark:text-slate-200 break-words print-text-black">
                     {principalComment || '—'}
                   </div>
                 </div>
@@ -960,41 +944,41 @@ export default function StudentReportCardPage() {
               <div className="space-y-2 sm:space-y-3 print:space-y-2">
 
                 {/* Performance summary */}
-                <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
-                  <div className="bg-blue-700 text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 uppercase">
+                <div className="border-2 border-blue-900 dark:border-blue-800 rounded-sm overflow-hidden bg-white dark:bg-slate-900 print:border-blue-900">
+                  <div className="bg-blue-700 dark:bg-blue-900 text-white text-[9px] sm:text-[10px] font-bold px-2 py-1 uppercase print:bg-blue-700 print-text-black">
                     Performance Summary
                   </div>
-                  <div className="p-2 sm:p-2.5 text-[9px] sm:text-[10px] space-y-1 print:p-1.5">
+                  <div className="p-2 sm:p-2.5 text-[9px] sm:text-[10px] space-y-1 print:p-1.5 text-slate-800 dark:text-slate-200">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Total Score</span>
-                      <span className="font-bold">{totalScore}</span>
+                      <span className="text-gray-600 dark:text-slate-400 print-text-black">Total Score</span>
+                      <span className="font-bold print-text-black">{totalScore}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Average</span>
-                      <span className="font-bold">{fmtAvg}%</span>
+                      <span className="text-gray-600 dark:text-slate-400 print-text-black">Average</span>
+                      <span className="font-bold print-text-black">{fmtAvg}%</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-gray-600">Grade</span>
-                      <span className={getOverallGradeTextColor(overallGrade)}>
+                      <span className="text-gray-600 dark:text-slate-400 print-text-black">Grade</span>
+                      <span className={cn(getOverallGradeTextColor(overallGrade), "print-text-black")}>
                         {overallGrade} – {getOverallGradeRemark(overallGrade)}
                       </span>
                     </div>
                     {bestSubject && (
-                      <div className="flex justify-between text-emerald-700 pt-1 border-t border-gray-200">
-                        <span className="flex items-center gap-1 font-medium">
-                          <TrendingUp className="h-3 w-3 shrink-0" /> Best
+                      <div className="flex justify-between text-emerald-700 dark:text-emerald-400 pt-1 border-t border-gray-200 dark:border-slate-800 print:border-gray-200 print-text-black">
+                        <span className="flex items-center gap-1 font-medium print-text-black">
+                          <TrendingUp className="h-3 w-3 shrink-0 print-text-black" /> Best
                         </span>
-                        <span className="font-bold text-right text-[8px] sm:text-[9px] break-words ml-1 max-w-[120px]">
+                        <span className="font-bold text-right text-[8px] sm:text-[9px] break-words ml-1 max-w-[120px] print-text-black">
                           {bestSubject.subject} ({bestSubject.total})
                         </span>
                       </div>
                     )}
                     {showImprove && worstSubject && (
-                      <div className="flex justify-between text-red-600">
-                        <span className="flex items-center gap-1 font-medium">
-                          <TrendingDown className="h-3 w-3 shrink-0" /> Improve
+                      <div className="flex justify-between text-red-600 dark:text-red-400 print-text-black">
+                        <span className="flex items-center gap-1 font-medium print-text-black">
+                          <TrendingDown className="h-3 w-3 shrink-0 print-text-black" /> Improve
                         </span>
-                        <span className="font-bold text-right text-[8px] sm:text-[9px] break-words ml-1 max-w-[120px]">
+                        <span className="font-bold text-right text-[8px] sm:text-[9px] break-words ml-1 max-w-[120px] print-text-black">
                           {worstSubject.subject} ({worstSubject.total})
                         </span>
                       </div>
@@ -1006,17 +990,17 @@ export default function StudentReportCardPage() {
                 <div className="grid grid-cols-2 md:grid-cols-1 gap-2 print:grid-cols-1 print:gap-1.5">
 
                   {/* Affective domain */}
-                  <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
-                    <div className="bg-blue-700 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase">
+                  <div className="border-2 border-blue-900 dark:border-blue-800 rounded-sm overflow-hidden bg-white dark:bg-slate-900 print:border-blue-900">
+                    <div className="bg-blue-700 dark:bg-blue-900 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase print:bg-blue-700 print-text-black">
                       Affective Domain
                     </div>
                     <div className="p-1 sm:p-1.5 print:p-1">
                       <table className="w-full border-collapse text-[7px] sm:text-[9px]">
                         <tbody>
                           {ratings.behavior.map(item => (
-                            <tr key={item.name} className="border-b border-gray-100 last:border-0">
-                              <td className="py-0.5 pr-1 font-medium text-gray-700">{item.name}</td>
-                              <td className="py-0.5 text-right font-bold text-blue-700 w-5">{item.rating}</td>
+                            <tr key={item.name} className="border-b border-gray-100 dark:border-slate-800 last:border-0 print:border-gray-100">
+                              <td className="py-0.5 pr-1 font-medium text-gray-700 dark:text-slate-300 print-text-black">{item.name}</td>
+                              <td className="py-0.5 text-right font-bold text-blue-700 dark:text-blue-400 w-5 print-text-black">{item.rating}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1025,17 +1009,17 @@ export default function StudentReportCardPage() {
                   </div>
 
                   {/* Psychomotor */}
-                  <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
-                    <div className="bg-blue-700 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase">
+                  <div className="border-2 border-blue-900 dark:border-blue-800 rounded-sm overflow-hidden bg-white dark:bg-slate-900 print:border-blue-900">
+                    <div className="bg-blue-700 dark:bg-blue-900 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase print:bg-blue-700 print-text-black">
                       Psychomotor
                     </div>
                     <div className="p-1 sm:p-1.5 print:p-1">
                       <table className="w-full border-collapse text-[7px] sm:text-[9px]">
                         <tbody>
                           {ratings.skills.map(item => (
-                            <tr key={item.name} className="border-b border-gray-100 last:border-0">
-                              <td className="py-0.5 pr-1 font-medium text-gray-700">{item.name}</td>
-                              <td className="py-0.5 text-right font-bold text-green-700 w-5">{item.rating}</td>
+                            <tr key={item.name} className="border-b border-gray-100 dark:border-slate-800 last:border-0 print:border-gray-100">
+                              <td className="py-0.5 pr-1 font-medium text-gray-700 dark:text-slate-300 print-text-black">{item.name}</td>
+                              <td className="py-0.5 text-right font-bold text-green-700 dark:text-emerald-400 w-5 print-text-black">{item.rating}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -1045,13 +1029,13 @@ export default function StudentReportCardPage() {
                 </div>
 
                 {/* Rating key */}
-                <div className="border-2 border-blue-900 rounded-sm overflow-hidden">
-                  <div className="bg-blue-700 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase">
+                <div className="border-2 border-blue-900 dark:border-blue-800 rounded-sm overflow-hidden bg-white dark:bg-slate-900 print:border-blue-900">
+                  <div className="bg-blue-700 dark:bg-blue-900 text-white text-[8px] sm:text-[9px] font-bold px-2 py-1 uppercase print:bg-blue-700 print-text-black">
                     Key To Ratings
                   </div>
-                  <div className="p-2 text-[8px] sm:text-[9px] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-1 gap-0.5 print:grid-cols-1 print:p-1.5">
+                  <div className="p-2 text-[8px] sm:text-[9px] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-1 gap-0.5 text-gray-700 dark:text-slate-300 print:grid-cols-1 print:p-1.5 print-text-black">
                     {['5 – Excellent', '4 – Very Good', '3 – Good', '2 – Fair', '1 – Poor'].map(r => (
-                      <div key={r} className="font-medium text-gray-700">{r}</div>
+                      <div key={r} className="font-medium">{r}</div>
                     ))}
                   </div>
                 </div>
@@ -1065,11 +1049,11 @@ export default function StudentReportCardPage() {
 
             {/* ── FOOTER ── */}
             <div className="
-              border-t-2 border-blue-900
+              border-t-2 border-blue-900 dark:border-blue-800
               mt-3 sm:mt-4 pt-1 sm:pt-1.5
               text-center
-              text-[7px] sm:text-[9px] text-gray-500
-              print:mt-2 print:pt-1
+              text-[7px] sm:text-[9px] text-gray-500 dark:text-slate-500
+              print:border-blue-900 print:mt-2 print:pt-1 print-text-black
             ">
               Powered by Vincollins Portal | {school.motto}
             </div>

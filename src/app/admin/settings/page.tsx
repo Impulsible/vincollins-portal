@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,18 +11,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
 import {
-  Loader2, Settings, User, Shield, Bell, Palette, Database,
-  Save, Camera, Key, Mail, Phone, MapPin, School,
-  Globe, Lock, Eye, EyeOff, LogOut, Trash2,
-  CheckCircle2, AlertTriangle, ChevronRight, Calendar,
-  Wifi, HardDrive, RefreshCw, Info, GraduationCap,
-  ArrowRight, Clock, Zap
+  Loader2, User, Shield, Bell, Palette, Database,
+  Save, Key, Lock, Eye, EyeOff, Trash2,
+  CheckCircle2, AlertTriangle, Calendar,
+  Wifi, Info, GraduationCap, Clock, Zap
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -62,7 +59,7 @@ function SectionHeader({
   return (
     <div className="flex items-start gap-3 mb-6">
       <div className={cn('h-9 w-9 rounded-xl flex items-center justify-center shrink-0', iconClass)}>
-        <Icon className="h-4.5 w-4.5" />
+        <Icon className="h-4 w-4" />
       </div>
       <div>
         <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
@@ -131,15 +128,14 @@ function PasswordInput({
 
 // ── Term status badge ──────────────────────────────────────────────────────────
 function TermStatusBadge({ term, currentTerm }: { term: string; currentTerm: string }) {
-  const isCurrent = term === currentTerm
+  const isCurrent = term.trim().toLowerCase() === currentTerm.trim().toLowerCase()
   return (
     <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
+      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap',
       isCurrent ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
     )}>
       {isCurrent ? <Zap className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
-      {term}
-      {isCurrent && ' (current)'}
+      {isCurrent ? 'current' : 'not current'}
     </span>
   )
 }
@@ -176,16 +172,17 @@ export default function AdminSettingsPage() {
   })
   const [schoolLoaded, setSchoolLoaded] = useState(false)
 
-  // ✅ DYNAMIC: Current term from school_settings table
-  const [currentTerm, setCurrentTerm] = useState('')
-  const [currentSession, setCurrentSession] = useState('')
+  // ✅ DYNAMIC: Current term from term_settings (master source)
+  const [currentTerm, setCurrentTerm] = useState('')       // e.g. "third"
+  const [currentTermName, setCurrentTermName] = useState('') // e.g. "Third Term"
+  const [currentSession, setCurrentSession] = useState('') // e.g. "2025/2026"
   const [isLoadingTerm, setIsLoadingTerm] = useState(true)
 
   // Next-term date
   const [nextTermDate, setNextTermDate] = useState('')
   const [savingNextTerm, setSavingNextTerm] = useState(false)
 
-  // Notification prefs (loaded from DB / localStorage)
+  // Notification prefs
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [examAlerts, setExamAlerts] = useState(true)
   const [reportCardAlerts, setReportCardAlerts] = useState(true)
@@ -198,31 +195,49 @@ export default function AdminSettingsPage() {
   // DB status
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
 
-  // ── Fetch current term from database ───────────────────────────────────────
+  // ── Fetch current term from database (term_settings → terms → academic_sessions) ──
   const fetchCurrentTerm = async () => {
     try {
-      const { data: settings, error } = await supabase
-        .from('school_settings')
-        .select('current_term, current_session')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single()
+      // 1) Preferred source: term_settings
+      const { data: ts, error: tsErr } = await supabase
+        .from('term_settings')
+        .select('term, term_name, session_year')
+        .eq('is_current', true)
+        .maybeSingle()
 
-      if (error) {
-        console.error('Error fetching term settings:', error)
-        setCurrentTerm('third')
-        setCurrentSession('2025/2026')
+      if (!tsErr && ts) {
+        setCurrentTerm(ts.term || '')
+        setCurrentTermName(ts.term_name || '')
+        setCurrentSession(ts.session_year || '')
         return
       }
 
-      if (settings) {
-        setCurrentTerm(settings.current_term || 'third')
-        setCurrentSession(settings.current_session || '2025/2026')
+      // 2) Fallback: terms
+      const { data: t, error: tErr } = await supabase
+        .from('terms')
+        .select('term_code, term_name, session_year')
+        .eq('is_current', true)
+        .maybeSingle()
+
+      if (!tErr && t) {
+        setCurrentTerm(t.term_code || '')
+        setCurrentTermName(t.term_name || '')
+        setCurrentSession(t.session_year || '')
+        return
       }
-    } catch (error) {
-      console.error('Error fetching current term:', error)
-      setCurrentTerm('third')
-      setCurrentSession('2025/2026')
+
+      // 3) Last resort: academic_sessions (session only)
+      const { data: s } = await supabase
+        .from('academic_sessions')
+        .select('session_year')
+        .eq('is_current', true)
+        .maybeSingle()
+
+      if (s?.session_year) {
+        setCurrentSession(s.session_year)
+      }
+    } catch (err) {
+      console.error('Error fetching current term:', err)
     } finally {
       setIsLoadingTerm(false)
     }
@@ -268,8 +283,8 @@ export default function AdminSettingsPage() {
             school_address: map['school_address'] || '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
             school_phone: map['school_phone'] || '+234 912 1155 554',
             school_email: map['school_email'] || 'vincollinscollege@gmail.com',
-            current_term: map['current_term'] || currentTerm || 'Third Term',
-            current_session: map['current_session'] || currentSession || '2025/2026',
+            current_term: map['current_term'] || '',
+            current_session: map['current_session'] || '',
             portal_name: map['portal_name'] || 'Vincollins Portal',
           })
 
@@ -359,26 +374,37 @@ export default function AdminSettingsPage() {
   const handleSaveSchoolSettings = async () => {
     setSaving(true)
     try {
+      // 1) Save all school settings keys to system_settings
       const entries = Object.entries(schoolSettings) as [string, string][]
       await Promise.all(entries.map(([k, v]) => upsertSetting(k, v)))
-      
-      // Also update school_settings table if term/session changed
-      if (schoolSettings.current_term || schoolSettings.current_session) {
+
+      // 2) ✅ If admin typed a NEW current term / session, update the master tables
+      const normalizedTerm = (schoolSettings.current_term || '').trim().toLowerCase().replace(/\s*term$/, '')
+      const normalizedSession = (schoolSettings.current_session || '').trim()
+
+      // Only run if we actually have values (don't wipe on empty)
+      if (normalizedTerm && normalizedSession) {
+        const { error: tsUpdateErr } = await supabase
+          .from('term_settings')
+          .update({ is_current: false })
+          .neq('id', '00000000-0000-0000-0000-000000000000')
+
+        if (tsUpdateErr) console.warn('Could not reset term_settings is_current:', tsUpdateErr)
+
         await supabase
-          .from('school_settings')
-          .update({
-            current_term: schoolSettings.current_term.toLowerCase().replace(' term', ''),
-            current_session: schoolSettings.current_session,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', (await supabase.from('school_settings').select('id').single()).data?.id)
+          .from('term_settings')
+          .update({ is_current: true })
+          .eq('term', normalizedTerm)
+          .eq('session_year', normalizedSession)
       }
-      
+
       toast.success('School settings saved to database')
       await fetchCurrentTerm()
     } catch (err: any) {
       toast.error(err.message || 'Failed to save school settings')
-    } finally { setSaving(false) }
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleSaveNextTermDate = async () => {
@@ -390,7 +416,9 @@ export default function AdminSettingsPage() {
       window.dispatchEvent(new CustomEvent('next-term-date-updated', { detail: { date: nextTermDate } }))
     } catch (err: any) {
       toast.error(err.message || 'Failed to save next term date')
-    } finally { setSavingNextTerm(false) }
+    } finally {
+      setSavingNextTerm(false)
+    }
   }
 
   const handleSaveNotifications = () => {
@@ -447,9 +475,9 @@ export default function AdminSettingsPage() {
             <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
             <p className="text-sm text-slate-500 mt-0.5">
               Manage your profile, school configuration, and preferences
-              {currentTerm && (
+              {currentTermName && currentSession && (
                 <span className="ml-2 text-emerald-600 text-xs font-medium">
-                  (Current term: {currentTerm.charAt(0).toUpperCase() + currentTerm.slice(1)} • {currentSession})
+                  (Current term: {currentTermName} • {currentSession})
                 </span>
               )}
             </p>
@@ -468,7 +496,7 @@ export default function AdminSettingsPage() {
         </div>
 
         {/* Current term banner */}
-        {currentTerm && (
+        {currentTermName && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-xl">
@@ -476,10 +504,10 @@ export default function AdminSettingsPage() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-emerald-800">
-                  Current Term: <span className="capitalize">{currentTerm}</span>
+                  Current Term: <span className="capitalize">{currentTermName}</span>
                 </p>
                 <p className="text-xs text-emerald-600">
-                  Session: {currentSession}
+                  Session: {currentSession || '—'}
                 </p>
               </div>
             </div>
@@ -496,7 +524,7 @@ export default function AdminSettingsPage() {
               {[
                 { value: 'profile', label: 'Profile', icon: User },
                 { value: 'password', label: 'Password', icon: Key },
-                { value: 'school', label: 'School', icon: School },
+                { value: 'school', label: 'School', icon: GraduationCap },
                 { value: 'system', label: 'System', icon: Database },
                 { value: 'preferences', label: 'Preferences', icon: Bell },
               ].map(tab => {
@@ -637,7 +665,6 @@ export default function AdminSettingsPage() {
                       show={showNewPassword}
                       onToggle={() => setShowNewPassword(v => !v)}
                     />
-                    {/* Strength bar */}
                     {passwordStrength && (
                       <div className="mt-1.5 space-y-1">
                         <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
@@ -721,7 +748,7 @@ export default function AdminSettingsPage() {
             <Card className="border border-slate-200/80 shadow-sm bg-white">
               <CardContent className="p-6">
                 <SectionHeader
-                  icon={School}
+                  icon={GraduationCap}
                   iconClass="bg-emerald-100 text-emerald-600"
                   title="School Information"
                   description="Manage school details — saved directly to the database"
@@ -762,22 +789,23 @@ export default function AdminSettingsPage() {
                     />
                   </div>
 
-                  {/* ✅ DYNAMIC: Current term and session with badges */}
+                  {/* ✅ DYNAMIC: Current term and session */}
                   <div className="space-y-1.5">
                     <Label className="text-xs font-medium text-slate-600">Current Term</Label>
                     <div className="flex items-center gap-2">
                       <Input
                         value={schoolSettings.current_term}
                         onChange={e => setSchoolSettings(s => ({ ...s, current_term: e.target.value }))}
+                        placeholder="e.g. first, second, third"
                         className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500 flex-1"
                       />
                       <TermStatusBadge 
                         term={schoolSettings.current_term} 
-                        currentTerm={currentTerm.charAt(0).toUpperCase() + currentTerm.slice(1)} 
+                        currentTerm={currentTerm} 
                       />
                     </div>
                     <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Info className="h-3 w-3" /> Changing this updates the system's current term
+                      <Info className="h-3 w-3" /> Must match a <code className="bg-slate-100 px-1 rounded">term_settings.term</code> value
                     </p>
                   </div>
                   
@@ -787,19 +815,16 @@ export default function AdminSettingsPage() {
                       <Input
                         value={schoolSettings.current_session}
                         onChange={e => setSchoolSettings(s => ({ ...s, current_session: e.target.value }))}
+                        placeholder="e.g. 2025/2026"
                         className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500 flex-1"
                       />
-                      <Badge className={cn(
-                        'text-xs font-medium px-2 py-0.5 border',
-                        schoolSettings.current_session === currentSession 
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                          : 'bg-slate-100 text-slate-500 border-slate-200'
-                      )}>
-                        {schoolSettings.current_session === currentSession ? 'current' : 'not current'}
-                      </Badge>
+                      <TermStatusBadge 
+                        term={schoolSettings.current_session} 
+                        currentTerm={currentSession} 
+                      />
                     </div>
                     <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Info className="h-3 w-3" /> Changing this updates the system's current session
+                      <Info className="h-3 w-3" /> Must match a <code className="bg-slate-100 px-1 rounded">term_settings.session_year</code> value
                     </p>
                   </div>
                 </div>
@@ -1014,7 +1039,7 @@ export default function AdminSettingsPage() {
               <CardContent className="p-6">
                 <div className="flex items-start gap-3 mb-5">
                   <div className="h-9 w-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="h-4.5 w-4.5 text-red-600" />
+                    <AlertTriangle className="h-4 w-4 text-red-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-red-700 text-sm">Danger Zone</h3>

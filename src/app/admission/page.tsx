@@ -1,4 +1,4 @@
-// app/admission/page.tsx - FIXED HEADER SPACING
+// app/admission/page.tsx - FIXED HEADER SPACING + DARK MODE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -79,12 +79,12 @@ export default function AdmissionPage() {
 
   if (!mounted) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-slate-950 dark:to-slate-900 transition-colors duration-300">
         <div className="h-16 sm:h-20 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a]" />
         <div className="container max-w-4xl mx-auto px-4 py-8 md:py-12">
           <div className="animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mx-auto mb-8"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
+            <div className="h-8 bg-gray-200 dark:bg-slate-800 rounded w-1/4 mx-auto mb-8"></div>
+            <div className="h-64 bg-gray-200 dark:bg-slate-800 rounded"></div>
           </div>
         </div>
       </div>
@@ -93,31 +93,36 @@ export default function AdmissionPage() {
 
   if (submitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+      <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-slate-950 dark:to-slate-900 transition-colors duration-300">
         <Header />
         
         <div className="flex items-center justify-center p-4 pt-24 sm:pt-28 pb-16">
-          <Card className="max-w-md w-full text-center">
+          <Card className="max-w-md w-full text-center bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <CardContent className="pt-12 pb-8">
-              <div className="h-16 w-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="h-10 w-10 text-emerald-600" />
+              <div className="h-16 w-16 bg-emerald-100 dark:bg-emerald-950/50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h2 className="text-2xl font-bold mb-2">Application Submitted!</h2>
-              <p className="text-slate-600 mb-6">
+              <h2 className="text-2xl font-bold mb-2 text-slate-800 dark:text-white">
+                Application Submitted!
+              </h2>
+              <p className="text-slate-600 dark:text-slate-400 mb-6">
                 Thank you for applying to Vincollins College. We will review your application and contact you within 3-5 business days.
               </p>
-              <p className="text-sm text-slate-500 mb-4">
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                 Application ID: {formData.first_name.slice(0, 3)}-{Date.now().toString().slice(-6)}
               </p>
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link href="/">
-                  <Button variant="outline">
+                  <Button 
+                    variant="outline"
+                    className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
                     <Home className="h-4 w-4 mr-2" />
                     Home
                   </Button>
                 </Link>
                 <Link href="/contact">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700">
+                  <Button className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500">
                     Contact Us
                   </Button>
                 </Link>
@@ -132,11 +137,11 @@ export default function AdmissionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-white dark:from-slate-950 dark:to-slate-900 transition-colors duration-300">
       <Header />
 
-      {/* Hero Section - FIXED: Proper padding from header */}
-      <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0d2e8a] to-[#1e3a8a] text-white overflow-hidden pt-20 sm:pt-24 lg:pt-28 pb-8 sm:pb-10 md:pb-12 lg:pb-16">
+      {/* Hero Section */}
+      <section className="relative bg-gradient-to-br from-[#0A2472] via-[#0d2e8a] to-[#1e3a8a] dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-white overflow-hidden pt-20 sm:pt-24 lg:pt-28 pb-8 sm:pb-10 md:pb-12 lg:pb-16">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_30%_50%,rgba(255,255,255,0.4)_0%,transparent_50%)]" />
           <div className="absolute -top-24 -right-24 w-96 h-96 bg-blue-400 rounded-full blur-3xl opacity-20" />
@@ -145,7 +150,6 @@ export default function AdmissionPage() {
         
         <div className="relative container max-w-6xl mx-auto px-4 sm:px-6">
           <div className="max-w-3xl">
-            {/* Badge with proper spacing */}
             <div className="inline-flex items-center gap-2 px-4 sm:px-5 py-2 sm:py-2.5 bg-white/15 backdrop-blur-sm rounded-full border border-white/20 mb-5 sm:mb-6">
               <GraduationCap className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-amber-300" />
               <span className="text-xs sm:text-sm md:text-base font-medium text-white/90 whitespace-nowrap">Start Your Journey</span>
@@ -217,7 +221,7 @@ export default function AdmissionPage() {
       </section>
 
       {/* Breadcrumb */}
-      <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
         <div className="container max-w-6xl mx-auto px-3 sm:px-4 py-2.5 sm:py-3">
           <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
             <Link href="/" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
@@ -243,101 +247,103 @@ export default function AdmissionPage() {
               />
             </div>
           </div>
-          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent mb-2">
+          <h1 className="text-2xl md:text-4xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-400 dark:to-teal-400 bg-clip-text text-transparent mb-2">
             Start Your Journey
           </h1>
-          <p className="text-slate-600 text-sm md:text-base">
+          <p className="text-slate-600 dark:text-slate-400 text-sm md:text-base">
             Join Vincollins College - Where Excellence Meets Opportunity
           </p>
         </div>
 
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <CardHeader>
-            <CardTitle>Student Information</CardTitle>
-            <CardDescription>Please fill in all required fields (*)</CardDescription>
+            <CardTitle className="text-slate-800 dark:text-white">Student Information</CardTitle>
+            <CardDescription className="text-slate-500 dark:text-slate-400">
+              Please fill in all required fields (*)
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Student Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <Label>First Name *</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">First Name *</Label>
                   <Input
                     required
                     value={formData.first_name}
                     onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <Label>Middle Name</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Middle Name</Label>
                   <Input
                     value={formData.middle_name}
                     onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <Label>Last Name *</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Last Name *</Label>
                   <Input
                     required
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Email *</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Email *</Label>
                   <Input
                     type="email"
                     required
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <div>
-                  <Label>Phone *</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Phone *</Label>
                   <Input
                     required
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <Label>Date of Birth</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Date of Birth</Label>
                   <Input
                     type="date"
                     value={formData.date_of_birth}
                     onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                   />
                 </div>
                 <div>
-                  <Label>Gender</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Gender</Label>
                   <Select value={formData.gender} onValueChange={(v) => setFormData({ ...formData, gender: v })}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                       <SelectValue placeholder="Select gender" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                       {genders.map(g => <SelectItem key={g} value={g}>{g}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label>Applying for Class *</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Applying for Class *</Label>
                   <Select required value={formData.applying_for_class} onValueChange={(v) => setFormData({ ...formData, applying_for_class: v })}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                       {classes.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -345,132 +351,140 @@ export default function AdmissionPage() {
               </div>
 
               <div>
-                <Label>Current School</Label>
+                <Label className="text-slate-700 dark:text-slate-300">Current School</Label>
                 <Input
                   value={formData.current_school}
                   onChange={(e) => setFormData({ ...formData, current_school: e.target.value })}
-                  className="mt-1"
+                  className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
               </div>
 
               {/* Parent/Guardian Details */}
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Parent/Guardian Information</h3>
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
+                <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-white">Parent/Guardian Information</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <Label>Parent/Guardian Name *</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">Parent/Guardian Name *</Label>
                     <Input
                       required
                       value={formData.parent_name}
                       onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
-                      className="mt-1"
+                      className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div>
-                    <Label>Parent Phone *</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">Parent Phone *</Label>
                     <Input
                       required
                       value={formData.parent_phone}
                       onChange={(e) => setFormData({ ...formData, parent_phone: e.target.value })}
-                      className="mt-1"
+                      className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div className="sm:col-span-2">
-                    <Label>Parent Email</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">Parent Email</Label>
                     <Input
                       type="email"
                       value={formData.parent_email}
                       onChange={(e) => setFormData({ ...formData, parent_email: e.target.value })}
-                      className="mt-1"
+                      className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Address */}
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Address</h3>
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
+                <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-white">Address</h3>
                 <div>
-                  <Label>Street Address</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Street Address</Label>
                   <Textarea
                     value={formData.address}
                     onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                     rows={2}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4">
                   <div>
-                    <Label>City</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">City</Label>
                     <Input
                       value={formData.city}
                       onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                      className="mt-1"
+                      className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div>
-                    <Label>State</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">State</Label>
                     <Input
                       value={formData.state}
                       onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      className="mt-1"
+                      className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                   <div>
-                    <Label>Country</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">Country</Label>
                     <Input
                       value={formData.country}
                       onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                      className="mt-1"
+                      className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Additional Information */}
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">Additional Information</h3>
+              <div className="border-t border-slate-200 dark:border-slate-800 pt-6">
+                <h3 className="text-lg font-semibold mb-4 text-slate-800 dark:text-white">Additional Information</h3>
                 <div>
-                  <Label>Medical Conditions (if any)</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Medical Conditions (if any)</Label>
                   <Textarea
                     value={formData.medical_conditions}
                     onChange={(e) => setFormData({ ...formData, medical_conditions: e.target.value })}
                     placeholder="Allergies, medications, or special needs..."
                     rows={2}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 <div className="mt-4">
-                  <Label>How did you hear about us?</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">How did you hear about us?</Label>
                   <Select value={formData.how_did_you_hear} onValueChange={(v) => setFormData({ ...formData, how_did_you_hear: v })}>
-                    <SelectTrigger className="mt-1">
+                    <SelectTrigger className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                       <SelectValue placeholder="Select option" />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                       {howDidYouHear.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div className="mt-4">
-                  <Label>Additional Notes</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Additional Notes</Label>
                   <Textarea
                     value={formData.additional_notes}
                     onChange={(e) => setFormData({ ...formData, additional_notes: e.target.value })}
                     placeholder="Any other information you'd like to share..."
                     rows={3}
-                    className="mt-1"
+                    className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-800">
                 <Link href="/">
-                  <Button type="button" variant="outline" className="w-full sm:w-auto">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Home
                   </Button>
                 </Link>
-                <Button type="submit" disabled={loading} className="bg-emerald-600 hover:bg-emerald-700 w-full sm:w-auto">
+                <Button 
+                  type="submit" 
+                  disabled={loading} 
+                  className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 w-full sm:w-auto"
+                >
                   {loading ? (
                     <>Submitting...</>
                   ) : (
@@ -487,27 +501,27 @@ export default function AdmissionPage() {
       </div>
 
       {/* Footer */}
-      <footer className="border-t bg-white mt-8 md:mt-12">
+      <footer className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 mt-8 md:mt-12">
         <div className="container mx-auto px-4 py-4 md:py-6">
           <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4 mb-3">
-            <Link href="/" className="text-xs sm:text-sm text-slate-500 hover:text-emerald-600 transition-colors flex items-center gap-1">
+            <Link href="/" className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
               <Home className="h-3 w-3" />
               Home
             </Link>
-            <span className="text-slate-300">|</span>
-            <Link href="/admission" className="text-xs sm:text-sm text-emerald-600 font-medium">
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+            <Link href="/admission" className="text-xs sm:text-sm text-emerald-600 dark:text-emerald-400 font-medium">
               Admission
             </Link>
-            <span className="text-slate-300">|</span>
-            <Link href="/contact" className="text-xs sm:text-sm text-slate-500 hover:text-emerald-600 transition-colors">
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+            <Link href="/contact" className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Contact
             </Link>
-            <span className="text-slate-300">|</span>
-            <Link href="/portal" className="text-xs sm:text-sm text-slate-500 hover:text-emerald-600 transition-colors">
+            <span className="text-slate-300 dark:text-slate-700">|</span>
+            <Link href="/portal" className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors">
               Portal
             </Link>
           </div>
-          <p className="text-center text-xs sm:text-sm text-slate-500" suppressHydrationWarning>
+          <p className="text-center text-xs sm:text-sm text-slate-500 dark:text-slate-400" suppressHydrationWarning>
             © {new Date().getFullYear()} Vincollins College. All rights reserved.
           </p>
         </div>

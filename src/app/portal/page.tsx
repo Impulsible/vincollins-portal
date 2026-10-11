@@ -45,7 +45,7 @@ const ROLE_CONFIG = {
     greeting: 'Welcome back, Administrator',
     message: 'Accessing admin control panel...',
     tabBg: 'data-[state=active]:bg-purple-600',
-    infoBg: 'bg-purple-50 border-purple-200 text-purple-700',
+    infoBg: 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/60 text-purple-700 dark:text-purple-300',
     infoText: '🛡️ Administrative dashboard with full system control',
     redirect: '/admin',
   },
@@ -58,7 +58,7 @@ const ROLE_CONFIG = {
     greeting: 'Welcome back, Instructor',
     message: 'Loading your teaching dashboard...',
     tabBg: 'data-[state=active]:bg-blue-600',
-    infoBg: 'bg-blue-50 border-blue-200 text-blue-700',
+    infoBg: 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60 text-blue-700 dark:text-blue-300',
     infoText: '📚 Teaching portal for class and exam management',
     redirect: '/staff',
   },
@@ -71,7 +71,7 @@ const ROLE_CONFIG = {
     greeting: 'Welcome back, Student',
     message: 'Preparing your learning workspace...',
     tabBg: 'data-[state=active]:bg-emerald-600',
-    infoBg: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    infoBg: 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60 text-emerald-700 dark:text-emerald-300',
     infoText: '🎓 Student dashboard with CBT exam access',
     redirect: '/student',
   },
@@ -138,7 +138,6 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
       return avatarUrl
     }
-    // Resolves from standard 'avatars' storage bucket
     const { data } = supabase.storage.from('avatars').getPublicUrl(avatarUrl)
     return data?.publicUrl || null
   })()
@@ -146,13 +145,13 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
   const isStudent = role === 'student'
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 15 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 15 }}
         transition={{ type: 'spring', stiffness: 350, damping: 28 }}
-        className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden border border-gray-100"
+        className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-800"
       >
         {/* Decorative Top Accent Gradients */}
         <div
@@ -166,10 +165,10 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
           {/* Close/Skip button */}
           <button
             onClick={onGo}
-            className="absolute top-5 right-5 h-8 w-8 rounded-full bg-gray-50 hover:bg-gray-100 border border-gray-100 flex items-center justify-center transition-colors group"
+            className="absolute top-5 right-5 h-8 w-8 rounded-full bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-100 dark:border-slate-700 flex items-center justify-center transition-colors group"
             aria-label="Go to dashboard"
           >
-            <ArrowRight className="h-4 w-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+            <ArrowRight className="h-4 w-4 text-gray-400 dark:text-slate-400 group-hover:text-gray-600 dark:group-hover:text-slate-200 transition-colors" />
           </button>
 
           <div className="flex flex-col items-center text-center">
@@ -181,21 +180,20 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
               <span className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping duration-1000 pointer-events-none" />
 
               <div
-                className="relative w-32 h-32 rounded-full p-1.5 flex items-center justify-center bg-white shadow-xl transition-all"
+                className="relative w-32 h-32 rounded-full p-1.5 flex items-center justify-center bg-white dark:bg-slate-900 shadow-xl transition-all"
                 style={{
                   background: `linear-gradient(135deg, ${config.color}, #6EE7B7)`,
                 }}
               >
-                <div className="relative w-full h-full rounded-full bg-white overflow-hidden flex items-center justify-center">
+                <div className="relative w-full h-full rounded-full bg-white dark:bg-slate-900 overflow-hidden flex items-center justify-center">
                   {isStudent && resolvedAvatarUrl && !imgError ? (
                     <>
                       {/* Image loading state */}
                       {!imgLoaded && (
-                        <div className="absolute inset-0 bg-gray-50 flex items-center justify-center animate-pulse">
+                        <div className="absolute inset-0 bg-gray-50 dark:bg-slate-800 flex items-center justify-center animate-pulse">
                           <Loader2 className="h-6 w-6 text-emerald-500 animate-spin" />
                         </div>
                       )}
-                      {/* Standard element avoiding domain-whitelist issues */}
                       <img
                         src={resolvedAvatarUrl}
                         alt={userName}
@@ -208,7 +206,6 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
                       />
                     </>
                   ) : (
-                    // Fallback to high-end styled initials block
                     <div 
                       className="w-full h-full flex flex-col items-center justify-center text-white font-bold tracking-wider"
                       style={{
@@ -222,7 +219,7 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
                 </div>
 
                 {/* Highly-visible, Verified Badge */}
-                <div className="absolute bottom-1 right-1 h-8 w-8 bg-emerald-500 rounded-full border-4 border-white flex items-center justify-center shadow-md">
+                <div className="absolute bottom-1 right-1 h-8 w-8 bg-emerald-500 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center shadow-md">
                   <Check className="h-4 w-4 text-white stroke-[3px]" />
                 </div>
               </div>
@@ -230,16 +227,16 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
 
             {/* ── CUSTOMER & ACCOUNT DETAILS ────────────────────────────── */}
             <div className="space-y-2 mb-8">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold tracking-wide border border-emerald-100 uppercase">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide border border-emerald-100 dark:border-emerald-800/60 uppercase">
+                <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                 Verified Student Access
               </div>
 
-              <h3 className="text-2xl font-black text-gray-900 tracking-tight pt-1">
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight pt-1">
                 Welcome back, {firstName}!
               </h3>
               
-              <p className="text-sm text-gray-500 font-medium max-w-xs mx-auto">
+              <p className="text-sm text-gray-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
                 {config.message}
               </p>
             </div>
@@ -247,12 +244,12 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
             {/* ── GO BUTTON / ACTION ────────────────────────────────────── */}
             <Button
               onClick={onGo}
-              className="w-full py-6 text-sm font-bold rounded-2xl shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/30 transition-all duration-300 relative overflow-hidden group"
+              className="w-full py-6 text-sm font-bold rounded-2xl shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/30 transition-all duration-300 relative overflow-hidden group cursor-pointer"
               style={{
                 background: `linear-gradient(135deg, ${config.color}, #047857)`,
               }}
             >
-              <span className="relative z-10 flex items-center justify-center gap-2">
+              <span className="relative z-10 flex items-center justify-center gap-2 text-white">
                 Enter Student Portal
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </span>
@@ -260,13 +257,13 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
 
             {/* ── AUTOREDIRECT COUNTDOWN RING ────────────────────────────── */}
             <div className="mt-4 flex items-center gap-2">
-              <div className="h-1.5 w-16 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-1.5 w-16 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
                 <div 
                   className="h-full bg-emerald-500 transition-all duration-100 ease-linear"
                   style={{ width: `${progress}%` }}
                 />
               </div>
-              <p className="text-[11px] text-gray-400 font-medium">
+              <p className="text-[11px] text-gray-400 dark:text-slate-500 font-medium">
                 Redirecting you in a moment...
               </p>
             </div>
@@ -284,18 +281,18 @@ function LockoutBanner({ remainingSeconds }: { remainingSeconds: number }) {
   const progress = (remainingSeconds / 300) * 100
 
   return (
-    <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-center space-y-2">
-      <div className="flex items-center justify-center gap-2 text-red-700">
+    <div className="rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-4 text-center space-y-2">
+      <div className="flex items-center justify-center gap-2 text-red-700 dark:text-red-400">
         <Lock className="h-4 w-4" />
         <p className="text-sm font-semibold">Account Temporarily Locked</p>
       </div>
-      <p className="text-xs text-red-500">
+      <p className="text-xs text-red-500 dark:text-red-400/90">
         Too many failed attempts. Try again in{' '}
         <span className="font-bold">
           {minutes} minute{minutes !== 1 ? 's' : ''}
         </span>
       </p>
-      <div className="h-1.5 bg-red-100 rounded-full overflow-hidden">
+      <div className="h-1.5 bg-red-100 dark:bg-red-950/60 rounded-full overflow-hidden">
         <div
           className="h-full bg-red-400 rounded-full transition-all duration-1000"
           style={{ width: `${progress}%` }}
@@ -341,13 +338,13 @@ export default function LoginPage() {
   const redirectTimerRef = useRef<NodeJS.Timeout | null>(null)
   const redirectStartedRef = useRef(false)
 
-  // ── Preload hero image ───────────────────────────────────────────────────
+  // Preload hero image
   useEffect(() => {
     const img = document.createElement('img')
     img.src = '/images/portal.jpg'
   }, [])
 
-  // ── Clear stale localStorage on portal visit ────────────────────────────
+  // Clear stale localStorage on portal visit
   useEffect(() => {
     try {
       const keysToKeep = ['user_profile', 'auth_user', 'auth_role', 'school_settings', 'pwa-install-dismissed']
@@ -371,7 +368,7 @@ export default function LoginPage() {
     return () => window.removeEventListener('pageshow', handlePageShow)
   }, [])
 
-  // ── Load school settings ─────────────────────────────────────────────────
+  // Load school settings
   useEffect(() => {
     const load = async () => {
       try {
@@ -405,7 +402,7 @@ export default function LoginPage() {
     load()
   }, [])
 
-  // ── Auto redirect timer ──────────────────────────────────────────────────
+  // Auto redirect timer
   useEffect(() => {
     if (!successData || redirectStartedRef.current) return
 
@@ -419,14 +416,14 @@ export default function LoginPage() {
     }
   }, [successData, router])
 
-  // ── Cleanup on unmount ───────────────────────────────────────────────────
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current)
     }
   }, [])
 
-  // ── Go to dashboard (manual) ─────────────────────────────────────────────
+  // Go to dashboard (manual)
   const goToDashboard = useCallback(() => {
     if (redirectTimerRef.current) {
       clearTimeout(redirectTimerRef.current)
@@ -436,13 +433,13 @@ export default function LoginPage() {
     router.push(successData.redirectPath)
   }, [successData, router])
 
-  // ── Role change ──────────────────────────────────────────────────────────
+  // Role change
   const handleRoleChange = useCallback((role: UserRole) => {
     setSelectedRole(role)
     setError('')
   }, [])
 
-  // ── Login ────────────────────────────────────────────────────────────────
+  // Login
   const handleLogin = useCallback(
     async (e: React.FormEvent) => {
       e.preventDefault()
@@ -471,7 +468,6 @@ export default function LoginPage() {
       }
 
       try {
-        // ── Sign in ──────────────────────────────────────────────────────
         const { data: signInData, error: signInError } =
           await supabase.auth.signInWithPassword({
             email: cleanEmail,
@@ -513,7 +509,6 @@ export default function LoginPage() {
           return
         }
 
-        // ── Fetch Profile & Avatar Photo (added avatar_url and photo_url queries) ────
         const { data: profile } = await supabase
           .from('profiles')
           .select('role, full_name, first_name, last_name, avatar_url, photo_url')
@@ -530,7 +525,6 @@ export default function LoginPage() {
             ? 'teacher'
             : (rawRole as UserRole)
 
-        // ── Role mismatch check ──────────────────────────────────────────
         if (userRole !== selectedRole) {
           const displayName =
             userRole === 'teacher'
@@ -546,10 +540,8 @@ export default function LoginPage() {
           return
         }
 
-        // ── Success ──────────────────────────────────────────────────────
         checkAndRecord(true)
 
-        // Build display name
         let userName =
           profile?.first_name && profile?.last_name
             ? `${profile.first_name} ${profile.last_name}`
@@ -567,7 +559,6 @@ export default function LoginPage() {
         const redirectPath = ROLE_CONFIG[userRole].redirect
         const databaseAvatar = profile?.avatar_url || profile?.photo_url || signInData.user.user_metadata?.avatar_url || null
 
-        // Persist minimal auth info locally
         try {
           localStorage.setItem(
             'auth_user',
@@ -614,7 +605,6 @@ export default function LoginPage() {
     ],
   )
 
-  // ── Role-aware button/tab colors ──────────────────────────────────────────
   const submitBtnClass = {
     admin: 'bg-purple-600 hover:bg-purple-700',
     teacher: 'bg-blue-600 hover:bg-blue-700',
@@ -627,22 +617,21 @@ export default function LoginPage() {
     student: <GraduationCap className="h-4 w-4" />,
   }[selectedRole]
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <>
-      <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="min-h-screen flex flex-col bg-gray-50 dark:bg-slate-950 transition-colors duration-300">
         <Header />
 
         <div className="flex-1 flex pt-16 sm:pt-20">
           <div className="flex w-full">
 
             {/* ── LEFT: Hero Image ──────────────────────────────────────── */}
-            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] bg-gradient-to-br from-[#0A2472] to-[#1e3a8a]">
+            <div className="hidden lg:flex lg:w-[55%] xl:w-[60%] bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 border-r border-transparent dark:border-slate-800">
               <div className="relative w-full min-h-[calc(100vh-80px)]">
                 {!imageError && (
                   <>
                     {!heroLoaded && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] animate-pulse z-0" />
+                      <div className="absolute inset-0 bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 animate-pulse z-0" />
                     )}
                     <Image
                       src="/images/portal.jpg"
@@ -650,7 +639,7 @@ export default function LoginPage() {
                       fill
                       className={cn(
                         'object-cover object-center transition-opacity duration-500 z-0',
-                        heroLoaded ? 'opacity-100' : 'opacity-0',
+                        heroLoaded ? 'opacity-100 dark:opacity-85' : 'opacity-0',
                       )}
                       priority
                       sizes="(max-width: 1024px) 55vw, 60vw"
@@ -660,7 +649,7 @@ export default function LoginPage() {
                   </>
                 )}
 
-                <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/20 to-transparent z-10" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-black/30 to-transparent dark:from-slate-950/80 dark:via-slate-950/50 dark:to-slate-950/20 z-10" />
 
                 <div className="relative z-20 flex flex-col justify-center px-12 xl:px-16 py-12 w-full min-h-[calc(100vh-80px)]">
                   <motion.div
@@ -670,8 +659,8 @@ export default function LoginPage() {
                     className="text-white"
                   >
                     {/* Badge */}
-                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/30 mb-8">
-                      <Sparkles className="h-4 w-4 text-yellow-300" />
+                    <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/20 dark:bg-slate-900/60 backdrop-blur-md border border-white/30 dark:border-slate-700/60 mb-8">
+                      <Sparkles className="h-4 w-4 text-amber-300" />
                       <span className="text-sm font-medium tracking-wide">
                         Secure Portal Access
                       </span>
@@ -699,7 +688,7 @@ export default function LoginPage() {
                           )}
                         </div>
                       ) : (
-                        <div className="h-16 w-16 xl:h-20 xl:w-20 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
+                        <div className="h-16 w-16 xl:h-20 xl:w-20 rounded-2xl bg-white/20 dark:bg-slate-800/60 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
                           <GraduationCap className="h-8 w-8 xl:h-10 xl:w-10 text-white" />
                         </div>
                       )}
@@ -707,7 +696,7 @@ export default function LoginPage() {
                         <h2 className="text-2xl xl:text-3xl font-bold">
                           {schoolSettings.school_name}
                         </h2>
-                        <p className="text-white/60 text-sm italic mt-1">
+                        <p className="text-white/70 dark:text-slate-300 text-sm italic mt-1">
                           &ldquo;{schoolSettings.school_motto}&rdquo;
                         </p>
                       </div>
@@ -715,7 +704,7 @@ export default function LoginPage() {
 
                     <h1 className="text-4xl xl:text-5xl 2xl:text-6xl font-bold leading-tight">
                       Welcome to Your{' '}
-                      <span className="text-[#F5A623]">Digital Campus</span>
+                      <span className="text-[#F5A623] dark:text-amber-400">Digital Campus</span>
                     </h1>
                   </motion.div>
                 </div>
@@ -723,7 +712,7 @@ export default function LoginPage() {
             </div>
 
             {/* ── RIGHT: Login Form ─────────────────────────────────────── */}
-            <div className="w-full lg:w-[45%] xl:w-[40%] bg-white flex items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-8 min-h-[calc(100vh-80px)]">
+            <div className="w-full lg:w-[45%] xl:w-[40%] bg-white dark:bg-slate-900 flex items-center justify-center py-8 lg:py-12 px-4 sm:px-6 lg:px-8 min-h-[calc(100vh-80px)] transition-colors duration-300">
               <div className="w-full max-w-md">
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
@@ -755,25 +744,25 @@ export default function LoginPage() {
                           )}
                         </div>
                       ) : (
-                        <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] flex items-center justify-center mx-auto mb-3 shadow-xl">
+                        <div className="h-20 w-20 rounded-2xl bg-gradient-to-br from-[#0A2472] to-[#1e3a8a] dark:from-blue-600 dark:to-indigo-600 flex items-center justify-center mx-auto mb-3 shadow-xl">
                           <GraduationCap className="h-10 w-10 text-white" />
                         </div>
                       )}
                     </motion.div>
-                    <h2 className="text-xl font-bold text-gray-900">
+                    <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                       {schoolSettings.school_name}
                     </h2>
-                    <p className="text-xs text-gray-500 italic mt-1">
+                    <p className="text-xs text-gray-500 dark:text-slate-400 italic mt-1">
                       &ldquo;{schoolSettings.school_motto}&rdquo;
                     </p>
                   </div>
 
                   {/* Heading */}
                   <div className="text-center mb-8">
-                    <h3 className="text-2xl lg:text-3xl font-bold text-gray-900">
+                    <h3 className="text-2xl lg:text-3xl font-bold text-gray-900 dark:text-white">
                       Sign In
                     </h3>
-                    <p className="text-gray-500 text-sm mt-2">
+                    <p className="text-gray-500 dark:text-slate-400 text-sm mt-2">
                       Access your personalised portal
                     </p>
                   </div>
@@ -784,24 +773,24 @@ export default function LoginPage() {
                     onValueChange={(v) => handleRoleChange(v as UserRole)}
                     className="mb-6"
                   >
-                    <TabsList className="grid w-full grid-cols-3 gap-1 bg-gray-100 p-1 rounded-xl">
+                    <TabsList className="grid w-full grid-cols-3 gap-1 bg-gray-100 dark:bg-slate-800/80 p-1 rounded-xl">
                       <TabsTrigger
                         value="student"
-                        className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                        className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all dark:text-slate-300 dark:data-[state=active]:text-white"
                       >
                         <GraduationCap className="h-4 w-4" />
                         <span className="font-medium">Student</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="teacher"
-                        className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                        className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all dark:text-slate-300 dark:data-[state=active]:text-white"
                       >
                         <Users className="h-4 w-4" />
                         <span className="font-medium">Teacher</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="admin"
-                        className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all"
+                        className="flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm data-[state=active]:bg-purple-600 data-[state=active]:text-white data-[state=active]:shadow-lg transition-all dark:text-slate-300 dark:data-[state=active]:text-white"
                       >
                         <Shield className="h-4 w-4" />
                         <span className="font-medium">Admin</span>
@@ -837,9 +826,9 @@ export default function LoginPage() {
                       >
                         <Alert
                           variant="destructive"
-                          className="border-red-200 bg-red-50 text-red-800 rounded-xl"
+                          className="border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 text-red-800 dark:text-red-300 rounded-xl"
                         >
-                          <AlertCircle className="h-4 w-4 text-red-600" />
+                          <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                           <AlertDescription className="text-sm ml-2">
                             {error}
                           </AlertDescription>
@@ -868,12 +857,12 @@ export default function LoginPage() {
                     <div>
                       <label
                         htmlFor="email"
-                        className="block text-sm font-medium text-gray-700 mb-2"
+                        className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
                       >
                         Email Address
                       </label>
                       <div className="relative">
-                        <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" />
                         <Input
                           id="email"
                           type="email"
@@ -884,10 +873,10 @@ export default function LoginPage() {
                             if (error) setError('')
                           }}
                           className={cn(
-                            'pl-10 h-12 rounded-xl border-2 bg-gray-50 focus:bg-white text-sm transition-all',
+                            'pl-10 h-12 rounded-xl border-2 bg-gray-50 dark:bg-slate-800/50 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-800 text-sm transition-all',
                             error
-                              ? 'border-red-300 focus:border-red-400'
-                              : 'border-gray-200 focus:border-primary',
+                              ? 'border-red-300 dark:border-red-800 focus:border-red-400'
+                              : 'border-gray-200 dark:border-slate-700 focus:border-primary dark:focus:border-blue-400',
                           )}
                           required
                           disabled={loading || isLocked}
@@ -901,12 +890,12 @@ export default function LoginPage() {
                     <div>
                       <label
                         htmlFor="password"
-                        className="block text-sm font-medium text-gray-700 mb-2"
+                        className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-2"
                       >
                         Password
                       </label>
                       <div className="relative">
-                        <KeyRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                        <KeyRound className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 dark:text-slate-500 pointer-events-none" />
                         <Input
                           id="password"
                           type={showPassword ? 'text' : 'password'}
@@ -917,10 +906,10 @@ export default function LoginPage() {
                             if (error) setError('')
                           }}
                           className={cn(
-                            'pl-10 pr-12 h-12 rounded-xl border-2 bg-gray-50 focus:bg-white text-sm transition-all',
+                            'pl-10 pr-12 h-12 rounded-xl border-2 bg-gray-50 dark:bg-slate-800/50 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-slate-500 focus:bg-white dark:focus:bg-slate-800 text-sm transition-all',
                             error
-                              ? 'border-red-300 focus:border-red-400'
-                              : 'border-gray-200 focus:border-primary',
+                              ? 'border-red-300 dark:border-red-800 focus:border-red-400'
+                              : 'border-gray-200 dark:border-slate-700 focus:border-primary dark:focus:border-blue-400',
                           )}
                           required
                           disabled={loading || isLocked}
@@ -929,7 +918,7 @@ export default function LoginPage() {
                         <button
                           type="button"
                           onClick={() => setShowPassword((p) => !p)}
-                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors p-1"
+                          className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-slate-200 transition-colors p-1"
                           tabIndex={-1}
                           aria-label={
                             showPassword ? 'Hide password' : 'Show password'
@@ -948,7 +937,7 @@ export default function LoginPage() {
                     <Button
                       type="submit"
                       className={cn(
-                        'w-full h-12 text-sm font-semibold text-white',
+                        'w-full h-12 text-sm font-semibold text-white cursor-pointer',
                         'shadow-lg hover:shadow-xl transition-all rounded-xl mt-2',
                         submitBtnClass,
                         (loading || isLocked) && 'opacity-70 cursor-not-allowed',
@@ -976,8 +965,8 @@ export default function LoginPage() {
                   </form>
 
                   {/* Footer */}
-                  <div className="mt-8 pt-6 border-t border-gray-100 space-y-4">
-                    <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400">
+                  <div className="mt-8 pt-6 border-t border-gray-100 dark:border-slate-800 space-y-4">
+                    <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs text-gray-400 dark:text-slate-400">
                       {schoolSettings.school_phone && (
                         <div className="flex items-center gap-1.5">
                           <Phone className="h-3.5 w-3.5" />
@@ -992,17 +981,17 @@ export default function LoginPage() {
                       )}
                     </div>
 
-                    <p className="text-center text-xs text-gray-400">
+                    <p className="text-center text-xs text-gray-400 dark:text-slate-400">
                       Need assistance?{' '}
                       <Link
                         href="/contact"
-                        className="text-primary hover:underline font-medium transition-colors"
+                        className="text-primary dark:text-blue-400 hover:underline font-medium transition-colors"
                       >
                         Contact Support
                       </Link>
                     </p>
 
-                    <p className="text-center text-[11px] text-gray-300">
+                    <p className="text-center text-[11px] text-gray-400 dark:text-slate-500">
                       © {new Date().getFullYear()}{' '}
                       {schoolSettings.school_name}. All rights reserved.
                     </p>

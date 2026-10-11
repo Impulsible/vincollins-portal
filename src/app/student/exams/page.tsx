@@ -1,5 +1,5 @@
-// src/app/student/exams/page.tsx - COMPLETE FIXED VERSION
-
+/* eslint-disable @typescript-eslint/no-unused-vars */
+// src/app/student/exams/page.tsx - COMPLETE FIXED VERSION WITH DARK MODE
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
@@ -66,14 +66,14 @@ export default function StudentExamsPage() {
     else loadData()
   }, [loadData, selectedTermSession])
 
-  // ✅ FIXED: Include all completion statuses for completed tab
+  // Include all completion statuses for completed tab
   const displayedExams = filteredExams.filter((exam) => {
     const status = getExamStatus(exam)
     switch (activeTab) {
       case 'available': 
         return status === 'available' || status === 'in_progress'
       case 'completed': 
-        // ✅ Include graded and pending_theory as completed
+        // Include graded and pending_theory as completed
         return status === 'completed' || status === 'graded' || status === 'pending_theory'
       case 'upcoming': 
         return status === 'upcoming'
@@ -84,7 +84,7 @@ export default function StudentExamsPage() {
     }
   })
 
-  // ✅ FIXED: Updated counts with all statuses
+  // Updated counts with all statuses
   const availableCount = filteredExams.filter(e => {
     const status = getExamStatus(e)
     return status === 'available' || status === 'in_progress'
@@ -101,24 +101,30 @@ export default function StudentExamsPage() {
 
   if (!mounted || loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
         <Header onLogout={handleLogout} />
         <div className="flex">
           <div className="hidden lg:block">
-            <StudentSidebar profile={null} onLogout={handleLogout} collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="exams" setActiveTab={handleTabChange} />
+            <StudentSidebar 
+              profile={null} 
+              onLogout={handleLogout} 
+              collapsed={sidebarCollapsed}
+              onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+              activeTab="exams" 
+              setActiveTab={handleTabChange} 
+            />
           </div>
           <div className={cn('flex-1 flex items-center justify-center min-h-[calc(100vh-64px)]', sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72')}>
             <div className="text-center space-y-4">
               <div className="relative mx-auto w-fit">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-200">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-blue-900/20">
                   <BookMarked className="h-8 w-8 text-white" />
                 </div>
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600 absolute -bottom-1 -right-1 bg-white rounded-full" />
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400 absolute -bottom-1 -right-1 bg-white dark:bg-slate-800 rounded-full border border-slate-100 dark:border-slate-700 p-0.5" />
               </div>
               <div>
-                <p className="font-semibold text-slate-700">Loading Exams</p>
-                <p className="text-sm text-slate-400 mt-1">Fetching your exam schedule...</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-200">Loading Exams</p>
+                <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Fetching your exam schedule...</p>
               </div>
             </div>
           </div>
@@ -128,59 +134,79 @@ export default function StudentExamsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50/20 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
       <Header onLogout={handleLogout} />
       <div className="flex overflow-x-hidden">
-        <StudentSidebar profile={profile} onLogout={handleLogout} collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} activeTab="exams" setActiveTab={handleTabChange} />
+        <StudentSidebar 
+          profile={profile} 
+          onLogout={handleLogout} 
+          collapsed={sidebarCollapsed}
+          onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
+          activeTab="exams" 
+          setActiveTab={handleTabChange} 
+        />
         <div className={cn('flex-1 transition-all duration-300 overflow-x-hidden', sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72')}>
           <main className="pt-[72px] lg:pt-24 pb-20 px-3 sm:px-5 lg:px-8">
             <div className="max-w-7xl mx-auto">
-              <ExamsHeader profile={profile} stats={normalizedStats} onBackToDashboard={() => router.push('/student')} />
               
-              <TermProgressCard 
+              <ExamsHeader 
+                profile={profile} 
                 stats={normalizedStats} 
-                availableTerms={availableTerms} 
-                selectedTermSession={selectedTermSession} 
-                onTermChange={handleTermSessionChange} 
-                onRefresh={handleRefresh} 
+                onBackToDashboard={() => router.push('/student')} 
               />
               
-              <SubjectFilter 
-                availableSubjects={availableSubjects} 
-                selectedSubject={selectedSubject} 
-                onSubjectChange={setSelectedSubject} 
-                searchQuery={searchQuery} 
-                onSearchChange={setSearchQuery} 
-                viewMode={viewMode} 
-                onViewModeChange={setViewMode} 
-                exams={exams} 
-                examAttempts={examAttempts} 
-                getSubjectConfig={getSubjectConfig} 
-              />
+              <div className="mt-6 sm:mt-8">
+                <TermProgressCard 
+                  stats={normalizedStats} 
+                  availableTerms={availableTerms} 
+                  selectedTermSession={selectedTermSession} 
+                  onTermChange={handleTermSessionChange} 
+                  onRefresh={handleRefresh} 
+                />
+              </div>
               
-              {/* ✅ Pass all counts including expired */}
-              <ExamTabs 
-                activeTab={activeTab} 
-                onTabChange={setActiveTab} 
-                availableCount={availableCount} 
-                upcomingCount={upcomingCount} 
-                completedCount={completedCount}
-                expiredCount={expiredCount}
-              />
+              <div className="mt-6 sm:mt-8">
+                <SubjectFilter 
+                  availableSubjects={availableSubjects} 
+                  selectedSubject={selectedSubject} 
+                  onSubjectChange={setSelectedSubject} 
+                  searchQuery={searchQuery} 
+                  onSearchChange={setSearchQuery} 
+                  viewMode={viewMode} 
+                  onViewModeChange={setViewMode} 
+                  exams={exams} 
+                  examAttempts={examAttempts} 
+                  getSubjectConfig={getSubjectConfig} 
+                />
+              </div>
               
-              {displayedExams.length === 0
-                ? <EmptyExamsState activeTab={activeTab} stats={normalizedStats} />
-                : <ExamList 
-                    exams={displayedExams} 
-                    examAttempts={examAttempts} 
-                    viewMode={viewMode} 
-                    getExamStatus={getExamStatus} 
-                    getSubjectConfig={getSubjectConfig} 
-                    onTakeExam={handleTakeExam} 
-                    onViewResult={handleViewResult} 
-                  />
-              }
+              <div className="mt-4 sm:mt-6">
+                {/* Pass all counts including expired */}
+                <ExamTabs 
+                  activeTab={activeTab} 
+                  onTabChange={setActiveTab} 
+                  availableCount={availableCount} 
+                  upcomingCount={upcomingCount} 
+                  completedCount={completedCount}
+                  expiredCount={expiredCount}
+                />
+              </div>
+              
+              <div className="mt-4 sm:mt-6">
+                {displayedExams.length === 0
+                  ? <EmptyExamsState activeTab={activeTab} stats={normalizedStats} />
+                  : <ExamList 
+                      exams={displayedExams} 
+                      examAttempts={examAttempts} 
+                      viewMode={viewMode} 
+                      getExamStatus={getExamStatus} 
+                      getSubjectConfig={getSubjectConfig} 
+                      onTakeExam={handleTakeExam} 
+                      onViewResult={handleViewResult} 
+                    />
+                }
+              </div>
+
             </div>
           </main>
         </div>

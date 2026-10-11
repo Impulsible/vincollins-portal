@@ -1,4 +1,3 @@
-
 /* eslint-disable @typescript-eslint/no-unused-vars */
 // app/student/help/page.tsx - SECURE: No Self-Service Password Reset, Contact Support Only
 'use client'
@@ -22,10 +21,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { getFirstName, getDisplayName } from '@/lib/get-display-name'
 import {
   Loader2, HelpCircle, MessageCircle, Phone, Mail, MapPin,
   ChevronRight, Home, ArrowLeft, Send, FileText,
@@ -40,6 +39,9 @@ import Link from 'next/link'
 interface StudentProfile {
   id: string
   full_name: string
+  first_name?: string | null
+  last_name?: string | null
+  display_name?: string | null
   email: string
   class: string
   department: string
@@ -129,7 +131,6 @@ const guides = [
   { id: 6, title: 'Mobile App Guide', description: 'Using Vincollins on your mobile device', readTime: '5 min' }
 ]
 
-// Chat Bot Knowledge Base
 const chatResponses: Record<string, string> = {
   'hello': 'Hello! How can I help you today? You can ask me about exams, assignments, results, account issues, or technical problems.',
   'hi': 'Hi there! What can I assist you with today?',
@@ -215,18 +216,13 @@ export default function StudentHelpPage() {
     priority: 'normal'
   })
 
-  const getInitials = (name?: string): string => {
-    if (!name) return 'S'
-    const parts = name.split(' ')
-    return parts.length >= 2 ? (parts[0][0] + parts[1][0]).toUpperCase() : parts[0].slice(0, 2).toUpperCase()
-  }
-
-const formatProfileForHeader = (profile: StudentProfile | null) => {
+  // ✅ FIXED: Uses shared helpers — "Esther" not "Soga"
+  const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: profile.full_name,
-      firstName: profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
+      name: getDisplayName(profile, 'Student'),
+      firstName: getFirstName(profile),
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -252,6 +248,9 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
         setProfile({
           id: profileData.id,
           full_name: profileData.full_name || 'Student',
+          first_name: profileData.first_name || null,
+          last_name: profileData.last_name || null,
+          display_name: profileData.display_name || null,
           email: profileData.email || session.user.email || '',
           class: profileData.class || 'Not Assigned',
           department: profileData.department || 'General',
@@ -429,12 +428,12 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
           <div className="text-center">
-            <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
-            <p className="mt-4 text-slate-600 text-sm">Loading help center...</p>
+            <Loader2 className="h-10 w-10 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto" />
+            <p className="mt-4 text-slate-600 dark:text-slate-400 text-sm">Loading help center...</p>
           </div>
         </div>
       </div>
@@ -442,7 +441,7 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex flex-col transition-colors duration-300">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
       <div className="flex flex-1">
@@ -470,15 +469,20 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-4 md:mb-6 flex items-center justify-between flex-wrap gap-2"
               >
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-                  <Link href="/student" className="hover:text-primary flex items-center gap-1">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+                  <Link href="/student" className="hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1">
                     <Home className="h-3.5 w-3.5" />
                     <span className="hidden xs:inline">Dashboard</span>
                   </Link>
-                  <ChevronRight className="h-3.5 w-3.5 hidden xs:block" />
-                  <span className="text-foreground font-medium">Help & Support</span>
+                  <ChevronRight className="h-3.5 w-3.5 hidden xs:block text-slate-400 dark:text-slate-500" />
+                  <span className="text-slate-800 dark:text-slate-200 font-medium">Help & Support</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => router.push('/student')} className="h-8 text-xs">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => router.push('/student')} 
+                  className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
                   <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
                   Back
                 </Button>
@@ -490,8 +494,12 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-6 md:mb-8"
               >
-                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">Help & Support Center</h1>
-                <p className="text-muted-foreground mt-1.5 sm:mt-2 text-xs sm:text-sm md:text-base">Find answers to common questions or contact our support team</p>
+                <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-slate-800 dark:text-white">
+                  Help & Support Center
+                </h1>
+                <p className="text-slate-500 dark:text-slate-400 mt-1.5 sm:mt-2 text-xs sm:text-sm md:text-base">
+                  Find answers to common questions or contact our support team
+                </p>
               </motion.div>
 
               {/* Search Bar */}
@@ -501,22 +509,22 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 className="mb-4 md:mb-6 lg:mb-8"
               >
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-slate-400 dark:text-slate-500" />
                   <Input
                     placeholder="Search for answers..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base bg-white shadow-sm"
+                    className="pl-9 sm:pl-10 h-10 sm:h-12 text-sm sm:text-base bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-400 dark:focus:border-emerald-500 shadow-sm"
                   />
                 </div>
               </motion.div>
 
               {/* Main Tabs */}
               <Tabs defaultValue="faq" className="space-y-4 sm:space-y-6">
-                <TabsList className="bg-white p-1 rounded-xl shadow-sm border w-full overflow-x-auto flex-nowrap">
-                  <TabsTrigger value="faq" className="rounded-lg text-xs sm:text-sm whitespace-nowrap">FAQ</TabsTrigger>
-                  <TabsTrigger value="guides" className="rounded-lg text-xs sm:text-sm whitespace-nowrap">Quick Guides</TabsTrigger>
-                  <TabsTrigger value="contact" className="rounded-lg text-xs sm:text-sm whitespace-nowrap">Contact Support</TabsTrigger>
+                <TabsList className="bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 w-full overflow-x-auto flex-nowrap h-auto">
+                  <TabsTrigger value="faq" className="rounded-lg text-xs sm:text-sm whitespace-nowrap text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">FAQ</TabsTrigger>
+                  <TabsTrigger value="guides" className="rounded-lg text-xs sm:text-sm whitespace-nowrap text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">Quick Guides</TabsTrigger>
+                  <TabsTrigger value="contact" className="rounded-lg text-xs sm:text-sm whitespace-nowrap text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white">Contact Support</TabsTrigger>
                 </TabsList>
 
                 {/* FAQ Tab */}
@@ -529,8 +537,10 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                           key={cat.id}
                           variant={activeCategory === cat.id ? 'default' : 'outline'}
                           className={cn(
-                            "cursor-pointer hover:bg-primary/10 transition-all px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm whitespace-nowrap shrink-0",
-                            activeCategory === cat.id && "bg-primary text-white"
+                            "cursor-pointer transition-all px-3 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm whitespace-nowrap shrink-0",
+                            activeCategory === cat.id 
+                              ? "bg-emerald-600 hover:bg-emerald-700 text-white border-emerald-600"
+                              : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-emerald-300 dark:hover:border-emerald-700"
                           )}
                           onClick={() => setActiveCategory(cat.id)}
                         >
@@ -541,25 +551,27 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                     })}
                   </div>
 
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
                     <CardContent className="p-4 sm:p-6">
                       {filteredFaqs.length === 0 ? (
                         <div className="text-center py-8 sm:py-12">
-                          <HelpCircle className="h-10 w-10 sm:h-12 sm:w-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
-                          <p className="text-slate-500 text-sm sm:text-base">No FAQs found matching your search.</p>
-                          <p className="text-xs text-slate-400 mt-1">Try different keywords or browse all categories.</p>
+                          <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3">
+                            <HelpCircle className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+                          </div>
+                          <p className="text-slate-500 dark:text-slate-400 text-sm sm:text-base">No FAQs found matching your search.</p>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try different keywords or browse all categories.</p>
                         </div>
                       ) : (
                         <div className="space-y-2 sm:space-y-3">
                           {filteredFaqs.map((faq, index) => (
-                            <div key={index} className="border border-slate-200 rounded-lg overflow-hidden">
+                            <div key={index} className="border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
                               <details className="group">
-                                <summary className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50 list-none">
-                                  <span className="font-medium text-gray-900 text-sm sm:text-base pr-4">{faq.question}</span>
-                                  <ChevronRight className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-90 shrink-0" />
+                                <summary className="flex items-center justify-between p-3 sm:p-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/60 list-none">
+                                  <span className="font-medium text-slate-800 dark:text-slate-100 text-sm sm:text-base pr-4">{faq.question}</span>
+                                  <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500 transition-transform group-open:rotate-90 shrink-0" />
                                 </summary>
-                                <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t border-slate-200 bg-slate-50">
-                                  <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">{faq.answer}</p>
+                                <div className="px-3 sm:px-4 pb-3 sm:pb-4 pt-0 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
+                                  <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed">{faq.answer}</p>
                                 </div>
                               </details>
                             </div>
@@ -576,15 +588,15 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                     {guides.map((guide) => (
                       <Card 
                         key={guide.id} 
-                        className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer" 
+                        className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 hover:shadow-md dark:hover:shadow-slate-950/50 transition-shadow cursor-pointer" 
                         onClick={() => setSelectedGuide(guide.id)}
                       >
                         <CardHeader className="pb-2 sm:pb-3 px-4 sm:px-6">
-                          <CardTitle className="text-base sm:text-lg">{guide.title}</CardTitle>
-                          <CardDescription className="text-xs sm:text-sm">{guide.description}</CardDescription>
+                          <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">{guide.title}</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">{guide.description}</CardDescription>
                         </CardHeader>
                         <CardContent className="px-4 sm:px-6 pb-4">
-                          <div className="flex items-center text-xs sm:text-sm text-slate-500">
+                          <div className="flex items-center text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                             <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                             {guide.readTime} read
                           </div>
@@ -598,41 +610,41 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 <TabsContent value="contact">
                   <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
                     <div className="lg:col-span-1 space-y-3 sm:space-y-4">
-                      <Card className="border-0 shadow-sm bg-white">
+                      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
                         <CardHeader className="pb-2 px-4 sm:px-6">
-                          <CardTitle className="text-base sm:text-lg">Contact Information</CardTitle>
+                          <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">Contact Information</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4">
                           <div className="flex items-start gap-2 sm:gap-3">
-                            <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mt-0.5 shrink-0" />
+                            <Phone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
                             <div>
-                              <p className="font-medium text-sm sm:text-base">Phone Support</p>
-                              <p className="text-xs sm:text-sm text-slate-600">+234 800 123 4567</p>
-                              <p className="text-[10px] sm:text-xs text-slate-500">Mon-Fri, 8am-4pm</p>
+                              <p className="font-medium text-sm sm:text-base text-slate-800 dark:text-slate-200">Phone Support</p>
+                              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">+234 800 123 4567</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-500">Mon-Fri, 8am-4pm</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-2 sm:gap-3">
-                            <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mt-0.5 shrink-0" />
+                            <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
                             <div>
-                              <p className="font-medium text-sm sm:text-base">Email Support</p>
-                              <p className="text-xs sm:text-sm text-slate-600 break-all">support@vincollins.edu.ng</p>
-                              <p className="text-[10px] sm:text-xs text-slate-500">Response within 24h</p>
+                              <p className="font-medium text-sm sm:text-base text-slate-800 dark:text-slate-200">Email Support</p>
+                              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 break-all">support@vincollins.edu.ng</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-500">Response within 24h</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-2 sm:gap-3">
-                            <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 mt-0.5 shrink-0" />
+                            <MapPin className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
                             <div>
-                              <p className="font-medium text-sm sm:text-base">Visit Us</p>
-                              <p className="text-xs sm:text-sm text-slate-600">ICT Support Center</p>
-                              <p className="text-[10px] sm:text-xs text-slate-500">Main Campus Building</p>
+                              <p className="font-medium text-sm sm:text-base text-slate-800 dark:text-slate-200">Visit Us</p>
+                              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">ICT Support Center</p>
+                              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-500">Main Campus Building</p>
                             </div>
                           </div>
-                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mt-2">
+                          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 rounded-lg p-3 mt-2">
                             <div className="flex items-start gap-2">
-                              <Shield className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                              <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
                               <div>
-                                <p className="text-xs font-medium text-amber-800">Password Resets</p>
-                                <p className="text-[10px] sm:text-xs text-amber-700 mt-0.5">
+                                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Password Resets</p>
+                                <p className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-400 mt-0.5">
                                   Password resets require identity verification. Visit the ICT Support Center or submit a ticket.
                                 </p>
                               </div>
@@ -643,30 +655,30 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                     </div>
 
                     <div className="lg:col-span-2">
-                      <Card className="border-0 shadow-sm bg-white">
+                      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
                         <CardHeader className="pb-3 px-4 sm:px-6">
-                          <CardTitle className="text-base sm:text-lg">Submit a Support Ticket</CardTitle>
-                          <CardDescription className="text-xs sm:text-sm">Fill out the form below and we'll get back to you soon</CardDescription>
+                          <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">Submit a Support Ticket</CardTitle>
+                          <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Fill out the form below and we'll get back to you soon</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-3 sm:space-y-4 px-4 sm:px-6 pb-4 sm:pb-6">
                           <div>
-                            <Label htmlFor="subject" className="text-xs sm:text-sm">Subject *</Label>
+                            <Label htmlFor="subject" className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">Subject *</Label>
                             <Input
                               id="subject"
                               value={ticketForm.subject}
                               onChange={(e) => setTicketForm({ ...ticketForm, subject: e.target.value })}
                               placeholder="Brief description of your issue"
-                              className="mt-1 text-sm"
+                              className="mt-1 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                             />
                           </div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                             <div>
-                              <Label htmlFor="category" className="text-xs sm:text-sm">Category *</Label>
+                              <Label htmlFor="category" className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">Category *</Label>
                               <Select value={ticketForm.category} onValueChange={(v) => setTicketForm({ ...ticketForm, category: v })}>
-                                <SelectTrigger className="mt-1 text-sm">
+                                <SelectTrigger className="mt-1 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                                   <SelectValue placeholder="Select category" />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="dark:bg-slate-900 dark:border-slate-800">
                                   <SelectItem value="technical">Technical Issue</SelectItem>
                                   <SelectItem value="exam">Exam Related</SelectItem>
                                   <SelectItem value="assignment">Assignment Help</SelectItem>
@@ -677,12 +689,12 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                               </Select>
                             </div>
                             <div>
-                              <Label htmlFor="priority" className="text-xs sm:text-sm">Priority</Label>
+                              <Label htmlFor="priority" className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">Priority</Label>
                               <Select value={ticketForm.priority} onValueChange={(v) => setTicketForm({ ...ticketForm, priority: v })}>
-                                <SelectTrigger className="mt-1 text-sm">
+                                <SelectTrigger className="mt-1 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                                   <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent>
+                                <SelectContent className="dark:bg-slate-900 dark:border-slate-800">
                                   <SelectItem value="low">Low</SelectItem>
                                   <SelectItem value="normal">Normal</SelectItem>
                                   <SelectItem value="high">High</SelectItem>
@@ -692,20 +704,20 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                             </div>
                           </div>
                           <div>
-                            <Label htmlFor="message" className="text-xs sm:text-sm">Message *</Label>
+                            <Label htmlFor="message" className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">Message *</Label>
                             <Textarea
                               id="message"
                               value={ticketForm.message}
                               onChange={(e) => setTicketForm({ ...ticketForm, message: e.target.value })}
                               placeholder="Describe your issue in detail..."
                               rows={5}
-                              className="mt-1 text-sm resize-none"
+                              className="mt-1 text-sm resize-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                             />
                           </div>
                           <Button 
                             onClick={handleSubmitTicket} 
                             disabled={submitting}
-                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm sm:text-base h-10 sm:h-11"
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-sm sm:text-base h-10 sm:h-11"
                           >
                             {submitting ? (
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -734,7 +746,7 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               className={cn(
-                "fixed z-50 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden",
+                "fixed z-50 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden",
                 "top-20 sm:top-24 md:top-28",
                 "right-3 sm:right-4 md:right-6",
                 "w-[calc(100vw-1.5rem)] sm:w-[380px]",
@@ -742,7 +754,7 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 "max-h-[calc(100vh-120px)] sm:max-h-[calc(100vh-140px)]"
               )}
             >
-              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 p-3 sm:p-4 text-white">
+              <div className="bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 p-3 sm:p-4 text-white">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className="relative">
@@ -770,7 +782,7 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 </div>
               </div>
 
-              <div className="h-[300px] sm:h-[350px] md:h-[400px] max-h-[calc(100vh-320px)] overflow-y-auto p-3 sm:p-4 bg-slate-50">
+              <div className="h-[300px] sm:h-[350px] md:h-[400px] max-h-[calc(100vh-320px)] overflow-y-auto p-3 sm:p-4 bg-slate-50 dark:bg-slate-950">
                 <div className="space-y-3 sm:space-y-4">
                   {chatMessages.map((message) => (
                     <div key={message.id}>
@@ -779,15 +791,15 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                         message.sender === 'user' && "flex-row-reverse"
                       )}>
                         {message.sender === 'bot' && (
-                          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                            <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                            <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
                           </div>
                         )}
                         <div className={cn(
                           "max-w-[85%] sm:max-w-[80%] rounded-2xl px-3 py-2 sm:px-4 sm:py-2.5",
                           message.sender === 'user'
                             ? "bg-emerald-600 text-white"
-                            : "bg-white border border-slate-200 text-slate-700"
+                            : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200"
                         )}>
                           <p className="text-xs sm:text-sm whitespace-pre-wrap">{message.text}</p>
                           <span className="text-[9px] sm:text-[10px] opacity-60 mt-1 block">
@@ -800,13 +812,13 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                         <div className="flex items-center gap-2 ml-9 sm:ml-10 mt-1">
                           <button
                             onClick={() => handleChatFeedback(message.id, 'up')}
-                            className={cn("p-1 rounded hover:bg-slate-200 transition-colors", feedbackGiven[message.id] === 'up' && "text-green-600")}
+                            className={cn("p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-400 dark:text-slate-500", feedbackGiven[message.id] === 'up' && "text-green-600 dark:text-green-400")}
                           >
                             <ThumbsUp className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </button>
                           <button
                             onClick={() => handleChatFeedback(message.id, 'down')}
-                            className={cn("p-1 rounded hover:bg-slate-200 transition-colors", feedbackGiven[message.id] === 'down' && "text-red-600")}
+                            className={cn("p-1 rounded hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-slate-400 dark:text-slate-500", feedbackGiven[message.id] === 'down' && "text-red-600 dark:text-red-400")}
                           >
                             <ThumbsDown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </button>
@@ -817,14 +829,14 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                   
                   {isTyping && (
                     <div className="flex items-start gap-2">
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-full bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                        <Bot className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
                       </div>
-                      <div className="bg-white border border-slate-200 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
+                      <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl px-3 py-2.5 sm:px-4 sm:py-3">
                         <div className="flex gap-1">
-                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <span className="h-1.5 w-1.5 sm:h-2 sm:w-2 bg-slate-400 dark:bg-slate-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
                         </div>
                       </div>
                     </div>
@@ -834,13 +846,13 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 </div>
               </div>
 
-              <div className="p-2 sm:p-3 border-t border-slate-200 bg-white">
+              <div className="p-2 sm:p-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                 <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {quickReplies.slice(0, 4).map((reply) => (
                     <Badge
                       key={reply}
                       variant="outline"
-                      className="cursor-pointer hover:bg-emerald-50 hover:border-emerald-300 transition-colors text-[10px] sm:text-xs py-0.5 sm:py-1"
+                      className="cursor-pointer hover:bg-emerald-50 dark:hover:bg-emerald-950/40 hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors text-[10px] sm:text-xs py-0.5 sm:py-1 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
                       onClick={() => handleQuickReply(reply)}
                     >
                       {reply}
@@ -849,20 +861,20 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
                 </div>
               </div>
 
-              <div className="p-3 sm:p-4 border-t border-slate-200 bg-white">
+              <div className="p-3 sm:p-4 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                 <div className="flex items-center gap-2">
                   <Input
                     value={chatInput}
                     onChange={(e) => setChatInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Type your message..."
-                    className="flex-1 bg-slate-50 border-slate-200 text-sm h-9 sm:h-10"
+                    className="flex-1 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 text-sm h-9 sm:h-10"
                   />
                   <Button
                     onClick={handleSendMessage}
                     disabled={!chatInput.trim()}
                     size="icon"
-                    className="bg-emerald-600 hover:bg-emerald-700 shrink-0 h-9 w-9 sm:h-10 sm:w-10"
+                    className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 shrink-0 h-9 w-9 sm:h-10 sm:w-10"
                   >
                     <Send className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   </Button>
@@ -872,14 +884,13 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
           )}
         </AnimatePresence>
 
-        {/* Minimized Chat */}
         <AnimatePresence>
           {isChatOpen && isMinimized && (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 20 }}
-              className="fixed z-50 top-20 sm:top-24 right-3 sm:right-4 md:right-6 bg-gradient-to-r from-emerald-600 to-teal-600 rounded-full shadow-lg py-2 px-4 cursor-pointer"
+              className="fixed z-50 top-20 sm:top-24 right-3 sm:right-4 md:right-6 bg-gradient-to-r from-emerald-600 to-teal-600 dark:from-emerald-700 dark:to-teal-700 rounded-full shadow-lg py-2 px-4 cursor-pointer"
               onClick={toggleMinimize}
             >
               <div className="flex items-center gap-2 sm:gap-3 text-white">
@@ -891,7 +902,6 @@ const formatProfileForHeader = (profile: StudentProfile | null) => {
           )}
         </AnimatePresence>
 
-        {/* Chat Button */}
         {!isChatOpen && (
           <motion.button
             onClick={toggleChat}

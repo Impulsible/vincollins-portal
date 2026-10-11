@@ -1,4 +1,4 @@
-// components/student/StudentClassRoster.tsx - FULLY CORRECTED WITH ACTIVE STATUS FILTER
+// components/student/StudentClassRoster.tsx - FULLY CORRECTED WITH ACTIVE STATUS FILTER + DARK MODE
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
@@ -163,7 +163,7 @@ function ClassmateProfileModal({
   return (
     <>
       <Dialog open={open} onOpenChange={onClose}>
-        <DialogContent className="max-w-md rounded-xl p-0 overflow-hidden border-0 bg-white">
+        <DialogContent className="max-w-md rounded-xl p-0 overflow-hidden border-0 bg-white dark:bg-slate-900">
           <DialogHeader className="sr-only">
             <DialogTitle>{displayName}'s Profile</DialogTitle>
             <DialogDescription>
@@ -212,7 +212,7 @@ function ClassmateProfileModal({
                 }
               }}
             >
-              <Avatar className="h-20 w-20 ring-4 ring-white shadow-lg">
+              <Avatar className="h-20 w-20 ring-4 ring-white dark:ring-slate-900 shadow-lg">
                 <AvatarImage src={classmate.photo_url || undefined} alt={displayName} />
                 <AvatarFallback className={cn("bg-gradient-to-br text-white text-xl font-bold", getAvatarColor(displayName))}>
                   {getInitials(displayName)}
@@ -223,8 +223,13 @@ function ClassmateProfileModal({
           
           <div className="px-5 pb-5">
             <div className="text-center mb-4">
-              <h3 className="text-lg font-semibold text-slate-800">{displayName}</h3>
-              <Badge className="mt-1 bg-emerald-100 text-emerald-700 text-xs" aria-label={`Class: ${classmate.class}`}>
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100">
+                {displayName}
+              </h3>
+              <Badge 
+                className="mt-1 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs border-0" 
+                aria-label={`Class: ${classmate.class}`}
+              >
                 <GraduationCap className="h-3 w-3 mr-1" aria-hidden="true" />
                 {classmate.class}
               </Badge>
@@ -269,13 +274,16 @@ function InfoCard({ icon: Icon, label, value }: {
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
-      <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center" aria-hidden="true">
-        <Icon className="h-4 w-4 text-slate-500" />
+    <div className="flex items-center gap-3 p-2.5 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-lg">
+      <div 
+        className="h-8 w-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 flex items-center justify-center" 
+        aria-hidden="true"
+      >
+        <Icon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
       </div>
-      <div>
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className="text-sm text-slate-700">{value}</p>
+      <div className="min-w-0">
+        <p className="text-xs text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="text-sm text-slate-700 dark:text-slate-200 truncate">{value}</p>
       </div>
     </div>
   )
@@ -296,7 +304,7 @@ function ClassmateCard({ classmate, onClick }: { classmate: Classmate; onClick: 
 
   return (
     <div 
-      className="group cursor-pointer bg-white rounded-lg border border-slate-200 overflow-hidden hover:shadow-md transition-shadow focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden hover:shadow-md dark:hover:shadow-slate-950/50 transition-shadow focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950"
       onClick={onClick}
       onKeyDown={handleKeyDown}
       role="button"
@@ -310,7 +318,7 @@ function ClassmateCard({ classmate, onClick }: { classmate: Classmate; onClick: 
       </div>
       
       <div className="flex justify-center -mt-8">
-        <Avatar className="h-16 w-16 ring-3 ring-white shadow-sm">
+        <Avatar className="h-16 w-16 ring-3 ring-white dark:ring-slate-900 shadow-sm">
           <AvatarImage src={classmate.photo_url || undefined} alt={displayName} />
           <AvatarFallback className={cn("bg-gradient-to-br text-white text-sm font-bold", getAvatarColor(displayName))}>
             {getInitials(displayName)}
@@ -319,8 +327,14 @@ function ClassmateCard({ classmate, onClick }: { classmate: Classmate; onClick: 
       </div>
       
       <div className="px-3 pb-3 pt-1 text-center">
-        <h3 className="font-medium text-sm text-slate-800 truncate">{displayName}</h3>
-        <Badge variant="outline" className="text-[10px] mt-1 bg-slate-50" aria-label={`Class: ${classmate.class}`}>
+        <h3 className="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">
+          {displayName}
+        </h3>
+        <Badge 
+          variant="outline" 
+          className="text-[10px] mt-1 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300" 
+          aria-label={`Class: ${classmate.class}`}
+        >
           {classmate.class}
         </Badge>
       </div>
@@ -343,7 +357,7 @@ function ClassmateRow({ classmate, onClick }: { classmate: Classmate; onClick: (
 
   return (
     <div 
-      className="group cursor-pointer bg-white rounded-lg border border-slate-200 p-3 hover:bg-slate-50 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+      className="group cursor-pointer bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-3 hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-950"
       onClick={onClick}
       onKeyDown={handleKeyDown}
       role="button"
@@ -351,7 +365,7 @@ function ClassmateRow({ classmate, onClick }: { classmate: Classmate; onClick: (
       aria-label={`View ${displayName}'s profile`}
     >
       <div className="flex items-center gap-3">
-        <Avatar className="h-10 w-10 ring-2 ring-white shadow-sm">
+        <Avatar className="h-10 w-10 ring-2 ring-white dark:ring-slate-800 shadow-sm">
           <AvatarImage src={classmate.photo_url || undefined} alt={displayName} />
           <AvatarFallback className={cn("bg-gradient-to-br text-white text-xs font-bold", getAvatarColor(displayName))}>
             {getInitials(displayName)}
@@ -359,11 +373,13 @@ function ClassmateRow({ classmate, onClick }: { classmate: Classmate; onClick: (
         </Avatar>
         
         <div className="flex-1 min-w-0">
-          <h3 className="font-medium text-sm text-slate-800">{displayName}</h3>
+          <h3 className="font-medium text-sm text-slate-800 dark:text-slate-100 truncate">
+            {displayName}
+          </h3>
           <div className="flex items-center gap-2 mt-0.5">
-            <span className="text-xs text-slate-500">{classmate.class}</span>
+            <span className="text-xs text-slate-500 dark:text-slate-400">{classmate.class}</span>
             {classmate.department && (
-              <span className="text-xs text-slate-400">• {classmate.department}</span>
+              <span className="text-xs text-slate-400 dark:text-slate-500">• {classmate.department}</span>
             )}
           </div>
         </div>
@@ -371,7 +387,7 @@ function ClassmateRow({ classmate, onClick }: { classmate: Classmate; onClick: (
         <Button 
           variant="ghost" 
           size="sm" 
-          className="h-8 w-8 rounded-full text-slate-400 hover:text-emerald-600"
+          className="h-8 w-8 rounded-full text-slate-400 dark:text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
           aria-label={`View ${displayName}'s profile`}
         >
           <Eye className="h-4 w-4" aria-hidden="true" />
@@ -386,22 +402,38 @@ function ClassmateRow({ classmate, onClick }: { classmate: Classmate; onClick: (
 // ============================================
 function NoClassAssigned() {
   return (
-    <div className="bg-white rounded-lg border p-8 text-center" role="status" aria-live="polite">
-      <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3" aria-hidden="true">
-        <GraduationCap className="h-6 w-6 text-slate-400" />
+    <div 
+      className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-8 text-center" 
+      role="status" 
+      aria-live="polite"
+    >
+      <div 
+        className="h-12 w-12 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3" 
+        aria-hidden="true"
+      >
+        <GraduationCap className="h-6 w-6 text-slate-400 dark:text-slate-500" />
       </div>
-      <h3 className="font-medium text-slate-800 mb-1">No Class Assigned</h3>
-      <p className="text-sm text-slate-500">Please contact your administrator.</p>
+      <h3 className="font-medium text-slate-800 dark:text-slate-200 mb-1">No Class Assigned</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400">Please contact your administrator.</p>
     </div>
   )
 }
 
 function NoClassmatesFound() {
   return (
-    <div className="bg-white rounded-lg border p-8 text-center" role="status" aria-live="polite">
-      <Users className="h-12 w-12 text-slate-300 mx-auto mb-3" aria-hidden="true" />
-      <h3 className="font-medium text-slate-800 mb-1">No Classmates Found</h3>
-      <p className="text-sm text-slate-500">Other students will appear here once enrolled.</p>
+    <div 
+      className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-8 text-center" 
+      role="status" 
+      aria-live="polite"
+    >
+      <div 
+        className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-3" 
+        aria-hidden="true"
+      >
+        <Users className="h-8 w-8 text-slate-400 dark:text-slate-500" />
+      </div>
+      <h3 className="font-medium text-slate-800 dark:text-slate-200 mb-1">No Classmates Found</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400">Other students will appear here once enrolled.</p>
     </div>
   )
 }
@@ -435,29 +467,24 @@ export function StudentClassRoster({
           .from('profiles')
           .select('id, first_name, last_name, full_name, display_name, class, photo_url, cover_photo_url, department, admission_year, phone, address')
           .eq('role', 'student')
-          .eq('is_active', true) // 🚫 CRITICAL: Never show inactive students (students who left school)
+          .eq('is_active', true) // 🚫 CRITICAL: Never show inactive students
           .neq('id', studentId || '')
           .order('first_name')
 
-        // ✅ JSS students see ONLY their exact class
-        // ✅ SS students see ALL students in the same year (across departments)
         if (isJSS) {
-          // JSS: Exact match (JSS 1 only sees JSS 1)
           query = query.eq('class', studentClass)
           console.log(`🔍 JSS Student - Fetching exact class: ${studentClass} (active only)`)
         } else if (isSS) {
-          // SS: Match by year (SS1 Arts sees SS1 Science, SS1 Commercial)
           query = query.ilike('class', `%${yearGroup}%`)
           console.log(`🔍 SS Student - Fetching year group: ${yearGroup}% (active only)`)
         } else {
-          // Fallback: Exact match
           query = query.eq('class', studentClass)
         }
 
         const { data, error } = await query
         if (error) throw error
 
-        console.log(`✅ Found ${data?.length || 0} active classmates (inactive students excluded)`)
+        console.log(`✅ Found ${data?.length || 0} active classmates`)
 
         if (data) {
           const mappedClassmates = data.map((student: any) => ({
@@ -516,14 +543,18 @@ export function StudentClassRoster({
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h2 className="text-xl font-semibold text-slate-800 flex items-center gap-2">
-              <Users className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+            <h2 className="text-xl font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+              <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
               {isJSS ? studentClass : `${yearGroup} Classmates`}
-              <Badge variant="secondary" className="text-xs" aria-label={`${classmates.length} students`}>
+              <Badge 
+                variant="secondary" 
+                className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300" 
+                aria-label={`${classmates.length} students`}
+              >
                 {classmates.length}
               </Badge>
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               <GraduationCap className="h-3 w-3 inline mr-1" aria-hidden="true" />
               {isJSS 
                 ? `${studentClass} • ${classmates.length} student${classmates.length !== 1 ? 's' : ''}`
@@ -536,22 +567,32 @@ export function StudentClassRoster({
           
           <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
+              <Search 
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" 
+                aria-hidden="true" 
+              />
               <Input
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={handleSearchKeyDown}
-                className="pl-8 h-8 w-48 text-sm"
+                className="pl-8 h-8 w-48 text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:border-emerald-400 dark:focus:border-emerald-500 focus:ring-emerald-400/20"
                 aria-label="Search classmates"
               />
             </div>
             
-            <div className="flex items-center gap-0.5 bg-slate-100 rounded-md p-0.5" role="group" aria-label="View mode">
+            <div 
+              className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800 rounded-md p-0.5" 
+              role="group" 
+              aria-label="View mode"
+            >
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn("h-7 w-7 p-0", viewMode === 'grid' && "bg-white shadow-sm")}
+                className={cn(
+                  "h-7 w-7 p-0 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400",
+                  viewMode === 'grid' && "bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400"
+                )}
                 onClick={() => setViewMode('grid')}
                 aria-label="Grid view"
                 aria-pressed={viewMode === 'grid'}
@@ -561,7 +602,10 @@ export function StudentClassRoster({
               <Button
                 variant="ghost"
                 size="sm"
-                className={cn("h-7 w-7 p-0", viewMode === 'list' && "bg-white shadow-sm")}
+                className={cn(
+                  "h-7 w-7 p-0 text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400",
+                  viewMode === 'list' && "bg-white dark:bg-slate-700 shadow-sm text-emerald-600 dark:text-emerald-400"
+                )}
                 onClick={() => setViewMode('list')}
                 aria-label="List view"
                 aria-pressed={viewMode === 'list'}
@@ -574,13 +618,13 @@ export function StudentClassRoster({
 
         {/* Search results info */}
         {searchQuery && totalCount !== classmates.length && (
-          <div className="text-sm text-slate-500" role="status" aria-live="polite">
+          <div className="text-sm text-slate-500 dark:text-slate-400" role="status" aria-live="polite">
             Found {totalCount} of {classmates.length} classmates matching "{searchQuery}"
             <Button 
               variant="link" 
               size="sm" 
               onClick={() => setSearchQuery('')} 
-              className="h-auto p-0 text-xs text-emerald-600 ml-2"
+              className="h-auto p-0 text-xs text-emerald-600 dark:text-emerald-400 ml-2"
               aria-label="Clear search"
             >
               Clear
@@ -590,9 +634,13 @@ export function StudentClassRoster({
 
         {/* No results */}
         {totalCount === 0 ? (
-          <div className="bg-white rounded-lg border p-8 text-center" role="status" aria-live="polite">
-            <Search className="h-10 w-10 text-slate-300 mx-auto mb-2" aria-hidden="true" />
-            <p className="text-sm text-slate-500">No students found</p>
+          <div 
+            className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 p-8 text-center" 
+            role="status" 
+            aria-live="polite"
+          >
+            <Search className="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" aria-hidden="true" />
+            <p className="text-sm text-slate-500 dark:text-slate-400">No students found</p>
           </div>
         ) : viewMode === 'grid' ? (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
@@ -611,14 +659,18 @@ export function StudentClassRoster({
         {/* Footer */}
         {!compact && totalCount > 0 && (
           <div className="pt-1 text-center">
-            <p className="text-xs text-slate-400" aria-live="polite">
+            <p className="text-xs text-slate-400 dark:text-slate-500" aria-live="polite">
               Showing {totalCount} of {classmates.length} students
             </p>
           </div>
         )}
       </div>
 
-      <ClassmateProfileModal classmate={selectedClassmate} open={modalOpen} onClose={() => setModalOpen(false)} />
+      <ClassmateProfileModal 
+        classmate={selectedClassmate} 
+        open={modalOpen} 
+        onClose={() => setModalOpen(false)} 
+      />
     </>
   )
 }

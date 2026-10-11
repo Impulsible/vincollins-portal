@@ -1,5 +1,4 @@
-// src/components/student/exams/ExamList.tsx - FIXED VERSION
-
+// src/components/student/exams/ExamList.tsx
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
@@ -15,38 +14,26 @@ interface ExamListProps {
   getSubjectConfig: (subject: string) => SubjectConfig
   onTakeExam: (examId: string) => void
   onViewResult: (examId: string) => void
-  // ✅ Optional: show count and term info
   showCount?: boolean
   termName?: string
   sessionYear?: string
 }
 
 export function ExamList({ 
-  exams, 
-  examAttempts, 
-  viewMode, 
-  getExamStatus, 
-  getSubjectConfig, 
-  onTakeExam, 
-  onViewResult,
-  showCount = false,
-  termName,
-  sessionYear,
+  exams, examAttempts, viewMode, getExamStatus, getSubjectConfig, 
+  onTakeExam, onViewResult, showCount = false, termName, sessionYear,
 }: ExamListProps) {
   if (exams.length === 0) return null
 
   return (
     <div className="w-full">
-      {/* ✅ Show exam count if enabled */}
       {showCount && (
         <div className="flex items-center justify-between mb-4 px-1">
-          <p className="text-sm text-muted-foreground">
-            Showing <span className="font-semibold text-foreground">{exams.length}</span> exam{exams.length !== 1 ? 's' : ''}
-            {termName && sessionYear && (
-              <span className="ml-1">for {termName} {sessionYear}</span>
-            )}
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Showing <span className="font-semibold text-slate-800 dark:text-slate-100">{exams.length}</span> exam{exams.length !== 1 ? 's' : ''}
+            {termName && sessionYear && <span className="ml-1">for {termName} {sessionYear}</span>}
           </p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-slate-400 dark:text-slate-500">
             {viewMode === 'grid' ? 'Grid View' : 'List View'}
           </p>
         </div>
@@ -55,9 +42,7 @@ export function ExamList({
       <AnimatePresence mode="wait">
         <motion.div
           key={viewMode}
-          initial={{ opacity: 0, y: 8 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          exit={{ opacity: 0 }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
           transition={{ duration: 0.2 }}
           className={cn(
             'pb-12',
@@ -67,12 +52,7 @@ export function ExamList({
           )}
         >
           {exams.map((exam, i) => (
-            <motion.div
-              key={exam.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
-            >
+            <motion.div key={exam.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
               <ExamCard
                 exam={exam}
                 attempt={examAttempts[exam.id]}

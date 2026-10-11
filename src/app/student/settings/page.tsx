@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// app/student/settings/page.tsx - FULLY RESPONSIVE, NO DARK MODE
+// app/student/settings/page.tsx - FULLY RESPONSIVE WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -36,6 +36,7 @@ import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import { motion } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { getFirstName, getDisplayName } from '@/lib/get-display-name'   // ✅ ADDED
 import {
   Loader2, User, Bell, Shield, Palette, Globe, Volume2,
   Save, ChevronRight, Home, ArrowLeft,
@@ -47,6 +48,9 @@ import Link from 'next/link'
 interface StudentProfile {
   id: string
   full_name: string
+  first_name?: string | null      // ✅ ADDED
+  last_name?: string | null       // ✅ ADDED
+  display_name?: string | null    // ✅ ADDED
   email: string
   class: string
   department: string
@@ -85,12 +89,10 @@ export default function StudentSettingsPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('account')
   
-  // Delete account states
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [deleting, setDeleting] = useState(false)
   
-  // Notification preferences
   const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
     email_notifications: true,
     push_notifications: true,
@@ -101,14 +103,12 @@ export default function StudentSettingsPage() {
     sound_enabled: true
   })
   
-  // Appearance settings (no dark mode)
   const [appearance, setAppearance] = useState<AppearanceSettings>({
     font_size: 'medium',
     reduced_motion: false,
     high_contrast: false
   })
   
-  // Privacy settings
   const [privacy, setPrivacy] = useState<PrivacySettings>({
     show_online_status: true,
     show_profile_to_classmates: true,
@@ -125,12 +125,13 @@ export default function StudentSettingsPage() {
     return parts[0].slice(0, 2).toUpperCase()
   }
 
- const formatProfileForHeader = (profile: StudentProfile | null) => {
+  // ✅ FIXED: Uses shared helpers → "Esther" not "Soga"
+  const formatProfileForHeader = (profile: StudentProfile | null) => {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: profile.full_name,
-      firstName: profile.full_name?.split(' ')[0] || 'Student',  // ✅ ADD THIS
+      name: getDisplayName(profile, 'Student'),
+      firstName: getFirstName(profile),
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -158,9 +159,13 @@ export default function StudentSettingsPage() {
         return
       }
 
+      // ✅ Populate all name fields
       setProfile({
         id: profileData.id,
         full_name: profileData.full_name || 'Student',
+        first_name: profileData.first_name || null,
+        last_name: profileData.last_name || null,
+        display_name: profileData.display_name || null,
         email: profileData.email,
         class: profileData.class || 'Not Assigned',
         department: profileData.department || 'General',
@@ -168,7 +173,6 @@ export default function StudentSettingsPage() {
         photo_url: profileData.photo_url
       })
 
-      // Load saved settings from localStorage
       const savedNotifications = localStorage.getItem('student_notification_prefs')
       if (savedNotifications) {
         setNotificationPrefs(JSON.parse(savedNotifications))
@@ -184,7 +188,6 @@ export default function StudentSettingsPage() {
         setPrivacy(JSON.parse(savedPrivacy))
       }
 
-      // Apply font size
       applyFontSize(appearance.font_size)
 
     } catch (error) {
@@ -225,14 +228,12 @@ export default function StudentSettingsPage() {
     localStorage.setItem('student_appearance', JSON.stringify(appearance))
     applyFontSize(appearance.font_size)
     
-    // Apply reduced motion
     if (appearance.reduced_motion) {
       document.documentElement.classList.add('reduce-motion')
     } else {
       document.documentElement.classList.remove('reduce-motion')
     }
     
-    // Apply high contrast
     if (appearance.high_contrast) {
       document.documentElement.classList.add('high-contrast')
     } else {
@@ -274,17 +275,17 @@ export default function StudentSettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden w-full">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden w-full transition-colors duration-300">
         <Header onLogout={handleLogout} />
         <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 flex flex-col overflow-x-hidden w-full">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 flex flex-col overflow-x-hidden w-full transition-colors duration-300">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
       
       <div className="flex flex-1 w-full overflow-x-hidden">
@@ -304,48 +305,61 @@ export default function StudentSettingsPage() {
           <main className="pt-16 lg:pt-20 pb-24 lg:pb-12 px-3 sm:px-4 lg:px-6 w-full overflow-x-hidden">
             <div className="container mx-auto max-w-4xl px-0">
               
-              {/* Breadcrumb - Responsive */}
+              {/* Breadcrumb */}
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
               >
-                <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-muted-foreground flex-wrap">
-                  <Link href="/student" className="hover:text-emerald-600 flex items-center gap-1 transition-colors">
+                <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400 flex-wrap">
+                  <Link href="/student" className="hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors">
                     <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     <span className="hidden xs:inline">Dashboard</span>
                     <span className="xs:hidden">Home</span>
                   </Link>
-                  <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  <span className="text-foreground font-medium">Settings</span>
+                  <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-slate-400 dark:text-slate-500" />
+                  <span className="text-slate-800 dark:text-slate-200 font-medium">Settings</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => router.push('/student')} className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => router.push('/student')} 
+                  className="w-full sm:w-auto text-xs sm:text-sm h-8 sm:h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
                   <ArrowLeft className="mr-1.5 h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   Back to Dashboard
                 </Button>
               </motion.div>
 
-              {/* Profile Summary - Responsive */}
+              {/* Profile Summary */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="mb-4 sm:mb-6 w-full overflow-hidden"
               >
-                <Card className="border-0 shadow-sm bg-gradient-to-br from-emerald-50 to-teal-50 overflow-hidden">
+                <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30 overflow-hidden">
                   <CardContent className="p-3 sm:p-4 lg:p-5">
                     <div className="flex flex-col xs:flex-row items-center xs:items-start gap-3 sm:gap-4 text-center xs:text-left">
-                      <Avatar className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 ring-2 ring-white shrink-0">
+                      <Avatar className="h-12 w-12 sm:h-14 sm:w-14 md:h-16 md:w-16 ring-2 ring-white dark:ring-slate-900 shrink-0">
                         <AvatarImage src={profile?.photo_url} />
-                        <AvatarFallback className="bg-emerald-600 text-white text-base sm:text-lg md:text-xl">
+                        <AvatarFallback className="bg-emerald-600 dark:bg-emerald-700 text-white text-base sm:text-lg md:text-xl">
                           {getInitials(profile?.full_name)}
                         </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
-                        <h2 className="text-base sm:text-lg md:text-xl font-bold text-gray-900 truncate">{profile?.full_name}</h2>
-                        <p className="text-xs sm:text-sm text-gray-600 break-all">{profile?.email}</p>
+                        <h2 className="text-base sm:text-lg md:text-xl font-bold text-slate-800 dark:text-white truncate">
+                          {profile?.full_name}
+                        </h2>
+                        <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 break-all">
+                          {profile?.email}
+                        </p>
                         <div className="flex flex-wrap justify-center xs:justify-start gap-1.5 mt-1">
-                          <Badge variant="outline" className="bg-white text-[10px] sm:text-xs">{profile?.class}</Badge>
-                          <Badge variant="outline" className="bg-white text-[10px] sm:text-xs">{profile?.vin_id}</Badge>
+                          <Badge variant="outline" className="bg-white dark:bg-slate-900 text-[10px] sm:text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {profile?.class}
+                          </Badge>
+                          <Badge variant="outline" className="bg-white dark:bg-slate-900 text-[10px] sm:text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {profile?.vin_id}
+                          </Badge>
                         </div>
                       </div>
                     </div>
@@ -353,7 +367,7 @@ export default function StudentSettingsPage() {
                 </Card>
               </motion.div>
 
-              {/* Settings Tabs - Responsive */}
+              {/* Settings Tabs */}
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -361,23 +375,35 @@ export default function StudentSettingsPage() {
                 className="w-full overflow-hidden"
               >
                 <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-                  <TabsList className="grid w-full grid-cols-4 bg-white p-1 rounded-xl shadow-sm border h-auto">
-                    <TabsTrigger value="account" className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2">
+                  <TabsList className="grid w-full grid-cols-4 bg-white dark:bg-slate-900 p-1 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 h-auto">
+                    <TabsTrigger 
+                      value="account" 
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2"
+                    >
                       <User className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 mr-0.5 xs:mr-1 sm:mr-2" />
                       <span className="hidden xs:inline">Account</span>
                       <span className="xs:hidden">Acct</span>
                     </TabsTrigger>
-                    <TabsTrigger value="notifications" className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2">
+                    <TabsTrigger 
+                      value="notifications" 
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2"
+                    >
                       <Bell className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 mr-0.5 xs:mr-1 sm:mr-2" />
                       <span className="hidden xs:inline">Notifications</span>
                       <span className="xs:hidden">Notif</span>
                     </TabsTrigger>
-                    <TabsTrigger value="appearance" className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2">
+                    <TabsTrigger 
+                      value="appearance" 
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2"
+                    >
                       <Palette className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 mr-0.5 xs:mr-1 sm:mr-2" />
                       <span className="hidden xs:inline">Appearance</span>
                       <span className="xs:hidden">Appear</span>
                     </TabsTrigger>
-                    <TabsTrigger value="privacy" className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2">
+                    <TabsTrigger 
+                      value="privacy" 
+                      className="rounded-lg data-[state=active]:bg-emerald-600 data-[state=active]:text-white text-slate-600 dark:text-slate-400 text-[11px] xs:text-xs sm:text-sm py-1.5 sm:py-2"
+                    >
                       <Shield className="h-3 w-3 xs:h-3.5 xs:w-3.5 sm:h-4 sm:w-4 mr-0.5 xs:mr-1 sm:mr-2" />
                       <span className="hidden xs:inline">Privacy</span>
                       <span className="xs:hidden">Priv</span>
@@ -386,37 +412,40 @@ export default function StudentSettingsPage() {
 
                   {/* ACCOUNT TAB */}
                   <TabsContent value="account" className="space-y-4 sm:space-y-6">
-                    <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
                       <CardHeader className="px-3 sm:px-4 md:px-5 pt-4 sm:pt-5 pb-2">
-                        <CardTitle className="text-base sm:text-lg">Account Information</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Manage your account details</CardDescription>
+                        <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">Account Information</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Manage your account details</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
-                        {/* Email */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div className="flex items-center gap-3">
-                            <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                            <Mail className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             <div className="min-w-0">
-                              <p className="font-medium text-sm sm:text-base">Email Address</p>
-                              <p className="text-xs sm:text-sm text-slate-500 break-all">{profile?.email}</p>
+                              <p className="font-medium text-sm sm:text-base text-slate-800 dark:text-slate-200">Email Address</p>
+                              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 break-all">{profile?.email}</p>
                             </div>
                           </div>
-                          <Badge variant="outline" className="gap-1 shrink-0 text-[10px] sm:text-xs w-fit">
-                            <CheckCircle className="h-3 w-3 text-green-500" />
+                          <Badge variant="outline" className="gap-1 shrink-0 text-[10px] sm:text-xs w-fit border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            <CheckCircle className="h-3 w-3 text-green-500 dark:text-green-400" />
                             Verified
                           </Badge>
                         </div>
 
-                        {/* Two-Factor Authentication */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div className="flex items-center gap-3">
-                            <Smartphone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                            <Smartphone className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             <div>
-                              <p className="font-medium text-sm sm:text-base">Two-Factor Authentication</p>
-                              <p className="text-xs sm:text-sm text-slate-500">Add an extra layer of security</p>
+                              <p className="font-medium text-sm sm:text-base text-slate-800 dark:text-slate-200">Two-Factor Authentication</p>
+                              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Add an extra layer of security</p>
                             </div>
                           </div>
-                          <Button variant="outline" size="sm" disabled className="shrink-0 text-[11px] sm:text-xs">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            disabled 
+                            className="shrink-0 text-[11px] sm:text-xs border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400"
+                          >
                             Coming Soon
                           </Button>
                         </div>
@@ -424,21 +453,21 @@ export default function StudentSettingsPage() {
                     </Card>
 
                     {/* Danger Zone */}
-                    <Card className="border-0 shadow-sm bg-white border-l-4 border-l-red-500 overflow-hidden">
+                    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 border-l-4 border-l-red-500 overflow-hidden">
                       <CardHeader className="px-3 sm:px-4 md:px-5 pt-4 sm:pt-5 pb-2">
-                        <CardTitle className="text-red-600 text-base sm:text-lg">Danger Zone</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Irreversible actions for your account</CardDescription>
+                        <CardTitle className="text-red-600 dark:text-red-400 text-base sm:text-lg">Danger Zone</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Irreversible actions for your account</CardDescription>
                       </CardHeader>
                       <CardContent className="px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                           <div>
-                            <p className="font-medium text-sm sm:text-base">Delete Account</p>
-                            <p className="text-xs sm:text-sm text-slate-500">Permanently delete your account and all data</p>
+                            <p className="font-medium text-sm sm:text-base text-slate-800 dark:text-slate-200">Delete Account</p>
+                            <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Permanently delete your account and all data</p>
                           </div>
                           <Button
                             variant="outline"
                             size="sm"
-                            className="text-red-600 border-red-200 hover:bg-red-50 shrink-0 text-xs sm:text-sm h-8 sm:h-9"
+                            className="text-red-600 dark:text-red-400 border-red-200 dark:border-red-800 hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0 text-xs sm:text-sm h-8 sm:h-9"
                             onClick={() => setShowDeleteDialog(true)}
                           >
                             <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
@@ -451,16 +480,16 @@ export default function StudentSettingsPage() {
 
                   {/* NOTIFICATIONS TAB */}
                   <TabsContent value="notifications" className="space-y-4 sm:space-y-6">
-                    <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
                       <CardHeader className="px-3 sm:px-4 md:px-5 pt-4 sm:pt-5 pb-2">
-                        <CardTitle className="text-base sm:text-lg">Notification Preferences</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Choose what notifications you want to receive</CardDescription>
+                        <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">Notification Preferences</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Choose what notifications you want to receive</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Email Notifications</p>
-                            <p className="text-xs text-slate-500">Receive notifications via email</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Email Notifications</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Receive notifications via email</p>
                           </div>
                           <Switch
                             checked={notificationPrefs.email_notifications}
@@ -468,10 +497,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Push Notifications</p>
-                            <p className="text-xs text-slate-500">Receive notifications in browser</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Push Notifications</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Receive notifications in browser</p>
                           </div>
                           <Switch
                             checked={notificationPrefs.push_notifications}
@@ -479,14 +508,14 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <Separator />
+                        <Separator className="bg-slate-200 dark:bg-slate-800" />
 
-                        <h4 className="font-semibold text-xs sm:text-sm text-slate-700 pt-1">Notification Types</h4>
+                        <h4 className="font-semibold text-xs sm:text-sm text-slate-700 dark:text-slate-300 pt-1">Notification Types</h4>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Exam Reminders</p>
-                            <p className="text-xs text-slate-500">Get reminded about upcoming exams</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Exam Reminders</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Get reminded about upcoming exams</p>
                           </div>
                           <Switch
                             checked={notificationPrefs.exam_reminders}
@@ -494,10 +523,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Assignment Deadlines</p>
-                            <p className="text-xs text-slate-500">Notifications for assignment due dates</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Assignment Deadlines</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Notifications for assignment due dates</p>
                           </div>
                           <Switch
                             checked={notificationPrefs.assignment_deadlines}
@@ -505,10 +534,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Result Notifications</p>
-                            <p className="text-xs text-slate-500">Get notified when results are published</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Result Notifications</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Get notified when results are published</p>
                           </div>
                           <Switch
                             checked={notificationPrefs.result_notifications}
@@ -516,10 +545,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Announcements</p>
-                            <p className="text-xs text-slate-500">School-wide announcements</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Announcements</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">School-wide announcements</p>
                           </div>
                           <Switch
                             checked={notificationPrefs.announcement_notifications}
@@ -527,12 +556,12 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div className="flex items-center gap-2 sm:gap-3">
-                            <Volume2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 shrink-0" />
+                            <Volume2 className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                             <div>
-                              <p className="font-medium text-sm">Notification Sound</p>
-                              <p className="text-xs text-slate-500">Play sound for new notifications</p>
+                              <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Notification Sound</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Play sound for new notifications</p>
                             </div>
                           </div>
                           <Switch
@@ -542,7 +571,10 @@ export default function StudentSettingsPage() {
                         </div>
                       </CardContent>
                       <div className="px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
-                        <Button onClick={saveNotificationSettings} className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm h-9 sm:h-10">
+                        <Button 
+                          onClick={saveNotificationSettings} 
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-sm h-9 sm:h-10"
+                        >
                           <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                           Save Notification Settings
                         </Button>
@@ -550,22 +582,24 @@ export default function StudentSettingsPage() {
                     </Card>
                   </TabsContent>
 
-                  {/* APPEARANCE TAB - NO DARK MODE */}
+                  {/* APPEARANCE TAB */}
                   <TabsContent value="appearance" className="space-y-4 sm:space-y-6">
-                    <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
                       <CardHeader className="px-3 sm:px-4 md:px-5 pt-4 sm:pt-5 pb-2">
-                        <CardTitle className="text-base sm:text-lg">Appearance Settings</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Customize how the platform looks</CardDescription>
+                        <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">Appearance Settings</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Customize how the platform looks</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-5 sm:space-y-6 px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
-                        {/* Font Size */}
                         <div>
-                          <Label className="mb-2 sm:mb-3 block text-sm">Font Size</Label>
-                          <Select value={appearance.font_size} onValueChange={(value: 'small' | 'medium' | 'large') => setAppearance(prev => ({ ...prev, font_size: value }))}>
-                            <SelectTrigger className="text-sm h-9 sm:h-10">
+                          <Label className="mb-2 sm:mb-3 block text-sm text-slate-700 dark:text-slate-300">Font Size</Label>
+                          <Select 
+                            value={appearance.font_size} 
+                            onValueChange={(value: 'small' | 'medium' | 'large') => setAppearance(prev => ({ ...prev, font_size: value }))}
+                          >
+                            <SelectTrigger className="text-sm h-9 sm:h-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                               <SelectValue />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="dark:bg-slate-900 dark:border-slate-800">
                               <SelectItem value="small">Small</SelectItem>
                               <SelectItem value="medium">Medium (Default)</SelectItem>
                               <SelectItem value="large">Large</SelectItem>
@@ -573,16 +607,15 @@ export default function StudentSettingsPage() {
                           </Select>
                         </div>
 
-                        <Separator />
+                        <Separator className="bg-slate-200 dark:bg-slate-800" />
 
-                        {/* Accessibility */}
                         <div className="space-y-3 sm:space-y-4">
-                          <h4 className="font-semibold text-xs sm:text-sm text-slate-700">Accessibility</h4>
+                          <h4 className="font-semibold text-xs sm:text-sm text-slate-700 dark:text-slate-300">Accessibility</h4>
                           
-                          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                             <div>
-                              <p className="font-medium text-sm">Reduced Motion</p>
-                              <p className="text-xs text-slate-500">Minimize animations and transitions</p>
+                              <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Reduced Motion</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Minimize animations and transitions</p>
                             </div>
                             <Switch
                               checked={appearance.reduced_motion}
@@ -590,10 +623,10 @@ export default function StudentSettingsPage() {
                             />
                           </div>
 
-                          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                          <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                             <div>
-                              <p className="font-medium text-sm">High Contrast</p>
-                              <p className="text-xs text-slate-500">Increase contrast for better visibility</p>
+                              <p className="font-medium text-sm text-slate-800 dark:text-slate-200">High Contrast</p>
+                              <p className="text-xs text-slate-500 dark:text-slate-400">Increase contrast for better visibility</p>
                             </div>
                             <Switch
                               checked={appearance.high_contrast}
@@ -603,7 +636,10 @@ export default function StudentSettingsPage() {
                         </div>
                       </CardContent>
                       <div className="px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
-                        <Button onClick={saveAppearanceSettings} className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm h-9 sm:h-10">
+                        <Button 
+                          onClick={saveAppearanceSettings} 
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-sm h-9 sm:h-10"
+                        >
                           <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                           Save Appearance Settings
                         </Button>
@@ -613,16 +649,16 @@ export default function StudentSettingsPage() {
 
                   {/* PRIVACY TAB */}
                   <TabsContent value="privacy" className="space-y-4 sm:space-y-6">
-                    <Card className="border-0 shadow-sm bg-white overflow-hidden">
+                    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
                       <CardHeader className="px-3 sm:px-4 md:px-5 pt-4 sm:pt-5 pb-2">
-                        <CardTitle className="text-base sm:text-lg">Privacy Settings</CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Control your privacy and visibility</CardDescription>
+                        <CardTitle className="text-base sm:text-lg text-slate-800 dark:text-slate-100">Privacy Settings</CardTitle>
+                        <CardDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Control your privacy and visibility</CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3 sm:space-y-4 px-3 sm:px-4 md:px-5">
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Show Online Status</p>
-                            <p className="text-xs text-slate-500">Let others see when you're online</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Show Online Status</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Let others see when you're online</p>
                           </div>
                           <Switch
                             checked={privacy.show_online_status}
@@ -630,10 +666,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Profile Visibility</p>
-                            <p className="text-xs text-slate-500">Show your profile to classmates</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Profile Visibility</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Show your profile to classmates</p>
                           </div>
                           <Switch
                             checked={privacy.show_profile_to_classmates}
@@ -641,10 +677,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Allow Messages</p>
-                            <p className="text-xs text-slate-500">Receive messages from teachers and classmates</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Allow Messages</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Receive messages from teachers and classmates</p>
                           </div>
                           <Switch
                             checked={privacy.allow_messages}
@@ -652,10 +688,10 @@ export default function StudentSettingsPage() {
                           />
                         </div>
 
-                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+                        <div className="flex flex-col xs:flex-row xs:items-center justify-between gap-2 p-3 bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                           <div>
-                            <p className="font-medium text-sm">Activity Feed</p>
-                            <p className="text-xs text-slate-500">Show your recent activity to others</p>
+                            <p className="font-medium text-sm text-slate-800 dark:text-slate-200">Activity Feed</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">Show your recent activity to others</p>
                           </div>
                           <Switch
                             checked={privacy.show_activity_feed}
@@ -664,7 +700,10 @@ export default function StudentSettingsPage() {
                         </div>
                       </CardContent>
                       <div className="px-3 sm:px-4 md:px-5 pb-4 sm:pb-5">
-                        <Button onClick={savePrivacySettings} className="w-full bg-emerald-600 hover:bg-emerald-700 text-sm h-9 sm:h-10">
+                        <Button 
+                          onClick={savePrivacySettings} 
+                          className="w-full bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-sm h-9 sm:h-10"
+                        >
                           <Save className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5" />
                           Save Privacy Settings
                         </Button>
@@ -678,35 +717,39 @@ export default function StudentSettingsPage() {
         </div>
       </div>
 
-      {/* Delete Account Confirmation Dialog */}
+      {/* Delete Account Confirmation */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent className="max-w-[90vw] sm:max-w-md rounded-xl">
+        <AlertDialogContent className="max-w-[90vw] sm:max-w-md rounded-xl bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-red-600 flex items-center gap-2 text-base sm:text-lg">
+            <AlertDialogTitle className="text-red-600 dark:text-red-400 flex items-center gap-2 text-base sm:text-lg">
               <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
               Delete Account
             </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs sm:text-sm">
+            <AlertDialogDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
               This action cannot be undone. This will permanently delete your account and all associated data.
             </AlertDialogDescription>
           </AlertDialogHeader>
           
           <div className="py-3 sm:py-4">
-            <p className="text-xs sm:text-sm font-medium mb-2">Type <span className="font-mono bg-slate-100 px-2 py-1 rounded">DELETE</span> to confirm:</p>
+            <p className="text-xs sm:text-sm font-medium mb-2 text-slate-700 dark:text-slate-300">
+              Type <span className="font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded text-slate-900 dark:text-slate-100">DELETE</span> to confirm:
+            </p>
             <Input
               value={deleteConfirmation}
               onChange={(e) => setDeleteConfirmation(e.target.value)}
               placeholder="DELETE"
-              className="font-mono text-sm h-9 sm:h-10"
+              className="font-mono text-sm h-9 sm:h-10 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
           </div>
           
           <AlertDialogFooter className="flex flex-col xs:flex-row gap-2">
-            <AlertDialogCancel className="text-xs sm:text-sm h-9">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="text-xs sm:text-sm h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDeleteAccount}
               disabled={deleting || deleteConfirmation !== 'DELETE'}
-              className="bg-red-600 hover:bg-red-700 text-xs sm:text-sm h-9"
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-xs sm:text-sm h-9"
             >
               {deleting && <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />}
               Delete Account

@@ -1,4 +1,4 @@
-// components/layout/header.tsx - OPTIMIZED VERSION
+/* eslint-disable react/no-unescaped-entities */
 'use client'
 
 import { useState, useEffect, Suspense, lazy, memo } from 'react'
@@ -11,6 +11,7 @@ import { UserSection } from './header/UserSection'
 import { SearchBar } from './header/SearchBar'
 import { MobileMenu } from './header/MobileMenu'
 import { SignOutDialog } from './header/SignOutDialog'
+import { ThemeToggle } from '@/components/layout/ThemeToggle'
 
 const CBTDialog = lazy(() => import('./header/CBTDialog'))
 
@@ -31,7 +32,7 @@ interface HeaderProps {
 
 // ✅ Simple loading shell
 const HeaderShell = memo(() => (
-  <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-2 sm:py-3">
+  <header className="fixed top-0 left-0 right-0 w-full z-50 bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 py-2 sm:py-3 border-b dark:border-slate-800/40">
     <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6">
       <div className="flex items-center justify-between">
         <div className="h-8 w-32 bg-white/20 rounded animate-pulse" />
@@ -93,24 +94,18 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
   let showDashboardNav = false
 
   if (!isHydrated || isLoading) {
-    // Still loading, show nothing or shell
     showPublicNav = false
     showDashboardNav = false
   } else if (isDashboardPage && effectiveIsAuthenticated) {
-    // On dashboard page and authenticated (or has cached user) → dashboard nav
     showDashboardNav = true
     showPublicNav = false
   } else if (!effectiveIsAuthenticated && !isDashboardPage) {
-    // Not authenticated and not on dashboard → public nav
     showPublicNav = true
   } else if (isPublicPage || isHomePage || isPortalPage) {
-    // On public page → public nav
     showPublicNav = true
   } else if (effectiveIsAuthenticated) {
-    // Authenticated on unknown page → dashboard nav
     showDashboardNav = true
   } else {
-    // Fallback to public nav
     showPublicNav = true
   }
 
@@ -132,12 +127,13 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
     return <HeaderShell />
   }
 
-  // ✅ Always show header - use cached data if available
   return (
     <>
       <header className={cn(
         "fixed top-0 left-0 right-0 w-full z-50 transition-all duration-500",
-        scrolled ? "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] shadow-2xl py-1.5 sm:py-2" : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] py-2 sm:py-3 lg:py-4"
+        scrolled 
+          ? "bg-[#0A2472]/95 dark:bg-slate-950/95 backdrop-blur-md shadow-2xl py-1.5 sm:py-2 border-b border-white/5 dark:border-slate-800/60" 
+          : "bg-gradient-to-r from-[#0A2472] to-[#1e3a8a] dark:from-slate-950 dark:to-slate-900 py-2 sm:py-3 lg:py-4 border-b border-transparent dark:border-slate-800/20"
       )}>
         <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 xl:px-8">
           <div className="flex items-center justify-between gap-3">
@@ -153,21 +149,26 @@ function HeaderContent({ user: propUser, onLogout }: HeaderProps) {
               />
             </div>
 
-            <UserSection
-              user={user}
-              isAuthenticated={effectiveIsAuthenticated}
-              pathname={pathname}
-              notifications={notifications}
-              unreadCount={unreadCount}
-              isPublicPage={isPublicPage || isPortalPage || isHomePage}
-              onSearchToggle={() => setSearchOpen(!searchOpen)}
-              onMobileToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
-              onSignOut={() => setShowSignOut(true)}
-              mobileMenuOpen={mobileMenuOpen}
-              onMarkAsRead={markAsRead}
-              onMarkAllAsRead={markAllAsRead}
-              onDeleteNotification={deleteNotification}
-            />
+            <div className="flex items-center gap-2">
+              {/* Theme Selector for Quick access */}
+              <ThemeToggle align="end" />
+              
+              <UserSection
+                user={user}
+                isAuthenticated={effectiveIsAuthenticated}
+                pathname={pathname}
+                notifications={notifications}
+                unreadCount={unreadCount}
+                isPublicPage={isPublicPage || isPortalPage || isHomePage}
+                onSearchToggle={() => setSearchOpen(!searchOpen)}
+                onMobileToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+                onSignOut={() => setShowSignOut(true)}
+                mobileMenuOpen={mobileMenuOpen}
+                onMarkAsRead={markAsRead}
+                onMarkAllAsRead={markAllAsRead}
+                onDeleteNotification={deleteNotification}
+              />
+            </div>
           </div>
         </div>
 

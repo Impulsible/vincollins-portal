@@ -85,23 +85,23 @@ export function CTA() {
   return (
     <section
       ref={containerRef}
-      className="relative overflow-hidden py-16 sm:py-20 md:py-24 lg:py-28"
+      className="relative overflow-hidden py-16 sm:py-20 md:py-24 lg:py-28 transition-colors duration-300"
     >
-      {/* Base background - Darker for better white contrast */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#061540] via-[#081B5C] to-[#0A2472]" />
+      {/* Base background - Adaptive gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#061540] via-[#081B5C] to-[#0A2472] dark:from-slate-950 dark:via-slate-900 dark:to-slate-950" />
 
-      {/* Enhanced glow effects for better depth */}
-      <motion.div style={{ opacity, scale }} className="absolute inset-0">
-        <div className="absolute -top-20 right-0 h-[400px] w-[400px] rounded-full bg-amber-400/15 blur-3xl" />
-        <div className="absolute -bottom-20 left-0 h-[400px] w-[400px] rounded-full bg-rose-400/15 blur-3xl" />
+      {/* Enhanced glow effects */}
+      <motion.div style={{ opacity, scale }} className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-20 right-0 h-[400px] w-[400px] rounded-full bg-amber-400/15 dark:bg-amber-400/10 blur-3xl" />
+        <div className="absolute -bottom-20 left-0 h-[400px] w-[400px] rounded-full bg-rose-400/15 dark:bg-rose-400/10 blur-3xl" />
         <div className="absolute left-1/2 top-1/2 h-[600px] w-[600px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/8 blur-3xl" />
       </motion.div>
 
-      {/* Darker grid overlay for texture */}
-      <div className="absolute inset-0 bg-[url('/images/grid.svg')] bg-repeat opacity-[0.03]" />
+      {/* Darker grid overlay */}
+      <div className="absolute inset-0 bg-[url('/images/grid.svg')] bg-repeat opacity-[0.03] dark:opacity-[0.05]" />
 
-      {/* Top border accent - Brighter for better visibility */}
-      <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 to-transparent" />
+      {/* Top border accent */}
+      <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-white/50 dark:via-slate-700 to-transparent" />
 
       <Container className="relative px-4 sm:px-6">
         <motion.div
@@ -111,7 +111,7 @@ export function CTA() {
           viewport={{ once: true }}
           className="mx-auto max-w-6xl"
         >
-          {/* Badge - Enhanced contrast */}
+          {/* Badge */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -119,7 +119,7 @@ export function CTA() {
             viewport={{ once: true }}
             className="flex justify-center"
           >
-            <Badge className="mb-5 border border-white/25 bg-white/15 px-4 py-2 text-white shadow-xl backdrop-blur-md transition-colors duration-300 hover:bg-white/20">
+            <Badge className="mb-5 border border-white/25 dark:border-slate-800 bg-white/15 dark:bg-slate-900/80 px-4 py-2 text-white shadow-xl backdrop-blur-md transition-colors duration-300 hover:bg-white/20 dark:hover:bg-slate-800">
               <Sparkles className="mr-2 h-3.5 w-3.5 text-amber-300" />
               <span className="text-xs font-semibold tracking-wide sm:text-sm">
                 Join Our Community Today
@@ -127,7 +127,7 @@ export function CTA() {
             </Badge>
           </motion.div>
 
-          {/* Heading - Enhanced white contrast */}
+          {/* Heading */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -141,14 +141,14 @@ export function CTA() {
 
             <div className="mx-auto mb-5 mt-5 h-1 w-24 rounded-full bg-gradient-to-r from-amber-400 via-white to-rose-400" />
 
-            <p className="mx-auto max-w-3xl px-4 text-base leading-7 text-white/95 sm:text-lg md:text-xl drop-shadow">
+            <p className="mx-auto max-w-3xl px-4 text-base leading-7 text-white/95 dark:text-slate-300 sm:text-lg md:text-xl drop-shadow">
               Experience excellence in education. Apply now to begin your journey with
               Vincollins College and become part of a community that nurtures future
               leaders.
             </p>
           </motion.div>
 
-          {/* CTA buttons - Enhanced contrast */}
+          {/* CTA buttons */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -160,7 +160,7 @@ export function CTA() {
               <Button
                 size="lg"
                 className={cn(
-                  'w-full rounded-xl border border-amber-400/40 bg-amber-400 text-slate-950 shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300',
+                  'w-full rounded-xl border border-amber-400/40 bg-amber-400 text-slate-950 shadow-[0_12px_30px_rgba(0,0,0,0.25)] transition-all duration-300 cursor-pointer',
                   'px-6 py-6 text-base font-bold hover:-translate-y-0.5 hover:bg-amber-300 hover:shadow-[0_18px_40px_rgba(0,0,0,0.3)] sm:w-auto sm:px-8 sm:text-lg'
                 )}
               >
@@ -175,8 +175,8 @@ export function CTA() {
                 size="lg"
                 variant="outline"
                 className={cn(
-                  'w-full rounded-xl border-2 border-white/40 bg-white/12 px-6 py-6 text-base font-semibold text-white backdrop-blur-md transition-all duration-300',
-                  'hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/20 hover:text-white sm:w-auto sm:px-8 sm:text-lg'
+                  'w-full rounded-xl border-2 border-white/40 dark:border-slate-700 bg-white/12 dark:bg-slate-900/60 px-6 py-6 text-base font-semibold text-white backdrop-blur-md transition-all duration-300 cursor-pointer',
+                  'hover:-translate-y-0.5 hover:border-white/60 hover:bg-white/20 dark:hover:bg-slate-800 hover:text-white sm:w-auto sm:px-8 sm:text-lg'
                 )}
               >
                 <Calendar className="mr-2 h-5 w-5 transition-transform duration-300 group-hover:scale-105" />
@@ -185,7 +185,7 @@ export function CTA() {
             </Link>
           </motion.div>
 
-          {/* Benefits - Enhanced contrast */}
+          {/* Benefits */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -198,7 +198,7 @@ export function CTA() {
               return (
                 <div
                   key={index}
-                  className="flex items-center gap-2 rounded-full border border-white/25 bg-white/12 px-4 py-2 backdrop-blur-md"
+                  className="flex items-center gap-2 rounded-full border border-white/25 dark:border-slate-800 bg-white/12 dark:bg-slate-900/60 px-4 py-2 backdrop-blur-md"
                 >
                   <Icon className="h-3.5 w-3.5 text-amber-300" />
                   <span className="whitespace-nowrap text-xs font-medium text-white sm:text-sm">
@@ -209,7 +209,7 @@ export function CTA() {
             })}
           </motion.div>
 
-          {/* Stats - Enhanced contrast */}
+          {/* Stats */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -230,7 +230,7 @@ export function CTA() {
                   viewport={{ once: true }}
                   className="group text-center"
                 >
-                  <div className="rounded-2xl border border-white/20 bg-white/[0.10] p-6 shadow-[0_10px_30px_rgba(0,0,0,0.25)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.15] hover:border-white/30">
+                  <div className="rounded-2xl border border-white/20 dark:border-slate-800 bg-white/[0.10] dark:bg-slate-900/70 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.25)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.15] dark:hover:bg-slate-800/80 hover:border-white/30 dark:hover:border-slate-700">
                     <div
                       className={cn(
                         'mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border shadow-md transition-transform duration-300 group-hover:scale-105',
@@ -244,7 +244,7 @@ export function CTA() {
                       {stat.value}
                     </p>
                     <p className="text-sm font-semibold text-white/95">{stat.label}</p>
-                    <p className="mt-1 text-xs text-white/80">{stat.description}</p>
+                    <p className="mt-1 text-xs text-white/80 dark:text-slate-400">{stat.description}</p>
 
                     <div
                       className={cn(
@@ -258,24 +258,24 @@ export function CTA() {
             })}
           </motion.div>
 
-          {/* ✅ FIXED Contact cards - Corrected phone number and added suppressHydrationWarning */}
+          {/* Contact cards */}
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.65, duration: 0.55 }}
             viewport={{ once: true }}
-            className="grid grid-cols-1 gap-4 border-t border-white/25 px-4 pt-8 sm:grid-cols-2 md:grid-cols-3"
+            className="grid grid-cols-1 gap-4 border-t border-white/25 dark:border-slate-800 px-4 pt-8 sm:grid-cols-2 md:grid-cols-3"
           >
             <Link
               href="tel:+2349121155554"
-              className="group rounded-2xl border border-white/20 bg-white/[0.08] p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] hover:text-white hover:border-white/35"
+              className="group rounded-2xl border border-white/20 dark:border-slate-800 bg-white/[0.08] dark:bg-slate-900/60 p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] dark:hover:bg-slate-800 hover:text-white hover:border-white/35 dark:hover:border-slate-700"
             >
               <div className="flex items-center gap-3">
-                <div className="rounded-full bg-white/15 p-2.5 transition-colors duration-300 group-hover:bg-white/25">
+                <div className="rounded-full bg-white/15 dark:bg-slate-800 p-2.5 transition-colors duration-300 group-hover:bg-white/25">
                   <Phone className="h-4 w-4 text-amber-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/70">Call Us</p>
+                  <p className="text-xs text-white/70 dark:text-slate-400">Call Us</p>
                   <p className="text-sm font-semibold text-white" suppressHydrationWarning>
                     +234 912 1155 554
                   </p>
@@ -285,14 +285,14 @@ export function CTA() {
 
             <Link
               href="mailto:vincollinscollege@gmail.com"
-              className="group rounded-2xl border border-white/20 bg-white/[0.08] p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] hover:text-white hover:border-white/35"
+              className="group rounded-2xl border border-white/20 dark:border-slate-800 bg-white/[0.08] dark:bg-slate-900/60 p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] dark:hover:bg-slate-800 hover:text-white hover:border-white/35 dark:hover:border-slate-700"
             >
               <div className="flex items-center gap-3">
-                <div className="rounded-full bg-white/15 p-2.5 transition-colors duration-300 group-hover:bg-white/25">
+                <div className="rounded-full bg-white/15 dark:bg-slate-800 p-2.5 transition-colors duration-300 group-hover:bg-white/25">
                   <Mail className="h-4 w-4 text-amber-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/70">Email Us</p>
+                  <p className="text-xs text-white/70 dark:text-slate-400">Email Us</p>
                   <p className="text-sm font-semibold text-white" suppressHydrationWarning>
                     vincollinscollege@gmail.com
                   </p>
@@ -303,14 +303,14 @@ export function CTA() {
             <Link
               href="https://maps.google.com"
               target="_blank"
-              className="group rounded-2xl border border-white/20 bg-white/[0.08] p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] hover:text-white hover:border-white/35 sm:col-span-2 md:col-span-1"
+              className="group rounded-2xl border border-white/20 dark:border-slate-800 bg-white/[0.08] dark:bg-slate-900/60 p-4 text-white/90 backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.14] dark:hover:bg-slate-800 hover:text-white hover:border-white/35 dark:hover:border-slate-700 sm:col-span-2 md:col-span-1"
             >
               <div className="flex items-center gap-3">
-                <div className="rounded-full bg-white/15 p-2.5 transition-colors duration-300 group-hover:bg-white/25">
+                <div className="rounded-full bg-white/15 dark:bg-slate-800 p-2.5 transition-colors duration-300 group-hover:bg-white/25">
                   <MapPin className="h-4 w-4 text-rose-300" />
                 </div>
                 <div>
-                  <p className="text-xs text-white/70">Visit Us</p>
+                  <p className="text-xs text-white/70 dark:text-slate-400">Visit Us</p>
                   <p className="text-sm font-semibold text-white" suppressHydrationWarning>
                     7/9, Lawani Street, off Ishaga Rd, Surulere, Lagos
                   </p>
@@ -319,7 +319,7 @@ export function CTA() {
             </Link>
           </motion.div>
 
-          {/* Bottom helper text - Enhanced contrast */}
+          {/* Bottom helper text */}
           <motion.div
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -327,7 +327,7 @@ export function CTA() {
             viewport={{ once: true }}
             className="mt-8 px-4 text-center sm:mt-10"
           >
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/[0.10] px-4 py-2 backdrop-blur-md">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/25 dark:border-slate-800 bg-white/[0.10] dark:bg-slate-900/60 px-4 py-2 backdrop-blur-md">
               <Clock className="h-3.5 w-3.5 text-amber-300" />
               <p className="text-xs text-white/85 sm:text-sm">
                 Limited seats available for the upcoming academic session

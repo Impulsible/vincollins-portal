@@ -30,17 +30,21 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
   }
 
   return (
-    <Card className="border border-slate-200 shadow-sm bg-white overflow-hidden w-full rounded-2xl">
+    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden w-full rounded-2xl transition-colors duration-300">
       <CardHeader className="pb-3 px-5 pt-5">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-slate-800 flex items-center gap-2">
-            <div className="p-1.5 bg-blue-100 rounded-lg">
-              <Activity className="h-4 w-4 text-blue-600" />
+          <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <div className="p-1.5 bg-blue-100 dark:bg-blue-950/50 rounded-lg">
+              <Activity className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             </div>
             Recent Activity
           </CardTitle>
-          <Button variant="ghost" size="sm" onClick={() => router.push('/student/exams')}
-            className="text-blue-600 hover:text-blue-700 hover:bg-blue-50 text-xs font-medium">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/student/exams')}
+            className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-xs font-medium cursor-pointer"
+          >
             View All <ArrowRight className="ml-1 h-3 w-3" />
           </Button>
         </div>
@@ -48,18 +52,17 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
       <CardContent className="px-5 pb-5">
         {attempts.length === 0 ? (
           <div className="text-center py-8">
-            <div className="bg-slate-100 rounded-full p-3 w-fit mx-auto mb-3">
-              <Activity className="h-6 w-6 text-slate-400" />
+            <div className="bg-slate-100 dark:bg-slate-800 rounded-full p-3 w-fit mx-auto mb-3">
+              <Activity className="h-6 w-6 text-slate-400 dark:text-slate-500" />
             </div>
-            <p className="text-sm font-medium text-slate-600">No recent activity</p>
-            <p className="text-xs text-slate-400 mt-1">Your exam history will appear here</p>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No recent activity</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Your exam history will appear here</p>
           </div>
         ) : (
           <div className="space-y-2">
             {attempts.slice(0, 5).map((attempt, index) => {
               const isInProgress = attempt.status === 'in_progress'
               
-              // ✅ Use CA score when available, otherwise exam percentage
               const hasCA = attempt.has_ca && attempt.ca_score
               const displayPct = hasCA 
                 ? Number(attempt.ca_score.total_score) || 0
@@ -67,7 +70,6 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
               
               const displayGrade = hasCA ? attempt.ca_score.grade : null
               
-              // ✅ Pass/fail based on CA grade (WAEC) or 50% threshold
               const isPassed = hasCA 
                 ? attempt.ca_score.grade !== 'F9'
                 : displayPct >= 50
@@ -75,7 +77,7 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
               return (
                 <div 
                   key={attempt.id || index} 
-                  className="p-3.5 bg-slate-50 hover:bg-slate-100 rounded-xl border border-slate-100 transition-colors cursor-pointer"
+                  className="p-3.5 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-800 transition-colors cursor-pointer"
                   onClick={() => {
                     if (isInProgress) {
                       router.push(`/student/exam/${attempt.exam_id}`)
@@ -86,16 +88,16 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                 >
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm text-slate-800 truncate">
+                      <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 truncate">
                         {attempt.exam_title || 'Exam'}
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         {attempt.exam_subject || 'Unknown Subject'}
                       </p>
                     </div>
                     <div className="shrink-0">
                       {isInProgress ? (
-                        <Badge className="bg-blue-100 text-blue-700 text-xs border-blue-200">
+                        <Badge className="bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 text-xs border-blue-200 dark:border-blue-800">
                           <RefreshCw className="h-3 w-3 mr-1" /> In Progress
                         </Badge>
                       ) : (
@@ -105,7 +107,7 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                   </div>
                   
                   <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
                       {!isInProgress && (
                         <span className="flex items-center gap-1">
                           <Trophy className="h-3 w-3" />
@@ -116,8 +118,8 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                             <Badge className={cn(
                               "text-[10px] px-1 py-0 ml-1 font-bold",
                               displayGrade === 'F9' 
-                                ? 'bg-red-100 text-red-700' 
-                                : 'bg-emerald-100 text-emerald-700'
+                                ? 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300' 
+                                : 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
                             )}>
                               {displayGrade}
                             </Badge>
@@ -129,14 +131,14 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                         {formatDate(attempt.submitted_at || attempt.started_at || attempt.created_at)}
                       </span>
                       {!isInProgress && attempt.correct_count !== undefined && (
-                        <span className="flex items-center gap-1 text-emerald-600">
+                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                           <CheckCircle className="h-3 w-3" />
                           {attempt.correct_count}
                         </span>
                       )}
                     </div>
                     {isInProgress && (
-                      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600">
+                      <Button size="sm" variant="ghost" className="h-7 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer">
                         <RefreshCw className="h-3 w-3 mr-1" /> Resume
                       </Button>
                     )}

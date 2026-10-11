@@ -9,14 +9,6 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { motion } from 'framer-motion'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 
 // Footer Navigation Data
 const footerNavItems = {
@@ -25,7 +17,6 @@ const footerNavItems = {
     { id: 'nursery', title: 'Nursery', href: '/academics/nursery' },
     { id: 'primary', title: 'Primary', href: '/academics/primary' },
     { id: 'college', title: 'College', href: '/academics/college' },
-    // ❌ Removed: CBT Platform
   ],
   about: [
     { id: 'story', title: 'Our Story', href: '/about' },
@@ -41,7 +32,6 @@ const footerNavItems = {
   ],
 }
 
-// Default contact info (will be updated from database)
 const defaultContactInfo = {
   address: '7/9 Lawani Street, off Ishaga Rd, Surulere, Lagos',
   phone: '+234 912 1155 554',
@@ -54,14 +44,6 @@ const socialLinks = [
   { icon: Twitter, href: 'https://twitter.com/vincollins', label: 'Twitter' },
   { icon: Instagram, href: 'https://instagram.com/vincollins', label: 'Instagram' },
   { icon: Linkedin, href: 'https://linkedin.com/school/vincollins', label: 'LinkedIn' },
-]
-
-// CBT Features (kept for reference, but no longer linked from footer)
-const cbtFeatures = [
-  { title: 'Secure Exam Environment', description: 'Full-screen lockdown with tab-switch detection', icon: Lock },
-  { title: 'Smart Timer System', description: 'Real-time countdown with auto-submit feature', icon: Timer },
-  { title: 'Question Randomization', description: 'Dynamic shuffling of questions and options', icon: Shuffle },
-  { title: 'Instant Results', description: 'Immediate grading for objective questions', icon: Sparkles },
 ]
 
 interface SchoolSettings {
@@ -79,14 +61,11 @@ export function Footer() {
   const [schoolSettings, setSchoolSettings] = useState<SchoolSettings | null>(null)
   const [email, setEmail] = useState('')
   const [subscribed, setSubscribed] = useState(false)
-  const [showCbtInfo, setShowCbtInfo] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [userRole, setUserRole] = useState<string>('student')
   
-  // Hydration fix: Track client-side mounting
   const [mounted, setMounted] = useState(false)
   
-  // Dynamic contact info state
   const [contactData, setContactData] = useState({
     address: defaultContactInfo.address,
     phone: defaultContactInfo.phone,
@@ -94,12 +73,10 @@ export function Footer() {
     hours: defaultContactInfo.hours,
   })
 
-  // Mark component as mounted on client
   useEffect(() => {
     setMounted(true)
   }, [])
 
-  // Check authentication status
   useEffect(() => {
     const checkAuth = async () => {
       try {
@@ -145,7 +122,6 @@ export function Footer() {
     }
   }, [])
 
-  // Fetch school settings including contact info
   useEffect(() => {
     const fetchSchoolSettings = async () => {
       try {
@@ -157,7 +133,6 @@ export function Footer() {
         if (!error && data) {
           setSchoolSettings(data)
           
-          // Update contact data with database values
           setContactData({
             address: data.school_address || defaultContactInfo.address,
             phone: data.school_phone || defaultContactInfo.phone,
@@ -187,340 +162,339 @@ export function Footer() {
   }
 
   return (
-    <>
-      <footer className="relative bg-[#0A2472] text-white overflow-hidden">
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#F5A623]/5 rounded-full blur-3xl" />
-        <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#F5A623]/5 rounded-full blur-3xl" />
-        <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#F5A623] to-transparent" />
+    <footer className="relative bg-[#0A2472] dark:bg-slate-950 text-white overflow-hidden border-t border-transparent dark:border-slate-800 transition-colors duration-300">
+      <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#F5A623]/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-[#F5A623]/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-transparent via-[#F5A623] dark:via-amber-500 to-transparent" />
 
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative">
-          <div className="py-14 lg:py-20">
-            <div className="grid grid-cols-1 gap-10 md:gap-12 lg:grid-cols-12">
-              {/* Brand Column */}
-              <div className="lg:col-span-4 space-y-6">
-                <Link href="/" className="inline-flex items-center gap-3 group">
-                  <motion.div
-                    initial={{ scale: 0.9, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring" as const, stiffness: 200, damping: 20 }}
-                    className="relative"
-                  >
-                    {schoolSettings?.logo_path ? (
-                      <div className="relative h-14 w-14 group-hover:scale-105 transition-all duration-300">
-                        <Image 
-                          src={schoolSettings.logo_path} 
-                          alt={schoolSettings.school_name || 'Vincollins College Logo'} 
-                          width={56}
-                          height={56}
-                          className="object-contain"
-                          priority
-                        />
-                      </div>
-                    ) : (
-                      <div className="relative h-14 w-14 bg-white rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300">
-                        <GraduationCap className="h-7 w-7 text-[#0A2472]" />
-                      </div>
-                    )}
-                  </motion.div>
-                  <div>
-                    <div className="flex items-baseline gap-2 flex-wrap">
-                      <span className="font-dancing text-3xl sm:text-4xl font-bold text-white leading-tight group-hover:text-[#F5A623] transition-colors">
-                        Vincollins
-                      </span>
-                      <span className="font-dancing text-3xl sm:text-4xl text-[#F5A623] leading-tight">
-                        College
-                      </span>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl relative">
+        <div className="py-14 lg:py-20">
+          <div className="grid grid-cols-1 gap-10 md:gap-12 lg:grid-cols-12">
+            
+            {/* Brand Column */}
+            <div className="lg:col-span-4 space-y-6">
+              <Link href="/" className="inline-flex items-center gap-3 group">
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring" as const, stiffness: 200, damping: 20 }}
+                  className="relative"
+                >
+                  {schoolSettings?.logo_path ? (
+                    <div className="relative h-14 w-14 group-hover:scale-105 transition-all duration-300">
+                      <Image 
+                        src={schoolSettings.logo_path} 
+                        alt={schoolSettings.school_name || 'Vincollins College Logo'} 
+                        width={56}
+                        height={56}
+                        className="object-contain"
+                        priority
+                      />
                     </div>
-                    <span className="text-xs sm:text-sm font-medium text-[#F5A623]/80 tracking-wide block mt-1">
-                      Geared Towards Excellence
+                  ) : (
+                    <div className="relative h-14 w-14 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:scale-105 transition-all duration-300 border border-transparent dark:border-slate-800">
+                      <GraduationCap className="h-7 w-7 text-[#0A2472] dark:text-blue-400" />
+                    </div>
+                  )}
+                </motion.div>
+                <div>
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className="font-dancing text-3xl sm:text-4xl font-bold text-white leading-tight group-hover:text-[#F5A623] transition-colors">
+                      Vincollins
+                    </span>
+                    <span className="font-dancing text-3xl sm:text-4xl text-[#F5A623] leading-tight">
+                      College
                     </span>
                   </div>
-                </Link>
-                
-                <p className="text-white/70 text-sm leading-relaxed max-w-md">
-                  Providing quality education from Crèche to College. Nurturing future leaders with excellence, integrity, and innovation since 2022.
-                </p>
-                
-                <div className="flex flex-wrap gap-2">
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg border border-white/20">
-                    <Award className="h-3.5 w-3.5 text-[#F5A623]" />
-                    <span className="text-xs font-medium text-white/90">4+ Years</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg border border-white/20">
-                    <Shield className="h-3.5 w-3.5 text-[#F5A623]" />
-                    <span className="text-xs font-medium text-white/90">Accredited</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 rounded-lg border border-white/20">
-                    <Heart className="h-3.5 w-3.5 text-[#F5A623]" />
-                    <span className="text-xs font-medium text-white/90">50+ Alumni</span>
-                  </div>
+                  <span className="text-xs sm:text-sm font-medium text-[#F5A623]/80 tracking-wide block mt-1">
+                    Geared Towards Excellence
+                  </span>
                 </div>
-                
-                <div className="flex space-x-3 pt-2">
-                  {socialLinks.map((social) => (
-                    <Link 
-                      key={social.label}
-                      href={social.href} 
-                      className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-white/80 hover:text-white transition-all duration-300 hover:scale-110 border border-white/20 hover:bg-[#1877f2] hover:border-[#1877f2]"
-                      aria-label={social.label}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <social.icon className="h-4 w-4" />
-                    </Link>
-                  ))}
-                </div>
-              </div>
-
-              {/* Navigation Columns */}
-              <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 gap-8">
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
-                    Our Schools
-                  </h3>
-                  <ul className="space-y-3">
-                    {footerNavItems.academics.map((item) => (
-                      <li key={item.id}>
-                        <Link 
-                          href={item.href}
-                          className="group inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#F5A623] transition-all duration-300"
-                        >
-                          <ChevronRight className="h-3.5 w-3.5 text-[#F5A623]/60 group-hover:text-[#F5A623] transition-all duration-300 group-hover:translate-x-0.5" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
-                    About Us
-                  </h3>
-                  <ul className="space-y-3">
-                    {footerNavItems.about.map((item) => (
-                      <li key={item.id}>
-                        <Link 
-                          href={item.href} 
-                          className="group inline-flex items-center gap-2 text-sm text-white/70 hover:text-[#F5A623] transition-all duration-300"
-                        >
-                          <ChevronRight className="h-3.5 w-3.5 text-[#F5A623]/60 group-hover:text-[#F5A623] transition-all duration-300 group-hover:translate-x-0.5" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-                    <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
-                    Portals
-                  </h3>
-                  <ul className="space-y-3">
-                    {footerNavItems.portal.map((item) => {
-                      const isActive = pathname === item.href
-                      const isPortalLink = item.href === '/portal'
-                      
-                      return (
-                        <li key={item.id}>
-                          {isPortalLink ? (
-                            <a
-                              href="/portal"
-                              onClick={handlePortalClick}
-                              className={cn(
-                                'group inline-flex items-center gap-2 text-sm transition-all duration-300 cursor-pointer',
-                                isActive 
-                                  ? 'text-[#F5A623] font-medium' 
-                                  : 'text-white/70 hover:text-[#F5A623]'
-                              )}
-                            >
-                              <ChevronRight className={cn(
-                                'h-3.5 w-3.5 transition-all duration-300 group-hover:translate-x-0.5',
-                                isActive ? 'text-[#F5A623]' : 'text-[#F5A623]/60 group-hover:text-[#F5A623]'
-                              )} />
-                              <span>{item.title}</span>
-                            </a>
-                          ) : (
-                            <Link 
-                              href={item.href}
-                              className={cn(
-                                'group inline-flex items-center gap-2 text-sm transition-all duration-300',
-                                isActive 
-                                  ? 'text-[#F5A623] font-medium' 
-                                  : 'text-white/70 hover:text-[#F5A623]'
-                              )}
-                            >
-                              <ChevronRight className={cn(
-                                'h-3.5 w-3.5 transition-all duration-300 group-hover:translate-x-0.5',
-                                isActive ? 'text-[#F5A623]' : 'text-[#F5A623]/60 group-hover:text-[#F5A623]'
-                              )} />
-                              <span>{item.title}</span>
-                            </Link>
-                          )}
-                        </li>
-                      )
-                    })}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Contact Column */}
-              <div className="lg:col-span-3 space-y-5">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
-                  <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
-                  Contact Us
-                </h3>
-                <ul className="space-y-4">
-                  <li className="flex items-start gap-3 text-sm group">
-                    <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
-                      <MapPin className="h-4 w-4 text-[#F5A623]" />
-                    </div>
-                    {mounted ? (
-                      <span className="leading-relaxed text-white/80">
-                        {contactData.address}
-                      </span>
-                    ) : (
-                      <span className="leading-relaxed text-white/80">
-                        {defaultContactInfo.address}
-                      </span>
-                    )}
-                  </li>
-                  
-                  <li className="flex items-center gap-3 text-sm group">
-                    <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
-                      <Phone className="h-4 w-4 text-[#F5A623]" />
-                    </div>
-                    {mounted ? (
-                      <a 
-                        href={`tel:${contactData.phone.replace(/\s/g, '')}`} 
-                        className="text-white/80 hover:text-[#F5A623] transition-colors"
-                      >
-                        {contactData.phone}
-                      </a>
-                    ) : (
-                      <a 
-                        href={`tel:${defaultContactInfo.phone.replace(/\s/g, '')}`} 
-                        className="text-white/80 hover:text-[#F5A623] transition-colors"
-                      >
-                        {defaultContactInfo.phone}
-                      </a>
-                    )}
-                  </li>
-                  
-                  <li className="flex items-center gap-3 text-sm group">
-                    <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
-                      <Mail className="h-4 w-4 text-[#F5A623]" />
-                    </div>
-                    {mounted ? (
-                      <a 
-                        href={`mailto:${contactData.email}`} 
-                        className="text-white/80 hover:text-[#F5A623] transition-colors"
-                      >
-                        {contactData.email}
-                      </a>
-                    ) : (
-                      <a 
-                        href={`mailto:${defaultContactInfo.email}`} 
-                        className="text-white/80 hover:text-[#F5A623] transition-colors"
-                      >
-                        {defaultContactInfo.email}
-                      </a>
-                    )}
-                  </li>
-                  
-                  <li className="flex items-center gap-3 text-sm group">
-                    <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
-                      <Clock className="h-4 w-4 text-[#F5A623]" />
-                    </div>
-                    {mounted ? (
-                      <span className="text-white/80">
-                        {contactData.hours}
-                      </span>
-                    ) : (
-                      <span className="text-white/80">
-                        {defaultContactInfo.hours}
-                      </span>
-                    )}
-                  </li>
-                </ul>
-
-                <Link 
-                  href="/contact" 
-                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg transition-all duration-300 text-sm shadow-md hover:shadow-lg group w-full justify-center"
-                >
-                  <Send className="h-3.5 w-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-                  <span>Send us a message</span>
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
-                </Link>
-
-                <div className="pt-2">
-                  <p className="text-xs font-semibold text-white/90 mb-3 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-[#F5A623] shrink-0" />
-                    <span>Subscribe to our newsletter</span>
-                  </p>
-                  <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2 w-full">
-                    <input 
-                      type="email" 
-                      placeholder="Enter your email" 
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="flex-1 px-4 py-2.5 text-sm bg-white/10 rounded-lg text-white placeholder:text-white/50 border border-white/20 focus:outline-none focus:border-[#F5A623] focus:ring-2 focus:ring-[#F5A623]/30 transition-all w-full"
-                      required
-                    />
-                    <button 
-                      type="submit"
-                      className="px-4 py-2.5 text-sm font-semibold bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] rounded-lg transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap"
-                    >
-                      {subscribed ? 'Subscribed!' : 'Subscribe'}
-                    </button>
-                  </form>
-                  {subscribed && (
-                    <motion.p 
-                      initial={{ opacity: 0, y: 5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-xs text-[#F5A623] mt-2"
-                    >
-                      Thank you for subscribing!
-                    </motion.p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="py-6 border-t border-white/15">
-            <div className="flex flex-col md:flex-row justify-between items-center gap-4">
-              <p className="text-xs text-white/60 text-center md:text-left">
-                {mounted ? (
-                  <>© {currentYear} Vincollins College. All rights reserved.</>
-                ) : (
-                  <>© 2026 Vincollins College. All rights reserved.</>
-                )}
+              </Link>
+              
+              <p className="text-white/70 dark:text-slate-300 text-sm leading-relaxed max-w-md">
+                Providing quality education from Crèche to College. Nurturing future leaders with excellence, integrity, and innovation since 2022.
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-6">
-                {[
-                  { href: '/privacy', label: 'Privacy Policy' },
-                  { href: '/terms', label: 'Terms of Service' },
-                  { href: '/cookies', label: 'Cookie Policy' },
-                  { href: '/sitemap', label: 'Sitemap' }
-                ].map((link) => (
+              
+              <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 dark:bg-slate-900 rounded-lg border border-white/20 dark:border-slate-800">
+                  <Award className="h-3.5 w-3.5 text-[#F5A623]" />
+                  <span className="text-xs font-medium text-white/90">4+ Years</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 dark:bg-slate-900 rounded-lg border border-white/20 dark:border-slate-800">
+                  <Shield className="h-3.5 w-3.5 text-[#F5A623]" />
+                  <span className="text-xs font-medium text-white/90">Accredited</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white/10 dark:bg-slate-900 rounded-lg border border-white/20 dark:border-slate-800">
+                  <Heart className="h-3.5 w-3.5 text-[#F5A623]" />
+                  <span className="text-xs font-medium text-white/90">50+ Alumni</span>
+                </div>
+              </div>
+              
+              <div className="flex space-x-3 pt-2">
+                {socialLinks.map((social) => (
                   <Link 
-                    key={link.href}
-                    href={link.href} 
-                    className="text-xs text-white/50 hover:text-[#F5A623] transition-colors duration-300"
+                    key={social.label}
+                    href={social.href} 
+                    className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 dark:bg-slate-900 text-white/80 hover:text-white transition-all duration-300 hover:scale-110 border border-white/20 dark:border-slate-800 hover:bg-[#1877f2] hover:border-[#1877f2]"
+                    aria-label={social.label}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    {link.label}
+                    <social.icon className="h-4 w-4" />
                   </Link>
                 ))}
               </div>
             </div>
+
+            {/* Navigation Columns */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-3 gap-8">
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
+                  Our Schools
+                </h3>
+                <ul className="space-y-3">
+                  {footerNavItems.academics.map((item) => (
+                    <li key={item.id}>
+                      <Link 
+                        href={item.href}
+                        className="group inline-flex items-center gap-2 text-sm text-white/70 dark:text-slate-400 hover:text-[#F5A623] dark:hover:text-[#F5A623] transition-all duration-300"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5 text-[#F5A623]/60 group-hover:text-[#F5A623] transition-all duration-300 group-hover:translate-x-0.5" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
+                  About Us
+                </h3>
+                <ul className="space-y-3">
+                  {footerNavItems.about.map((item) => (
+                    <li key={item.id}>
+                      <Link 
+                        href={item.href} 
+                        className="group inline-flex items-center gap-2 text-sm text-white/70 dark:text-slate-400 hover:text-[#F5A623] dark:hover:text-[#F5A623] transition-all duration-300"
+                      >
+                        <ChevronRight className="h-3.5 w-3.5 text-[#F5A623]/60 group-hover:text-[#F5A623] transition-all duration-300 group-hover:translate-x-0.5" />
+                        <span>{item.title}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
+                  <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
+                  Portals
+                </h3>
+                <ul className="space-y-3">
+                  {footerNavItems.portal.map((item) => {
+                    const isActive = pathname === item.href
+                    const isPortalLink = item.href === '/portal'
+                    
+                    return (
+                      <li key={item.id}>
+                        {isPortalLink ? (
+                          <a
+                            href="/portal"
+                            onClick={handlePortalClick}
+                            className={cn(
+                              'group inline-flex items-center gap-2 text-sm transition-all duration-300 cursor-pointer',
+                              isActive 
+                                ? 'text-[#F5A623] font-medium' 
+                                : 'text-white/70 dark:text-slate-400 hover:text-[#F5A623]'
+                            )}
+                          >
+                            <ChevronRight className={cn(
+                              'h-3.5 w-3.5 transition-all duration-300 group-hover:translate-x-0.5',
+                              isActive ? 'text-[#F5A623]' : 'text-[#F5A623]/60 group-hover:text-[#F5A623]'
+                            )} />
+                            <span>{item.title}</span>
+                          </a>
+                        ) : (
+                          <Link 
+                            href={item.href}
+                            className={cn(
+                              'group inline-flex items-center gap-2 text-sm transition-all duration-300',
+                              isActive 
+                                ? 'text-[#F5A623] font-medium' 
+                                : 'text-white/70 dark:text-slate-400 hover:text-[#F5A623]'
+                            )}
+                          >
+                            <ChevronRight className={cn(
+                              'h-3.5 w-3.5 transition-all duration-300 group-hover:translate-x-0.5',
+                              isActive ? 'text-[#F5A623]' : 'text-[#F5A623]/60 group-hover:text-[#F5A623]'
+                            )} />
+                            <span>{item.title}</span>
+                          </Link>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            </div>
+
+            {/* Contact Column */}
+            <div className="lg:col-span-3 space-y-5">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider mb-5 flex items-center gap-2">
+                <span className="w-1.5 h-4 bg-[#F5A623] rounded-full" />
+                Contact Us
+              </h3>
+              <ul className="space-y-4">
+                <li className="flex items-start gap-3 text-sm group">
+                  <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
+                    <MapPin className="h-4 w-4 text-[#F5A623]" />
+                  </div>
+                  {mounted ? (
+                    <span className="leading-relaxed text-white/80 dark:text-slate-300">
+                      {contactData.address}
+                    </span>
+                  ) : (
+                    <span className="leading-relaxed text-white/80 dark:text-slate-300">
+                      {defaultContactInfo.address}
+                    </span>
+                  )}
+                </li>
+                
+                <li className="flex items-center gap-3 text-sm group">
+                  <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
+                    <Phone className="h-4 w-4 text-[#F5A623]" />
+                  </div>
+                  {mounted ? (
+                    <a 
+                      href={`tel:${contactData.phone.replace(/\s/g, '')}`} 
+                      className="text-white/80 dark:text-slate-300 hover:text-[#F5A623] transition-colors"
+                    >
+                      {contactData.phone}
+                    </a>
+                  ) : (
+                    <a 
+                      href={`tel:${defaultContactInfo.phone.replace(/\s/g, '')}`} 
+                      className="text-white/80 dark:text-slate-300 hover:text-[#F5A623] transition-colors"
+                    >
+                      {defaultContactInfo.phone}
+                    </a>
+                  )}
+                </li>
+                
+                <li className="flex items-center gap-3 text-sm group">
+                  <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
+                    <Mail className="h-4 w-4 text-[#F5A623]" />
+                  </div>
+                  {mounted ? (
+                    <a 
+                      href={`mailto:${contactData.email}`} 
+                      className="text-white/80 dark:text-slate-300 hover:text-[#F5A623] transition-colors"
+                    >
+                      {contactData.email}
+                    </a>
+                  ) : (
+                    <a 
+                      href={`mailto:${defaultContactInfo.email}`} 
+                      className="text-white/80 dark:text-slate-300 hover:text-[#F5A623] transition-colors"
+                    >
+                      {defaultContactInfo.email}
+                    </a>
+                  )}
+                </li>
+                
+                <li className="flex items-center gap-3 text-sm group">
+                  <div className="p-2 bg-[#F5A623]/10 rounded-lg flex-shrink-0 group-hover:bg-[#F5A623]/20 transition-colors">
+                    <Clock className="h-4 w-4 text-[#F5A623]" />
+                  </div>
+                  {mounted ? (
+                    <span className="text-white/80 dark:text-slate-300">
+                      {contactData.hours}
+                    </span>
+                  ) : (
+                    <span className="text-white/80 dark:text-slate-300">
+                      {defaultContactInfo.hours}
+                    </span>
+                  )}
+                </li>
+              </ul>
+
+              <Link 
+                href="/contact" 
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] font-bold rounded-lg transition-all duration-300 text-sm shadow-md hover:shadow-lg group w-full justify-center"
+              >
+                <Send className="h-3.5 w-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+                <span>Send us a message</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform" />
+              </Link>
+
+              <div className="pt-2">
+                <p className="text-xs font-semibold text-white/90 dark:text-slate-200 mb-3 flex items-center gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-[#F5A623] shrink-0" />
+                  <span>Subscribe to our newsletter</span>
+                </p>
+                <form onSubmit={handleSubscribe} className="flex flex-col sm:flex-row gap-2 w-full">
+                  <input 
+                    type="email" 
+                    placeholder="Enter your email" 
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="flex-1 px-4 py-2.5 text-sm bg-white/10 dark:bg-slate-900 rounded-lg text-white placeholder:text-white/50 dark:placeholder:text-slate-500 border border-white/20 dark:border-slate-800 focus:outline-none focus:border-[#F5A623] focus:ring-2 focus:ring-[#F5A623]/30 transition-all w-full"
+                    required
+                  />
+                  <button 
+                    type="submit"
+                    className="px-4 py-2.5 text-sm font-semibold bg-[#F5A623] hover:bg-[#F5A623]/90 text-[#0A2472] rounded-lg transition-all duration-300 shadow-md hover:shadow-lg whitespace-nowrap cursor-pointer"
+                  >
+                    {subscribed ? 'Subscribed!' : 'Subscribe'}
+                  </button>
+                </form>
+                {subscribed && (
+                  <motion.p 
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-xs text-[#F5A623] mt-2"
+                  >
+                    Thank you for subscribing!
+                  </motion.p>
+                )}
+              </div>
+            </div>
           </div>
         </div>
-      </footer>
-    </>
+
+        {/* Bottom Bar */}
+        <div className="py-6 border-t border-white/15 dark:border-slate-800">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <p className="text-xs text-white/60 dark:text-slate-400 text-center md:text-left">
+              {mounted ? (
+                <>© {currentYear} Vincollins College. All rights reserved.</>
+              ) : (
+                <>© 2026 Vincollins College. All rights reserved.</>
+              )}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-6">
+              {[
+                { href: '/privacy', label: 'Privacy Policy' },
+                { href: '/terms', label: 'Terms of Service' },
+                { href: '/cookies', label: 'Cookie Policy' },
+                { href: '/sitemap', label: 'Sitemap' }
+              ].map((link) => (
+                <Link 
+                  key={link.href}
+                  href={link.href} 
+                  className="text-xs text-white/50 dark:text-slate-400 hover:text-[#F5A623] dark:hover:text-[#F5A623] transition-colors duration-300"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </footer>
   )
 }

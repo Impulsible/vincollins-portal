@@ -1,4 +1,4 @@
-// app/student/profile/page.tsx - COMPLETE FIXED VERSION
+// app/student/profile/page.tsx - COMPLETE FIXED VERSION WITH DARK MODE
 
 /* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
+import { getFirstName, getDisplayName as getDisplayNameFromProfile } from '@/lib/get-display-name'
 import {
   Dialog,
   DialogContent,
@@ -56,7 +57,6 @@ interface StudentProfile {
   bio?: string
 }
 
-// Full Screen Image Viewer
 function FullScreenImageViewer({ 
   imageUrl, 
   title, 
@@ -106,7 +106,6 @@ export default function StudentProfilePage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState('profile')
   
-  // Real stats from database
   const [stats, setStats] = useState({
     classmates: 0,
     completedExams: 0,
@@ -128,7 +127,6 @@ export default function StudentProfilePage() {
     bio: ''
   })
 
-  // ✅ Get current term from database
   const [currentTerm, setCurrentTerm] = useState('')
   const [currentSession, setCurrentSession] = useState('')
 
@@ -158,7 +156,6 @@ export default function StudentProfilePage() {
     }
   }
 
-  // ✅ Fetch current term
   async function fetchCurrentTermAndSession(): Promise<{ term: string; session: string }> {
     try {
       const { data: settings, error } = await supabase
@@ -222,7 +219,6 @@ export default function StudentProfilePage() {
           bio: profileData.bio || ''
         })
         
-        // Load real stats
         await loadStats(session.user.id, profileData.class, profileData.department)
       } else {
         const emailName = session.user.email?.split('@')[0] || 'Student'
@@ -276,14 +272,11 @@ export default function StudentProfilePage() {
     }
   }
 
-  // ✅ Updated loadStats with only Classmates, Exams Done, Average Score
   async function loadStats(userId: string, studentClass: string, department: string) {
     try {
-      // 1. ✅ Get classmates count - multiple strategies
       let classmatesCount = 0
       
       try {
-        // Strategy 1: Exact match on class
         const { count: exactCount, error: exactError } = await supabase
           .from('profiles')
           .select('*', { count: 'exact', head: true })
@@ -293,10 +286,8 @@ export default function StudentProfilePage() {
         
         if (!exactError) {
           classmatesCount = exactCount || 0
-          console.log(`📊 Exact match classmates: ${classmatesCount}`)
         }
         
-        // Strategy 2: If exact match returns 0, try ILIKE with the full class name
         if (classmatesCount === 0) {
           const { count: likeCount, error: likeError } = await supabase
             .from('profiles')
@@ -307,11 +298,9 @@ export default function StudentProfilePage() {
           
           if (!likeError) {
             classmatesCount = likeCount || 0
-            console.log(`📊 ILIKE match classmates: ${classmatesCount}`)
           }
         }
         
-        // Strategy 3: Extract class level (e.g., "SS2") and match
         if (classmatesCount === 0) {
           const classLevelMatch = studentClass.match(/^(JSS[1-3]|SS[1-3])/i)
           const classLevel = classLevelMatch ? classLevelMatch[0].toUpperCase() : ''
@@ -326,27 +315,6 @@ export default function StudentProfilePage() {
             
             if (!levelError) {
               classmatesCount = levelCount || 0
-              console.log(`📊 Class level match (${classLevel}) classmates: ${classmatesCount}`)
-            }
-          }
-        }
-        
-        // Strategy 4: Get all students in the same year (SS2) across all departments
-        if (classmatesCount === 0) {
-          const yearMatch = studentClass.match(/^(JSS[1-3]|SS[1-3])/i)
-          const year = yearMatch ? yearMatch[0].toUpperCase() : ''
-          
-          if (year) {
-            const { count: yearCount, error: yearError } = await supabase
-              .from('profiles')
-              .select('*', { count: 'exact', head: true })
-              .ilike('class', `${year}%`)
-              .eq('role', 'student')
-              .neq('id', userId)
-            
-            if (!yearError) {
-              classmatesCount = yearCount || 0
-              console.log(`📊 Year match (${year}) classmates: ${classmatesCount}`)
             }
           }
         }
@@ -354,7 +322,6 @@ export default function StudentProfilePage() {
         console.log('classmates count query failed:', e)
       }
 
-      // 2. ✅ Get exam performance stats for current term
       let completedExams = 0
       let averageScore = 0
 
@@ -372,7 +339,6 @@ export default function StudentProfilePage() {
             completedExams = attempts.length
             const totalScore = attempts.reduce((sum, a) => sum + (a.percentage || 0), 0)
             averageScore = Math.round(totalScore / attempts.length)
-            console.log(`📊 Exams completed: ${completedExams}, Average: ${averageScore}%`)
           }
         } catch (e) {
           console.log('exam attempts query failed:', e)
@@ -384,14 +350,9 @@ export default function StudentProfilePage() {
         completedExams: completedExams || 0,
         averageScore: averageScore || 0
       })
-      
     } catch (error) {
       console.error('Error loading stats:', error)
-      setStats({
-        classmates: 0,
-        completedExams: 0,
-        averageScore: 0
-      })
+      setStats({ classmates: 0, completedExams: 0, averageScore: 0 })
     }
   }
 
@@ -520,24 +481,26 @@ export default function StudentProfilePage() {
     router.push('/portal')
   }
 
-  const getDisplayName = (): string => {
+  // ✅ Local display name (for UI on this page — full name)
+  const getLocalDisplayName = (): string => {
     if (!profile) return 'Student'
     return profile.display_name || profile.full_name || 'Student'
   }
 
   const getInitials = (): string => {
-    const name = getDisplayName()
+    const name = getLocalDisplayName()
     const parts = name.trim().split(/\s+/)
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase()
     return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase()
   }
 
+  // ✅ FIXED: Uses shared getFirstName helper → "Esther" not "Soga"
   const formatProfileForHeader = () => {
     if (!profile) return undefined
     return {
       id: profile.id,
-      name: getDisplayName(),
-      firstName: getDisplayName().split(' ')[0],
+      name: getDisplayNameFromProfile(profile, 'Student'),
+      firstName: getFirstName(profile),   // ✅ "Esther"
       email: profile.email,
       role: 'student' as const,
       avatar: profile.photo_url || undefined,
@@ -549,21 +512,21 @@ export default function StudentProfilePage() {
     return (
       <>
         <Header onLogout={handleLogout} />
-        <div className="min-h-screen bg-slate-50 pt-20">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 pt-20 transition-colors duration-300">
           <div className="container mx-auto px-4 max-w-4xl">
-            <Skeleton className="h-64 w-full rounded-2xl mb-6" />
-            <Skeleton className="h-96 w-full rounded-2xl" />
+            <Skeleton className="h-64 w-full rounded-2xl mb-6 bg-slate-200 dark:bg-slate-800" />
+            <Skeleton className="h-96 w-full rounded-2xl bg-slate-200 dark:bg-slate-800" />
           </div>
         </div>
       </>
     )
   }
 
-  const displayName = getDisplayName()
+  const displayName = getLocalDisplayName()
   const coverPhotoUrl = profile?.cover_photo_url
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
       <Header user={formatProfileForHeader()} onLogout={handleLogout} />
       
       <div className="flex">
@@ -585,19 +548,24 @@ export default function StudentProfilePage() {
               
               {/* Breadcrumb */}
               <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Link href="/student" className="hover:text-emerald-600">Dashboard</Link>
-                  <ChevronRight className="h-4 w-4" />
-                  <span className="text-foreground font-medium">Profile</span>
+                <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                  <Link href="/student" className="hover:text-emerald-600 dark:hover:text-emerald-400">Dashboard</Link>
+                  <ChevronRight className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                  <span className="text-slate-800 dark:text-slate-200 font-medium">Profile</span>
                 </div>
-                <Button variant="outline" size="sm" onClick={() => router.push('/student')}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => router.push('/student')}
+                  className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                >
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back
                 </Button>
               </div>
 
               {/* Profile Header */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden mb-6">
                 {/* Cover Photo */}
                 <div className="relative h-36 md:h-48 bg-gradient-to-r from-emerald-500 to-teal-500">
                   {coverPhotoUrl && (
@@ -624,7 +592,7 @@ export default function StudentProfilePage() {
                 <div className="px-6 pb-6">
                   <div className="flex flex-col md:flex-row md:items-end gap-4 -mt-12 mb-4">
                     <div className="relative">
-                      <Avatar className="h-24 w-24 md:h-28 md:w-28 ring-4 ring-white shadow-xl">
+                      <Avatar className="h-24 w-24 md:h-28 md:w-28 ring-4 ring-white dark:ring-slate-900 shadow-xl">
                         <AvatarImage src={profile?.photo_url || undefined} key={avatarKey} />
                         <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-500 text-white text-2xl font-bold">
                           {getInitials()}
@@ -632,7 +600,7 @@ export default function StudentProfilePage() {
                       </Avatar>
                       <button
                         onClick={() => avatarInputRef.current?.click()}
-                        className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-emerald-600 text-white shadow-lg hover:bg-emerald-700"
+                        className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
                         disabled={isUploadingAvatar}
                       >
                         {isUploadingAvatar ? <Loader2 className="h-3 w-3 animate-spin" /> : <Camera className="h-3 w-3" />}
@@ -643,19 +611,21 @@ export default function StudentProfilePage() {
                     <div className="flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-4">
                         <div>
-                          <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{displayName}</h1>
+                          <h1 className="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white">
+                            {displayName}
+                          </h1>
                           <div className="flex flex-wrap gap-2 mt-2">
-                            <Badge className="bg-emerald-100 text-emerald-700">
+                            <Badge className="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-0">
                               <GraduationCap className="h-3 w-3 mr-1" />
                               {profile?.class}
                             </Badge>
-                            <Badge variant="outline">
+                            <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
                               <Fingerprint className="h-3 w-3 mr-1" />
                               VIN: {profile?.vin_id}
                             </Badge>
                             {profile?.admission_number && (
-                              <Badge variant="outline" className="bg-amber-50">
-                                <Hash className="h-3 w-3 mr-1 text-amber-600" />
+                              <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400">
+                                <Hash className="h-3 w-3 mr-1" />
                                 {profile.admission_number}
                               </Badge>
                             )}
@@ -663,14 +633,31 @@ export default function StudentProfilePage() {
                         </div>
                         
                         {!isEditing ? (
-                          <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
+                          <Button 
+                            onClick={() => setIsEditing(true)} 
+                            variant="outline" 
+                            size="sm"
+                            className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                          >
                             <Edit3 className="h-4 w-4 mr-2" />
                             Edit Profile
                           </Button>
                         ) : (
                           <div className="flex gap-2">
-                            <Button variant="outline" size="sm" onClick={() => setIsEditing(false)}>Cancel</Button>
-                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveProfile} disabled={saving}>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={() => setIsEditing(false)}
+                              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500" 
+                              onClick={handleSaveProfile} 
+                              disabled={saving}
+                            >
                               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-1" />}
                               Save
                             </Button>
@@ -680,14 +667,14 @@ export default function StudentProfilePage() {
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2 text-sm text-slate-500 mt-1">
+                  <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400 mt-1">
                     <Mail className="h-4 w-4" />
                     <span>{profile?.email}</span>
                   </div>
                 </div>
               </div>
 
-              {/* Stats Cards - 3 cards only */}
+              {/* Stats Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <StatCard 
                   icon={Users} 
@@ -710,30 +697,49 @@ export default function StudentProfilePage() {
               </div>
 
               {/* Personal Info Card */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100">
-                  <h2 className="text-lg font-semibold text-slate-800">Personal Information</h2>
-                  <p className="text-sm text-slate-500">Your personal details and contact information</p>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                  <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-100">Personal Information</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Your personal details and contact information</p>
                 </div>
                 
                 <div className="p-6">
                   {isEditing ? (
                     <div className="space-y-4">
                       <div>
-                        <Label>Full Name</Label>
-                        <Input value={editForm.full_name} onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} />
+                        <Label className="text-slate-700 dark:text-slate-300">Full Name</Label>
+                        <Input 
+                          value={editForm.full_name} 
+                          onChange={(e) => setEditForm({ ...editForm, full_name: e.target.value })} 
+                          className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
                       </div>
                       <div>
-                        <Label>Phone Number</Label>
-                        <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} />
+                        <Label className="text-slate-700 dark:text-slate-300">Phone Number</Label>
+                        <Input 
+                          value={editForm.phone} 
+                          onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} 
+                          className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
                       </div>
                       <div>
-                        <Label>Address</Label>
-                        <Textarea value={editForm.address} onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} rows={2} />
+                        <Label className="text-slate-700 dark:text-slate-300">Address</Label>
+                        <Textarea 
+                          value={editForm.address} 
+                          onChange={(e) => setEditForm({ ...editForm, address: e.target.value })} 
+                          rows={2}
+                          className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                        />
                       </div>
                       <div>
-                        <Label>Bio</Label>
-                        <Textarea value={editForm.bio} onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} rows={3} placeholder="Tell us about yourself..." />
+                        <Label className="text-slate-700 dark:text-slate-300">Bio</Label>
+                        <Textarea 
+                          value={editForm.bio} 
+                          onChange={(e) => setEditForm({ ...editForm, bio: e.target.value })} 
+                          rows={3} 
+                          placeholder="Tell us about yourself..."
+                          className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                        />
                       </div>
                     </div>
                   ) : (
@@ -754,7 +760,6 @@ export default function StudentProfilePage() {
         </div>
       </div>
 
-      {/* Full Screen Viewer */}
       {fullscreenImage && (
         <FullScreenImageViewer
           imageUrl={fullscreenImage.url}
@@ -767,34 +772,36 @@ export default function StudentProfilePage() {
   )
 }
 
-// Helper Components
 function StatCard({ icon: Icon, label, value, color }: { icon: React.ElementType; label: string; value: string; color: string }) {
   const colorClasses = {
-    emerald: "bg-emerald-50 text-emerald-600",
-    amber: "bg-amber-50 text-amber-600",
-    rose: "bg-rose-50 text-rose-600",
+    emerald: "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400",
+    amber: "bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400",
+    rose: "bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400",
   }
   
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 text-center hover:shadow-md transition-shadow">
+    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-4 text-center hover:shadow-md dark:hover:shadow-slate-950/50 transition-shadow">
       <div className={cn("h-10 w-10 rounded-xl flex items-center justify-center mx-auto mb-2", colorClasses[color as keyof typeof colorClasses])}>
         <Icon className="h-5 w-5" />
       </div>
-      <p className="text-2xl font-bold text-slate-800">{value}</p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-2xl font-bold text-slate-800 dark:text-white">{value}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
     </div>
   )
 }
 
 function InfoItem({ icon: Icon, label, value, fullWidth = false }: { icon: React.ElementType; label: string; value: string; fullWidth?: boolean }) {
   return (
-    <div className={cn("flex items-start gap-3 p-3 rounded-xl bg-slate-50", fullWidth && "md:col-span-2")}>
-      <div className="p-1.5 bg-white rounded-lg">
-        <Icon className="h-4 w-4 text-emerald-600" />
+    <div className={cn(
+      "flex items-start gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-100 dark:border-slate-800",
+      fullWidth && "md:col-span-2"
+    )}>
+      <div className="p-1.5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg">
+        <Icon className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
       </div>
       <div className="flex-1">
-        <p className="text-xs text-slate-400">{label}</p>
-        <p className="text-sm font-medium text-slate-700">{value || 'Not provided'}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500">{label}</p>
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{value || 'Not provided'}</p>
       </div>
     </div>
   )
