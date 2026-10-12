@@ -1,4 +1,4 @@
-// app/staff/layout.tsx - COMPLETE FIXED VERSION WITH TERM FILTERING
+// app/staff/layout.tsx - COMPLETE FIXED VERSION WITH TERM FILTERING & DARK MODE
 
 'use client'
 
@@ -153,26 +153,26 @@ export const useStaffContext = () => {
 // ── Loading State ──────────────────────────────────────────────────────────────
 function StaffLoadingState() {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors">
       <div className="text-center">
         <motion.div
           animate={{ rotate: 360 }}
           transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
           className="inline-block"
         >
-          <Briefcase className="h-16 w-16 text-emerald-600" />
+          <Briefcase className="h-16 w-16 text-emerald-600 dark:text-emerald-500" />
         </motion.div>
-        <p className="mt-6 text-slate-700 text-lg font-medium">
+        <p className="mt-6 text-slate-700 dark:text-slate-200 text-lg font-medium">
           Loading Staff Dashboard
         </p>
-        <p className="mt-2 text-slate-500 text-sm">
+        <p className="mt-2 text-slate-500 dark:text-slate-400 text-sm">
           Preparing your teaching workspace
         </p>
         <div className="flex justify-center gap-1.5 mt-6">
           {[0, 1, 2].map((i) => (
             <motion.div
               key={i}
-              className="h-2.5 w-2.5 rounded-full bg-emerald-400"
+              className="h-2.5 w-2.5 rounded-full bg-emerald-400 dark:bg-emerald-500"
               animate={{ y: [0, -12, 0] }}
               transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
             />
@@ -219,18 +219,18 @@ function DesktopTopBar({
   }
 
   return (
-    <header className="h-16 lg:h-20 border-b bg-white flex items-center px-4 lg:px-6 sticky top-0 z-40 shadow-sm">
+    <header className="h-16 lg:h-20 border-b bg-white dark:bg-slate-950 dark:border-slate-800 flex items-center px-4 lg:px-6 sticky top-0 z-40 shadow-sm transition-colors">
       <div className="flex items-center justify-between w-full gap-4">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="hidden sm:flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 flex-shrink-0">
-            <GraduationCap className="h-4 w-4 text-emerald-600" />
+          <div className="hidden sm:flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex-shrink-0">
+            <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-base lg:text-lg font-semibold text-slate-900 truncate">
+            <h1 className="text-base lg:text-lg font-semibold text-slate-900 dark:text-white truncate">
               {getDisplayTitle()}
             </h1>
             {profile?.department && (
-              <p className="text-xs text-muted-foreground truncate hidden sm:block">
+              <p className="text-xs text-muted-foreground dark:text-slate-400 truncate hidden sm:block">
                 {profile.department} Department
               </p>
             )}
@@ -244,9 +244,9 @@ function DesktopTopBar({
             title="Refresh dashboard data"
             className={cn(
               'hidden sm:flex items-center justify-center',
-              'h-9 w-9 rounded-lg border border-gray-200',
-              'text-gray-500 hover:text-emerald-600 hover:border-emerald-300',
-              'hover:bg-emerald-50 transition-all',
+              'h-9 w-9 rounded-lg border border-gray-200 dark:border-slate-700',
+              'text-gray-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 dark:hover:border-emerald-800',
+              'hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all',
               isRefreshing && 'opacity-50 cursor-not-allowed',
             )}
           >
@@ -261,64 +261,64 @@ function DesktopTopBar({
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
-                className="flex items-center gap-2 lg:gap-3 h-9 px-2 lg:px-3"
+                className="flex items-center gap-2 lg:gap-3 h-9 px-2 lg:px-3 hover:bg-slate-100 dark:hover:bg-slate-800"
               >
-                <Avatar className="h-8 w-8 lg:h-9 lg:w-9">
+                <Avatar className="h-8 w-8 lg:h-9 lg:w-9 ring-2 ring-transparent dark:ring-slate-800">
                   <AvatarImage
                     src={profile?.photo_url || profile?.avatar_url || undefined}
                   />
-                  <AvatarFallback className="bg-emerald-100 text-emerald-700 text-xs lg:text-sm">
+                  <AvatarFallback className="bg-emerald-100 dark:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 text-xs lg:text-sm">
                     {getInitials(profile?.full_name || profile?.first_name)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden md:block text-left">
-                  <p className="text-sm font-medium leading-none">
+                  <p className="text-sm font-medium leading-none dark:text-slate-200">
                     {profile?.full_name || 'Staff Member'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
+                  <p className="text-xs text-muted-foreground dark:text-slate-400 mt-0.5">
                     {profile?.email || ''}
                   </p>
                 </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground hidden sm:block" />
+                <ChevronDown className="h-4 w-4 text-muted-foreground dark:text-slate-400 hidden sm:block" />
               </Button>
             </DropdownMenuTrigger>
 
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 dark:bg-slate-900 dark:border-slate-800">
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium">{profile?.full_name}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm font-medium dark:text-slate-200">{profile?.full_name}</p>
+                  <p className="text-xs text-muted-foreground dark:text-slate-400">
                     {profile?.email}
                   </p>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="dark:bg-slate-800" />
               <DropdownMenuItem
                 onClick={() => router.push('/staff/announcements')}
-                className="cursor-pointer"
+                className="cursor-pointer dark:text-slate-300 dark:focus:bg-slate-800"
               >
                 <Megaphone className="mr-2 h-4 w-4" />
                 Announcements
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => router.push('/staff/notifications')}
-                className="cursor-pointer"
+                className="cursor-pointer dark:text-slate-300 dark:focus:bg-slate-800"
               >
                 <Bell className="mr-2 h-4 w-4" />
                 Notifications
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer dark:text-slate-300 dark:focus:bg-slate-800">
                 <User className="mr-2 h-4 w-4" />
                 View Profile
               </DropdownMenuItem>
-              <DropdownMenuItem className="cursor-pointer">
+              <DropdownMenuItem className="cursor-pointer dark:text-slate-300 dark:focus:bg-slate-800">
                 <Settings className="mr-2 h-4 w-4" />
                 Settings
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="dark:bg-slate-800" />
               <DropdownMenuItem
                 onClick={onLogout}
-                className="cursor-pointer text-red-600 focus:text-red-600 focus:bg-red-50"
+                className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30"
               >
                 <LogOut className="mr-2 h-4 w-4" />
                 Sign Out
@@ -354,17 +354,17 @@ function MobileTopBar({
   }
 
   return (
-    <header className="fixed top-0 left-0 right-0 h-[60px] lg:hidden bg-white border-b z-40 flex items-center px-4 shadow-sm">
+    <header className="fixed top-0 left-0 right-0 h-[60px] lg:hidden bg-white dark:bg-slate-950 border-b dark:border-slate-800 z-40 flex items-center px-4 shadow-sm transition-colors">
       <div className="flex items-center gap-3 w-full">
-        <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 flex-shrink-0">
-          <Briefcase className="h-4 w-4 text-emerald-600" />
+        <div className="flex items-center justify-center h-8 w-8 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex-shrink-0">
+          <Briefcase className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
         </div>
 
         <div className="min-w-0 flex-1">
-          <h1 className="font-semibold text-sm text-slate-900">
+          <h1 className="font-semibold text-sm text-slate-900 dark:text-white">
             {getMobileTitle()}
           </h1>
-          <p className="text-[11px] text-muted-foreground truncate">
+          <p className="text-[11px] text-muted-foreground dark:text-slate-400 truncate">
             {profile?.full_name || 'Staff Portal'}
           </p>
         </div>
@@ -374,8 +374,8 @@ function MobileTopBar({
           disabled={isRefreshing}
           className={cn(
             'flex items-center justify-center h-8 w-8 rounded-lg',
-            'text-gray-500 hover:text-emerald-600',
-            'hover:bg-emerald-50 transition-all',
+            'text-gray-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400',
+            'hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all',
             isRefreshing && 'opacity-50',
           )}
         >
@@ -496,7 +496,7 @@ export default function StaffLayout({
         termCode: '',
         sessionYear: '',
       }}>
-        <div className="min-h-screen bg-slate-50">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
           <div className="hidden lg:block">
             <StaffSidebar
               profile={null}
@@ -758,7 +758,7 @@ export default function StaffLayout({
         sessionYear,
       }}
     >
-      <div className="min-h-screen bg-slate-50">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
 
         {/* ── DESKTOP ──────────────────────────────────────────────────────── */}
         <div className="hidden lg:block">

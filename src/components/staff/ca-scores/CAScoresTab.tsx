@@ -1,4 +1,4 @@
-// components/staff/ca-scores/CAScoresTab.tsx - UPDATED WITH ACTIVE STATUS SAFELY ENFORCED
+// components/staff/ca-scores/CAScoresTab.tsx - UPDATED WITH ACTIVE STATUS SAFELY ENFORCED + COMPLETE DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -340,7 +340,6 @@ export function CAScoresTab({ staffProfile }: any) {
   }, [selectedSubject, subjectsStatus])
 
   const loadClasses = useCallback(async () => {
-    // ✅ Exclude inactive students when finding available classes
     const { data } = await supabase.from('profiles').select('class').eq('role', 'student').eq('is_active', true).not('class', 'is', null)
     const unique = [...new Set((data || []).map((d: any) => d.class).filter(Boolean))] as string[]
     const general = ['JSS 1', 'JSS 2', 'JSS 3', 'SS1', 'SS2', 'SS3']
@@ -382,18 +381,16 @@ export function CAScoresTab({ staffProfile }: any) {
     return SUBJECT_NAME_MAPPING[subject] || subject
   }, [])
 
-  // ── LOAD STUDENTS FOR SCORE ENTRY (ONLY ACTIVE STUDENTS) ───────────────────
   const loadAllData = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
     try {
       const classVariations = getClassVariations(selectedClass)
-      // 🚫 CRITICAL: Exclude students who left the school (`.eq('is_active', true)`)
       let q = supabase
         .from('profiles')
         .select('id,full_name,display_name,class,admission_number,vin_id')
         .eq('role', 'student')
-        .eq('is_active', true) // 👈 Hide left students from teacher's entry sheet
+        .eq('is_active', true)
       
       q = classVariations.length > 1 ? q.in('class', classVariations) : q.eq('class', selectedClass)
       const { data: profileData, error: profileError } = await q.order('display_name')
@@ -462,7 +459,6 @@ export function CAScoresTab({ staffProfile }: any) {
     }
   }, [selectedClass, selectedSubject, selectedTerm, selectedYear, isLoadingTerm, getMappedSubject])
 
-  // ── LOAD SCORES FOR VIEW TAB (EXCLUDES DEPARTED INACTIVE RECORDS) ──────────
   const loadScoresForViewTab = useCallback(async () => {
     if (!selectedClass || !selectedSubject || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
@@ -512,12 +508,11 @@ export function CAScoresTab({ staffProfile }: any) {
         const studentIds = Array.from(studentMap.keys())
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('id,full_name,display_name,admission_number,is_active') // 👈 Included active status
+          .select('id,full_name,display_name,admission_number,is_active')
           .in('id', studentIds)
 
         const profileMap = new Map()
         profiles?.forEach((p: any) => {
-          // 🚫 CRITICAL: Exclude records of students who have left the school
           if (p.is_active !== false) {
             profileMap.set(p.id, {
               full_name: p.display_name || p.full_name || 'Unknown',
@@ -528,7 +523,7 @@ export function CAScoresTab({ staffProfile }: any) {
 
         const mergedScores = Array.from(studentMap.values())
         const result = mergedScores
-          .filter((s: any) => profileMap.has(s.student_id)) // 👈 Filter out ex-student records
+          .filter((s: any) => profileMap.has(s.student_id))
           .map((s: any) => ({
             ...s,
             student: profileMap.get(s.student_id)
@@ -1030,15 +1025,15 @@ export function CAScoresTab({ staffProfile }: any) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center space-y-3">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto" />
-          <p className="text-sm text-slate-500">{isLoadingTerm ? 'Loading term settings…' : 'Loading assessment data…'}</p>
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">{isLoadingTerm ? 'Loading term settings…' : 'Loading assessment data…'}</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 transition-colors duration-300">
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Card className="relative overflow-hidden border-0 shadow-sm bg-white dark:bg-slate-900">
@@ -1050,7 +1045,7 @@ export function CAScoresTab({ staffProfile }: any) {
                 <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{stats.totalStudents}</p>
               </div>
               <div className="p-2 rounded-lg bg-emerald-100 dark:bg-slate-800">
-                <Users className="h-5 w-5 text-emerald-600" />
+                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </CardContent>
@@ -1066,7 +1061,7 @@ export function CAScoresTab({ staffProfile }: any) {
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">of {stats.totalStudents}</p>
               </div>
               <div className="p-2 rounded-lg bg-blue-100 dark:bg-slate-800">
-                <GraduationCap className="h-5 w-5 text-blue-600" />
+                <GraduationCap className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </CardContent>
@@ -1081,7 +1076,7 @@ export function CAScoresTab({ staffProfile }: any) {
                 <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{stats.classAverage}%</p>
               </div>
               <div className="p-2 rounded-lg bg-violet-100 dark:bg-slate-800">
-                <TrendingUp className="h-5 w-5 text-violet-600" />
+                <TrendingUp className="h-5 w-5 text-violet-600 dark:text-violet-400" />
               </div>
             </div>
           </CardContent>
@@ -1097,7 +1092,7 @@ export function CAScoresTab({ staffProfile }: any) {
                 <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{stats.passCount} passed · {stats.failCount} failed</p>
               </div>
               <div className="p-2 rounded-lg bg-amber-100 dark:bg-slate-800">
-                <Award className="h-5 w-5 text-amber-600" />
+                <Award className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
             </div>
           </CardContent>
@@ -1108,8 +1103,8 @@ export function CAScoresTab({ staffProfile }: any) {
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-xs text-slate-500 dark:text-slate-400">
         <span className="font-semibold text-slate-600 dark:text-slate-300">Subject status:</span>
         <span className="flex items-center gap-1.5"><Circle className="h-3.5 w-3.5 text-slate-400" />Available</span>
-        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />Entered by you</span>
-        <span className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-red-500" />Locked by another teacher</span>
+        <span className="flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />Entered by you</span>
+        <span className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />Locked by another teacher</span>
       </div>
 
       {/* Configuration Card */}
@@ -1122,7 +1117,13 @@ export function CAScoresTab({ staffProfile }: any) {
               </div>
               <CardTitle className="text-base font-semibold text-slate-800 dark:text-slate-100">Assessment Configuration</CardTitle>
             </div>
-            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={loading || checkingSubjects} className="text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 h-8 px-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleRefresh} 
+              disabled={loading || checkingSubjects} 
+              className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 h-8 px-3"
+            >
               <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', (loading || checkingSubjects) && 'animate-spin')} />
               Refresh
             </Button>
@@ -1134,10 +1135,10 @@ export function CAScoresTab({ staffProfile }: any) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Class</Label>
               <Select value={selectedClass} onValueChange={handleClassChange}>
-                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-200">
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   {classes.map(cls => (
                     <SelectItem key={`class-${cls}`} value={cls}>
                       {isGeneralClass(cls) ?
@@ -1159,15 +1160,15 @@ export function CAScoresTab({ staffProfile }: any) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Subject</Label>
               <Select value={selectedSubject} onValueChange={handleSubjectChange}>
-                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-200">
                   <SelectValue placeholder="Select subject">
                     {selectedSubject && (
                       <div className="flex items-center justify-between w-full gap-2">
                         <span className="truncate">{getMappedSubject(selectedSubject)}</span>
                         {subjectsStatus[selectedSubject]?.enteredByOther ? (
-                          <span className="flex items-center gap-1 text-red-500 text-xs font-medium"><Lock className="h-3.5 w-3.5" />Locked</span>
+                          <span className="flex items-center gap-1 text-red-500 dark:text-red-400 text-xs font-medium"><Lock className="h-3.5 w-3.5" />Locked</span>
                         ) : subjectsStatus[selectedSubject]?.enteredByMe ? (
-                          <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium"><CheckCircle2 className="h-3.5 w-3.5" />You</span>
+                          <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium"><CheckCircle2 className="h-3.5 w-3.5" />You</span>
                         ) : (
                           <span className="flex items-center gap-1 text-slate-400 text-xs"><Circle className="h-3.5 w-3.5" />Open</span>
                         )}
@@ -1175,9 +1176,9 @@ export function CAScoresTab({ staffProfile }: any) {
                     )}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   {checkingSubjects ? (
-                    <div className="flex items-center gap-2 py-4 px-3 text-sm text-slate-500">
+                    <div className="flex items-center gap-2 py-4 px-3 text-sm text-slate-500 dark:text-slate-400">
                       <Loader2 className="h-4 w-4 animate-spin" />Checking…
                     </div>
                   ) : (
@@ -1186,9 +1187,9 @@ export function CAScoresTab({ staffProfile }: any) {
                         <div className="flex items-center justify-between w-full gap-3">
                           <span>{getMappedSubject(sub)}</span>
                           {subjectsStatus[sub]?.enteredByOther ? (
-                            <Lock className="h-3.5 w-3.5 text-red-500" />
+                            <Lock className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
                           ) : subjectsStatus[sub]?.enteredByMe ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
                           ) : (
                             <Circle className="h-3.5 w-3.5 text-slate-400" />
                           )}
@@ -1200,7 +1201,7 @@ export function CAScoresTab({ staffProfile }: any) {
               </Select>
               {isLocked && selectedSubject && (
                 <div className="flex items-start gap-2 p-2 bg-red-50 dark:bg-red-950/30 rounded-md border border-red-200 dark:border-red-800/50 text-xs">
-                  <Lock className="h-3.5 w-3.5 text-red-500 mt-0.5 flex-shrink-0" />
+                  <Lock className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="font-semibold text-red-700 dark:text-red-400">Locked</p>
                     <p className="text-red-600 dark:text-red-500">{subjectsStatus[selectedSubject]?.otherTeacherName || 'Another teacher'} has entered scores.</p>
@@ -1213,10 +1214,10 @@ export function CAScoresTab({ staffProfile }: any) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Examination</Label>
               <Select value={selectedExamId} onValueChange={handleExamChange} disabled={skipExam || isLocked}>
-                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-200">
                   <SelectValue placeholder={skipExam ? 'Skipped (CA only)' : 'Select exam'} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   {availableExams.length === 0 ? (
                     <div className="px-3 py-2 text-sm text-slate-400">No exams available</div>
                   ) : (
@@ -1234,7 +1235,7 @@ export function CAScoresTab({ staffProfile }: any) {
                       'text-xs px-2 py-0.5 rounded border transition-colors',
                       skipExam ?
                         'bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700' :
-                        'text-slate-500 border-slate-200 hover:border-slate-300 dark:border-slate-700 dark:hover:border-slate-600'
+                        'text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
                     )}
                   >
                     {skipExam ? '✓ CA Only' : 'Skip exam'}
@@ -1242,7 +1243,7 @@ export function CAScoresTab({ staffProfile }: any) {
                   {skipExam && (
                     <button
                       onClick={() => { setSkipExam(false); if (availableExams.length > 0) setSelectedExamId(availableExams[0].id) }}
-                      className="text-xs px-2 py-0.5 rounded border border-slate-200 text-slate-400 hover:text-slate-600 dark:border-slate-700 transition-colors"
+                      className="text-xs px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                     >
                       Cancel
                     </button>
@@ -1255,7 +1256,7 @@ export function CAScoresTab({ staffProfile }: any) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Term</Label>
               <Select value={selectedTerm} onValueChange={handleTermChange}>
-                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-200">
                   <SelectValue placeholder="Select term">
                     {selectedTerm && (
                       <span className="font-medium text-emerald-600 dark:text-emerald-400">
@@ -1264,7 +1265,7 @@ export function CAScoresTab({ staffProfile }: any) {
                     )}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   {termOptions.length > 0 ? (
                     termOptions.map((o, index) => (
                       <SelectItem key={`term-opt-${o.value}-${index}`} value={o.value}>
@@ -1285,10 +1286,10 @@ export function CAScoresTab({ staffProfile }: any) {
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Session</Label>
               <Select value={selectedYear} onValueChange={handleYearChange}>
-                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm">
+                <SelectTrigger className="h-9 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-200">
                   <SelectValue placeholder="Select session" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   {availableSessions.length > 0 ? (
                     availableSessions.map((session, index) => (
                       <SelectItem key={`session-opt-${session}-${index}`} value={session}>
@@ -1321,7 +1322,7 @@ export function CAScoresTab({ staffProfile }: any) {
                 disabled={autoFetching || students.length === 0}
                 variant="outline"
                 size="sm"
-                className="h-9"
+                className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 <RefreshCw className={cn('h-4 w-4 mr-2', autoFetching && 'animate-spin')} />
                 Auto-Fetch Exam Scores
@@ -1343,10 +1344,16 @@ export function CAScoresTab({ staffProfile }: any) {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-10 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg w-auto inline-flex">
-          <TabsTrigger value="entry" className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 px-4">
+          <TabsTrigger 
+            value="entry" 
+            className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm text-slate-600 dark:text-slate-400 data-[state=active]:text-slate-800 dark:data-[state=active]:text-slate-100 px-4"
+          >
             <FileText className="h-4 w-4" />Score Entry
           </TabsTrigger>
-          <TabsTrigger value="view" className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white data-[state=active]:shadow-sm dark:data-[state=active]:bg-slate-900 px-4">
+          <TabsTrigger 
+            value="view" 
+            className="flex items-center gap-2 text-sm rounded-md data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:shadow-sm text-slate-600 dark:text-slate-400 data-[state=active]:text-slate-800 dark:data-[state=active]:text-slate-100 px-4"
+          >
             <BarChart3 className="h-4 w-4" />View Scores
             {caScores.length > 0 && (
               <span className="ml-1 bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-1.5 py-0.5 rounded-full">
@@ -1367,10 +1374,15 @@ export function CAScoresTab({ staffProfile }: any) {
                 <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                   <strong>{getMappedSubject(selectedSubject)}</strong> scores for <strong>{selectedClass}</strong> were entered by <strong>{subjectsStatus[selectedSubject]?.otherTeacherName || 'another teacher'}</strong>.
                 </p>
-                <Button variant="outline" size="sm" className="mt-5" onClick={() => {
-                  const avail = subjects.find(s => !subjectsStatus[s]?.enteredByOther && s !== selectedSubject)
-                  avail ? setSelectedSubject(avail) : toast.info('All subjects have scores entered.')
-                }}>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="mt-5 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  onClick={() => {
+                    const avail = subjects.find(s => !subjectsStatus[s]?.enteredByOther && s !== selectedSubject)
+                    avail ? setSelectedSubject(avail) : toast.info('All subjects have scores entered.')
+                  }}
+                >
                   Switch to Available Subject <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </CardContent>
@@ -1378,17 +1390,17 @@ export function CAScoresTab({ staffProfile }: any) {
           ) : loading ? (
             <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="text-center py-16">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
-                <p className="text-sm text-slate-500">Loading students…</p>
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto mb-3" />
+                <p className="text-sm text-slate-500 dark:text-slate-400">Loading students…</p>
               </CardContent>
             </Card>
           ) : students.length === 0 ? (
             <Card className="border-0 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="text-center py-16">
                 <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
-                  <Users className="h-10 w-10 text-slate-400" />
+                  <Users className="h-10 w-10 text-slate-400 dark:text-slate-500" />
                 </div>
-                <p className="text-sm text-slate-500">No active students found in <strong>{selectedClass}</strong></p>
+                <p className="text-sm text-slate-500 dark:text-slate-400">No active students found in <strong>{selectedClass}</strong></p>
               </CardContent>
             </Card>
           ) : (
@@ -1398,7 +1410,9 @@ export function CAScoresTab({ staffProfile }: any) {
                   <div className="flex items-center gap-2">
                     <BookOpen className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                     <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">{cls}</span>
-                    <Badge variant="secondary" className="text-xs font-medium ml-1">{groupedStudents[cls].length} students</Badge>
+                    <Badge variant="secondary" className="text-xs font-medium ml-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                      {groupedStudents[cls].length} students
+                    </Badge>
                   </div>
                   <div className="text-xs text-slate-400 dark:text-slate-500">CA1 /20 · CA2 /20 · Exam /60</div>
                 </div>
@@ -1433,7 +1447,7 @@ export function CAScoresTab({ staffProfile }: any) {
                             <TableCell className="pl-5 py-2.5">
                               <div>
                                 <p className="font-medium text-sm text-slate-800 dark:text-slate-200">{student.full_name}</p>
-                                <p className="text-xs text-slate-400 font-mono mt-0.5">{student.admission_number}</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 font-mono mt-0.5">{student.admission_number}</p>
                               </div>
                             </TableCell>
                             <TableCell className="text-center py-2.5">
@@ -1443,7 +1457,7 @@ export function CAScoresTab({ staffProfile }: any) {
                                 max="20"
                                 value={entry.ca1}
                                 onChange={e => handleScoreChange(student.id, 'ca1', e.target.value)}
-                                className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500"
+                                className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus-visible:ring-emerald-500"
                                 placeholder="0"
                                 disabled={isLocked}
                               />
@@ -1455,7 +1469,7 @@ export function CAScoresTab({ staffProfile }: any) {
                                 max="20"
                                 value={entry.ca2}
                                 onChange={e => handleScoreChange(student.id, 'ca2', e.target.value)}
-                                className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500"
+                                className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus-visible:ring-emerald-500"
                                 placeholder="0"
                                 disabled={isLocked}
                               />
@@ -1470,7 +1484,7 @@ export function CAScoresTab({ staffProfile }: any) {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => handleAutoFetchSingle(student.id)}
-                                  className="h-8 w-20 mx-auto text-xs text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                                  className="h-8 w-20 mx-auto text-xs text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
                                 >
                                   <RefreshCw className="h-3 w-3 mr-1" />Load
                                 </Button>
@@ -1481,7 +1495,7 @@ export function CAScoresTab({ staffProfile }: any) {
                                   max="60"
                                   value={entry.exam}
                                   onChange={e => handleScoreChange(student.id, 'exam', e.target.value)}
-                                  className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 focus-visible:ring-emerald-500"
+                                  className="w-20 h-8 text-center mx-auto text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus-visible:ring-emerald-500"
                                   placeholder="0"
                                   disabled={isLocked}
                                 />
@@ -1507,7 +1521,7 @@ export function CAScoresTab({ staffProfile }: any) {
                                 disabled={saving || isLocked}
                                 className={cn(
                                   'h-8 px-3 text-xs gap-1.5 rounded-md transition-colors',
-                                  isSaved ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                                  isSaved ? 'text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                                 )}
                               >
                                 {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isSaved ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Save className="h-3.5 w-3.5" />}
@@ -1547,10 +1561,16 @@ export function CAScoresTab({ staffProfile }: any) {
                       placeholder="Search students…"
                       value={searchQuery}
                       onChange={e => setSearchQuery(e.target.value)}
-                      className="pl-8 h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                      className="pl-8 h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
-                  <Button variant="outline" size="sm" onClick={loadScoresForViewTab} disabled={loading} className="h-9 w-9 p-0">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={loadScoresForViewTab} 
+                    disabled={loading} 
+                    className="h-9 w-9 p-0 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
                     <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
                   </Button>
                 </div>
@@ -1559,17 +1579,23 @@ export function CAScoresTab({ staffProfile }: any) {
             <CardContent className="p-0">
               {loading ? (
                 <div className="text-center py-16">
-                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-3" />
-                  <p className="text-sm text-slate-500">Loading scores…</p>
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto mb-3" />
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Loading scores…</p>
                 </div>
               ) : caScores.length === 0 ? (
                 <div className="text-center py-16">
                   <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
-                    <FileText className="h-10 w-10 text-slate-400" />
+                    <FileText className="h-10 w-10 text-slate-400 dark:text-slate-500" />
                   </div>
                   <p className="text-sm font-medium text-slate-600 dark:text-slate-400">No scores published yet</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500 mt-1 mb-5">Enter scores and save them to see them here.</p>
-                  <Button variant="outline" size="sm" onClick={() => setActiveTab('entry')} disabled={isLocked}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setActiveTab('entry')} 
+                    disabled={isLocked}
+                    className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
                     Go to Score Entry <ChevronRight className="h-4 w-4 ml-1" />
                   </Button>
                 </div>
@@ -1607,7 +1633,7 @@ export function CAScoresTab({ staffProfile }: any) {
                             <TableCell className="pl-5 py-3 font-medium text-sm text-slate-800 dark:text-slate-200">
                               <div className="flex items-center gap-1.5">
                                 {name}
-                                {!isOwn && <Lock className="h-3 w-3 text-red-400 flex-shrink-0" />}
+                                {!isOwn && <Lock className="h-3 w-3 text-red-400 dark:text-red-500 flex-shrink-0" />}
                               </div>
                             </TableCell>
                             <TableCell className="text-center text-xs font-mono text-slate-500 dark:text-slate-400">{adm}</TableCell>
@@ -1621,8 +1647,8 @@ export function CAScoresTab({ staffProfile }: any) {
                             </TableCell>
                             <TableCell className="text-center">
                               {isOwn ? (
-                                <Badge variant="secondary" className="text-xs gap-1">
-                                  <CheckCircle2 className="h-3 w-3 text-emerald-500" />You
+                                <Badge variant="secondary" className="text-xs gap-1 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                                  <CheckCircle2 className="h-3 w-3 text-emerald-500 dark:text-emerald-400" />You
                                 </Badge>
                               ) : (
                                 <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs gap-1">
@@ -1688,11 +1714,11 @@ export function CAScoresTab({ staffProfile }: any) {
               <div className="space-y-3 pl-11">
                 <div className="flex flex-wrap gap-1.5">
                   {[selectedClass, getMappedSubject(selectedSubject), getTermLabel(selectedTerm), selectedYear].map((v, i) => v && (
-                    <Badge key={`delete-badge-${i}`} variant="secondary" className="text-xs font-medium">{v}</Badge>
+                    <Badge key={`delete-badge-${i}`} variant="secondary" className="text-xs font-medium bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">{v}</Badge>
                   ))}
                 </div>
                 <div className="flex items-center gap-2 p-2.5 bg-red-50 dark:bg-red-950/30 rounded-lg border border-red-200 dark:border-red-800/50">
-                  <Database className="h-4 w-4 text-red-500 flex-shrink-0" />
+                  <Database className="h-4 w-4 text-red-500 dark:text-red-400 flex-shrink-0" />
                   <span className="text-sm font-semibold text-red-700 dark:text-red-400">{caScores.length} record{caScores.length !== 1 ? 's' : ''} will be permanently deleted</span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">This action cannot be undone.</p>
@@ -1700,8 +1726,19 @@ export function CAScoresTab({ staffProfile }: any) {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 mt-2">
-            <Button variant="outline" onClick={() => setShowDeleteAllDialog(false)} disabled={isDeletingAll} className="h-9">Cancel</Button>
-            <Button onClick={handleDeleteAllScores} disabled={isDeletingAll} className="bg-red-600 hover:bg-red-700 text-white h-9 gap-1.5">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteAllDialog(false)} 
+              disabled={isDeletingAll} 
+              className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleDeleteAllScores} 
+              disabled={isDeletingAll} 
+              className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white h-9 gap-1.5"
+            >
               {isDeletingAll ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash className="h-4 w-4" />}
               Delete Permanently
             </Button>
@@ -1714,17 +1751,17 @@ export function CAScoresTab({ staffProfile }: any) {
         <DialogContent className="max-w-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-              <Loader2 className="h-4 w-4 animate-spin text-red-500" />Deleting scores…
+              <Loader2 className="h-4 w-4 animate-spin text-red-500 dark:text-red-400" />Deleting scores…
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-2 pt-1">
             <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
               <div 
-                className="bg-red-600 h-2 rounded-full transition-all duration-300"
+                className="bg-red-600 dark:bg-red-500 h-2 rounded-full transition-all duration-300"
                 style={{ width: `${deleteProgress}%` }}
               />
             </div>
-            <p className="text-right text-xs text-slate-500">{deleteProgress}%</p>
+            <p className="text-right text-xs text-slate-500 dark:text-slate-400">{deleteProgress}%</p>
           </div>
         </DialogContent>
       </Dialog>
@@ -1740,25 +1777,25 @@ export function CAScoresTab({ staffProfile }: any) {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">CA1 /20</Label>
+                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">CA1 /20</Label>
                   <Input
                     type="number"
                     min="0"
                     max="20"
                     value={editingScore.ca1_score || 0}
                     onChange={e => setEditingScore({ ...editingScore, ca1_score: parseInt(e.target.value) || 0 })}
-                    className="h-9 text-center text-sm"
+                    className="h-9 text-center text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs font-semibold text-slate-500 uppercase tracking-wide">CA2 /20</Label>
+                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">CA2 /20</Label>
                   <Input
                     type="number"
                     min="0"
                     max="20"
                     value={editingScore.ca2_score || 0}
                     onChange={e => setEditingScore({ ...editingScore, ca2_score: parseInt(e.target.value) || 0 })}
-                    className="h-9 text-center text-sm"
+                    className="h-9 text-center text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200"
                   />
                 </div>
               </div>
@@ -1771,10 +1808,17 @@ export function CAScoresTab({ staffProfile }: any) {
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" size="sm" onClick={() => setShowEditDialog(false)}>Cancel</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => setShowEditDialog(false)}
+              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              Cancel
+            </Button>
             <Button
               size="sm"
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white"
               onClick={async () => {
                 if (!editingScore) return
                 const ca1 = sanitizeNum(editingScore.ca1_score)

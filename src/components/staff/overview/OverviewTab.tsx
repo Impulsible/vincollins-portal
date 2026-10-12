@@ -1,5 +1,5 @@
 // ============================================
-// OVERVIEW TAB COMPONENT - FIXED
+// OVERVIEW TAB COMPONENT - FIXED WITH DARK MODE
 // ============================================
 
 'use client'
@@ -73,7 +73,7 @@ export function OverviewTab({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       transition={{ duration: 0.2 }}
-      className="space-y-6 sm:space-y-8 lg:space-y-10"
+      className="space-y-6 sm:space-y-8 lg:space-y-10 transition-colors duration-300"
     >
       <StaffWelcomeBanner 
         profile={profile} 

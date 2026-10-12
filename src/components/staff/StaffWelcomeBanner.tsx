@@ -3,9 +3,18 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { 
-  GraduationCap, Quote, Calendar, Flame, 
-  Clock, CheckCircle2, Users, Award, Sparkles, Timer, Globe2
+import {
+  GraduationCap,
+  Quote,
+  Calendar,
+  Flame,
+  Clock,
+  CheckCircle2,
+  Users,
+  Award,
+  Sparkles,
+  Timer,
+  Globe2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -51,7 +60,6 @@ interface StaffWelcomeBannerProps {
 
 const STORAGE_KEY = 'staff_session_start'
 
-// Nigerian Language Pack — Greetings + Culturally Relevant Quotes
 interface LanguagePack {
   language: string
   flag: string
@@ -77,8 +85,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'A good teacher is like a candle — it consumes itself to light the way for others.',
       translation: '',
-      author: 'Mustafa Kemal Atatürk'
-    }
+      author: 'Mustafa Kemal Atatürk',
+    },
   },
   {
     language: 'Yoruba',
@@ -90,8 +98,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Bí a bá ń gun igi, à máa wo ìsàlẹ̀.',
       translation: 'When climbing a tree, always look down to maintain balance.',
-      author: 'Yoruba Proverb'
-    }
+      author: 'Yoruba Proverb',
+    },
   },
   {
     language: 'Igbo',
@@ -103,8 +111,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Onye kwe, Chi ya ekwe.',
       translation: 'If one agrees, their personal god agrees too.',
-      author: 'Igbo Proverb'
-    }
+      author: 'Igbo Proverb',
+    },
   },
   {
     language: 'Hausa',
@@ -116,8 +124,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Ilimi gishirin zuciya ne.',
       translation: 'Knowledge is the salt of the mind.',
-      author: 'Hausa Proverb'
-    }
+      author: 'Hausa Proverb',
+    },
   },
   {
     language: 'Pidgin',
@@ -125,12 +133,12 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     morning: 'How body this morning?',
     afternoon: 'How afternoon dey go?',
     evening: 'How evening dey run?',
-    emoji: '🤜🏾',
+    emoji: ' tip',
     quote: {
       text: 'No condition is permanent, better days dey come.',
       translation: 'Nothing lasts forever; better days are ahead.',
-      author: 'Nigerian Street Wisdom'
-    }
+      author: 'Nigerian Street Wisdom',
+    },
   },
   {
     language: 'Efik/Ibibio',
@@ -142,8 +150,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Ifiọk edi inyene oro owo mîkemeke ndibô.',
       translation: 'Wisdom is a wealth that cannot be stolen.',
-      author: 'Efik Proverb'
-    }
+      author: 'Efik Proverb',
+    },
   },
   {
     language: 'Edo (Bini)',
@@ -155,8 +163,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Ẹbẹ ne ọ yan ne ọ gha ló.',
       translation: 'What is written on your palm, you will experience in life.',
-      author: 'Benin (Edo) Proverb'
-    }
+      author: 'Benin (Edo) Proverb',
+    },
   },
   {
     language: 'Fulfulde (Fulani)',
@@ -168,8 +176,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Ganndal ɓuri jawdi.',
       translation: 'Knowledge is better than wealth.',
-      author: 'Fulfulde Proverb'
-    }
+      author: 'Fulfulde Proverb',
+    },
   },
   {
     language: 'Tiv',
@@ -181,8 +189,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Fan kwagh ka ngu i i vihi ga.',
       translation: 'Wisdom is something that never spoils.',
-      author: 'Tiv Proverb'
-    }
+      author: 'Tiv Proverb',
+    },
   },
   {
     language: 'Nupe',
@@ -194,8 +202,8 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Agbara kpata zhi efo gan.',
       translation: 'Patience is the key to a peaceful life.',
-      author: 'Nupe Proverb'
-    }
+      author: 'Nupe Proverb',
+    },
   },
   {
     language: 'Kanuri',
@@ -207,12 +215,12 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Karangenyi ye tanda-ro.',
       translation: 'Learning has no end.',
-      author: 'Kanuri Proverb'
-    }
+      author: 'Kanuri Proverb',
+    },
   },
   {
     language: 'Ijaw',
-    flag: '🚣🏾',
+    flag: '🛶',
     morning: 'Ebi mienemi',
     afternoon: 'Ebi mien seimi',
     evening: 'Ebi mien koromo',
@@ -220,18 +228,37 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     quote: {
       text: 'Beni oyinbo kiri timi ye ye.',
       translation: 'The one who knows the river never drowns.',
-      author: 'Ijaw Proverb'
-    }
-  }
+      author: 'Ijaw Proverb',
+    },
+  },
 ]
 
-export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWelcomeBannerProps) {
-  const [currentTime, setCurrentTime] = useState<Date>(new Date())
-  const [sessionStart, setSessionStart] = useState<Date | null>(null)
-  const [langIndex, setLangIndex] = useState<number>(0)
+function formatSessionDuration(totalSeconds: number): string {
+  const h = Math.floor(totalSeconds / 3600)
+  const m = Math.floor((totalSeconds % 3600) / 60)
+  const s = totalSeconds % 60
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`
+  if (m > 0) return `${m}m ${String(s).padStart(2, '0')}s`
+  return `${s}s`
+}
 
-  // Track session timer & dynamic clock
+export default function StaffWelcomeBanner({
+  profile,
+  stats,
+  termInfo,
+}: StaffWelcomeBannerProps) {
+  const [mounted, setMounted] = useState(false)
+  const [currentTime, setCurrentTime] = useState<Date | null>(null)
+  const [sessionStart, setSessionStart] = useState<Date | null>(null)
+  const [langIndex, setLangIndex] = useState(0)
+  const [avatarError, setAvatarError] = useState(false)
+  const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
+
+  // Session timer + clock
   useEffect(() => {
+    setMounted(true)
+    setCurrentTime(new Date())
+
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
       setSessionStart(new Date(stored))
@@ -245,163 +272,261 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
     return () => clearInterval(timer)
   }, [])
 
-  // Rotate through Nigerian languages every 6 seconds
+  // Respect reduced motion
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
+    setPrefersReducedMotion(mq.matches)
+    const onChange = (e: MediaQueryListEvent) => setPrefersReducedMotion(e.matches)
+    mq.addEventListener?.('change', onChange)
+    return () => mq.removeEventListener?.('change', onChange)
+  }, [])
+
+  // Language rotator (paused if reduced motion)
+  useEffect(() => {
+    if (prefersReducedMotion) return
     const rotator = setInterval(() => {
       setLangIndex((prev) => (prev + 1) % NIGERIAN_LANGUAGES.length)
     }, 6000)
     return () => clearInterval(rotator)
-  }, [])
+  }, [prefersReducedMotion])
 
-  // Clear session on page close
+  // Clear session only on explicit staff logout (not every refresh)
   useEffect(() => {
-    const handleClear = () => localStorage.removeItem(STORAGE_KEY)
-    window.addEventListener('beforeunload', handleClear)
-    return () => window.removeEventListener('beforeunload', handleClear)
+    const handleLogout = () => {
+      localStorage.removeItem(STORAGE_KEY)
+      setSessionStart(null)
+    }
+    window.addEventListener('staff-logout', handleLogout)
+    return () => window.removeEventListener('staff-logout', handleLogout)
   }, [])
 
-  // Current Active Language Pack
   const activeLang = NIGERIAN_LANGUAGES[langIndex]
 
-  // Match time of day to proper greeting phrase
   const currentGreeting = useMemo(() => {
+    if (!currentTime) {
+      return { phrase: 'Welcome', language: 'English', emoji: '👋', flag: '🇳🇬' }
+    }
     const hour = currentTime.getHours()
     let phrase = activeLang.morning
     if (hour >= 12 && hour < 17) phrase = activeLang.afternoon
     if (hour >= 17) phrase = activeLang.evening
-
     return {
       phrase,
       language: activeLang.language,
       flag: activeLang.flag,
-      emoji: activeLang.emoji
+      emoji: activeLang.emoji,
     }
   }, [currentTime, activeLang])
 
-  const firstName = (profile?.full_name || profile?.name || 'Teacher').split(' ')[0]
+  const subtitle = useMemo(() => {
+    if (!currentTime) return 'Welcome back.'
+    const hour = currentTime.getHours()
+    if (hour < 12) return 'Ready to inspire your students today?'
+    if (hour < 17) return 'Keep up the great work with your classes.'
+    if (hour < 21) return 'Wrap up grading and plan for tomorrow.'
+    return 'Rest well — your students need you sharp tomorrow.'
+  }, [currentTime])
+
+  // Staff names are typically "First Last" (unlike student SURNAME FIRST)
+  const firstName = (profile?.full_name || profile?.name || 'Teacher').trim().split(/\s+/)[0]
 
   const getInitials = (): string => {
     const fullName = profile?.full_name || profile?.name || ''
     if (!fullName) return 'ST'
-    const names = fullName.split(' ')
+    const names = fullName.trim().split(/\s+/)
     return names.length >= 2
       ? (names[0][0] + names[names.length - 1][0]).toUpperCase()
       : fullName.slice(0, 2).toUpperCase()
   }
 
   const formattedDate = useMemo(() => {
+    if (!currentTime) return ''
     return currentTime.toLocaleDateString('en-NG', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     })
   }, [currentTime])
 
   const formattedTime = useMemo(() => {
-    return currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    if (!currentTime) return ''
+    return currentTime.toLocaleTimeString([], {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    })
   }, [currentTime])
 
-  const onlineDuration = useMemo(() => {
-    if (!sessionStart) return '00:00:00'
-    const diffMs = currentTime.getTime() - sessionStart.getTime()
-    const totalSeconds = Math.floor(diffMs / 1000)
-    const h = String(Math.floor(totalSeconds / 3600)).padStart(2, '0')
-    const m = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0')
-    const s = String(totalSeconds % 60).padStart(2, '0')
-    return `${h}:${m}:${s}`
+  const sessionLabel = useMemo(() => {
+    if (!currentTime || !sessionStart) return 'Session 0s'
+    const totalSeconds = Math.max(
+      0,
+      Math.floor((currentTime.getTime() - sessionStart.getTime()) / 1000)
+    )
+    return `Session ${formatSessionDuration(totalSeconds)}`
   }, [currentTime, sessionStart])
 
   const pendingGrading = stats?.pendingGrading || 0
-  const weekDisplay = termInfo?.displayWeek || (termInfo ? `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}` : '')
-  const roleDisplay = profile?.role === 'admin' ? 'Administrator' : profile?.role === 'staff' || profile?.role === 'teacher' ? 'Teacher' : profile?.role || 'Staff'
+  const publishedExams = stats?.publishedExams || 0
+  const activeStudents = stats?.activeStudents || stats?.totalStudents || 0
+  const averagePerformance = stats?.averagePerformance || 0
+  const hasPerformance = averagePerformance > 0
+
+  const weekDisplay =
+    termInfo?.displayWeek ||
+    (termInfo ? `Week ${termInfo.currentWeek}/${termInfo.totalWeeks}` : '')
+
+  const roleDisplay =
+    profile?.role === 'admin'
+      ? 'Administrator'
+      : profile?.role === 'staff' || profile?.role === 'teacher'
+        ? 'Teacher'
+        : profile?.role || 'Staff'
+
+  const avatarUrl = profile?.photo_url || profile?.avatar_url || undefined
+
+  const cycleLanguage = () => {
+    setLangIndex((prev) => (prev + 1) % NIGERIAN_LANGUAGES.length)
+  }
+
+  if (!mounted || !currentTime) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-4 sm:p-6 md:p-8 shadow-2xl mb-6 sm:mb-8 border border-slate-800">
+        <div className="h-[260px] sm:h-[300px] animate-pulse bg-white/5 rounded-xl" />
+      </div>
+    )
+  }
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -20 }}
+      initial={prefersReducedMotion ? false : { opacity: 0, y: -12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
+      transition={{ duration: 0.4 }}
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 p-4 sm:p-5 md:p-6 lg:p-8 text-white shadow-2xl mb-6 sm:mb-8 border border-slate-800"
       suppressHydrationWarning
     >
-      {/* Background Neon Glow Accents */}
-      <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-3xl" />
+      {/* Background glows */}
+      <div className="absolute top-0 right-0 w-72 h-72 bg-gradient-to-br from-blue-500/10 to-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-56 h-56 bg-gradient-to-tr from-emerald-500/10 to-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
       <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 sm:gap-6">
-        <div className="flex-1 w-full">
-          {/* Top Info Badges Row */}
-          <div className="flex flex-wrap items-center gap-2 mb-3 sm:mb-4">
-            <span className="text-sm font-medium bg-white/10 dark:bg-white/5 px-3 py-1 rounded-full backdrop-blur-sm text-slate-200 border border-white/10">
+        <div className="flex-1 w-full min-w-0">
+          {/* Meta chips */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-3 sm:mb-4">
+            <span className="text-[11px] sm:text-xs font-medium bg-white/10 px-2.5 sm:px-3 py-1 rounded-full backdrop-blur-sm text-slate-200 border border-white/10">
               {formattedDate}
             </span>
-            <span className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium bg-blue-500/10 px-3 py-1 rounded-full text-blue-300 border border-blue-500/20">
-              <Clock className="h-3.5 w-3.5" />
+            <span className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-medium bg-blue-500/10 px-2.5 sm:px-3 py-1 rounded-full text-blue-300 border border-blue-500/20">
+              <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
               {formattedTime}
             </span>
-            <span className="inline-flex items-center gap-1.5 font-mono text-xs sm:text-sm font-medium bg-white/5 px-3 py-1 rounded-full text-indigo-300 border border-white/5">
-              <Timer className="h-3.5 w-3.5" />
-              {onlineDuration}
+            {/* Labeled — no longer looks like a second clock */}
+            <span
+              className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-medium bg-white/5 px-2.5 sm:px-3 py-1 rounded-full text-indigo-300 border border-white/5"
+              title="How long you've been in this session"
+            >
+              <Timer className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
+              {sessionLabel}
             </span>
             {weekDisplay && (
-              <span className="inline-flex items-center gap-1 text-xs sm:text-sm font-medium bg-amber-500/10 px-3 py-1 rounded-full text-amber-300 border border-amber-500/20">
-                <Calendar className="h-3.5 w-3.5" />
+              <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-medium bg-amber-500/10 px-2.5 sm:px-3 py-1 rounded-full text-amber-300 border border-amber-500/20">
+                <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
                 {weekDisplay}
               </span>
             )}
           </div>
 
-          {/* Dynamic Multi-Language Greeting */}
-          <div className="min-h-[50px] sm:min-h-[60px] flex flex-col justify-center mb-3">
-            <AnimatePresence mode="wait">
+          {/* Greeting + mobile avatar — fixed min-height kills layout jump */}
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div className="min-w-0 flex-1 min-h-[56px] sm:min-h-[64px] flex flex-col justify-center">
+              <AnimatePresence mode="popLayout">
+                <motion.div
+                  key={langIndex}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="flex items-center flex-wrap gap-2"
+                  aria-live="polite"
+                >
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight text-white leading-snug">
+                    <span>{currentGreeting.phrase}</span>,{' '}
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-amber-200">
+                      {firstName}
+                    </span>
+                    {/* Smaller emoji — no bounce (was causing visual noise) */}
+                    <span className="ml-1.5 inline-block text-lg sm:text-xl">
+                      {currentGreeting.emoji}
+                    </span>
+                  </h1>
+
+                  <button
+                    type="button"
+                    onClick={cycleLanguage}
+                    className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-semibold tracking-wider uppercase text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md hover:bg-blue-500/20 transition-colors shrink-0"
+                    title="Tap to switch language"
+                  >
+                    <Globe2 className="h-3 w-3" />
+                    {currentGreeting.language}
+                  </button>
+                </motion.div>
+              </AnimatePresence>
+            </div>
+
+            {/* Mobile avatar */}
+            <div className="sm:hidden shrink-0 pt-1">
+              <Avatar className="h-11 w-11 ring-2 ring-blue-400/30 shadow-lg">
+                {avatarUrl && !avatarError ? (
+                  <AvatarImage
+                    src={avatarUrl}
+                    alt={firstName}
+                    onError={() => setAvatarError(true)}
+                    className="object-cover"
+                  />
+                ) : null}
+                <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-800 text-white text-sm font-bold">
+                  {getInitials()}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          </div>
+
+          <p className="text-slate-300 text-xs sm:text-sm md:text-base mb-3 max-w-md">
+            {subtitle}
+          </p>
+
+          {/* Quote — fixed min-height prevents jump on long/short proverbs */}
+          <div className="min-h-[52px] sm:min-h-[64px] flex items-center mb-4">
+            <AnimatePresence mode="popLayout">
               <motion.div
-                key={langIndex}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.4, ease: "easeOut" }}
-                className="flex items-center flex-wrap gap-2 sm:gap-3"
+                key={`quote-${langIndex}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                className="flex items-start gap-2 max-w-2xl w-full"
               >
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white">
-                  <span>{currentGreeting.phrase}</span>,{' '}
-                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-amber-200">
-                    {firstName}
-                  </span>
-                  <span className="ml-2 inline-block animate-bounce">{currentGreeting.emoji}</span>
-                </h1>
-                <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs font-semibold tracking-wider uppercase text-blue-300 bg-blue-500/10 border border-blue-500/20 px-2 py-0.5 rounded-md self-center">
-                  <Globe2 className="h-3 w-3" />
-                  {currentGreeting.language}
-                </span>
+                <Quote className="h-3.5 w-3.5 text-amber-400/70 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="text-slate-200 text-xs sm:text-sm italic leading-relaxed font-medium">
+                    &ldquo;{activeLang.quote.text}&rdquo;
+                  </p>
+                  {activeLang.quote.translation && (
+                    <p className="hidden sm:block text-[10px] sm:text-xs text-slate-400 mt-0.5 italic">
+                      &rarr; {activeLang.quote.translation}
+                    </p>
+                  )}
+                  <p className="text-[10px] text-amber-300/60 mt-0.5 font-medium">
+                    — {activeLang.quote.author}
+                  </p>
+                </div>
               </motion.div>
             </AnimatePresence>
           </div>
 
-          {/* Dynamic Culturally Relevant Proverb Quote */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={`quote-${langIndex}`}
-              initial={{ opacity: 0, x: -8 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 8 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="flex items-start gap-2 mb-4 max-w-2xl"
-            >
-              <Quote className="h-4 w-4 text-amber-400/70 shrink-0 mt-1" />
-              <div>
-                <p className="text-gray-200 text-xs sm:text-sm italic leading-relaxed font-medium">
-                  &ldquo;{activeLang.quote.text}&rdquo;
-                </p>
-                {activeLang.quote.translation && (
-                  <p className="text-[10px] sm:text-xs text-slate-400 mt-1 italic">
-                    &rarr; {activeLang.quote.translation}
-                  </p>
-                )}
-                <p className="text-[10px] text-amber-300/60 mt-1 font-medium">
-                  — {activeLang.quote.author}
-                </p>
-              </div>
-            </motion.div>
-          </AnimatePresence>
-
-          {/* Secondary Role and Department Badges */}
+          {/* Role badges */}
           <div className="flex flex-wrap gap-2">
             <Badge className="bg-slate-800 text-slate-200 border border-slate-700 text-xs px-2.5 py-1">
               <GraduationCap className="h-3.5 w-3.5 mr-1 text-blue-400" />
@@ -414,91 +539,154 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
           </div>
         </div>
 
-        {/* Profile Avatar Card */}
-        <div className="relative group hidden sm:block shrink-0">
-          <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 ring-4 ring-slate-800/80 shadow-2xl transition-transform duration-300 group-hover:scale-105">
-            <AvatarImage src={profile?.photo_url || profile?.avatar_url || undefined} className="object-cover" />
-            <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-800 text-white text-2xl sm:text-3xl font-bold">
-              {getInitials()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="absolute -bottom-1 -right-1 w-5 h-5 sm:w-6 sm:h-6 bg-emerald-500 rounded-full ring-4 ring-slate-900 flex items-center justify-center">
-            <div className="w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white rounded-full animate-pulse" />
+        {/* Desktop avatar — online pip removed for a cleaner look */}
+        <div className="relative group hidden sm:block shrink-0 self-center">
+          <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full opacity-40 group-hover:opacity-80 blur-md transition duration-300" />
+          <div className="relative">
+            <Avatar className="h-20 w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 ring-4 ring-slate-800/80 shadow-2xl transition-transform duration-300 group-hover:scale-105">
+              {avatarUrl && !avatarError ? (
+                <AvatarImage
+                  src={avatarUrl}
+                  alt={firstName}
+                  onError={() => setAvatarError(true)}
+                  className="object-cover"
+                />
+              ) : null}
+              <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-800 text-white text-2xl sm:text-3xl font-bold">
+                {getInitials()}
+              </AvatarFallback>
+            </Avatar>
           </div>
         </div>
       </div>
 
-      {/* Pending Grading Alert */}
+      {/* Pending grading alert */}
       {pendingGrading > 0 && (
         <div className="relative z-10 mt-4 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center gap-3">
           <Flame className="h-5 w-5 text-amber-400 shrink-0 animate-pulse" />
           <div>
             <p className="text-xs sm:text-sm text-amber-200 font-medium">
-              You have {pendingGrading} submission{pendingGrading !== 1 ? 's' : ''} awaiting grading.
+              You have {pendingGrading} submission{pendingGrading !== 1 ? 's' : ''}{' '}
+              awaiting grading.
             </p>
-            <p className="text-[10px] sm:text-xs text-amber-300/60">Take a moment to review and submit student grades.</p>
+            <p className="text-[10px] sm:text-xs text-amber-300/60">
+              Take a moment to review and submit student grades.
+            </p>
           </div>
         </div>
       )}
 
-      {/* Mini Dashboard Metrics Stats Row */}
-      <div className="relative z-10 mt-6 pt-4 border-t border-slate-800/80">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      {/* Stats */}
+      <div className="relative z-10 mt-5 sm:mt-6 pt-4 border-t border-slate-800/80">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Published exams */}
           <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-blue-300 transition-colors">
-                {stats?.publishedExams || 0}
+              <p
+                className={cn(
+                  'text-xl sm:text-2xl md:text-3xl font-bold transition-colors',
+                  publishedExams > 0
+                    ? 'text-white group-hover:text-blue-300'
+                    : 'text-slate-500'
+                )}
+              >
+                {publishedExams}
               </p>
-              <CheckCircle2 className="h-5 w-5 text-emerald-400 opacity-80" />
+              <CheckCircle2 className="h-5 w-5 text-emerald-400 opacity-80 shrink-0" />
             </div>
             <p className="text-xs text-slate-400">Published Exams</p>
+            {publishedExams === 0 && (
+              <p className="text-[10px] text-slate-500 mt-0.5">None published yet</p>
+            )}
           </div>
 
+          {/* Active students */}
           <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-blue-300 transition-colors">
-                {stats?.activeStudents || stats?.totalStudents || 0}
+              <p
+                className={cn(
+                  'text-xl sm:text-2xl md:text-3xl font-bold transition-colors',
+                  activeStudents > 0
+                    ? 'text-white group-hover:text-blue-300'
+                    : 'text-slate-500'
+                )}
+              >
+                {activeStudents}
               </p>
-              <Users className="h-5 w-5 text-blue-400 opacity-80" />
+              <Users className="h-5 w-5 text-blue-400 opacity-80 shrink-0" />
             </div>
             <p className="text-xs text-slate-400">Active Students</p>
+            {activeStudents === 0 && (
+              <p className="text-[10px] text-slate-500 mt-0.5">No students linked</p>
+            )}
           </div>
 
-          <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
+          {/* Pending grading — emphasize when > 0 */}
+          <div
+            className={cn(
+              'group cursor-default bg-white/5 border rounded-xl p-3 hover:bg-white/10 transition-colors',
+              pendingGrading > 0 ? 'border-amber-500/30' : 'border-slate-800'
+            )}
+          >
             <div className="flex items-center justify-between mb-1">
-              <p className={cn(
-                "text-xl sm:text-2xl md:text-3xl font-bold transition-colors",
-                pendingGrading > 0 ? "text-amber-300" : "text-white group-hover:text-blue-300"
-              )}>
+              <p
+                className={cn(
+                  'text-xl sm:text-2xl md:text-3xl font-bold transition-colors',
+                  pendingGrading > 0
+                    ? 'text-amber-300'
+                    : 'text-slate-500 group-hover:text-blue-300'
+                )}
+              >
                 {pendingGrading}
               </p>
               {pendingGrading > 0 ? (
-                <Flame className="h-5 w-5 text-amber-400 opacity-80 animate-pulse" />
+                <Flame className="h-5 w-5 text-amber-400 opacity-80 animate-pulse shrink-0" />
               ) : (
-                <CheckCircle2 className="h-5 w-5 text-slate-500 opacity-80" />
+                <CheckCircle2 className="h-5 w-5 text-slate-500 opacity-80 shrink-0" />
               )}
             </div>
-            <p className={cn(
-              "text-xs",
-              pendingGrading > 0 ? "text-amber-400" : "text-slate-400"
-            )}>
+            <p
+              className={cn(
+                'text-xs',
+                pendingGrading > 0 ? 'text-amber-400' : 'text-slate-400'
+              )}
+            >
               Pending Grading
             </p>
+            {pendingGrading === 0 && (
+              <p className="text-[10px] text-slate-500 mt-0.5">All caught up</p>
+            )}
           </div>
 
-          <div className="group cursor-default bg-white/5 border border-slate-800 rounded-xl p-3 hover:bg-white/10 transition-colors">
+          {/* Avg performance */}
+          <div
+            className={cn(
+              'group cursor-default bg-white/5 border rounded-xl p-3 hover:bg-white/10 transition-colors',
+              hasPerformance ? 'border-amber-500/20' : 'border-slate-800'
+            )}
+          >
             <div className="flex items-center justify-between mb-1">
-              <p className="text-xl sm:text-2xl md:text-3xl font-bold text-white group-hover:text-blue-300 transition-colors">
-                {stats?.averagePerformance || 0}%
+              <p
+                className={cn(
+                  'text-xl sm:text-2xl md:text-3xl font-bold transition-colors',
+                  hasPerformance
+                    ? 'text-white group-hover:text-blue-300'
+                    : 'text-slate-500'
+                )}
+              >
+                {hasPerformance ? `${averagePerformance}%` : '—'}
               </p>
-              <Award className="h-5 w-5 text-amber-300 opacity-80" />
+              <Award className="h-5 w-5 text-amber-300 opacity-80 shrink-0" />
             </div>
             <p className="text-xs text-slate-400">Avg Performance</p>
+            {!hasPerformance && (
+              <p className="text-[10px] text-slate-500 mt-0.5">After first results</p>
+            )}
           </div>
         </div>
 
-        {/* Dynamic Week Progress Bar */}
-        {termInfo && termInfo.currentWeek > 0 && (
+        {/* Term week progress */}
+        {termInfo && termInfo.currentWeek > 0 ? (
           <div className="mt-4">
             <div className="flex items-center justify-between mb-1">
               <span className="text-xs text-slate-400">{termInfo.termName} Progress</span>
@@ -507,9 +695,14 @@ export default function StaffWelcomeBanner({ profile, stats, termInfo }: StaffWe
             <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-indigo-600 rounded-full transition-all duration-700"
-                style={{ width: `${termInfo.weekProgress}%` }}
+                style={{ width: `${Math.min(100, Math.max(0, termInfo.weekProgress))}%` }}
               />
             </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <span className="text-xs text-slate-500">Term Progress</span>
+            <span className="text-[11px] text-slate-500">No active term data</span>
           </div>
         )}
       </div>

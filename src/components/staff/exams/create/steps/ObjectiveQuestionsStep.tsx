@@ -1,4 +1,4 @@
-// src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx - UPDATED WITH MARK CALCULATION
+// src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx - WITH DARK MODE
 
 "use client";
 
@@ -9,11 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -26,7 +22,6 @@ import { parseDocument } from "../hooks/useQuestionParser";
 import { OBJECTIVE_TEMPLATE } from "../constants";
 import type { Question, ParseResult } from "../types";
 
-// ✅ Mark distribution interface
 interface MarkDistribution {
   objectiveTotal: number;
   theoryTotal: number;
@@ -83,28 +78,24 @@ export function ObjectiveQuestionsStep({
     marks: defaultMark,
   });
 
-  // ✅ Calculate objective total from questions
-  const objectiveTotal = useMemo(() => {
-    return questions.reduce((s, q) => s + q.marks, 0);
-  }, [questions]);
+  const objectiveTotal = useMemo(
+    () => questions.reduce((s, q) => s + q.marks, 0),
+    [questions]
+  );
 
-  // ✅ Check if balanced
-  const isBalanced = useMemo(() => {
-    return markDistribution?.isBalanced ?? (objectiveTotal + 0 === 60);
-  }, [objectiveTotal, markDistribution]);
+  const isBalanced = useMemo(
+    () => markDistribution?.isBalanced ?? (objectiveTotal + 0 === 60),
+    [objectiveTotal, markDistribution]
+  );
 
-  // ✅ Marks per question
   const marksPerQuestion = useMemo(() => {
-    if (questions.length > 0) {
-      return objectiveTotal / questions.length;
-    }
+    if (questions.length > 0) return objectiveTotal / questions.length;
     return defaultMark;
   }, [objectiveTotal, questions.length, defaultMark]);
 
-  // ✅ Update all questions when defaultMark changes
   useEffect(() => {
     if (questions.length > 0 && onDefaultMarkChange) {
-      // This will be handled by the parent via onDefaultMarkChange
+      // handled by parent
     }
   }, [defaultMark, questions.length, onDefaultMarkChange]);
 
@@ -118,7 +109,6 @@ export function ObjectiveQuestionsStep({
     setParseError(null);
     const result = onParse(bulkText);
 
-    // ✅ Apply default mark to parsed questions
     const itemsWithMarks = result.items.map(q => ({
       ...q,
       marks: defaultMark,
@@ -128,18 +118,14 @@ export function ObjectiveQuestionsStep({
       result.warnings.forEach((w) => toast.warning(w, { duration: 5000 }));
     }
     if (itemsWithMarks.length === 0) {
-      setParseError(
-        "No valid questions found. Check the format matches the template."
-      );
+      setParseError("No valid questions found. Check the format matches the template.");
       return;
     }
 
     onQuestionsChange([...questions, ...itemsWithMarks]);
     onBulkTextChange("");
     toast.success(
-      `✅ Added ${itemsWithMarks.length} questions${
-        result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
-      }`
+      `✅ Added ${itemsWithMarks.length} questions${result.skipped > 0 ? ` (${result.skipped} skipped)` : ""}`
     );
   }, [bulkText, onParse, questions, onQuestionsChange, onBulkTextChange, defaultMark]);
 
@@ -149,7 +135,6 @@ export function ObjectiveQuestionsStep({
       try {
         const text = await parseDocument(file);
         const result = onParse(text);
-        // ✅ Apply default mark
         const itemsWithMarks = result.items.map(q => ({
           ...q,
           marks: defaultMark,
@@ -159,9 +144,7 @@ export function ObjectiveQuestionsStep({
           if (result.warnings.length > 0) {
             result.warnings.forEach((w) => toast.warning(w));
           }
-          toast.success(
-            `✅ ${itemsWithMarks.length} questions imported from file`
-          );
+          toast.success(`✅ ${itemsWithMarks.length} questions imported from file`);
         } else {
           toast.warning("No questions found in file. Check the format.");
         }
@@ -198,7 +181,7 @@ export function ObjectiveQuestionsStep({
         question: manualQ.question,
         options: manualQ.options,
         correct_answer: manualQ.correct_answer,
-        marks: defaultMark, // ✅ Use defaultMark
+        marks: defaultMark,
       },
     ]);
     setManualQ({
@@ -220,27 +203,20 @@ export function ObjectiveQuestionsStep({
     URL.revokeObjectURL(url);
   };
 
-  // ✅ Handle mark update for all questions
   const handleMarkUpdate = (newMark: number) => {
-    if (onDefaultMarkChange) {
-      onDefaultMarkChange(newMark);
-    }
-    // Update all existing questions with new mark
-    onQuestionsChange(questions.map(q => ({
-      ...q,
-      marks: newMark,
-    })));
+    if (onDefaultMarkChange) onDefaultMarkChange(newMark);
+    onQuestionsChange(questions.map(q => ({ ...q, marks: newMark })));
   };
 
   return (
-    <div className="flex-1 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-950 transition-colors duration-300">
       <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
 
-        {/* ── Mark Distribution Warning ── */}
+        {/* Warning */}
         {markDistribution && !markDistribution.isBalanced && (
-          <Alert className="bg-amber-50 border-amber-200">
-            <AlertCircle className="h-4 w-4 text-amber-600" />
-            <AlertDescription className="text-amber-700 text-xs">
+          <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50">
+            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <AlertDescription className="text-amber-700 dark:text-amber-300 text-xs">
               Total marks ({markDistribution.objectiveTotal + markDistribution.theoryTotal}) is not 60. 
               Objective: {markDistribution.objectiveTotal} marks, Theory: {markDistribution.theoryTotal} marks.
               {markDistribution.objectiveTotal + markDistribution.theoryTotal > 60 
@@ -250,7 +226,7 @@ export function ObjectiveQuestionsStep({
           </Alert>
         )}
 
-        {/* ── Stats ── */}
+        {/* Stats */}
         <div className="grid grid-cols-4 gap-2">
           <StatCard value={questions.length} label="Questions" color="blue" />
           <StatCard value={totalMarks.toFixed(1)} label="Total Marks" color="emerald" />
@@ -258,29 +234,29 @@ export function ObjectiveQuestionsStep({
           <StatCard value={marksPerQuestion.toFixed(2)} label="Per Question" color="amber" />
         </div>
 
-        {/* ── Default Mark Selector ── */}
-        <div className="flex items-center gap-3 p-2 bg-blue-50 rounded-lg border border-blue-200">
-          <Calculator className="h-4 w-4 text-blue-600" />
-          <span className="text-xs text-blue-700 font-medium">Mark per question:</span>
+        {/* Default Mark Selector */}
+        <div className="flex items-center gap-3 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-900/50">
+          <Calculator className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Mark per question:</span>
           <Select 
             value={defaultMark.toString()} 
             onValueChange={(v) => handleMarkUpdate(parseFloat(v))}
           >
-            <SelectTrigger className="h-7 text-xs w-24 bg-white">
+            <SelectTrigger className="h-7 text-xs w-24 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               <SelectItem value="0.5">0.5</SelectItem>
               <SelectItem value="1">1</SelectItem>
               <SelectItem value="2">2</SelectItem>
             </SelectContent>
           </Select>
-          <Badge className="bg-blue-200 text-blue-700 text-[10px] ml-auto">
+          <Badge className="bg-blue-200 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px] ml-auto">
             {questions.length} questions × {defaultMark} = {totalMarks.toFixed(1)} marks
           </Badge>
         </div>
 
-        {/* ── Comprehension Passage Toggle ── */}
+        {/* Passage toggle */}
         <div className="flex items-center gap-2">
           <Button
             variant={hasPassage ? "default" : "outline"}
@@ -288,23 +264,25 @@ export function ObjectiveQuestionsStep({
             onClick={() => onHasPassageChange(!hasPassage)}
             className={cn(
               "text-xs",
-              hasPassage && "bg-amber-500 hover:bg-amber-600 text-white"
+              hasPassage 
+                ? "bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white" 
+                : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             )}
           >
             <BookOpen className="h-3 w-3 mr-1" />
             {hasPassage ? "📖 Passage Enabled" : "Add Comprehension Passage"}
           </Button>
           {hasPassage && (
-            <span className="text-[10px] text-amber-600 hidden sm:inline">
+            <span className="text-[10px] text-amber-600 dark:text-amber-400 hidden sm:inline">
               Passage will appear above questions during exam
             </span>
           )}
         </div>
 
-        {/* ── Passage Text Area ── */}
+        {/* Passage area */}
         {hasPassage && (
-          <div className="space-y-1.5 p-3 bg-amber-50 rounded-lg border border-amber-200">
-            <Label className="text-[10px] font-semibold text-amber-700 uppercase flex items-center gap-1">
+          <div className="space-y-1.5 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900/50">
+            <Label className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 uppercase flex items-center gap-1">
               <BookOpen className="h-3 w-3" />
               Comprehension Passage
             </Label>
@@ -312,27 +290,16 @@ export function ObjectiveQuestionsStep({
               value={passageText}
               onChange={(e) => onPassageTextChange(e.target.value)}
               rows={8}
-              className="mt-1 resize-none text-sm sm:text-base leading-relaxed bg-white"
-              placeholder={`Paste the reading passage here...
-
-Example:
-Kofi was a young boy who lived in a small village near the Volta River. 
-He was known for his kindness and bravery. Every morning, he helped 
-the elderly fetch water before going to school.
-
-One day, he found an injured eagle and nursed it back to health. 
-The eagle became his loyal companion, and the villagers called him 
-"The Eagle Boy."
-
-Read the passage above and answer the following questions.`}
+              className="mt-1 resize-none text-sm sm:text-base leading-relaxed bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-900/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+              placeholder={`Paste the reading passage here...`}
             />
-            <p className="text-[10px] text-amber-600">
+            <p className="text-[10px] text-amber-600 dark:text-amber-400">
               Students will see this passage during the exam.
             </p>
           </div>
         )}
 
-        {/* ── Mode Switcher ── */}
+        {/* Mode switcher */}
         <ModeSwitcher
           modes={[
             { id: "bulk", label: "Bulk Import", icon: Sparkles },
@@ -342,7 +309,7 @@ Read the passage above and answer the following questions.`}
           onChange={(v) => setMode(v as "bulk" | "manual")}
         />
 
-        {/* ── Bulk Import ── */}
+        {/* Bulk Import */}
         {mode === "bulk" && (
           <BulkImporter
             value={bulkText}
@@ -362,31 +329,29 @@ Read the passage above and answer the following questions.`}
           />
         )}
 
-        {/* ── Manual Add ── */}
+        {/* Manual */}
         {mode === "manual" && (
-          <div className="space-y-3 p-3 bg-gray-50 rounded-lg border">
+          <div className="space-y-3 p-3 bg-gray-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800">
             <div>
-              <Label className="text-[10px] font-semibold text-gray-600 uppercase">
+              <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                 Question
               </Label>
               <Textarea
                 value={manualQ.question}
-                onChange={(e) =>
-                  setManualQ((p) => ({ ...p, question: e.target.value }))
-                }
+                onChange={(e) => setManualQ((p) => ({ ...p, question: e.target.value }))}
                 rows={3}
-                className="mt-1 resize-none text-sm sm:text-base leading-relaxed"
+                className="mt-1 resize-none text-sm sm:text-base leading-relaxed bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 placeholder="Enter question text..."
               />
             </div>
 
             <div className="space-y-1.5">
-              <Label className="text-[10px] font-semibold text-gray-600 uppercase">
+              <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                 Options
               </Label>
               {manualQ.options.map((opt, idx) => (
                 <div key={idx} className="flex items-center gap-1.5">
-                  <div className="w-6 h-6 rounded bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600 flex-shrink-0">
+                  <div className="w-6 h-6 rounded bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-slate-300 flex-shrink-0">
                     {String.fromCharCode(65 + idx)}
                   </div>
                   <Input
@@ -396,7 +361,7 @@ Read the passage above and answer the following questions.`}
                       opts[idx] = e.target.value;
                       setManualQ((p) => ({ ...p, options: opts }));
                     }}
-                    className="h-9 text-sm sm:text-base"
+                    className="h-9 text-sm sm:text-base bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     placeholder={`Option ${String.fromCharCode(65 + idx)}`}
                   />
                 </div>
@@ -405,27 +370,21 @@ Read the passage above and answer the following questions.`}
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-[10px] font-semibold text-gray-600 uppercase">
+                <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                   Correct Answer
                 </Label>
                 <Select
                   value={manualQ.correct_answer}
-                  onValueChange={(v) =>
-                    setManualQ((p) => ({ ...p, correct_answer: v }))
-                  }
+                  onValueChange={(v) => setManualQ((p) => ({ ...p, correct_answer: v }))}
                 >
-                  <SelectTrigger className="mt-1 h-9 text-sm sm:text-base">
+                  <SelectTrigger className="mt-1 h-9 text-sm sm:text-base bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
                     <SelectValue placeholder="Select answer" />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                     {manualQ.options.map(
                       (o, i) =>
                         o.trim() && (
-                          <SelectItem
-                            key={i}
-                            value={o}
-                            className="text-sm sm:text-base"
-                          >
+                          <SelectItem key={i} value={o} className="text-sm sm:text-base">
                             {String.fromCharCode(65 + i)}. {o}
                           </SelectItem>
                         )
@@ -434,7 +393,7 @@ Read the passage above and answer the following questions.`}
                 </Select>
               </div>
               <div>
-                <Label className="text-[10px] font-semibold text-gray-600 uppercase">
+                <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                   Marks (Auto)
                 </Label>
                 <Input
@@ -443,9 +402,9 @@ Read the passage above and answer the following questions.`}
                   min="0.5"
                   value={defaultMark}
                   disabled
-                  className="mt-1 h-9 text-sm sm:text-base bg-gray-100 text-gray-600"
+                  className="mt-1 h-9 text-sm sm:text-base bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
                 />
-                <p className="text-[9px] text-gray-400 mt-0.5">
+                <p className="text-[9px] text-gray-400 dark:text-slate-500 mt-0.5">
                   Using default mark: {defaultMark}
                 </p>
               </div>
@@ -453,7 +412,7 @@ Read the passage above and answer the following questions.`}
 
             <Button
               onClick={handleAddManual}
-              className="w-full h-9 text-sm bg-emerald-600 hover:bg-emerald-700"
+              className="w-full h-9 text-sm bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white"
             >
               <Plus className="mr-1 h-3.5 w-3.5" />
               Add Question
@@ -461,22 +420,22 @@ Read the passage above and answer the following questions.`}
           </div>
         )}
 
-        {/* ── Question List ── */}
+        {/* Question list */}
         {questions.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <Label className="text-[10px] font-semibold text-gray-600 uppercase">
+              <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                 Questions ({questions.length})
               </Label>
               <div className="flex items-center gap-2">
-                <Badge className="bg-blue-100 text-blue-700 text-[10px]">
+                <Badge className="bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 text-[10px] border-0">
                   {totalMarks.toFixed(1)} marks total
                 </Badge>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => onQuestionsChange([])}
-                  className="text-red-500 text-[10px] h-6"
+                  className="text-red-500 dark:text-red-400 text-[10px] h-6 hover:bg-red-50 dark:hover:bg-red-950/30"
                 >
                   Clear All
                 </Button>
@@ -488,9 +447,7 @@ Read the passage above and answer the following questions.`}
                   key={q.id}
                   question={q}
                   index={i}
-                  onDelete={(id) =>
-                    onQuestionsChange(questions.filter((x) => x.id !== id))
-                  }
+                  onDelete={(id) => onQuestionsChange(questions.filter((x) => x.id !== id))}
                 />
               ))}
             </div>
@@ -500,8 +457,6 @@ Read the passage above and answer the following questions.`}
     </div>
   );
 }
-
-// ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatCard({
   value,
@@ -513,16 +468,16 @@ function StatCard({
   color: "blue" | "emerald" | "purple" | "amber";
 }) {
   const styles = {
-    blue: "bg-blue-50 border-blue-100 text-blue-700",
-    emerald: "bg-emerald-50 border-emerald-100 text-emerald-700",
-    purple: "bg-purple-50 border-purple-100 text-purple-700",
-    amber: "bg-amber-50 border-amber-100 text-amber-700",
+    blue: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50 text-blue-700 dark:text-blue-300",
+    emerald: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300",
+    purple: "bg-purple-50 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900/50 text-purple-700 dark:text-purple-300",
+    amber: "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50 text-amber-700 dark:text-amber-300",
   }[color];
   const textSmall = {
-    blue: "text-blue-600",
-    emerald: "text-emerald-600",
-    purple: "text-purple-600",
-    amber: "text-amber-600",
+    blue: "text-blue-600 dark:text-blue-400",
+    emerald: "text-emerald-600 dark:text-emerald-400",
+    purple: "text-purple-600 dark:text-purple-400",
+    amber: "text-amber-600 dark:text-amber-400",
   }[color];
 
   return (
@@ -538,16 +493,12 @@ function ModeSwitcher({
   active,
   onChange,
 }: {
-  modes: {
-    id: string;
-    label: string;
-    icon: React.ComponentType<{ className?: string }>;
-  }[];
+  modes: { id: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
   active: string;
   onChange: (id: string) => void;
 }) {
   return (
-    <div className="flex bg-gray-100 rounded-lg p-0.5 gap-0.5">
+    <div className="flex bg-gray-100 dark:bg-slate-800 rounded-lg p-0.5 gap-0.5">
       {modes.map(({ id, label, icon: Icon }) => (
         <button
           key={id}
@@ -555,8 +506,8 @@ function ModeSwitcher({
           className={cn(
             "flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md text-xs font-medium transition-all",
             active === id
-              ? "bg-white shadow-sm text-gray-800"
-              : "text-gray-500 hover:text-gray-700"
+              ? "bg-white dark:bg-slate-700 shadow-sm text-gray-800 dark:text-white"
+              : "text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200"
           )}
         >
           <Icon className="h-3 w-3" />

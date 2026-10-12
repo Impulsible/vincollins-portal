@@ -1,4 +1,4 @@
-// app/staff/settings/page.tsx - STAFF SETTINGS PAGE (FIXED COLUMN NAMES)
+// app/staff/settings/page.tsx - STAFF SETTINGS PAGE + DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -62,8 +62,8 @@ const DEFAULT_SETTINGS: SettingsState = {
 function SettingsSkeleton() {
   return (
     <div className="space-y-3 sm:space-y-4">
-      <Skeleton className="h-8 w-40 rounded-lg" />
-      <Skeleton className="h-72 rounded-2xl" />
+      <Skeleton className="h-8 w-40 rounded-lg bg-slate-200 dark:bg-slate-800" />
+      <Skeleton className="h-72 rounded-2xl bg-slate-200 dark:bg-slate-800" />
     </div>
   )
 }
@@ -81,15 +81,15 @@ function SettingToggle({
   return (
     <div className="flex items-start justify-between gap-3 sm:gap-4 py-3">
       <div className="flex items-start gap-2 sm:gap-3 min-w-0 flex-1">
-        <div className="p-1.5 sm:p-2 bg-slate-100 rounded-lg shrink-0">
-          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
+        <div className="p-1.5 sm:p-2 bg-slate-100 dark:bg-slate-800 rounded-lg shrink-0">
+          <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600 dark:text-slate-400" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs sm:text-sm font-medium text-slate-900">{title}</p>
-          <p className="text-[10px] sm:text-xs text-slate-500 mt-0.5">{description}</p>
-          <div className="mt-1.5 p-2 bg-slate-50 rounded-lg border border-slate-100">
-            <p className="text-[9px] sm:text-[10px] text-slate-400 font-medium mb-0.5">YOU WILL RECEIVE:</p>
-            <p className="text-[10px] sm:text-xs text-slate-600 italic">
+          <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">{title}</p>
+          <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5">{description}</p>
+          <div className="mt-1.5 p-2 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-800">
+            <p className="text-[9px] sm:text-[10px] text-slate-400 dark:text-slate-500 font-medium mb-0.5">YOU WILL RECEIVE:</p>
+            <p className="text-[10px] sm:text-xs text-slate-600 dark:text-slate-300 italic">
               &ldquo;{notificationExample}&rdquo;
             </p>
           </div>
@@ -112,7 +112,7 @@ export default function StaffSettingsPage() {
   const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS)
 
   // ============================================
-  // LOAD PROFILE & SETTINGS FROM DATABASE
+  // LOAD PROFILE & SETTINGS
   // ============================================
   const loadData = useCallback(async () => {
     try {
@@ -126,7 +126,6 @@ export default function StaffSettingsPage() {
         return
       }
 
-      // Fetch only columns that exist in your profiles table
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, email, role, photo_url, department, vin_id, created_at')
@@ -134,7 +133,6 @@ export default function StaffSettingsPage() {
         .single()
 
       if (profileError) {
-        // Check if it's because the profile doesn't exist
         if (profileError.code === 'PGRST116') {
           console.log('Profile not found for settings page')
           toast.error('Profile not found. Please contact administrator.')
@@ -146,7 +144,6 @@ export default function StaffSettingsPage() {
         setProfile(profileData as StaffProfile)
       }
 
-      // Load settings from localStorage
       const savedSettings = localStorage.getItem('staff-settings')
       if (savedSettings) {
         try {
@@ -197,7 +194,7 @@ export default function StaffSettingsPage() {
   // ============================================
   if (loading) {
     return (
-      <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6">
+      <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6 transition-colors duration-300">
         <SettingsSkeleton />
       </div>
     )
@@ -207,28 +204,28 @@ export default function StaffSettingsPage() {
   // RENDER
   // ============================================
   return (
-    <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6">
+    <div className="px-3 sm:px-4 md:px-5 lg:px-6 py-4 sm:py-5 md:py-6 transition-colors duration-300">
       
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="space-y-4 sm:space-y-5 md:space-y-6"
       >
-        {/* Breadcrumb & Back Button */}
+        {/* Breadcrumb */}
         <div className="mb-1 sm:mb-2 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-muted-foreground">
-            <Link href="/staff" className="hover:text-primary flex items-center gap-1 transition-colors">
+          <div className="flex items-center gap-1 sm:gap-2 text-[11px] sm:text-xs md:text-sm text-slate-500 dark:text-slate-400">
+            <Link href="/staff" className="hover:text-blue-600 dark:hover:text-blue-400 flex items-center gap-1 transition-colors">
               <Home className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               <span className="hidden xs:inline">Dashboard</span>
             </Link>
             <ChevronRight className="h-3 w-3 sm:h-3.5 sm:w-3.5 flex-shrink-0" />
-            <span className="text-foreground font-medium">Settings</span>
+            <span className="text-slate-800 dark:text-slate-200 font-medium">Settings</span>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={() => router.push('/staff')} 
-            className="h-7 sm:h-8 text-[11px] sm:text-xs flex-shrink-0"
+            className="h-7 sm:h-8 text-[11px] sm:text-xs flex-shrink-0 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             <ArrowLeft className="mr-1 sm:mr-1.5 h-3 w-3 sm:h-3.5 sm:w-3.5" />
             Back
@@ -237,11 +234,11 @@ export default function StaffSettingsPage() {
 
         {/* Page Title */}
         <div className="mb-3 sm:mb-4">
-          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 flex items-center gap-2">
-            <Settings className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-slate-600" />
+          <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <Settings className="h-5 w-5 sm:h-6 sm:w-6 md:h-7 md:w-7 text-slate-600 dark:text-slate-400" />
             Settings
           </h1>
-          <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 mt-0.5">
+          <p className="text-[11px] sm:text-xs md:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Manage your notification preferences and account information
           </p>
         </div>
@@ -250,50 +247,52 @@ export default function StaffSettingsPage() {
         <div className="space-y-3 sm:space-y-4 md:space-y-6">
           
           {/* Account Info Card */}
-          <Card className="border-0 shadow-lg">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-lg bg-white dark:bg-slate-900">
             <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
-              <CardTitle className="text-sm sm:text-base md:text-lg">Account Information</CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+              <CardTitle className="text-sm sm:text-base md:text-lg text-slate-800 dark:text-white">
+                Account Information
+              </CardTitle>
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm text-slate-500 dark:text-slate-400">
                 Your account details
               </CardDescription>
             </CardHeader>
             <CardContent className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Full Name</p>
-                  <p className="font-medium text-sm sm:text-base text-slate-900">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mb-0.5">Full Name</p>
+                  <p className="font-medium text-sm sm:text-base text-slate-900 dark:text-slate-100">
                     {profile?.full_name || 'Not set'}
                   </p>
                 </div>
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Email Address</p>
-                  <p className="font-medium text-sm sm:text-base text-slate-900 break-all">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mb-0.5">Email Address</p>
+                  <p className="font-medium text-sm sm:text-base text-slate-900 dark:text-slate-100 break-all">
                     {profile?.email || 'Not set'}
                   </p>
                 </div>
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Role</p>
-                  <Badge className="text-[10px] sm:text-xs bg-blue-100 text-blue-700">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mb-0.5">Role</p>
+                  <Badge className="text-[10px] sm:text-xs bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-0">
                     {profile?.role || 'Staff'}
                   </Badge>
                 </div>
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                  <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Staff ID</p>
-                  <p className="font-medium text-sm sm:text-base text-slate-900 font-mono">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mb-0.5">Staff ID</p>
+                  <p className="font-medium text-sm sm:text-base text-slate-900 dark:text-slate-100 font-mono">
                     {profile?.vin_id || profile?.id?.slice(0, 8) || 'N/A'}
                   </p>
                 </div>
                 {profile?.department && (
-                  <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
-                    <p className="text-[10px] sm:text-xs text-slate-500 mb-0.5">Department</p>
-                    <p className="font-medium text-sm sm:text-base text-slate-900">
+                  <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
+                    <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mb-0.5">Department</p>
+                    <p className="font-medium text-sm sm:text-base text-slate-900 dark:text-slate-100">
                       {profile.department}
                     </p>
                   </div>
                 )}
               </div>
               {profile?.created_at && (
-                <p className="text-[10px] sm:text-xs text-slate-400 mt-3">
+                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 mt-3">
                   Member since: {new Date(profile.created_at).toLocaleDateString('en-US', {
                     year: 'numeric',
                     month: 'long',
@@ -305,13 +304,13 @@ export default function StaffSettingsPage() {
           </Card>
 
           {/* Notification Preferences */}
-          <Card className="border-0 shadow-lg">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-lg bg-white dark:bg-slate-900">
             <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
-              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500" />
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+                <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-500 dark:text-amber-400" />
                 Notification Preferences
               </CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm text-slate-500 dark:text-slate-400">
                 Choose what notifications you want to receive
               </CardDescription>
             </CardHeader>
@@ -324,7 +323,7 @@ export default function StaffSettingsPage() {
                 checked={settings.emailNotifications} 
                 onToggle={() => handleToggle('emailNotifications')} 
               />
-              <Separator />
+              <Separator className="bg-slate-200 dark:bg-slate-800" />
               <SettingToggle 
                 icon={Clock} 
                 title="Exam Reminders" 
@@ -333,7 +332,7 @@ export default function StaffSettingsPage() {
                 checked={settings.examReminders} 
                 onToggle={() => handleToggle('examReminders')} 
               />
-              <Separator />
+              <Separator className="bg-slate-200 dark:bg-slate-800" />
               <SettingToggle 
                 icon={CheckCircle} 
                 title="Grading Alerts" 
@@ -342,7 +341,7 @@ export default function StaffSettingsPage() {
                 checked={settings.gradingAlerts} 
                 onToggle={() => handleToggle('gradingAlerts')} 
               />
-              <Separator />
+              <Separator className="bg-slate-200 dark:bg-slate-800" />
               <SettingToggle 
                 icon={Users} 
                 title="Student Activity" 
@@ -351,7 +350,7 @@ export default function StaffSettingsPage() {
                 checked={settings.studentActivity} 
                 onToggle={() => handleToggle('studentActivity')} 
               />
-              <Separator />
+              <Separator className="bg-slate-200 dark:bg-slate-800" />
               <SettingToggle 
                 icon={Megaphone} 
                 title="System Announcements" 
@@ -360,7 +359,7 @@ export default function StaffSettingsPage() {
                 checked={settings.systemAnnouncements} 
                 onToggle={() => handleToggle('systemAnnouncements')} 
               />
-              <Separator />
+              <Separator className="bg-slate-200 dark:bg-slate-800" />
               <SettingToggle 
                 icon={Calendar} 
                 title="Timetable Updates" 
@@ -369,7 +368,7 @@ export default function StaffSettingsPage() {
                 checked={settings.timetableUpdates} 
                 onToggle={() => handleToggle('timetableUpdates')} 
               />
-              <Separator />
+              <Separator className="bg-slate-200 dark:bg-slate-800" />
               <SettingToggle 
                 icon={FileText} 
                 title="Report Generation" 
@@ -382,45 +381,45 @@ export default function StaffSettingsPage() {
           </Card>
 
           {/* Teaching Preferences */}
-          <Card className="border-0 shadow-lg">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-lg bg-white dark:bg-slate-900">
             <CardHeader className="pb-2 sm:pb-3 px-3 sm:px-4 md:px-6">
-              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500" />
+              <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+                <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 dark:text-emerald-400" />
                 Teaching Preferences
               </CardTitle>
-              <CardDescription className="text-[10px] sm:text-xs md:text-sm">
+              <CardDescription className="text-[10px] sm:text-xs md:text-sm text-slate-500 dark:text-slate-400">
                 Configure your teaching and grading defaults
               </CardDescription>
             </CardHeader>
             <CardContent className="px-3 sm:px-4 md:px-6 pb-3 sm:pb-4 md:pb-6">
               <div className="space-y-3">
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                   <div className="flex items-center gap-2 mb-2">
-                    <GraduationCap className="h-4 w-4 text-emerald-600" />
-                    <p className="text-xs sm:text-sm font-medium text-slate-900">Default Grade View</p>
+                    <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">Default Grade View</p>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-slate-500">
-                    Current: <span className="font-medium text-slate-700">Percentage & Letter Grade</span>
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    Current: <span className="font-medium text-slate-700 dark:text-slate-300">Percentage & Letter Grade</span>
                   </p>
                 </div>
                 
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                   <div className="flex items-center gap-2 mb-2">
-                    <Clock className="h-4 w-4 text-blue-600" />
-                    <p className="text-xs sm:text-sm font-medium text-slate-900">Auto-Save Interval</p>
+                    <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">Auto-Save Interval</p>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-slate-500">
-                    Current: <span className="font-medium text-slate-700">Every 5 minutes</span>
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    Current: <span className="font-medium text-slate-700 dark:text-slate-300">Every 5 minutes</span>
                   </p>
                 </div>
                 
-                <div className="p-3 sm:p-4 bg-slate-50 rounded-xl">
+                <div className="p-3 sm:p-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl">
                   <div className="flex items-center gap-2 mb-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-600" />
-                    <p className="text-xs sm:text-sm font-medium text-slate-900">Low Attendance Alert</p>
+                    <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs sm:text-sm font-medium text-slate-900 dark:text-slate-100">Low Attendance Alert</p>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-slate-500">
-                    Current: <span className="font-medium text-slate-700">Below 75% attendance</span>
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">
+                    Current: <span className="font-medium text-slate-700 dark:text-slate-300">Below 75% attendance</span>
                   </p>
                 </div>
               </div>
@@ -432,7 +431,7 @@ export default function StaffSettingsPage() {
             <Button 
               onClick={handleSaveSettings} 
               disabled={saving}
-              className="bg-blue-600 hover:bg-blue-700 h-9 sm:h-10 text-xs sm:text-sm"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 h-9 sm:h-10 text-xs sm:text-sm"
             >
               {saving ? (
                 <>

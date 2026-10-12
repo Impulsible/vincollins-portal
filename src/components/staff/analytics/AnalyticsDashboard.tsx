@@ -1,4 +1,4 @@
-// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED UNIQUE STUDENT COUNTING
+// src/components/staff/analytics/AnalyticsDashboard.tsx - FIXED UNIQUE STUDENT COUNTING + DARK MODE
 // @ts-nocheck
 'use client'
 
@@ -47,14 +47,12 @@ export function AnalyticsDashboard() {
     overview: {}, classStats: [], subjectStats: [], gradeDist: [], topStudents: [], classes: [] 
   })
   
-  // ✅ Dynamic term and session from database
   const [termOptions, setTermOptions] = useState<TermOption[]>([])
   const [selectedTerm, setSelectedTerm] = useState('')
   const [selectedYear, setSelectedYear] = useState('')
   const [selectedClass, setSelectedClass] = useState('all')
   const [isLoadingTerms, setIsLoadingTerms] = useState(true)
 
-  // ✅ Fetch terms from database
   useEffect(() => {
     const fetchTerms = async () => {
       try {
@@ -70,7 +68,6 @@ export function AnalyticsDashboard() {
         }
 
         if (data) {
-          // Get current term from school_settings
           const { data: settings } = await supabase
             .from('school_settings')
             .select('current_term, current_session')
@@ -88,7 +85,6 @@ export function AnalyticsDashboard() {
           
           setTermOptions(options)
           
-          // Set default selection to current term
           if (settings?.current_term && settings?.current_session) {
             setSelectedTerm(settings.current_term)
             setSelectedYear(settings.current_session)
@@ -118,13 +114,11 @@ export function AnalyticsDashboard() {
         return 
       }
 
-      // ✅ Step 1: Get THIS teacher's exams
       const { data: teacherExams } = await supabase
         .from('exams')
         .select('id, title, subject, class, status')
         .eq('created_by', userId)
 
-      // ✅ BUILD EXAM MAP for subject lookup
       const examMap: Record<string, any> = {}
       ;(teacherExams || []).forEach(exam => {
         examMap[exam.id] = exam
@@ -133,9 +127,6 @@ export function AnalyticsDashboard() {
       const examIds = (teacherExams || []).map(e => e.id)
       const publishedExams = (teacherExams || []).filter(e => e.status === 'published').length
 
-      console.log('📊 [ANALYTICS] Teacher exams:', teacherExams?.map(e => ({ id: e.id, subject: e.subject, class: e.class })))
-
-      // ✅ Step 2: Get students
       const { data: students } = await supabase
         .from('profiles')
         .select('id, full_name, class')
@@ -146,7 +137,6 @@ export function AnalyticsDashboard() {
       const studentMap: Record<string, any> = {}
       students?.forEach(s => { studentMap[s.id] = s })
 
-      // ✅ Step 3: Get scores - MERGE exam_attempts + ca_scores WITH TERM FILTER
       const allScores: any[] = []
 
       if (examIds.length > 0 && selectedTerm && selectedYear) {
@@ -168,24 +158,14 @@ export function AnalyticsDashboard() {
         const attempts = attemptsResult?.data || []
         const caScores = caResult?.data || []
 
-        console.log('📊 [ANALYTICS] Raw data:', {
-          attemptsCount: attempts.length,
-          caScoresCount: caScores.length,
-          term: selectedTerm,
-          year: selectedYear
-        })
-
-        // ✅ Build CA map for quick lookup
         const caMap: Record<string, any> = {}
         caScores.forEach((c: any) => {
           const key = `${c.student_id}|${c.exam_id}`
           caMap[key] = c
         })
 
-        // ✅ Track which student+exam pairs have been processed
         const processedKeys = new Set<string>()
 
-        // Process exam_attempts - MERGE with CA scores
         attempts.forEach((a: any) => {
           const exam = examMap[a.exam_id]
           const key = `${a.student_id}|${a.exam_id}`
@@ -193,7 +173,6 @@ export function AnalyticsDashboard() {
           
           processedKeys.add(key)
           
-          // ✅ Use CA percentage if available (combined score), otherwise exam percentage
           const hasCA = ca && (ca.ca1_score > 0 || ca.ca2_score > 0)
           const percentage = hasCA ? (ca.percentage || 0) : (a.percentage || 0)
           const totalScore = hasCA ? (ca.total_score || 0) : (a.total_score || 0)
@@ -215,12 +194,9 @@ export function AnalyticsDashboard() {
           })
         })
 
-        // Process CA-only entries (no exam attempt)
         caScores.forEach((c: any) => {
           const exam = examMap[c.exam_id]
           const key = `${c.student_id}|${c.exam_id}`
-          
-          // Skip if already merged with exam attempt
           if (processedKeys.has(key)) return
           
           const subject = exam?.subject || c.subject || 'Unknown Subject'
@@ -240,23 +216,12 @@ export function AnalyticsDashboard() {
         })
       }
 
-      console.log('📊 [ANALYTICS] Merged scores count:', allScores.length)
-
-      // ✅ Step 4: Filter by class
       const filtered = selectedClass !== 'all'
         ? allScores.filter(s => s.student_class === selectedClass)
         : allScores
 
-      // ✅ Filter out "Unknown Subject" entries
       const validScores = filtered.filter(s => s.subject !== 'Unknown Subject' && s.subject !== '—')
 
-      console.log('📊 [ANALYTICS] Score counts:', {
-        allScores: allScores.length,
-        filtered: filtered.length,
-        validScores: validScores.length
-      })
-
-      // ✅ TRACK UNIQUE STUDENTS WITH SCORES
       const uniqueStudentIds = new Set<string>()
       const classStudentMap: Record<string, Set<string>> = {}
       
@@ -272,9 +237,7 @@ export function AnalyticsDashboard() {
       })
       
       const uniqueStudentCount = uniqueStudentIds.size
-      console.log('📊 [ANALYTICS] Unique students with scores:', uniqueStudentCount)
 
-      // ✅ Step 5: Calculate overview using UNIQUE students
       const avgScore = validScores.length > 0
         ? Math.round(validScores.reduce((sum, s) => sum + (s.percentage || s.total_score || 0), 0) / validScores.length)
         : 0
@@ -285,7 +248,7 @@ export function AnalyticsDashboard() {
         : 0
 
       const overview = {
-        totalStudents: uniqueStudentCount, // ✅ FIXED: Unique students with scores
+        totalStudents: uniqueStudentCount,
         totalExams: publishedExams,
         avgScore,
         passRate,
@@ -293,7 +256,6 @@ export function AnalyticsDashboard() {
         activeClasses: Object.keys(classStudentMap).length
       }
 
-      // ✅ Step 6: Subject Stats with unique student counts
       const subjMap: Record<string, any> = {}
       validScores.forEach(s => {
         const subj = s.subject
@@ -311,16 +273,13 @@ export function AnalyticsDashboard() {
 
       const subjectStats = Object.entries(subjMap).map(([name, d]: any) => ({
         name,
-        students: d.students.size, // ✅ Unique students per subject
+        students: d.students.size,
         avgScore: d.count > 0 ? Math.round(d.total / d.count) : 0,
         passRate: d.count > 0 ? Math.round((d.pass / d.count) * 100) : 0,
         highest: d.high,
         lowest: d.low
       })).sort((a: any, b: any) => b.avgScore - a.avgScore)
 
-      console.log('📊 [ANALYTICS] Subject stats:', subjectStats.map(s => `${s.name}: ${s.students} students, ${s.avgScore}%`))
-
-      // ✅ Step 7: Class Stats with unique students
       const classStats = Object.entries(classStudentMap).map(([name, studentSet]: [string, Set<string>]) => {
         const classScores = validScores.filter(s => s.student_class === name)
         const total = classScores.reduce((sum, s) => sum + (s.percentage || s.total_score || 0), 0)
@@ -330,7 +289,7 @@ export function AnalyticsDashboard() {
         
         return {
           name,
-          students: studentSet.size, // ✅ Unique students per class
+          students: studentSet.size,
           avgScore: classScores.length > 0 ? Math.round(total / classScores.length) : 0,
           passRate: classScores.length > 0 ? Math.round((passCount / classScores.length) * 100) : 0,
           highest,
@@ -338,7 +297,6 @@ export function AnalyticsDashboard() {
         }
       }).sort((a: any, b: any) => b.avgScore - a.avgScore)
 
-      // ✅ Step 8: Top Students (unique students only)
       const studentScores: Record<string, any> = {}
       validScores.forEach(s => {
         const key = s.student_id || s.student_name || 'unknown'
@@ -366,7 +324,6 @@ export function AnalyticsDashboard() {
         .sort((a, b) => b.avgScore - a.avgScore)
         .slice(0, 20)
 
-      // ✅ Step 9: Grade Distribution
       const allGrades = ['A1', 'B2', 'B3', 'C4', 'C5', 'C6', 'D7', 'E8', 'F9']
       const gradeCounts: Record<string, number> = {}
       allGrades.forEach(g => { gradeCounts[g] = 0 })
@@ -402,7 +359,6 @@ export function AnalyticsDashboard() {
     }
   }
 
-  // Load data when term/year changes
   useEffect(() => {
     if (selectedTerm && selectedYear) {
       loadData()
@@ -424,21 +380,20 @@ export function AnalyticsDashboard() {
 
   if (loading || isLoadingTerms) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh] transition-colors duration-300">
         <div className="text-center">
           <div className="relative mx-auto mb-6 h-16 w-16">
-            <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 animate-spin" />
-            <TrendingUp className="absolute inset-0 m-auto h-6 w-6 text-emerald-500" />
+            <div className="absolute inset-0 rounded-full border-4 border-slate-100 dark:border-slate-800" />
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-emerald-500 dark:border-t-emerald-400 animate-spin" />
+            <TrendingUp className="absolute inset-0 m-auto h-6 w-6 text-emerald-500 dark:text-emerald-400" />
           </div>
-          <h2 className="text-lg font-semibold text-slate-700 mb-1">Loading Analytics</h2>
-          <p className="text-sm text-slate-500">Fetching your students' performance data...</p>
+          <h2 className="text-lg font-semibold text-slate-700 dark:text-slate-200 mb-1">Loading Analytics</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400">Fetching your students' performance data...</p>
         </div>
       </div>
     )
   }
 
-  // ✅ Get current term info for the overview
   const currentTermLabel = termOptions.find(t => t.value === selectedTerm)?.label || selectedTerm
   const currentTermInfo = {
     termName: currentTermLabel,
@@ -448,30 +403,30 @@ export function AnalyticsDashboard() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 w-full max-w-full">
-      <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500">
-        <Link href="/staff" className="hover:text-emerald-600 transition-colors flex items-center gap-1">
+    <div className="space-y-4 sm:space-y-6 w-full max-w-full transition-colors duration-300">
+      <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+        <Link href="/staff" className="hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors flex items-center gap-1">
           <Home className="h-3.5 w-3.5" />
           <span className="hidden sm:inline">Dashboard</span>
         </Link>
         <ChevronRight className="h-3.5 w-3.5 shrink-0" />
-        <span className="text-slate-800 font-medium">My Analytics</span>
+        <span className="text-slate-800 dark:text-slate-200 font-medium">My Analytics</span>
       </nav>
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
+            <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600 dark:text-emerald-400" />
             My Analytics
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Performance insights for your exams and students</p>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">Performance insights for your exams and students</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Select value={selectedClass} onValueChange={setSelectedClass}>
-            <SelectTrigger className="h-9 text-xs w-[130px] bg-white">
+            <SelectTrigger className="h-9 text-xs w-[130px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200">
               <SelectValue placeholder="All Classes" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               <SelectItem value="all">All Classes</SelectItem>
               {data.classes.map((c: string) => (
                 <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -479,12 +434,11 @@ export function AnalyticsDashboard() {
             </SelectContent>
           </Select>
           
-          {/* ✅ Dynamic Term Selector from Database */}
           <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-            <SelectTrigger className="h-9 text-xs w-[130px] bg-white">
+            <SelectTrigger className="h-9 text-xs w-[130px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200">
               <SelectValue placeholder="Select Term" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               {termOptions.map((term) => (
                 <SelectItem key={`${term.value}-${term.session_year}`} value={term.value}>
                   {term.label} {term.is_current ? '✓' : ''}
@@ -493,12 +447,11 @@ export function AnalyticsDashboard() {
             </SelectContent>
           </Select>
           
-          {/* ✅ Dynamic Session Selector from Database */}
           <Select value={selectedYear} onValueChange={setSelectedYear}>
-            <SelectTrigger className="h-9 text-xs w-[130px] bg-white">
+            <SelectTrigger className="h-9 text-xs w-[130px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200">
               <SelectValue placeholder="Select Session" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               {[...new Set(termOptions.map(t => t.session_year))].map((session) => (
                 <SelectItem key={session} value={session}>
                   {session}
@@ -507,27 +460,50 @@ export function AnalyticsDashboard() {
             </SelectContent>
           </Select>
           
-          <Button variant="outline" size="sm" onClick={loadData} className="h-9">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={loadData} 
+            className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
             <RefreshCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
-      {/* ✅ Pass termInfo to AnalyticsOverview */}
       <AnalyticsOverview 
         overview={data.overview} 
         termInfo={currentTermInfo}
       />
 
       <Tabs defaultValue="classes">
-        <TabsList className="bg-white border rounded-lg p-1 h-auto w-full sm:w-auto overflow-x-auto flex-nowrap shadow-sm">
-          <TabsTrigger value="classes" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">By Class</TabsTrigger>
-          <TabsTrigger value="subjects" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">By Subject</TabsTrigger>
-          <TabsTrigger value="students" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">Top Students</TabsTrigger>
-          <TabsTrigger value="grades" className="text-xs sm:text-sm px-3 py-1.5 rounded-md data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap">Grades</TabsTrigger>
+        <TabsList className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-1 h-auto w-full sm:w-auto overflow-x-auto flex-nowrap shadow-sm">
+          <TabsTrigger 
+            value="classes" 
+            className="text-xs sm:text-sm px-3 py-1.5 rounded-md text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap"
+          >
+            By Class
+          </TabsTrigger>
+          <TabsTrigger 
+            value="subjects" 
+            className="text-xs sm:text-sm px-3 py-1.5 rounded-md text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap"
+          >
+            By Subject
+          </TabsTrigger>
+          <TabsTrigger 
+            value="students" 
+            className="text-xs sm:text-sm px-3 py-1.5 rounded-md text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap"
+          >
+            Top Students
+          </TabsTrigger>
+          <TabsTrigger 
+            value="grades" 
+            className="text-xs sm:text-sm px-3 py-1.5 rounded-md text-slate-600 dark:text-slate-400 data-[state=active]:bg-emerald-600 data-[state=active]:text-white whitespace-nowrap"
+          >
+            Grades
+          </TabsTrigger>
         </TabsList>
         
-        {/* ✅ Pass termInfo to ClassPerformance */}
         <TabsContent value="classes" className="mt-4">
           <ClassPerformance 
             data={data.classStats} 
@@ -535,7 +511,6 @@ export function AnalyticsDashboard() {
           />
         </TabsContent>
         
-        {/* ✅ Pass termInfo to SubjectPerformance */}
         <TabsContent value="subjects" className="mt-4">
           <SubjectPerformance 
             data={data.subjectStats} 
@@ -545,7 +520,12 @@ export function AnalyticsDashboard() {
         
         <TabsContent value="students" className="mt-4">
           <div className="flex justify-end mb-2">
-            <Button variant="outline" size="sm" onClick={handleExport}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleExport}
+              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
               <Download className="mr-1.5 h-4 w-4" />Export CSV
             </Button>
           </div>

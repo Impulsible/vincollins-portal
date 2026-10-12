@@ -1,10 +1,9 @@
-// app/staff/grade/page.tsx - FIXED: NO CONTEXT
+// app/staff/grade/page.tsx - FULL DARK MODE
 'use client'
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
-// ❌ REMOVED: import { useStaff } from '@/contexts/StaffContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Loader2 } from 'lucide-react'
@@ -51,25 +50,27 @@ export default function GradePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+      <div className="flex items-center justify-center h-64 transition-colors duration-300">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
       </div>
     )
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 transition-colors duration-300">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Grading</h1>
-        <p className="text-muted-foreground text-sm mt-1">Grade student submissions</p>
+        <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">Grade student submissions</p>
       </div>
       
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <CardHeader>
-          <CardTitle>Pending Submissions</CardTitle>
+          <CardTitle className="text-slate-800 dark:text-white">Pending Submissions</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-muted-foreground text-center py-8">Grading interface coming soon...</p>
+          <p className="text-slate-500 dark:text-slate-400 text-center py-8">
+            Grading interface coming soon...
+          </p>
         </CardContent>
       </Card>
     </div>

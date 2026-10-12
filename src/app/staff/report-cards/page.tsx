@@ -136,23 +136,23 @@ const getGradeStyle = (grade: string): string => {
 
 const getOverallGradeColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-    case 'B': return 'bg-blue-100 text-blue-700 border-blue-200'
-    case 'C': return 'bg-cyan-100 text-cyan-700 border-cyan-200'
-    case 'P': return 'bg-amber-100 text-amber-700 border-amber-200'
-    case 'F': return 'bg-red-100 text-red-700 border-red-200'
-    default: return 'bg-gray-100 text-gray-600 border-gray-200'
+    case 'A': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/40'
+    case 'B': return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/40'
+    case 'C': return 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400 border-cyan-200 dark:border-cyan-900/40'
+    case 'P': return 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40'
+    case 'F': return 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/40'
+    default: return 'bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-gray-200 dark:border-slate-700'
   }
 }
 
 const getOverallGradeTextColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'text-emerald-700 font-bold'
-    case 'B': return 'text-blue-700 font-bold'
-    case 'C': return 'text-cyan-700 font-bold'
-    case 'P': return 'text-amber-700 font-bold'
-    case 'F': return 'text-red-700 font-bold'
-    default: return 'text-gray-700'
+    case 'A': return 'text-emerald-700 dark:text-emerald-400 font-bold'
+    case 'B': return 'text-blue-700 dark:text-blue-400 font-bold'
+    case 'C': return 'text-cyan-700 dark:text-cyan-400 font-bold'
+    case 'P': return 'text-amber-700 dark:text-amber-400 font-bold'
+    case 'F': return 'text-red-700 dark:text-red-400 font-bold'
+    default: return 'text-gray-700 dark:text-slate-300'
   }
 }
 
@@ -584,25 +584,25 @@ export default function StaffReportCardsPage() {
 
   if (loading && reportCards.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
-        <p className="text-slate-500 text-sm">Loading report cards...</p>
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 transition-colors duration-300">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-500 dark:text-blue-400" />
+        <p className="text-slate-500 dark:text-slate-400 text-sm">Loading report cards...</p>
       </div>
     )
   }
 
   return (
-    <div className="space-y-6 p-3 sm:p-4 md:p-6">
+    <div className="space-y-6 p-3 sm:p-4 md:p-6 transition-colors duration-300">
 
       {/* ── New publish alert ── */}
       {newPublishAlert && (
-        <div className="bg-emerald-50 border-l-4 border-emerald-500 rounded-lg p-3 flex items-center justify-between gap-2">
+        <div className="bg-emerald-50 dark:bg-emerald-950/30 border-l-4 border-emerald-500 dark:border-emerald-600 rounded-lg p-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Bell className="h-4 w-4 text-emerald-600 shrink-0" />
-            <span className="text-sm text-emerald-700 font-medium">{newPublishAlert}</span>
+            <Bell className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="text-sm text-emerald-700 dark:text-emerald-300 font-medium">{newPublishAlert}</span>
           </div>
           <button onClick={() => setNewPublishAlert(null)}>
-            <X className="h-4 w-4 text-emerald-400" />
+            <X className="h-4 w-4 text-emerald-400 dark:text-emerald-500" />
           </button>
         </div>
       )}
@@ -610,14 +610,14 @@ export default function StaffReportCardsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-            <FileText className="h-6 w-6 text-blue-600" />
+          <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             Student Report Cards
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             View published report cards • {getTermLabel(selectedTerm)} {selectedYear}
           </p>
-          <p className="text-xs text-amber-600 mt-0.5 flex items-center gap-1">
+          <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5 flex items-center gap-1">
             <Lock className="h-3 w-3" />
             Only report cards released by the admin are shown here
           </p>
@@ -627,12 +627,17 @@ export default function StaffReportCardsPage() {
             variant="outline" size="sm"
             onClick={loadReportCards}
             disabled={loading}
-            className="h-9 text-xs"
+            className="h-9 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
           >
             <RefreshCw className={cn("h-3.5 w-3.5 mr-1.5", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportCSV} className="h-9 text-xs">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExportCSV} 
+            className="h-9 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
             <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
           </Button>
         </div>
@@ -641,47 +646,47 @@ export default function StaffReportCardsPage() {
       {/* Stats Cards */}
       {(classStats.length > 0 || reportCards.length > 0) && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card className="border border-gray-200 shadow-sm">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold">Total Students</p>
-                  <p className="text-2xl font-bold text-slate-700">{reportCards.length}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Total Students</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-100">{reportCards.length}</p>
                 </div>
-                <Users className="h-8 w-8 text-slate-300" />
+                <Users className="h-8 w-8 text-slate-300 dark:text-slate-600" />
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 shadow-sm">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold">Classes</p>
-                  <p className="text-2xl font-bold text-slate-700">{classStats.length}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Classes</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-100">{classStats.length}</p>
                 </div>
-                <GraduationCap className="h-8 w-8 text-slate-300" />
+                <GraduationCap className="h-8 w-8 text-slate-300 dark:text-slate-600" />
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 shadow-sm">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold">Average Score</p>
-                  <p className="text-2xl font-bold text-slate-700">{overallAvg}%</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-semibold">Average Score</p>
+                  <p className="text-2xl font-bold text-slate-700 dark:text-slate-100">{overallAvg}%</p>
                 </div>
-                <TrendingUp className="h-8 w-8 text-slate-300" />
+                <TrendingUp className="h-8 w-8 text-slate-300 dark:text-slate-600" />
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 shadow-sm">
+          <Card className="border border-emerald-200/60 dark:border-emerald-900/40 shadow-sm bg-emerald-50 dark:bg-emerald-950/30">
             <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] text-slate-500 uppercase font-semibold">Published</p>
-                  <p className="text-2xl font-bold text-emerald-600">{reportCards.length}</p>
+                  <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase font-semibold">Published</p>
+                  <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-300">{reportCards.length}</p>
                 </div>
-                <CheckCircle2 className="h-8 w-8 text-emerald-400" />
+                <CheckCircle2 className="h-8 w-8 text-emerald-400 dark:text-emerald-500" />
               </div>
             </CardContent>
           </Card>
@@ -689,13 +694,13 @@ export default function StaffReportCardsPage() {
       )}
 
       {/* Filters */}
-      <Card className="border border-gray-200 shadow-sm">
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
         <CardContent className="p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
-              <Label className="text-xs text-slate-500 font-medium">Class</Label>
+              <Label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Class</Label>
               <Select value={selectedClass} onValueChange={setSelectedClass}>
-                <SelectTrigger className="h-9 text-sm mt-1">
+                <SelectTrigger className="h-9 text-sm mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                   <SelectValue placeholder="All Classes" />
                 </SelectTrigger>
                 <SelectContent>
@@ -709,9 +714,11 @@ export default function StaffReportCardsPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-slate-500 font-medium">Term</Label>
+              <Label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Term</Label>
               <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-                <SelectTrigger className="h-9 text-sm mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {TERMS.map(term => (
                     <SelectItem key={term.value} value={term.value}>{term.label}</SelectItem>
@@ -720,9 +727,11 @@ export default function StaffReportCardsPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-slate-500 font-medium">Session</Label>
+              <Label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Session</Label>
               <Select value={selectedYear} onValueChange={setSelectedYear}>
-                <SelectTrigger className="h-9 text-sm mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-9 text-sm mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
+                  <SelectValue />
+                </SelectTrigger>
                 <SelectContent>
                   {YEARS.map(year => (
                     <SelectItem key={year} value={year}>{year}</SelectItem>
@@ -731,18 +740,18 @@ export default function StaffReportCardsPage() {
               </Select>
             </div>
             <div className="lg:col-span-2">
-              <Label className="text-xs text-slate-500 font-medium">Search Student</Label>
+              <Label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Search Student</Label>
               <div className="relative mt-1">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                 <Input
                   placeholder="Search by name or admission number..."
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="pl-8 h-9 text-sm"
+                  className="pl-8 h-9 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 />
                 {searchQuery && (
                   <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2">
-                    <X className="h-3.5 w-3.5 text-slate-400" />
+                    <X className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   </button>
                 )}
               </div>
@@ -753,78 +762,80 @@ export default function StaffReportCardsPage() {
 
       {/* Results Summary */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           Showing {paginatedCards.length} of {filteredCards.length} students
           {reportCards.length > 0 && (
-            <span className="ml-2 text-emerald-600 font-medium">
+            <span className="ml-2 text-emerald-600 dark:text-emerald-400 font-medium">
               • All visible cards are published ✅
             </span>
           )}
         </p>
         {searchQuery && (
-          <Badge variant="outline" className="text-xs">Filtered: {searchQuery}</Badge>
+          <Badge variant="outline" className="text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+            Filtered: {searchQuery}
+          </Badge>
         )}
       </div>
 
       {/* Report Cards Table */}
-      <Card className="border border-gray-200 shadow-sm overflow-hidden">
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="text-xs font-semibold">Student</TableHead>
-                <TableHead className="text-xs font-semibold">Admission No</TableHead>
-                <TableHead className="text-xs font-semibold">Class</TableHead>
-                <TableHead className="text-center text-xs font-semibold">Average</TableHead>
-                <TableHead className="text-center text-xs font-semibold">Grade</TableHead>
-                <TableHead className="text-center text-xs font-semibold">Published</TableHead>
-                <TableHead className="text-right text-xs font-semibold">Actions</TableHead>
+              <TableRow className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-700">
+                <TableHead className="text-xs font-semibold text-slate-600 dark:text-slate-300">Student</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-600 dark:text-slate-300">Admission No</TableHead>
+                <TableHead className="text-xs font-semibold text-slate-600 dark:text-slate-300">Class</TableHead>
+                <TableHead className="text-center text-xs font-semibold text-slate-600 dark:text-slate-300">Average</TableHead>
+                <TableHead className="text-center text-xs font-semibold text-slate-600 dark:text-slate-300">Grade</TableHead>
+                <TableHead className="text-center text-xs font-semibold text-slate-600 dark:text-slate-300">Published</TableHead>
+                <TableHead className="text-right text-xs font-semibold text-slate-600 dark:text-slate-300">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {paginatedCards.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-12">
-                    <FileText className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                    <p className="text-slate-500 font-medium">No published report cards found</p>
-                    <p className="text-xs text-slate-400 mt-1">
+                    <FileText className="h-12 w-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-500 dark:text-slate-400 font-medium">No published report cards found</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                       Report cards will appear here once the admin publishes them
                     </p>
                   </TableCell>
                 </TableRow>
               ) : (
                 paginatedCards.map((card) => (
-                  <TableRow key={card.id} className="hover:bg-gray-50 transition-colors">
+                  <TableRow key={card.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border-b border-slate-100 dark:border-slate-800">
                     <TableCell>
-                      <p className="font-medium text-sm">{card.student_name}</p>
+                      <p className="font-medium text-sm text-slate-800 dark:text-slate-100">{card.student_name}</p>
                     </TableCell>
-                    <TableCell className="text-xs font-mono">
+                    <TableCell className="text-xs font-mono text-slate-600 dark:text-slate-300">
                       {card.student_admission_number || '—'}
                     </TableCell>
-                    <TableCell className="text-xs">{card.class}</TableCell>
-                    <TableCell className="text-center font-semibold text-sm">
+                    <TableCell className="text-xs text-slate-600 dark:text-slate-300">{card.class}</TableCell>
+                    <TableCell className="text-center font-semibold text-sm text-slate-800 dark:text-slate-100">
                       {card.average_score}%
                     </TableCell>
                     <TableCell className="text-center">
                       <span className={cn(
                         "inline-block px-2 py-0.5 rounded text-xs font-bold",
-                        card.overall_grade === 'A' ? 'bg-emerald-100 text-emerald-700' :
-                        card.overall_grade === 'B' ? 'bg-blue-100 text-blue-700' :
-                        card.overall_grade === 'C' ? 'bg-cyan-100 text-cyan-700' :
-                        card.overall_grade === 'P' ? 'bg-amber-100 text-amber-700' :
-                        'bg-red-100 text-red-700'
+                        card.overall_grade === 'A' ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400' :
+                        card.overall_grade === 'B' ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400' :
+                        card.overall_grade === 'C' ? 'bg-cyan-100 dark:bg-cyan-950/50 text-cyan-700 dark:text-cyan-400' :
+                        card.overall_grade === 'P' ? 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400' :
+                        'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400'
                       )}>
                         {card.overall_grade}
                       </span>
                     </TableCell>
                     <TableCell className="text-center">
                       <div className="flex flex-col items-center gap-0.5">
-                        <Badge className="bg-emerald-50 text-emerald-700 border-none text-[10px]">
+                        <Badge className="bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-none text-[10px]">
                           <CheckCircle2 className="h-2.5 w-2.5 mr-1" />
                           Published
                         </Badge>
                         {card.published_at && (
-                          <span className="text-[9px] text-slate-400">
+                          <span className="text-[9px] text-slate-400 dark:text-slate-500">
                             {new Date(card.published_at).toLocaleDateString()}
                           </span>
                         )}
@@ -832,7 +843,7 @@ export default function StaffReportCardsPage() {
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
-                        variant="ghost" size="sm" className="h-7 text-xs"
+                        variant="ghost" size="sm" className="h-7 text-xs text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
                         onClick={() => { setSelectedCard(card); setShowViewDialog(true) }}
                       >
                         <Eye className="h-3 w-3 mr-1" /> View
@@ -846,18 +857,18 @@ export default function StaffReportCardsPage() {
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
-            <p className="text-xs text-slate-500">Page {currentPage} of {totalPages}</p>
+          <div className="flex items-center justify-between px-4 py-3 border-t border-slate-200 dark:border-slate-800">
+            <p className="text-xs text-slate-500 dark:text-slate-400">Page {currentPage} of {totalPages}</p>
             <div className="flex gap-1">
               <Button
-                variant="outline" size="sm" className="h-8 w-8 p-0"
+                variant="outline" size="sm" className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 disabled={currentPage === 1}
                 onClick={() => setCurrentPage(prev => prev - 1)}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
               <Button
-                variant="outline" size="sm" className="h-8 w-8 p-0"
+                variant="outline" size="sm" className="h-8 w-8 p-0 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 disabled={currentPage === totalPages}
                 onClick={() => setCurrentPage(prev => prev + 1)}
               >
@@ -870,24 +881,29 @@ export default function StaffReportCardsPage() {
 
       {/* ── View Report Card Dialog ── */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
-        <DialogContent className="max-w-[210mm] w-full max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="max-w-[210mm] w-full max-h-[90vh] overflow-y-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700">
           {selectedCard && (
             <>
-              <DialogHeader className="sticky top-0 z-10 bg-white border-b border-gray-200 p-4">
+              <DialogHeader className="sticky top-0 z-10 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 p-4">
                 <div className="flex items-center justify-between">
-                  <DialogTitle className="flex items-center gap-2 text-base font-bold">
-                    <FileText className="h-5 w-5 text-blue-600" />
+                  <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800 dark:text-slate-100">
+                    <FileText className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                     Report Card — {selectedCard.student_name}
                   </DialogTitle>
                   <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 text-xs">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={handlePrint} 
+                      className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                    >
                       <Printer className="h-3.5 w-3.5 mr-1.5" /> Print
                     </Button>
                     <Button
                       variant="outline" size="sm"
                       onClick={handleDownloadPDF}
                       disabled={downloading}
-                      className="h-8 text-xs"
+                      className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                     >
                       {downloading
                         ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -898,24 +914,24 @@ export default function StaffReportCardsPage() {
                     <Button
                       variant="ghost" size="sm"
                       onClick={() => setShowViewDialog(false)}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
-                <DialogDescription className="text-sm">
+                <DialogDescription className="text-sm text-slate-500 dark:text-slate-400">
                   {selectedCard.class} • {getTermLabel(selectedCard.term)} {selectedCard.academic_year}
                   {selectedCard.published_at && (
-                    <span className="ml-2 text-emerald-600 text-xs">
+                    <span className="ml-2 text-emerald-600 dark:text-emerald-400 text-xs">
                       • Published {new Date(selectedCard.published_at).toLocaleDateString()}
                     </span>
                   )}
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="p-6 bg-gray-100">
-                {/* ── THE REPORT CARD ── */}
+              <div className="p-6 bg-gray-100 dark:bg-slate-950">
+                {/* ── THE REPORT CARD (kept light for print/pdf) ── */}
                 <div
                   ref={printRef}
                   className="print-report bg-white mx-auto text-black border-2 border-blue-900 print:border-2 print:border-blue-900 w-[210mm] min-h-[297mm] p-4 print:p-2 shadow-lg"

@@ -1,4 +1,4 @@
-// components/staff/exams/ExamList.tsx - COMPLETE FIXED VERSION WITH TERM INFO
+// components/staff/exams/ExamList.tsx - COMPLETE FIXED VERSION + DARK MODE
 
 'use client'
 
@@ -9,36 +9,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem,
+  DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  Search,
-  PlusCircle,
-  Eye,
-  Edit,
-  MoreVertical,
-  Copy,
-  Send,
-  Trash2,
-  Calculator,
-  Clock,
-  FileText,
-  Users,
-  Award,
-  Calendar,
+  Search, PlusCircle, Eye, Edit, MoreVertical, Copy,
+  Send, Trash2, Clock, FileText, Users, Award, Calendar,
 } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
@@ -81,7 +60,7 @@ interface ExamListProps {
   draftCount: number
   pendingCount: number
   publishedCount: number
-  termInfo?: {  // ✅ Added
+  termInfo?: {
     termName: string
     sessionYear: string
     termCode: string
@@ -92,13 +71,13 @@ interface ExamListProps {
 const getStatusBadge = (status: string) => {
   switch (status) {
     case 'published':
-      return <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">Published</Badge>
+      return <Badge className="bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-0">Published</Badge>
     case 'pending':
-      return <Badge className="bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 border-0">Pending</Badge>
+      return <Badge className="bg-yellow-100 dark:bg-yellow-950/50 text-yellow-700 dark:text-yellow-400 border-0">Pending</Badge>
     case 'draft':
-      return <Badge className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400 border-0">Draft</Badge>
+      return <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-0">Draft</Badge>
     default:
-      return <Badge variant="outline">{status}</Badge>
+      return <Badge variant="outline" className="border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">{status}</Badge>
   }
 }
 
@@ -128,7 +107,7 @@ export function ExamList({
   draftCount,
   pendingCount,
   publishedCount,
-  termInfo,  // ✅ Added
+  termInfo,
 }: ExamListProps) {
   const router = useRouter()
   const [duplicating, setDuplicating] = useState<string | null>(null)
@@ -155,23 +134,17 @@ export function ExamList({
   }
 
   const handleViewSubmissions = (examId: string) => {
-    if (onViewSubmissions) {
-      onViewSubmissions(examId)
-    } else {
-      router.push(`/staff/exams/${examId}/submissions`)
-    }
+    if (onViewSubmissions) onViewSubmissions(examId)
+    else router.push(`/staff/exams/${examId}/submissions`)
   }
 
   const handleEnterScores = (examId: string) => {
-    if (onEnterScores) {
-      onEnterScores(examId)
-    } else {
-      router.push(`/staff/exams/${examId}/scores`)
-    }
+    if (onEnterScores) onEnterScores(examId)
+    else router.push(`/staff/exams/${examId}/scores`)
   }
 
   return (
-    <div className="w-full space-y-4 sm:space-y-6">
+    <div className="w-full space-y-4 sm:space-y-6 transition-colors duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div className="min-w-0 flex-1">
@@ -184,52 +157,52 @@ export function ExamList({
         </div>
         <Button
           onClick={onCreateExam}
-          className="bg-emerald-600 hover:bg-emerald-700 shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto h-9 sm:h-10 text-sm"
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 shadow-lg hover:shadow-xl transition-all duration-200 w-full sm:w-auto h-9 sm:h-10 text-sm"
         >
           <PlusCircle className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4" />
           Create Exam
         </Button>
       </div>
 
-      {/* ✅ Term Info Banner */}
+      {/* Term Info Banner */}
       {termInfo && termInfo.termName && (
-        <div className="flex items-center gap-2 text-xs text-slate-500 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 shadow-sm">
-          <Calendar className="h-3.5 w-3.5 text-emerald-600" />
-          <span className="font-medium text-slate-700 dark:text-slate-300">{termInfo.termName}</span>
-          <span className="text-slate-300">·</span>
-          <span className="font-medium text-slate-700 dark:text-slate-300">{termInfo.sessionYear}</span>
+        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 shadow-sm">
+          <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span className="font-medium text-slate-700 dark:text-slate-200">{termInfo.termName}</span>
+          <span className="text-slate-300 dark:text-slate-600">·</span>
+          <span className="font-medium text-slate-700 dark:text-slate-200">{termInfo.sessionYear}</span>
           {termInfo.isCurrent && (
-            <Badge className="ml-1 bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">
+            <Badge className="ml-1 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-[10px]">
               Current
             </Badge>
           )}
-          <span className="text-slate-300 ml-auto">📚 {exams.length} exam{exams.length !== 1 ? 's' : ''}</span>
+          <span className="text-slate-300 dark:text-slate-600 ml-auto">📚 {exams.length} exam{exams.length !== 1 ? 's' : ''}</span>
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-2.5 sm:p-3 md:p-4">
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Total Exams</p>
+            <p className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400">Total Exams</p>
             <p className="text-base sm:text-lg md:text-xl font-bold text-slate-900 dark:text-white">{totalExams}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-2.5 sm:p-3 md:p-4">
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Drafts</p>
+            <p className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400">Drafts</p>
             <p className="text-base sm:text-lg md:text-xl font-bold text-slate-900 dark:text-white">{draftCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-2.5 sm:p-3 md:p-4">
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Pending</p>
+            <p className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400">Pending</p>
             <p className="text-base sm:text-lg md:text-xl font-bold text-amber-600 dark:text-amber-400">{pendingCount}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-2.5 sm:p-3 md:p-4">
-            <p className="text-[9px] sm:text-xs text-muted-foreground">Published</p>
+            <p className="text-[9px] sm:text-xs text-slate-500 dark:text-slate-400">Published</p>
             <p className="text-base sm:text-lg md:text-xl font-bold text-emerald-600 dark:text-emerald-400">{publishedCount}</p>
           </CardContent>
         </Card>
@@ -238,31 +211,31 @@ export function ExamList({
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Search exams by title, subject, or class..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+            className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
         </div>
         <Tabs value={statusFilter} onValueChange={onStatusFilterChange} className="w-full sm:w-auto">
-          <TabsList className="grid grid-cols-4 w-full sm:w-[320px] h-9 sm:h-10">
-            <TabsTrigger value="all" className="text-xs sm:text-sm">All</TabsTrigger>
-            <TabsTrigger value="draft" className="text-xs sm:text-sm">Drafts</TabsTrigger>
-            <TabsTrigger value="pending" className="text-xs sm:text-sm">Pending</TabsTrigger>
-            <TabsTrigger value="published" className="text-xs sm:text-sm">Published</TabsTrigger>
+          <TabsList className="grid grid-cols-4 w-full sm:w-[320px] h-9 sm:h-10 bg-slate-100 dark:bg-slate-800">
+            <TabsTrigger value="all" className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white">All</TabsTrigger>
+            <TabsTrigger value="draft" className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white">Drafts</TabsTrigger>
+            <TabsTrigger value="pending" className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white">Pending</TabsTrigger>
+            <TabsTrigger value="published" className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white">Published</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      {/* Exam Table/List */}
-      <Card className="border-0 shadow-xl overflow-hidden">
+      {/* Table */}
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-xl bg-white dark:bg-slate-900 overflow-hidden">
         <CardHeader className="pb-2 sm:pb-3 border-b border-slate-100 dark:border-slate-800 px-4 sm:px-6 pt-4 sm:pt-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <CardTitle className="text-base sm:text-lg text-slate-900 dark:text-white">All Exams</CardTitle>
-              <CardDescription className="text-xs sm:text-sm mt-0.5">
+              <CardDescription className="text-xs sm:text-sm mt-0.5 text-slate-500 dark:text-slate-400">
                 {exams.length} exam{exams.length !== 1 ? 's' : ''} total
                 {termInfo && termInfo.termName && ` · ${termInfo.termName}`}
               </CardDescription>
@@ -273,9 +246,9 @@ export function ExamList({
           {exams.length === 0 ? (
             <div className="py-12 sm:py-16 text-center">
               <div className="inline-flex items-center justify-center w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-slate-100 dark:bg-slate-800 mb-3 sm:mb-4">
-                <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400" />
+                <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-base sm:text-lg font-semibold text-slate-700 dark:text-slate-300 mb-1 sm:mb-2">
+              <h3 className="text-base sm:text-lg font-semibold text-slate-700 dark:text-slate-200 mb-1 sm:mb-2">
                 No exams found
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
@@ -283,14 +256,18 @@ export function ExamList({
                   ? `No exams for ${termInfo.termName} ${termInfo.sessionYear}`
                   : 'Try adjusting your search or create a new exam'}
               </p>
-              <Button onClick={onCreateExam} variant="link" className="mt-3 text-emerald-600 text-sm">
+              <Button 
+                onClick={onCreateExam} 
+                variant="link" 
+                className="mt-3 text-emerald-600 dark:text-emerald-400"
+              >
                 <PlusCircle className="mr-1 h-3.5 w-3.5" />
                 Create your first exam
               </Button>
             </div>
           ) : (
             <>
-              {/* Mobile View - Card Layout */}
+              {/* Mobile */}
               <div className="block lg:hidden divide-y divide-slate-100 dark:divide-slate-800">
                 {exams.map((exam) => (
                   <div key={exam.id} className="p-3 sm:p-4 space-y-2 sm:space-y-3">
@@ -305,28 +282,23 @@ export function ExamList({
                       </div>
                       {getStatusBadge(exam.status)}
                     </div>
-                    <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500">
+                    <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
                         {exam.duration || 60} min
                       </span>
-                      <span>
-                        📝 {exam.total_questions || 0} Qs
-                      </span>
-                      <span>
-                        🎯 {exam.total_marks || 0} pts
-                      </span>
+                      <span>📝 {exam.total_questions || 0} Qs</span>
+                      <span>🎯 {exam.total_marks || 0} pts</span>
                     </div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] sm:text-xs text-slate-400">{formatDate(exam.created_at)}</span>
+                      <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">{formatDate(exam.created_at)}</span>
                       <div className="flex items-center gap-0.5 sm:gap-1">
                         {(exam.status === 'published' || exam.status === 'pending') && (
                           <Button 
                             variant="ghost" 
                             size="icon" 
                             onClick={() => handleViewSubmissions(exam.id)} 
-                            className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                            title="View Submissions"
+                            className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                           >
                             <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
@@ -335,8 +307,7 @@ export function ExamList({
                           variant="ghost" 
                           size="icon" 
                           onClick={() => onViewExam(exam.id)} 
-                          className="h-7 w-7 sm:h-8 sm:w-8"
-                          title="View Exam"
+                          className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                           <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
@@ -345,42 +316,42 @@ export function ExamList({
                             variant="ghost" 
                             size="icon" 
                             onClick={() => onEditExam(exam.id)} 
-                            className="h-7 w-7 sm:h-8 sm:w-8"
+                            className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                           >
                             <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
                         )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                               <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem onClick={() => onViewExam(exam.id)}>
+                          <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                            <DropdownMenuItem onClick={() => onViewExam(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                               <Eye className="mr-2 h-3.5 w-3.5" /> View Details
                             </DropdownMenuItem>
                             {(exam.status === 'published' || exam.status === 'pending') && (
-                              <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)}>
+                              <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                 <Users className="mr-2 h-3.5 w-3.5" /> View Submissions
                               </DropdownMenuItem>
                             )}
                             {exam.status === 'published' && (
-                              <DropdownMenuItem onClick={() => handleEnterScores(exam.id)}>
+                              <DropdownMenuItem onClick={() => handleEnterScores(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                 <Award className="mr-2 h-3.5 w-3.5" /> Enter Scores
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id}>
+                            <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                               <Copy className="mr-2 h-3.5 w-3.5" />
                               {duplicating === exam.id ? 'Duplicating...' : 'Duplicate'}
                             </DropdownMenuItem>
                             {exam.status === 'draft' && (
-                              <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)}>
+                              <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                 <Send className="mr-2 h-3.5 w-3.5" /> Submit for Approval
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteClick(exam)}>
+                            <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
+                            <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/40" onClick={() => handleDeleteClick(exam)}>
                               <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -391,41 +362,43 @@ export function ExamList({
                 ))}
               </div>
 
-              {/* Desktop View - Table Layout */}
+              {/* Desktop */}
               <div className="hidden lg:block overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-slate-50 dark:bg-slate-800/50">
-                      <TableHead className="text-xs">Title</TableHead>
-                      <TableHead className="text-xs">Subject</TableHead>
-                      <TableHead className="text-xs">Class</TableHead>
-                      <TableHead className="text-center text-xs">Questions</TableHead>
-                      <TableHead className="text-center text-xs">Marks</TableHead>
-                      <TableHead className="text-center text-xs">Duration</TableHead>
-                      <TableHead className="text-xs">Status</TableHead>
-                      <TableHead className="text-xs">Created</TableHead>
-                      <TableHead className="text-right text-xs">Actions</TableHead>
+                    <TableRow className="bg-slate-50 dark:bg-slate-800/60 border-slate-100 dark:border-slate-800">
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Title</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Subject</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Class</TableHead>
+                      <TableHead className="text-center text-xs text-slate-600 dark:text-slate-400">Questions</TableHead>
+                      <TableHead className="text-center text-xs text-slate-600 dark:text-slate-400">Marks</TableHead>
+                      <TableHead className="text-center text-xs text-slate-600 dark:text-slate-400">Duration</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Status</TableHead>
+                      <TableHead className="text-xs text-slate-600 dark:text-slate-400">Created</TableHead>
+                      <TableHead className="text-right text-xs text-slate-600 dark:text-slate-400">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {exams.map((exam) => (
-                      <TableRow key={exam.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                        <TableCell className="font-medium text-sm max-w-[200px] truncate">
+                      <TableRow key={exam.id} className="border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                        <TableCell className="font-medium text-sm max-w-[200px] truncate text-slate-900 dark:text-white">
                           {exam.title || 'Untitled'}
                         </TableCell>
-                        <TableCell className="text-sm">{exam.subject || '—'}</TableCell>
+                        <TableCell className="text-sm text-slate-700 dark:text-slate-300">{exam.subject || '—'}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className="text-[10px]">{exam.class || '—'}</Badge>
+                          <Badge variant="outline" className="text-[10px] border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                            {exam.class || '—'}
+                          </Badge>
                         </TableCell>
-                        <TableCell className="text-center text-sm">{exam.total_questions || 0}</TableCell>
-                        <TableCell className="text-center text-sm font-medium">{exam.total_marks || 0}</TableCell>
-                        <TableCell className="text-center text-sm">
+                        <TableCell className="text-center text-sm text-slate-700 dark:text-slate-300">{exam.total_questions || 0}</TableCell>
+                        <TableCell className="text-center text-sm font-medium text-slate-800 dark:text-slate-200">{exam.total_marks || 0}</TableCell>
+                        <TableCell className="text-center text-sm text-slate-700 dark:text-slate-300">
                           <span className="flex items-center justify-center gap-1">
                             <Clock className="h-3 w-3" />{exam.duration || 60}m
                           </span>
                         </TableCell>
                         <TableCell>{getStatusBadge(exam.status)}</TableCell>
-                        <TableCell className="text-sm text-slate-500">{formatDate(exam.created_at)}</TableCell>
+                        <TableCell className="text-sm text-slate-500 dark:text-slate-400">{formatDate(exam.created_at)}</TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {(exam.status === 'published' || exam.status === 'pending') && (
@@ -433,8 +406,7 @@ export function ExamList({
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => handleViewSubmissions(exam.id)} 
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                                title="View Submissions"
+                                className="h-8 w-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                               >
                                 <Users className="h-4 w-4" />
                               </Button>
@@ -443,8 +415,7 @@ export function ExamList({
                               variant="ghost" 
                               size="icon" 
                               onClick={() => onViewExam(exam.id)} 
-                              className="h-8 w-8"
-                              title="View Exam"
+                              className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
@@ -453,45 +424,44 @@ export function ExamList({
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => onEditExam(exam.id)} 
-                                className="h-8 w-8"
-                                title="Edit Exam"
+                                className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                               >
                                 <Edit className="h-4 w-4" />
                               </Button>
                             )}
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48">
-                                <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem onClick={() => onViewExam(exam.id)}>
+                              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                                <DropdownMenuLabel className="text-xs text-slate-500 dark:text-slate-400">Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
+                                <DropdownMenuItem onClick={() => onViewExam(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                   <Eye className="mr-2 h-3.5 w-3.5" /> View Details
                                 </DropdownMenuItem>
                                 {(exam.status === 'published' || exam.status === 'pending') && (
-                                  <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)}>
+                                  <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                     <Users className="mr-2 h-3.5 w-3.5" /> View Submissions
                                   </DropdownMenuItem>
                                 )}
                                 {exam.status === 'published' && (
-                                  <DropdownMenuItem onClick={() => handleEnterScores(exam.id)}>
+                                  <DropdownMenuItem onClick={() => handleEnterScores(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                     <Award className="mr-2 h-3.5 w-3.5" /> Enter Scores
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id}>
+                                <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                   <Copy className="mr-2 h-3.5 w-3.5" />
                                   {duplicating === exam.id ? 'Duplicating...' : 'Duplicate'}
                                 </DropdownMenuItem>
                                 {exam.status === 'draft' && (
-                                  <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)}>
+                                  <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
                                     <Send className="mr-2 h-3.5 w-3.5" /> Submit for Approval
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteClick(exam)}>
+                                <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
+                                <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/40" onClick={() => handleDeleteClick(exam)}>
                                   <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -508,10 +478,10 @@ export function ExamList({
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       {deleteDialogOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 rounded-xl p-5 sm:p-6 max-w-md w-full mx-3 sm:mx-4 shadow-2xl">
+          <div className="bg-white dark:bg-slate-900 rounded-xl p-5 sm:p-6 max-w-md w-full mx-3 sm:mx-4 shadow-2xl border border-slate-200 dark:border-slate-800">
             <h3 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white mb-2">Delete Exam</h3>
             <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-5 sm:mb-6">
               Are you sure you want to delete <span className="font-semibold text-slate-700 dark:text-slate-300">{examToDelete?.title}</span>?
@@ -521,13 +491,13 @@ export function ExamList({
               <Button 
                 variant="outline" 
                 onClick={() => setDeleteDialogOpen(false)}
-                className="h-8 sm:h-9 text-sm"
+                className="h-8 sm:h-9 text-sm border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 Cancel
               </Button>
               <Button 
                 onClick={handleConfirmDelete} 
-                className="bg-red-600 hover:bg-red-700 h-8 sm:h-9 text-sm"
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white h-8 sm:h-9 text-sm"
               >
                 Delete Exam
               </Button>

@@ -24,18 +24,18 @@ export function PendingTasksAlert({ count, termName, onGradeNow }: PendingTasksA
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.1 }}
     >
-      <Card className="border-0 shadow-sm bg-gradient-to-r from-amber-50 to-yellow-50 border-l-4 border-l-amber-500">
+      <Card className="border-0 shadow-sm bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-l-4 border-l-amber-500 dark:border-l-amber-600 transition-colors duration-300">
         <CardContent className="p-4 sm:p-5">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div className="flex items-center gap-3 flex-1">
-              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                <Bell className="h-5 w-5 text-amber-600" />
+              <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-full bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+                <Bell className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
               <div>
-                <p className="font-semibold text-amber-800 text-sm sm:text-base">
+                <p className="font-semibold text-amber-800 dark:text-amber-300 text-sm sm:text-base">
                   Pending Grading Tasks
                 </p>
-                <p className="text-xs sm:text-sm text-amber-600">
+                <p className="text-xs sm:text-sm text-amber-600 dark:text-amber-400">
                   You have {count} exam submissions waiting for {termName}
                 </p>
               </div>
@@ -43,7 +43,7 @@ export function PendingTasksAlert({ count, termName, onGradeNow }: PendingTasksA
             <Button 
               size="sm" 
               onClick={onGradeNow} 
-              className="bg-amber-600 hover:bg-amber-700 text-white h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
+              className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 text-white h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
             >
               Grade Now <ArrowRight className="ml-1.5 h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </Button>

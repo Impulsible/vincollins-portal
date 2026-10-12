@@ -25,6 +25,7 @@ export type TabType =
 // TERM INFO - FIXED: Made properties required
 // ============================================
 export interface TermInfo {
+  currentTerm: any
   term: any
   termCode: 'first' | 'second' | 'third'
   termName: string

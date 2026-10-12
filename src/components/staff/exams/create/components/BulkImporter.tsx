@@ -1,4 +1,4 @@
-// src/components/staff/exams/create/components/BulkImporter.tsx - UPDATED WITH MARK CALCULATION
+// src/components/staff/exams/create/components/BulkImporter.tsx - WITH COMPLETE DARK MODE
 
 "use client";
 
@@ -24,7 +24,6 @@ interface BulkImporterProps {
   parseButtonIcon?: React.ReactNode;
   textareaClassName?: string;
   textareaRows?: number;
-  // ✅ New props for mark calculation
   defaultMark?: number;
   objectiveTotal?: number;
   theoryTotal?: number;
@@ -48,40 +47,39 @@ interface ContentAnalysis {
 
 const ACCENT = {
   emerald: {
-    border: "border-emerald-200 focus-within:border-emerald-400",
-    header: "bg-emerald-50 border-b border-emerald-200",
-    badge: "bg-emerald-100 text-emerald-700",
-    btn: "bg-emerald-600 hover:bg-emerald-700",
-    ghost: "text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50",
-    error: "border-red-300 bg-red-50",
+    border: "border-emerald-200 dark:border-emerald-900/50 focus-within:border-emerald-400 dark:focus-within:border-emerald-600",
+    header: "bg-emerald-50 dark:bg-emerald-950/30 border-b border-emerald-200 dark:border-emerald-900/50",
+    badge: "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400",
+    btn: "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500",
+    ghost: "text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-950/40",
+    error: "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30",
   },
   blue: {
-    border: "border-blue-200 focus-within:border-blue-400",
-    header: "bg-blue-50 border-b border-blue-200",
-    badge: "bg-blue-100 text-blue-700",
-    btn: "bg-blue-600 hover:bg-blue-700",
-    ghost: "text-blue-600 hover:text-blue-700 hover:bg-blue-50",
-    error: "border-red-300 bg-red-50",
+    border: "border-blue-200 dark:border-blue-900/50 focus-within:border-blue-400 dark:focus-within:border-blue-600",
+    header: "bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-900/50",
+    badge: "bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400",
+    btn: "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500",
+    ghost: "text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40",
+    error: "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30",
   },
   purple: {
-    border: "border-purple-200 focus-within:border-purple-400",
-    header: "bg-purple-50 border-b border-purple-200",
-    badge: "bg-purple-100 text-purple-700",
-    btn: "bg-purple-600 hover:bg-purple-700",
-    ghost: "text-purple-600 hover:text-purple-700 hover:bg-purple-50",
-    error: "border-red-300 bg-red-50",
+    border: "border-purple-200 dark:border-purple-900/50 focus-within:border-purple-400 dark:focus-within:border-purple-600",
+    header: "bg-purple-50 dark:bg-purple-950/30 border-b border-purple-200 dark:border-purple-900/50",
+    badge: "bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400",
+    btn: "bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500",
+    ghost: "text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/40",
+    error: "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30",
   },
   amber: {
-    border: "border-amber-200 focus-within:border-amber-400",
-    header: "bg-amber-50 border-b border-amber-200",
-    badge: "bg-amber-100 text-amber-700",
-    btn: "bg-amber-600 hover:bg-amber-700",
-    ghost: "text-amber-600 hover:text-amber-700 hover:bg-amber-50",
-    error: "border-red-300 bg-red-50",
+    border: "border-amber-200 dark:border-amber-900/50 focus-within:border-amber-400 dark:focus-within:border-amber-600",
+    header: "bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50",
+    badge: "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400",
+    btn: "bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500",
+    ghost: "text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 hover:bg-amber-50 dark:hover:bg-amber-950/40",
+    error: "border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30",
   },
 } as const;
 
-// ── Convert markdown table to HTML ──────────────────────────────────────────
 const convertMarkdownTableToHtml = (text: string): string => {
   if (!text) return '';
   
@@ -113,26 +111,15 @@ const convertMarkdownTableToHtml = (text: string): string => {
   return html;
 };
 
-// ── Enhanced Content Detection ──────────────────────────────────────────────
-
 const detectContent = (text: string): ContentAnalysis => {
   if (!text) {
     return {
-      hasTables: false,
-      hasCharts: false,
-      hasImages: false,
-      hasMath: false,
-      hasCode: false,
-      hasLists: false,
-      tableCount: 0,
-      chartCount: 0,
-      imageCount: 0,
-      totalQuestions: 0,
-      detectedFormat: 'plain',
+      hasTables: false, hasCharts: false, hasImages: false, hasMath: false,
+      hasCode: false, hasLists: false, tableCount: 0, chartCount: 0,
+      imageCount: 0, totalQuestions: 0, detectedFormat: 'plain',
     };
   }
 
-  // ── Detect format ──
   let detectedFormat: 'markdown' | 'html' | 'plain' | 'mixed' = 'plain';
   if (text.includes('```') || text.includes('**') || text.includes('## ')) {
     detectedFormat = 'markdown';
@@ -141,45 +128,32 @@ const detectContent = (text: string): ContentAnalysis => {
     detectedFormat = detectedFormat === 'markdown' ? 'mixed' : 'html';
   }
 
-  // ── Count tables ──
   const tableCount = (
     (text.match(/\|.+\|/g)?.length || 0) +
     (text.match(/<table[\s\S]*?<\/table>/gi)?.length || 0) +
     (text.match(/\+--.*--\+/g)?.length || 0)
   );
 
-  // ── Count charts ──
   const chartKeywords = ['chart', 'graph', 'diagram', 'plot', 'bar chart', 'pie chart', 'line graph', 'histogram', 'scatter plot'];
   const chartCount = chartKeywords.reduce((count, kw) => {
     return count + (text.toLowerCase().match(new RegExp(kw, 'g'))?.length || 0);
   }, 0);
 
-  // ── Count images ──
   const imageCount = (
     (text.match(/!\[.*?\]\(.*?\)/g)?.length || 0) +
     (text.match(/<img[^>]*>/gi)?.length || 0) +
     (text.match(/data:image[^,;]+[;,]?/g)?.length || 0)
   );
 
-  // ── Detect math ──
   const hasMath = (
-    text.includes('∑') ||
-    text.includes('∫') ||
-    text.includes('√') ||
-    text.includes('∂') ||
-    text.includes('∞') ||
+    text.includes('∑') || text.includes('∫') || text.includes('√') ||
+    text.includes('∂') || text.includes('∞') ||
     Boolean(text.match(/[a-z]=\d+/)) ||
-    text.includes('frac{') ||
-    text.includes('sqrt{')
+    text.includes('frac{') || text.includes('sqrt{')
   );
 
-  // ── Detect code ──
   const hasCode = text.includes('```') || text.includes('`');
-
-  // ── Detect lists ──
   const hasLists = Boolean(text.match(/^[\d]+\.\s/m)) || Boolean(text.match(/^[-*•]\s/m));
-
-  // ── Count questions ──
   const questionMatch = text.match(/\d+[\.\)]\s/g);
   const totalQuestions = questionMatch ? questionMatch.length : 0;
 
@@ -187,24 +161,17 @@ const detectContent = (text: string): ContentAnalysis => {
     hasTables: tableCount > 0,
     hasCharts: chartCount > 0,
     hasImages: imageCount > 0,
-    hasMath,
-    hasCode,
-    hasLists,
-    tableCount,
-    chartCount,
-    imageCount,
-    totalQuestions,
-    detectedFormat,
+    hasMath, hasCode, hasLists,
+    tableCount, chartCount, imageCount, totalQuestions, detectedFormat,
   };
 };
 
-// ── Render Table Preview ──────────────────────────────────────────────────────
 const TablePreview = ({ text }: { text: string }) => {
   const tableHtml = convertMarkdownTableToHtml(text);
   
   if (!tableHtml) {
     return (
-      <div className="text-xs text-gray-400 italic">
+      <div className="text-xs text-gray-400 dark:text-gray-500 italic">
         Table detected but couldn't be rendered. Please ensure proper markdown table format.
       </div>
     );
@@ -235,7 +202,6 @@ export function BulkImporter({
   parseButtonIcon,
   textareaClassName = "text-sm leading-relaxed",
   textareaRows = 14,
-  // ✅ New props
   defaultMark = 0.5,
   objectiveTotal = 0,
   theoryTotal = 0,
@@ -249,7 +215,6 @@ export function BulkImporter({
   
   const accent = ACCENT[accentColor];
 
-  // ── Analyze content on change ──
   useEffect(() => {
     const result = detectContent(value);
     setAnalysis(result);
@@ -272,7 +237,6 @@ export function BulkImporter({
     }
   };
 
-  // ── Extract table content from text ──
   const getTableContent = (text: string): string => {
     const lines = text.split('\n');
     let tableLines: string[] = [];
@@ -295,7 +259,7 @@ export function BulkImporter({
   return (
     <div className={cn("rounded-xl border-2 overflow-hidden transition-colors", accent.border)}>
 
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div className={cn("flex flex-wrap items-center justify-between gap-2 px-3 py-2", accent.header)}>
         <div className="flex items-center gap-2 flex-wrap">
           <span className={cn("text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full", accent.badge)}>
@@ -303,10 +267,10 @@ export function BulkImporter({
           </span>
           {value && analysis && (
             <>
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-gray-500 dark:text-slate-400">
                 {value.split("\n").length} lines
               </span>
-              <span className="text-[10px] text-gray-400">
+              <span className="text-[10px] text-gray-400 dark:text-slate-500">
                 {getFormatLabel(analysis.detectedFormat)}
               </span>
             </>
@@ -314,11 +278,12 @@ export function BulkImporter({
         </div>
 
         <div className="flex items-center gap-1 flex-wrap">
-          {/* ✅ Mark Info */}
           {showMarkInfo && (
             <Badge className={cn(
-              "text-[10px]",
-              isBalanced ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+              "text-[10px] border-0",
+              isBalanced 
+                ? "bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400" 
+                : "bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400"
             )}>
               <Calculator className="h-2.5 w-2.5 mr-0.5" />
               {objectiveTotal} + {theoryTotal} = {objectiveTotal + theoryTotal}
@@ -326,7 +291,6 @@ export function BulkImporter({
             </Badge>
           )}
 
-          {/* Toggle rendered view */}
           {hasVisibleTable && (
             <Button
               type="button"
@@ -337,19 +301,16 @@ export function BulkImporter({
             >
               {showRenderedContent ? (
                 <>
-                  <EyeOff className="h-3 w-3 mr-1" />
-                  Raw
+                  <EyeOff className="h-3 w-3 mr-1" />Raw
                 </>
               ) : (
                 <>
-                  <Eye className="h-3 w-3 mr-1" />
-                  Rendered
+                  <Eye className="h-3 w-3 mr-1" />Rendered
                 </>
               )}
             </Button>
           )}
 
-          {/* Insert example */}
           {onInsertExample && (
             <Button
               type="button"
@@ -362,7 +323,6 @@ export function BulkImporter({
             </Button>
           )}
 
-          {/* Download template */}
           {onDownloadTemplate && (
             <Button
               type="button"
@@ -375,20 +335,18 @@ export function BulkImporter({
             </Button>
           )}
 
-          {/* Clear */}
           {value && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
               onClick={() => onChange("")}
-              className="h-6 text-[10px] px-2 text-gray-500 hover:text-red-600 hover:bg-red-50"
+              className="h-6 text-[10px] px-2 text-gray-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
             >
               Clear
             </Button>
           )}
 
-          {/* Upload file */}
           <Button
             type="button"
             variant="ghost"
@@ -414,11 +372,11 @@ export function BulkImporter({
         </div>
       </div>
 
-      {/* ── Content Analysis Banner ── */}
+      {/* Analysis banner */}
       {value && analysis && (
-        <div className="px-3 py-1.5 bg-blue-50/80 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-800 flex flex-wrap items-center gap-2">
+        <div className="px-3 py-1.5 bg-blue-50/80 dark:bg-blue-950/20 border-b border-blue-100 dark:border-blue-900/50 flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="h-3.5 w-3.5 text-blue-500" />
+            <Sparkles className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
             <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300">Detected:</span>
           </div>
           
@@ -454,24 +412,24 @@ export function BulkImporter({
             )}
           </div>
           
-          <span className="text-[10px] text-gray-400 ml-auto hidden sm:inline">
+          <span className="text-[10px] text-gray-400 dark:text-slate-500 ml-auto hidden sm:inline">
             ✨ Formatting preserved
           </span>
         </div>
       )}
 
-      {/* ── Rendered Table Preview ── */}
+      {/* Rendered table preview */}
       {showRenderedContent && hasVisibleTable && (
         <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-medium text-gray-600 dark:text-gray-400">📊 Table Preview</span>
-            <span className="text-[10px] text-gray-400">Rendered from markdown</span>
+            <span className="text-[10px] text-gray-400 dark:text-gray-500">Rendered from markdown</span>
           </div>
           <TablePreview text={getTableContent(value)} />
         </div>
       )}
 
-      {/* ── Paste textarea ── */}
+      {/* Textarea */}
       <Textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -480,6 +438,7 @@ export function BulkImporter({
         className={cn(
           "w-full resize-none rounded-none border-0 ring-0 focus-visible:ring-0",
           "bg-white dark:bg-gray-950 placeholder:text-gray-300 dark:placeholder:text-gray-600",
+          "text-slate-800 dark:text-slate-100",
           "font-mono",
           textareaClassName,
           parseError && accent.error
@@ -489,37 +448,38 @@ export function BulkImporter({
         autoCapitalize="off"
       />
 
-      {/* ── Error message ── */}
+      {/* Error */}
       {parseError && (
         <div className="flex items-start gap-2 px-3 py-2 bg-red-50 dark:bg-red-950/20 border-t border-red-200 dark:border-red-800">
-          <AlertCircle className="h-3.5 w-3.5 text-red-500 mt-0.5 shrink-0" />
+          <AlertCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400 mt-0.5 shrink-0" />
           <p className="text-xs text-red-600 dark:text-red-400 leading-relaxed">{parseError}</p>
         </div>
       )}
 
-      {/* ── Parse / submit button ── */}
+      {/* Footer */}
       <div className="px-3 py-2 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-100 dark:border-gray-800 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {value && analysis && (
-            <div className="flex items-center gap-1 text-[10px] text-gray-400">
-              <Check className="h-3 w-3 text-emerald-500" />
+            <div className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500">
+              <Check className="h-3 w-3 text-emerald-500 dark:text-emerald-400" />
               <span>{analysis.totalQuestions || 0} questions</span>
               {analysis.hasTables && (
-                <span className="text-blue-400">· {analysis.tableCount} tables</span>
+                <span className="text-blue-400 dark:text-blue-500">· {analysis.tableCount} tables</span>
               )}
             </div>
           )}
-          {/* ✅ Mark info in footer */}
           {showMarkInfo && (
             <span className={cn(
               "text-[10px]",
-              isBalanced ? "text-emerald-600" : "text-amber-600"
+              isBalanced 
+                ? "text-emerald-600 dark:text-emerald-400" 
+                : "text-amber-600 dark:text-amber-400"
             )}>
               {isBalanced ? "✅ " : "⚠️ "}
               {objectiveTotal + theoryTotal}/60
             </span>
           )}
-          <p className="text-[10px] text-gray-400 leading-snug hidden sm:block">
+          <p className="text-[10px] text-gray-400 dark:text-gray-500 leading-snug hidden sm:block">
             {value && analysis && (analysis.hasTables || analysis.hasCharts || analysis.hasImages) 
               ? "✨ Tables, charts, and images will be preserved." 
               : "Paste questions above, then click parse."}

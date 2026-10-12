@@ -1,4 +1,4 @@
-// app/staff/assignments/page.tsx - WITH ATTACHMENT INDICATORS
+// app/staff/assignments/page.tsx - WITH ATTACHMENT INDICATORS + DARK MODE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -116,14 +116,18 @@ export default function AssignmentsPage() {
 
   const getStatusBadge = (assignment: any) => {
     if (assignment.status === 'draft') {
-      return <Badge className="bg-gray-100 text-gray-700">Draft</Badge>
+      return <Badge className="bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300 border-0">Draft</Badge>
     }
     
     if (isPast(new Date(assignment.due_date))) {
-      return <Badge className="bg-red-100 text-red-700"><AlertCircle className="h-3 w-3 mr-1" />Overdue</Badge>
+      return <Badge className="bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 border-0">
+        <AlertCircle className="h-3 w-3 mr-1" />Overdue
+      </Badge>
     }
     
-    return <Badge className="bg-green-100 text-green-700"><CheckCircle className="h-3 w-3 mr-1" />Published</Badge>
+    return <Badge className="bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400 border-0">
+      <CheckCircle className="h-3 w-3 mr-1" />Published
+    </Badge>
   }
 
   const getClassesDisplay = (classes: string[]) => {
@@ -142,9 +146,9 @@ export default function AssignmentsPage() {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-5 md:p-6 lg:p-7">
+      <div className="p-4 sm:p-5 md:p-6 lg:p-7 transition-colors duration-300">
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
         </div>
       </div>
     )
@@ -158,22 +162,31 @@ export default function AssignmentsPage() {
   }
 
   return (
-    <div className="p-4 sm:p-5 md:p-6 lg:p-7 space-y-4 sm:space-y-6">
+    <div className="p-4 sm:p-5 md:p-6 lg:p-7 space-y-4 sm:space-y-6 transition-colors duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white">Assignments</h1>
-          <p className="text-muted-foreground text-sm mt-1">
+          <p className="text-slate-500 dark:text-slate-400 text-sm mt-1">
             Manage and track your assignments
           </p>
         </div>
         
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => profile?.id && loadAssignments(profile.id, true)} disabled={refreshing}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => profile?.id && loadAssignments(profile.id, true)} 
+            disabled={refreshing}
+            className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+          >
             <RefreshCw className={cn("h-4 w-4 mr-2", refreshing && "animate-spin")} />
             Refresh
           </Button>
-          <Button onClick={() => router.push('/staff/assignments/create')} className="bg-emerald-600 hover:bg-emerald-700">
+          <Button 
+            onClick={() => router.push('/staff/assignments/create')} 
+            className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          >
             <Plus className="h-4 w-4 mr-2" />
             Create Assignment
           </Button>
@@ -182,71 +195,91 @@ export default function AssignmentsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="border-0 shadow-sm bg-white">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-slate-500">Total</p>
-                <p className="text-2xl font-bold">{stats.total}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Total</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-slate-100">{stats.total}</p>
               </div>
-              <FileText className="h-8 w-8 text-blue-500 opacity-50" />
+              <FileText className="h-8 w-8 text-blue-500 dark:text-blue-400 opacity-50" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-green-50">
+        <Card className="border border-green-200/60 dark:border-green-900/40 shadow-sm bg-green-50 dark:bg-green-950/30">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-green-600">Published</p>
-                <p className="text-2xl font-bold text-green-700">{stats.published}</p>
+                <p className="text-xs text-green-600 dark:text-green-400">Published</p>
+                <p className="text-2xl font-bold text-green-700 dark:text-green-300">{stats.published}</p>
               </div>
-              <CheckCircle className="h-8 w-8 text-green-500 opacity-50" />
+              <CheckCircle className="h-8 w-8 text-green-500 dark:text-green-400 opacity-50" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-yellow-50">
+        <Card className="border border-yellow-200/60 dark:border-yellow-900/40 shadow-sm bg-yellow-50 dark:bg-yellow-950/30">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-yellow-600">Drafts</p>
-                <p className="text-2xl font-bold text-yellow-700">{stats.drafts}</p>
+                <p className="text-xs text-yellow-600 dark:text-yellow-400">Drafts</p>
+                <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{stats.drafts}</p>
               </div>
-              <Edit className="h-8 w-8 text-yellow-500 opacity-50" />
+              <Edit className="h-8 w-8 text-yellow-500 dark:text-yellow-400 opacity-50" />
             </div>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-red-50">
+        <Card className="border border-red-200/60 dark:border-red-900/40 shadow-sm bg-red-50 dark:bg-red-950/30">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-red-600">Overdue</p>
-                <p className="text-2xl font-bold text-red-700">{stats.overdue}</p>
+                <p className="text-xs text-red-600 dark:text-red-400">Overdue</p>
+                <p className="text-2xl font-bold text-red-700 dark:text-red-300">{stats.overdue}</p>
               </div>
-              <AlertCircle className="h-8 w-8 text-red-500 opacity-50" />
+              <AlertCircle className="h-8 w-8 text-red-500 dark:text-red-400 opacity-50" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
         <CardContent className="p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full sm:w-auto">
-              <TabsList className="bg-slate-100">
-                <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
-                <TabsTrigger value="published">Published ({stats.published})</TabsTrigger>
-                <TabsTrigger value="draft">Drafts ({stats.drafts})</TabsTrigger>
-                <TabsTrigger value="overdue">Overdue ({stats.overdue})</TabsTrigger>
+              <TabsList className="bg-slate-100 dark:bg-slate-800">
+                <TabsTrigger 
+                  value="all"
+                  className="text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white"
+                >
+                  All ({stats.total})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="published"
+                  className="text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white"
+                >
+                  Published ({stats.published})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="draft"
+                  className="text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white"
+                >
+                  Drafts ({stats.drafts})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="overdue"
+                  className="text-slate-600 dark:text-slate-400 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-900 data-[state=active]:text-slate-900 dark:data-[state=active]:text-white"
+                >
+                  Overdue ({stats.overdue})
+                </TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
               <Input
                 placeholder="Search by title, subject, or class..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 bg-white"
+                className="pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
           </div>
@@ -254,45 +287,53 @@ export default function AssignmentsPage() {
       </Card>
 
       {/* Assignments List */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
         <CardContent className="p-0">
           {filteredAssignments.length === 0 ? (
             <div className="text-center py-12">
-              <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No assignments found</h3>
-              <p className="text-muted-foreground mb-4">
+              <div className="h-16 w-16 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-4">
+                <FileText className="h-8 w-8 text-slate-300 dark:text-slate-500" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2 text-slate-800 dark:text-slate-200">
+                No assignments found
+              </h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
                 {searchQuery ? 'Try a different search term' : 'Create your first assignment'}
               </p>
               {!searchQuery && (
-                <Button onClick={() => router.push('/staff/assignments/create')} className="bg-emerald-600">
+                <Button 
+                  onClick={() => router.push('/staff/assignments/create')} 
+                  className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                >
                   <Plus className="h-4 w-4 mr-2" />
                   Create Assignment
                 </Button>
               )}
             </div>
           ) : (
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-slate-200 dark:divide-slate-800">
               {filteredAssignments.map((assignment) => (
                 <div 
                   key={assignment.id} 
-                  className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
                   onClick={() => router.push(`/staff/assignments/${assignment.id}`)}
                 >
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap mb-2">
-                        <h3 className="font-semibold text-base sm:text-lg">{assignment.title}</h3>
+                        <h3 className="font-semibold text-base sm:text-lg text-slate-800 dark:text-slate-100">
+                          {assignment.title}
+                        </h3>
                         {getStatusBadge(assignment)}
-                        {/* ✅ Attachment Indicator */}
                         {assignment.attachment_urls && assignment.attachment_urls.length > 0 && (
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 text-[10px]">
+                          <Badge className="bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 text-[10px] border-0">
                             <Paperclip className="h-2.5 w-2.5 mr-0.5" />
                             {assignment.file_count || assignment.attachment_urls.length} file(s)
                           </Badge>
                         )}
                       </div>
                       
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-muted-foreground">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
                         <span className="flex items-center gap-1">
                           <BookOpen className="h-3.5 w-3.5" />
                           {assignment.subject}
@@ -311,7 +352,9 @@ export default function AssignmentsPage() {
                         </span>
                         <span className={cn(
                           "flex items-center gap-1",
-                          isPast(new Date(assignment.due_date)) ? "text-red-600" : "text-slate-500"
+                          isPast(new Date(assignment.due_date)) 
+                            ? "text-red-600 dark:text-red-400" 
+                            : "text-slate-500 dark:text-slate-400"
                         )}>
                           <Clock className="h-3.5 w-3.5" />
                           {getDaysRemaining(assignment.due_date)}
@@ -323,7 +366,7 @@ export default function AssignmentsPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8"
+                        className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                         onClick={(e) => {
                           e.stopPropagation()
                           router.push(`/staff/assignments/${assignment.id}`)
@@ -334,7 +377,7 @@ export default function AssignmentsPage() {
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="h-8 w-8"
+                        className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                         onClick={(e) => {
                           e.stopPropagation()
                           router.push(`/staff/assignments/${assignment.id}/edit`)
@@ -345,9 +388,8 @@ export default function AssignmentsPage() {
                     </div>
                   </div>
                   
-                  {/* ✅ Show file names on hover or in expanded view */}
                   {assignment.attachment_urls && assignment.attachment_urls.length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-slate-100 text-[10px] text-slate-400 flex items-center gap-2">
+                    <div className="mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-2">
                       <Paperclip className="h-3 w-3" />
                       <span className="truncate">
                         {assignment.attachment_urls.map((url: string, i: number) => {

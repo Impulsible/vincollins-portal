@@ -110,29 +110,45 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
   const [imgError, setImgError] = useState(false)
   const [progress, setProgress] = useState(100)
 
-  // Subtle circular progress visual
+  // Role-specific copy
+  const accessLabel =
+    role === 'admin'
+      ? 'Verified Admin Access'
+      : role === 'teacher'
+        ? 'Verified Staff Access'
+        : 'Verified Student Access'
+
+  const portalLabel =
+    role === 'admin'
+      ? 'Enter Admin Portal'
+      : role === 'teacher'
+        ? 'Enter Staff Portal'
+        : 'Enter Student Portal'
+
+  const roleTag =
+    role === 'admin' ? 'Admin' : role === 'teacher' ? 'Staff' : 'Student'
+
+  // 3s auto-redirect progress bar
   useEffect(() => {
-    const duration = 3000 // 3 seconds
+    const duration = 3000
     const intervalTime = 30
     const step = (intervalTime / duration) * 100
     const timer = setInterval(() => {
       setProgress((prev) => Math.max(0, prev - step))
     }, intervalTime)
-
     return () => clearInterval(timer)
   }, [])
 
-  // Generate modern gradient-initials placeholder if no image exists or fails
-  const getInitials = () => {
-    return userName
+  const getInitials = () =>
+    userName
       .split(' ')
+      .filter(Boolean)
       .slice(0, 2)
       .map((n) => n[0])
       .join('')
       .toUpperCase()
-  }
 
-  // Resolves Supabase storage avatars or full URLs
+  // Resolves Supabase storage avatars or absolute URLs
   const resolvedAvatarUrl = (() => {
     if (!avatarUrl) return null
     if (avatarUrl.startsWith('http://') || avatarUrl.startsWith('https://')) {
@@ -142,7 +158,35 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
     return data?.publicUrl || null
   })()
 
-  const isStudent = role === 'student'
+  const showPhoto = Boolean(resolvedAvatarUrl) && !imgError
+
+  // Role accents
+  const accent = {
+    admin: {
+      badge:
+        'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-100 dark:border-purple-800/60',
+      sparkle: 'text-purple-600 dark:text-purple-400',
+      bar: 'bg-purple-500',
+      shadow: 'shadow-purple-600/20 hover:shadow-purple-600/30',
+      gradientEnd: '#7C3AED',
+    },
+    teacher: {
+      badge:
+        'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-100 dark:border-blue-800/60',
+      sparkle: 'text-blue-600 dark:text-blue-400',
+      bar: 'bg-blue-500',
+      shadow: 'shadow-blue-600/20 hover:shadow-blue-600/30',
+      gradientEnd: '#1D4ED8',
+    },
+    student: {
+      badge:
+        'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-100 dark:border-emerald-800/60',
+      sparkle: 'text-emerald-600 dark:text-emerald-400',
+      bar: 'bg-emerald-500',
+      shadow: 'shadow-emerald-600/20 hover:shadow-emerald-600/30',
+      gradientEnd: '#047857',
+    },
+  }[role]
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
@@ -153,16 +197,16 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
         transition={{ type: 'spring', stiffness: 350, damping: 28 }}
         className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-3xl shadow-2xl overflow-hidden border border-gray-100 dark:border-slate-800"
       >
-        {/* Decorative Top Accent Gradients */}
+        {/* Decorative top accent */}
         <div
-          className="h-2 w-full transition-all duration-300"
+          className="h-2 w-full"
           style={{
-            background: `linear-gradient(90deg, ${config.color}, #34D399, ${config.color})`,
+            background: `linear-gradient(90deg, ${config.color}, ${accent.gradientEnd}, ${config.color})`,
           }}
         />
 
         <div className="p-8">
-          {/* Close/Skip button */}
+          {/* Skip / go now */}
           <button
             onClick={onGo}
             className="absolute top-5 right-5 h-8 w-8 rounded-full bg-gray-50 dark:bg-slate-800 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-100 dark:border-slate-700 flex items-center justify-center transition-colors group"
@@ -172,94 +216,110 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
           </button>
 
           <div className="flex flex-col items-center text-center">
-            
-            {/* ── PROFILE PHOTO / AVATAR PORT CONTAINER ─────────────────── */}
+            {/* Avatar */}
             <div className="relative mb-6">
-              
-              {/* Outer decorative/pulsing ring */}
-              <span className="absolute inset-0 rounded-full bg-emerald-500/10 animate-ping duration-1000 pointer-events-none" />
+              <span
+                className="absolute inset-0 rounded-full animate-ping duration-1000 pointer-events-none opacity-30"
+                style={{ backgroundColor: config.color }}
+              />
 
               <div
-                className="relative w-32 h-32 rounded-full p-1.5 flex items-center justify-center bg-white dark:bg-slate-900 shadow-xl transition-all"
+                className="relative w-32 h-32 rounded-full p-1.5 flex items-center justify-center shadow-xl"
                 style={{
-                  background: `linear-gradient(135deg, ${config.color}, #6EE7B7)`,
+                  background: `linear-gradient(135deg, ${config.color}, ${accent.gradientEnd})`,
                 }}
               >
                 <div className="relative w-full h-full rounded-full bg-white dark:bg-slate-900 overflow-hidden flex items-center justify-center">
-                  {isStudent && resolvedAvatarUrl && !imgError ? (
+                  {showPhoto ? (
                     <>
-                      {/* Image loading state */}
                       {!imgLoaded && (
                         <div className="absolute inset-0 bg-gray-50 dark:bg-slate-800 flex items-center justify-center animate-pulse">
-                          <Loader2 className="h-6 w-6 text-emerald-500 animate-spin" />
+                          <Loader2
+                            className="h-6 w-6 animate-spin"
+                            style={{ color: config.color }}
+                          />
                         </div>
                       )}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
-                        src={resolvedAvatarUrl}
+                        src={resolvedAvatarUrl!}
                         alt={userName}
                         className={cn(
-                          "w-full h-full object-cover transition-transform duration-500 hover:scale-110",
-                          imgLoaded ? "opacity-100" : "opacity-0"
+                          'w-full h-full object-cover transition-transform duration-500 hover:scale-110',
+                          imgLoaded ? 'opacity-100' : 'opacity-0',
                         )}
                         onLoad={() => setImgLoaded(true)}
                         onError={() => setImgError(true)}
                       />
                     </>
                   ) : (
-                    <div 
+                    <div
                       className="w-full h-full flex flex-col items-center justify-center text-white font-bold tracking-wider"
                       style={{
-                        background: `linear-gradient(135deg, ${config.color}, #10B981)`
+                        background: `linear-gradient(135deg, ${config.color}, ${accent.gradientEnd})`,
                       }}
                     >
                       <span className="text-3xl font-extrabold">{getInitials()}</span>
-                      {isStudent && <span className="text-[10px] uppercase font-medium tracking-widest opacity-80 mt-0.5">Student</span>}
+                      <span className="text-[10px] uppercase font-medium tracking-widest opacity-80 mt-0.5">
+                        {roleTag}
+                      </span>
                     </div>
                   )}
                 </div>
 
-                {/* Highly-visible, Verified Badge */}
-                <div className="absolute bottom-1 right-1 h-8 w-8 bg-emerald-500 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center shadow-md">
+                {/* Verified check — role-colored */}
+                <div
+                  className="absolute bottom-1 right-1 h-8 w-8 rounded-full border-4 border-white dark:border-slate-900 flex items-center justify-center shadow-md"
+                  style={{ backgroundColor: config.color }}
+                >
                   <Check className="h-4 w-4 text-white stroke-[3px]" />
                 </div>
               </div>
             </div>
 
-            {/* ── CUSTOMER & ACCOUNT DETAILS ────────────────────────────── */}
+            {/* Labels */}
             <div className="space-y-2 mb-8">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-semibold tracking-wide border border-emerald-100 dark:border-emerald-800/60 uppercase">
-                <Sparkles className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                Verified Student Access
+              <div
+                className={cn(
+                  'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold tracking-wide border uppercase',
+                  accent.badge,
+                )}
+              >
+                <Sparkles className={cn('h-3.5 w-3.5', accent.sparkle)} />
+                {accessLabel}
               </div>
 
               <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight pt-1">
                 Welcome back, {firstName}!
               </h3>
-              
+
               <p className="text-sm text-gray-500 dark:text-slate-400 font-medium max-w-xs mx-auto">
                 {config.message}
               </p>
             </div>
 
-            {/* ── GO BUTTON / ACTION ────────────────────────────────────── */}
+            {/* CTA */}
             <Button
               onClick={onGo}
-              className="w-full py-6 text-sm font-bold rounded-2xl shadow-lg shadow-emerald-600/20 hover:shadow-xl hover:shadow-emerald-600/30 transition-all duration-300 relative overflow-hidden group cursor-pointer"
+              className={cn(
+                'w-full py-6 text-sm font-bold rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 relative overflow-hidden group cursor-pointer',
+                accent.shadow,
+              )}
               style={{
-                background: `linear-gradient(135deg, ${config.color}, #047857)`,
+                background: `linear-gradient(135deg, ${config.color}, ${accent.gradientEnd})`,
               }}
             >
               <span className="relative z-10 flex items-center justify-center gap-2 text-white">
-                Enter Student Portal
+                {portalLabel}
                 <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
               </span>
             </Button>
 
-            {/* ── AUTOREDIRECT COUNTDOWN RING ────────────────────────────── */}
+            {/* Auto-redirect bar */}
             <div className="mt-4 flex items-center gap-2">
               <div className="h-1.5 w-16 bg-gray-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-500 transition-all duration-100 ease-linear"
+                <div
+                  className={cn('h-full transition-all duration-100 ease-linear', accent.bar)}
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -267,7 +327,6 @@ function SuccessModal({ userName, role, redirectPath, avatarUrl, onGo }: Success
                 Redirecting you in a moment...
               </p>
             </div>
-
           </div>
         </div>
       </motion.div>
@@ -557,7 +616,11 @@ export default function LoginPage() {
           .join(' ')
 
         const redirectPath = ROLE_CONFIG[userRole].redirect
-        const databaseAvatar = profile?.avatar_url || profile?.photo_url || signInData.user.user_metadata?.avatar_url || null
+        const databaseAvatar =
+          profile?.avatar_url ||
+          profile?.photo_url ||
+          signInData.user.user_metadata?.avatar_url ||
+          null
 
         try {
           localStorage.setItem(
@@ -579,11 +642,11 @@ export default function LoginPage() {
           )
         } catch {}
 
-        setSuccessData({ 
-          userName, 
-          role: userRole, 
-          redirectPath, 
-          avatarUrl: databaseAvatar 
+        setSuccessData({
+          userName,
+          role: userRole,
+          redirectPath,
+          avatarUrl: databaseAvatar,
         })
         setLoading(false)
 

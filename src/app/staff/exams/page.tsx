@@ -1,4 +1,4 @@
-// app/staff/exams/page.tsx - UPDATED WITH TERM FILTERING
+// app/staff/exams/page.tsx - UPDATED WITH TERM FILTERING + DARK MODE
 
 'use client'
 
@@ -29,20 +29,17 @@ export default function StaffExamsPage() {
 
   const [showCreateDialog, setShowCreateDialog] = useState(false)
 
-  // ✅ Term filter state
   const [termOptions, setTermOptions] = useState<TermOption[]>([])
   const [selectedTerm, setSelectedTerm] = useState<string>('')
   const [selectedSession, setSelectedSession] = useState<string>('')
   const [isLoadingTerms, setIsLoadingTerms] = useState(true)
 
-  // ✅ Pass term filters to useExams
   const {
     exams, filteredExams, loading, searchQuery, setSearchQuery,
     statusFilter, setStatusFilter, loadExams,
     handleDeleteExam, handleDuplicateExam, handleSubmitForApproval
   } = useExams(profile?.id, selectedTerm, selectedSession)
 
-  // ✅ Fetch terms from database
   useEffect(() => {
     const fetchTerms = async () => {
       try {
@@ -58,7 +55,6 @@ export default function StaffExamsPage() {
         }
 
         if (data) {
-          // Get current term from school_settings
           const { data: settings } = await supabase
             .from('school_settings')
             .select('current_term, current_session')
@@ -76,7 +72,6 @@ export default function StaffExamsPage() {
           
           setTermOptions(options)
           
-          // Set default selection to current term
           if (settings?.current_term && settings?.current_session) {
             setSelectedTerm(settings.current_term)
             setSelectedSession(settings.current_session)
@@ -95,25 +90,10 @@ export default function StaffExamsPage() {
     fetchTerms()
   }, [])
 
-  // ✅ Navigate to view exam
-  const handleViewExam = (id: string) => {
-    router.push(`/staff/exams/${id}`)
-  }
-
-  // ✅ Navigate to edit exam
-  const handleEditExam = (id: string) => {
-    router.push(`/staff/exams/${id}/edit`)
-  }
-
-  // ✅ Navigate to submissions
-  const handleViewSubmissions = (id: string) => {
-    router.push(`/staff/exams/${id}/submissions`)
-  }
-
-  // ✅ Navigate to scores
-  const handleEnterScores = (id: string) => {
-    router.push(`/staff/exams/${id}/scores`)
-  }
+  const handleViewExam = (id: string) => router.push(`/staff/exams/${id}`)
+  const handleEditExam = (id: string) => router.push(`/staff/exams/${id}/edit`)
+  const handleViewSubmissions = (id: string) => router.push(`/staff/exams/${id}/submissions`)
+  const handleEnterScores = (id: string) => router.push(`/staff/exams/${id}/scores`)
 
   const handleCreateSuccess = () => {
     loadExams()
@@ -125,54 +105,61 @@ export default function StaffExamsPage() {
 
   if (loading || isLoadingTerms) {
     return (
-      <div className="mt-6 sm:mt-8 lg:mt-10 p-6 sm:p-8 lg:p-10 space-y-5">
-        <Skeleton className="h-8 w-36" />
+      <div className="mt-6 sm:mt-8 lg:mt-10 p-6 sm:p-8 lg:p-10 space-y-5 transition-colors duration-300">
+        <Skeleton className="h-8 w-36 bg-slate-200 dark:bg-slate-800" />
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-20 rounded-xl" />)}
+          {[1,2,3,4].map(i => (
+            <Skeleton key={i} className="h-20 rounded-xl bg-slate-200 dark:bg-slate-800" />
+          ))}
         </div>
-        <Skeleton className="h-96 w-full rounded-xl" />
+        <Skeleton className="h-96 w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
       </div>
     )
   }
 
-  // Get current term label
   const currentTermLabel = termOptions.find(t => t.value === selectedTerm)?.label || selectedTerm
 
-  // Count exams by status
   const draftCount = exams.filter((e: any) => e.status === 'draft').length
   const pendingCount = exams.filter((e: any) => e.status === 'pending').length
   const publishedCount = exams.filter((e: any) => e.status === 'published').length
 
   return (
     <>
-      <div className="mt-6 sm:mt-8 lg:mt-10 p-6 sm:p-8 lg:p-10 max-w-[1600px] mx-auto">
-        {/* ✅ Term Filter Bar */}
+      <div className="mt-6 sm:mt-8 lg:mt-10 p-6 sm:p-8 lg:p-10 max-w-[1600px] mx-auto transition-colors duration-300">
+        {/* Term Filter Bar */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 text-xs text-slate-500 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-            <Calendar className="h-3.5 w-3.5 text-emerald-600" />
-            <span className="font-medium text-slate-700">{currentTermLabel || 'All Terms'}</span>
-            <span className="text-slate-300">·</span>
-            <span className="font-medium text-slate-700">{selectedSession || 'All Sessions'}</span>
+          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-1.5 transition-colors">
+            <Calendar className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="font-medium text-slate-700 dark:text-slate-200">
+              {currentTermLabel || 'All Terms'}
+            </span>
+            <span className="text-slate-300 dark:text-slate-600">·</span>
+            <span className="font-medium text-slate-700 dark:text-slate-200">
+              {selectedSession || 'All Sessions'}
+            </span>
             {termOptions.find(t => t.value === selectedTerm)?.is_current && (
-              <Badge className="ml-1 bg-emerald-100 text-emerald-700 border-emerald-200 text-[10px]">
+              <Badge className="ml-1 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800 text-[10px]">
                 Current
               </Badge>
             )}
           </div>
           
           <div className="flex items-center gap-2">
-            <Filter className="h-3.5 w-3.5 text-slate-400" />
-            <Select value={selectedTerm} onValueChange={(value) => {
-              const term = termOptions.find(t => t.value === value)
-              if (term) {
-                setSelectedTerm(value)
-                setSelectedSession(term.session_year)
-              }
-            }}>
-              <SelectTrigger className="h-8 text-xs w-[140px] bg-white border-slate-200">
+            <Filter className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+            <Select 
+              value={selectedTerm} 
+              onValueChange={(value) => {
+                const term = termOptions.find(t => t.value === value)
+                if (term) {
+                  setSelectedTerm(value)
+                  setSelectedSession(term.session_year)
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs w-[140px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200">
                 <SelectValue placeholder="Select Term" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                 {termOptions.map((term) => (
                   <SelectItem key={`${term.value}-${term.session_year}`} value={term.value}>
                     {term.label} {term.is_current ? '✓' : ''}
@@ -182,10 +169,10 @@ export default function StaffExamsPage() {
             </Select>
             
             <Select value={selectedSession} onValueChange={setSelectedSession}>
-              <SelectTrigger className="h-8 text-xs w-[130px] bg-white border-slate-200">
+              <SelectTrigger className="h-8 text-xs w-[130px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200">
                 <SelectValue placeholder="Select Session" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                 {[...new Set(termOptions.map(t => t.session_year))].map((session) => (
                   <SelectItem key={session} value={session}>
                     {session}

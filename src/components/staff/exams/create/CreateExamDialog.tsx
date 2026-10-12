@@ -1,4 +1,4 @@
-// src/components/staff/exams/create/CreateExamDialog.tsx - FIXED
+// src/components/staff/exams/create/CreateExamDialog.tsx - FIXED + DARK MODE
 
 "use client";
 
@@ -33,7 +33,6 @@ import type {
   MarkDistribution,
 } from "./types";
 
-// ✅ Mark calculation - objective has NO LIMIT, theory = remaining
 const calculateMarkDistribution = (
   questions: Question[],
   theoryQuestions: TheoryQuestion[],
@@ -76,49 +75,37 @@ export function CreateExamDialog({
   onSuccess,
   teacherProfile,
 }: CreateExamDialogProps) {
-  // ── Navigation ────────────────────────────────────────────────────────────
   const [activeStep, setActiveStep] = useState<StepId>("details");
   const [completedSteps, setCompletedSteps] = useState<Set<StepId>>(new Set());
 
-  // ── Exam State ────────────────────────────────────────────────────────────
   const [examDetails, setExamDetails] = useState<ExamDetails>(DEFAULT_EXAM_DETAILS);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
 
-  // ── Config ────────────────────────────────────────────────────────────────
   const [objectiveMax, setObjectiveMax] = useState(20);
   const [theoryMax, setTheoryMax] = useState(40);
-  // ✅ FIX: Use number type with explicit typing
   const [defaultMark, setDefaultMark] = useState<number>(MARK_CONSTANTS.DEFAULT_MARK);
   const [theoryQuestionsTotal, setTheoryQuestionsTotal] = useState(0);
   const [theoryQuestionsToAnswer, setTheoryQuestionsToAnswer] = useState<number | null>(null);
   const [theoryMarksPerQuestion, setTheoryMarksPerQuestion] = useState(10);
   const [scoringRule, setScoringRule] = useState<ScoringRule>("standard");
-  
-  // Theory total marks (teacher sets this manually)
   const [theoryTotalMarks, setTheoryTotalMarks] = useState<number>(MARK_CONSTANTS.DEFAULT_THEORY_TOTAL);
 
-  // ── Bulk Text ─────────────────────────────────────────────────────────────
   const [bulkQuestionsText, setBulkQuestionsText] = useState("");
   const [bulkTheoryText, setBulkTheoryText] = useState("");
 
-  // ── Passage ───────────────────────────────────────────────────────────────
   const [passageText, setPassageText] = useState("");
   const [hasPassage, setHasPassage] = useState(false);
 
-  // ── Draft UI ──────────────────────────────────────────────────────────────
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
-  // ── Services ──────────────────────────────────────────────────────────────
   const { debouncedSave, loadFromStorage, clearStorage } = useExamDraft();
   const { parseObjective, parseTheory } = useQuestionParser(defaultMark);
 
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
-
   const { loading, submit } = useExamSubmit(onSuccess, handleClose);
 
-  // ── Derived: Mark Distribution ────────────────────────────────────────────
   const markDistribution = useMemo(() => {
     return calculateMarkDistribution(
       questions,
@@ -128,7 +115,6 @@ export function CreateExamDialog({
     );
   }, [questions, theoryQuestions, defaultMark, theoryTotalMarks]);
 
-  // ── Derived: Progress ────────────────────────────────────────────────────
   const examProgress = useMemo(() => {
     let score = 0;
     if (examDetails.title) score += 25;
@@ -144,7 +130,6 @@ export function CreateExamDialog({
   const isFirst = currentStepIndex === 0;
   const isLast = currentStepIndex === STEPS.length - 1;
 
-  // ── Auto-save ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const hasData =
       examDetails.title ||
@@ -173,30 +158,14 @@ export function CreateExamDialog({
       theoryTotalMarks,
     });
   }, [
-    activeStep,
-    hasTheory,
-    examDetails,
-    questions,
-    theoryQuestions,
-    objectiveMax,
-    theoryMax,
-    theoryQuestionsTotal,
-    theoryQuestionsToAnswer,
-    theoryMarksPerQuestion,
-    scoringRule,
-    defaultMark,
-    bulkQuestionsText,
-    bulkTheoryText,
-    passageText,
-    hasPassage,
-    theoryTotalMarks,
-    debouncedSave,
+    activeStep, hasTheory, examDetails, questions, theoryQuestions,
+    objectiveMax, theoryMax, theoryQuestionsTotal, theoryQuestionsToAnswer,
+    theoryMarksPerQuestion, scoringRule, defaultMark, bulkQuestionsText,
+    bulkTheoryText, passageText, hasPassage, theoryTotalMarks, debouncedSave,
   ]);
 
-  // ── Load draft on open ────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-
     const draft = loadFromStorage();
     if (!draft) return;
 
@@ -225,7 +194,6 @@ export function CreateExamDialog({
     });
   }, [open, loadFromStorage]);
 
-  // ── Navigation ────────────────────────────────────────────────────────────
   const goToStep = useCallback((id: StepId) => setActiveStep(id), []);
 
   const goNext = useCallback(() => {
@@ -239,7 +207,6 @@ export function CreateExamDialog({
     if (prev) setActiveStep(prev.id);
   }, [currentStepIndex]);
 
-  // ── Clear Draft ───────────────────────────────────────────────────────────
   const handleClearDraft = useCallback(() => {
     clearStorage();
     setHasSavedDraft(false);
@@ -264,7 +231,6 @@ export function CreateExamDialog({
     toast.success("Started fresh!");
   }, [clearStorage]);
 
-  // ── Close ────────────────────────────────────────────────────────────────
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
       if (!isOpen) {
@@ -275,7 +241,6 @@ export function CreateExamDialog({
     [onOpenChange]
   );
 
-  // ── Submit ────────────────────────────────────────────────────────────────
   const handleSubmit = useCallback(
     async (submitForApproval: boolean) => {
       if (isOver) {
@@ -312,27 +277,13 @@ export function CreateExamDialog({
       }
     },
     [
-      submit,
-      examDetails,
-      questions,
-      theoryQuestions,
-      hasTheory,
-      theoryQuestionsTotal,
-      theoryQuestionsToAnswer,
-      scoringRule,
-      teacherProfile,
-      clearStorage,
-      passageText,
-      hasPassage,
-      defaultMark,
-      totalMarks,
-      isOver,
-      markDistribution,
-      theoryTotalMarks,
+      submit, examDetails, questions, theoryQuestions, hasTheory,
+      theoryQuestionsTotal, theoryQuestionsToAnswer, scoringRule, teacherProfile,
+      clearStorage, passageText, hasPassage, defaultMark, totalMarks, isOver,
+      markDistribution, theoryTotalMarks,
     ]
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
@@ -342,11 +293,12 @@ export function CreateExamDialog({
           "sm:w-[98vw] sm:h-[98vh] sm:rounded-xl",
           "md:w-[96vw] md:h-[96vh] md:rounded-2xl",
           "lg:w-[94vw] lg:max-w-[1400px] lg:h-[95vh]",
-          "xl:max-w-[1500px] 2xl:max-w-[1600px]"
+          "xl:max-w-[1500px] 2xl:max-w-[1600px]",
+          "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
         )}
       >
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className="bg-gradient-to-r from-gray-900 to-slate-800 px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 flex-shrink-0">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-gray-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 flex-shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="w-7 h-7 bg-emerald-500 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -388,9 +340,7 @@ export function CreateExamDialog({
                     style={{ width: `${examProgress}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-gray-400">
-                  {examProgress}%
-                </span>
+                <span className="text-[10px] text-gray-400">{examProgress}%</span>
               </div>
               {(examDetails.title || questions.length > 0) && (
                 <button
@@ -413,26 +363,24 @@ export function CreateExamDialog({
           </div>
         </div>
 
-        {/* ── Draft Banner ────────────────────────────────────────────────── */}
+        {/* Draft banner */}
         {hasSavedDraft && (
-          <div className="bg-amber-50 border-b border-amber-200 px-3 py-1.5 flex items-center justify-between flex-shrink-0">
-            <p className="text-[10px] sm:text-xs text-amber-700 font-medium truncate">
+          <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50 px-3 py-1.5 flex items-center justify-between flex-shrink-0">
+            <p className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-400 font-medium truncate">
               📝 Draft restored — {questions.length} obj
-              {theoryQuestions.length > 0
-                ? ` + ${theoryQuestions.length} theory`
-                : ""}
+              {theoryQuestions.length > 0 ? ` + ${theoryQuestions.length} theory` : ""}
             </p>
             <button
               onClick={() => setHasSavedDraft(false)}
-              className="text-amber-500 hover:text-amber-700 p-0.5 flex-shrink-0"
+              className="text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 p-0.5 flex-shrink-0"
             >
               <X className="h-3 w-3" />
             </button>
           </div>
         )}
 
-        {/* ── Step Content ────────────────────────────────────────────────── */}
-        <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+        {/* Step content */}
+        <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white dark:bg-slate-950">
           {activeStep === "details" && (
             <ExamDetailsStep
               examDetails={examDetails}
@@ -466,10 +414,7 @@ export function CreateExamDialog({
               markDistribution={markDistribution}
               onDefaultMarkChange={(newMark: number) => {
                 setDefaultMark(newMark);
-                setQuestions(prev => prev.map(q => ({
-                  ...q,
-                  marks: newMark
-                })));
+                setQuestions(prev => prev.map(q => ({ ...q, marks: newMark })));
               }}
             />
           )}
@@ -508,15 +453,15 @@ export function CreateExamDialog({
           )}
         </div>
 
-        {/* ── Footer ─────────────────────────────────────────────────────── */}
-        <div className="flex-shrink-0 bg-white border-t px-3 sm:px-4 py-2 sm:py-2.5">
+        {/* Footer */}
+        <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-3 sm:px-4 py-2 sm:py-2.5">
           <div className="flex items-center justify-between max-w-4xl mx-auto">
             <div className="flex items-center gap-1.5">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => handleOpenChange(false)}
-                className="text-gray-500 h-7 sm:h-8 px-2 text-xs"
+                className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 h-7 sm:h-8 px-2 text-xs"
               >
                 <X className="h-3.5 w-3.5 sm:mr-1" />
                 <span className="hidden sm:inline">Close</span>
@@ -526,7 +471,7 @@ export function CreateExamDialog({
                   variant="outline"
                   size="sm"
                   onClick={goPrev}
-                  className="h-7 sm:h-8 px-2 text-xs"
+                  className="h-7 sm:h-8 px-2 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                 >
                   <ChevronLeft className="h-3.5 w-3.5 sm:mr-0.5" />
                   <span className="hidden sm:inline">Back</span>
@@ -534,15 +479,15 @@ export function CreateExamDialog({
               )}
             </div>
 
-            <div className="hidden md:flex items-center gap-3 text-xs text-slate-500">
+            <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               <span>Obj: {markDistribution.objectiveTotal.toFixed(1)}mk</span>
-              <span className="text-slate-300">|</span>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
               <span>Theory: {markDistribution.theoryTotal.toFixed(1)}mk</span>
-              <span className="text-slate-300">|</span>
+              <span className="text-slate-300 dark:text-slate-600">|</span>
               <span className={cn(
                 "font-semibold",
-                totalMarks === MARK_CONSTANTS.EXAM_TOTAL ? "text-emerald-600" : 
-                isOver ? "text-red-600" : "text-amber-600"
+                totalMarks === MARK_CONSTANTS.EXAM_TOTAL ? "text-emerald-600 dark:text-emerald-400" : 
+                isOver ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
               )}>
                 Total: {totalMarks}mk
                 {isOver && " ⛔ OVER"}
@@ -556,7 +501,9 @@ export function CreateExamDialog({
                   disabled={isOver}
                   className={cn(
                     "h-7 sm:h-8 px-3 sm:px-4 text-xs",
-                    isOver ? "bg-gray-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700"
+                    isOver 
+                      ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed" 
+                      : "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   )}
                 >
                   Next
@@ -568,7 +515,7 @@ export function CreateExamDialog({
                     variant="outline"
                     onClick={() => handleSubmit(false)}
                     disabled={loading || isOver}
-                    className="h-7 sm:h-8 px-2 sm:px-3 text-xs"
+                    className="h-7 sm:h-8 px-2 sm:px-3 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
                   >
                     {loading ? (
                       <Loader2 className="mr-1 h-3 w-3 animate-spin" />
@@ -583,8 +530,8 @@ export function CreateExamDialog({
                     className={cn(
                       "h-7 sm:h-8 px-2 sm:px-3 text-xs",
                       !isOver && totalMarks === MARK_CONSTANTS.EXAM_TOTAL
-                        ? "bg-emerald-600 hover:bg-emerald-700"
-                        : "bg-gray-400 cursor-not-allowed"
+                        ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                        : "bg-gray-400 dark:bg-gray-700 cursor-not-allowed"
                     )}
                   >
                     {loading ? (

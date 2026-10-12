@@ -85,13 +85,17 @@ function EmptyState({
 }) {
   return (
     <div className="flex flex-col items-center justify-center py-10 px-4">
-      <div className="w-12 h-12 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-        <Icon className="h-6 w-6 text-slate-400" />
+      <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+        <Icon className="h-6 w-6 text-slate-400 dark:text-slate-500" />
       </div>
-      <p className="text-sm font-medium text-slate-600 mb-1">{title}</p>
-      {subtitle && <p className="text-xs text-slate-400 mb-4 text-center">{subtitle}</p>}
+      <p className="text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">{title}</p>
+      {subtitle && <p className="text-xs text-slate-400 dark:text-slate-500 mb-4 text-center">{subtitle}</p>}
       {action && (
-        <Button size="sm" onClick={action.onClick} className="bg-slate-800 hover:bg-slate-700 text-white h-8 text-xs px-3">
+        <Button 
+          size="sm" 
+          onClick={action.onClick} 
+          className="bg-slate-800 hover:bg-slate-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-8 text-xs px-3"
+        >
           <Plus className="h-3 w-3 mr-1.5" />
           {action.label}
         </Button>
@@ -102,17 +106,17 @@ function EmptyState({
 
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-emerald-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-emerald-950/30 flex items-center justify-center transition-colors duration-300">
       <div className="text-center">
         <div className="relative w-20 h-20 mx-auto mb-6">
           <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 animate-pulse" />
           <div className="absolute inset-0 flex items-center justify-center">
             <Briefcase className="h-9 w-9 text-white" />
           </div>
-          <div className="absolute -inset-2 rounded-3xl border-2 border-emerald-200 animate-ping opacity-30" />
+          <div className="absolute -inset-2 rounded-3xl border-2 border-emerald-200 dark:border-emerald-800 animate-ping opacity-30" />
         </div>
-        <p className="text-slate-800 text-xl font-semibold">Loading Dashboard</p>
-        <p className="mt-1.5 text-slate-400 text-sm">Preparing your workspace...</p>
+        <p className="text-slate-800 dark:text-white text-xl font-semibold">Loading Dashboard</p>
+        <p className="mt-1.5 text-slate-400 dark:text-slate-500 text-sm">Preparing your workspace...</p>
       </div>
     </div>
   )
@@ -120,14 +124,17 @@ function LoadingScreen() {
 
 function TimeoutScreen({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center transition-colors duration-300">
       <div className="text-center px-4 max-w-sm">
-        <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-4">
-          <AlertTriangle className="h-8 w-8 text-amber-500" />
+        <div className="w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center mx-auto mb-4">
+          <AlertTriangle className="h-8 w-8 text-amber-500 dark:text-amber-400" />
         </div>
-        <h3 className="text-lg font-semibold text-slate-800 mb-2">Connection Issue</h3>
-        <p className="text-sm text-slate-500 mb-6">Check your connection and try again.</p>
-        <Button onClick={onRetry} className="bg-emerald-600 hover:bg-emerald-700 h-10 px-6">
+        <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-2">Connection Issue</h3>
+        <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Check your connection and try again.</p>
+        <Button 
+          onClick={onRetry} 
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 h-10 px-6"
+        >
           <RefreshCw className="h-4 w-4 mr-2" /> Try Again
         </Button>
       </div>
@@ -149,16 +156,36 @@ function StatCard({
   trend?: string
 }) {
   const colorMap = {
-    emerald: { bg: 'bg-emerald-50 border-emerald-100', icon: 'bg-emerald-500', badge: 'text-emerald-600 bg-emerald-50' },
-    blue: { bg: 'bg-blue-50 border-blue-100', icon: 'bg-blue-500', badge: 'text-blue-600 bg-blue-50' },
-    violet: { bg: 'bg-violet-50 border-violet-100', icon: 'bg-violet-500', badge: 'text-violet-600 bg-violet-50' },
-    amber: { bg: 'bg-amber-50 border-amber-100', icon: 'bg-amber-500', badge: 'text-amber-600 bg-amber-50' },
-    rose: { bg: 'bg-rose-50 border-rose-100', icon: 'bg-rose-500', badge: 'text-rose-600 bg-rose-50' },
+    emerald: { 
+      bg: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50', 
+      icon: 'bg-emerald-500', 
+      badge: 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50' 
+    },
+    blue: { 
+      bg: 'bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50', 
+      icon: 'bg-blue-500', 
+      badge: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50' 
+    },
+    violet: { 
+      bg: 'bg-violet-50 dark:bg-violet-950/30 border-violet-100 dark:border-violet-900/50', 
+      icon: 'bg-violet-500', 
+      badge: 'text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/50' 
+    },
+    amber: { 
+      bg: 'bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50', 
+      icon: 'bg-amber-500', 
+      badge: 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/50' 
+    },
+    rose: { 
+      bg: 'bg-rose-50 dark:bg-rose-950/30 border-rose-100 dark:border-rose-900/50', 
+      icon: 'bg-rose-500', 
+      badge: 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/50' 
+    },
   }
   const c = colorMap[color]
 
   return (
-    <div className={cn('rounded-2xl p-4 border shadow-sm', c.bg)}>
+    <div className={cn('rounded-2xl p-4 border shadow-sm transition-colors duration-300', c.bg)}>
       <div className="flex items-start justify-between mb-3">
         <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shadow-sm', c.icon)}>
           <Icon className="h-4 w-4 text-white" />
@@ -169,8 +196,8 @@ function StatCard({
           </span>
         )}
       </div>
-      <p className="text-2xl font-bold text-slate-800 leading-none mb-1">{value}</p>
-      <p className="text-xs text-slate-500 font-medium">{label}</p>
+      <p className="text-2xl font-bold text-slate-800 dark:text-white leading-none mb-1">{value}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">{label}</p>
     </div>
   )
 }
@@ -180,8 +207,8 @@ function SectionHeader({
   title,
   badge,
   href,
-  iconColor = 'text-slate-600',
-  iconBg = 'bg-slate-100',
+  iconColor = 'text-slate-600 dark:text-slate-400',
+  iconBg = 'bg-slate-100 dark:bg-slate-800',
 }: {
   icon: React.ComponentType<{ className?: string }>
   title: string
@@ -191,20 +218,25 @@ function SectionHeader({
   iconBg?: string
 }) {
   return (
-    <div className="flex items-center justify-between py-3 px-4 border-b border-slate-100">
+    <div className="flex items-center justify-between py-3 px-4 border-b border-slate-100 dark:border-slate-800">
       <div className="flex items-center gap-2.5">
         <div className={cn('w-7 h-7 rounded-lg flex items-center justify-center', iconBg)}>
           <Icon className={cn('h-3.5 w-3.5', iconColor)} />
         </div>
-        <h3 className="text-sm font-semibold text-slate-800">{title}</h3>
+        <h3 className="text-sm font-semibold text-slate-800 dark:text-white">{title}</h3>
         {badge && (
-          <Badge className="text-[10px] h-5 px-1.5 bg-emerald-100 text-emerald-700 border-0 font-medium">
+          <Badge className="text-[10px] h-5 px-1.5 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-0 font-medium">
             {badge}
           </Badge>
         )}
       </div>
       {href && (
-        <Button variant="ghost" size="sm" asChild className="h-7 text-xs text-slate-500 hover:text-slate-800 px-2">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          asChild 
+          className="h-7 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white px-2"
+        >
           <Link href={href}>
             All <ArrowRight className="ml-1 h-3 w-3" />
           </Link>
@@ -241,19 +273,21 @@ function formatDate(d?: string) {
 
 function getStatusStyle(status: string) {
   switch (status?.toLowerCase()) {
-    case 'published': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-    case 'draft': return 'bg-slate-100 text-slate-600 border-slate-200'
-    case 'active': return 'bg-blue-100 text-blue-700 border-blue-200'
-    case 'closed': return 'bg-rose-100 text-rose-600 border-rose-200'
-    default: return 'bg-slate-100 text-slate-600 border-slate-200'
+    case 'published': return 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50'
+    case 'draft': return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
+    case 'active': return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50'
+    case 'closed': return 'bg-rose-100 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50'
+    default: return 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700'
   }
 }
 
-// ── Data Fetcher ──────────────────────────────────────────────────────────────
-
+// ── Data Fetcher (UNCHANGED) ──────────────────────────────────────────────────
 async function fetchDashboardData(
   userId: string, termCode?: string, sessionYear?: string
 ): Promise<DashboardData> {
+  // ... (same as before — no changes needed)
+  // [UNCHANGED — same logic]
+  
   let examIdQuery = supabase.from('exams').select('id').eq('created_by', userId)
   if (termCode && sessionYear) examIdQuery = examIdQuery.eq('term', termCode).eq('session_year', sessionYear)
   const { data: teacherExams } = await examIdQuery
@@ -389,8 +423,7 @@ async function fetchDashboardData(
   return { exams, assignments, notes, stats }
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
-
+// ── Main Component (UNCHANGED LOGIC) ─────────────────────────────────────────
 export default function StaffDashboardPage() {
   const router = useRouter()
   const { user: contextUser, loading: authLoading, isAuthenticated } = useUser()
@@ -528,7 +561,7 @@ export default function StaffDashboardPage() {
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-slate-950 dark:to-slate-900 transition-colors duration-300">
 
       {/* ── ORIGINAL BANNER — kept as-is, just passes data ────────────── */}
       <StaffWelcomeBanner
@@ -590,13 +623,13 @@ export default function StaffDashboardPage() {
         {/* ── Quick Actions ────────────────────────────────────────────── */}
         <div>
           <div className="flex items-center justify-between mb-3">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Quick Actions</p>
+            <p className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Quick Actions</p>
             <Button
               size="sm"
               variant="ghost"
               onClick={handleRefresh}
               disabled={refreshing}
-              className="h-7 text-xs text-slate-400 hover:text-slate-600 px-2"
+              className="h-7 text-xs text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 px-2"
             >
               <RefreshCw className={cn('h-3 w-3 mr-1.5', refreshing && 'animate-spin')} />
               Refresh
@@ -612,14 +645,14 @@ export default function StaffDashboardPage() {
               <button
                 key={action.label}
                 onClick={() => router.push(action.href)}
-                className="group flex flex-col items-start gap-3 p-4 bg-white hover:bg-slate-50 border border-slate-100 hover:border-slate-200 rounded-2xl transition-all shadow-sm hover:shadow-md text-left"
+                className="group flex flex-col items-start gap-3 p-4 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/60 border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 rounded-2xl transition-all shadow-sm hover:shadow-md dark:hover:shadow-slate-950/50 text-left"
               >
                 <div className={cn('w-9 h-9 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform', action.gradient)}>
                   <action.icon className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">{action.label}</p>
-                  <p className="text-[11px] text-slate-400">{action.desc}</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{action.label}</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">{action.desc}</p>
                 </div>
               </button>
             ))}
@@ -628,26 +661,26 @@ export default function StaffDashboardPage() {
 
         {/* ── Performance Banner ───────────────────────────────────────── */}
         {stats.averagePerformance > 0 && (
-          <div className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-slate-100 shadow-sm">
+          <div className="flex items-center gap-4 p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0 shadow-sm">
               <TrendingUp className="h-5 w-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between mb-1.5">
-                <p className="text-sm font-semibold text-slate-700">Average Student Performance</p>
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">Average Student Performance</p>
                 <span className={cn('text-lg font-bold',
-                  stats.averagePerformance >= 75 ? 'text-emerald-600' :
-                  stats.averagePerformance >= 50 ? 'text-amber-600' : 'text-rose-600'
+                  stats.averagePerformance >= 75 ? 'text-emerald-600 dark:text-emerald-400' :
+                  stats.averagePerformance >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
                 )}>
                   {stats.averagePerformance}%
                 </span>
               </div>
-              <Progress value={stats.averagePerformance} className="h-1.5" />
+              <Progress value={stats.averagePerformance} className="h-1.5 bg-slate-100 dark:bg-slate-800" />
             </div>
             <Badge className={cn('flex-shrink-0 text-xs border hidden sm:inline-flex',
-              stats.averagePerformance >= 75 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-              stats.averagePerformance >= 50 ? 'bg-amber-50 text-amber-700 border-amber-200' :
-              'bg-rose-50 text-rose-600 border-rose-200'
+              stats.averagePerformance >= 75 ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50' :
+              stats.averagePerformance >= 50 ? 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/50' :
+              'bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 border-rose-200 dark:border-rose-900/50'
             )}>
               {stats.averagePerformance >= 75 ? '🎯 Great' : stats.averagePerformance >= 50 ? '📈 Fair' : '⚠️ Low'}
             </Badge>
@@ -656,56 +689,61 @@ export default function StaffDashboardPage() {
 
         {/* ── Pending Grading ──────────────────────────────────────────── */}
         {pendingCount > 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-amber-100 dark:border-amber-900/50 bg-amber-50/50 dark:bg-amber-950/20 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <Clock className="h-3.5 w-3.5 text-amber-600" />
+                <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
+                  <Clock className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                 </div>
                 <div>
-                  <p className="text-sm font-semibold text-slate-800">Pending Grading</p>
-                  <p className="text-[11px] text-slate-400">{pendingCount} submission{pendingCount !== 1 ? 's' : ''} awaiting review</p>
+                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Pending Grading</p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500">{pendingCount} submission{pendingCount !== 1 ? 's' : ''} awaiting review</p>
                 </div>
               </div>
-              <Badge className="bg-amber-100 text-amber-700 border-0 text-xs font-semibold">{pendingCount}</Badge>
+              <Badge className="bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border-0 text-xs font-semibold">{pendingCount}</Badge>
             </div>
             <div className="p-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
               {stats.recentSubmissions.slice(0, 6).map((sub: any) => (
                 <button
                   key={sub.id}
                   onClick={() => router.push(`/staff/exams/${sub.exam_id}/submissions/${sub.id}`)}
-                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-all text-left group"
+                  className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-amber-50 dark:hover:bg-amber-950/30 border border-transparent hover:border-amber-200 dark:hover:border-amber-900/50 transition-all text-left group"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
-                    <GraduationCap className="h-4 w-4 text-slate-500" />
+                  <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                    <GraduationCap className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-800 truncate">{sub.student_name ?? 'Unknown'}</p>
-                    <p className="text-[11px] text-slate-400 truncate">{sub.exam_title}</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{formatDate(sub.submitted_at)}</p>
+                    <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{sub.student_name ?? 'Unknown'}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 truncate">{sub.exam_title}</p>
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5">{formatDate(sub.submitted_at)}</p>
                   </div>
-                  <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-100 group-hover:bg-amber-200 flex items-center justify-center transition-colors">
-                    <ChevronRight className="h-3.5 w-3.5 text-amber-600" />
+                  <div className="flex-shrink-0 w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-950/50 group-hover:bg-amber-200 dark:group-hover:bg-amber-900/50 flex items-center justify-center transition-colors">
+                    <ChevronRight className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
                   </div>
                 </button>
               ))}
             </div>
             {pendingCount > 6 && (
               <div className="px-4 pb-3 text-center">
-                <Button variant="ghost" size="sm" onClick={() => router.push('/staff/exams')} className="text-xs text-amber-600 hover:text-amber-700">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => router.push('/staff/exams')} 
+                  className="text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300"
+                >
                   View all {pendingCount} submissions <ArrowRight className="ml-1 h-3 w-3" />
                 </Button>
               </div>
             )}
           </div>
         ) : stats.totalExams > 0 ? (
-          <div className="flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0">
-              <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+          <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-2xl">
+            <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-emerald-800">All caught up!</p>
-              <p className="text-xs text-emerald-600">No submissions pending — great work! 🎉</p>
+              <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">All caught up!</p>
+              <p className="text-xs text-emerald-600 dark:text-emerald-400">No submissions pending — great work! 🎉</p>
             </div>
           </div>
         ) : null}
@@ -717,14 +755,14 @@ export default function StaffDashboardPage() {
           <div className="lg:col-span-2 space-y-4">
 
             {/* Recent Exams */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
               <SectionHeader
                 icon={MonitorPlay}
                 title="Recent Exams"
                 badge={termInfo.termName || undefined}
                 href="/staff/exams"
-                iconColor="text-blue-600"
-                iconBg="bg-blue-50"
+                iconColor="text-blue-600 dark:text-blue-400"
+                iconBg="bg-blue-50 dark:bg-blue-950/50"
               />
               <div className="p-3">
                 {exams.length === 0 ? (
@@ -740,14 +778,14 @@ export default function StaffDashboardPage() {
                       <button
                         key={exam.id}
                         onClick={() => router.push(`/staff/exams/${exam.id}/submissions`)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left group"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left group"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center flex-shrink-0">
-                          <MonitorPlay className="h-4 w-4 text-blue-500" />
+                        <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/50 flex items-center justify-center flex-shrink-0">
+                          <MonitorPlay className="h-4 w-4 text-blue-500 dark:text-blue-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{exam.title}</p>
-                          <p className="text-[11px] text-slate-400">{exam.subject} · {exam.class}</p>
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{exam.title}</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">{exam.subject} · {exam.class}</p>
                         </div>
                         <Badge variant="outline" className={cn('text-[10px] flex-shrink-0 font-medium capitalize border', getStatusStyle(exam.status))}>
                           {exam.status ?? 'draft'}
@@ -760,14 +798,14 @@ export default function StaffDashboardPage() {
             </div>
 
             {/* Assignments */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
               <SectionHeader
                 icon={FileText}
                 title="Recent Assignments"
                 badge={termInfo.termName || undefined}
                 href="/staff/assignments"
-                iconColor="text-violet-600"
-                iconBg="bg-violet-50"
+                iconColor="text-violet-600 dark:text-violet-400"
+                iconBg="bg-violet-50 dark:bg-violet-950/50"
               />
               <div className="p-3">
                 {assignments.length === 0 ? (
@@ -783,16 +821,16 @@ export default function StaffDashboardPage() {
                       <button
                         key={item.id}
                         onClick={() => router.push(`/staff/assignments/${item.id}`)}
-                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left"
                       >
-                        <div className="w-9 h-9 rounded-xl bg-violet-50 flex items-center justify-center flex-shrink-0">
-                          <FileText className="h-4 w-4 text-violet-500" />
+                        <div className="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center flex-shrink-0">
+                          <FileText className="h-4 w-4 text-violet-500 dark:text-violet-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-slate-800 truncate">{item.title}</p>
-                          <p className="text-[11px] text-slate-400">{item.displaySubject} · {item.displayClass}</p>
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{item.title}</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500">{item.displaySubject} · {item.displayClass}</p>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-slate-300 flex-shrink-0" />
+                        <ChevronRight className="h-4 w-4 text-slate-300 dark:text-slate-600 flex-shrink-0" />
                       </button>
                     ))}
                   </div>
@@ -801,14 +839,14 @@ export default function StaffDashboardPage() {
             </div>
 
             {/* Study Notes */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
               <SectionHeader
                 icon={BookOpen}
                 title="Study Notes"
                 badge={termInfo.termName || undefined}
                 href="/staff/notes"
-                iconColor="text-emerald-600"
-                iconBg="bg-emerald-50"
+                iconColor="text-emerald-600 dark:text-emerald-400"
+                iconBg="bg-emerald-50 dark:bg-emerald-950/50"
               />
               <div className="p-3">
                 {notes.length === 0 ? (
@@ -824,14 +862,14 @@ export default function StaffDashboardPage() {
                       <button
                         key={note.id}
                         onClick={() => router.push(`/staff/notes/${note.id}`)}
-                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 hover:bg-emerald-50 border border-transparent hover:border-emerald-100 transition-all text-left"
+                        className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 border border-transparent hover:border-emerald-100 dark:hover:border-emerald-900/50 transition-all text-left"
                       >
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                          <BookMarked className="h-3.5 w-3.5 text-emerald-600" />
+                        <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center flex-shrink-0">
+                          <BookMarked className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate">{note.title}</p>
-                          <p className="text-[11px] text-slate-400 capitalize">{note.subject ?? 'General'}</p>
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 truncate">{note.title}</p>
+                          <p className="text-[11px] text-slate-400 dark:text-slate-500 capitalize">{note.subject ?? 'General'}</p>
                         </div>
                       </button>
                     ))}
@@ -845,14 +883,14 @@ export default function StaffDashboardPage() {
           <div className="space-y-4">
 
             {/* Overview */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
-                  <BarChart3 className="h-3.5 w-3.5 text-slate-600" />
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <BarChart3 className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-800">Overview</h3>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Overview</h3>
                 {termInfo.termName && (
-                  <Badge className="text-[10px] h-5 px-1.5 bg-emerald-100 text-emerald-700 border-0 font-medium ml-auto">
+                  <Badge className="text-[10px] h-5 px-1.5 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-0 font-medium ml-auto">
                     {termInfo.termName}
                   </Badge>
                 )}
@@ -860,21 +898,21 @@ export default function StaffDashboardPage() {
               <div className="p-4 space-y-4">
                 <div className="grid grid-cols-2 gap-2.5">
                   {[
-                    { label: 'Students', value: stats.totalStudents, bg: 'bg-blue-50', text: 'text-blue-700' },
-                    { label: 'Active', value: stats.activeStudents, bg: 'bg-emerald-50', text: 'text-emerald-700' },
-                    { label: 'Classes', value: stats.activeClasses, bg: 'bg-violet-50', text: 'text-violet-700' },
-                    { label: 'Published', value: stats.publishedExams, bg: 'bg-teal-50', text: 'text-teal-700' },
+                    { label: 'Students', value: stats.totalStudents, bg: 'bg-blue-50 dark:bg-blue-950/30', text: 'text-blue-700 dark:text-blue-300' },
+                    { label: 'Active', value: stats.activeStudents, bg: 'bg-emerald-50 dark:bg-emerald-950/30', text: 'text-emerald-700 dark:text-emerald-300' },
+                    { label: 'Classes', value: stats.activeClasses, bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-700 dark:text-violet-300' },
+                    { label: 'Published', value: stats.publishedExams, bg: 'bg-teal-50 dark:bg-teal-950/30', text: 'text-teal-700 dark:text-teal-300' },
                   ].map((item) => (
                     <div key={item.label} className={cn('rounded-xl p-3 text-center', item.bg)}>
                       <p className={cn('text-xl font-bold', item.text)}>{item.value}</p>
-                      <p className="text-[11px] font-medium text-slate-500">{item.label}</p>
+                      <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">{item.label}</p>
                     </div>
                   ))}
                 </div>
 
                 {stats.classBreakdown.length > 0 && (
                   <div>
-                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2.5">
+                    <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-2.5">
                       Class Breakdown
                     </p>
                     <div className="space-y-2">
@@ -883,10 +921,10 @@ export default function StaffDashboardPage() {
                         return (
                           <div key={cls.name}>
                             <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs font-medium text-slate-700">{cls.name}</span>
-                              <span className="text-[11px] text-slate-400">{cls.count}</span>
+                              <span className="text-xs font-medium text-slate-700 dark:text-slate-200">{cls.name}</span>
+                              <span className="text-[11px] text-slate-400 dark:text-slate-500">{cls.count}</span>
                             </div>
-                            <div className="w-full bg-slate-100 rounded-full h-1.5">
+                            <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1.5">
                               <div className="h-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
@@ -899,30 +937,30 @@ export default function StaffDashboardPage() {
             </div>
 
             {/* Tools */}
-            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-2.5">
-                <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center">
-                  <Zap className="h-3.5 w-3.5 text-slate-600" />
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <Zap className="h-3.5 w-3.5 text-slate-600 dark:text-slate-400" />
                 </div>
-                <h3 className="text-sm font-semibold text-slate-800">Quick Tools</h3>
+                <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">Quick Tools</h3>
               </div>
               <div className="p-3 space-y-1.5">
                 {[
-                  { label: 'Attendance', icon: CalendarDays, href: '/staff/attendance', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                  { label: 'CA Scores', icon: Calculator, href: '/staff/ca-scores', color: 'text-amber-600', bg: 'bg-amber-50' },
-                  { label: 'Report Cards', icon: FileCheck, href: '/staff/report-cards', color: 'text-blue-600', bg: 'bg-blue-50' },
-                  { label: 'All Students', icon: Users, href: '/staff/students', color: 'text-violet-600', bg: 'bg-violet-50' },
+                  { label: 'Attendance', icon: CalendarDays, href: '/staff/attendance', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-950/50' },
+                  { label: 'CA Scores', icon: Calculator, href: '/staff/ca-scores', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950/50' },
+                  { label: 'Report Cards', icon: FileCheck, href: '/staff/report-cards', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-950/50' },
+                  { label: 'All Students', icon: Users, href: '/staff/students', color: 'text-violet-600 dark:text-violet-400', bg: 'bg-violet-50 dark:bg-violet-950/50' },
                 ].map((tool) => (
                   <button
                     key={tool.label}
                     onClick={() => router.push(tool.href)}
-                    className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-colors text-left group"
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/60 transition-colors text-left group"
                   >
                     <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', tool.bg)}>
                       <tool.icon className={cn('h-3.5 w-3.5', tool.color)} />
                     </div>
-                    <span className="text-sm font-medium text-slate-700 group-hover:text-slate-900 flex-1">{tool.label}</span>
-                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 transition-colors" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white flex-1">{tool.label}</span>
+                    <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 transition-colors" />
                   </button>
                 ))}
               </div>
@@ -930,7 +968,7 @@ export default function StaffDashboardPage() {
 
             {/* Term Activity */}
             {termInfo.weekProgress > 0 && (
-              <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 text-white shadow-sm">
+              <div className="bg-gradient-to-br from-slate-800 to-slate-900 dark:from-slate-900 dark:to-slate-950 rounded-2xl p-4 text-white shadow-sm border border-slate-800">
                 <div className="flex items-center gap-2 mb-3">
                   <Target className="h-4 w-4 text-slate-400" />
                   <p className="text-xs font-semibold text-slate-300">Term Activity</p>
@@ -963,7 +1001,7 @@ export default function StaffDashboardPage() {
 
       {/* ── Floating Refresh Indicator ─────────────────────────────────── */}
       {refreshing && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-full shadow-xl text-xs font-medium">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2 bg-slate-900 dark:bg-slate-800 text-white rounded-full shadow-xl text-xs font-medium border border-slate-800 dark:border-slate-700">
           <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
           Refreshing...
         </div>

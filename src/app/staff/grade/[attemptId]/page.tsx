@@ -15,8 +15,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Loader2, Save, ChevronLeft, ChevronRight, Award, MessageSquare } from 'lucide-react'
+import { Loader2, Save, ChevronLeft, ChevronRight, Award } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface TheoryAnswer {
@@ -60,7 +59,6 @@ export default function GradeTheoryPage() {
   async function loadTheoryAnswers() {
     setLoading(true)
     try {
-      // Get attempt details with student and exam info
       const { data: attemptData, error: attemptError } = await supabase
         .from('exam_attempts')
         .select(`
@@ -85,7 +83,6 @@ export default function GradeTheoryPage() {
         percentage: 0
       })
 
-      // Get theory answers
       const { data: theoryData, error: theoryError } = await supabase
         .from('theory_answers')
         .select(`
@@ -111,7 +108,6 @@ export default function GradeTheoryPage() {
         setPointsAwarded(formatted[0].points_awarded)
         setFeedback(formatted[0].teacher_feedback)
       }
-
     } catch (error) {
       console.error('Error loading theory answers:', error)
       toast.error('Failed to load answers')
@@ -136,7 +132,6 @@ export default function GradeTheoryPage() {
 
       if (error) throw error
 
-      // Update local state
       const updated = [...theoryAnswers]
       updated[currentIndex] = {
         ...current,
@@ -144,9 +139,7 @@ export default function GradeTheoryPage() {
         teacher_feedback: feedback
       }
       setTheoryAnswers(updated)
-
       toast.success('Answer saved')
-
     } catch (error) {
       console.error('Error saving:', error)
       toast.error('Failed to save')
@@ -156,10 +149,8 @@ export default function GradeTheoryPage() {
   async function finalizeGrading() {
     setSaving(true)
     try {
-      // Save current if any changes
       await saveCurrentGrading()
 
-      // Calculate total theory score
       const totalTheoryPoints = theoryAnswers.reduce((sum, t) => sum + t.points, 0)
       const earnedTheoryPoints = theoryAnswers.reduce((sum, t) => sum + (t.points_awarded || 0), 0)
       
@@ -173,7 +164,6 @@ export default function GradeTheoryPage() {
       else if (percentage >= 60) grade = 'C'
       else if (percentage >= 50) grade = 'D'
 
-      // Update exam attempt
       const { error } = await supabase
         .from('exam_attempts')
         .update({
@@ -189,7 +179,6 @@ export default function GradeTheoryPage() {
 
       toast.success('Grading completed successfully!')
       router.push('/staff/exams')
-
     } catch (error) {
       console.error('Error finalizing:', error)
       toast.error('Failed to finalize grading')
@@ -205,8 +194,8 @@ export default function GradeTheoryPage() {
     return (
       <>
         <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', firstName: 'Staff', role: 'teacher', email: '' }} />
-        <div className="min-h-screen flex items-center justify-center pt-20">
-          <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="min-h-screen flex items-center justify-center pt-20 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
         </div>
         <Footer />
       </>
@@ -217,10 +206,15 @@ export default function GradeTheoryPage() {
     return (
       <>
         <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', firstName: 'Staff', role: 'teacher', email: '' }} />
-        <div className="min-h-screen flex items-center justify-center pt-20">
-          <Card className="text-center p-8">
-            <p className="text-muted-foreground">No theory questions to grade</p>
-            <Button className="mt-4" onClick={() => router.back()}>Go Back</Button>
+        <div className="min-h-screen flex items-center justify-center pt-20 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          <Card className="text-center p-8 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+            <p className="text-slate-500 dark:text-slate-400">No theory questions to grade</p>
+            <Button 
+              className="mt-4 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500" 
+              onClick={() => router.back()}
+            >
+              Go Back
+            </Button>
           </Card>
         </div>
         <Footer />
@@ -232,34 +226,38 @@ export default function GradeTheoryPage() {
     <>
       <Header user={{ id: 'staff', isAuthenticated: true, name: 'Staff', firstName: 'Staff', role: 'teacher', email: '' }} />
       
-      <main className="min-h-screen bg-gray-50 pt-20">
+      <main className="min-h-screen bg-slate-50 dark:bg-slate-950 pt-20 transition-colors duration-300">
         <div className="container mx-auto px-4 py-8">
           <div className="mb-6">
-            <Button variant="ghost" onClick={() => router.back()}>
+            <Button 
+              variant="ghost" 
+              onClick={() => router.back()}
+              className="text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
               <ChevronLeft className="mr-2 h-4 w-4" />
               Back to Exams
             </Button>
           </div>
 
           {/* Exam Info */}
-          <Card className="mb-6">
+          <Card className="mb-6 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <CardContent className="p-4">
               <div className="grid gap-4 md:grid-cols-4">
                 <div>
-                  <p className="text-sm text-muted-foreground">Student</p>
-                  <p className="font-medium">{attempt?.student_name}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Student</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{attempt?.student_name}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Class</p>
-                  <p className="font-medium">{attempt?.student_class}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Class</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{attempt?.student_class}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Exam</p>
-                  <p className="font-medium">{attempt?.exam_title}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Exam</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{attempt?.exam_title}</p>
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Subject</p>
-                  <p className="font-medium">{attempt?.exam_subject}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Subject</p>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">{attempt?.exam_subject}</p>
                 </div>
               </div>
             </CardContent>
@@ -267,10 +265,12 @@ export default function GradeTheoryPage() {
 
           <div className="grid gap-6 lg:grid-cols-3">
             {/* Question List */}
-            <Card className="lg:col-span-1">
+            <Card className="lg:col-span-1 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               <CardHeader>
-                <CardTitle>Theory Questions</CardTitle>
-                <CardDescription>{theoryAnswers.length} questions to grade</CardDescription>
+                <CardTitle className="text-slate-800 dark:text-white">Theory Questions</CardTitle>
+                <CardDescription className="text-slate-500 dark:text-slate-400">
+                  {theoryAnswers.length} questions to grade
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
@@ -285,14 +285,19 @@ export default function GradeTheoryPage() {
                       }}
                       className={`w-full text-left p-3 rounded-lg transition-colors ${
                         idx === currentIndex
-                          ? 'bg-primary text-white'
-                          : 'hover:bg-gray-100'
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                       }`}
                     >
                       <div className="flex justify-between items-center">
                         <span>Question {idx + 1}</span>
                         {item.points_awarded > 0 && (
-                          <Badge variant={idx === currentIndex ? 'outline' : 'secondary'} className={idx === currentIndex ? 'border-white' : ''}>
+                          <Badge 
+                            className={idx === currentIndex 
+                              ? 'bg-white/20 text-white border-0' 
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-0'
+                            }
+                          >
                             {item.points_awarded}/{item.points} pts
                           </Badge>
                         )}
@@ -304,24 +309,30 @@ export default function GradeTheoryPage() {
             </Card>
 
             {/* Grading Area */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-2 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
               <CardHeader>
-                <CardTitle>Grade Question {currentIndex + 1}</CardTitle>
+                <CardTitle className="text-slate-800 dark:text-white">
+                  Grade Question {currentIndex + 1}
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
-                  <Label>Question</Label>
-                  <p className="mt-1 p-3 bg-gray-50 rounded-lg">{current?.question_text}</p>
+                  <Label className="text-slate-700 dark:text-slate-300">Question</Label>
+                  <p className="mt-1 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg text-slate-800 dark:text-slate-200">
+                    {current?.question_text}
+                  </p>
                 </div>
                 
                 <div>
-                  <Label>Student's Answer</Label>
-                  <p className="mt-1 p-3 bg-gray-50 rounded-lg whitespace-pre-wrap">{current?.answer_text || 'No answer provided'}</p>
+                  <Label className="text-slate-700 dark:text-slate-300">Student's Answer</Label>
+                  <p className="mt-1 p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-lg whitespace-pre-wrap text-slate-800 dark:text-slate-200">
+                    {current?.answer_text || 'No answer provided'}
+                  </p>
                 </div>
                 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
-                    <Label>Points Awarded</Label>
+                    <Label className="text-slate-700 dark:text-slate-300">Points Awarded</Label>
                     <div className="flex items-center gap-2 mt-1">
                       <Input
                         type="number"
@@ -329,36 +340,46 @@ export default function GradeTheoryPage() {
                         onChange={(e) => setPointsAwarded(parseInt(e.target.value) || 0)}
                         max={current?.points}
                         min={0}
+                        className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                       />
-                      <span className="text-sm text-muted-foreground">/ {current?.points} pts</span>
+                      <span className="text-sm text-slate-500 dark:text-slate-400">/ {current?.points} pts</span>
                     </div>
                   </div>
                   <div>
-                    <Label>Score Percentage</Label>
-                    <div className="mt-1 p-2 bg-gray-50 rounded text-center">
+                    <Label className="text-slate-700 dark:text-slate-300">Score Percentage</Label>
+                    <div className="mt-1 p-2 bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded text-center text-slate-800 dark:text-slate-200">
                       {Math.round((pointsAwarded / (current?.points || 1)) * 100)}%
                     </div>
                   </div>
                 </div>
                 
                 <div>
-                  <Label>Feedback (Optional)</Label>
+                  <Label className="text-slate-700 dark:text-slate-300">Feedback (Optional)</Label>
                   <Textarea
                     value={feedback}
                     onChange={(e) => setFeedback(e.target.value)}
                     placeholder="Provide feedback to the student..."
                     rows={3}
+                    className="bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                   />
                 </div>
                 
                 <div className="flex justify-between pt-4">
-                  <Button variant="outline" onClick={saveCurrentGrading}>
+                  <Button 
+                    variant="outline" 
+                    onClick={saveCurrentGrading}
+                    className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                  >
                     <Save className="mr-2 h-4 w-4" />
                     Save
                   </Button>
                   
                   {isLast ? (
-                    <Button onClick={finalizeGrading} disabled={saving}>
+                    <Button 
+                      onClick={finalizeGrading} 
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    >
                       {saving ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       ) : (
@@ -374,6 +395,7 @@ export default function GradeTheoryPage() {
                         setPointsAwarded(theoryAnswers[currentIndex + 1]?.points_awarded)
                         setFeedback(theoryAnswers[currentIndex + 1]?.teacher_feedback)
                       }}
+                      className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                     >
                       Next Question
                       <ChevronRight className="ml-2 h-4 w-4" />

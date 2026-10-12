@@ -1,4 +1,4 @@
-// app/staff/ca-scores/page.tsx
+// app/staff/ca-scores/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -26,14 +26,12 @@ function CAScoresContent() {
   const [error, setError] = useState<string | null>(null)
   const lastVisibilityRef = useRef(0)
 
-  // 1. Set profile from context
   useEffect(() => {
     if (contextUser) {
       setProfile(contextUser)
     }
   }, [contextUser])
 
-  // 2. Fetch current term + current session from database
   useEffect(() => {
     let cancelled = false
 
@@ -41,7 +39,6 @@ function CAScoresContent() {
       try {
         setError(null)
 
-        // --- Step 1: Get the current academic session ---
         const { data: sessionData, error: sessionError } = await supabase
           .from('academic_sessions')
           .select('session_year')
@@ -52,8 +49,6 @@ function CAScoresContent() {
 
         const currentSessionYear = sessionData?.session_year ?? null
 
-        // --- Step 2: Get the current term ---
-        // Prefer term_settings, scoped to the current session if we have it.
         let termQuery = supabase
           .from('term_settings')
           .select('term, term_name, session_year')
@@ -65,7 +60,6 @@ function CAScoresContent() {
 
         let { data: termData, error: termError } = await termQuery.maybeSingle()
 
-        // Fallback: if nothing matched the session filter, retry without it
         if (!termData && currentSessionYear) {
           const fallback = await supabase
             .from('term_settings')
@@ -77,7 +71,6 @@ function CAScoresContent() {
           termError = fallback.error
         }
 
-        // Final fallback: use `terms` table
         if (!termData) {
           const termsFallback = await supabase
             .from('terms')
@@ -131,7 +124,6 @@ function CAScoresContent() {
     }
   }, [])
 
-  // 3. Visibility refresh hook (unchanged)
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -148,8 +140,8 @@ function CAScoresContent() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-emerald-600 mx-auto" />
-          <p className="mt-3 text-sm text-slate-500">Loading CA Scores...</p>
+          <Loader2 className="h-10 w-10 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto" />
+          <p className="mt-3 text-sm text-slate-500 dark:text-slate-400">Loading CA Scores...</p>
         </div>
       </div>
     )
@@ -158,15 +150,15 @@ function CAScoresContent() {
   if (error) {
     return (
       <div className="w-full px-3 sm:px-4 md:px-5 lg:px-6 py-4">
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5 shrink-0" />
+        <div className="rounded-lg border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
           <div>
-            <h3 className="font-semibold text-red-800">Unable to load current term</h3>
-            <p className="text-sm text-red-700 mt-1">{error}</p>
+            <h3 className="font-semibold text-red-800 dark:text-red-300">Unable to load current term</h3>
+            <p className="text-sm text-red-700 dark:text-red-400 mt-1">{error}</p>
             <Button
               variant="outline"
               size="sm"
-              className="mt-3"
+              className="mt-3 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/50"
               onClick={() => window.location.reload()}
             >
               Retry
@@ -183,17 +175,17 @@ function CAScoresContent() {
         <div className="flex items-center gap-2">
           <Link
             href="/staff"
-            className="text-sm text-muted-foreground hover:text-primary flex items-center gap-1"
+            className="text-sm text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1 transition-colors"
           >
             <ArrowLeft className="h-3 w-3" /> Back to Dashboard
           </Link>
         </div>
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">CA Scores</h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">CA Scores</h1>
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
             Manage continuous assessment scores for your students
             {termInfo && (
-              <span className="ml-1 text-emerald-700 font-medium">
+              <span className="ml-1 text-emerald-700 dark:text-emerald-400 font-medium">
                 — {termInfo.termName} {termInfo.sessionYear}
               </span>
             )}

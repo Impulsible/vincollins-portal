@@ -1,4 +1,4 @@
-// app/staff/notes/create/page.tsx - COMPLETE NOTES CREATION PAGE
+// app/staff/notes/create/page.tsx - COMPLETE NOTES CREATION PAGE + DARK MODE
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
@@ -28,11 +28,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 
-// ============================================
-// CONSTANTS
-// ============================================
 const allClasses = ['JSS 1', 'JSS 2', 'JSS 3', 'SS 1', 'SS 2', 'SS 3']
-
 const jssClasses = ['JSS 1', 'JSS 2', 'JSS 3']
 const ssClasses = ['SS 1', 'SS 2', 'SS 3']
 
@@ -61,14 +57,14 @@ const acceptedFileTypes = [
 ]
 
 const fileTypeIcons: Record<string, JSX.Element> = {
-  'application/pdf': <FileText className="h-4 w-4 text-red-500" />,
-  'application/msword': <FileText className="h-4 w-4 text-blue-500" />,
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': <FileText className="h-4 w-4 text-blue-500" />,
-  'application/vnd.ms-excel': <FileSpreadsheet className="h-4 w-4 text-green-500" />,
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': <FileSpreadsheet className="h-4 w-4 text-green-500" />,
-  'text/csv': <FileSpreadsheet className="h-4 w-4 text-green-500" />,
-  'application/vnd.ms-powerpoint': <Eye className="h-4 w-4 text-orange-500" />,
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation': <Eye className="h-4 w-4 text-orange-500" />,
+  'application/pdf': <FileText className="h-4 w-4 text-red-500 dark:text-red-400" />,
+  'application/msword': <FileText className="h-4 w-4 text-blue-500 dark:text-blue-400" />,
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': <FileText className="h-4 w-4 text-blue-500 dark:text-blue-400" />,
+  'application/vnd.ms-excel': <FileSpreadsheet className="h-4 w-4 text-green-500 dark:text-green-400" />,
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': <FileSpreadsheet className="h-4 w-4 text-green-500 dark:text-green-400" />,
+  'text/csv': <FileSpreadsheet className="h-4 w-4 text-green-500 dark:text-green-400" />,
+  'application/vnd.ms-powerpoint': <Eye className="h-4 w-4 text-orange-500 dark:text-orange-400" />,
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': <Eye className="h-4 w-4 text-orange-500 dark:text-orange-400" />,
 }
 
 interface UploadedFile {
@@ -103,7 +99,6 @@ export default function CreateNotePage() {
   const [dragActive, setDragActive] = useState(false)
   const [selectedClasses, setSelectedClasses] = useState<string[]>([])
 
-  // Derived: determine if selected classes are JSS or SS
   const selectedLevel = selectedClasses.length > 0
     ? selectedClasses.some(c => jssClasses.includes(c)) && selectedClasses.some(c => ssClasses.includes(c))
       ? 'mixed'
@@ -112,7 +107,6 @@ export default function CreateNotePage() {
         : 'ss'
     : 'jss'
 
-  // Get subjects based on level
   const availableSubjects = selectedLevel === 'ss' ? seniorSubjects 
     : selectedLevel === 'jss' ? juniorSubjects 
     : [...new Set([...juniorSubjects, ...seniorSubjects])]
@@ -128,9 +122,6 @@ export default function CreateNotePage() {
     if (data) setProfile(data)
   }
 
-  // ============================================
-  // CLASS SELECTION
-  // ============================================
   const handleClassToggle = (className: string) => {
     setSelectedClasses(prev => prev.includes(className) ? prev.filter(c => c !== className) : [...prev, className])
   }
@@ -140,9 +131,6 @@ export default function CreateNotePage() {
   const selectAll = () => setSelectedClasses([...allClasses])
   const clearAll = () => setSelectedClasses([])
 
-  // ============================================
-  // TEXT FORMATTING
-  // ============================================
   const insertFormatting = (format: string) => {
     const textarea = editorRef.current
     if (!textarea) return
@@ -178,9 +166,6 @@ export default function CreateNotePage() {
     }, 0)
   }
 
-  // ============================================
-  // FILE HANDLING
-  // ============================================
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault(); e.stopPropagation()
     setDragActive(e.type === 'dragenter' || e.type === 'dragover')
@@ -219,13 +204,10 @@ export default function CreateNotePage() {
   }
 
   const getFileIcon = (type: string) => {
-    if (type.startsWith('image/')) return <ImageIcon className="h-4 w-4 text-purple-500" />
-    return fileTypeIcons[type] || <FileIcon className="h-4 w-4 text-slate-500" />
+    if (type.startsWith('image/')) return <ImageIcon className="h-4 w-4 text-purple-500 dark:text-purple-400" />
+    return fileTypeIcons[type] || <FileIcon className="h-4 w-4 text-slate-500 dark:text-slate-400" />
   }
 
-  // ============================================
-  // SUBMIT
-  // ============================================
   const uploadFiles = async (noteId: string): Promise<string[]> => {
     const urls: string[] = []
     for (const file of files) {
@@ -269,7 +251,6 @@ export default function CreateNotePage() {
 
       if (error) throw error
 
-      // Upload files
       if (files.length > 0) {
         const fileUrls = await uploadFiles(note.id)
         if (fileUrls.length > 0) {
@@ -277,7 +258,6 @@ export default function CreateNotePage() {
         }
       }
 
-      // Notify students
       for (const className of selectedClasses) {
         const { data: students } = await supabase.from('profiles').select('id').eq('class', className).eq('role', 'student')
         if (students?.length) {
@@ -304,51 +284,100 @@ export default function CreateNotePage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl transition-colors duration-300">
       {/* Breadcrumb */}
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
-          <Link href="/staff" className="hover:text-primary flex items-center gap-1"><Home className="h-3.5 w-3.5" /> Dashboard</Link>
+        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-500 dark:text-slate-400">
+          <Link href="/staff" className="hover:text-emerald-600 dark:hover:text-emerald-400 flex items-center gap-1">
+            <Home className="h-3.5 w-3.5" /> Dashboard
+          </Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <Link href="/staff/notes" className="hover:text-primary">Notes</Link>
+          <Link href="/staff/notes" className="hover:text-emerald-600 dark:hover:text-emerald-400">Notes</Link>
           <ChevronRight className="h-3.5 w-3.5" />
-          <span className="text-foreground font-medium">Create</span>
+          <span className="text-slate-800 dark:text-slate-200 font-medium">Create</span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => router.push('/staff/notes')}>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          onClick={() => router.push('/staff/notes')}
+          className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" /> Back
         </Button>
       </div>
 
       <div>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Lesson Note</h1>
-        <p className="text-muted-foreground mt-1 text-xs sm:text-sm">Create comprehensive lesson notes with attachments</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Create Lesson Note</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-1 text-xs sm:text-sm">
+          Create comprehensive lesson notes with attachments
+        </p>
       </div>
 
       {/* Class Selection */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 text-blue-600" />Target Classes *</CardTitle>
-          <CardDescription>Select which classes receive this note</CardDescription>
+          <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+            <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />Target Classes *
+          </CardTitle>
+          <CardDescription className="text-slate-500 dark:text-slate-400">
+            Select which classes receive this note
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           {/* Quick Select */}
           <div className="flex flex-wrap gap-2">
-            <Button variant="outline" size="sm" onClick={selectAllJSS} className="text-xs h-8">All JSS</Button>
-            <Button variant="outline" size="sm" onClick={selectAllSS} className="text-xs h-8">All SS</Button>
-            <Button variant="outline" size="sm" onClick={selectAll} className="text-xs h-8">All Classes</Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={selectAllJSS} 
+              className="text-xs h-8 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              All JSS
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={selectAllSS} 
+              className="text-xs h-8 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              All SS
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={selectAll} 
+              className="text-xs h-8 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+            >
+              All Classes
+            </Button>
             {selectedClasses.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={clearAll} className="text-xs h-8 text-red-500"><X className="h-3 w-3 mr-1" />Clear</Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearAll} 
+                className="text-xs h-8 text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+              >
+                <X className="h-3 w-3 mr-1" />Clear
+              </Button>
             )}
           </div>
           
           {/* JSS Classes */}
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-1.5">Junior Secondary (JSS)</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Junior Secondary (JSS)</p>
             <div className="flex flex-wrap gap-2">
               {jssClasses.map(cls => (
-                <Badge key={cls} variant={selectedClasses.includes(cls) ? 'default' : 'outline'}
-                  className={cn("cursor-pointer px-4 py-2 text-sm", selectedClasses.includes(cls) && "bg-blue-600 text-white")}
-                  onClick={() => handleClassToggle(cls)}>
+                <Badge 
+                  key={cls} 
+                  variant={selectedClasses.includes(cls) ? 'default' : 'outline'}
+                  className={cn(
+                    "cursor-pointer px-4 py-2 text-sm transition-all",
+                    selectedClasses.includes(cls) 
+                      ? "bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white border-blue-600" 
+                      : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-blue-300 dark:hover:border-blue-700"
+                  )}
+                  onClick={() => handleClassToggle(cls)}
+                >
                   {selectedClasses.includes(cls) && <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}{cls}
                 </Badge>
               ))}
@@ -357,12 +386,20 @@ export default function CreateNotePage() {
 
           {/* SS Classes */}
           <div>
-            <p className="text-xs font-medium text-slate-500 mb-1.5">Senior Secondary (SS)</p>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Senior Secondary (SS)</p>
             <div className="flex flex-wrap gap-2">
               {ssClasses.map(cls => (
-                <Badge key={cls} variant={selectedClasses.includes(cls) ? 'default' : 'outline'}
-                  className={cn("cursor-pointer px-4 py-2 text-sm", selectedClasses.includes(cls) && "bg-purple-600 text-white")}
-                  onClick={() => handleClassToggle(cls)}>
+                <Badge 
+                  key={cls} 
+                  variant={selectedClasses.includes(cls) ? 'default' : 'outline'}
+                  className={cn(
+                    "cursor-pointer px-4 py-2 text-sm transition-all",
+                    selectedClasses.includes(cls) 
+                      ? "bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white border-purple-600" 
+                      : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-purple-300 dark:hover:border-purple-700"
+                  )}
+                  onClick={() => handleClassToggle(cls)}
+                >
                   {selectedClasses.includes(cls) && <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}{cls}
                 </Badge>
               ))}
@@ -370,27 +407,38 @@ export default function CreateNotePage() {
           </div>
 
           {selectedClasses.length > 0 && (
-            <p className="text-xs text-muted-foreground pt-1">Sending to {selectedClasses.length} class(es): {selectedClasses.join(', ')}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 pt-1">
+              Sending to {selectedClasses.length} class(es): <span className="font-medium text-slate-700 dark:text-slate-200">{selectedClasses.join(', ')}</span>
+            </p>
           )}
         </CardContent>
       </Card>
 
       {/* Note Details */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2"><FileText className="h-5 w-5 text-emerald-600" />Note Details</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+            <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />Note Details
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label className="text-sm">Title *</Label>
-              <Input value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="e.g., Introduction to Algebra" className="mt-1" />
+              <Label className="text-sm text-slate-700 dark:text-slate-300">Title *</Label>
+              <Input 
+                value={form.title} 
+                onChange={e => setForm({ ...form, title: e.target.value })} 
+                placeholder="e.g., Introduction to Algebra" 
+                className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+              />
             </div>
             <div>
-              <Label className="text-sm">Subject *</Label>
+              <Label className="text-sm text-slate-700 dark:text-slate-300">Subject *</Label>
               <Select value={form.subject} onValueChange={v => setForm({ ...form, subject: v })}>
-                <SelectTrigger className="mt-1"><SelectValue placeholder="Select subject" /></SelectTrigger>
-                <SelectContent className="max-h-[300px]">
+                <SelectTrigger className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                  <SelectValue placeholder="Select subject" />
+                </SelectTrigger>
+                <SelectContent className="max-h-[300px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   {availableSubjects.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -399,14 +447,21 @@ export default function CreateNotePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <Label className="text-sm">Topic</Label>
-              <Input value={form.topic} onChange={e => setForm({ ...form, topic: e.target.value })} placeholder="e.g., Quadratic Equations" className="mt-1" />
+              <Label className="text-sm text-slate-700 dark:text-slate-300">Topic</Label>
+              <Input 
+                value={form.topic} 
+                onChange={e => setForm({ ...form, topic: e.target.value })} 
+                placeholder="e.g., Quadratic Equations" 
+                className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+              />
             </div>
             <div>
-              <Label className="text-sm">Term</Label>
+              <Label className="text-sm text-slate-700 dark:text-slate-300">Term</Label>
               <Select value={form.term} onValueChange={v => setForm({ ...form, term: v })}>
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
                   <SelectItem value="first">First Term</SelectItem>
                   <SelectItem value="second">Second Term</SelectItem>
                   <SelectItem value="third">Third Term</SelectItem>
@@ -414,37 +469,66 @@ export default function CreateNotePage() {
               </Select>
             </div>
             <div>
-              <Label className="text-sm">Week</Label>
-              <Input type="number" value={form.week} onChange={e => setForm({ ...form, week: e.target.value })} placeholder="Week number" min={1} max={14} className="mt-1" />
+              <Label className="text-sm text-slate-700 dark:text-slate-300">Week</Label>
+              <Input 
+                type="number" 
+                value={form.week} 
+                onChange={e => setForm({ ...form, week: e.target.value })} 
+                placeholder="Week number" 
+                min={1} 
+                max={14} 
+                className="mt-1 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <Label className="text-sm">Duration (minutes)</Label>
-              <Input type="number" value={form.duration} onChange={e => setForm({ ...form, duration: e.target.value })} className="mt-1 w-32" min={10} max={180} />
+              <Label className="text-sm text-slate-700 dark:text-slate-300">Duration (minutes)</Label>
+              <Input 
+                type="number" 
+                value={form.duration} 
+                onChange={e => setForm({ ...form, duration: e.target.value })} 
+                className="mt-1 w-32 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" 
+                min={10} 
+                max={180} 
+              />
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Objectives */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2"><Sparkles className="h-5 w-5 text-amber-600" />Learning Objectives</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+            <Sparkles className="h-5 w-5 text-amber-600 dark:text-amber-400" />Learning Objectives
+          </CardTitle>
         </CardHeader>
         <CardContent>
-          <Textarea value={form.objectives} onChange={e => setForm({ ...form, objectives: e.target.value })}
-            placeholder="By the end of the lesson, students should be able to:&#10;1. Define...&#10;2. Explain...&#10;3. Solve..." rows={4} className="resize-none" />
+          <Textarea 
+            value={form.objectives} 
+            onChange={e => setForm({ ...form, objectives: e.target.value })}
+            placeholder="By the end of the lesson, students should be able to:&#10;1. Define...&#10;2. Explain...&#10;3. Solve..." 
+            rows={4} 
+            className="resize-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+          />
         </CardContent>
       </Card>
 
       {/* Content Editor */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-lg flex items-center gap-2"><BookOpen className="h-5 w-5 text-purple-600" />Lesson Content</CardTitle>
-            <Button variant="ghost" size="sm" onClick={() => setPreviewMode(!previewMode)} className="text-xs">
+            <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+              <BookOpen className="h-5 w-5 text-purple-600 dark:text-purple-400" />Lesson Content
+            </CardTitle>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setPreviewMode(!previewMode)} 
+              className="text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
               <Eye className="h-4 w-4 mr-1" />{previewMode ? 'Edit' : 'Preview'}
             </Button>
           </div>
@@ -452,26 +536,27 @@ export default function CreateNotePage() {
         <CardContent>
           {/* Toolbar */}
           {!previewMode && (
-            <div className="flex flex-wrap gap-1 p-2 bg-slate-50 rounded-t-lg border border-b-0">
+            <div className="flex flex-wrap gap-1 p-2 bg-slate-50 dark:bg-slate-800/60 rounded-t-lg border border-b-0 border-slate-200 dark:border-slate-800">
               <ToolbarButton icon={<Bold className="h-3.5 w-3.5" />} onClick={() => insertFormatting('bold')} title="Bold" />
               <ToolbarButton icon={<Italic className="h-3.5 w-3.5" />} onClick={() => insertFormatting('italic')} title="Italic" />
               <ToolbarButton icon={<Underline className="h-3.5 w-3.5" />} onClick={() => insertFormatting('underline')} title="Underline" />
               <ToolbarButton icon={<Strikethrough className="h-3.5 w-3.5" />} onClick={() => insertFormatting('strikethrough')} title="Strikethrough" />
-              <div className="w-px bg-slate-300 mx-1" />
+              <div className="w-px bg-slate-300 dark:bg-slate-700 mx-1" />
               <ToolbarButton icon={<Heading1 className="h-3.5 w-3.5" />} onClick={() => insertFormatting('h1')} title="Heading 1" />
               <ToolbarButton icon={<Heading2 className="h-3.5 w-3.5" />} onClick={() => insertFormatting('h2')} title="Heading 2" />
               <ToolbarButton icon={<Heading3 className="h-3.5 w-3.5" />} onClick={() => insertFormatting('h3')} title="Heading 3" />
-              <div className="w-px bg-slate-300 mx-1" />
+              <div className="w-px bg-slate-300 dark:bg-slate-700 mx-1" />
               <ToolbarButton icon={<List className="h-3.5 w-3.5" />} onClick={() => insertFormatting('list')} title="Bullet List" />
               <ToolbarButton icon={<ListOrdered className="h-3.5 w-3.5" />} onClick={() => insertFormatting('ordered')} title="Numbered List" />
-              <div className="w-px bg-slate-300 mx-1" />
+              <div className="w-px bg-slate-300 dark:bg-slate-700 mx-1" />
               <ToolbarButton icon={<Quote className="h-3.5 w-3.5" />} onClick={() => insertFormatting('quote')} title="Blockquote" />
               <ToolbarButton icon={<Code className="h-3.5 w-3.5" />} onClick={() => insertFormatting('code')} title="Code Block" />
             </div>
           )}
           
           {previewMode ? (
-            <div className="min-h-[300px] p-4 border rounded-b-lg bg-white prose prose-sm max-w-none"
+            <div 
+              className="min-h-[300px] p-4 border border-slate-200 dark:border-slate-800 rounded-b-lg bg-white dark:bg-slate-950 prose prose-sm dark:prose-invert max-w-none text-slate-700 dark:text-slate-300"
               dangerouslySetInnerHTML={{ __html: form.content.replace(/\n/g, '<br/>')
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -483,82 +568,126 @@ export default function CreateNotePage() {
                 .replace(/^- (.*$)/gm, '<li>$1</li>')
                 .replace(/^> (.*$)/gm, '<blockquote>$1</blockquote>')
                 .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
-              }} />
-            ) : (
-              <Textarea ref={editorRef} value={form.content}
-                onChange={e => setForm({ ...form, content: e.target.value })}
-                onPaste={(e) => {
-                  const items = e.clipboardData?.items
-                  if (items) {
-                    for (const item of Array.from(items)) {
-                      if (item.type.startsWith('image/')) {
-                        e.preventDefault()
-                        const file = item.getAsFile()
-                        if (file) { handleFiles([file]); toast.success('Image pasted! Upload when saving.') }
-                        return
-                      }
+              }} 
+            />
+          ) : (
+            <Textarea 
+              ref={editorRef} 
+              value={form.content}
+              onChange={e => setForm({ ...form, content: e.target.value })}
+              onPaste={(e) => {
+                const items = e.clipboardData?.items
+                if (items) {
+                  for (const item of Array.from(items)) {
+                    if (item.type.startsWith('image/')) {
+                      e.preventDefault()
+                      const file = item.getAsFile()
+                      if (file) { handleFiles([file]); toast.success('Image pasted! Upload when saving.') }
+                      return
                     }
                   }
-                }}
-                placeholder="Write your lesson content here...&#10;&#10;Use the toolbar above or markdown:&#10;# Heading 1&#10;## Heading 2&#10;**bold** *italic*&#10;- List item&#10;> Blockquote&#10;```code```"
-                className="min-h-[350px] rounded-t-none border-t-0 font-mono text-sm resize-y" />
-            )}
+                }
+              }}
+              placeholder="Write your lesson content here...&#10;&#10;Use the toolbar above or markdown:&#10;# Heading 1&#10;## Heading 2&#10;**bold** *italic*&#10;- List item&#10;> Blockquote&#10;```code```"
+              className="min-h-[350px] rounded-t-none border-t-0 font-mono text-sm resize-y bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+            />
+          )}
         </CardContent>
       </Card>
 
       {/* Summary & References */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Summary</CardTitle>
+            <CardTitle className="text-lg text-slate-800 dark:text-white">Summary</CardTitle>
           </CardHeader>
           <CardContent>
-            <Textarea value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })}
-              placeholder="Key points and summary..." rows={4} className="resize-none" />
+            <Textarea 
+              value={form.summary} 
+              onChange={e => setForm({ ...form, summary: e.target.value })}
+              placeholder="Key points and summary..." 
+              rows={4} 
+              className="resize-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+            />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg">References</CardTitle>
+            <CardTitle className="text-lg text-slate-800 dark:text-white">References</CardTitle>
           </CardHeader>
           <CardContent>
-            <Textarea value={form.references} onChange={e => setForm({ ...form, references: e.target.value })}
-              placeholder="Textbooks, websites, materials..." rows={4} className="resize-none" />
+            <Textarea 
+              value={form.references} 
+              onChange={e => setForm({ ...form, references: e.target.value })}
+              placeholder="Textbooks, websites, materials..." 
+              rows={4} 
+              className="resize-none bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" 
+            />
           </CardContent>
         </Card>
       </div>
 
       {/* File Upload */}
-      <Card>
+      <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg flex items-center gap-2"><Upload className="h-5 w-5 text-orange-600" />Attachments</CardTitle>
-          <CardDescription>PDF, Word, Excel, Images, Videos (Max 50MB each)</CardDescription>
+          <CardTitle className="text-lg flex items-center gap-2 text-slate-800 dark:text-white">
+            <Upload className="h-5 w-5 text-orange-600 dark:text-orange-400" />Attachments
+          </CardTitle>
+          <CardDescription className="text-slate-500 dark:text-slate-400">
+            PDF, Word, Excel, Images, Videos (Max 50MB each)
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className={cn("border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all",
-            dragActive ? "border-emerald-500 bg-emerald-50" : "border-slate-300 hover:border-emerald-400 hover:bg-slate-50")}
-            onDragEnter={handleDrag} onDragLeave={handleDrag} onDragOver={handleDrag} onDrop={handleDrop}
-            onClick={() => document.getElementById('note-file-upload')?.click()}>
-            <Upload className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-            <p className="text-sm font-medium text-slate-600">Drag & drop files, or click to browse</p>
-            <p className="text-xs text-slate-500 mt-1">PDF, DOC, DOCX, TXT, XLSX, PPT, JPG, PNG, MP4, MP3</p>
-            <input id="note-file-upload" type="file" multiple className="hidden"
-              onChange={e => e.target.files && handleFiles(e.target.files)} accept={acceptedFileTypes.join(',')} />
+          <div 
+            className={cn(
+              "border-2 border-dashed rounded-xl p-6 sm:p-8 text-center cursor-pointer transition-all",
+              dragActive 
+                ? "border-emerald-500 dark:border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30" 
+                : "border-slate-300 dark:border-slate-700 hover:border-emerald-400 dark:hover:border-emerald-600 hover:bg-slate-50 dark:hover:bg-slate-800/40"
+            )}
+            onDragEnter={handleDrag} 
+            onDragLeave={handleDrag} 
+            onDragOver={handleDrag} 
+            onDrop={handleDrop}
+            onClick={() => document.getElementById('note-file-upload')?.click()}
+          >
+            <Upload className="h-10 w-10 text-slate-400 dark:text-slate-500 mx-auto mb-3" />
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Drag & drop files, or click to browse</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">PDF, DOC, DOCX, TXT, XLSX, PPT, JPG, PNG, MP4, MP3</p>
+            <input 
+              id="note-file-upload" 
+              type="file" 
+              multiple 
+              className="hidden"
+              onChange={e => e.target.files && handleFiles(e.target.files)} 
+              accept={acceptedFileTypes.join(',')} 
+            />
           </div>
 
           {files.length > 0 && (
             <div className="mt-4 space-y-2">
               {files.map(file => (
-                <div key={file.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                <div 
+                  key={file.id} 
+                  className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/60 rounded-lg border border-slate-100 dark:border-slate-800"
+                >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-10 w-10 rounded-lg bg-white border flex items-center justify-center shrink-0">{getFileIcon(file.type)}</div>
+                    <div className="h-10 w-10 rounded-lg bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
+                      {getFileIcon(file.type)}
+                    </div>
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{file.name}</p>
-                      <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
+                      <p className="text-sm font-medium truncate text-slate-800 dark:text-slate-200">{file.name}</p>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{formatFileSize(file.size)}</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="text-red-500 shrink-0"
-                    onClick={e => { e.stopPropagation(); removeFile(file.id) }}><Trash2 className="h-4 w-4" /></Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0"
+                    onClick={e => { e.stopPropagation(); removeFile(file.id) }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               ))}
             </div>
@@ -568,21 +697,33 @@ export default function CreateNotePage() {
 
       {/* Actions */}
       <div className="flex items-center gap-3 pb-8">
-        <Button onClick={handleSubmit} disabled={submitting} className="bg-emerald-600 hover:bg-emerald-700 h-11 px-8">
+        <Button 
+          onClick={handleSubmit} 
+          disabled={submitting} 
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 h-11 px-8"
+        >
           {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
           Publish Note
         </Button>
-        <Button variant="outline" onClick={() => router.push('/staff/notes')}>Cancel</Button>
+        <Button 
+          variant="outline" 
+          onClick={() => router.push('/staff/notes')}
+          className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+        >
+          Cancel
+        </Button>
       </div>
     </div>
   )
 }
 
-// Small toolbar button component
 function ToolbarButton({ icon, onClick, title }: { icon: JSX.Element; onClick: () => void; title: string }) {
   return (
-    <button onClick={onClick} title={title}
-      className="p-1.5 rounded hover:bg-white hover:shadow-sm transition-all text-slate-600 hover:text-slate-900">
+    <button 
+      onClick={onClick} 
+      title={title}
+      className="p-1.5 rounded hover:bg-white dark:hover:bg-slate-700 hover:shadow-sm transition-all text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+    >
       {icon}
     </button>
   )

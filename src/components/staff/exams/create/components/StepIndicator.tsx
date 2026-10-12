@@ -1,4 +1,4 @@
-// src/components/staff/exams/create/components/StepIndicator.tsx
+// src/components/staff/exams/create/components/StepIndicator.tsx - WITH DARK MODE
 
 "use client";
 
@@ -40,8 +40,8 @@ export function StepIndicator({
                   isCurrent
                     ? "bg-emerald-500 border-emerald-400 text-white shadow-md shadow-emerald-500/25"
                     : isDone || isPast
-                    ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-400"
-                    : "bg-white/5 border-white/20 text-gray-500"
+                    ? "bg-emerald-500/20 dark:bg-emerald-500/10 border-emerald-500/50 text-emerald-400 dark:text-emerald-400"
+                    : "bg-white/5 border-white/20 dark:border-white/10 text-gray-500 dark:text-gray-500"
                 )}
               >
                 {isDone && !isCurrent ? (
@@ -67,7 +67,9 @@ export function StepIndicator({
               <div
                 className={cn(
                   "flex-1 h-0.5 mx-1 rounded-full",
-                  isPast || isDone ? "bg-emerald-500/50" : "bg-white/10"
+                  isPast || isDone 
+                    ? "bg-emerald-500/50" 
+                    : "bg-white/10 dark:bg-white/5"
                 )}
               />
             )}

@@ -1,4 +1,4 @@
-// app/staff/announcements/page.tsx - NO DUPLICATES (Clean version)
+// app/staff/announcements/page.tsx - NO DUPLICATES (Clean version + DARK MODE)
 'use client'
 
 import { StaffAnnouncements } from '@/components/staff/StaffAnnouncements'
@@ -10,14 +10,14 @@ export default function StaffAnnouncementsPage() {
   const router = useRouter()
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden">
-      {/* Back Button - Optional, since layout already has top bar */}
+    <div className="w-full max-w-full overflow-x-hidden transition-colors duration-300">
+      {/* Back Button */}
       <div className="mb-4">
         <Button 
           variant="ghost" 
           size="sm" 
           onClick={() => router.back()}
-          className="text-slate-500 hover:text-slate-700 -ml-2"
+          className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 -ml-2"
         >
           <ArrowLeft className="h-4 w-4 mr-1" />
           Back

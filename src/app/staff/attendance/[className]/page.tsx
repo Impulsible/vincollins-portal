@@ -14,8 +14,6 @@ import {
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
 interface Student {
   id: string
   student_id: string
@@ -54,8 +52,6 @@ interface Week {
   startDate: Date
   endDate: Date
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const normalizeClassName = (name: string): string => {
   if (!name) return ''
@@ -110,11 +106,9 @@ function getRecord(records: AttendanceRecord[], studentId: string, dateStr: stri
   return records.find(r => r.student_id === studentId && r.date === dateStr)
 }
 
-// ── Loading ───────────────────────────────────────────────────────────────────
-
 function LoadingScreen() {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center transition-colors duration-300">
       <div className="text-center">
         <div className="relative w-16 h-16 mx-auto mb-4">
           <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 animate-pulse" />
@@ -122,16 +116,12 @@ function LoadingScreen() {
             <Users className="h-8 w-8 text-white" />
           </div>
         </div>
-        <p className="font-semibold text-slate-700">Loading attendance...</p>
-        <p className="text-sm text-slate-400 mt-1">Fetching student records</p>
+        <p className="font-semibold text-slate-700 dark:text-slate-200">Loading attendance...</p>
+        <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Fetching student records</p>
       </div>
     </div>
   )
 }
-
-// ── Attendance Toggle Cell ────────────────────────────────────────────────────
-// Three states cycle: null → present → absent → null
-// Visual: pill-shaped toggle with smooth transitions
 
 function AttendanceCell({
   record,
@@ -154,28 +144,26 @@ function AttendanceCell({
     else onChange(null)
   }
 
-  // ── Locked / future placeholder ─────────────────────────────────────────
   if (cellLocked && status === null) {
     return (
       <div className="flex flex-col items-center gap-1.5">
         <div className={cn(
           'w-10 h-10 rounded-2xl flex items-center justify-center',
           isFuture
-            ? 'bg-slate-50 border border-dashed border-slate-200'
-            : 'bg-slate-100 border border-slate-200'
+            ? 'bg-slate-50 dark:bg-slate-900/50 border border-dashed border-slate-200 dark:border-slate-700'
+            : 'bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700'
         )}>
           {isFuture
-            ? <Clock className="h-4 w-4 text-slate-300" />
-            : <Shield className="h-4 w-4 text-slate-300" />}
+            ? <Clock className="h-4 w-4 text-slate-300 dark:text-slate-600" />
+            : <Shield className="h-4 w-4 text-slate-300 dark:text-slate-600" />}
         </div>
-        <span className="text-[10px] font-medium text-slate-300 leading-none">
+        <span className="text-[10px] font-medium text-slate-300 dark:text-slate-600 leading-none">
           {isFuture ? 'Soon' : 'Locked'}
         </span>
       </div>
     )
   }
 
-  // ── Interactive toggle ──────────────────────────────────────────────────
   return (
     <div className="flex flex-col items-center gap-1.5">
       <button
@@ -191,41 +179,36 @@ function AttendanceCell({
             : 'Click to clear'
         }
         className={cn(
-          // base
           'relative w-10 h-10 rounded-2xl border-2 flex items-center justify-center',
           'transition-all duration-200 ease-out',
           'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1',
+          'dark:focus-visible:ring-offset-slate-950',
 
-          // unmarked
           status === null && !cellLocked && [
-            'bg-white border-slate-200',
-            'hover:border-blue-300 hover:bg-blue-50/40',
+            'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700',
+            'hover:border-blue-300 dark:hover:border-blue-600 hover:bg-blue-50/40 dark:hover:bg-blue-950/30',
             'hover:scale-105 active:scale-95',
             'focus-visible:ring-blue-300',
           ],
 
-          // present
           status === 'present' && [
-            'bg-emerald-500 border-emerald-600',
-            'shadow-md shadow-emerald-200/70',
-            !cellLocked && 'hover:bg-emerald-600 hover:scale-105 active:scale-95',
+            'bg-emerald-500 border-emerald-600 dark:bg-emerald-600 dark:border-emerald-500',
+            'shadow-md shadow-emerald-200/70 dark:shadow-emerald-950/50',
+            !cellLocked && 'hover:bg-emerald-600 dark:hover:bg-emerald-500 hover:scale-105 active:scale-95',
             'focus-visible:ring-emerald-400',
           ],
 
-          // absent
           status === 'absent' && [
-            'bg-rose-500 border-rose-600',
-            'shadow-md shadow-rose-200/70',
-            !cellLocked && 'hover:bg-rose-600 hover:scale-105 active:scale-95',
+            'bg-rose-500 border-rose-600 dark:bg-rose-600 dark:border-rose-500',
+            'shadow-md shadow-rose-200/70 dark:shadow-rose-950/50',
+            !cellLocked && 'hover:bg-rose-600 dark:hover:bg-rose-500 hover:scale-105 active:scale-95',
             'focus-visible:ring-rose-400',
           ],
 
-          // locked with value
           cellLocked && status !== null && 'opacity-80 cursor-not-allowed',
           cellLocked && status === null && 'cursor-not-allowed',
         )}
       >
-        {/* Ripple ring for present */}
         {status === 'present' && !cellLocked && (
           <span className="absolute inset-0 rounded-2xl animate-ping bg-emerald-400 opacity-20" />
         )}
@@ -239,32 +222,28 @@ function AttendanceCell({
         {status === null && (
           <div className={cn(
             'w-2.5 h-2.5 rounded-full transition-colors duration-200',
-            'bg-slate-200 group-hover:bg-blue-300'
+            'bg-slate-200 dark:bg-slate-600 group-hover:bg-blue-300'
           )} />
         )}
 
-        {/* Lock overlay badge */}
         {cellLocked && status !== null && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center">
-            <Shield className="h-2.5 w-2.5 text-slate-400" />
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+            <Shield className="h-2.5 w-2.5 text-slate-400 dark:text-slate-500" />
           </span>
         )}
       </button>
 
-      {/* Status label */}
       <span className={cn(
         'text-[10px] font-semibold leading-none tracking-wide',
-        status === 'present' && 'text-emerald-600',
-        status === 'absent'  && 'text-rose-500',
-        status === null      && 'text-slate-300',
+        status === 'present' && 'text-emerald-600 dark:text-emerald-400',
+        status === 'absent'  && 'text-rose-500 dark:text-rose-400',
+        status === null      && 'text-slate-300 dark:text-slate-600',
       )}>
         {status === 'present' ? 'P' : status === 'absent' ? 'A' : '·'}
       </span>
     </div>
   )
 }
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function MarkAttendancePage() {
   const router = useRouter()
@@ -281,8 +260,6 @@ export default function MarkAttendancePage() {
   const [saving,           setSaving]           = useState<string | null>(null)
   const [lockedDates,      setLockedDates]      = useState<Set<string>>(new Set())
   const [matchedClassName, setMatchedClassName] = useState(classNameFromUrl)
-
-  // ── Fetch ───────────────────────────────────────────────────────────────────
 
   const fetchAll = useCallback(async () => {
     if (!user?.id) return
@@ -354,8 +331,6 @@ export default function MarkAttendancePage() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
-  // ── Handlers ────────────────────────────────────────────────────────────────
-
   const handleCellChange = (studentId: string, dateStr: string, status: 'present' | 'absent' | null) => {
     setRecords(prev => {
       const existing = prev.find(r => r.student_id === studentId && r.date === dateStr)
@@ -415,8 +390,6 @@ export default function MarkAttendancePage() {
     })
   }
 
-  // ── Derived ─────────────────────────────────────────────────────────────────
-
   const todayStr   = toDateStr(new Date())
   const currentWeek = termWeeks[currentWeekIndex]
 
@@ -439,40 +412,38 @@ export default function MarkAttendancePage() {
 
   const weekStats = currentWeek ? getWeekStats(currentWeek) : null
 
-  // ── Render ──────────────────────────────────────────────────────────────────
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
 
-      {/* ── Sticky Header ─────────────────────────────────────────────────── */}
-      <div className="bg-white border-b border-slate-100 sticky top-0 z-30 shadow-sm">
+      {/* Sticky Header */}
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-4 h-14">
             <button
               onClick={() => router.push('/staff/attendance')}
-              className="flex items-center gap-1.5 text-slate-500 hover:text-slate-800 transition-colors text-sm font-medium"
+              className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors text-sm font-medium"
             >
               <ArrowLeft className="h-4 w-4" /> Back
             </button>
-            <div className="h-5 w-px bg-slate-200" />
+            <div className="h-5 w-px bg-slate-200 dark:bg-slate-700" />
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
                 <BookOpen className="h-4 w-4 text-white" />
               </div>
               <div>
-                <p className="text-sm font-bold text-slate-800 leading-none">{classNameFromUrl}</p>
+                <p className="text-sm font-bold text-slate-800 dark:text-slate-100 leading-none">{classNameFromUrl}</p>
                 {termInfo && (
-                  <p className="text-[11px] text-slate-400 mt-0.5 leading-none">
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-0.5 leading-none">
                     {termInfo.term_name} · {termInfo.session_year}
                   </p>
                 )}
               </div>
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <span className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded-full text-xs font-semibold">
+              <span className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-full text-xs font-semibold">
                 {students.length} Students
               </span>
-              <span className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-semibold">
+              <span className="px-2.5 py-1 bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 rounded-full text-xs font-semibold">
                 {termWeeks.length} Weeks
               </span>
             </div>
@@ -482,27 +453,27 @@ export default function MarkAttendancePage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
 
-        {/* ── Week Navigator ─────────────────────────────────────────────── */}
+        {/* Week Navigator */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCurrentWeekIndex(i => Math.max(0, i - 1))}
               disabled={currentWeekIndex === 0}
-              className="w-8 h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
             >
-              <ChevronLeft className="h-4 w-4 text-slate-600" />
+              <ChevronLeft className="h-4 w-4 text-slate-600 dark:text-slate-400" />
             </button>
 
-            <div className="flex items-center gap-2.5 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-              <Calendar className="h-4 w-4 text-blue-500 flex-shrink-0" />
-              <span className="text-sm font-bold text-slate-800">{currentWeek?.weekLabel ?? '—'}</span>
+            <div className="flex items-center gap-2.5 px-4 py-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+              <Calendar className="h-4 w-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+              <span className="text-sm font-bold text-slate-800 dark:text-slate-100">{currentWeek?.weekLabel ?? '—'}</span>
               {currentWeek?.days.some(d => d.isToday) && (
-                <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold">
+                <span className="px-1.5 py-0.5 bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 rounded-full text-[10px] font-bold">
                   Current
                 </span>
               )}
               {currentWeek && (
-                <span className="text-xs text-slate-400 hidden sm:inline">
+                <span className="text-xs text-slate-400 dark:text-slate-500 hidden sm:inline">
                   {currentWeek.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   {' – '}
                   {currentWeek.endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -513,61 +484,59 @@ export default function MarkAttendancePage() {
             <button
               onClick={() => setCurrentWeekIndex(i => Math.min(termWeeks.length - 1, i + 1))}
               disabled={currentWeekIndex === termWeeks.length - 1}
-              className="w-8 h-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
+              className="w-8 h-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-colors shadow-sm"
             >
-              <ChevronRight className="h-4 w-4 text-slate-600" />
+              <ChevronRight className="h-4 w-4 text-slate-600 dark:text-slate-400" />
             </button>
           </div>
 
           {weekStats && (
             <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full">
-                <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                <span className="text-xs font-bold text-emerald-700">{weekStats.totalPresent}</span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-100 dark:border-emerald-900/50 rounded-full">
+                <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300">{weekStats.totalPresent}</span>
               </div>
-              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border border-rose-100 rounded-full">
-                <UserX className="h-3.5 w-3.5 text-rose-500" />
-                <span className="text-xs font-bold text-rose-600">{weekStats.totalAbsent}</span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 dark:bg-rose-950/30 border border-rose-100 dark:border-rose-900/50 rounded-full">
+                <UserX className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
+                <span className="text-xs font-bold text-rose-600 dark:text-rose-400">{weekStats.totalAbsent}</span>
               </div>
               {weekStats.totalUnmarked > 0 && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-100 rounded-full">
-                  <Clock className="h-3.5 w-3.5 text-amber-500" />
-                  <span className="text-xs font-bold text-amber-600">{weekStats.totalUnmarked}</span>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-100 dark:border-amber-900/50 rounded-full">
+                  <Clock className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+                  <span className="text-xs font-bold text-amber-600 dark:text-amber-400">{weekStats.totalUnmarked}</span>
                 </div>
               )}
             </div>
           )}
         </div>
 
-        {/* ── Empty State ────────────────────────────────────────────────── */}
+        {/* Empty State */}
         {students.length === 0 && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-16 text-center">
-            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="h-8 w-8 text-slate-400" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm p-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-8 w-8 text-slate-400 dark:text-slate-500" />
             </div>
-            <p className="font-semibold text-slate-700 mb-1">No students found</p>
-            <p className="text-sm text-slate-400">
+            <p className="font-semibold text-slate-700 dark:text-slate-200 mb-1">No students found</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500">
               No active students assigned to <strong>{classNameFromUrl}</strong>
             </p>
           </div>
         )}
 
-        {/* ── Attendance Table ───────────────────────────────────────────── */}
+        {/* Attendance Table */}
         {students.length > 0 && currentWeek && (
-          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
 
             {/* Column headers */}
             <div
-              className="grid border-b border-slate-100 bg-slate-50/60"
+              className="grid border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40"
               style={{ gridTemplateColumns: `minmax(180px,1fr) repeat(5, minmax(96px,1fr)) 90px` }}
             >
-              {/* Student column */}
-              <div className="px-5 py-4 border-r border-slate-100 flex items-center gap-2">
-                <Users className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Student</span>
+              <div className="px-5 py-4 border-r border-slate-100 dark:border-slate-800 flex items-center gap-2">
+                <Users className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Student</span>
               </div>
 
-              {/* Day columns */}
               {currentWeek.days.map(day => {
                 const stats    = getDayStats(day.dateStr)
                 const isToday  = day.isToday
@@ -581,41 +550,38 @@ export default function MarkAttendancePage() {
                   <div
                     key={day.dateStr}
                     className={cn(
-                      'px-3 py-3 border-r border-slate-100 last:border-r-0',
-                      isToday && 'bg-blue-50/50',
+                      'px-3 py-3 border-r border-slate-100 dark:border-slate-800 last:border-r-0',
+                      isToday && 'bg-blue-50/50 dark:bg-blue-950/20',
                     )}
                   >
-                    {/* Day name + date */}
                     <div className="text-center mb-2.5">
                       <p className={cn(
                         'text-xs font-bold uppercase tracking-widest',
-                        isToday ? 'text-blue-600' : 'text-slate-500',
+                        isToday ? 'text-blue-600 dark:text-blue-400' : 'text-slate-500 dark:text-slate-400',
                       )}>
                         {day.dayShort}
                       </p>
                       <p className={cn(
                         'text-[11px] font-semibold mt-0.5',
-                        isToday ? 'text-blue-400' : 'text-slate-400',
+                        isToday ? 'text-blue-400 dark:text-blue-500' : 'text-slate-400 dark:text-slate-500',
                       )}>
                         {day.date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric' })}
                       </p>
                       {isToday && (
-                        <span className="inline-block mt-1 px-2 py-0.5 bg-blue-500 text-white rounded-full text-[9px] font-bold tracking-wide">
+                        <span className="inline-block mt-1 px-2 py-0.5 bg-blue-500 dark:bg-blue-600 text-white rounded-full text-[9px] font-bold tracking-wide">
                           TODAY
                         </span>
                       )}
                     </div>
 
-                    {/* Present/Absent mini bar */}
                     {!isFuture && (
                       <div className="mb-2.5">
                         <div className="flex items-center justify-center gap-2 mb-1.5">
-                          <span className="text-[11px] font-bold text-emerald-600">{stats.present}P</span>
-                          <span className="text-[10px] text-slate-300">·</span>
-                          <span className="text-[11px] font-bold text-rose-500">{stats.absent}A</span>
+                          <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{stats.present}P</span>
+                          <span className="text-[10px] text-slate-300 dark:text-slate-600">·</span>
+                          <span className="text-[11px] font-bold text-rose-500 dark:text-rose-400">{stats.absent}A</span>
                         </div>
-                        {/* Progress bar */}
-                        <div className="w-full bg-slate-100 rounded-full h-1 overflow-hidden">
+                        <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
                           <div
                             className="h-full rounded-full bg-emerald-500 transition-all duration-300"
                             style={{ width: `${pct}%` }}
@@ -624,20 +590,19 @@ export default function MarkAttendancePage() {
                       </div>
                     )}
 
-                    {/* Lock / status button */}
                     {isFuture ? (
-                      <div className="flex items-center justify-center gap-1 py-1.5 rounded-xl bg-slate-50 text-slate-300 text-[10px] font-semibold border border-dashed border-slate-200">
+                      <div className="flex items-center justify-center gap-1 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-slate-300 dark:text-slate-600 text-[10px] font-semibold border border-dashed border-slate-200 dark:border-slate-700">
                         <Clock className="h-3 w-3" /> Upcoming
                       </div>
                     ) : isLocked ? (
-                      <div className="flex items-center justify-center gap-1 py-1.5 rounded-xl bg-emerald-50 text-emerald-600 text-[10px] font-bold border border-emerald-100">
+                      <div className="flex items-center justify-center gap-1 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold border border-emerald-100 dark:border-emerald-900/50">
                         <Shield className="h-3 w-3" /> Saved
                       </div>
                     ) : (
                       <button
                         onClick={() => saveDay(day.dateStr)}
                         disabled={!!isSaving}
-                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-[10px] font-bold transition-all border border-blue-700 shadow-sm shadow-blue-200"
+                        className="w-full flex items-center justify-center gap-1 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 active:scale-95 text-white text-[10px] font-bold transition-all border border-blue-700 dark:border-blue-600 shadow-sm"
                       >
                         {isSaving
                           ? <Loader2 className="h-3 w-3 animate-spin" />
@@ -646,18 +611,17 @@ export default function MarkAttendancePage() {
                       </button>
                     )}
 
-                    {/* Quick mark all */}
                     {!isFuture && !isLocked && (
                       <div className="flex gap-1 mt-1.5">
                         <button
                           onClick={() => markAllForDay(day.dateStr, 'present')}
-                          className="flex-1 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-700 text-[9px] font-bold transition-all"
+                          className="flex-1 py-1 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 active:scale-95 text-emerald-700 dark:text-emerald-400 text-[9px] font-bold transition-all border border-emerald-100 dark:border-emerald-900/50"
                         >
                           All P
                         </button>
                         <button
                           onClick={() => markAllForDay(day.dateStr, 'absent')}
-                          className="flex-1 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 active:scale-95 text-rose-600 text-[9px] font-bold transition-all"
+                          className="flex-1 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 active:scale-95 text-rose-600 dark:text-rose-400 text-[9px] font-bold transition-all border border-rose-100 dark:border-rose-900/50"
                         >
                           All A
                         </button>
@@ -667,15 +631,14 @@ export default function MarkAttendancePage() {
                 )
               })}
 
-              {/* Week total header */}
-              <div className="px-3 py-4 bg-slate-100/60 flex flex-col items-center justify-center gap-1">
-                <TrendingUp className="h-3.5 w-3.5 text-slate-400" />
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Week</p>
+              <div className="px-3 py-4 bg-slate-100/60 dark:bg-slate-800/40 flex flex-col items-center justify-center gap-1">
+                <TrendingUp className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Week</p>
               </div>
             </div>
 
             {/* Student rows */}
-            <div className="divide-y divide-slate-50">
+            <div className="divide-y divide-slate-50 dark:divide-slate-800">
               {students.map((student, idx) => {
                 const weekCount = getStudentWeekCount(student.student_id, currentWeek)
                 const weekPct   = Math.round((weekCount / 5) * 100)
@@ -684,12 +647,11 @@ export default function MarkAttendancePage() {
                 return (
                   <div
                     key={student.student_id}
-                    className="grid items-center hover:bg-slate-50/60 transition-colors group"
+                    className="grid items-center hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors group"
                     style={{ gridTemplateColumns: `minmax(180px,1fr) repeat(5, minmax(96px,1fr)) 90px` }}
                   >
-                    {/* Student info */}
-                    <div className="px-5 py-3 border-r border-slate-50 flex items-center gap-3">
-                      <Avatar className="w-9 h-9 border-2 border-white shadow-sm flex-shrink-0">
+                    <div className="px-5 py-3 border-r border-slate-50 dark:border-slate-800 flex items-center gap-3">
+                      <Avatar className="w-9 h-9 border-2 border-white dark:border-slate-900 shadow-sm flex-shrink-0">
                         {student.photo_url ? (
                           <AvatarImage src={student.photo_url} alt={student.student_name} className="object-cover" />
                         ) : (
@@ -699,14 +661,13 @@ export default function MarkAttendancePage() {
                         )}
                       </Avatar>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-800 truncate leading-tight">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate leading-tight">
                           {student.student_name}
                         </p>
-                        <p className="text-[10px] text-slate-400 font-medium">#{String(idx + 1).padStart(2, '0')}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">#{String(idx + 1).padStart(2, '0')}</p>
                       </div>
                     </div>
 
-                    {/* Day cells */}
                     {currentWeek.days.map(day => {
                       const record   = getRecord(records, student.student_id, day.dateStr)
                       const isLocked = lockedDates.has(day.dateStr) || (record?.locked ?? false)
@@ -716,9 +677,9 @@ export default function MarkAttendancePage() {
                         <div
                           key={day.dateStr}
                           className={cn(
-                            'flex items-center justify-center py-3 border-r border-slate-50 last:border-r-0',
-                            day.isToday && 'bg-blue-50/20',
-                            isFuture  && 'bg-slate-50/10',
+                            'flex items-center justify-center py-3 border-r border-slate-50 dark:border-slate-800 last:border-r-0',
+                            day.isToday && 'bg-blue-50/20 dark:bg-blue-950/10',
+                            isFuture  && 'bg-slate-50/10 dark:bg-slate-900/40',
                           )}
                         >
                           <AttendanceCell
@@ -731,17 +692,16 @@ export default function MarkAttendancePage() {
                       )
                     })}
 
-                    {/* Week total */}
-                    <div className="px-3 py-3 bg-slate-50/40 group-hover:bg-slate-100/40 flex flex-col items-center justify-center gap-1.5 transition-colors">
+                    <div className="px-3 py-3 bg-slate-50/40 dark:bg-slate-900/40 group-hover:bg-slate-100/40 dark:group-hover:bg-slate-800/40 flex flex-col items-center justify-center gap-1.5 transition-colors">
                       <span className={cn(
                         'text-sm font-bold leading-none tabular-nums',
-                        weekCount === 5 ? 'text-emerald-600' :
-                        weekCount >= 3 ? 'text-blue-600' :
-                        weekCount >  0 ? 'text-amber-600' : 'text-slate-300',
+                        weekCount === 5 ? 'text-emerald-600 dark:text-emerald-400' :
+                        weekCount >= 3 ? 'text-blue-600 dark:text-blue-400' :
+                        weekCount >  0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-300 dark:text-slate-600',
                       )}>
                         {weekCount}/5
                       </span>
-                      <div className="w-12 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                      <div className="w-12 h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                         <div
                           className={cn(
                             'h-full rounded-full transition-all duration-300',
@@ -760,11 +720,11 @@ export default function MarkAttendancePage() {
 
             {/* Footer totals row */}
             <div
-              className="grid border-t border-slate-100 bg-slate-50/80"
+              className="grid border-t border-slate-100 dark:border-slate-800 bg-slate-50/80 dark:bg-slate-800/40"
               style={{ gridTemplateColumns: `minmax(180px,1fr) repeat(5, minmax(96px,1fr)) 90px` }}
             >
-              <div className="px-5 py-3 border-r border-slate-100">
-                <p className="text-xs font-bold text-slate-500">Daily Total</p>
+              <div className="px-5 py-3 border-r border-slate-100 dark:border-slate-800">
+                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Daily Total</p>
               </div>
               {currentWeek.days.map(day => {
                 const s        = getDayStats(day.dateStr)
@@ -773,29 +733,29 @@ export default function MarkAttendancePage() {
                   <div
                     key={day.dateStr}
                     className={cn(
-                      'px-3 py-3 border-r border-slate-100 last:border-r-0 text-center',
-                      day.isToday && 'bg-blue-50/30',
+                      'px-3 py-3 border-r border-slate-100 dark:border-slate-800 last:border-r-0 text-center',
+                      day.isToday && 'bg-blue-50/30 dark:bg-blue-950/20',
                     )}
                   >
                     {isFuture ? (
-                      <span className="text-[10px] text-slate-300">—</span>
+                      <span className="text-[10px] text-slate-300 dark:text-slate-600">—</span>
                     ) : (
                       <div className="space-y-0.5">
-                        <p className="text-[11px] font-bold text-emerald-600">{s.present} present</p>
-                        <p className="text-[11px] font-bold text-rose-500">{s.absent} absent</p>
+                        <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{s.present} present</p>
+                        <p className="text-[11px] font-bold text-rose-500 dark:text-rose-400">{s.absent} absent</p>
                         {s.unmarked > 0 && (
-                          <p className="text-[10px] text-amber-500">{s.unmarked} left</p>
+                          <p className="text-[10px] text-amber-500 dark:text-amber-400">{s.unmarked} left</p>
                         )}
                       </div>
                     )}
                   </div>
                 )
               })}
-              <div className="px-3 py-3 bg-slate-100/60 text-center">
+              <div className="px-3 py-3 bg-slate-100/60 dark:bg-slate-800/60 text-center">
                 {weekStats && (
                   <div className="space-y-0.5">
-                    <p className="text-[11px] font-bold text-emerald-600">{weekStats.totalPresent}</p>
-                    <p className="text-[11px] font-bold text-rose-500">{weekStats.totalAbsent}</p>
+                    <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">{weekStats.totalPresent}</p>
+                    <p className="text-[11px] font-bold text-rose-500 dark:text-rose-400">{weekStats.totalAbsent}</p>
                   </div>
                 )}
               </div>
@@ -803,60 +763,60 @@ export default function MarkAttendancePage() {
           </div>
         )}
 
-        {/* ── All Weeks Overview ─────────────────────────────────────────── */}
+        {/* All Weeks Overview */}
         {termWeeks.length > 1 && students.length > 0 && (
           <div>
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
+            <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3">
               Term Overview — All Weeks
             </p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
               {termWeeks.map((week, wi) => {
-                const ws          = getWeekStats(week)
-                const total       = ws.totalPresent + ws.totalAbsent
-                const pct         = total > 0 ? Math.round((ws.totalPresent / total) * 100) : 0
-                const isCurrent   = wi === currentWeekIndex
-                const isFutureWk  = week.startDate > new Date()
-                const allLocked   = week.days.every(d => lockedDates.has(d.dateStr))
+                const ws         = getWeekStats(week)
+                const total      = ws.totalPresent + ws.totalAbsent
+                const pct        = total > 0 ? Math.round((ws.totalPresent / total) * 100) : 0
+                const isCurrent  = wi === currentWeekIndex
+                const isFutureWk = week.startDate > new Date()
+                const allLocked  = week.days.every(d => lockedDates.has(d.dateStr))
 
                 return (
                   <button
                     key={wi}
                     onClick={() => setCurrentWeekIndex(wi)}
                     className={cn(
-                      'relative p-3 rounded-2xl border text-left transition-all hover:shadow-md',
+                      'relative p-3 rounded-2xl border text-left transition-all hover:shadow-md dark:hover:shadow-slate-950/50',
                       isCurrent
-                        ? 'bg-blue-600 border-blue-700 shadow-md shadow-blue-200'
-                        : 'bg-white border-slate-100 hover:border-slate-200 shadow-sm',
+                        ? 'bg-blue-600 dark:bg-blue-600 border-blue-700 dark:border-blue-500 shadow-md shadow-blue-200 dark:shadow-blue-950/50'
+                        : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 shadow-sm',
                     )}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <p className={cn('text-xs font-bold', isCurrent ? 'text-white' : 'text-slate-700')}>
+                      <p className={cn('text-xs font-bold', isCurrent ? 'text-white' : 'text-slate-700 dark:text-slate-200')}>
                         {week.weekLabel}
                       </p>
                       {allLocked && !isFutureWk && (
-                        <Shield className={cn('h-3 w-3', isCurrent ? 'text-blue-200' : 'text-emerald-500')} />
+                        <Shield className={cn('h-3 w-3', isCurrent ? 'text-blue-200' : 'text-emerald-500 dark:text-emerald-400')} />
                       )}
                       {isFutureWk && (
-                        <Clock className={cn('h-3 w-3', isCurrent ? 'text-blue-200' : 'text-slate-300')} />
+                        <Clock className={cn('h-3 w-3', isCurrent ? 'text-blue-200' : 'text-slate-300 dark:text-slate-600')} />
                       )}
                     </div>
                     {!isFutureWk ? (
                       <>
-                        <p className={cn('text-lg font-bold leading-none mb-1', isCurrent ? 'text-white' : 'text-slate-800')}>
+                        <p className={cn('text-lg font-bold leading-none mb-1', isCurrent ? 'text-white' : 'text-slate-800 dark:text-slate-100')}>
                           {pct}%
                         </p>
-                        <div className="w-full bg-white/20 rounded-full h-1 mb-1.5">
+                        <div className="w-full bg-white/20 dark:bg-white/10 rounded-full h-1 mb-1.5">
                           <div
                             className={cn('h-1 rounded-full transition-all', isCurrent ? 'bg-white' : 'bg-emerald-500')}
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <p className={cn('text-[10px]', isCurrent ? 'text-blue-200' : 'text-slate-400')}>
+                        <p className={cn('text-[10px]', isCurrent ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500')}>
                           {ws.totalPresent}P · {ws.totalAbsent}A
                         </p>
                       </>
                     ) : (
-                      <p className={cn('text-[10px]', isCurrent ? 'text-blue-200' : 'text-slate-300')}>
+                      <p className={cn('text-[10px]', isCurrent ? 'text-blue-200' : 'text-slate-300 dark:text-slate-600')}>
                         {week.startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </p>
                     )}
@@ -867,39 +827,39 @@ export default function MarkAttendancePage() {
           </div>
         )}
 
-        {/* ── Legend ────────────────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center gap-4 py-3 px-4 bg-white rounded-2xl border border-slate-100 shadow-sm text-xs text-slate-500">
-          <span className="font-bold text-slate-600">Legend</span>
+        {/* Legend */}
+        <div className="flex flex-wrap items-center gap-4 py-3 px-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm text-xs text-slate-500 dark:text-slate-400">
+          <span className="font-bold text-slate-600 dark:text-slate-300">Legend</span>
 
           <div className="flex items-center gap-1.5">
-            <div className="w-7 h-7 rounded-2xl bg-emerald-500 border-2 border-emerald-600 flex items-center justify-center shadow-sm shadow-emerald-200">
+            <div className="w-7 h-7 rounded-2xl bg-emerald-500 dark:bg-emerald-600 border-2 border-emerald-600 dark:border-emerald-500 flex items-center justify-center shadow-sm shadow-emerald-200 dark:shadow-emerald-950/50">
               <CheckCircle2 className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-medium text-slate-600">Present</span>
+            <span className="font-medium text-slate-600 dark:text-slate-300">Present</span>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="w-7 h-7 rounded-2xl bg-rose-500 border-2 border-rose-600 flex items-center justify-center shadow-sm shadow-rose-200">
+            <div className="w-7 h-7 rounded-2xl bg-rose-500 dark:bg-rose-600 border-2 border-rose-600 dark:border-rose-500 flex items-center justify-center shadow-sm shadow-rose-200 dark:shadow-rose-950/50">
               <XCircle className="h-3.5 w-3.5 text-white" />
             </div>
-            <span className="font-medium text-slate-600">Absent</span>
+            <span className="font-medium text-slate-600 dark:text-slate-300">Absent</span>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="w-7 h-7 rounded-2xl border-2 border-slate-200 bg-white flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-slate-200" />
+            <div className="w-7 h-7 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex items-center justify-center">
+              <div className="w-2 h-2 rounded-full bg-slate-200 dark:bg-slate-600" />
             </div>
-            <span className="font-medium text-slate-600">Unmarked</span>
+            <span className="font-medium text-slate-600 dark:text-slate-300">Unmarked</span>
           </div>
 
           <div className="flex items-center gap-1.5">
-            <div className="w-7 h-7 rounded-2xl bg-slate-100 border border-slate-200 flex items-center justify-center">
-              <Shield className="h-3.5 w-3.5 text-slate-400" />
+            <div className="w-7 h-7 rounded-2xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center">
+              <Shield className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
             </div>
-            <span className="font-medium text-slate-600">Locked</span>
+            <span className="font-medium text-slate-600 dark:text-slate-300">Locked</span>
           </div>
 
-          <span className="ml-auto text-slate-300 italic hidden md:inline">
+          <span className="ml-auto text-slate-300 dark:text-slate-600 italic hidden md:inline">
             Click to cycle: — → Present → Absent → —
           </span>
         </div>
