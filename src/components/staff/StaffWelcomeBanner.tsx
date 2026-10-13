@@ -22,6 +22,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface StaffProfile {
   id?: string
   full_name?: string
+  first_name?: string
+  last_name?: string
   name?: string
   department?: string
   role?: string
@@ -133,7 +135,7 @@ const NIGERIAN_LANGUAGES: LanguagePack[] = [
     morning: 'How body this morning?',
     afternoon: 'How afternoon dey go?',
     evening: 'How evening dey run?',
-    emoji: ' tip',
+    emoji: '👋',
     quote: {
       text: 'No condition is permanent, better days dey come.',
       translation: 'Nothing lasts forever; better days are ahead.',
@@ -254,6 +256,25 @@ export default function StaffWelcomeBanner({
   const [avatarError, setAvatarError] = useState(false)
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(false)
 
+  // ✅ Exact First Name Extraction Logic (matching Header behavior)
+  const firstName = useMemo(() => {
+    // 1. Direct DB first_name if available
+    if (profile?.first_name && profile.first_name.trim()) {
+      const clean = profile.first_name.trim().split(/\s+/)[0]
+      return clean.charAt(0).toUpperCase() + clean.slice(1).toLowerCase()
+    }
+
+    // 2. Parse full_name / name (Format: "SURNAME FIRSTNAME")
+    const rawName = (profile?.full_name || profile?.name || '').trim()
+    if (!rawName) return 'Teacher'
+
+    const parts = rawName.split(/\s+/)
+    // In "Nkon Susan", parts[0] = "Nkon" (Surname), parts[1] = "Susan" (First Name)
+    const selected = parts.length >= 2 ? parts[1] : parts[0]
+
+    return selected.charAt(0).toUpperCase() + selected.slice(1).toLowerCase()
+  }, [profile])
+
   // Session timer + clock
   useEffect(() => {
     setMounted(true)
@@ -282,7 +303,7 @@ export default function StaffWelcomeBanner({
     return () => mq.removeEventListener?.('change', onChange)
   }, [])
 
-  // Language rotator (paused if reduced motion)
+  // Language rotator
   useEffect(() => {
     if (prefersReducedMotion) return
     const rotator = setInterval(() => {
@@ -291,7 +312,7 @@ export default function StaffWelcomeBanner({
     return () => clearInterval(rotator)
   }, [prefersReducedMotion])
 
-  // Clear session only on explicit staff logout (not every refresh)
+  // Clear session on logout
   useEffect(() => {
     const handleLogout = () => {
       localStorage.removeItem(STORAGE_KEY)
@@ -327,9 +348,6 @@ export default function StaffWelcomeBanner({
     if (hour < 21) return 'Wrap up grading and plan for tomorrow.'
     return 'Rest well — your students need you sharp tomorrow.'
   }, [currentTime])
-
-  // Staff names are typically "First Last" (unlike student SURNAME FIRST)
-  const firstName = (profile?.full_name || profile?.name || 'Teacher').trim().split(/\s+/)[0]
 
   const getInitials = (): string => {
     const fullName = profile?.full_name || profile?.name || ''
@@ -422,7 +440,6 @@ export default function StaffWelcomeBanner({
               <Clock className="h-3 w-3 sm:h-3.5 sm:w-3.5 shrink-0" />
               {formattedTime}
             </span>
-            {/* Labeled — no longer looks like a second clock */}
             <span
               className="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-medium bg-white/5 px-2.5 sm:px-3 py-1 rounded-full text-indigo-300 border border-white/5"
               title="How long you've been in this session"
@@ -438,7 +455,7 @@ export default function StaffWelcomeBanner({
             )}
           </div>
 
-          {/* Greeting + mobile avatar — fixed min-height kills layout jump */}
+          {/* Greeting + mobile avatar */}
           <div className="flex items-start justify-between gap-3 mb-2">
             <div className="min-w-0 flex-1 min-h-[56px] sm:min-h-[64px] flex flex-col justify-center">
               <AnimatePresence mode="popLayout">
@@ -456,7 +473,6 @@ export default function StaffWelcomeBanner({
                     <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-amber-200">
                       {firstName}
                     </span>
-                    {/* Smaller emoji — no bounce (was causing visual noise) */}
                     <span className="ml-1.5 inline-block text-lg sm:text-xl">
                       {currentGreeting.emoji}
                     </span>
@@ -497,7 +513,7 @@ export default function StaffWelcomeBanner({
             {subtitle}
           </p>
 
-          {/* Quote — fixed min-height prevents jump on long/short proverbs */}
+          {/* Quote */}
           <div className="min-h-[52px] sm:min-h-[64px] flex items-center mb-4">
             <AnimatePresence mode="popLayout">
               <motion.div
@@ -511,7 +527,7 @@ export default function StaffWelcomeBanner({
                 <Quote className="h-3.5 w-3.5 text-amber-400/70 shrink-0 mt-0.5" />
                 <div className="min-w-0">
                   <p className="text-slate-200 text-xs sm:text-sm italic leading-relaxed font-medium">
-                    &ldquo;{activeLang.quote.text}&rdquo;
+                    &ldquo;{activeLang.quote.text.replace(/\{name\}/g, firstName)}&rdquo;
                   </p>
                   {activeLang.quote.translation && (
                     <p className="hidden sm:block text-[10px] sm:text-xs text-slate-400 mt-0.5 italic">
@@ -539,7 +555,7 @@ export default function StaffWelcomeBanner({
           </div>
         </div>
 
-        {/* Desktop avatar — online pip removed for a cleaner look */}
+        {/* Desktop avatar */}
         <div className="relative group hidden sm:block shrink-0 self-center">
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-400 to-indigo-500 rounded-full opacity-40 group-hover:opacity-80 blur-md transition duration-300" />
           <div className="relative">
@@ -621,7 +637,7 @@ export default function StaffWelcomeBanner({
             )}
           </div>
 
-          {/* Pending grading — emphasize when > 0 */}
+          {/* Pending grading */}
           <div
             className={cn(
               'group cursor-default bg-white/5 border rounded-xl p-3 hover:bg-white/10 transition-colors',
