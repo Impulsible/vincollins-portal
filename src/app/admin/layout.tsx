@@ -1,4 +1,4 @@
-// app/admin/layout.tsx - WITH LOADING STATE
+// app/admin/layout.tsx - WITH LOADING STATE & DARK MODE
 
 'use client'
 
@@ -35,7 +35,7 @@ const routeToTabMap: Record<string, string> = {
   '/admin/inquiries': 'inquiries',
   '/admin/monitor': 'cbt-monitor',
   '/admin/announcements': 'announcements',
-  '/admin/promotions': 'promotions',  // ← ADDED
+  '/admin/promotions': 'promotions',
   '/admin/settings': 'settings',
   '/admin/help': 'help',
 }
@@ -50,7 +50,7 @@ const tabToRouteMap: Record<string, string> = {
   'inquiries': '/admin/inquiries',
   'cbt-monitor': '/admin/monitor',
   'announcements': '/admin/announcements',
-  'promotions': '/admin/promotions',  // ← ADDED
+  'promotions': '/admin/promotions',
   'settings': '/admin/settings',
   'help': '/admin/help',
 }
@@ -81,7 +81,6 @@ function formatProfileForHeader(profile: AdminProfile | null) {
   }
 }
 
-// Cache counts for 2 minutes
 let countsCache: { data: any; timestamp: number } | null = null
 const COUNTS_CACHE_DURATION = 120000
 
@@ -114,7 +113,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           .single()
         if (data) setProfile(data)
 
-        // Use cached counts if available
         if (countsCache && Date.now() - countsCache.timestamp < COUNTS_CACHE_DURATION) {
           const c = countsCache.data
           setNotificationCount(c.notificationCount)
@@ -125,7 +123,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           return
         }
 
-        // Fetch counts (only when cache expired)
         try {
           const [notificationsRes, examsRes, reportsRes, inquiriesRes] = await Promise.allSettled([
             supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', session.user.id).eq('read', false),
@@ -152,7 +149,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           setPendingReports(counts.pendingReports)
           setPendingInquiries(counts.pendingInquiries)
         } catch {
-          // Silently fail - counts just stay at 0
+          // Silently fail
         }
       } catch (error) {
         console.error('Error initializing admin layout:', error)
@@ -163,7 +160,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     init()
   }, [router])
 
-  // Sync active tab with pathname
   useEffect(() => {
     if (pathname) {
       const tab = getTabFromPathname(pathname)
@@ -181,18 +177,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }
 
-  // Single source of truth for sign out
   const handleLogout = () => {
     instantLogout()
   }
 
-  // Show loading state
   if (loading) {
     return <AdminLoading profile={profile} onLogout={handleLogout} />
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 text-slate-900 dark:text-slate-100 overflow-x-hidden transition-colors duration-300">
       <Header user={formatProfileForHeader(profile)} onLogout={handleLogout} />
 
       <div className="flex overflow-x-hidden">

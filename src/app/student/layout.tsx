@@ -1,4 +1,4 @@
-// src/app/student/layout.tsx - NAVIGATION ENFORCEMENT & BLOCKS FOR INACTIVE PROFILES
+// src/app/student/layout.tsx - NAVIGATION ENFORCEMENT & DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -23,7 +23,6 @@ interface StudentProfile {
   is_active?: boolean
 }
 
-// Tab ↔ path mapping
 const PATH_TO_TAB: Record<string, string> = {
   '/student': 'overview',
   '/student/announcements': 'announcements',
@@ -58,12 +57,10 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
   const isExamPage = pathname?.startsWith('/student/exam/')
 
-  // Sync tab with URL
   useEffect(() => {
     setActiveTab(getTabFromPath(pathname || '/student'))
   }, [pathname])
 
-  // Load profile with active status check
   const loadProfile = useCallback(async () => {
     setLoading(true)
     try {
@@ -82,7 +79,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
 
       setUserId(session.user.id)
 
-      // Fetch profile and include is_active state
       const { data, error: profileError } = await supabase
         .from('profiles')
         .select('id, full_name, display_name, first_name, email, photo_url, class, department, vin_id, is_active')
@@ -95,7 +91,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         return
       }
 
-      // Verify they are a student
       const { data: roleData } = await supabase
         .from('profiles')
         .select('role')
@@ -122,7 +117,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     loadProfile()
   }, [loadProfile])
 
-  // CRITICAL ENFORCEMENT: Block inactive students from live system pages
   useEffect(() => {
     if (profile && profile.is_active === false) {
       const allowedTabs = ['overview', 'results', 'profile']
@@ -135,7 +129,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     }
   }, [pathname, profile, router])
 
-  // Listen for auth changes
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_OUT' || !session) {
@@ -181,7 +174,6 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }, [userId, router])
 
   const handleTabChange = useCallback((tab: string) => {
-    // Block inactive tab changes manually
     if (profile && profile.is_active === false) {
       const allowedTabs = ['overview', 'results', 'profile']
       if (!allowedTabs.includes(tab)) {
@@ -214,37 +206,40 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }
 
   if (isExamPage) {
-    // Prevent inactive students from launching the Exam CBT module
     if (profile && profile.is_active === false) {
       router.replace('/student')
       return null
     }
 
     return (
-      <ErrorBoundary variant="student">
-        {children}
-      </ErrorBoundary>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <ErrorBoundary variant="student">
+          {children}
+        </ErrorBoundary>
+      </div>
     )
   }
 
   return (
-    <ErrorBoundary variant="student">
-      {userId && profile?.is_active !== false && <StudentPresence userId={userId} />}
-      {children}
-      <MobileBottomNav
-        role="student"
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        profile={profile
-          ? {
-              full_name: profile.full_name,
-              email: profile.email,
-              photo_url: profile.photo_url,
-            }
-          : null
-        }
-        onLogout={handleLogout}
-      />
-    </ErrorBoundary>
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors duration-300">
+      <ErrorBoundary variant="student">
+        {userId && profile?.is_active !== false && <StudentPresence userId={userId} />}
+        {children}
+        <MobileBottomNav
+          role="student"
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          profile={profile
+            ? {
+                full_name: profile.full_name,
+                email: profile.email,
+                photo_url: profile.photo_url,
+              }
+            : null
+          }
+          onLogout={handleLogout}
+        />
+      </ErrorBoundary>
+    </div>
   )
 }

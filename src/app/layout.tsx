@@ -182,6 +182,23 @@ const organizationSchema = {
   },
 };
 
+/**
+ * ✅ Inline script runs BEFORE React hydrates.
+ * Reads localStorage theme setting and applies `dark` or `light` class
+ * directly to <html> so there's no flicker on page load.
+ */
+const themeInitScript = `
+(function() {
+  try {
+    var stored = localStorage.getItem('theme');
+    var systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    var isDark = stored === 'dark' || (stored === 'system' && systemDark) || (!stored && systemDark);
+    document.documentElement.classList.toggle('dark', isDark);
+    document.documentElement.style.colorScheme = isDark ? 'dark' : 'light';
+  } catch (e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: {
@@ -201,6 +218,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <head>
+        {/* ✅ FOUC-prevention script runs before anything else */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+
         {/* Cache Control */}
         <meta httpEquiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
         <meta httpEquiv="Pragma" content="no-cache" />
@@ -240,13 +260,14 @@ export default function RootLayout({
         )}
         suppressHydrationWarning
       >
-        <SessionProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+          storageKey="theme"
+        >
+          <SessionProvider>
             <PWAProvider>
               <TwoStageSplashScreen>
                 <ProgressBar />
@@ -256,8 +277,8 @@ export default function RootLayout({
                 </ClientLayout>
               </TwoStageSplashScreen>
             </PWAProvider>
-          </ThemeProvider>
-        </SessionProvider>
+          </SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
