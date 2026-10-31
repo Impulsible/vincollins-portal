@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 // ── Route config ──────────────────────────────────────────────────────────────
 const PROTECTED_ROUTES = {
   '/admin': ['admin'],
-  '/staff': ['staff', 'admin'],   // admin can also view staff
+  '/staff': ['staff', 'admin'],
   '/student': ['student'],
 } as const
 
@@ -31,20 +31,31 @@ function getRequiredRoles(pathname: string): string[] | null {
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 export async function middleware(req: NextRequest) {
+  const { pathname } = req.nextUrl
+
+  // ✅ CRITICAL FIX: Skip ALL Next.js internals and static assets immediately.
+  // This must be the FIRST thing in middleware so image optimizer requests
+  // never reach Supabase auth logic.
+  if (
+    pathname.startsWith('/_next/') ||
+    pathname.startsWith('/images/') ||
+    pathname === '/favicon.ico' ||
+    pathname === '/sw.js' ||
+    pathname === '/manifest.json' ||
+    pathname === '/offline.html' ||
+    /\.[^/]+$/.test(pathname) // any file with an extension
+  ) {
+    return NextResponse.next()
+  }
+
   const res = NextResponse.next({ request: { headers: req.headers } })
-  const pathname = req.nextUrl.pathname
 
-  // ✅ Debug: Log the current path
-  console.log('🔍 Middleware - Path:', pathname)
-
-  // ✅ Skip middleware for staff exam sub-routes (let them pass through)
-  // This prevents the middleware from interfering with /staff/exams/[id]/submissions
+  // ✅ Skip middleware for staff exam sub-routes
   if (pathname.startsWith('/staff/exams/')) {
-    console.log('✅ Staff exam route - allowing through:', pathname)
     return res
   }
 
-  // Validate env — fail fast in dev, log in prod
+  // Validate env
   if (
     !process.env.NEXT_PUBLIC_SUPABASE_URL ||
     !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -74,7 +85,6 @@ export async function middleware(req: NextRequest) {
     }
   )
 
-  // Get session — use getUser() not getSession() for server-side (more secure)
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 
   if (userError) {
@@ -82,12 +92,9 @@ export async function middleware(req: NextRequest) {
   }
 
   const isLoggedIn = !!user
-
-  // ── Auth pages (portal/login) ─────────────────────────────────────────────
   const isAuthPage = AUTH_ROUTES.some((r) => pathname.startsWith(r))
 
   if (isAuthPage && isLoggedIn) {
-    // User is logged in but on login page — redirect to their dashboard
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -102,22 +109,18 @@ export async function middleware(req: NextRequest) {
     } catch (err) {
       console.warn('[Middleware] Profile fetch error:', err)
     }
-    // If profile fetch fails, let them stay on portal
     return res
   }
 
-  // ── Protected routes ──────────────────────────────────────────────────────
   const requiredRoles = getRequiredRoles(pathname)
 
   if (requiredRoles) {
-    // Not logged in — send to portal
     if (!isLoggedIn) {
       const url = new URL('/portal', req.url)
       url.searchParams.set('redirect', pathname)
       return NextResponse.redirect(url)
     }
 
-    // Logged in — check role
     try {
       const { data: profile } = await supabase
         .from('profiles')
@@ -128,20 +131,13 @@ export async function middleware(req: NextRequest) {
       const userRole = profile?.role?.toLowerCase()
 
       if (!userRole || !requiredRoles.includes(userRole)) {
-        // Wrong role — redirect to their correct dashboard
         const destination = userRole
           ? getRedirectForRole(userRole, req.url)
           : '/portal'
-
-        console.warn(
-          `[Middleware] Role mismatch: user has "${userRole}", route requires "${requiredRoles.join('|')}"`
-        )
-
         return NextResponse.redirect(new URL(destination, req.url))
       }
     } catch (err) {
       console.error('[Middleware] Role check failed:', err)
-      // On error — safer to send to portal than allow access
       return NextResponse.redirect(new URL('/portal', req.url))
     }
   }
@@ -151,19 +147,15 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   matcher: [
-    '/admin/:path*',
-    '/student/:path*',
-    '/staff/:path*',
-    '/portal',
-    '/',
     /*
-     * Skip:
-     * - _next/static (static files)
+     * Match everything EXCEPT:
+     * - _next/static (static build files)
      * - _next/image (image optimization)
-     * - favicon.png
-     * - public assets
+     * - images (your public image folder)
+     * - favicon, sw.js, manifest.json, offline.html
      * - api routes
+     * - any path ending in a file extension (catch-all for assets)
      */
-    '/((?!_next/static|_next/image|favicon|images|sw\\.js|manifest\\.json|offline\\.html|api).*)',
+    '/((?!_next/static|_next/image|images|favicon|sw\\.js|manifest\\.json|offline\\.html|api|.*\\.[^/]+$).*)',
   ],
 }
