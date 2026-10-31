@@ -49,8 +49,8 @@ const TRANSITION_MS = 700
 
 const carouselImages: CarouselImage[] = [
   {
-    src: '/images/junior.jpeg',
-    alt: 'Vincollins College Junior Year',
+    src: '/images/students.jpeg',
+    alt: 'Vincollins College Student',
     objectPosition: 'object-[center_25%]',
   },
   {
@@ -209,7 +209,8 @@ export function Hero() {
       </div>
 
       <Container className="relative py-4 lg:py-6 px-4 sm:px-6">
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center">
+        {/* CHANGED: items-center -> items-start to align top edges */}
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-start">
           
           {/* ── Left Content ── */}
           <div className="space-y-6 lg:space-y-8 animate-hero-fade-in-up max-w-full">
@@ -419,7 +420,7 @@ export function Hero() {
               />
             </div>
 
-            {/* ── Minimalist Trust Badge (As Requested) ── */}
+            {/* ── Minimalist Trust Badge ── */}
             <div className="absolute -bottom-5 sm:-bottom-6 left-1/2 -translate-x-1/2 z-20">
               <div className="flex items-center gap-2.5 sm:gap-3 bg-white dark:bg-slate-900 rounded-full px-4 py-2 sm:px-5 sm:py-2.5 shadow-xl border border-gray-100 dark:border-slate-800">
                 
