@@ -52,16 +52,8 @@ const trustFeatures = [
 // Carousel images
 const carouselImages = [
   {
-    src: '/images/junior.jpeg',
-    alt: 'Vincollins College Junior Year',
-  },
-  {
     src: '/images/hero-student.jpg',
     alt: 'Vincollins College Campus',
-  },
-  {
-    src: '/images/art-gallery.jpeg',
-    alt: 'Vincollins College Art Gallery',
   },
   {
     src: '/images/computer.jpg',
