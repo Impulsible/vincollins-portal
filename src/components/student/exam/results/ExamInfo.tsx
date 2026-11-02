@@ -10,6 +10,11 @@ interface ExamInfoProps {
 }
 
 export function ExamInfo({ exam, allQuestions, examResult }: ExamInfoProps) {
+  // Calculate true values
+  const trueObjectiveMax = allQuestions.filter(q => q.type !== 'theory').reduce((sum, q) => sum + Number(q.points || 1), 0)
+  const trueTheoryMax = allQuestions.filter(q => q.type === 'theory').reduce((sum, q) => sum + Number(q.points || 1), 0)
+  const examTotalMax = trueObjectiveMax + trueTheoryMax
+
   return (
     <Card className="border-0 shadow-lg bg-[#1a1f2e]">
       <CardContent className="p-6">
@@ -25,31 +30,32 @@ export function ExamInfo({ exam, allQuestions, examResult }: ExamInfoProps) {
           </div>
           <div>
             <span className="text-gray-400">Duration:</span>{' '}
-            <span className="text-white font-medium">
-              {exam?.duration} minutes
-            </span>
+            <span className="text-white font-medium">{exam?.duration} minutes</span>
           </div>
           <div>
             <span className="text-gray-400">Questions:</span>{' '}
             <span className="text-white font-medium">{allQuestions.length}</span>
           </div>
+          
+          {/* Exact True Split */}
+          <div>
+            <span className="text-gray-400">Exam Total:</span>{' '}
+            <span className="text-white font-medium">{examTotalMax} Marks</span>
+          </div>
+          <div>
+            <span className="text-gray-400">Objective Max:</span>{' '}
+            <span className="text-white font-medium">{trueObjectiveMax} Marks</span>
+          </div>
+          
           <div>
             <span className="text-gray-400">Submitted:</span>{' '}
             <span className="text-white font-medium">
-              {examResult?.submitted_at
-                ? new Date(examResult.submitted_at).toLocaleString()
-                : 'N/A'}
+              {examResult?.submitted_at ? new Date(examResult.submitted_at).toLocaleString() : 'N/A'}
             </span>
           </div>
           <div>
             <span className="text-gray-400">Status:</span>{' '}
-            <Badge
-              className={
-                examResult?.status === 'graded'
-                  ? 'bg-green-500/20 text-green-400'
-                  : 'bg-yellow-500/20 text-yellow-400'
-              }
-            >
+            <Badge className={examResult?.status === 'graded' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}>
               {examResult?.status}
             </Badge>
           </div>

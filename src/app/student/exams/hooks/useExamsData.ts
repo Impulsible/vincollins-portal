@@ -205,10 +205,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       return
     }
 
-    // Normalized keyword for .ilike queries ("third" / "second" / "first")
-    const termKeyword = targetTerm.toLowerCase().includes('third') ? 'third' : 
-                        targetTerm.toLowerCase().includes('second') ? 'second' : 'first'
-
     isFetching.current = true
     setLoading(true)
 
@@ -392,12 +388,14 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         console.error("Error fetching attempts:", attemptsError)
       }
 
-      // ✅ Fetch Online Exams (flexible term matching via ilike)
+      // ✅ Fetch Online Exams
+      // NOTE: Term filter is applied in JS via isTermMatch below, NOT in SQL.
+      // SQL `.ilike("term", "%first%")` fails for '1st Term' / 'First Term' variants,
+      // which silently dropped exams that the student should see.
       const { data: examsData, error: examsError } = await supabase
         .from("exams")
         .select("*")
         .eq("status", "published")
-        .ilike("term", `%${termKeyword}%`)
         .eq("session_year", targetSession)
         .order("created_at", { ascending: false })
 
@@ -416,7 +414,10 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         if (!exam.class) return false
         if (seenIds.has(exam.id)) return false
         seenIds.add(exam.id)
-        
+
+        // ✅ Flexible term match — handles '1st Term' / 'First Term' / 'first' / '3rd' / 'third'
+        if (!isTermMatch(exam.term, targetTerm)) return false
+
         const examYear = extractYear(exam.class)
         
         if (isCurrentTerm) {
@@ -429,15 +430,18 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
 
       console.log('📚 Filtered online exams:', filteredExams.length)
       
-      // ✅ Fetch CA Scores
+      // ✅ Fetch CA Scores (term matched in JS to handle all term formats)
       const { data: caScoresData } = await supabase
         .from("ca_scores")
         .select("*")
         .eq("student_id", sp.id)
-        .ilike("term", `%${termKeyword}%`)
 
       const caMap: Record<string, any> = {}
-      caScoresData?.filter(c => c.academic_year === targetSession || c.session_year === targetSession)
+      caScoresData
+        ?.filter((c: any) =>
+          isTermMatch(c.term, targetTerm) &&
+          (c.academic_year === targetSession || c.session_year === targetSession)
+        )
         .forEach((ca: any) => { 
           if (ca.exam_id) caMap[ca.exam_id] = ca 
         })
@@ -616,14 +620,16 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       setExams(filteredExams)
       setExamAttempts(am)
 
-      // ✅ Get term progress stats
-      const { data: termProgressData } = await supabase
+      // ✅ Get term progress stats (term matched in JS)
+      const { data: termProgressRows } = await supabase
         .from("student_term_progress")
-        .select("total_subjects, completed_exams, average_score, grade, pending_theory_count")
+        .select("total_subjects, completed_exams, average_score, grade, pending_theory_count, term, session_year")
         .eq("student_id", sp.id)
-        .ilike("term", `%${termKeyword}%`)
         .eq("session_year", targetSession)
-        .maybeSingle()
+
+      const termProgressData = termProgressRows?.find((row: any) =>
+        isTermMatch(row.term, targetTerm)
+      ) || null
 
       const pendingTheoryAttempts = Object.values(am).filter(a => a.status === 'pending_theory')
       const pendingTheoryCount = pendingTheoryAttempts.length

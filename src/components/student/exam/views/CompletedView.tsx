@@ -2,7 +2,7 @@
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { BookOpen, Home, Eye, Trophy, CheckCircle2, Clock } from 'lucide-react'
+import { BookOpen, Home, Eye, Trophy, CheckCircle2, Clock, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ScoreSummary } from '../results/ScoreSummary'
 import { ObjectiveBreakdown } from '../results/ObjectiveBreakdown'
@@ -29,11 +29,17 @@ export function CompletedView({
   onViewFullResults,
 }: CompletedViewProps) {
   const theoryQuestions = allQuestions.filter(q => q.type === 'theory')
-  const isPassed = examResult?.is_passed
+  
+  const isPending = examResult?.status === 'pending_theory'
+  const isPassed = examResult?.is_passed && !isPending
 
+  // 🛠️ READ DYNAMIC BOUNDS FROM DB (No hardcoding)
+  const totalExamMax = examResult?.total_marks || ((examResult?.objective_total || 0) + (examResult?.theory_total || 0))
+  const objectiveMax = examResult?.objective_total || 0
+  
   const statusConfig = {
     graded: { bg: 'bg-green-50', text: 'text-green-700', border: 'border-green-200', icon: CheckCircle2, label: 'Graded' },
-    pending_theory: { bg: 'bg-yellow-50', text: 'text-yellow-700', border: 'border-yellow-200', icon: Clock, label: 'Pending Grading' },
+    pending_theory: { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', icon: Clock, label: 'Pending Grading' },
     completed: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', icon: Trophy, label: 'Completed' },
   }
 
@@ -71,31 +77,38 @@ export function CompletedView({
 
       {/* Result Banner */}
       <div className={cn(
-        "border-b py-6 px-4",
-        isPassed ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
+        "border-b py-8 px-4 transition-colors",
+        isPending ? "bg-amber-50 border-amber-100" 
+        : isPassed ? "bg-green-50 border-green-100" 
+        : "bg-red-50 border-red-100"
       )}>
         <div className="max-w-6xl mx-auto text-center">
           <div className={cn(
-            "inline-flex h-16 w-16 rounded-full items-center justify-center mb-3",
-            isPassed ? "bg-green-100" : "bg-red-100"
+            "inline-flex h-16 w-16 rounded-full items-center justify-center mb-3 shadow-sm",
+            isPending ? "bg-amber-100" : isPassed ? "bg-green-100" : "bg-red-100"
           )}>
-            {isPassed ? (
+            {isPending ? (
+              <Clock className="h-8 w-8 text-amber-500" />
+            ) : isPassed ? (
               <Trophy className="h-8 w-8 text-green-600" />
             ) : (
-              <Trophy className="h-8 w-8 text-red-400" />
+              <XCircle className="h-8 w-8 text-red-500" />
             )}
           </div>
           <h2 className={cn(
             "text-2xl font-bold",
-            isPassed ? "text-green-700" : "text-red-700"
+            isPending ? "text-amber-700" : isPassed ? "text-green-700" : "text-red-700"
           )}>
-            {isPassed ? 'Congratulations! You Passed!' : 'Exam Completed'}
+            {isPending ? 'Exam Pending Grading' : isPassed ? 'Congratulations! You Passed!' : 'Exam Completed'}
           </h2>
+          
           <p className={cn(
-            "text-lg mt-1",
-            isPassed ? "text-green-600" : "text-red-600"
+            "text-lg mt-1 font-medium",
+            isPending ? "text-amber-600" : isPassed ? "text-green-600" : "text-red-600"
           )}>
-            Score: {examResult?.score}/{examResult?.total} ({examResult?.percentage}%)
+            {isPending 
+              ? `Objective Score: ${examResult?.objective_score || 0} / ${objectiveMax} (Theory Pending)` 
+              : `Score: ${(examResult?.objective_score || 0) + (examResult?.theory_score || 0)} / ${totalExamMax} (${examResult?.percentage || 0}%)`}
           </p>
         </div>
       </div>

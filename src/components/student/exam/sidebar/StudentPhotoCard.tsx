@@ -1,9 +1,10 @@
-// src/components/student/exam/sidebar/StudentPhotoCard.tsx
-import { Card, CardContent } from '@/components/ui/card'
+'use client'
+
 import { Badge } from '@/components/ui/badge'
-import { Camera, User, Hash, BookOpen } from 'lucide-react'
+import { Camera, User, Hash, BookOpen, ShieldCheck } from 'lucide-react'
 import Image from 'next/image'
 import type { StudentProfile } from '@/app/student/exam/[id]/types'
+import { cn } from '@/lib/utils'
 
 interface StudentPhotoCardProps {
   profile: StudentProfile | null
@@ -14,74 +15,90 @@ export function StudentPhotoCard({
   profile,
   size = 'small',
 }: StudentPhotoCardProps) {
-  const dimensions = size === 'large' 
-    ? { width: 200, height: 240, container: 'w-full h-56' }
-    : { width: 160, height: 200, container: 'w-full h-44' }
+  const isLarge = size === 'large'
 
   return (
-    <Card className="border border-gray-700 shadow-lg bg-[#1a1f2e] overflow-hidden">
-      {/* Header */}
-      <div className="bg-gradient-to-r from-[#c41e3a] to-[#e8354a] px-3 py-1.5">
-        <h4 className="text-white text-xs font-medium text-center flex items-center justify-center gap-1">
-          <Camera className="h-3 w-3" />
-          Candidate
-        </h4>
-      </div>
-      
-      {/* Photo - Takes most of the space */}
-      <CardContent className="p-0">
-        <div className="relative">
-          {profile?.photo_url ? (
-            <div className={`${dimensions.container} overflow-hidden`}>
-              <Image
-                src={profile.photo_url}
-                alt={profile.full_name || 'Student'}
-                width={dimensions.width}
-                height={dimensions.height}
-                className="w-full h-full object-cover"
-                unoptimized
-              />
-            </div>
-          ) : (
-            <div className={`${dimensions.container} bg-[#0a0f1a] flex items-center justify-center`}>
-              <User className={size === 'large' ? 'h-20 w-20 text-gray-600' : 'h-16 w-16 text-gray-600'} />
-            </div>
-          )}
-          
-          {/* ID Badges - Overlaid at bottom */}
-          <div className="absolute bottom-1 left-2 right-2 flex gap-1">
-            <Badge className="flex-1 justify-center bg-[#c41e3a]/90 backdrop-blur-sm text-white py-0.5 text-[10px] font-medium">
-              {profile?.vin_id || 'N/A'}
-            </Badge>
-            {profile?.admission_number && (
-              <Badge className="flex-1 justify-center bg-gray-800/90 backdrop-blur-sm text-white py-0.5 text-[10px] font-medium">
-                {profile.admission_number}
-              </Badge>
-            )}
-          </div>
+    <div className="rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-sm overflow-hidden">
+      {/* Header strip */}
+      <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 px-3 py-2 overflow-hidden">
+        <div className="absolute -top-6 -right-6 h-16 w-16 bg-white/10 rounded-full blur-xl" />
+        <div className="relative flex items-center justify-center gap-1.5">
+          <Camera className="h-3 w-3 text-white/80" />
+          <span className="text-[10px] font-bold text-white/90 uppercase tracking-[0.14em]">
+            Candidate
+          </span>
         </div>
-      </CardContent>
-      
-      {/* Name & Details - Compact below photo */}
-      <CardContent className="px-2 py-2 text-center bg-[#141824]">
-        <p className="text-white font-semibold text-sm truncate">
+      </div>
+
+      {/* Photo */}
+      <div className="relative">
+        {profile?.photo_url ? (
+          <div className={cn(
+            'overflow-hidden',
+            isLarge ? 'h-56' : 'h-44'
+          )}>
+            <Image
+              src={profile.photo_url}
+              alt={profile.full_name || 'Student'}
+              width={isLarge ? 200 : 160}
+              height={isLarge ? 240 : 200}
+              className="w-full h-full object-cover"
+              unoptimized
+            />
+          </div>
+        ) : (
+          <div className={cn(
+            'bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center',
+            isLarge ? 'h-56' : 'h-44'
+          )}>
+            <User className={cn(
+              'text-slate-300',
+              isLarge ? 'h-20 w-20' : 'h-16 w-16'
+            )} />
+          </div>
+        )}
+
+        {/* Gradient overlay at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+
+        {/* ID Badges overlaid */}
+        <div className="absolute bottom-2 left-2 right-2 flex gap-1.5">
+          <Badge className="flex-1 justify-center bg-white/20 backdrop-blur-md text-white ring-1 ring-white/25 border-0 py-0.5 text-[10px] font-bold">
+            <Hash className="h-2.5 w-2.5 mr-1" />
+            {profile?.vin_id || 'N/A'}
+          </Badge>
+          {profile?.admission_number && (
+            <Badge className="flex-1 justify-center bg-white/15 backdrop-blur-md text-white ring-1 ring-white/20 border-0 py-0.5 text-[10px] font-bold">
+              {profile.admission_number}
+            </Badge>
+          )}
+        </div>
+      </div>
+
+      {/* Details */}
+      <div className="px-3 py-3 text-center bg-gradient-to-br from-slate-50 to-white">
+        <p className="font-bold text-slate-900 text-sm truncate">
           {profile?.full_name || 'Student'}
         </p>
-        <div className="flex items-center justify-center gap-3 mt-1 text-gray-400 text-[11px]">
+        <div className="flex items-center justify-center gap-3 mt-1.5 text-slate-500 text-[11px]">
           {profile?.class && (
-            <span className="flex items-center gap-1">
-              <BookOpen className="h-3 w-3" />
+            <span className="flex items-center gap-1 font-medium">
+              <BookOpen className="h-3 w-3 text-indigo-500" />
               {profile.class}
             </span>
           )}
           {profile?.admission_number && (
-            <span className="flex items-center gap-1">
-              <Hash className="h-3 w-3" />
+            <span className="flex items-center gap-1 font-medium">
+              <Hash className="h-3 w-3 text-indigo-500" />
               {profile.admission_number}
             </span>
           )}
         </div>
-      </CardContent>
-    </Card>
+        <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-emerald-600 font-semibold">
+          <ShieldCheck className="h-3 w-3" />
+          Verified
+        </div>
+      </div>
+    </div>
   )
 }

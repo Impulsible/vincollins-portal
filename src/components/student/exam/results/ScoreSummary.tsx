@@ -2,7 +2,7 @@
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
 import { Progress } from '@/components/ui/progress'
-import { Award, CheckCircle, XCircle, Target, TrendingUp, FileText } from 'lucide-react'
+import { Award, CheckCircle, XCircle, Target, TrendingUp, FileText, Clock, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ExamResult } from '@/app/student/exam/[id]/types'
 
@@ -13,24 +13,36 @@ interface ScoreSummaryProps {
 export function ScoreSummary({ examResult }: ScoreSummaryProps) {
   if (!examResult) return null
 
-  const isPassed = examResult.is_passed
-  const scorePercent = examResult.percentage || 0
+  const isPending = examResult.status === 'pending_theory'
+  const isPassed = examResult.is_passed && !isPending
+
+  // 🛠️ STRICT MATH: Total Exam - Objective = Theory
+  const totalExamMax = examResult.total || 60 // Fallback to 60 if DB fails
+  const trueObjectiveMax = examResult.objective_total || 20 // Fallback to 20 if DB fails
+  const trueTheoryMax = totalExamMax - trueObjectiveMax // Should be 40
+
+  const currentScore = examResult.objective_score || 0
+  const scorePercent = totalExamMax > 0 ? Math.round((currentScore / totalExamMax) * 100) : 0
 
   return (
     <Card className="border border-slate-200 shadow-md bg-white rounded-2xl overflow-hidden">
       {/* Score Header */}
       <div className={cn(
-        "p-6 text-center",
-        isPassed 
+        "p-6 text-center transition-colors",
+        isPending
+          ? "bg-gradient-to-br from-amber-50 to-orange-50"
+          : isPassed 
           ? "bg-gradient-to-br from-emerald-50 to-green-50" 
           : "bg-gradient-to-br from-red-50 to-rose-50"
       )}>
         <div className={cn(
           "inline-flex h-16 w-16 rounded-2xl items-center justify-center mb-3 shadow-sm",
-          isPassed ? "bg-emerald-100" : "bg-red-100"
+          isPending ? "bg-amber-100" : isPassed ? "bg-emerald-100" : "bg-red-100"
         )}>
-          {isPassed ? (
-            <Award className="h-8 w-8 text-emerald-600" />
+          {isPending ? (
+            <Clock className="h-8 w-8 text-amber-500" />
+          ) : isPassed ? (
+            <Trophy className="h-8 w-8 text-emerald-600" />
           ) : (
             <Award className="h-8 w-8 text-red-400" />
           )}
@@ -40,32 +52,54 @@ export function ScoreSummary({ examResult }: ScoreSummaryProps) {
         </h3>
         <p className={cn(
           "text-5xl font-black tracking-tight mt-1",
-          isPassed ? "text-emerald-700" : "text-red-700"
+          isPending ? "text-amber-600" : isPassed ? "text-emerald-700" : "text-red-700"
         )}>
-          {examResult.score}
-          <span className="text-2xl text-slate-300 font-normal">/{examResult.total}</span>
+          {currentScore}
+          <span className="text-2xl text-slate-300 font-normal">/{totalExamMax}</span>
         </p>
+        
         <div className="flex items-center justify-center gap-1.5 mt-2">
-          <TrendingUp className={cn("h-4 w-4", isPassed ? "text-emerald-500" : "text-red-400")} />
-          <span className={cn("text-lg font-bold", isPassed ? "text-emerald-600" : "text-red-500")}>
-            {scorePercent}%
-          </span>
+          {isPending ? (
+            <span className="text-sm font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-full">
+              Pending Theory Grade
+            </span>
+          ) : (
+            <>
+              <TrendingUp className={cn("h-4 w-4", isPassed ? "text-emerald-500" : "text-red-400")} />
+              <span className={cn("text-lg font-bold", isPassed ? "text-emerald-600" : "text-red-500")}>
+                {scorePercent}%
+              </span>
+            </>
+          )}
         </div>
-        <Progress 
-          value={scorePercent} 
-          className={cn("h-2 mt-3 max-w-[200px] mx-auto", isPassed ? "[&>div]:bg-emerald-500" : "[&>div]:bg-red-400")} 
-        />
+
+        {!isPending && (
+          <Progress 
+            value={scorePercent} 
+            className={cn("h-2 mt-3 max-w-[200px] mx-auto", isPassed ? "[&>div]:bg-emerald-500" : "[&>div]:bg-red-400")} 
+          />
+        )}
       </div>
 
       <CardContent className="p-5 space-y-4">
         {/* Pass/Fail Status */}
         <div className={cn(
           "rounded-xl p-4 text-center border-2 flex items-center justify-center gap-3",
-          isPassed
+          isPending 
+            ? "bg-amber-50 border-amber-200"
+            : isPassed
             ? "bg-emerald-50 border-emerald-200"
             : "bg-red-50 border-red-200"
         )}>
-          {isPassed ? (
+          {isPending ? (
+            <>
+              <Clock className="h-6 w-6 text-amber-500 shrink-0" />
+              <div className="text-left">
+                <p className="font-bold text-amber-700">Awaiting Results</p>
+                <p className="text-xs text-amber-600">Theory grading in progress</p>
+              </div>
+            </>
+          ) : isPassed ? (
             <>
               <CheckCircle className="h-6 w-6 text-emerald-600 shrink-0" />
               <div className="text-left">
@@ -103,8 +137,8 @@ export function ScoreSummary({ examResult }: ScoreSummaryProps) {
             <FileText className="h-4 w-4 text-blue-500 mx-auto mb-1" />
             <p className="text-xs text-blue-500 font-medium uppercase tracking-wide mb-1">Objective</p>
             <p className="text-xl font-bold text-blue-700">
-              {examResult.objective_score || examResult.score}
-              <span className="text-sm text-blue-400 font-normal">/{examResult.objective_total || examResult.total}</span>
+              {currentScore}
+              <span className="text-sm text-blue-400 font-normal">/{trueObjectiveMax}</span>
             </p>
           </div>
           <div className="bg-purple-50 rounded-xl p-3.5 text-center border border-purple-100">
@@ -113,10 +147,13 @@ export function ScoreSummary({ examResult }: ScoreSummaryProps) {
             {examResult.status === 'graded' ? (
               <p className="text-xl font-bold text-purple-700">
                 {examResult.theory_score || 0}
-                <span className="text-sm text-purple-400 font-normal">/{examResult.theory_total || 0}</span>
+                <span className="text-sm text-purple-400 font-normal">/{trueTheoryMax}</span>
               </p>
             ) : (
-              <p className="text-xl font-bold text-slate-300">—/{examResult.theory_total || 0}</p>
+              <p className="text-xl font-bold text-slate-400 flex items-center justify-center gap-1">
+                <Clock className="h-4 w-4" />
+                <span className="text-sm font-normal">/{trueTheoryMax}</span>
+              </p>
             )}
           </div>
         </div>

@@ -1,6 +1,7 @@
-// src/components/student/exam/header/AutoSaveIndicator.tsx
-import { Badge } from '@/components/ui/badge'
-import { Save, CheckCircle } from 'lucide-react'
+'use client'
+
+import { Save, CheckCircle2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 interface AutoSaveIndicatorProps {
   autoSaving: boolean
@@ -10,19 +11,19 @@ interface AutoSaveIndicatorProps {
 export function AutoSaveIndicator({ autoSaving, lastSaved }: AutoSaveIndicatorProps) {
   if (autoSaving) {
     return (
-      <Badge className="bg-blue-500/20 text-blue-400 px-2 py-0.5 text-xs">
-        <Save className="h-3 w-3 mr-1 animate-pulse" />
-        Saving...
-      </Badge>
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 ring-1 ring-amber-200 text-amber-700 text-xs font-semibold">
+        <Save className="h-3 w-3 animate-pulse" />
+        <span>Saving…</span>
+      </div>
     )
   }
 
   if (lastSaved) {
     return (
-      <Badge className="bg-green-500/20 text-green-400 px-2 py-0.5 text-xs">
-        <CheckCircle className="h-3 w-3 mr-1" />
-        Saved
-      </Badge>
+      <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-50 ring-1 ring-emerald-200 text-emerald-700 text-xs font-semibold">
+        <CheckCircle2 className="h-3 w-3" />
+        <span>Saved</span>
+      </div>
     )
   }
 

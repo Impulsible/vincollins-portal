@@ -6,7 +6,7 @@ import { motion } from 'framer-motion'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Award, RefreshCw, TrendingUp, CheckCircle2, Calendar } from 'lucide-react'
+import { Award, RefreshCw, TrendingUp, CheckCircle2, Calendar, Calculator } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { StatsState, TermOption, TermSession } from '@/app/student/types'
 
@@ -132,10 +132,13 @@ export function TermProgressCard({
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
                   {stats.completed}/{stats.totalSubjects} done
                 </div>
+                
+                {/* 🛠️ THE AVERAGE SCORE BADGE */}
                 <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300">
-                  <TrendingUp className="h-3.5 w-3.5 text-blue-500" />
-                  {stats.averageScore}% avg
+                  <Calculator className="h-3.5 w-3.5 text-teal-500" />
+                  {stats.averageScore}% avg (CA+Exam)
                 </div>
+
                 {displayGrade && (
                   <div className={cn('flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold border', gradeStyle.soft, gradeStyle.text, gradeStyle.border)}>
                     <Award className="h-3.5 w-3.5" />

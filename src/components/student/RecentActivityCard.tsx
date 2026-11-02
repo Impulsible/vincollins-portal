@@ -1,3 +1,4 @@
+// src/components/student/RecentActivityCard.tsx
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,27 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
     if (diffHours < 24) return `${diffHours}h ago`
     if (diffDays < 7) return `${diffDays}d ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  // 🛠️ FORCE THE MATH: Ignore whatever was passed in and calculate CA + Obj + Thy
+  const calculateExactPercentage = (attempt: any) => {
+    const ca1 = Number(attempt.ca_score?.ca1_score) || 0
+    const ca2 = Number(attempt.ca_score?.ca2_score) || 0
+    const caTotal = ca1 + ca2
+
+    const objScore = Number(attempt.objective_score) || 0
+    const thyScore = Number(attempt.theory_score) || 0
+
+    // If there is CA, add it. 
+    if (caTotal > 0) {
+      const total = caTotal + objScore + thyScore
+      return Math.min(100, Math.round(total)) // 13 + 1 + 38 = 52
+    }
+
+    // If no CA, just use the exam percentage (Obj + Thy)
+    if (attempt.percentage) return Math.min(100, Math.round(Number(attempt.percentage)))
+    
+    return 0
   }
 
   return (
@@ -62,18 +84,15 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
           <div className="space-y-2">
             {attempts.slice(0, 5).map((attempt, index) => {
               const isInProgress = attempt.status === 'in_progress'
+              const displayPct = calculateExactPercentage(attempt)
+              const isPassed = displayPct >= 40
               
-              const hasCA = attempt.has_ca && attempt.ca_score
-              const displayPct = hasCA 
-                ? Number(attempt.ca_score.total_score) || 0
-                : (attempt.percentage || 0)
-              
-              const displayGrade = hasCA ? attempt.ca_score.grade : null
-              
-              const isPassed = hasCA 
-                ? attempt.ca_score.grade !== 'F9'
-                : displayPct >= 50
-              
+              // Extract CA breakdown for display
+              const ca1 = Number(attempt.ca_score?.ca1_score) || 0
+              const ca2 = Number(attempt.ca_score?.ca2_score) || 0
+              const caTotal = ca1 + ca2
+              const hasCA = !!attempt.ca_score && caTotal > 0
+
               return (
                 <div 
                   key={attempt.id || index} 
@@ -107,21 +126,21 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                   </div>
                   
                   <div className="flex items-center justify-between mt-2">
-                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                    <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
                       {!isInProgress && (
                         <span className="flex items-center gap-1">
                           <Trophy className="h-3 w-3" />
                           <span className={cn("font-bold", getScoreColor(displayPct))}>
-                            {Math.round(displayPct)}%
+                            {displayPct}%
                           </span>
-                          {displayGrade && (
+                          {displayPct > 0 && (
                             <Badge className={cn(
                               "text-[10px] px-1 py-0 ml-1 font-bold",
-                              displayGrade === 'F9' 
-                                ? 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300' 
-                                : 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300'
+                              displayPct >= 40 
+                                ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300' 
+                                : 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-300'
                             )}>
-                              {displayGrade}
+                              {displayPct >= 75 ? 'A1' : displayPct >= 70 ? 'B2' : displayPct >= 65 ? 'B3' : displayPct >= 60 ? 'C4' : displayPct >= 55 ? 'C5' : displayPct >= 50 ? 'C6' : displayPct >= 45 ? 'D7' : displayPct >= 40 ? 'E8' : 'F9'}
                             </Badge>
                           )}
                         </span>
@@ -130,10 +149,11 @@ export function RecentActivityCard({ attempts, getStatusBadge, getScoreColor }: 
                         <Clock className="h-3 w-3" />
                         {formatDate(attempt.submitted_at || attempt.started_at || attempt.created_at)}
                       </span>
-                      {!isInProgress && attempt.correct_count !== undefined && (
-                        <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                          <CheckCircle className="h-3 w-3" />
-                          {attempt.correct_count}
+                      {!isInProgress && (
+                        <span className="flex items-center gap-1 text-slate-400 text-[10px]">
+                          {hasCA ? `CA: ${caTotal} | ` : ''}
+                          Obj: {Number(attempt.objective_score) || 0}
+                          {Number(attempt.theory_score) > 0 ? ` | Th: ${attempt.theory_score}` : ''}
                         </span>
                       )}
                     </div>

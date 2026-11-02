@@ -1,11 +1,17 @@
-// src/components/staff/exams/create/CreateExamDialog.tsx - FIXED + DARK MODE
+// src/components/staff/exams/create/CreateExamDialog.tsx
 
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
-  GraduationCap, X, RotateCcw, ChevronLeft,
-  ChevronRight, Save, Send, Loader2,
+  GraduationCap,
+  X,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Save,
+  Send,
+  Loader2,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -23,6 +29,7 @@ import { useExamSubmit } from "./hooks/useExamSubmit";
 import { useQuestionParser } from "./hooks/useQuestionParser";
 
 import { STEPS, DEFAULT_EXAM_DETAILS, MARK_CONSTANTS } from "./constants";
+
 import type {
   CreateExamDialogProps,
   ExamDetails,
@@ -33,41 +40,109 @@ import type {
   MarkDistribution,
 } from "./types";
 
+/* ═══════════════════════════════════════════════════════════
+   SCORING ENGINE — equal-marks theory enforcement
+   ─────────────────────────────────────────────────────────
+   Objective total  = Σ objective question marks
+   Theory total     = effectiveN × theoryMarksPerQuestion
+                      (ALL theory Qs must carry the same mark —
+                       any N a student picks yields the same max)
+   Exam total       = objective + theory  →  must equal 60
+   CA1 = 20, CA2 = 20, CA total = 40, Grand = 100
+   ═══════════════════════════════════════════════════════════ */
+
 const calculateMarkDistribution = (
   questions: Question[],
   theoryQuestions: TheoryQuestion[],
   defaultMark: number,
-  theoryTotalMarks: number
+  theoryQuestionsToAnswer: number | null,
+  theoryMarksPerQuestion: number,
+  hasTheory: boolean,
 ): MarkDistribution => {
-  const objectiveTotal = questions.reduce((sum, q) => sum + (q.marks || defaultMark), 0);
-  const questionCount = questions.length;
-  
-  const theoryTotal = theoryTotalMarks;
+  /* ── objective ─────────────────────────────────────── */
+  const objectiveTotal = questions.reduce(
+    (sum, q) => sum + (q.marks || defaultMark),
+    0,
+  );
+
+  /* ── theory ────────────────────────────────────────── */
   const theoryQuestionCount = theoryQuestions.length;
-  
-  const marksPerTheoryQuestion = theoryQuestionCount > 0 
-    ? theoryTotal / theoryQuestionCount 
+
+  const effectiveN = hasTheory
+    ? Math.min(
+        theoryQuestionsToAnswer && theoryQuestionsToAnswer > 0
+          ? theoryQuestionsToAnswer
+          : theoryQuestionCount,
+        theoryQuestionCount,
+      )
     : 0;
-  
+
+  const theoryTotal = hasTheory ? effectiveN * theoryMarksPerQuestion : 0;
+
+  /* ── fairness gate ─────────────────────────────────── */
+  const theoryMarksEqual =
+    theoryQuestionCount === 0 ||
+    theoryQuestions.every((q) => q.marks === theoryMarksPerQuestion);
+
+  /* ── totals ────────────────────────────────────────── */
   const examTotal = objectiveTotal + theoryTotal;
-  const isBalanced = examTotal === MARK_CONSTANTS.EXAM_TOTAL;
-  const isOver = examTotal > MARK_CONSTANTS.EXAM_TOTAL;
-  
+
   return {
     objectiveTotal,
     theoryTotal,
     examTotal,
-    ca1Max: MARK_CONSTANTS.CA1_MAX,
-    ca2Max: MARK_CONSTANTS.CA2_MAX,
-    caTotal: MARK_CONSTANTS.CA_TOTAL,
-    grandTotal: MARK_CONSTANTS.GRAND_TOTAL,
-    questionCount,
+    ca1Max: MARK_CONSTANTS.CA1_MAX, // 20
+    ca2Max: MARK_CONSTANTS.CA2_MAX, // 20
+    caTotal: MARK_CONSTANTS.CA_TOTAL, // 40
+    grandTotal: MARK_CONSTANTS.GRAND_TOTAL, // 100
+    questionCount: questions.length,
     theoryQuestionCount,
-    marksPerTheoryQuestion,
-    isBalanced,
-    theoryMarksPerQuestion: marksPerTheoryQuestion,
+    theoryMarksPerQuestion,
+    marksPerTheoryQuestion: theoryMarksPerQuestion, // back-compat alias
+    isBalanced:
+      examTotal === MARK_CONSTANTS.EXAM_TOTAL &&
+      (!hasTheory || theoryMarksEqual),
+    theoryMarksEqual,
   };
 };
+
+/* ═══════════════════════════════════════════════════════════
+   VALIDATION GATE — runs before save
+   ═══════════════════════════════════════════════════════════ */
+
+const validateExam = (
+  details: ExamDetails,
+  dist: MarkDistribution,
+  hasTheory: boolean,
+): string[] => {
+  const errors: string[] = [];
+
+  if (!details.title.trim()) errors.push("Exam title is required.");
+  if (!details.subject.trim()) errors.push("Subject is required.");
+  if (!details.class.trim()) errors.push("Class is required.");
+
+  if (dist.questionCount === 0)
+    errors.push("Add at least one objective question.");
+
+  if (dist.examTotal !== MARK_CONSTANTS.EXAM_TOTAL)
+    errors.push(
+      `Exam total is ${dist.examTotal}, must be ${MARK_CONSTANTS.EXAM_TOTAL}.`,
+    );
+
+  if (hasTheory && !dist.theoryMarksEqual)
+    errors.push(
+      "All theory questions must carry the same marks so any N a student picks is fair.",
+    );
+
+  if (hasTheory && dist.theoryQuestionCount === 0)
+    errors.push("Add at least one theory question or disable theory.");
+
+  return errors;
+};
+
+/* ═══════════════════════════════════════════════════════════
+   COMPONENT
+   ═══════════════════════════════════════════════════════════ */
 
 export function CreateExamDialog({
   open,
@@ -78,22 +153,33 @@ export function CreateExamDialog({
   const [activeStep, setActiveStep] = useState<StepId>("details");
   const [completedSteps, setCompletedSteps] = useState<Set<StepId>>(new Set());
 
-  const [examDetails, setExamDetails] = useState<ExamDetails>(DEFAULT_EXAM_DETAILS);
+  const [examDetails, setExamDetails] =
+    useState<ExamDetails>(DEFAULT_EXAM_DETAILS);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
 
+  /* legacy state — still consumed by ExamDetailsStep & PreviewStep.
+     Derived below from markDistribution so it can never drift. */
   const [objectiveMax, setObjectiveMax] = useState(20);
   const [theoryMax, setTheoryMax] = useState(40);
-  const [defaultMark, setDefaultMark] = useState<number>(MARK_CONSTANTS.DEFAULT_MARK);
-  const [theoryQuestionsTotal, setTheoryQuestionsTotal] = useState(0);
-  const [theoryQuestionsToAnswer, setTheoryQuestionsToAnswer] = useState<number | null>(null);
-  const [theoryMarksPerQuestion, setTheoryMarksPerQuestion] = useState(10);
+
+  const [defaultMark, setDefaultMark] = useState<number>(
+    MARK_CONSTANTS.DEFAULT_MARK,
+  );
+
+  /* 0 / null = student answers ALL theory questions */
+  const [theoryQuestionsToAnswer, setTheoryQuestionsToAnswer] = useState<
+    number | null
+  >(null);
+
+  /* Master marks per theory question — single source of truth */
+  const [theoryMarksPerQuestion, setTheoryMarksPerQuestion] =
+    useState<number>(10);
+
   const [scoringRule, setScoringRule] = useState<ScoringRule>("standard");
-  const [theoryTotalMarks, setTheoryTotalMarks] = useState<number>(MARK_CONSTANTS.DEFAULT_THEORY_TOTAL);
 
   const [bulkQuestionsText, setBulkQuestionsText] = useState("");
-  const [bulkTheoryText, setBulkTheoryText] = useState("");
 
   const [passageText, setPassageText] = useState("");
   const [hasPassage, setHasPassage] = useState(false);
@@ -106,14 +192,33 @@ export function CreateExamDialog({
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
   const { loading, submit } = useExamSubmit(onSuccess, handleClose);
 
-  const markDistribution = useMemo(() => {
-    return calculateMarkDistribution(
+  /* ── derived scoring ── */
+
+  const markDistribution = useMemo<MarkDistribution>(
+    () =>
+      calculateMarkDistribution(
+        questions,
+        theoryQuestions,
+        defaultMark,
+        theoryQuestionsToAnswer,
+        theoryMarksPerQuestion,
+        hasTheory,
+      ),
+    [
       questions,
       theoryQuestions,
       defaultMark,
-      theoryTotalMarks
-    );
-  }, [questions, theoryQuestions, defaultMark, theoryTotalMarks]);
+      theoryQuestionsToAnswer,
+      theoryMarksPerQuestion,
+      hasTheory,
+    ],
+  );
+
+  /* keep legacy objectiveMax / theoryMax mirrors in sync */
+  useEffect(() => {
+    setObjectiveMax(markDistribution.objectiveTotal);
+    setTheoryMax(markDistribution.theoryTotal);
+  }, [markDistribution.objectiveTotal, markDistribution.theoryTotal]);
 
   const examProgress = useMemo(() => {
     let score = 0;
@@ -130,6 +235,13 @@ export function CreateExamDialog({
   const isFirst = currentStepIndex === 0;
   const isLast = currentStepIndex === STEPS.length - 1;
 
+  const validationErrors = useMemo(
+    () => validateExam(examDetails, markDistribution, hasTheory),
+    [examDetails, markDistribution, hasTheory],
+  );
+
+  /* ── auto-save draft ── */
+
   useEffect(() => {
     const hasData =
       examDetails.title ||
@@ -144,25 +256,38 @@ export function CreateExamDialog({
       examDetails,
       questions,
       theoryQuestions,
-      objectiveMax,
-      theoryMax,
-      theoryQuestionsTotal,
+      objectiveMax: markDistribution.objectiveTotal,
+      theoryMax: markDistribution.theoryTotal,
       theoryQuestionsToAnswer,
-      theoryMarksPerQuestion,
       scoringRule,
       defaultMark,
       bulkQuestionsText,
-      bulkTheoryText,
       passageText,
       hasPassage,
-      theoryTotalMarks,
+      theoryQuestionsTotal: theoryQuestions.length,
+      theoryMarksPerQuestion,
+      bulkTheoryText: "",
+      theoryTotalMarks: markDistribution.theoryTotal,
     });
   }, [
-    activeStep, hasTheory, examDetails, questions, theoryQuestions,
-    objectiveMax, theoryMax, theoryQuestionsTotal, theoryQuestionsToAnswer,
-    theoryMarksPerQuestion, scoringRule, defaultMark, bulkQuestionsText,
-    bulkTheoryText, passageText, hasPassage, theoryTotalMarks, debouncedSave,
+    activeStep,
+    hasTheory,
+    examDetails,
+    questions,
+    theoryQuestions,
+    theoryQuestionsToAnswer,
+    theoryMarksPerQuestion,
+    scoringRule,
+    defaultMark,
+    bulkQuestionsText,
+    passageText,
+    hasPassage,
+    markDistribution.objectiveTotal,
+    markDistribution.theoryTotal,
+    debouncedSave,
   ]);
+
+  /* ── restore draft on open ── */
 
   useEffect(() => {
     if (!open) return;
@@ -175,24 +300,21 @@ export function CreateExamDialog({
     setExamDetails(draft.examDetails ?? DEFAULT_EXAM_DETAILS);
     setQuestions(draft.questions ?? []);
     setTheoryQuestions(draft.theoryQuestions ?? []);
-    setObjectiveMax(draft.objectiveMax ?? 20);
-    setTheoryMax(draft.theoryMax ?? 40);
-    setTheoryQuestionsTotal(draft.theoryQuestionsTotal ?? 0);
     setTheoryQuestionsToAnswer(draft.theoryQuestionsToAnswer ?? null);
     setTheoryMarksPerQuestion(draft.theoryMarksPerQuestion ?? 10);
     setScoringRule(draft.scoringRule ?? "standard");
     setDefaultMark(draft.defaultMark ?? MARK_CONSTANTS.DEFAULT_MARK);
     setBulkQuestionsText(draft.bulkQuestionsText ?? "");
-    setBulkTheoryText(draft.bulkTheoryText ?? "");
     setPassageText(draft.passageText ?? "");
     setHasPassage(draft.hasPassage ?? false);
-    setTheoryTotalMarks(draft.theoryTotalMarks ?? MARK_CONSTANTS.DEFAULT_THEORY_TOTAL);
 
     toast.info("📝 Draft restored", {
       description: `${draft.questions?.length ?? 0} obj + ${draft.theoryQuestions?.length ?? 0} theory`,
       duration: 3000,
     });
   }, [open, loadFromStorage]);
+
+  /* ── navigation ── */
 
   const goToStep = useCallback((id: StepId) => setActiveStep(id), []);
 
@@ -207,6 +329,8 @@ export function CreateExamDialog({
     if (prev) setActiveStep(prev.id);
   }, [currentStepIndex]);
 
+  /* ── clear draft ── */
+
   const handleClearDraft = useCallback(() => {
     clearStorage();
     setHasSavedDraft(false);
@@ -217,19 +341,16 @@ export function CreateExamDialog({
     setQuestions([]);
     setTheoryQuestions([]);
     setBulkQuestionsText("");
-    setBulkTheoryText("");
     setPassageText("");
     setHasPassage(false);
     setDefaultMark(MARK_CONSTANTS.DEFAULT_MARK);
-    setObjectiveMax(20);
-    setTheoryMax(40);
-    setTheoryQuestionsTotal(0);
     setTheoryQuestionsToAnswer(null);
     setTheoryMarksPerQuestion(10);
     setScoringRule("standard");
-    setTheoryTotalMarks(MARK_CONSTANTS.DEFAULT_THEORY_TOTAL);
     toast.success("Started fresh!");
   }, [clearStorage]);
+
+  /* ── close ── */
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -238,19 +359,26 @@ export function CreateExamDialog({
       }
       onOpenChange(isOpen);
     },
-    [onOpenChange]
+    [onOpenChange],
   );
+
+  /* ── submit ── */
 
   const handleSubmit = useCallback(
     async (submitForApproval: boolean) => {
-      if (isOver) {
-        toast.error(`Exam total (${totalMarks}) exceeds ${MARK_CONSTANTS.EXAM_TOTAL} marks. Please reduce questions.`);
+      if (validationErrors.length > 0) {
+        toast.error(validationErrors[0]);
         return;
       }
-      if (totalMarks !== MARK_CONSTANTS.EXAM_TOTAL) {
-        toast.error(`Exam total must be ${MARK_CONSTANTS.EXAM_TOTAL} marks. Current total: ${totalMarks}`);
-        return;
-      }
+
+      const effectiveN = hasTheory
+        ? Math.min(
+            theoryQuestionsToAnswer && theoryQuestionsToAnswer > 0
+              ? theoryQuestionsToAnswer
+              : theoryQuestions.length,
+            theoryQuestions.length,
+          )
+        : 0;
 
       const success = await submit({
         examDetails,
@@ -258,31 +386,46 @@ export function CreateExamDialog({
         theoryQuestions,
         hasTheory,
         objectiveMax: markDistribution.objectiveTotal,
-        theoryMax: theoryTotalMarks,
-        theoryQuestionsTotal,
-        theoryQuestionsToAnswer,
-        theoryMarksPerQuestion: markDistribution.marksPerTheoryQuestion,
+        theoryMax: markDistribution.theoryTotal,
+        theoryQuestionsTotal: theoryQuestions.length,
+        theoryQuestionsToAnswer: effectiveN || null,
+        theoryMarksPerQuestion,
         scoringRule,
         teacherProfile,
         submitForApproval,
         passageText: hasPassage ? passageText : null,
         defaultMark,
         markDistribution,
-        theoryTotalMarks,
+        theoryTotalMarks: markDistribution.theoryTotal,
       });
-      
+
       if (success) {
         clearStorage();
         setHasSavedDraft(false);
       }
     },
     [
-      submit, examDetails, questions, theoryQuestions, hasTheory,
-      theoryQuestionsTotal, theoryQuestionsToAnswer, scoringRule, teacherProfile,
-      clearStorage, passageText, hasPassage, defaultMark, totalMarks, isOver,
-      markDistribution, theoryTotalMarks,
-    ]
+      submit,
+      examDetails,
+      questions,
+      theoryQuestions,
+      hasTheory,
+      theoryQuestionsToAnswer,
+      theoryMarksPerQuestion,
+      scoringRule,
+      teacherProfile,
+      clearStorage,
+      passageText,
+      hasPassage,
+      defaultMark,
+      markDistribution,
+      validationErrors,
+    ],
   );
+
+  /* ═══════════════════════════════════════════════════
+     RENDER
+     ═══════════════════════════════════════════════════ */
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -294,10 +437,10 @@ export function CreateExamDialog({
           "md:w-[96vw] md:h-[96vh] md:rounded-2xl",
           "lg:w-[94vw] lg:max-w-[1400px] lg:h-[95vh]",
           "xl:max-w-[1500px] 2xl:max-w-[1600px]",
-          "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800"
+          "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800",
         )}
       >
-        {/* Header */}
+        {/* ── Header ── */}
         <div className="bg-gradient-to-r from-gray-900 to-slate-800 dark:from-slate-950 dark:to-slate-900 px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 flex-shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -322,14 +465,21 @@ export function CreateExamDialog({
                   <span className="text-[10px] text-white font-semibold">
                     {questions.length + theoryQuestions.length}Q
                   </span>
-                  <span className={cn(
-                    "text-[10px]",
-                    totalMarks === MARK_CONSTANTS.EXAM_TOTAL ? "text-gray-400" : 
-                    isOver ? "text-red-400" : "text-amber-400"
-                  )}>
+                  <span
+                    className={cn(
+                      "text-[10px]",
+                      totalMarks === MARK_CONSTANTS.EXAM_TOTAL
+                        ? "text-gray-400"
+                        : isOver
+                          ? "text-red-400"
+                          : "text-amber-400",
+                    )}
+                  >
                     • {totalMarks}mk
                     {isOver && " ⛔"}
-                    {totalMarks !== MARK_CONSTANTS.EXAM_TOTAL && !isOver && " ⚠️"}
+                    {totalMarks !== MARK_CONSTANTS.EXAM_TOTAL &&
+                      !isOver &&
+                      " ⚠️"}
                   </span>
                 </div>
               )}
@@ -340,7 +490,9 @@ export function CreateExamDialog({
                     style={{ width: `${examProgress}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-gray-400">{examProgress}%</span>
+                <span className="text-[10px] text-gray-400">
+                  {examProgress}%
+                </span>
               </div>
               {(examDetails.title || questions.length > 0) && (
                 <button
@@ -363,12 +515,14 @@ export function CreateExamDialog({
           </div>
         </div>
 
-        {/* Draft banner */}
+        {/* ── Draft banner ── */}
         {hasSavedDraft && (
           <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50 px-3 py-1.5 flex items-center justify-between flex-shrink-0">
             <p className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-400 font-medium truncate">
               📝 Draft restored — {questions.length} obj
-              {theoryQuestions.length > 0 ? ` + ${theoryQuestions.length} theory` : ""}
+              {theoryQuestions.length > 0
+                ? ` + ${theoryQuestions.length} theory`
+                : ""}
             </p>
             <button
               onClick={() => setHasSavedDraft(false)}
@@ -379,7 +533,7 @@ export function CreateExamDialog({
           </div>
         )}
 
-        {/* Step content */}
+        {/* ── Step content ── */}
         <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white dark:bg-slate-950">
           {activeStep === "details" && (
             <ExamDetailsStep
@@ -414,7 +568,9 @@ export function CreateExamDialog({
               markDistribution={markDistribution}
               onDefaultMarkChange={(newMark: number) => {
                 setDefaultMark(newMark);
-                setQuestions(prev => prev.map(q => ({ ...q, marks: newMark })));
+                setQuestions((prev) =>
+                  prev.map((q) => ({ ...q, marks: newMark })),
+                );
               }}
             />
           )}
@@ -425,15 +581,10 @@ export function CreateExamDialog({
               onQuestionsChange={setTheoryQuestions}
               hasTheory={hasTheory}
               onHasTheoryChange={setHasTheory}
-              theoryMax={theoryMax}
-              bulkText={bulkTheoryText}
-              onBulkTextChange={setBulkTheoryText}
-              onParse={parseTheory}
-              markDistribution={markDistribution}
-              defaultMark={defaultMark}
-              theoryTotalMarks={theoryTotalMarks}
-              onTheoryTotalMarksChange={setTheoryTotalMarks}
               objectiveTotal={markDistribution.objectiveTotal}
+              /* equal-marks enforcement props */
+              questionsToAnswer={theoryQuestionsToAnswer ?? 0}
+              onQuestionsToAnswerChange={setTheoryQuestionsToAnswer}
             />
           )}
 
@@ -443,17 +594,17 @@ export function CreateExamDialog({
               questions={questions}
               theoryQuestions={theoryQuestions}
               hasTheory={hasTheory}
-              objectiveMax={objectiveMax}
-              theoryMax={theoryMax}
+              objectiveMax={markDistribution.objectiveTotal}
+              theoryMax={markDistribution.theoryTotal}
               passageText={hasPassage ? passageText : undefined}
               defaultMark={defaultMark}
               markDistribution={markDistribution}
-              theoryTotalMarks={theoryTotalMarks}
+              theoryTotalMarks={markDistribution.theoryTotal}
             />
           )}
         </div>
 
-        {/* Footer */}
+        {/* ── Footer ── */}
         <div className="flex-shrink-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-3 sm:px-4 py-2 sm:py-2.5">
           <div className="flex items-center justify-between max-w-4xl mx-auto">
             <div className="flex items-center gap-1.5">
@@ -482,13 +633,26 @@ export function CreateExamDialog({
             <div className="hidden md:flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
               <span>Obj: {markDistribution.objectiveTotal.toFixed(1)}mk</span>
               <span className="text-slate-300 dark:text-slate-600">|</span>
-              <span>Theory: {markDistribution.theoryTotal.toFixed(1)}mk</span>
+              <span>
+                Theory: {markDistribution.theoryTotal.toFixed(1)}mk
+                {hasTheory &&
+                  theoryQuestions.length > 0 &&
+                  ` (${Math.min(
+                    theoryQuestionsToAnswer ?? theoryQuestions.length,
+                    theoryQuestions.length,
+                  )}/${theoryQuestions.length} × ${theoryMarksPerQuestion})`}
+              </span>
               <span className="text-slate-300 dark:text-slate-600">|</span>
-              <span className={cn(
-                "font-semibold",
-                totalMarks === MARK_CONSTANTS.EXAM_TOTAL ? "text-emerald-600 dark:text-emerald-400" : 
-                isOver ? "text-red-600 dark:text-red-400" : "text-amber-600 dark:text-amber-400"
-              )}>
+              <span
+                className={cn(
+                  "font-semibold",
+                  totalMarks === MARK_CONSTANTS.EXAM_TOTAL
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : isOver
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-amber-600 dark:text-amber-400",
+                )}
+              >
                 Total: {totalMarks}mk
                 {isOver && " ⛔ OVER"}
               </span>
@@ -501,9 +665,9 @@ export function CreateExamDialog({
                   disabled={isOver}
                   className={cn(
                     "h-7 sm:h-8 px-3 sm:px-4 text-xs",
-                    isOver 
-                      ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed" 
-                      : "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    isOver
+                      ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed"
+                      : "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500",
                   )}
                 >
                   Next
@@ -526,12 +690,19 @@ export function CreateExamDialog({
                   </Button>
                   <Button
                     onClick={() => handleSubmit(true)}
-                    disabled={loading || isOver || totalMarks !== MARK_CONSTANTS.EXAM_TOTAL}
+                    disabled={
+                      loading ||
+                      isOver ||
+                      totalMarks !== MARK_CONSTANTS.EXAM_TOTAL ||
+                      validationErrors.length > 0
+                    }
                     className={cn(
                       "h-7 sm:h-8 px-2 sm:px-3 text-xs",
-                      !isOver && totalMarks === MARK_CONSTANTS.EXAM_TOTAL
+                      !isOver &&
+                        totalMarks === MARK_CONSTANTS.EXAM_TOTAL &&
+                        validationErrors.length === 0
                         ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                        : "bg-gray-400 dark:bg-gray-700 cursor-not-allowed"
+                        : "bg-gray-400 dark:bg-gray-700 cursor-not-allowed",
                     )}
                   >
                     {loading ? (

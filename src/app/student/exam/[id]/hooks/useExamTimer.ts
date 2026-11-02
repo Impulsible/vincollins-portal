@@ -13,6 +13,7 @@ interface ExamTimerOptions {
   onTimeUp: () => void
   onTimeWarning?: (timeLeft: number) => void
   autoSubmit?: boolean
+  /** Absolute epoch ms when the attempt timer started. REQUIRED to start ticking. */
   startTime?: number
   examId?: string
   attemptId?: string
@@ -24,6 +25,14 @@ interface TimeComponents {
   minutes: number
   seconds: number
 }
+
+const TERMINAL_STATUSES = new Set([
+  "pending_theory",
+  "graded",
+  "completed",
+  "terminated",
+  "submitted",
+])
 
 export function useExamTimer({
   examStarted,
@@ -37,249 +46,231 @@ export function useExamTimer({
   attemptId,
   onTimeSync,
 }: ExamTimerOptions) {
-  const [timeLeft, setTimeLeft] = useState(durationMinutes * 60)
+  const totalSeconds = Math.max(0, Math.floor(durationMinutes * 60))
+
+  // Initialize from startTime if available; otherwise 0 until startTime arrives.
+  const [timeLeft, setTimeLeft] = useState<number>(() => {
+    if (startTime != null && Number.isFinite(startTime)) {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      return Math.max(0, totalSeconds - elapsed)
+    }
+    return 0
+  })
   const [isTimeUp, setIsTimeUp] = useState(false)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   const onTimeUpRef = useRef(onTimeUp)
   const onTimeWarningRef = useRef(onTimeWarning)
-  const startTimeRef = useRef<number | null>(null)
+  const onTimeSyncRef = useRef(onTimeSync)
+
+  const startTimeRef = useRef<number | null>(
+    startTime != null && Number.isFinite(startTime) ? startTime : null
+  )
+  const extensionSecondsRef = useRef(0)
+  const durationSecondsRef = useRef(totalSeconds)
+
   const hasAutoSubmittedRef = useRef(false)
   const warningTriggeredRef = useRef(false)
+  const stoppedRef = useRef(false)
 
-  // Update refs when callbacks change
+  useEffect(() => { onTimeUpRef.current = onTimeUp }, [onTimeUp])
+  useEffect(() => { onTimeWarningRef.current = onTimeWarning }, [onTimeWarning])
+  useEffect(() => { onTimeSyncRef.current = onTimeSync }, [onTimeSync])
   useEffect(() => {
-    onTimeUpRef.current = onTimeUp
-  }, [onTimeUp])
-
-  useEffect(() => {
-    onTimeWarningRef.current = onTimeWarning
-  }, [onTimeWarning])
-
-  // Calculate time left based on start time or duration
-  const calculateTimeLeft = useCallback(() => {
-    if (startTimeRef.current) {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000)
-      const totalSeconds = durationMinutes * 60
-      const remaining = Math.max(0, totalSeconds - elapsed)
-      return remaining
-    }
-    return durationMinutes * 60
+    durationSecondsRef.current = Math.max(0, Math.floor(durationMinutes * 60))
   }, [durationMinutes])
 
-  // ✅ FIXED: Simplified sync with server - only check submitted_at
-  const syncTimeWithServer = useCallback(async () => {
-    if (!attemptId || !examId || !examStarted || examEndedRef.current) return
+  const calculateTimeLeft = useCallback(() => {
+    const dur = durationSecondsRef.current + extensionSecondsRef.current
+    if (startTimeRef.current == null) return dur
+    const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000)
+    return Math.max(0, dur - elapsed)
+  }, [])
 
+  const stopTimer = useCallback(() => {
+    if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null }
+    if (syncIntervalRef.current) { clearInterval(syncIntervalRef.current); syncIntervalRef.current = null }
+    stoppedRef.current = true
+  }, [])
+
+  const syncTimeWithServer = useCallback(async () => {
+    if (!attemptId || !examStarted || examEndedRef.current || stoppedRef.current) return
     try {
       const { data, error } = await supabase
-        .from('exam_attempts')
-        .select('submitted_at, status')
-        .eq('id', attemptId)
+        .from("exam_attempts")
+        .select("submitted_at, status")
+        .eq("id", attemptId)
         .single()
-
-      if (error) {
-        console.error('Failed to sync time with server:', error)
-        return
-      }
-
-      // ✅ If already submitted, stop timer
-      if (data?.submitted_at || ['pending_theory', 'graded', 'completed', 'terminated'].includes(data?.status)) {
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
+      if (error) return
+      const isFinal =
+        !!data?.submitted_at ||
+        (data?.status != null && TERMINAL_STATUSES.has(String(data.status)))
+      if (isFinal) {
+        stopTimer()
         examEndedRef.current = true
-        onTimeUpRef.current()
-        return
+        setIsTimeUp(true)
+        setTimeLeft(0)
       }
-    } catch (error) {
-      console.error('Time sync error:', error)
+    } catch (e) {
+      console.error("Time sync error:", e)
     }
-  }, [attemptId, examId, examStarted, examEndedRef])
+  }, [attemptId, examStarted, examEndedRef, stopTimer])
 
-  // Initialize timer when exam starts
   useEffect(() => {
-    if (!examStarted || examEndedRef.current) {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
+    if (!examStarted || examEndedRef.current) { stopTimer(); return }
+
+    // 🛑 CRITICAL: Do NOT default to Date.now(). Wait for a real startTime.
+    if (startTime == null || !Number.isFinite(startTime)) {
+      return
+    }
+
+    hasAutoSubmittedRef.current = false
+    warningTriggeredRef.current = false
+    stoppedRef.current = false
+    startTimeRef.current = startTime
+
+    const initial = calculateTimeLeft()
+    setTimeLeft(initial)
+    setIsTimeUp(initial <= 0)
+
+    if (initial <= 0 && !hasAutoSubmittedRef.current) {
+      hasAutoSubmittedRef.current = true
+      setIsTimeUp(true)
+      examEndedRef.current = true
+      if (autoSubmit) {
+        toast.error("⏰ Time's up! Auto-submitting your exam...")
+        setTimeout(() => onTimeUpRef.current(), 500)
+      } else {
+        onTimeUpRef.current()
       }
       return
     }
 
-    // Reset auto-submit flag
-    hasAutoSubmittedRef.current = false
-    warningTriggeredRef.current = false
+    stopTimer()
+    stoppedRef.current = false
 
-    // Initialize start time
-    if (startTime) {
-      startTimeRef.current = startTime
-    } else if (!startTimeRef.current) {
-      startTimeRef.current = Date.now()
-    }
-
-    // Set initial time left
-    const initialTime = calculateTimeLeft()
-    setTimeLeft(initialTime)
-
-    // Clear any existing timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-
-    // Start timer
     timerRef.current = setInterval(() => {
-      // ✅ Check if exam ended
-      if (examEndedRef.current) {
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
-        return
-      }
-
+      if (examEndedRef.current || stoppedRef.current) { stopTimer(); return }
       const remaining = calculateTimeLeft()
       setTimeLeft(remaining)
+      onTimeSyncRef.current?.(remaining)
 
-      // Check for time warning at 5 minutes
       if (remaining <= 300 && remaining > 0 && !warningTriggeredRef.current) {
         warningTriggeredRef.current = true
-        
-        const minutes = Math.floor(remaining / 60)
-        const seconds = remaining % 60
-        const timeString = minutes > 0 
-          ? `${minutes} minute${minutes > 1 ? 's' : ''}${seconds > 0 ? ` and ${seconds} second${seconds > 1 ? 's' : ''}` : ''}`
-          : `${seconds} second${seconds > 1 ? 's' : ''}`
-        
-        toast.warning(`⚠️ Time is running out! ${timeString} remaining`)
-        
-        if (onTimeWarningRef.current) {
-          onTimeWarningRef.current(remaining)
-        }
+        const m = Math.floor(remaining / 60)
+        const s = remaining % 60
+        const str =
+          m > 0
+            ? `${m} minute${m > 1 ? "s" : ""}${s > 0 ? ` and ${s} second${s !== 1 ? "s" : ""}` : ""}`
+            : `${s} second${s !== 1 ? "s" : ""}`
+        toast.warning(`⚠️ Time is running out! ${str} remaining`)
+        onTimeWarningRef.current?.(remaining)
       }
 
-      // Check if time is up
       if (remaining <= 0 && !hasAutoSubmittedRef.current && !examEndedRef.current) {
         hasAutoSubmittedRef.current = true
         setIsTimeUp(true)
-        
-        if (timerRef.current) {
-          clearInterval(timerRef.current)
-          timerRef.current = null
-        }
-        
+        stopTimer()
         if (autoSubmit) {
           toast.error("⏰ Time's up! Auto-submitting your exam...")
-          setTimeout(() => {
-            onTimeUpRef.current()
-          }, 1500)
+          setTimeout(() => onTimeUpRef.current(), 1200)
         } else {
           onTimeUpRef.current()
         }
       }
     }, 1000)
 
-    // ✅ FIXED: Sync with server every 60 seconds (check if submitted)
-    const syncInterval = setInterval(() => {
-      if (!examEndedRef.current) {
-        syncTimeWithServer()
-      }
-    }, 60000)
+    syncIntervalRef.current = setInterval(() => {
+      if (!examEndedRef.current && !stoppedRef.current) void syncTimeWithServer()
+    }, 60_000)
 
-    return () => {
-      if (timerRef.current) {
-        clearInterval(timerRef.current)
-        timerRef.current = null
-      }
-      clearInterval(syncInterval)
-    }
-  }, [examStarted, examEndedRef, durationMinutes, startTime, calculateTimeLeft, autoSubmit, syncTimeWithServer])
+    return () => { stopTimer() }
+  }, [
+    examStarted,
+    durationMinutes,
+    startTime,
+    autoSubmit,
+    calculateTimeLeft,
+    syncTimeWithServer,
+    stopTimer,
+    examEndedRef,
+  ])
 
-  // Format time for display
   const formatTime = useCallback((seconds: number): string => {
-    if (seconds < 0) seconds = 0
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
-    }
-    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    const s = Math.max(0, Math.floor(seconds))
+    const h = Math.floor(s / 3600)
+    const m = Math.floor((s % 3600) / 60)
+    const sec = s % 60
+    if (h > 0) return `${h}:${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
+    return `${m.toString().padStart(2, "0")}:${sec.toString().padStart(2, "0")}`
   }, [])
 
-  // Get time components
   const getTimeComponents = useCallback((seconds: number): TimeComponents => {
-    if (seconds < 0) seconds = 0
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return { hours, minutes, seconds: secs }
+    const s = Math.max(0, Math.floor(seconds))
+    return { hours: Math.floor(s / 3600), minutes: Math.floor((s % 3600) / 60), seconds: s % 60 }
   }, [])
 
-  // Check if time is running low (less than 5 minutes)
   const isTimeRunningLow = timeLeft > 0 && timeLeft <= 300
 
-  // Get progress percentage (0-100)
   const getProgress = useCallback(() => {
-    const totalSeconds = durationMinutes * 60
-    if (totalSeconds === 0) return 0
-    return Math.max(0, Math.min(100, (timeLeft / totalSeconds) * 100))
-  }, [timeLeft, durationMinutes])
+    const total = durationSecondsRef.current + extensionSecondsRef.current
+    if (total <= 0) return 0
+    return Math.max(0, Math.min(100, (timeLeft / total) * 100))
+  }, [timeLeft])
 
-  // Get time status color
   const getTimeColor = useCallback(() => {
-    if (timeLeft <= 0) return 'text-red-500'
-    if (timeLeft <= 300) return 'text-amber-500'
-    if (timeLeft <= 600) return 'text-yellow-500'
-    return 'text-emerald-500'
+    if (timeLeft <= 0) return "text-red-500"
+    if (timeLeft <= 300) return "text-amber-500"
+    if (timeLeft <= 600) return "text-yellow-500"
+    return "text-emerald-500"
   }, [timeLeft])
 
-  // Get time status label
   const getTimeStatus = useCallback(() => {
-    if (timeLeft <= 0) return 'Time Expired'
-    if (timeLeft <= 300) return 'Critical'
-    if (timeLeft <= 600) return 'Running Low'
-    return 'Good'
+    if (timeLeft <= 0) return "Time Expired"
+    if (timeLeft <= 300) return "Critical"
+    if (timeLeft <= 600) return "Running Low"
+    return "Good"
   }, [timeLeft])
 
-  // Cleanup function
-  const cleanup = useCallback(() => {
-    if (timerRef.current) {
-      clearInterval(timerRef.current)
-      timerRef.current = null
-    }
-  }, [])
+  const cleanup = useCallback(() => { stopTimer() }, [stopTimer])
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return cleanup
-  }, [cleanup])
+  const resetTimer = useCallback(
+    (newDurationMinutes?: number, newStartTime?: number) => {
+      if (newDurationMinutes != null && Number.isFinite(newDurationMinutes)) {
+        durationSecondsRef.current = Math.max(0, Math.floor(newDurationMinutes * 60))
+      }
+      extensionSecondsRef.current = 0
+      startTimeRef.current =
+        newStartTime != null && Number.isFinite(newStartTime) ? newStartTime : Date.now()
+      hasAutoSubmittedRef.current = false
+      warningTriggeredRef.current = false
+      stoppedRef.current = false
+      const next = calculateTimeLeft()
+      setTimeLeft(next)
+      setIsTimeUp(next <= 0)
+    },
+    [calculateTimeLeft]
+  )
 
-  // Reset timer
-  const resetTimer = useCallback((newDuration?: number, newStartTime?: number) => {
-    if (newDuration) {
-      // Update duration if needed
-    }
-    if (newStartTime) {
-      startTimeRef.current = newStartTime
-    } else {
-      startTimeRef.current = Date.now()
-    }
-    const initialTime = calculateTimeLeft()
-    setTimeLeft(initialTime)
-    setIsTimeUp(false)
-    hasAutoSubmittedRef.current = false
-    warningTriggeredRef.current = false
-  }, [calculateTimeLeft])
-
-  // ✅ FIXED: Extend time - only updates local state, no DB columns
-  const extendTime = useCallback((additionalMinutes: number) => {
-    const additionalSeconds = additionalMinutes * 60
-    setTimeLeft(prev => prev + additionalSeconds)
-    toast.success(`⏰ Time extended by ${additionalMinutes} minute${additionalMinutes > 1 ? 's' : ''}`)
-  }, [])
+  const extendTime = useCallback(
+    (additionalMinutes: number) => {
+      if (!Number.isFinite(additionalMinutes) || additionalMinutes === 0) return
+      extensionSecondsRef.current += Math.floor(additionalMinutes * 60)
+      const next = calculateTimeLeft()
+      setTimeLeft(next)
+      if (next > 0) {
+        setIsTimeUp(false)
+        if (next > 300) warningTriggeredRef.current = false
+        hasAutoSubmittedRef.current = false
+      }
+      toast.success(
+        `⏰ Time extended by ${additionalMinutes} minute${additionalMinutes !== 1 ? "s" : ""}`
+      )
+    },
+    [calculateTimeLeft]
+  )
 
   return {
     timeLeft,
@@ -295,7 +286,7 @@ export function useExamTimer({
     extendTime,
     cleanup,
     syncTimeWithServer,
-    totalSeconds: durationMinutes * 60,
+    totalSeconds: durationSecondsRef.current + extensionSecondsRef.current,
     isTimeExpired: timeLeft <= 0,
   }
 }

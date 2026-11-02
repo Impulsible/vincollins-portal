@@ -1,9 +1,13 @@
-// src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx - WITH DARK MODE
+// src/components/staff/exams/create/steps/ObjectiveQuestionsStep.tsx
+// REDESIGNED: Production-grade objective step aligned with 60-mark scoring
 
 "use client";
 
-import { useState, useCallback, useMemo, useEffect } from "react";
-import { Plus, CheckCheck, Sparkles, BookOpen, Calculator } from "lucide-react";
+import { useState, useCallback, useMemo } from "react";
+import {
+  Plus, CheckCheck, Sparkles, BookOpen, Calculator,
+  Target, TrendingUp, AlertCircle, Zap,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +17,6 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { BulkImporter } from "../components/BulkImporter";
@@ -21,6 +24,13 @@ import { ObjectiveCard } from "../components/QuestionCard";
 import { parseDocument } from "../hooks/useQuestionParser";
 import { OBJECTIVE_TEMPLATE } from "../constants";
 import type { Question, ParseResult } from "../types";
+
+/* ─── constants ─── */
+
+const EXAM_TOTAL = 60;
+const MARK_OPTIONS = [0.5, 1, 1.5, 2, 2.5, 5] as const;
+
+/* ─── types ─── */
 
 interface MarkDistribution {
   objectiveTotal: number;
@@ -53,10 +63,11 @@ interface ObjectiveQuestionsStepProps {
   onDefaultMarkChange?: (mark: number) => void;
 }
 
+/* ─── component ─── */
+
 export function ObjectiveQuestionsStep({
   questions,
   onQuestionsChange,
-  objectiveMax,
   defaultMark,
   bulkText,
   onBulkTextChange,
@@ -71,35 +82,41 @@ export function ObjectiveQuestionsStep({
   const [mode, setMode] = useState<"bulk" | "manual">("bulk");
   const [parseError, setParseError] = useState<string | null>(null);
   const [isParsingFile, setIsParsingFile] = useState(false);
+
   const [manualQ, setManualQ] = useState({
     question: "",
     options: ["", "", "", ""],
     correct_answer: "",
-    marks: defaultMark,
   });
+
+  /* ── derived state ── */
 
   const objectiveTotal = useMemo(
     () => questions.reduce((s, q) => s + q.marks, 0),
     [questions]
   );
 
-  const isBalanced = useMemo(
-    () => markDistribution?.isBalanced ?? (objectiveTotal + 0 === 60),
-    [objectiveTotal, markDistribution]
+  const theoryTotal = markDistribution?.theoryTotal ?? 0;
+  const grandTotal = objectiveTotal + theoryTotal;
+  const remaining = Math.max(0, EXAM_TOTAL - grandTotal);
+  const isOver = grandTotal > EXAM_TOTAL;
+  const isBalanced = grandTotal === EXAM_TOTAL;
+
+  // How many MORE questions could be added at current defaultMark before hitting 60?
+  const roomForMoreQuestions = useMemo(() => {
+    if (defaultMark <= 0) return 0;
+    return Math.floor(remaining / defaultMark);
+  }, [remaining, defaultMark]);
+
+  /* ── handlers ── */
+
+  const handleMarkUpdate = useCallback(
+    (newMark: number) => {
+      if (onDefaultMarkChange) onDefaultMarkChange(newMark);
+      onQuestionsChange(questions.map((q) => ({ ...q, marks: newMark })));
+    },
+    [onDefaultMarkChange, onQuestionsChange, questions]
   );
-
-  const marksPerQuestion = useMemo(() => {
-    if (questions.length > 0) return objectiveTotal / questions.length;
-    return defaultMark;
-  }, [objectiveTotal, questions.length, defaultMark]);
-
-  useEffect(() => {
-    if (questions.length > 0 && onDefaultMarkChange) {
-      // handled by parent
-    }
-  }, [defaultMark, questions.length, onDefaultMarkChange]);
-
-  const totalMarks = questions.reduce((s, q) => s + q.marks, 0);
 
   const handleParse = useCallback(() => {
     if (!bulkText.trim()) {
@@ -109,7 +126,7 @@ export function ObjectiveQuestionsStep({
     setParseError(null);
     const result = onParse(bulkText);
 
-    const itemsWithMarks = result.items.map(q => ({
+    const itemsWithMarks = result.items.map((q) => ({
       ...q,
       marks: defaultMark,
     }));
@@ -118,16 +135,32 @@ export function ObjectiveQuestionsStep({
       result.warnings.forEach((w) => toast.warning(w, { duration: 5000 }));
     }
     if (itemsWithMarks.length === 0) {
-      setParseError("No valid questions found. Check the format matches the template.");
+      setParseError(
+        "No valid questions found. Check the format matches the template."
+      );
       return;
+    }
+
+    // Pre-check: would this overflow the exam?
+    const projected = objectiveTotal + itemsWithMarks.length * defaultMark;
+    if (projected + theoryTotal > EXAM_TOTAL) {
+      toast.warning(
+        `Importing ${itemsWithMarks.length} will push total to ${projected + theoryTotal} (max ${EXAM_TOTAL}). Imported anyway — review marks.`,
+        { duration: 6000 }
+      );
     }
 
     onQuestionsChange([...questions, ...itemsWithMarks]);
     onBulkTextChange("");
     toast.success(
-      `✅ Added ${itemsWithMarks.length} questions${result.skipped > 0 ? ` (${result.skipped} skipped)` : ""}`
+      `✅ Added ${itemsWithMarks.length} question${itemsWithMarks.length === 1 ? "" : "s"}${
+        result.skipped > 0 ? ` (${result.skipped} skipped)` : ""
+      }`
     );
-  }, [bulkText, onParse, questions, onQuestionsChange, onBulkTextChange, defaultMark]);
+  }, [
+    bulkText, onParse, questions, onQuestionsChange, onBulkTextChange,
+    defaultMark, objectiveTotal, theoryTotal,
+  ]);
 
   const handleFileParse = useCallback(
     async (file: File) => {
@@ -135,7 +168,7 @@ export function ObjectiveQuestionsStep({
       try {
         const text = await parseDocument(file);
         const result = onParse(text);
-        const itemsWithMarks = result.items.map(q => ({
+        const itemsWithMarks = result.items.map((q) => ({
           ...q,
           marks: defaultMark,
         }));
@@ -144,7 +177,11 @@ export function ObjectiveQuestionsStep({
           if (result.warnings.length > 0) {
             result.warnings.forEach((w) => toast.warning(w));
           }
-          toast.success(`✅ ${itemsWithMarks.length} questions imported from file`);
+          toast.success(
+            `✅ ${itemsWithMarks.length} question${
+              itemsWithMarks.length === 1 ? "" : "s"
+            } imported from file`
+          );
         } else {
           toast.warning("No questions found in file. Check the format.");
         }
@@ -159,7 +196,7 @@ export function ObjectiveQuestionsStep({
     [onParse, questions, onQuestionsChange, defaultMark]
   );
 
-  const handleAddManual = () => {
+  const handleAddManual = useCallback(() => {
     if (!manualQ.question.trim()) {
       toast.error("Question text is required");
       return;
@@ -168,7 +205,8 @@ export function ObjectiveQuestionsStep({
       toast.error("Select a correct answer");
       return;
     }
-    if (manualQ.options.filter((o) => o.trim()).length < 2) {
+    const filledOptions = manualQ.options.filter((o) => o.trim());
+    if (filledOptions.length < 2) {
       toast.error("Add at least 2 options");
       return;
     }
@@ -178,7 +216,7 @@ export function ObjectiveQuestionsStep({
       {
         id: crypto.randomUUID(),
         type: "mcq",
-        question: manualQ.question,
+        question: manualQ.question.trim(),
         options: manualQ.options,
         correct_answer: manualQ.correct_answer,
         marks: defaultMark,
@@ -188,12 +226,11 @@ export function ObjectiveQuestionsStep({
       question: "",
       options: ["", "", "", ""],
       correct_answer: "",
-      marks: defaultMark,
     });
     toast.success("Question added");
-  };
+  }, [manualQ, questions, onQuestionsChange, defaultMark]);
 
-  const downloadTemplate = () => {
+  const downloadTemplate = useCallback(() => {
     const blob = new Blob([OBJECTIVE_TEMPLATE], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -201,71 +238,208 @@ export function ObjectiveQuestionsStep({
     a.download = "objective_template.txt";
     a.click();
     URL.revokeObjectURL(url);
-  };
+  }, []);
 
-  const handleMarkUpdate = (newMark: number) => {
-    if (onDefaultMarkChange) onDefaultMarkChange(newMark);
-    onQuestionsChange(questions.map(q => ({ ...q, marks: newMark })));
-  };
+  /* ── render ── */
 
   return (
     <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-950 transition-colors duration-300">
-      <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-3 sm:space-y-4">
+      <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-4">
 
-        {/* Warning */}
-        {markDistribution && !markDistribution.isBalanced && (
-          <Alert className="bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50">
-            <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <AlertDescription className="text-amber-700 dark:text-amber-300 text-xs">
-              Total marks ({markDistribution.objectiveTotal + markDistribution.theoryTotal}) is not 60. 
-              Objective: {markDistribution.objectiveTotal} marks, Theory: {markDistribution.theoryTotal} marks.
-              {markDistribution.objectiveTotal + markDistribution.theoryTotal > 60 
-                ? " Reduce objective questions or marks." 
-                : " Add more objective questions or increase marks."}
+        {/* ════════════════════════════════════════════
+            SCORING DASHBOARD
+            ════════════════════════════════════════════ */}
+        <div
+          className={cn(
+            "rounded-xl border p-4 space-y-3",
+            isBalanced
+              ? "bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-950/30 dark:to-green-950/30 border-emerald-200 dark:border-emerald-800/50"
+              : isOver
+              ? "bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/30 dark:to-rose-950/30 border-red-200 dark:border-red-800/50"
+              : "bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 border-blue-200 dark:border-blue-800/50"
+          )}
+        >
+          {/* title + grand total */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Calculator
+                className={cn(
+                  "h-4 w-4",
+                  isBalanced
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : isOver
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-blue-600 dark:text-blue-400"
+                )}
+              />
+              <span
+                className={cn(
+                  "text-xs font-bold uppercase tracking-wider",
+                  isBalanced
+                    ? "text-emerald-700 dark:text-emerald-300"
+                    : isOver
+                    ? "text-red-700 dark:text-red-300"
+                    : "text-blue-700 dark:text-blue-300"
+                )}
+              >
+                {isBalanced
+                  ? "✅ Balanced"
+                  : isOver
+                  ? "⛔ Over Limit"
+                  : "Objective Section"}
+              </span>
+            </div>
+            <Badge
+              className={cn(
+                "text-xs font-bold border-0",
+                isBalanced
+                  ? "bg-emerald-200 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200"
+                  : isOver
+                  ? "bg-red-200 dark:bg-red-900/60 text-red-800 dark:text-red-200"
+                  : "bg-blue-200 dark:bg-blue-900/60 text-blue-800 dark:text-blue-200"
+              )}
+            >
+              {grandTotal} / {EXAM_TOTAL}
+            </Badge>
+          </div>
+
+          {/* visual bar */}
+          <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
+            <div
+              className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
+              style={{
+                width: `${Math.min((objectiveTotal / EXAM_TOTAL) * 100, 100)}%`,
+              }}
+              title={`Objective: ${objectiveTotal}`}
+            />
+            <div
+              className={cn(
+                "h-full transition-all duration-500",
+                isBalanced
+                  ? "bg-emerald-500 dark:bg-emerald-400"
+                  : isOver
+                  ? "bg-red-500 dark:bg-red-400"
+                  : "bg-purple-400 dark:bg-purple-500"
+              )}
+              style={{
+                width: `${Math.min((theoryTotal / EXAM_TOTAL) * 100, 100)}%`,
+              }}
+              title={`Theory: ${theoryTotal}`}
+            />
+          </div>
+
+          {/* stat grid */}
+          <div className="grid grid-cols-4 gap-2">
+            <StatBlock
+              value={questions.length}
+              label="Questions"
+              color="blue"
+            />
+            <StatBlock
+              value={objectiveTotal.toFixed(1)}
+              label="Objective"
+              color="blue"
+              suffix="mk"
+            />
+            <StatBlock
+              value={theoryTotal.toFixed(1)}
+              label="Theory"
+              color="purple"
+              suffix="mk"
+              dimmed={theoryTotal === 0}
+            />
+            <StatBlock
+              value={remaining.toFixed(1)}
+              label="Remaining"
+              color={isBalanced ? "emerald" : isOver ? "red" : "amber"}
+              suffix="mk"
+            />
+          </div>
+        </div>
+
+        {/* ════════════════════════════════════════════
+            MARK PER QUESTION SELECTOR
+            ════════════════════════════════════════════ */}
+        <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <div className="flex items-center gap-2 flex-1">
+              <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center">
+                <Target className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-700 dark:text-slate-300 block">
+                  Mark per question
+                </Label>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                  Applied to all current and new questions
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {MARK_OPTIONS.map((mk) => (
+                  <button
+                    key={mk}
+                    onClick={() => handleMarkUpdate(mk)}
+                    className={cn(
+                      "min-w-[36px] h-8 px-2 rounded-md text-xs font-bold transition-all",
+                      defaultMark === mk
+                        ? "bg-blue-600 dark:bg-blue-500 text-white shadow-sm scale-105"
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    )}
+                  >
+                    {mk}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {questions.length > 0 && (
+            <div className="mt-2.5 pt-2.5 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2 text-[11px]">
+              <span className="text-slate-500 dark:text-slate-400">
+                {questions.length} × {defaultMark} ={" "}
+                <span className="font-bold text-blue-600 dark:text-blue-400">
+                  {objectiveTotal} marks
+                </span>
+              </span>
+              {!isOver && !isBalanced && roomForMoreQuestions > 0 && (
+                <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                  <Zap className="h-3 w-3" />
+                  Room for {roomForMoreQuestions} more
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ════════════════════════════════════════════
+            WARNINGS
+            ════════════════════════════════════════════ */}
+        {isOver && (
+          <Alert className="bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50">
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <AlertDescription className="text-red-700 dark:text-red-300 text-xs">
+              Total ({grandTotal}) exceeds {EXAM_TOTAL} by{" "}
+              {grandTotal - EXAM_TOTAL}. Reduce questions, lower marks, or
+              adjust theory section.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Stats */}
-        <div className="grid grid-cols-4 gap-2">
-          <StatCard value={questions.length} label="Questions" color="blue" />
-          <StatCard value={totalMarks.toFixed(1)} label="Total Marks" color="emerald" />
-          <StatCard value={objectiveMax} label="Max" color="purple" />
-          <StatCard value={marksPerQuestion.toFixed(2)} label="Per Question" color="amber" />
-        </div>
-
-        {/* Default Mark Selector */}
-        <div className="flex items-center gap-3 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-900/50">
-          <Calculator className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-          <span className="text-xs text-blue-700 dark:text-blue-300 font-medium">Mark per question:</span>
-          <Select 
-            value={defaultMark.toString()} 
-            onValueChange={(v) => handleMarkUpdate(parseFloat(v))}
-          >
-            <SelectTrigger className="h-7 text-xs w-24 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-              <SelectItem value="0.5">0.5</SelectItem>
-              <SelectItem value="1">1</SelectItem>
-              <SelectItem value="2">2</SelectItem>
-            </SelectContent>
-          </Select>
-          <Badge className="bg-blue-200 dark:bg-blue-900/60 text-blue-700 dark:text-blue-300 text-[10px] ml-auto">
-            {questions.length} questions × {defaultMark} = {totalMarks.toFixed(1)} marks
-          </Badge>
-        </div>
-
-        {/* Passage toggle */}
-        <div className="flex items-center gap-2">
+        {/* ════════════════════════════════════════════
+            PASSAGE
+            ════════════════════════════════════════════ */}
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={hasPassage ? "default" : "outline"}
             size="sm"
             onClick={() => onHasPassageChange(!hasPassage)}
             className={cn(
-              "text-xs",
-              hasPassage 
-                ? "bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white" 
+              "text-xs h-8",
+              hasPassage
+                ? "bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white"
                 : "border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
             )}
           >
@@ -273,13 +447,12 @@ export function ObjectiveQuestionsStep({
             {hasPassage ? "📖 Passage Enabled" : "Add Comprehension Passage"}
           </Button>
           {hasPassage && (
-            <span className="text-[10px] text-amber-600 dark:text-amber-400 hidden sm:inline">
-              Passage will appear above questions during exam
+            <span className="text-[10px] text-amber-600 dark:text-amber-400">
+              Shown above questions during exam
             </span>
           )}
         </div>
 
-        {/* Passage area */}
         {hasPassage && (
           <div className="space-y-1.5 p-3 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900/50">
             <Label className="text-[10px] font-semibold text-amber-700 dark:text-amber-300 uppercase flex items-center gap-1">
@@ -290,16 +463,19 @@ export function ObjectiveQuestionsStep({
               value={passageText}
               onChange={(e) => onPassageTextChange(e.target.value)}
               rows={8}
-              className="mt-1 resize-none text-sm sm:text-base leading-relaxed bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-900/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-              placeholder={`Paste the reading passage here...`}
+              className="mt-1 resize-y text-sm leading-relaxed bg-white dark:bg-slate-900 border-amber-200 dark:border-amber-900/50 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 min-h-[160px]"
+              placeholder="Paste the reading passage here..."
             />
             <p className="text-[10px] text-amber-600 dark:text-amber-400">
-              Students will see this passage during the exam.
+              {passageText.length} characters •{" "}
+              {passageText.split(/\s+/).filter(Boolean).length} words
             </p>
           </div>
         )}
 
-        {/* Mode switcher */}
+        {/* ════════════════════════════════════════════
+            MODE SWITCHER
+            ════════════════════════════════════════════ */}
         <ModeSwitcher
           modes={[
             { id: "bulk", label: "Bulk Import", icon: Sparkles },
@@ -309,148 +485,254 @@ export function ObjectiveQuestionsStep({
           onChange={(v) => setMode(v as "bulk" | "manual")}
         />
 
-        {/* Bulk Import */}
+        {/* ════════════════════════════════════════════
+            BULK IMPORT
+            ════════════════════════════════════════════ */}
         {mode === "bulk" && (
-          <BulkImporter
-            value={bulkText}
-            onChange={onBulkTextChange}
-            onFileParse={handleFileParse}
-            onParse={handleParse}
-            isParsingFile={isParsingFile}
-            parseError={parseError}
-            placeholder={`1. Question?\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: ${defaultMark}`}
-            accentColor="emerald"
-            onInsertExample={() => onBulkTextChange(OBJECTIVE_TEMPLATE)}
-            onDownloadTemplate={downloadTemplate}
-            parseButtonLabel="Parse & Add"
-            parseButtonIcon={<CheckCheck className="mr-1.5 h-3.5 w-3.5" />}
-            textareaClassName="text-sm sm:text-base leading-relaxed font-mono"
-            textareaRows={14}
-          />
+          <div className="space-y-2">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                Each parsed question will be set to{" "}
+                <span className="font-bold text-blue-600 dark:text-blue-400">
+                  {defaultMark} mark{defaultMark === 1 ? "" : "s"}
+                </span>
+              </span>
+              {!isOver && !isBalanced && roomForMoreQuestions > 0 && (
+                <Badge className="text-[10px] bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-0">
+                  Can add up to {roomForMoreQuestions}
+                </Badge>
+              )}
+            </div>
+            <BulkImporter
+              value={bulkText}
+              onChange={onBulkTextChange}
+              onFileParse={handleFileParse}
+              onParse={handleParse}
+              isParsingFile={isParsingFile}
+              parseError={parseError}
+              placeholder={`1. Question?\nA. Option A\nB. Option B\nC. Option C\nD. Option D\nAnswer: B\nMarks: ${defaultMark}`}
+              accentColor="emerald"
+              onInsertExample={() => onBulkTextChange(OBJECTIVE_TEMPLATE)}
+              onDownloadTemplate={downloadTemplate}
+              parseButtonLabel="Parse & Add"
+              parseButtonIcon={<CheckCheck className="mr-1.5 h-3.5 w-3.5" />}
+              textareaClassName="text-sm sm:text-base leading-relaxed font-mono"
+              textareaRows={14}
+            />
+          </div>
         )}
 
-        {/* Manual */}
+        {/* ════════════════════════════════════════════
+            MANUAL ADD
+            ════════════════════════════════════════════ */}
         {mode === "manual" && (
-          <div className="space-y-3 p-3 bg-gray-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800">
+          <div className="space-y-3 p-4 bg-gray-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
+                <Plus className="h-3.5 w-3.5" />
+                Add Question
+              </Label>
+              <Badge className="text-[10px] bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-0">
+                {defaultMark} mark{defaultMark === 1 ? "" : "s"}
+              </Badge>
+            </div>
+
+            {/* question */}
             <div>
               <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
-                Question
+                Question Text
               </Label>
               <Textarea
                 value={manualQ.question}
-                onChange={(e) => setManualQ((p) => ({ ...p, question: e.target.value }))}
+                onChange={(e) =>
+                  setManualQ((p) => ({ ...p, question: e.target.value }))
+                }
                 rows={3}
-                className="mt-1 resize-none text-sm sm:text-base leading-relaxed bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                placeholder="Enter question text..."
+                className="mt-1 resize-y text-sm leading-relaxed bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500 min-h-[80px]"
+                placeholder="Enter the question..."
               />
             </div>
 
+            {/* options */}
             <div className="space-y-1.5">
               <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
-                Options
+                Options <span className="text-slate-400 normal-case">(click letter to mark as correct)</span>
               </Label>
-              {manualQ.options.map((opt, idx) => (
-                <div key={idx} className="flex items-center gap-1.5">
-                  <div className="w-6 h-6 rounded bg-gray-200 dark:bg-slate-700 flex items-center justify-center text-[10px] font-bold text-gray-600 dark:text-slate-300 flex-shrink-0">
-                    {String.fromCharCode(65 + idx)}
+              {manualQ.options.map((opt, idx) => {
+                const letter = String.fromCharCode(65 + idx);
+                const isCorrect = opt && manualQ.correct_answer === opt;
+                return (
+                  <div key={idx} className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (opt.trim()) {
+                          setManualQ((p) => ({ ...p, correct_answer: opt }));
+                        }
+                      }}
+                      disabled={!opt.trim()}
+                      className={cn(
+                        "w-7 h-9 rounded flex items-center justify-center text-xs font-bold flex-shrink-0 transition-all",
+                        isCorrect
+                          ? "bg-emerald-500 dark:bg-emerald-600 text-white shadow-sm ring-2 ring-emerald-200 dark:ring-emerald-900"
+                          : opt.trim()
+                          ? "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-emerald-100 dark:hover:bg-emerald-950/50"
+                          : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-600 cursor-not-allowed"
+                      )}
+                      title={isCorrect ? "Correct answer" : "Click to mark correct"}
+                    >
+                      {letter}
+                    </button>
+                    <Input
+                      value={opt}
+                      onChange={(e) => {
+                        const opts = [...manualQ.options];
+                        const oldVal = opts[idx];
+                        opts[idx] = e.target.value;
+                        setManualQ((p) => ({
+                          ...p,
+                          options: opts,
+                          // keep correct_answer synced with new text
+                          correct_answer:
+                            p.correct_answer === oldVal
+                              ? e.target.value
+                              : p.correct_answer,
+                        }));
+                      }}
+                      className={cn(
+                        "h-9 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500",
+                        isCorrect && "border-emerald-300 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20"
+                      )}
+                      placeholder={`Option ${letter}`}
+                    />
                   </div>
-                  <Input
-                    value={opt}
-                    onChange={(e) => {
-                      const opts = [...manualQ.options];
-                      opts[idx] = e.target.value;
-                      setManualQ((p) => ({ ...p, options: opts }));
-                    }}
-                    className="h-9 text-sm sm:text-base bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    placeholder={`Option ${String.fromCharCode(65 + idx)}`}
-                  />
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
-                  Correct Answer
-                </Label>
-                <Select
-                  value={manualQ.correct_answer}
-                  onValueChange={(v) => setManualQ((p) => ({ ...p, correct_answer: v }))}
-                >
-                  <SelectTrigger className="mt-1 h-9 text-sm sm:text-base bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
-                    <SelectValue placeholder="Select answer" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                    {manualQ.options.map(
-                      (o, i) =>
-                        o.trim() && (
-                          <SelectItem key={i} value={o} className="text-sm sm:text-base">
-                            {String.fromCharCode(65 + i)}. {o}
-                          </SelectItem>
-                        )
-                    )}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
-                  Marks (Auto)
-                </Label>
-                <Input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  value={defaultMark}
-                  disabled
-                  className="mt-1 h-9 text-sm sm:text-base bg-gray-100 dark:bg-slate-800 text-gray-600 dark:text-slate-400 border-slate-200 dark:border-slate-700"
-                />
-                <p className="text-[9px] text-gray-400 dark:text-slate-500 mt-0.5">
-                  Using default mark: {defaultMark}
-                </p>
-              </div>
+            {/* fallback dropdown for accessibility */}
+            <div>
+              <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
+                Correct Answer
+              </Label>
+              <Select
+                value={manualQ.correct_answer}
+                onValueChange={(v) =>
+                  setManualQ((p) => ({ ...p, correct_answer: v }))
+                }
+              >
+                <SelectTrigger className="mt-1 h-9 text-sm bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200">
+                  <SelectValue placeholder="Select correct answer" />
+                </SelectTrigger>
+                <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+                  {manualQ.options.map(
+                    (o, i) =>
+                      o.trim() && (
+                        <SelectItem key={i} value={o} className="text-sm">
+                          {String.fromCharCode(65 + i)}. {o}
+                        </SelectItem>
+                      )
+                  )}
+                  {manualQ.options.every((o) => !o.trim()) && (
+                    <div className="px-2 py-1.5 text-xs text-slate-400">
+                      Fill in options first
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <Button
               onClick={handleAddManual}
-              className="w-full h-9 text-sm bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white"
+              disabled={isOver}
+              className={cn(
+                "w-full h-10 text-sm font-semibold text-white",
+                isOver
+                  ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed"
+                  : "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              )}
             >
-              <Plus className="mr-1 h-3.5 w-3.5" />
-              Add Question
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add Question ({defaultMark} mark{defaultMark === 1 ? "" : "s"})
             </Button>
           </div>
         )}
 
-        {/* Question list */}
+        {/* ════════════════════════════════════════════
+            QUESTION LIST
+            ════════════════════════════════════════════ */}
         {questions.length > 0 && (
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
+              <Label className="text-[10px] font-bold text-gray-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                <TrendingUp className="h-3 w-3" />
                 Questions ({questions.length})
               </Label>
               <div className="flex items-center gap-2">
                 <Badge className="bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 text-[10px] border-0">
-                  {totalMarks.toFixed(1)} marks total
+                  {objectiveTotal.toFixed(1)} marks
                 </Badge>
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => onQuestionsChange([])}
+                  onClick={() => {
+                    if (confirm(`Delete all ${questions.length} questions?`)) {
+                      onQuestionsChange([]);
+                      toast.success("Cleared");
+                    }
+                  }}
                   className="text-red-500 dark:text-red-400 text-[10px] h-6 hover:bg-red-50 dark:hover:bg-red-950/30"
                 >
                   Clear All
                 </Button>
               </div>
             </div>
-            <div className="max-h-[200px] sm:max-h-[280px] lg:max-h-[400px] overflow-y-auto space-y-1.5 pr-1">
+            <div className="max-h-[280px] sm:max-h-[380px] overflow-y-auto space-y-1.5 pr-1">
               {questions.map((q, i) => (
                 <ObjectiveCard
                   key={q.id}
                   question={q}
                   index={i}
-                  onDelete={(id) => onQuestionsChange(questions.filter((x) => x.id !== id))}
+                  onDelete={(id) =>
+                    onQuestionsChange(questions.filter((x) => x.id !== id))
+                  }
                 />
               ))}
             </div>
+
+            {/* running total footer */}
+            <div className="flex items-center justify-between px-2 py-1.5 bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800">
+              <span className="text-[10px] text-slate-500 dark:text-slate-400">
+                Obj {objectiveTotal} + Theory {theoryTotal} ={" "}
+                <span
+                  className={cn(
+                    "font-bold",
+                    isBalanced
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : isOver
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  )}
+                >
+                  {grandTotal} / {EXAM_TOTAL}
+                </span>
+              </span>
+              {isBalanced && (
+                <Badge className="text-[9px] bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border-0">
+                  ✓ Balanced
+                </Badge>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* empty state */}
+        {questions.length === 0 && (
+          <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+            <CheckCheck className="h-8 w-8 mx-auto mb-2 opacity-30" />
+            <p className="text-xs">
+              No objective questions yet. Use bulk import or add one manually above.
+            </p>
           </div>
         )}
       </div>
@@ -458,32 +740,53 @@ export function ObjectiveQuestionsStep({
   );
 }
 
-function StatCard({
+/* ─── sub-components ─── */
+
+function StatBlock({
   value,
   label,
   color,
+  suffix,
+  dimmed,
 }: {
   value: string | number;
   label: string;
-  color: "blue" | "emerald" | "purple" | "amber";
+  color: "blue" | "emerald" | "purple" | "amber" | "red";
+  suffix?: string;
+  dimmed?: boolean;
 }) {
-  const styles = {
-    blue: "bg-blue-50 dark:bg-blue-950/30 border-blue-100 dark:border-blue-900/50 text-blue-700 dark:text-blue-300",
-    emerald: "bg-emerald-50 dark:bg-emerald-950/30 border-emerald-100 dark:border-emerald-900/50 text-emerald-700 dark:text-emerald-300",
-    purple: "bg-purple-50 dark:bg-purple-950/30 border-purple-100 dark:border-purple-900/50 text-purple-700 dark:text-purple-300",
-    amber: "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50 text-amber-700 dark:text-amber-300",
+  const bgText = {
+    blue: "text-blue-700 dark:text-blue-300",
+    emerald: "text-emerald-700 dark:text-emerald-300",
+    purple: "text-purple-700 dark:text-purple-300",
+    amber: "text-amber-700 dark:text-amber-300",
+    red: "text-red-700 dark:text-red-300",
   }[color];
-  const textSmall = {
-    blue: "text-blue-600 dark:text-blue-400",
-    emerald: "text-emerald-600 dark:text-emerald-400",
-    purple: "text-purple-600 dark:text-purple-400",
-    amber: "text-amber-600 dark:text-amber-400",
+
+  const labelText = {
+    blue: "text-blue-500 dark:text-blue-400",
+    emerald: "text-emerald-500 dark:text-emerald-400",
+    purple: "text-purple-500 dark:text-purple-400",
+    amber: "text-amber-500 dark:text-amber-400",
+    red: "text-red-500 dark:text-red-400",
   }[color];
 
   return (
-    <div className={cn("p-2 rounded-lg border text-center", styles)}>
-      <p className="text-lg font-bold">{value}</p>
-      <p className={cn("text-[10px]", textSmall)}>{label}</p>
+    <div
+      className={cn(
+        "bg-white dark:bg-slate-900 rounded-lg p-2 text-center border border-slate-100 dark:border-slate-800",
+        dimmed && "opacity-50"
+      )}
+    >
+      <p className={cn("text-base sm:text-lg font-bold leading-tight", bgText)}>
+        {value}
+        {suffix && (
+          <span className="text-[9px] font-medium ml-0.5 opacity-70">
+            {suffix}
+          </span>
+        )}
+      </p>
+      <p className={cn("text-[9px] font-medium", labelText)}>{label}</p>
     </div>
   );
 }
@@ -493,7 +796,11 @@ function ModeSwitcher({
   active,
   onChange,
 }: {
-  modes: { id: string; label: string; icon: React.ComponentType<{ className?: string }> }[];
+  modes: {
+    id: string;
+    label: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }[];
   active: string;
   onChange: (id: string) => void;
 }) {

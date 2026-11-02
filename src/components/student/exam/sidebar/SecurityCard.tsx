@@ -1,6 +1,6 @@
-// src/components/student/exam/sidebar/SecurityCard.tsx
-import { Card, CardContent } from '@/components/ui/card'
-import { Shield } from 'lucide-react'
+'use client'
+
+import { Shield, Globe, Monitor, Wifi, WifiOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TAB_SWITCH_LIMIT, FULLSCREEN_EXIT_LIMIT } from '@/app/student/exam/[id]/constants'
 
@@ -15,44 +15,96 @@ export function SecurityCard({
   fullscreenExits,
   isOnline,
 }: SecurityCardProps) {
+  const items = [
+    {
+      label: 'Tab Switches',
+      value: tabSwitches,
+      limit: TAB_SWITCH_LIMIT,
+      icon: Globe,
+    },
+    {
+      label: 'Fullscreen Exits',
+      value: fullscreenExits,
+      limit: FULLSCREEN_EXIT_LIMIT,
+      icon: Monitor,
+    },
+  ]
+
   return (
-    <Card className="border border-gray-700 shadow-lg bg-[#1a1f2e]">
-      <CardContent className="p-4">
-        <h4 className="font-medium text-white text-xs mb-2 flex items-center gap-1">
-          <Shield className="h-3 w-3 text-[#c41e3a]" />
-          Security Status
-        </h4>
-        <div className="space-y-1.5 text-xs">
-          <div className="flex justify-between">
-            <span className="text-gray-400">Tab Switches:</span>
-            <span
-              className={cn(
-                tabSwitches > 0 ? 'text-yellow-400' : 'text-green-400'
-              )}
-            >
-              {tabSwitches}/{TAB_SWITCH_LIMIT}
-            </span>
+    <div className="rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-sm overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-sm">
+            <Shield className="h-3 w-3 text-white" />
           </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Fullscreen Exits:</span>
-            <span
-              className={cn(
-                fullscreenExits > 0 ? 'text-yellow-400' : 'text-green-400'
+          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.14em]">
+            Security Status
+          </span>
+        </div>
+
+        <div className="space-y-2">
+          {items.map((item) => {
+            const warn = item.value >= item.limit - 1
+            const active = item.value > 0
+            return (
+              <div
+                key={item.label}
+                className={cn(
+                  'flex items-center justify-between px-3 py-2 rounded-xl ring-1',
+                  warn
+                    ? 'bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200'
+                    : active
+                      ? 'bg-gradient-to-r from-amber-50 to-orange-50/50 ring-amber-200'
+                      : 'bg-slate-50 ring-slate-100'
+                )}
+              >
+                <div className="flex items-center gap-2">
+                  <item.icon className={cn(
+                    'h-3.5 w-3.5',
+                    warn ? 'text-rose-500' : active ? 'text-amber-500' : 'text-slate-400'
+                  )} />
+                  <span className="text-xs text-slate-600 font-medium">{item.label}</span>
+                </div>
+                <span className={cn(
+                  'text-xs font-bold tabular-nums',
+                  warn ? 'text-rose-600' : active ? 'text-amber-600' : 'text-emerald-600'
+                )}>
+                  {item.value}/{item.limit}
+                </span>
+              </div>
+            )
+          })}
+
+          {/* Network */}
+          <div className={cn(
+            'flex items-center justify-between px-3 py-2 rounded-xl ring-1',
+            isOnline
+              ? 'bg-gradient-to-r from-emerald-50 to-teal-50/50 ring-emerald-200'
+              : 'bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200'
+          )}>
+            <div className="flex items-center gap-2">
+              {isOnline ? (
+                <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+              ) : (
+                <WifiOff className="h-3.5 w-3.5 text-rose-500" />
               )}
-            >
-              {fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}
-            </span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-gray-400">Network:</span>
-            <span
-              className={cn(isOnline ? 'text-green-400' : 'text-red-400')}
-            >
-              {isOnline ? 'Connected' : 'Offline'}
-            </span>
+              <span className="text-xs text-slate-600 font-medium">Network</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className={cn(
+                'h-1.5 w-1.5 rounded-full',
+                isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
+              )} />
+              <span className={cn(
+                'text-xs font-bold',
+                isOnline ? 'text-emerald-600' : 'text-rose-600'
+              )}>
+                {isOnline ? 'Connected' : 'Offline'}
+              </span>
+            </div>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

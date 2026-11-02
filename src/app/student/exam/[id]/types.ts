@@ -1,65 +1,55 @@
-// app/student/exam/[id]/types.ts
+// src/app/student/exam/[id]/types.ts
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // EXAM RESULT
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface ExamResult {
-  // Core scores
   score: number
   total: number
   percentage: number
-  
-  // Breakdown
+
   objective_score: number
   objective_total: number
   theory_score: number
   theory_total: number
-  
-  // Statistics
+
   correct: number
   incorrect: number
   unanswered: number
-  
-  // CA scores
+
   ca_score: number
   ca1_score: number
   ca2_score: number
-  
-  // Status
+
   is_passed: boolean
   passing_percentage: number
   status: 'in_progress' | 'completed' | 'pending_theory' | 'graded' | 'terminated'
   grade: 'A' | 'B' | 'C' | 'D' | 'F' | 'P' | null
   remark?: string
-  
-  // Attempt info
+
   attempts_used: number
   max_attempts: number
-  
-  // Timestamps
+
   submitted_at: string | null
   graded_at?: string | null
   graded_by?: string | null
-  
-  // Time tracking
+
   time_spent?: number
   duration?: number
   started_at?: string | null
   ended_at?: string | null
-  
-  // Auto-submit info
+
   is_auto_submitted?: boolean
   auto_submit_reason?: string | null
-  
-  // Backward compatibility aliases
+
   total_score?: number
   total_marks?: number
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // EXAM STATE
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface ExamState {
   currentIndex: number
@@ -79,9 +69,9 @@ export interface ExamState {
   error?: string | null
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // QUESTION
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface Question {
   id: string
@@ -100,10 +90,6 @@ export interface Question {
   student_answer?: string
 }
 
-// ============================================
-// THEORY SUB-QUESTION
-// ============================================
-
 export interface TheorySubQuestion {
   id?: string
   text: string
@@ -112,10 +98,6 @@ export interface TheorySubQuestion {
   image_url?: string | null
   image_caption?: string | null
 }
-
-// ============================================
-// THEORY QUESTION DATA - ✅ FIXED
-// ============================================
 
 export interface TheoryQuestionData {
   id: string
@@ -127,10 +109,6 @@ export interface TheoryQuestionData {
   image_caption?: string | null
 }
 
-// ============================================
-// THEORY QUESTION - ✅ ADDED FOR RENDERER
-// ============================================
-
 export interface TheoryQuestion {
   id: string
   question: string
@@ -141,9 +119,9 @@ export interface TheoryQuestion {
   image_caption?: string | null
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // EXAM
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface Exam {
   id: string
@@ -161,6 +139,7 @@ export interface Exam {
   objective_max?: number
   theory_max?: number
   max_attempts?: number
+  required_theory_count?: number
   status: 'draft' | 'published' | 'ongoing' | 'completed' | 'archived'
   description?: string
   instructions?: string
@@ -173,11 +152,15 @@ export interface Exam {
   scoring_rule?: 'standard' | 'custom'
   is_locked?: boolean
   version?: number
+  shuffle_questions?: boolean
+  randomize_questions?: boolean
+  questions?: any[]
+  theory_questions?: any[]
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // EXAM ATTEMPT
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface ExamAttempt {
   id: string
@@ -213,9 +196,9 @@ export interface ExamAttempt {
   question_version?: number
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // STUDENT PROFILE
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface StudentProfile {
   id: string
@@ -234,23 +217,25 @@ export interface StudentProfile {
   display_name?: string
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // RESUME DATA
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface ResumeData {
   attemptId: string
   answers: Record<string, string>
-  timeLeft: number
+  started_at: string
+  duration: number
   tabSwitches: number
   fullscreenExits: number
   unloadCount: number
   attemptNumber?: number
+  timeLeft?: number
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // SECURITY STATE
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export interface SecurityState {
   tabSwitches: number
@@ -263,25 +248,21 @@ export interface SecurityState {
   isSystemSleeping: boolean
 }
 
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 // UTILITY TYPES
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
 
 export type QuestionStatus = 'answered' | 'flagged' | 'current' | 'not-answered'
 export type ExamStatus = 'in_progress' | 'completed' | 'pending_theory' | 'graded' | 'terminated'
 export type QuestionType = 'objective' | 'theory'
 
-// ============================================
-// TYPE GUARDS
-// ============================================
-
 export function isTheoryQuestionData(data: any): data is TheoryQuestionData {
   return data && typeof data === 'object' && 'id' in data && 'question' in data
 }
 
-// ============================================
-// HELPERS - Create default states
-// ============================================
+// ═════════════════════════════════════════════════════════════════════════
+// DEFAULT STATE FACTORIES
+// ═════════════════════════════════════════════════════════════════════════
 
 export function createDefaultExamState(): ExamState {
   return {

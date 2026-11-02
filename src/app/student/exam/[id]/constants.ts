@@ -1,10 +1,11 @@
 // src/app/student/exam/constants.ts
 
 // ============================================
-// ✅ ACADEMIC TERM
+// ✅ ACADEMIC TERM & SESSION
 // ============================================
-export const CURRENT_TERM = "third" as const
-export const CURRENT_SESSION = "2025/2026" as const
+// Removed hardcoded values. 
+// These are now fetched dynamically from your database (exams table/settings).
+// Import them from your DB fetcher instead of here.
 
 export type Term = 'first' | 'second' | 'third'
 export const TERMS: Term[] = ['first', 'second', 'third']
@@ -18,6 +19,9 @@ export const TERM_NAMES: Record<Term, string> = {
 // ============================================
 // ✅ SECURITY LIMITS
 // ============================================
+// If you want these to be set per-exam by the teacher, 
+// you will need to pass them via the exam object.
+// For now, these are kept as safe fallbacks if the exam doesn't specify.
 export const TAB_SWITCH_LIMIT = 3
 export const FULLSCREEN_EXIT_LIMIT = 3
 
@@ -89,6 +93,7 @@ export type WAECGrade = typeof WAEC_GRADES[keyof typeof WAEC_GRADES]
 // ============================================
 // ✅ GRADE THRESHOLDS
 // ============================================
+// Kept as system logic since grading policies are generally static
 export const GRADE_THRESHOLDS = {
   A: 80,
   B: 70,
@@ -155,6 +160,8 @@ export const WAEC_GRADE_COLORS = {
 // ============================================
 // ✅ DEFAULT VALUES
 // ============================================
+// These act as fallbacks only if the teacher did not provide 
+// a custom setting when creating the exam.
 export const DEFAULT_PASSING_PERCENTAGE = 50
 export const DEFAULT_MAX_ATTEMPTS = 1
 export const DEFAULT_EXAM_DURATION = 30 // minutes

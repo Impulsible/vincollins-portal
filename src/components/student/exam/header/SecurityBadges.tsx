@@ -1,5 +1,6 @@
-// src/components/student/exam/header/SecurityBadges.tsx
-import { Badge } from '@/components/ui/badge'
+'use client'
+
+import { Globe, Monitor } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TAB_SWITCH_LIMIT, FULLSCREEN_EXIT_LIMIT } from '@/app/student/exam/[id]/constants'
 
@@ -8,27 +9,47 @@ interface SecurityBadgesProps {
   fullscreenExits: number
 }
 
-export function SecurityBadges({ tabSwitches, fullscreenExits }: SecurityBadgesProps) {
-  const getTabColor = (count: number) => {
-    if (count === 0) return 'bg-green-500/20 text-green-400'
-    if (count === 1) return 'bg-yellow-500/20 text-yellow-400'
-    return 'bg-red-500/20 text-red-400'
+function getColor(count: number, limit: number) {
+  if (count === 0) return {
+    bg: 'bg-emerald-50',
+    ring: 'ring-emerald-200',
+    text: 'text-emerald-700',
+    icon: 'text-emerald-500',
   }
+  if (count >= limit - 1) return {
+    bg: 'bg-rose-50',
+    ring: 'ring-rose-200',
+    text: 'text-rose-700',
+    icon: 'text-rose-500',
+  }
+  return {
+    bg: 'bg-amber-50',
+    ring: 'ring-amber-200',
+    text: 'text-amber-700',
+    icon: 'text-amber-500',
+  }
+}
 
-  const getFullscreenColor = (count: number) => {
-    if (count === 0) return 'bg-green-500/20 text-green-400'
-    if (count === 1) return 'bg-yellow-500/20 text-yellow-400'
-    return 'bg-red-500/20 text-red-400'
-  }
+export function SecurityBadges({ tabSwitches, fullscreenExits }: SecurityBadgesProps) {
+  const tabColor = getColor(tabSwitches, TAB_SWITCH_LIMIT)
+  const fsColor = getColor(fullscreenExits, FULLSCREEN_EXIT_LIMIT)
 
   return (
     <>
-      <Badge className={cn("px-2 py-0.5 text-xs", getTabColor(tabSwitches))}>
-        Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}
-      </Badge>
-      <Badge className={cn("px-2 py-0.5 text-xs", getFullscreenColor(fullscreenExits))}>
-        FS: {fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}
-      </Badge>
+      <div className={cn(
+        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ring-1 text-xs font-semibold',
+        tabColor.bg, tabColor.ring, tabColor.text
+      )}>
+        <Globe className={cn('h-3 w-3', tabColor.icon)} />
+        <span>Tab: {tabSwitches}/{TAB_SWITCH_LIMIT}</span>
+      </div>
+      <div className={cn(
+        'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ring-1 text-xs font-semibold',
+        fsColor.bg, fsColor.ring, fsColor.text
+      )}>
+        <Monitor className={cn('h-3 w-3', fsColor.icon)} />
+        <span>FS: {fullscreenExits}/{FULLSCREEN_EXIT_LIMIT}</span>
+      </div>
     </>
   )
 }
