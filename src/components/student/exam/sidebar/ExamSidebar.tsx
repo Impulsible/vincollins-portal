@@ -1,28 +1,43 @@
-'use client'
+"use client";
 
-import { Shield, Wifi, WifiOff, User, CheckCircle2, Flag, HelpCircle, Globe, Monitor, RefreshCw } from 'lucide-react'
-import { cn } from '@/lib/utils'
-import Image from 'next/image'
-import type { StudentProfile } from '@/app/student/exam/[id]/types'
-import { motion } from 'framer-motion'
+import {
+  Shield,
+  Wifi,
+  WifiOff,
+  User,
+  CheckCircle2,
+  Flag,
+  HelpCircle,
+  Globe,
+  Monitor,
+  RefreshCw,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
+import type { StudentProfile } from "@/app/student/exam/[id]/types";
+import { motion } from "framer-motion";
 
 interface ExamSidebarProps {
-  profile: StudentProfile | null
-  exam: any
-  answeredCount: number
-  flaggedCount: number
-  unansweredCount: number
-  progressPercentage: number
-  tabSwitches: number
-  fullscreenExits: number
-  isOnline: boolean
+  profile: StudentProfile | null;
+  exam: any;
+  answeredCount: number;
+  flaggedCount: number;
+  unansweredCount: number;
+  progressPercentage: number;
+  tabSwitches: number;
+  fullscreenExits: number;
+  isOnline: boolean;
 }
 
 const fadeUp = (delay: number) => ({
   initial: { opacity: 0, y: 8 },
   animate: { opacity: 1, y: 0 },
-  transition: { delay, duration: 0.35, ease: [0.16, 1, 0.3, 1] as [number, number, number, number] },
-})
+  transition: {
+    delay,
+    duration: 0.35,
+    ease: [0.16, 1, 0.3, 1] as [number, number, number, number],
+  },
+});
 
 export function ExamSidebar({
   profile,
@@ -36,7 +51,7 @@ export function ExamSidebar({
 }: ExamSidebarProps) {
   const securityItems = [
     {
-      label: 'Tabs',
+      label: "Tabs",
       value: tabSwitches,
       limit: 3,
       icon: Globe,
@@ -44,14 +59,14 @@ export function ExamSidebar({
       active: tabSwitches > 0,
     },
     {
-      label: 'Fullscreen',
+      label: "Fullscreen",
       value: fullscreenExits,
       limit: 3,
       icon: Monitor,
       warn: fullscreenExits >= 2,
       active: fullscreenExits > 0,
     },
-  ]
+  ];
 
   return (
     <div className="space-y-3">
@@ -78,7 +93,7 @@ export function ExamSidebar({
             <motion.div
               initial={{ width: 0 }}
               animate={{ width: `${progressPercentage}%` }}
-              transition={{ duration: 0.8, ease: 'easeOut' }}
+              transition={{ duration: 0.8, ease: "easeOut" }}
               className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 rounded-full"
             />
           </div>
@@ -153,10 +168,10 @@ export function ExamSidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-slate-900 text-sm truncate leading-tight">
-              {profile?.full_name || 'Student'}
+              {profile?.full_name || "Student"}
             </p>
             <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-              {profile?.vin_id || profile?.class || '—'}
+              {profile?.vin_id || profile?.class || "—"}
             </p>
           </div>
         </div>
@@ -182,55 +197,77 @@ export function ExamSidebar({
               <div
                 key={item.label}
                 className={cn(
-                  'flex items-center justify-between px-3 py-2 rounded-xl ring-1 transition-colors',
+                  "flex items-center justify-between px-3 py-2 rounded-xl ring-1 transition-colors",
                   item.warn
-                    ? 'bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200'
+                    ? "bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200"
                     : item.active
-                      ? 'bg-gradient-to-r from-amber-50 to-orange-50/50 ring-amber-200'
-                      : 'bg-slate-50 ring-slate-100'
+                      ? "bg-gradient-to-r from-amber-50 to-orange-50/50 ring-amber-200"
+                      : "bg-slate-50 ring-slate-100",
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <item.icon className={cn(
-                    'h-3.5 w-3.5',
-                    item.warn ? 'text-rose-500' : item.active ? 'text-amber-500' : 'text-slate-400'
-                  )} />
-                  <span className="text-xs text-slate-600 font-medium">{item.label}</span>
+                  <item.icon
+                    className={cn(
+                      "h-3.5 w-3.5",
+                      item.warn
+                        ? "text-rose-500"
+                        : item.active
+                          ? "text-amber-500"
+                          : "text-slate-400",
+                    )}
+                  />
+                  <span className="text-xs text-slate-600 font-medium">
+                    {item.label}
+                  </span>
                 </div>
-                <span className={cn(
-                  'text-xs font-bold tabular-nums',
-                  item.warn ? 'text-rose-600' : item.active ? 'text-amber-600' : 'text-emerald-600'
-                )}>
+                <span
+                  className={cn(
+                    "text-xs font-bold tabular-nums",
+                    item.warn
+                      ? "text-rose-600"
+                      : item.active
+                        ? "text-amber-600"
+                        : "text-emerald-600",
+                  )}
+                >
                   {item.value}/{item.limit}
                 </span>
               </div>
             ))}
 
             {/* Network */}
-            <div className={cn(
-              'flex items-center justify-between px-3 py-2 rounded-xl ring-1',
-              isOnline
-                ? 'bg-gradient-to-r from-emerald-50 to-teal-50/50 ring-emerald-200'
-                : 'bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200'
-            )}>
+            <div
+              className={cn(
+                "flex items-center justify-between px-3 py-2 rounded-xl ring-1",
+                isOnline
+                  ? "bg-gradient-to-r from-emerald-50 to-teal-50/50 ring-emerald-200"
+                  : "bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200",
+              )}
+            >
               <div className="flex items-center gap-2">
                 {isOnline ? (
                   <Wifi className="h-3.5 w-3.5 text-emerald-500" />
                 ) : (
                   <WifiOff className="h-3.5 w-3.5 text-rose-500" />
                 )}
-                <span className="text-xs text-slate-600 font-medium">Network</span>
+                <span className="text-xs text-slate-600 font-medium">
+                  Network
+                </span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className={cn(
-                  'h-1.5 w-1.5 rounded-full',
-                  isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'
-                )} />
-                <span className={cn(
-                  'text-xs font-bold',
-                  isOnline ? 'text-emerald-600' : 'text-rose-600'
-                )}>
-                  {isOnline ? 'Online' : 'Offline'}
+                <div
+                  className={cn(
+                    "h-1.5 w-1.5 rounded-full",
+                    isOnline ? "bg-emerald-500 animate-pulse" : "bg-rose-500",
+                  )}
+                />
+                <span
+                  className={cn(
+                    "text-xs font-bold",
+                    isOnline ? "text-emerald-600" : "text-rose-600",
+                  )}
+                >
+                  {isOnline ? "Online" : "Offline"}
                 </span>
               </div>
             </div>
@@ -238,5 +275,5 @@ export function ExamSidebar({
         </div>
       </motion.div>
     </div>
-  )
+  );
 }
