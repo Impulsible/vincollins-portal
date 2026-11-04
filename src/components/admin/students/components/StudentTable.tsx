@@ -1,4 +1,4 @@
-// components/admin/students/components/StudentTable.tsx
+// components/admin/students/components/StudentTable.tsx - WITH DARK MODE
 'use client'
 
 import { Card } from '@/components/ui/card'
@@ -23,7 +23,7 @@ interface StudentTableProps {
   onEdit: (student: Student) => void
   onResetPassword: (student: Student) => void
   onDelete: (student: Student) => void
-  onToggleStatus: (student: Student) => void // 👈 New toggle event listener
+  onToggleStatus: (student: Student) => void
 }
 
 export function StudentTable({
@@ -35,21 +35,21 @@ export function StudentTable({
   onEdit,
   onResetPassword,
   onDelete,
-  onToggleStatus, // 👈 Destructure
+  onToggleStatus,
 }: StudentTableProps) {
   return (
-    <Card className="border shadow-sm rounded-xl overflow-hidden">
+    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden bg-white dark:bg-slate-900 transition-colors duration-300">
       <div className="overflow-x-auto">
         <Table>
-          <TableHeader className="bg-slate-50">
-            <TableRow className="border-b border-slate-200">
-              <TableHead className="font-semibold text-slate-700 py-4 px-4">Student</TableHead>
-              <TableHead className="font-semibold text-slate-700 py-4 px-4">VIN ID</TableHead>
-              <TableHead className="font-semibold text-slate-700 py-4 px-4">Admission No.</TableHead>
-              <TableHead className="font-semibold text-slate-700 py-4 px-4">Class</TableHead>
-              <TableHead className="font-semibold text-slate-700 py-4 px-4 hidden lg:table-cell">Dept</TableHead>
-              <TableHead className="font-semibold text-slate-700 py-4 px-4">Status</TableHead>
-              <TableHead className="font-semibold text-slate-700 py-4 px-4 text-center w-[80px]">Actions</TableHead>
+          <TableHeader className="bg-slate-50 dark:bg-slate-800/60">
+            <TableRow className="border-b border-slate-200 dark:border-slate-800 hover:bg-transparent">
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4">Student</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4">VIN ID</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4">Admission No.</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4">Class</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4 hidden lg:table-cell">Dept</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4">Status</TableHead>
+              <TableHead className="font-semibold text-slate-700 dark:text-slate-300 py-4 px-4 text-center w-[80px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -71,7 +71,7 @@ export function StudentTable({
                   onEdit={onEdit}
                   onResetPassword={onResetPassword}
                   onDelete={onDelete}
-                  onToggleStatus={onToggleStatus} // 👈 Forward here
+                  onToggleStatus={onToggleStatus}
                 />
               ))
             )}

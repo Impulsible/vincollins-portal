@@ -1,4 +1,4 @@
-// app/admin/promotions/page.tsx
+// app/admin/promotions/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -37,12 +37,7 @@ function resolveAvatar(p: Promotion): string | null {
 
 // ── 3. Helpers ────────────────────────────────────────────────────────────────
 function getInitials(name: string) {
-  return name
-    .split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase()
+  return name.split(' ').map((n) => n[0]).slice(0, 2).join('').toUpperCase()
 }
 
 function avatarColor(name: string) {
@@ -55,13 +50,7 @@ function avatarColor(name: string) {
 }
 
 // ── 4. Smart Avatar Component ─────────────────────────────────────────────────
-function StudentAvatar({
-  promotion,
-  size = 'md',
-}: {
-  promotion: Promotion
-  size?: 'sm' | 'md' | 'lg'
-}) {
+function StudentAvatar({ promotion, size = 'md' }: { promotion: Promotion; size?: 'sm' | 'md' | 'lg' }) {
   const [imgError, setImgError] = useState(false)
   const avatarUrl = resolveAvatar(promotion)
   const hasImage  = !!avatarUrl && !imgError
@@ -74,7 +63,7 @@ function StudentAvatar({
 
   if (hasImage) {
     return (
-      <div className={`${sizeClass} relative rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white shadow-sm`}>
+      <div className={`${sizeClass} relative rounded-full overflow-hidden flex-shrink-0 ring-2 ring-white dark:ring-slate-800 shadow-sm`}>
         <Image
           src={avatarUrl!}
           alt={promotion.student_name}
@@ -92,7 +81,7 @@ function StudentAvatar({
       className={`
         ${sizeClass} ${avatarColor(promotion.student_name)}
         rounded-full flex items-center justify-center
-        text-white font-bold flex-shrink-0 ring-2 ring-white shadow-sm
+        text-white font-bold flex-shrink-0 ring-2 ring-white dark:ring-slate-800 shadow-sm
       `}
     >
       {getInitials(promotion.student_name)}
@@ -101,9 +90,9 @@ function StudentAvatar({
 }
 
 const STATUS_CONFIG = {
-  pending:  { label: 'Pending',  bg: 'bg-amber-100',   text: 'text-amber-700',   border: 'border-amber-200',   dot: 'bg-amber-400',   icon: Clock       },
-  approved: { label: 'Approved', bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-400', icon: CheckCircle2 },
-  rejected: { label: 'Rejected', bg: 'bg-red-100',     text: 'text-red-700',     border: 'border-red-200',     dot: 'bg-red-400',     icon: XCircle     },
+  pending:  { label: 'Pending',  bg: 'bg-amber-100 dark:bg-amber-950/40',   text: 'text-amber-700 dark:text-amber-400',   border: 'border-amber-200 dark:border-amber-900/50',   dot: 'bg-amber-400',   icon: Clock       },
+  approved: { label: 'Approved', bg: 'bg-emerald-100 dark:bg-emerald-950/40', text: 'text-emerald-700 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-900/50', dot: 'bg-emerald-400', icon: CheckCircle2 },
+  rejected: { label: 'Rejected', bg: 'bg-red-100 dark:bg-red-950/40',     text: 'text-red-700 dark:text-red-400',     border: 'border-red-200 dark:border-red-900/50',     dot: 'bg-red-400',     icon: XCircle     },
 } as const
 
 function groupByClass(list: Promotion[]) {
@@ -141,16 +130,16 @@ function StatCard({ label, value, icon: Icon, colorClass, onClick, active }: {
       className={`
         relative flex items-center gap-4 p-5 rounded-2xl border transition-all duration-200 text-left w-full
         ${active
-          ? `${colorClass} shadow-md scale-[1.02] ring-2 ring-offset-1`
-          : 'bg-white border-gray-200 hover:shadow-md hover:scale-[1.01]'}
+          ? `${colorClass} shadow-md scale-[1.02] ring-2 ring-offset-1 dark:ring-offset-slate-950`
+          : 'bg-white dark:bg-slate-900 border-gray-200 dark:border-slate-800 hover:shadow-md dark:hover:shadow-slate-950/40 hover:scale-[1.01]'}
       `}
     >
-      <div className={`p-3 rounded-xl ${active ? 'bg-white/30' : 'bg-gray-100'}`}>
-        <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-gray-600'}`} />
+      <div className={`p-3 rounded-xl ${active ? 'bg-white/30' : 'bg-gray-100 dark:bg-slate-800'}`}>
+        <Icon className={`h-5 w-5 ${active ? 'text-white' : 'text-gray-600 dark:text-slate-400'}`} />
       </div>
       <div>
-        <p className={`text-2xl font-bold ${active ? 'text-white' : 'text-gray-900'}`}>{value}</p>
-        <p className={`text-xs font-medium ${active ? 'text-white/80' : 'text-gray-500'}`}>{label}</p>
+        <p className={`text-2xl font-bold ${active ? 'text-white' : 'text-gray-900 dark:text-white'}`}>{value}</p>
+        <p className={`text-xs font-medium ${active ? 'text-white/80' : 'text-gray-500 dark:text-slate-400'}`}>{label}</p>
       </div>
       {active && <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-white/60 animate-pulse" />}
     </button>
@@ -169,8 +158,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function ClassBadge({ label, color = 'blue' }: { label: string; color?: string }) {
   const map: Record<string, string> = {
-    blue:   'bg-blue-100 text-blue-700 border-blue-200',
-    green:  'bg-emerald-100 text-emerald-700 border-emerald-200',
+    blue:   'bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-900/50',
+    green:  'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50',
   }
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${map[color] ?? map.blue}`}>
@@ -184,7 +173,7 @@ function DepartmentSelect({ value, onChange }: { value: string; onChange: (v: st
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="text-xs border border-gray-300 rounded-lg px-2.5 py-1.5 bg-white focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none transition-all min-w-[120px]"
+      className="text-xs border border-gray-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none transition-all min-w-[120px]"
     >
       <option value="">Select dept…</option>
       <option value="Science">🔬 Science</option>
@@ -211,28 +200,28 @@ function GridView({ students, processing, selectedDepartment, onDeptChange, onAp
         return (
           <div
             key={p.id}
-            className={`relative flex flex-col rounded-xl border p-4 transition-all duration-200 hover:shadow-md
-              ${p.status === 'approved' ? 'border-emerald-200 bg-emerald-50/30'
-              : p.status === 'rejected' ? 'border-red-200 bg-red-50/30'
-              : 'border-gray-200 bg-white hover:border-violet-200'}`}
+            className={`relative flex flex-col rounded-xl border p-4 transition-all duration-200 hover:shadow-md dark:hover:shadow-slate-950/40
+              ${p.status === 'approved' ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/30 dark:bg-emerald-950/20'
+              : p.status === 'rejected' ? 'border-red-200 dark:border-red-900/50 bg-red-50/30 dark:bg-red-950/20'
+              : 'border-gray-200 dark:border-slate-800 bg-white dark:bg-slate-900 hover:border-violet-200 dark:hover:border-violet-800'}`}
           >
             <div className="flex items-center gap-3 mb-3">
               <StudentAvatar promotion={p} size="md" />
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900 truncate">{p.student_name}</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{p.student_name}</p>
                 <StatusBadge status={p.status} />
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 mb-3 flex-wrap">
               <ClassBadge label={p.current_class} color="blue" />
-              <TrendingUp className="h-3 w-3 text-gray-400 flex-shrink-0" />
+              <TrendingUp className="h-3 w-3 text-gray-400 dark:text-slate-500 flex-shrink-0" />
               <ClassBadge label={p.next_class} color="green" />
             </div>
 
             {needsDept && (
               <div className="mb-3">
-                <label className="text-xs text-gray-500 mb-1 block">Select Department *</label>
+                <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Select Department *</label>
                 <DepartmentSelect
                   value={selectedDepartment[p.student_id] || ''}
                   onChange={(v) => onDeptChange(p.student_id, v)}
@@ -246,7 +235,7 @@ function GridView({ students, processing, selectedDepartment, onDeptChange, onAp
                   <button
                     onClick={() => onApprove(p)}
                     disabled={isProcessing}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white text-xs font-semibold rounded-lg transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
                   >
                     {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                     Approve
@@ -254,7 +243,7 @@ function GridView({ students, processing, selectedDepartment, onDeptChange, onAp
                   <button
                     onClick={() => onReject(p)}
                     disabled={isProcessing}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white text-xs font-semibold rounded-lg transition-colors"
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
                   >
                     {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />}
                     Reject
@@ -262,7 +251,9 @@ function GridView({ students, processing, selectedDepartment, onDeptChange, onAp
                 </div>
               ) : (
                 <div className={`text-center text-xs font-medium py-1.5 rounded-lg ${
-                  p.status === 'approved' ? 'text-emerald-600 bg-emerald-100' : 'text-red-600 bg-red-100'
+                  p.status === 'approved' 
+                    ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-950/40' 
+                    : 'text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-950/40'
                 }`}>
                   {p.status === 'approved' ? '✓ Promotion Approved' : '✗ Promotion Rejected'}
                 </div>
@@ -285,7 +276,7 @@ function ListView({ students, processing, selectedDepartment, onDeptChange, onAp
   onReject:  (p: Promotion) => void
 }) {
   return (
-    <div className="divide-y divide-gray-100">
+    <div className="divide-y divide-gray-100 dark:divide-slate-800">
       {students.map((p, idx) => {
         const isProcessing = processing === p.id
         const needsDept    = p.current_class === 'JSS 3' && p.status === 'pending'
@@ -293,26 +284,26 @@ function ListView({ students, processing, selectedDepartment, onDeptChange, onAp
           <div
             key={p.id}
             className={`flex flex-wrap items-center gap-4 px-5 py-3.5 transition-colors
-              ${p.status === 'approved' ? 'bg-emerald-50/40'
-              : p.status === 'rejected' ? 'bg-red-50/40'
-              : 'hover:bg-gray-50'}`}
+              ${p.status === 'approved' ? 'bg-emerald-50/40 dark:bg-emerald-950/10'
+              : p.status === 'rejected' ? 'bg-red-50/40 dark:bg-red-950/10'
+              : 'hover:bg-gray-50 dark:hover:bg-slate-800/40'}`}
           >
             <div className="flex items-center gap-3 min-w-[200px] flex-1">
-              <span className="text-xs text-gray-400 w-6 text-right font-mono select-none">{idx + 1}</span>
+              <span className="text-xs text-gray-400 dark:text-slate-500 w-6 text-right font-mono select-none">{idx + 1}</span>
               <StudentAvatar promotion={p} size="sm" />
-              <span className="text-sm font-semibold text-gray-900 truncate">{p.student_name}</span>
+              <span className="text-sm font-semibold text-gray-900 dark:text-white truncate">{p.student_name}</span>
             </div>
 
             <div className="flex items-center gap-1.5 text-xs">
               <ClassBadge label={p.current_class} color="blue" />
-              <TrendingUp className="h-3 w-3 text-gray-400" />
+              <TrendingUp className="h-3 w-3 text-gray-400 dark:text-slate-500" />
               <ClassBadge label={p.next_class} color="green" />
             </div>
 
             <div className="w-36">
               {needsDept
                 ? <DepartmentSelect value={selectedDepartment[p.student_id] || ''} onChange={(v) => onDeptChange(p.student_id, v)} />
-                : <span className="text-xs text-gray-400">—</span>}
+                : <span className="text-xs text-gray-400 dark:text-slate-500">—</span>}
             </div>
 
             <div className="w-24"><StatusBadge status={p.status} /></div>
@@ -323,7 +314,7 @@ function ListView({ students, processing, selectedDepartment, onDeptChange, onAp
                   <button
                     onClick={() => onApprove(p)}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white text-xs font-semibold rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
                   >
                     {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <CheckCircle2 className="h-3 w-3" />}
                     Approve
@@ -331,14 +322,14 @@ function ListView({ students, processing, selectedDepartment, onDeptChange, onAp
                   <button
                     onClick={() => onReject(p)}
                     disabled={isProcessing}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white text-xs font-semibold rounded-lg transition-colors"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-xs font-semibold rounded-lg transition-colors"
                   >
                     {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <XCircle className="h-3 w-3" />}
                     Reject
                   </button>
                 </>
               ) : (
-                <span className={`text-xs font-semibold ${p.status === 'approved' ? 'text-emerald-600' : 'text-red-500'}`}>
+                <span className={`text-xs font-semibold ${p.status === 'approved' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400'}`}>
                   {p.status === 'approved' ? '✓ Approved' : '✗ Rejected'}
                 </span>
               )}
@@ -364,18 +355,18 @@ function ClassSection({ className, students, viewMode, processing, selectedDepar
   const rejected = students.filter(s => s.status === 'rejected').length
 
   return (
-    <div className="mb-6 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+    <div className="mb-6 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm overflow-hidden transition-colors duration-300">
       <button
         onClick={() => setCollapsed(c => !c)}
-        className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-gray-50 to-white hover:from-gray-100 transition-colors border-b border-gray-100"
+        className="w-full flex items-center justify-between px-5 py-4 bg-gradient-to-r from-gray-50 to-white dark:from-slate-800/60 dark:to-slate-900 hover:from-gray-100 dark:hover:from-slate-800 transition-colors border-b border-gray-100 dark:border-slate-800"
       >
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-violet-100 rounded-lg">
-            <BookOpen className="h-4 w-4 text-violet-600" />
+          <div className="p-2 bg-violet-100 dark:bg-violet-950/50 rounded-lg">
+            <BookOpen className="h-4 w-4 text-violet-600 dark:text-violet-400" />
           </div>
           <div className="text-left">
-            <h3 className="font-bold text-gray-900">{className}</h3>
-            <p className="text-xs text-gray-500">{students.length} student{students.length !== 1 ? 's' : ''}</p>
+            <h3 className="font-bold text-gray-900 dark:text-white">{className}</h3>
+            <p className="text-xs text-gray-500 dark:text-slate-400">{students.length} student{students.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -384,17 +375,17 @@ function ClassSection({ className, students, viewMode, processing, selectedDepar
               <StudentAvatar key={s.student_id} promotion={s} size="sm" />
             ))}
             {students.length > 4 && (
-              <div className="w-8 h-8 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center text-xs font-semibold text-gray-600">
+              <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-slate-800 border-2 border-white dark:border-slate-900 flex items-center justify-center text-xs font-semibold text-gray-600 dark:text-slate-300">
                 +{students.length - 4}
               </div>
             )}
           </div>
           <div className="hidden sm:flex items-center gap-2">
-            {pending  > 0 && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">{pending} pending</span>}
-            {approved > 0 && <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full">{approved} approved</span>}
-            {rejected > 0 && <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-semibold rounded-full">{rejected} rejected</span>}
+            {pending  > 0 && <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">{pending} pending</span>}
+            {approved > 0 && <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-xs font-semibold rounded-full">{approved} approved</span>}
+            {rejected > 0 && <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-xs font-semibold rounded-full">{rejected} rejected</span>}
           </div>
-          {collapsed ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronUp className="h-4 w-4 text-gray-400" />}
+          {collapsed ? <ChevronDown className="h-4 w-4 text-gray-400 dark:text-slate-500" /> : <ChevronUp className="h-4 w-4 text-gray-400 dark:text-slate-500" />}
         </div>
       </button>
 
@@ -436,7 +427,6 @@ export default function AdminPromotionsPage() {
     }
   }, [])
 
-  // ✅ FIXED: fetchPromotions with deduplication
   const fetchPromotions = useCallback(async () => {
     try {
       setLoading(true)
@@ -446,12 +436,9 @@ export default function AdminPromotionsPage() {
       const data = await res.json()
       
       if (data.promotions) {
-        // ✅ Deduplicate by student_id (keep the first occurrence)
         const seen = new Set()
         const uniquePromotions = data.promotions.filter((p: Promotion) => {
-          if (seen.has(p.student_id)) {
-            return false
-          }
+          if (seen.has(p.student_id)) return false
           seen.add(p.student_id)
           return true
         })
@@ -460,9 +447,7 @@ export default function AdminPromotionsPage() {
         
         const deptSel: Record<string, string> = {}
         uniquePromotions.forEach((p: Promotion) => {
-          if (p.current_class === 'JSS 3' && p.status === 'pending') {
-            deptSel[p.student_id] = 'Science'
-          }
+          if (p.current_class === 'JSS 3' && p.status === 'pending') deptSel[p.student_id] = 'Science'
         })
         setSelectedDepartment(deptSel)
       } else if (!res.ok) {
@@ -505,10 +490,6 @@ export default function AdminPromotionsPage() {
     finally { setBulkLoading(false) }
   }
 
-  // ============================================
-  // UPDATED: END OF TERM PROMOTIONS
-  // Creates promotions, auto-approves, updates term/session
-  // ============================================
   const handleEndOfTermPromotions = async () => {
     if (!confirm(
       '⚠️ END OF TERM PROMOTIONS\n\n' +
@@ -534,10 +515,7 @@ export default function AdminPromotionsPage() {
 
       const data = await response.json()
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to process end of term promotions')
-      }
-
+      if (!response.ok) throw new Error(data.error || 'Failed to process end of term promotions')
       if (!data.success) {
         toast.warning(data.message)
         setError(data.message)
@@ -642,39 +620,39 @@ export default function AdminPromotionsPage() {
 
   if (initialLoad && loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center transition-colors duration-300">
         <div className="text-center">
           <div className="relative mx-auto w-16 h-16 mb-4">
-            <div className="absolute inset-0 rounded-full border-4 border-violet-100" />
-            <div className="absolute inset-0 rounded-full border-4 border-t-violet-600 animate-spin" />
-            <GraduationCap className="absolute inset-0 m-auto h-6 w-6 text-violet-600" />
+            <div className="absolute inset-0 rounded-full border-4 border-violet-100 dark:border-violet-950/50" />
+            <div className="absolute inset-0 rounded-full border-4 border-t-violet-600 dark:border-t-violet-400 animate-spin" />
+            <GraduationCap className="absolute inset-0 m-auto h-6 w-6 text-violet-600 dark:text-violet-400" />
           </div>
-          <p className="text-gray-700 font-semibold">Loading Promotions…</p>
-          <p className="text-gray-400 text-sm mt-1">Please wait</p>
+          <p className="text-gray-700 dark:text-slate-200 font-semibold">Loading Promotions…</p>
+          <p className="text-gray-400 dark:text-slate-500 text-sm mt-1">Please wait</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-lg shadow-violet-200">
+            <div className="p-3 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl shadow-lg shadow-violet-200 dark:shadow-violet-900/40">
               <GraduationCap className="h-7 w-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Promotion Management</h1>
-              <p className="text-sm text-gray-500 mt-0.5">Students sorted A–Z within each class</p>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Promotion Management</h1>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">Students sorted A–Z within each class</p>
             </div>
           </div>
           <button
             onClick={() => { fetchPromotions(); fetchSystemStatus() }}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl text-sm font-medium shadow-sm transition-all disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-800 text-gray-700 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 rounded-xl text-sm font-medium shadow-sm transition-all disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             {loading ? 'Refreshing…' : 'Refresh'}
@@ -684,25 +662,27 @@ export default function AdminPromotionsPage() {
         {/* System Status */}
         {systemStatus && (
           <div className={`mb-6 rounded-2xl border p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
-            systemStatus.canProcessPromotions ? 'bg-emerald-50 border-emerald-200'
-            : systemStatus.settings?.promotionStatus === 'completed' ? 'bg-blue-50 border-blue-200'
-            : 'bg-amber-50 border-amber-200'
+            systemStatus.canProcessPromotions 
+              ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50'
+              : systemStatus.settings?.promotionStatus === 'completed' 
+                ? 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50'
+                : 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50'
           }`}>
             <div className="flex items-center gap-3">
-              <div className={`p-2 rounded-xl ${systemStatus.canProcessPromotions ? 'bg-emerald-100' : 'bg-amber-100'}`}>
-                <Info className={`h-4 w-4 ${systemStatus.canProcessPromotions ? 'text-emerald-600' : 'text-amber-600'}`} />
+              <div className={`p-2 rounded-xl ${systemStatus.canProcessPromotions ? 'bg-emerald-100 dark:bg-emerald-900/50' : 'bg-amber-100 dark:bg-amber-900/50'}`}>
+                <Info className={`h-4 w-4 ${systemStatus.canProcessPromotions ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
               </div>
               <div>
-                <p className="font-semibold text-gray-900 text-sm">{systemStatus.message || 'System Ready'}</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  Term: <strong>{systemStatus.settings?.currentTerm || 'Third'}</strong> &nbsp;·&nbsp;
-                  Session: <strong>{systemStatus.settings?.currentSession || '2025/2026'}</strong> &nbsp;·&nbsp;
-                  Status: <strong>{systemStatus.settings?.promotionStatus === 'completed' ? '✅ Completed' : '⏳ Pending'}</strong>
+                <p className="font-semibold text-gray-900 dark:text-white text-sm">{systemStatus.message || 'System Ready'}</p>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                  Term: <strong className="text-gray-700 dark:text-slate-300">{systemStatus.settings?.currentTerm || 'Third'}</strong> &nbsp;·&nbsp;
+                  Session: <strong className="text-gray-700 dark:text-slate-300">{systemStatus.settings?.currentSession || '2025/2026'}</strong> &nbsp;·&nbsp;
+                  Status: <strong className="text-gray-700 dark:text-slate-300">{systemStatus.settings?.promotionStatus === 'completed' ? '✅ Completed' : '⏳ Pending'}</strong>
                 </p>
               </div>
             </div>
             {systemStatus.canProcessPromotions && (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 text-white text-xs font-semibold rounded-full animate-pulse">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 dark:bg-emerald-600 text-white text-xs font-semibold rounded-full animate-pulse">
                 <Zap className="h-3 w-3" /> Ready for End of Term
               </span>
             )}
@@ -711,17 +691,17 @@ export default function AdminPromotionsPage() {
 
         {/* Alerts */}
         {error && (
-          <div className="mb-4 flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700">
+          <div className="mb-4 flex items-start gap-3 p-4 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-xl text-red-700 dark:text-red-400">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 mt-0.5" />
             <p className="flex-1 text-sm font-medium">{error}</p>
-            <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600 text-lg leading-none">×</button>
+            <button onClick={() => setError(null)} className="text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-300 text-lg leading-none">×</button>
           </div>
         )}
         {success && (
-          <div className="mb-4 flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700">
+          <div className="mb-4 flex items-start gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-xl text-emerald-700 dark:text-emerald-400">
             <CheckCircle2 className="h-5 w-5 flex-shrink-0 mt-0.5" />
             <p className="flex-1 text-sm font-medium">{success}</p>
-            <button onClick={() => setSuccess(null)} className="text-emerald-400 hover:text-emerald-600 text-lg leading-none">×</button>
+            <button onClick={() => setSuccess(null)} className="text-emerald-400 dark:text-emerald-500 hover:text-emerald-600 dark:hover:text-emerald-300 text-lg leading-none">×</button>
           </div>
         )}
 
@@ -734,34 +714,34 @@ export default function AdminPromotionsPage() {
         </div>
 
         {/* Toolbar */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 mb-6">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 shadow-sm p-4 mb-6">
           <div className="flex flex-wrap gap-3 items-center">
-            <button onClick={handleCreatePromotions} disabled={bulkLoading} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+            <button onClick={handleCreatePromotions} disabled={bulkLoading} className="inline-flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
               {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
               Create Promotions
             </button>
-            <button onClick={handleApproveAll} disabled={bulkLoading || pendingCount === 0} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-300 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+            <button onClick={handleApproveAll} disabled={bulkLoading || pendingCount === 0} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
               {bulkLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
               Approve All{pendingCount > 0 ? ` (${pendingCount})` : ''}
             </button>
             <button
               onClick={handleEndOfTermPromotions}
               disabled={processingEndOfTerm || !systemStatus?.canProcessPromotions}
-              className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm"
             >
               {processingEndOfTerm ? <Loader2 className="h-4 w-4 animate-spin" /> : <GraduationCap className="h-4 w-4" />}
               {processingEndOfTerm ? 'Processing…' : 'End of Term Promotions'}
             </button>
-            <button onClick={handleInitSystem} disabled={initializing} className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-800 disabled:bg-gray-300 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
+            <button onClick={handleInitSystem} disabled={initializing} className="inline-flex items-center gap-2 px-4 py-2.5 bg-gray-700 hover:bg-gray-800 dark:bg-slate-700 dark:hover:bg-slate-600 disabled:bg-gray-300 dark:disabled:bg-slate-800 text-white text-sm font-semibold rounded-xl transition-colors shadow-sm">
               {initializing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Settings className="h-4 w-4" />}
               {initializing ? 'Initializing…' : 'Init System'}
             </button>
-            <div className="hidden sm:block w-px h-8 bg-gray-200 mx-1" />
-            <div className="flex rounded-xl border border-gray-200 overflow-hidden">
-              <button onClick={() => setViewMode('list')} className={`p-2.5 transition-colors ${viewMode === 'list' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`} title="List view">
+            <div className="hidden sm:block w-px h-8 bg-gray-200 dark:bg-slate-700 mx-1" />
+            <div className="flex rounded-xl border border-gray-200 dark:border-slate-700 overflow-hidden">
+              <button onClick={() => setViewMode('list')} className={`p-2.5 transition-colors ${viewMode === 'list' ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`} title="List view">
                 <LayoutList className="h-4 w-4" />
               </button>
-              <button onClick={() => setViewMode('grid')} className={`p-2.5 transition-colors ${viewMode === 'grid' ? 'bg-violet-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`} title="Grid view">
+              <button onClick={() => setViewMode('grid')} className={`p-2.5 transition-colors ${viewMode === 'grid' ? 'bg-violet-600 text-white' : 'bg-white dark:bg-slate-800 text-gray-500 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700'}`} title="Grid view">
                 <LayoutGrid className="h-4 w-4" />
               </button>
             </div>
@@ -771,21 +751,25 @@ export default function AdminPromotionsPage() {
         {/* Search + Sort */}
         <div className="flex flex-col sm:flex-row gap-3 mb-5">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-500" />
             <input
               type="text" placeholder="Search by name or class…"
               value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-violet-400 focus:border-transparent outline-none shadow-sm"
             />
             {searchQuery && (
-              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-lg">×</button>
+              <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 text-lg">×</button>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400 flex-shrink-0" />
+            <Filter className="h-4 w-4 text-gray-400 dark:text-slate-500 flex-shrink-0" />
             {(['name', 'class', 'status', 'date'] as SortField[]).map(f => (
               <button key={f} onClick={() => toggleSort(f)}
-                className={`px-3 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${sortField === f ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-200 hover:border-violet-300'}`}
+                className={`px-3 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${
+                  sortField === f 
+                    ? 'bg-violet-600 text-white border-violet-600' 
+                    : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-700'
+                }`}
               >
                 {f} {sortField === f && (sortDir === 'asc' ? '↑' : '↓')}
               </button>
@@ -794,23 +778,23 @@ export default function AdminPromotionsPage() {
         </div>
 
         {searchQuery && (
-          <p className="text-sm text-gray-500 mb-4">
-            Showing <strong>{totalFiltered}</strong> result{totalFiltered !== 1 ? 's' : ''} for "<strong>{searchQuery}</strong>"
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
+            Showing <strong className="text-slate-700 dark:text-slate-200">{totalFiltered}</strong> result{totalFiltered !== 1 ? 's' : ''} for "<strong className="text-slate-700 dark:text-slate-200">{searchQuery}</strong>"
           </p>
         )}
 
         {/* Content */}
         {Object.keys(filteredGrouped).length === 0 ? (
-          <div className="bg-white rounded-2xl border border-gray-200 py-20 text-center shadow-sm">
-            <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-              <Users className="h-7 w-7 text-gray-400" />
+          <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-800 py-20 text-center shadow-sm">
+            <div className="mx-auto w-16 h-16 bg-gray-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
+              <Users className="h-7 w-7 text-gray-400 dark:text-slate-500" />
             </div>
-            <p className="text-gray-700 font-semibold text-lg">No promotions found</p>
-            <p className="text-gray-400 text-sm mt-1">
+            <p className="text-gray-700 dark:text-slate-200 font-semibold text-lg">No promotions found</p>
+            <p className="text-gray-400 dark:text-slate-500 text-sm mt-1">
               {filter === 'all' && !searchQuery ? 'Click "Create Promotions" to get started.' : 'Try adjusting your search or filter.'}
             </p>
             {filter === 'all' && !searchQuery && (
-              <button onClick={handleCreatePromotions} className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors">
+              <button onClick={handleCreatePromotions} className="mt-6 inline-flex items-center gap-2 px-5 py-2.5 bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white text-sm font-semibold rounded-xl transition-colors">
                 <BookOpen className="h-4 w-4" /> Create Promotions
               </button>
             )}
@@ -826,7 +810,7 @@ export default function AdminPromotionsPage() {
           ))
         )}
 
-        <div className="mt-8 text-center text-xs text-gray-400">
+        <div className="mt-8 text-center text-xs text-gray-400 dark:text-slate-500">
           <Shield className="inline h-3 w-3 mr-1" />
           Promotion actions are logged and irreversible. Review carefully before approving.
         </div>

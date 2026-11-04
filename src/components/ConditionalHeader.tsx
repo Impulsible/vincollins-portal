@@ -1,4 +1,4 @@
-// components/ConditionalHeader.tsx - OPTIMIZED FOR SPEED (No delays)
+// components/ConditionalHeader.tsx - OPTIMIZED FOR SPEED (No delays) + DARK MODE
 'use client'
 
 import { Suspense, useEffect, useState, useMemo } from 'react'
@@ -95,15 +95,15 @@ export function ConditionalHeader() {
     <Suspense fallback={
       <div className="h-[64px] sm:h-[72px] bg-gradient-to-r from-[#0A2472] to-[#1e3a8a]">
         <div className="max-w-[1440px] mx-auto px-3 sm:px-4 lg:px-6 h-full flex items-center justify-between">
-          <div className="h-8 w-32 bg-white/20 rounded animate-pulse" />
+          <div className="h-8 w-32 bg-white/10 dark:bg-slate-800/50 rounded animate-pulse" />
           <div className="hidden lg:flex gap-4">
-            <div className="h-8 w-20 bg-white/20 rounded animate-pulse" />
-            <div className="h-8 w-20 bg-white/20 rounded animate-pulse" />
-            <div className="h-8 w-20 bg-white/20 rounded animate-pulse" />
+            <div className="h-8 w-20 bg-white/10 dark:bg-slate-800/50 rounded animate-pulse" />
+            <div className="h-8 w-20 bg-white/10 dark:bg-slate-800/50 rounded animate-pulse" />
+            <div className="h-8 w-20 bg-white/10 dark:bg-slate-800/50 rounded animate-pulse" />
           </div>
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 bg-white/20 rounded-full animate-pulse" />
-            <div className="h-8 w-8 bg-white/20 rounded-full animate-pulse" />
+            <div className="h-8 w-8 bg-white/10 dark:bg-slate-800/50 rounded-full animate-pulse" />
+            <div className="h-8 w-8 bg-white/10 dark:bg-slate-800/50 rounded-full animate-pulse" />
           </div>
         </div>
       </div>

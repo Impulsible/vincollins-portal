@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/staff/StaffManagement.tsx
+// components/admin/staff/StaffManagement.tsx - WITH DARK MODE
 
 'use client'
 
@@ -51,8 +51,8 @@ interface Staff {
 }
 
 interface StaffManagementProps {
-  staff?: Staff[]           // Optional: pass from parent OR self-fetch
-  onRefresh?: () => void    // Optional: notify parent after mutations
+  staff?: Staff[]
+  onRefresh?: () => void
 }
 
 // ─── CONSTANTS ───────────────────────────────────────────────────
@@ -130,16 +130,13 @@ const API = {
 
 // ─── COMPONENT ───────────────────────────────────────────────────
 export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManagementProps) {
-  // Internal state for self-fetching (used when no external staff prop)
   const [internalStaff, setInternalStaff] = useState<Staff[]>([])
   const [isLoading, setIsLoading] = useState(!externalStaff)
 
-  // Use external staff if provided, otherwise use internal
   const staffList = externalStaff ?? internalStaff
 
-  // Self-fetch on mount if no external data
   const fetchStaff = useCallback(async () => {
-    if (externalStaff) return // Parent handles fetching
+    if (externalStaff) return
     try {
       setIsLoading(true)
       const data = await API.listStaff()
@@ -156,7 +153,6 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
     fetchStaff()
   }, [fetchStaff])
 
-  // Refresh handler: re-fetch internally + notify parent
   const handleRefresh = useCallback(async () => {
     await fetchStaff()
     onRefresh?.()
@@ -176,12 +172,8 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const [newStaff, setNewStaff] = useState({
-    first_name: '',
-    last_name: '',
-    department: '',
-    phone: '',
-    address: '',
-    join_year: currentYear,
+    first_name: '', last_name: '', department: '',
+    phone: '', address: '', join_year: currentYear,
   })
 
   // ─── FILTERING & SORTING ─────────────────────────────────────
@@ -237,9 +229,7 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
 
       setShowAddDialog(false)
       toast.success(`${result.user.full_name} added successfully!`)
-
       await handleRefresh()
-
       setTimeout(() => setShowCredentialsDialog(true), 500)
     } catch (error: any) {
       console.error('Create error:', error)
@@ -281,13 +271,9 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
     setIsSubmitting(true)
     try {
       const result = await API.deleteStaff(selectedStaff.id)
-
-      if (result.warning) {
-        toast.warning(result.warning)
-      } else {
-        toast.success('Staff member permanently deleted!')
-      }
-
+      if (result.warning) toast.warning(result.warning)
+      else toast.success('Staff member permanently deleted!')
+      
       setShowDeleteConfirm(false)
       setSelectedStaff(null)
       await handleRefresh()
@@ -319,16 +305,16 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
   // ─── LOADING STATE ───────────────────────────────────────────
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
-        <span className="ml-3 text-slate-500">Loading staff...</span>
+      <div className="flex items-center justify-center py-24 transition-colors duration-300">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
+        <span className="ml-3 text-slate-500 dark:text-slate-400">Loading staff...</span>
       </div>
     )
   }
 
   // ─── RENDER ──────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-colors duration-300">
       {/* Header */}
       <motion.div
         className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
@@ -336,17 +322,17 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
         animate={{ opacity: 1, y: 0 }}
       >
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 flex items-center gap-2">
-            <Users className="h-7 w-7 text-emerald-600" />
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <Users className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
             Staff Management
           </h1>
-          <p className="text-slate-500 mt-1">
+          <p className="text-slate-500 dark:text-slate-400 mt-1">
             Manage staff profiles, credentials, and department assignments
           </p>
         </div>
         <Button
           onClick={() => setShowAddDialog(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 shadow-sm hover:shadow-md transition-all h-10"
+          className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm hover:shadow-md transition-all h-10"
         >
           <UserPlus className="mr-2 h-4 w-4" /> Add Staff
         </Button>
@@ -354,54 +340,54 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-emerald-500 dark:border-l-emerald-500 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-slate-900">
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Total Staff</p>
-                <p className="text-2xl font-bold text-slate-800">{staffList.length}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total Staff</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-white">{staffList.length}</p>
               </div>
-              <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <Users className="h-5 w-5 text-emerald-600" />
+              <div className="h-10 w-10 bg-emerald-100 dark:bg-emerald-950/50 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </div>
         </Card>
-        <Card className="border-l-4 border-l-green-500 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-green-500 dark:border-l-green-500 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-slate-900">
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Active</p>
-                <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Active</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{activeCount}</p>
               </div>
-              <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Shield className="h-5 w-5 text-green-600" />
+              <div className="h-10 w-10 bg-green-100 dark:bg-green-950/50 rounded-lg flex items-center justify-center">
+                <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </div>
         </Card>
-        <Card className="border-l-4 border-l-slate-500 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-slate-500 dark:border-l-slate-500 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-slate-900">
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Inactive</p>
-                <p className="text-2xl font-bold text-slate-600">{inactiveCount}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Inactive</p>
+                <p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{inactiveCount}</p>
               </div>
-              <div className="h-10 w-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                <Circle className="h-5 w-5 text-slate-500" />
+              <div className="h-10 w-10 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
+                <Circle className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               </div>
             </div>
           </div>
         </Card>
-        <Card className="border-l-4 border-l-purple-500 shadow-sm hover:shadow-md transition-shadow">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-500 dark:border-l-purple-500 shadow-sm hover:shadow-md transition-shadow bg-white dark:bg-slate-900">
           <div className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Departments</p>
-                <p className="text-2xl font-bold text-purple-600">{departmentCount}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Departments</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{departmentCount}</p>
               </div>
-              <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Building className="h-5 w-5 text-purple-600" />
+              <div className="h-10 w-10 bg-purple-100 dark:bg-purple-950/50 rounded-lg flex items-center justify-center">
+                <Building className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </div>
@@ -411,83 +397,73 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
       {/* Search */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500" />
           <Input
             placeholder="Search by name, email, VIN ID, or department..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9 pr-8 h-10"
+            className="pl-9 pr-8 h-10 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
           />
           {searchQuery && (
             <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-              <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
+              <X className="h-4 w-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" />
             </button>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} className="h-10">
+        <Button variant="outline" size="sm" onClick={handleRefresh} className="h-10 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
           <RefreshCw className="mr-2 h-4 w-4" /> Refresh
         </Button>
       </div>
 
       {/* ─── ADD DIALOG ──────────────────────────────────────── */}
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto p-0">
-          <div className="sticky top-0 bg-white dark:bg-slate-950 z-10 border-b px-6 py-4">
+        <DialogContent className="sm:max-w-[550px] max-h-[85vh] overflow-y-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+          <div className="sticky top-0 bg-white dark:bg-slate-900 z-10 border-b border-slate-200 dark:border-slate-800 px-6 py-4">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-xl">
-                <UserPlus className="h-5 w-5 text-emerald-600" />
+              <DialogTitle className="flex items-center gap-2 text-xl text-slate-900 dark:text-white">
+                <UserPlus className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                 Add New Staff Member
               </DialogTitle>
             </DialogHeader>
-            <p className="text-sm text-slate-500 mt-1">Email and VIN ID will be auto-generated</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Email and VIN ID will be auto-generated</p>
           </div>
           <div className="space-y-5 px-6 py-5">
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-emerald-600" />
-                <h3 className="text-sm font-semibold text-slate-700">Personal Information</h3>
+                <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Personal Information</h3>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label className="text-xs text-slate-500">First Name *</Label>
-                  <Input
-                    value={newStaff.first_name}
-                    onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })}
-                    placeholder="First name"
-                    className="mt-1 h-9"
-                  />
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">First Name *</Label>
+                  <Input value={newStaff.first_name} onChange={(e) => setNewStaff({ ...newStaff, first_name: e.target.value })} placeholder="First name" className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500">Last Name *</Label>
-                  <Input
-                    value={newStaff.last_name}
-                    onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })}
-                    placeholder="Last name"
-                    className="mt-1 h-9"
-                  />
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Last Name *</Label>
+                  <Input value={newStaff.last_name} onChange={(e) => setNewStaff({ ...newStaff, last_name: e.target.value })} placeholder="Last name" className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
                 </div>
               </div>
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Building className="h-4 w-4 text-blue-600" />
-                <h3 className="text-sm font-semibold text-slate-700">Employment Details</h3>
+                <Building className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Employment Details</h3>
               </div>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs text-slate-500">Department *</Label>
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Department *</Label>
                   <Select value={newStaff.department} onValueChange={(v) => setNewStaff({ ...newStaff, department: v })}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Select department" /></SelectTrigger>
-                    <SelectContent>
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue placeholder="Select department" /></SelectTrigger>
+                    <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                       {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500">Join Year</Label>
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Join Year</Label>
                   <Select value={newStaff.join_year?.toString()} onValueChange={(v) => setNewStaff({ ...newStaff, join_year: parseInt(v) })}>
-                    <SelectTrigger className="h-9"><SelectValue placeholder="Select join year" /></SelectTrigger>
-                    <SelectContent className="max-h-[200px]">
+                    <SelectTrigger className="h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue placeholder="Select join year" /></SelectTrigger>
+                    <SelectContent className="max-h-[200px] bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                       {joinYears.map(y => <SelectItem key={y} value={y.toString()}>{y}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -496,11 +472,11 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-purple-600" />
-                <h3 className="text-sm font-semibold text-slate-700">Auto-generated Email</h3>
+                <Mail className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Auto-generated Email</h3>
               </div>
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3">
-                <p className="font-mono text-sm text-emerald-600">
+                <p className="font-mono text-sm text-emerald-600 dark:text-emerald-400">
                   {newStaff.first_name && newStaff.last_name
                     ? `${newStaff.first_name.toLowerCase().replace(/[^a-z]/g, '')}.${newStaff.last_name.toLowerCase().replace(/[^a-z]/g, '')}@vincollins.edu.ng`
                     : 'first.last@vincollins.edu.ng'}
@@ -509,35 +485,25 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
             </div>
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-slate-500" />
-                <h3 className="text-sm font-semibold text-slate-700">Contact Information</h3>
-                <Badge variant="outline" className="text-[10px]">Optional</Badge>
+                <Phone className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Contact Information</h3>
+                <Badge variant="outline" className="text-[10px] border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">Optional</Badge>
               </div>
               <div className="space-y-3">
                 <div>
-                  <Label className="text-xs text-slate-500">Phone Number</Label>
-                  <Input
-                    value={newStaff.phone}
-                    onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })}
-                    placeholder="+234 XXX XXX XXXX"
-                    className="mt-1 h-9"
-                  />
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Phone Number</Label>
+                  <Input value={newStaff.phone} onChange={(e) => setNewStaff({ ...newStaff, phone: e.target.value })} placeholder="+234 XXX XXX XXXX" className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
                 </div>
                 <div>
-                  <Label className="text-xs text-slate-500">Address</Label>
-                  <Input
-                    value={newStaff.address}
-                    onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })}
-                    placeholder="Staff address"
-                    className="mt-1 h-9"
-                  />
+                  <Label className="text-xs text-slate-500 dark:text-slate-400">Address</Label>
+                  <Input value={newStaff.address} onChange={(e) => setNewStaff({ ...newStaff, address: e.target.value })} placeholder="Staff address" className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
                 </div>
               </div>
             </div>
           </div>
-          <DialogFooter className="sticky bottom-0 bg-white dark:bg-slate-950 border-t px-6 py-4 gap-2">
-            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="h-9">Cancel</Button>
-            <Button onClick={handleAddStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 h-9">
+          <DialogFooter className="sticky bottom-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 py-4 gap-2">
+            <Button variant="outline" onClick={() => setShowAddDialog(false)} className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</Button>
+            <Button onClick={handleAddStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-9">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <UserPlus className="h-4 w-4 mr-2" />}
               {isSubmitting ? 'Creating...' : 'Add Staff'}
             </Button>
@@ -546,17 +512,17 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
       </Dialog>
 
       {/* ─── STAFF TABLE ─────────────────────────────────────── */}
-      <Card className="border shadow-sm overflow-hidden">
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
         <div className="overflow-x-auto">
           <Table>
-            <TableHeader className="bg-slate-50">
-              <TableRow>
-                <TableHead className="font-semibold py-3 px-4">Staff Member</TableHead>
-                <TableHead className="font-semibold py-3 px-4">VIN ID</TableHead>
-                <TableHead className="font-semibold py-3 px-4">Department</TableHead>
-                <TableHead className="font-semibold py-3 px-4 hidden md:table-cell">Phone</TableHead>
-                <TableHead className="font-semibold py-3 px-4">Status</TableHead>
-                <TableHead className="font-semibold py-3 px-4 text-center">Actions</TableHead>
+            <TableHeader className="bg-slate-50 dark:bg-slate-800/60">
+              <TableRow className="border-b border-slate-200 dark:border-slate-800 hover:bg-transparent">
+                <TableHead className="font-semibold py-3 px-4 text-slate-700 dark:text-slate-300">Staff Member</TableHead>
+                <TableHead className="font-semibold py-3 px-4 text-slate-700 dark:text-slate-300">VIN ID</TableHead>
+                <TableHead className="font-semibold py-3 px-4 text-slate-700 dark:text-slate-300">Department</TableHead>
+                <TableHead className="font-semibold py-3 px-4 hidden md:table-cell text-slate-700 dark:text-slate-300">Phone</TableHead>
+                <TableHead className="font-semibold py-3 px-4 text-slate-700 dark:text-slate-300">Status</TableHead>
+                <TableHead className="font-semibold py-3 px-4 text-center text-slate-700 dark:text-slate-300">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -564,8 +530,8 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-12">
                     <div className="flex flex-col items-center gap-3">
-                      <Users className="h-10 w-10 text-slate-300" />
-                      <p className="text-slate-500 font-medium">No staff members found</p>
+                      <Users className="h-10 w-10 text-slate-300 dark:text-slate-600" />
+                      <p className="text-slate-500 dark:text-slate-400 font-medium">No staff members found</p>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -576,42 +542,42 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: index * 0.02 }}
-                    className="border-b hover:bg-slate-50/50 transition-colors"
+                    className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
                   >
                     <TableCell className="py-3 px-4">
                       <div className="flex items-center gap-3 min-w-[200px]">
-                        <Avatar className="h-10 w-10 ring-1 ring-slate-200">
+                        <Avatar className="h-10 w-10 ring-1 ring-slate-200 dark:ring-slate-700">
                           <AvatarImage src={member.photo_url} />
-                          <AvatarFallback className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 text-emerald-700 font-semibold text-sm">
+                          <AvatarFallback className="bg-gradient-to-br from-emerald-500/20 to-emerald-500/10 dark:from-emerald-900/40 dark:to-emerald-900/20 text-emerald-700 dark:text-emerald-400 font-semibold text-sm">
                             {member.full_name?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'ST'}
                           </AvatarFallback>
                         </Avatar>
                         <div className="min-w-0 flex-1">
-                          <p className="font-medium text-slate-800 truncate">{member.full_name}</p>
-                          <p className="text-xs text-slate-500 truncate">{member.email}</p>
+                          <p className="font-medium text-slate-800 dark:text-white truncate">{member.full_name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400 truncate">{member.email}</p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell className="py-3 px-4">
-                      <code className="text-xs bg-slate-100 px-2 py-1 rounded font-mono">{member.vin_id}</code>
+                      <code className="text-xs bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded font-mono text-slate-700 dark:text-slate-300">{member.vin_id}</code>
                     </TableCell>
                     <TableCell className="py-3 px-4">
-                      <Badge variant="outline" className="font-normal bg-slate-50">
+                      <Badge variant="outline" className="font-normal bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
                         {member.department || '-'}
                       </Badge>
                     </TableCell>
                     <TableCell className="py-3 px-4 hidden md:table-cell">
                       <div className="flex items-center gap-1.5">
-                        <Phone className="h-3.5 w-3.5 text-slate-400" />
-                        <span className="text-sm text-slate-600">{member.phone || '-'}</span>
+                        <Phone className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                        <span className="text-sm text-slate-600 dark:text-slate-300">{member.phone || '-'}</span>
                       </div>
                     </TableCell>
                     <TableCell className="py-3 px-4">
                       <Badge className={cn(
                         "text-xs font-medium px-2 py-0.5",
                         member.is_active
-                          ? "bg-emerald-100 text-emerald-700"
-                          : "bg-slate-100 text-slate-600"
+                          ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400"
+                          : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                       )}>
                         {member.is_active ? 'Active' : 'Inactive'}
                       </Badge>
@@ -619,27 +585,24 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
                     <TableCell className="py-3 px-4 text-center">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
+                          <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-slate-100 dark:hover:bg-slate-800">
+                            <MoreVertical className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowViewDetailsDialog(true) }}>
-                            <Eye className="mr-2 h-4 w-4" /> View Details
+                        <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                          <DropdownMenuLabel className="text-slate-600 dark:text-slate-300">Actions</DropdownMenuLabel>
+                          <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-700" />
+                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowViewDetailsDialog(true) }} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700">
+                            <Eye className="mr-2 h-4 w-4 text-blue-600 dark:text-blue-400" /> View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowEditDialog(true) }}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit Profile
+                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowEditDialog(true) }} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700">
+                            <Edit className="mr-2 h-4 w-4 text-emerald-600 dark:text-emerald-400" /> Edit Profile
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleResetPasswordClick(member)}>
-                            <KeyRound className="mr-2 h-4 w-4" /> Reset Password
+                          <DropdownMenuItem onClick={() => handleResetPasswordClick(member)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-700">
+                            <KeyRound className="mr-2 h-4 w-4 text-amber-600 dark:text-amber-400" /> Reset Password
                           </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }}
-                            className="text-red-600 focus:text-red-700"
-                          >
+                          <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-700" />
+                          <DropdownMenuItem onClick={() => { setSelectedStaff(member); setShowDeleteConfirm(true) }} className="text-red-600 dark:text-red-400 focus:text-red-700 dark:focus:text-red-300 focus:bg-red-50 dark:focus:bg-red-950/30">
                             <Trash2 className="mr-2 h-4 w-4" /> Delete
                           </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -655,13 +618,13 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
 
       {/* ─── CREDENTIALS DIALOG ──────────────────────────────── */}
       <Dialog open={showCredentialsDialog} onOpenChange={setShowCredentialsDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle className="h-5 w-5 text-emerald-500" />
+            <DialogTitle className="flex items-center gap-2 text-lg text-slate-900 dark:text-white">
+              <CheckCircle className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
               Staff Account Created
             </DialogTitle>
-            <DialogDescription>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
               Save these credentials. Password = VIN ID
             </DialogDescription>
           </DialogHeader>
@@ -670,25 +633,25 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
               <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4 space-y-3">
                 <div className="flex justify-between items-center">
                   <div>
-                    <p className="text-xs text-slate-500">Email Address</p>
-                    <p className="font-mono text-sm font-medium">{newCredentials.email}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Email Address</p>
+                    <p className="font-mono text-sm font-medium text-slate-800 dark:text-slate-200">{newCredentials.email}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.email, 'Email')} className="h-8">
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.email, 'Email')} className="h-8 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
-                <div className="flex justify-between items-center pt-2 border-t">
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200 dark:border-slate-700">
                   <div>
-                    <p className="text-xs text-slate-500">Password / VIN ID</p>
-                    <p className="font-mono text-sm font-bold text-emerald-600">{newCredentials.password}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Password / VIN ID</p>
+                    <p className="font-mono text-sm font-bold text-emerald-600 dark:text-emerald-400">{newCredentials.password}</p>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.password, 'Password')} className="h-8">
+                  <Button variant="ghost" size="sm" onClick={() => copyToClipboard(newCredentials.password, 'Password')} className="h-8 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700">
                     <Copy className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
-              <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200">
-                <p className="text-xs text-amber-700 flex items-center gap-2">
+              <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200 dark:border-amber-900/50">
+                <p className="text-xs text-amber-700 dark:text-amber-400 flex items-center gap-2">
                   <Shield className="h-3.5 w-3.5" />
                   <span>Staff will be prompted to change password on first login</span>
                 </p>
@@ -696,75 +659,56 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setShowCredentialsDialog(false)} className="h-9">Close</Button>
+            <Button onClick={() => setShowCredentialsDialog(false)} className="h-9 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* ─── EDIT DIALOG ─────────────────────────────────────── */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Edit className="h-5 w-5 text-blue-600" />
+            <DialogTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
+              <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               Edit Staff Member
             </DialogTitle>
           </DialogHeader>
           {selectedStaff && (
             <div className="space-y-4 py-2">
               <div>
-                <Label className="text-sm">Full Name</Label>
-                <Input
-                  value={selectedStaff.full_name}
-                  onChange={(e) => setSelectedStaff({ ...selectedStaff, full_name: e.target.value })}
-                  className="mt-1 h-9"
-                />
+                <Label className="text-sm text-slate-700 dark:text-slate-300">Full Name</Label>
+                <Input value={selectedStaff.full_name} onChange={(e) => setSelectedStaff({ ...selectedStaff, full_name: e.target.value })} className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
               </div>
               <div>
-                <Label className="text-sm">Department</Label>
+                <Label className="text-sm text-slate-700 dark:text-slate-300">Department</Label>
                 <Select value={selectedStaff.department} onValueChange={(v) => setSelectedStaff({ ...selectedStaff, department: v })}>
-                  <SelectTrigger className="h-9"><SelectValue /></SelectTrigger>
-                  <SelectContent>
+                  <SelectTrigger className="h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                     {departments.map(d => <SelectItem key={d} value={d}>{d}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-sm">Phone</Label>
-                <Input
-                  value={selectedStaff.phone || ''}
-                  onChange={(e) => setSelectedStaff({ ...selectedStaff, phone: e.target.value })}
-                  className="mt-1 h-9"
-                />
+                <Label className="text-sm text-slate-700 dark:text-slate-300">Phone</Label>
+                <Input value={selectedStaff.phone || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, phone: e.target.value })} className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
               </div>
               <div>
-                <Label className="text-sm">Address</Label>
-                <Input
-                  value={selectedStaff.address || ''}
-                  onChange={(e) => setSelectedStaff({ ...selectedStaff, address: e.target.value })}
-                  className="mt-1 h-9"
-                />
+                <Label className="text-sm text-slate-700 dark:text-slate-300">Address</Label>
+                <Input value={selectedStaff.address || ''} onChange={(e) => setSelectedStaff({ ...selectedStaff, address: e.target.value })} className="mt-1 h-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
               </div>
               <div className="flex items-center justify-between pt-2">
-                <span className="text-sm text-slate-600">Account Status</span>
+                <span className="text-sm text-slate-600 dark:text-slate-400">Account Status</span>
                 <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={selectedStaff.is_active}
-                    onChange={(e) => setSelectedStaff({ ...selectedStaff, is_active: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-10 h-5 bg-slate-300 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600" />
-                  <span className="ml-3 text-sm font-medium">
-                    {selectedStaff.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  <input type="checkbox" checked={selectedStaff.is_active} onChange={(e) => setSelectedStaff({ ...selectedStaff, is_active: e.target.checked })} className="sr-only peer" />
+                  <div className="w-10 h-5 bg-slate-300 dark:bg-slate-700 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600" />
+                  <span className="ml-3 text-sm font-medium text-slate-700 dark:text-slate-300">{selectedStaff.is_active ? 'Active' : 'Inactive'}</span>
                 </label>
               </div>
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="h-9">Cancel</Button>
-            <Button onClick={handleUpdateStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 h-9">
+            <Button variant="outline" onClick={() => setShowEditDialog(false)} className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</Button>
+            <Button onClick={handleUpdateStaffClick} disabled={isSubmitting} className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-9">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Save Changes
             </Button>
@@ -774,24 +718,24 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
 
       {/* ─── DELETE DIALOG ───────────────────────────────────── */}
       <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-600">
+            <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" />
               Confirm Permanent Deletion
             </DialogTitle>
           </DialogHeader>
           {selectedStaff && (
             <div className="py-4 space-y-3">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-base font-semibold text-red-900">
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
+                <p className="text-base font-semibold text-red-900 dark:text-red-300">
                   Delete {selectedStaff.full_name}?
                 </p>
-                <p className="text-sm text-red-700 mt-1">
+                <p className="text-sm text-red-700 dark:text-red-400 mt-1">
                   This will permanently remove their account from the authentication system and all database records.
                 </p>
               </div>
-              <div className="text-sm text-slate-600 space-y-1">
+              <div className="text-sm text-slate-600 dark:text-slate-400 space-y-1">
                 <p>• Login credentials will be erased</p>
                 <p>• All associated records will be removed</p>
                 <p>• This action <strong>cannot</strong> be undone</p>
@@ -799,8 +743,8 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
             </div>
           )}
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="h-9">Cancel</Button>
-            <Button variant="destructive" onClick={handleDeleteStaffClick} disabled={isSubmitting} className="h-9">
+            <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteStaffClick} disabled={isSubmitting} className="h-9 bg-red-600 hover:bg-red-700 text-white">
               {isSubmitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
               {isSubmitting ? 'Deleting...' : 'Delete Permanently'}
             </Button>
@@ -810,13 +754,13 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
 
       {/* ─── VIEW DETAILS DIALOG ─────────────────────────────── */}
       <Dialog open={showViewDetailsDialog} onOpenChange={setShowViewDetailsDialog}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>Staff Details</DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-white">Staff Details</DialogTitle>
           </DialogHeader>
           {selectedStaff && (
             <div className="space-y-4 py-2">
-              <div className="flex items-center gap-4 pb-2 border-b">
+              <div className="flex items-center gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
                 <Avatar className="h-14 w-14">
                   <AvatarImage src={selectedStaff.photo_url} />
                   <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white text-lg font-semibold">
@@ -824,28 +768,28 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
                   </AvatarFallback>
                 </Avatar>
                 <div>
-                  <p className="text-lg font-bold text-slate-800">{selectedStaff.full_name}</p>
-                  <p className="text-sm text-slate-500">{selectedStaff.email}</p>
+                  <p className="text-lg font-bold text-slate-800 dark:text-white">{selectedStaff.full_name}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{selectedStaff.email}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-3 bg-slate-50 rounded-lg p-4">
+              <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg p-4">
                 <div>
-                  <p className="text-xs text-slate-500">VIN ID</p>
-                  <p className="font-mono text-sm font-medium">{selectedStaff.vin_id}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">VIN ID</p>
+                  <p className="font-mono text-sm font-medium text-slate-800 dark:text-slate-200">{selectedStaff.vin_id}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Department</p>
-                  <p className="font-medium text-sm">{selectedStaff.department || '-'}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Department</p>
+                  <p className="font-medium text-sm text-slate-800 dark:text-slate-200">{selectedStaff.department || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Phone</p>
-                  <p className="font-medium text-sm">{selectedStaff.phone || '-'}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Phone</p>
+                  <p className="font-medium text-sm text-slate-800 dark:text-slate-200">{selectedStaff.phone || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Status</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Status</p>
                   <Badge className={cn(
                     "text-xs",
-                    selectedStaff.is_active ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-600"
+                    selectedStaff.is_active ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
                   )}>
                     {selectedStaff.is_active ? 'Active' : 'Inactive'}
                   </Badge>
@@ -853,14 +797,14 @@ export function StaffManagement({ staff: externalStaff, onRefresh }: StaffManage
               </div>
               {selectedStaff.address && (
                 <div>
-                  <p className="text-xs text-slate-500">Address</p>
-                  <p className="text-sm bg-slate-50 rounded-lg p-3">{selectedStaff.address}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Address</p>
+                  <p className="text-sm bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 text-slate-800 dark:text-slate-200">{selectedStaff.address}</p>
                 </div>
               )}
             </div>
           )}
           <DialogFooter>
-            <Button onClick={() => setShowViewDetailsDialog(false)} className="h-9">Close</Button>
+            <Button onClick={() => setShowViewDetailsDialog(false)} className="h-9 bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white">Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

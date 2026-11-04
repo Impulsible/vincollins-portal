@@ -1,4 +1,4 @@
-// app/admin/broad-sheet/page.tsx - UPDATED WITH ACTIVE STATUS ROSTER ISOLATION
+// app/admin/broad-sheet/page.tsx - UPDATED WITH FULL DARK MODE
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
@@ -16,9 +16,8 @@ import {
   Loader2, RefreshCw, Printer, Search, X, FileSpreadsheet,
   Users, FileDown, Sparkles, FileText, CheckCircle2,
   AlertCircle, Eye, Shield, Bell, Zap,
-  TrendingUp, GraduationCap, ChevronLeft, Send,
-  Settings2, BookOpen, AlertTriangle,
-  CheckCircle,
+  TrendingUp, ChevronLeft, Send,
+  Settings2, BookOpen, AlertTriangle, CheckCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -44,37 +43,15 @@ const SUBJECT_DISPLAY_NAMES: Record<string, string> = {
 }
 
 const SUBJECT_ORDER: Record<string, number> = {
-  'English Language': 1, 
-  'English Studies': 1, 
-  'Mathematics': 2,
-  'Physics': 3, 
-  'Chemistry': 4, 
-  'Further Mathematics': 5, 
-  'Basic Science': 6,
-  'Biology': 7, 
-  'Agricultural Science': 8, 
-  'Basic Technology': 9,
-  'Economics': 10, 
-  'Geography': 11, 
-  'Social Studies': 12, 
-  'Civic Education': 13,
-  'Government': 14, 
-  'History': 15, 
-  'Commerce': 16, 
-  'Financial Accounting': 17,
-  'Business Studies': 18, 
-  'Literature in English': 19, 
-  'Christian Religious Studies': 20,
-  'CRS': 20,
-  'Cultural and Creative Arts': 21, 
-  'Music': 22, 
-  'Yoruba': 23, 
-  'French': 24,
-  'Data Processing': 25, 
-  'Information Technology': 26, 
-  'Home Economics': 27,
-  'Physical and Health Education': 28, 
-  'Security Education': 29,
+  'English Language': 1, 'English Studies': 1, 'Mathematics': 2,
+  'Physics': 3, 'Chemistry': 4, 'Further Mathematics': 5, 'Basic Science': 6,
+  'Biology': 7, 'Agricultural Science': 8, 'Basic Technology': 9,
+  'Economics': 10, 'Geography': 11, 'Social Studies': 12, 'Civic Education': 13,
+  'Government': 14, 'History': 15, 'Commerce': 16, 'Financial Accounting': 17,
+  'Business Studies': 18, 'Literature in English': 19, 'Christian Religious Studies': 20,
+  'CRS': 20, 'Cultural and Creative Arts': 21, 'Music': 22, 'Yoruba': 23, 'French': 24,
+  'Data Processing': 25, 'Information Technology': 26, 'Home Economics': 27,
+  'Physical and Health Education': 28, 'Security Education': 29,
 }
 
 const sortSubjectsByOrder = (subjects: string[]) =>
@@ -92,9 +69,7 @@ const extractYear = (className: string): string => {
   return className
 }
 
-const getDisplaySubjectName = (subject: string): string => {
-  return SUBJECT_DISPLAY_NAMES[subject] || subject
-}
+const getDisplaySubjectName = (subject: string): string => SUBJECT_DISPLAY_NAMES[subject] || subject
 
 const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
@@ -125,24 +100,30 @@ const getAllSubjectsForClass = (cls: string) => {
   return sortSubjectsByOrder(SS_SUBJECTS_SCIENCE)
 }
 
-const meetsMinimumSubjects = (cls: string, n: number) =>
-  extractYear(cls).startsWith('JSS') ? n >= JSS_MIN_SUBJECTS : n >= SS_MIN_SUBJECTS
-
 // ── Grading ───────────────────────────────────────────────────────────────────
 const getSubjectGrade = (s: number) => s >= 75 ? 'A1' : s >= 70 ? 'B2' : s >= 65 ? 'B3' : s >= 60 ? 'C4' : s >= 55 ? 'C5' : s >= 50 ? 'C6' : s >= 45 ? 'D7' : s >= 40 ? 'E8' : 'F9'
 const getOverallGrade = (p: number) => p >= 80 ? 'A' : p >= 70 ? 'B' : p >= 60 ? 'C' : p >= 50 ? 'P' : 'F'
 const getSubjectGradeRemark = (g: string) => ({ A1: 'Excellent', B2: 'Very Good', B3: 'Good', C4: 'Credit', C5: 'Credit', C6: 'Credit', D7: 'Pass', E8: 'Pass', F9: 'Fail' }[g] || '')
 
 const gradeChipClass = (g: string) => ({
-  A1: 'bg-emerald-100 text-emerald-700', B2: 'bg-blue-100 text-blue-700', B3: 'bg-blue-100 text-blue-700',
-  C4: 'bg-cyan-100 text-cyan-700', C5: 'bg-cyan-100 text-cyan-700', C6: 'bg-cyan-100 text-cyan-700',
-  D7: 'bg-amber-100 text-amber-700', E8: 'bg-amber-100 text-amber-700', F9: 'bg-red-100 text-red-700',
-}[g] || 'bg-slate-100 text-slate-600')
+  A1: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400', 
+  B2: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400', 
+  B3: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
+  C4: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400', 
+  C5: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400', 
+  C6: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400',
+  D7: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400', 
+  E8: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400', 
+  F9: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400',
+}[g] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300')
 
 const overallChipClass = (g: string) => ({
-  A: 'bg-emerald-100 text-emerald-700', B: 'bg-blue-100 text-blue-700',
-  C: 'bg-cyan-100 text-cyan-700', P: 'bg-amber-100 text-amber-700', F: 'bg-red-100 text-red-700',
-}[g] || 'bg-slate-100 text-slate-600')
+  A: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400', 
+  B: 'bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400',
+  C: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-950/40 dark:text-cyan-400', 
+  P: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400', 
+  F: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-400',
+}[g] || 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300')
 
 const extractFirstName = (name: string): string => {
   if (!name) return 'Student'
@@ -197,14 +178,14 @@ const getTermLabel = (t: string) => TERMS.find(x => x.value === t)?.label || 'Th
 // ── Stat card ─────────────────────────────────────────────────────────────────
 function StatCard({ label, value, accent, icon: Icon, sub }: { label: string; value: string | number; accent: string; icon: React.ElementType; sub?: string }) {
   return (
-    <Card className="relative overflow-hidden border-0 shadow-sm bg-white dark:bg-slate-900">
+    <Card className="relative overflow-hidden border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
       <div className={cn('absolute inset-y-0 left-0 w-1 rounded-l-lg', accent)} />
       <CardContent className="p-4 pl-5">
         <div className="flex items-start justify-between">
           <div>
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</p>
-            <p className="text-2xl font-bold text-slate-800 dark:text-slate-100 mt-0.5">{value}</p>
-            {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+            <p className="text-2xl font-bold text-slate-800 dark:text-white mt-0.5">{value}</p>
+            {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>}
           </div>
           <div className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800">
             <Icon className={cn('h-4 w-4', accent.replace('bg-', 'text-'))} />
@@ -261,7 +242,6 @@ export default function BroadSheetPage() {
         .single()
 
       if (error) {
-        console.error('Error fetching term settings:', error)
         setCurrentTerm('third')
         setCurrentSession('2025/2026')
         setIsLoadingTerm(false)
@@ -271,19 +251,12 @@ export default function BroadSheetPage() {
       if (settings) {
         const term = settings.current_term || 'third'
         const session = settings.current_session || '2025/2026'
-        
         setCurrentTerm(term)
         setCurrentSession(session)
-        
-        if (!selectedTerm) {
-          setSelectedTerm(term)
-        }
-        if (!selectedYear) {
-          setSelectedYear(session)
-        }
+        if (!selectedTerm) setSelectedTerm(term)
+        if (!selectedYear) setSelectedYear(session)
       }
     } catch (error) {
-      console.error('Error fetching current term:', error)
       setCurrentTerm('third')
       setCurrentSession('2025/2026')
     } finally {
@@ -299,13 +272,9 @@ export default function BroadSheetPage() {
     const init = async () => {
       try {
         const timeout = setTimeout(() => { setLoading(false); setLoadError(true) }, LOAD_TIMEOUT)
-        
         const { data: { session } } = await supabase.auth.getSession()
         clearTimeout(timeout)
-        if (!session) {
-          setLoading(false)
-          return
-        }
+        if (!session) { setLoading(false); return }
 
         const { data: pd } = await supabase.from('profiles').select('*').eq('id', session.user.id).single()
         if (pd) setProfile(pd)
@@ -363,7 +332,6 @@ export default function BroadSheetPage() {
     if (newScoreAlert) { const t = setTimeout(() => setNewScoreAlert(null), 5000); return () => clearTimeout(t) }
   }, [newScoreAlert])
 
-  // ── LOAD BROAD SHEET DATA (STRICT ACTIVE ISOLATION) ────────────────────────
   const loadBroadSheet = useCallback(async () => {
     if (!selectedClass || !selectedTerm || !selectedYear || isLoadingTerm) return
     setLoading(true)
@@ -373,11 +341,10 @@ export default function BroadSheetPage() {
       const isJSS = selectedClass.toUpperCase().includes('JSS')
       const isSS = selectedClass.toUpperCase().includes('SS')
       
-      // ✅ Get active students in class (exclude students who have left the school)
       let query = supabase.from('profiles')
         .select('id, full_name, display_name, admission_number, vin_id, class, department, gender, photo_url, first_name')
         .eq('role', 'student')
-        .eq('is_active', true) // 🚫 CRITICAL: Exclude inactive/withdrawn student profiles
+        .eq('is_active', true)
         .order('display_name')
         .limit(500)
       
@@ -410,9 +377,7 @@ export default function BroadSheetPage() {
         .eq('status', 'approved')
         .limit(5000)
       
-      if (scoreError) {
-        console.error('Score error:', scoreError)
-      }
+      if (scoreError) console.error('Score error:', scoreError)
 
       const { data: existingReportCards } = await supabase
         .from('report_cards')
@@ -441,9 +406,7 @@ export default function BroadSheetPage() {
             const theoryScore = score.exam_theory_score || 0
             examTotal = objScore + theoryScore
           }
-          if (examTotal === 0) {
-            examTotal = score.exam_objective_score || 0
-          }
+          if (examTotal === 0) examTotal = score.exam_objective_score || 0
           
           const total = (score.ca1_score || 0) + (score.ca2_score || 0) + examTotal
           
@@ -496,7 +459,6 @@ export default function BroadSheetPage() {
         : records
 
       setStudents(filteredRecords)
-      
     } catch (error) {
       console.error('Error loading broad sheet:', error)
       toast.error('Failed to load broad sheet')
@@ -506,10 +468,8 @@ export default function BroadSheetPage() {
     }
   }, [selectedClass, selectedTerm, selectedYear, selectedDepartment, isLoadingTerm])
 
-  // ── Generate Report Cards ──────────────────────────────────────────────────
   const handleGenerateReportCards = async () => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted)
-    
     if (ready.length === 0) {
       toast.warning(`No students meet the minimum subject requirement.`)
       return
@@ -551,17 +511,11 @@ export default function BroadSheetPage() {
             .single()
           
           const gender = profileData?.gender || 'male'
-          
           let firstName = ''
-          if (profileData?.first_name && profileData.first_name.trim() !== '') {
-            firstName = profileData.first_name
-          } else if (profileData?.display_name) {
-            firstName = extractFirstName(profileData.display_name)
-          } else if (profileData?.full_name) {
-            firstName = extractFirstName(profileData.full_name)
-          } else {
-            firstName = extractFirstName(student.name)
-          }
+          if (profileData?.first_name && profileData.first_name.trim() !== '') firstName = profileData.first_name
+          else if (profileData?.display_name) firstName = extractFirstName(profileData.display_name)
+          else if (profileData?.full_name) firstName = extractFirstName(profileData.full_name)
+          else firstName = extractFirstName(student.name)
           
           firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
 
@@ -569,58 +523,24 @@ export default function BroadSheetPage() {
           let principalComment = ''
           
           try {
-            const aiResponse = await generateAIComments(
-              firstName,
-              student.averageScore,
-              formattedSubjects,
-              selectedClass,
-              gender
-            )
-            
+            const aiResponse = await generateAIComments(firstName, student.averageScore, formattedSubjects, selectedClass, gender)
             if (aiResponse) {
-              teacherComment = aiResponse.teacher_comment || getFallbackTeacherComment(
-                firstName, student.averageScore, best?.name || '', best?.total || 0,
-                worst?.name || '', worst?.total || 0, gender
-              )
-              principalComment = aiResponse.principal_comment || getFallbackPrincipalComment(
-                student.averageScore, firstName, gender
-              )
+              teacherComment = aiResponse.teacher_comment || getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
+              principalComment = aiResponse.principal_comment || getFallbackPrincipalComment(student.averageScore, firstName, gender)
             } else {
-              teacherComment = getFallbackTeacherComment(
-                firstName, student.averageScore, best?.name || '', best?.total || 0,
-                worst?.name || '', worst?.total || 0, gender
-              )
+              teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
               principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
             }
           } catch (error) {
-            console.error('Comment generation error:', error)
-            teacherComment = getFallbackTeacherComment(
-              firstName, student.averageScore, best?.name || '', best?.total || 0,
-              worst?.name || '', worst?.total || 0, gender
-            )
+            teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
             principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
           }
 
-          const { data: existingCards } = await supabase
-            .from('report_cards')
-            .select('id')
-            .eq('student_id', student.id)
-            .eq('term', selectedTerm)
-            .eq('academic_year', selectedYear)
+          const { data: existingCards } = await supabase.from('report_cards').select('id').eq('student_id', student.id).eq('term', selectedTerm).eq('academic_year', selectedYear)
 
           if (existingCards && existingCards.length > 0) {
-            const { error: deleteError } = await supabase
-              .from('report_cards')
-              .delete()
-              .eq('student_id', student.id)
-              .eq('term', selectedTerm)
-              .eq('academic_year', selectedYear)
-            
-            if (deleteError) {
-              console.error('Delete error:', deleteError)
-              errorCount++
-              continue
-            }
+            const { error: deleteError } = await supabase.from('report_cards').delete().eq('student_id', student.id).eq('term', selectedTerm).eq('academic_year', selectedYear)
+            if (deleteError) { errorCount++; continue }
           }
 
           const reportCardData = {
@@ -653,40 +573,20 @@ export default function BroadSheetPage() {
             published_at: null
           }
 
-          const { error: insertError } = await supabase
-            .from('report_cards')
-            .insert(reportCardData)
-            .select()
-
-          if (insertError) {
-            console.error('Insert error for', student.name, ':', insertError)
-            errorCount++
-          } else {
+          const { error: insertError } = await supabase.from('report_cards').insert(reportCardData).select()
+          if (insertError) { errorCount++ } else {
             successCount++
             setGenProgress({ current: successCount, total: ready.length })
           }
 
-        } catch (studentError) {
-          console.error(`Error processing ${student.name}:`, studentError)
-          errorCount++
-        }
+        } catch (studentError) { errorCount++ }
       }
 
-      if (successCount > 0) {
-        toast.success(`✅ Generated ${successCount} report cards successfully!`)
-        await loadBroadSheet()
-      }
-
-      if (errorCount > 0) {
-        toast.warning(`⚠️ ${errorCount} report cards failed to generate. Check console for details.`)
-      }
-
-      if (successCount === 0 && errorCount > 0) {
-        toast.error('❌ Failed to generate any report cards. Please try again.')
-      }
+      if (successCount > 0) { toast.success(`✅ Generated ${successCount} report cards successfully!`); await loadBroadSheet() }
+      if (errorCount > 0) toast.warning(`⚠️ ${errorCount} report cards failed to generate.`)
+      if (successCount === 0 && errorCount > 0) toast.error('❌ Failed to generate any report cards.')
 
     } catch (error) {
-      console.error('Generation error:', error)
       toast.error('Failed to generate report cards')
     } finally {
       setGenerating(false)
@@ -694,14 +594,9 @@ export default function BroadSheetPage() {
     }
   }
 
-  // ── Regenerate Comments ──────────────────────────────────────────────────
   const handleRegenerateComments = async () => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted && s.reportCardId)
-    
-    if (ready.length === 0) {
-      toast.warning('No students with existing report cards found.')
-      return
-    }
+    if (ready.length === 0) { toast.warning('No students with existing report cards found.'); return }
     
     setRegenerating(true)
     setGenProgress({ current: 0, total: ready.length })
@@ -711,38 +606,21 @@ export default function BroadSheetPage() {
     try {
       for (const student of ready) {
         try {
-          const { data: profileData } = await supabase
-            .from('profiles')
-            .select('gender, first_name, display_name, full_name')
-            .eq('id', student.id)
-            .single()
-          
+          const { data: profileData } = await supabase.from('profiles').select('gender, first_name, display_name, full_name').eq('id', student.id).single()
           const gender = profileData?.gender || 'male'
-          let firstName = ''
           
-          if (profileData?.first_name && profileData.first_name.trim() !== '') {
-            firstName = profileData.first_name
-          } else if (profileData?.display_name) {
-            firstName = extractFirstName(profileData.display_name)
-          } else if (profileData?.full_name) {
-            firstName = extractFirstName(profileData.full_name)
-          } else {
-            firstName = extractFirstName(student.name)
-          }
+          let firstName = ''
+          if (profileData?.first_name && profileData.first_name.trim() !== '') firstName = profileData.first_name
+          else if (profileData?.display_name) firstName = extractFirstName(profileData.display_name)
+          else if (profileData?.full_name) firstName = extractFirstName(profileData.full_name)
+          else firstName = extractFirstName(student.name)
           
           firstName = firstName.charAt(0).toUpperCase() + firstName.slice(1).toLowerCase()
           
           const formattedSubjects = student.expectedSubjects.map(sub => {
             const score = student.subjectMap[sub]
             if (!score) return null
-            return {
-              name: sub,
-              ca: score.ca1 + score.ca2,
-              exam: score.exam_obj + score.exam_theory,
-              total: score.total,
-              grade: score.grade,
-              remark: getSubjectGradeRemark(score.grade)
-            }
+            return { name: sub, ca: score.ca1 + score.ca2, exam: score.exam_obj + score.exam_theory, total: score.total, grade: score.grade, remark: getSubjectGradeRemark(score.grade) }
           }).filter(Boolean)
           
           const sortedByScore = [...formattedSubjects].sort((a, b) => (b?.total || 0) - (a?.total || 0))
@@ -753,68 +631,30 @@ export default function BroadSheetPage() {
           let principalComment = ''
           
           try {
-            const aiResponse = await generateAIComments(
-              firstName,
-              student.averageScore,
-              formattedSubjects,
-              selectedClass,
-              gender
-            )
-            
+            const aiResponse = await generateAIComments(firstName, student.averageScore, formattedSubjects, selectedClass, gender)
             if (aiResponse) {
-              teacherComment = aiResponse.teacher_comment || getFallbackTeacherComment(
-                firstName, student.averageScore, best?.name || '', best?.total || 0,
-                worst?.name || '', worst?.total || 0, gender
-              )
-              principalComment = aiResponse.principal_comment || getFallbackPrincipalComment(
-                student.averageScore, firstName, gender
-              )
+              teacherComment = aiResponse.teacher_comment || getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
+              principalComment = aiResponse.principal_comment || getFallbackPrincipalComment(student.averageScore, firstName, gender)
             } else {
-              teacherComment = getFallbackTeacherComment(
-                firstName, student.averageScore, best?.name || '', best?.total || 0,
-                worst?.name || '', worst?.total || 0, gender
-              )
+              teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
               principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
             }
           } catch (error) {
-            console.error('Comment generation error:', error)
-            teacherComment = getFallbackTeacherComment(
-              firstName, student.averageScore, best?.name || '', best?.total || 0,
-              worst?.name || '', worst?.total || 0, gender
-            )
+            teacherComment = getFallbackTeacherComment(firstName, student.averageScore, best?.name || '', best?.total || 0, worst?.name || '', worst?.total || 0, gender)
             principalComment = getFallbackPrincipalComment(student.averageScore, firstName, gender)
           }
           
-          const { error: updateError } = await supabase
-            .from('report_cards')
-            .update({ 
-              teacher_comments: teacherComment, 
-              principal_comments: principalComment 
-            })
-            .eq('id', student.reportCardId)
-          
+          const { error: updateError } = await supabase.from('report_cards').update({ teacher_comments: teacherComment, principal_comments: principalComment }).eq('id', student.reportCardId)
           if (updateError) throw updateError
           
           successCount++
           setGenProgress({ current: successCount, total: ready.length })
-          
-        } catch (error) {
-          console.error(`Error regenerating for ${student.name}:`, error)
-          errorCount++
-        }
+        } catch (error) { errorCount++ }
       }
       
-      if (successCount > 0) {
-        toast.success(`✅ Regenerated comments for ${successCount} students!`)
-        await loadBroadSheet()
-      }
-      
-      if (errorCount > 0) {
-        toast.warning(`⚠️ ${errorCount} students failed to regenerate.`)
-      }
-      
+      if (successCount > 0) { toast.success(`✅ Regenerated comments for ${successCount} students!`); await loadBroadSheet() }
+      if (errorCount > 0) toast.warning(`⚠️ ${errorCount} students failed to regenerate.`)
     } catch (error) {
-      console.error('Regeneration error:', error)
       toast.error('Failed to regenerate comments')
     } finally {
       setRegenerating(false)
@@ -822,88 +662,47 @@ export default function BroadSheetPage() {
     }
   }
 
-  // ── Publish Report Cards ──────────────────────────────────────────────────
   const handlePublishReportCards = async () => {
     const gen = students.filter(s => s.meetsMinimum && s.reportCardStatus === 'generated')
-    if (gen.length === 0) { 
-      toast.warning('No generated report cards to publish. Generate them first.') 
-      return 
-    }
+    if (gen.length === 0) { toast.warning('No generated report cards to publish.'); return }
     
     setPublishing(true)
     try {
-      const { error } = await supabase
-        .from('report_cards')
-        .update({ 
-          status: 'published', 
-          published_at: new Date().toISOString() 
-        })
-        .in('student_id', gen.map(s => s.id))
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-        .eq('status', 'generated')
-      
+      const { error } = await supabase.from('report_cards').update({ status: 'published', published_at: new Date().toISOString() }).in('student_id', gen.map(s => s.id)).eq('term', selectedTerm).eq('academic_year', selectedYear).eq('status', 'generated')
       if (error) throw error
-      
       toast.success(`Published ${gen.length} report cards! Students can now view them.`)
       await loadBroadSheet()
     } catch (error) {
-      console.error('Publish error:', error)
       toast.error('Failed to publish report cards')
     } finally {
       setPublishing(false)
     }
   }
 
-  // ── Unpublish Report Cards ────────────────────────────────────────────────
   const handleUnpublishReportCards = async () => {
     const pub = students.filter(s => s.reportCardStatus === 'published')
-    if (pub.length === 0) { 
-      toast.warning('No published report cards.') 
-      return 
-    }
+    if (pub.length === 0) { toast.warning('No published report cards.'); return }
     
     setPublishing(true)
     try {
-      const { error } = await supabase
-        .from('report_cards')
-        .update({ 
-          status: 'generated', 
-          published_at: null 
-        })
-        .in('student_id', pub.map(s => s.id))
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-        .eq('status', 'published')
-      
+      const { error } = await supabase.from('report_cards').update({ status: 'generated', published_at: null }).in('student_id', pub.map(s => s.id)).eq('term', selectedTerm).eq('academic_year', selectedYear).eq('status', 'published')
       if (error) throw error
-      
       toast.success(`Unpublished ${pub.length} report cards.`)
       await loadBroadSheet()
     } catch (error) {
-      console.error('Unpublish error:', error)
       toast.error('Failed to unpublish')
     } finally {
       setPublishing(false)
     }
   }
 
-  // ── Export CSV ─────────────────────────────────────────────────────────────
   const handleExportCSV = () => {
     if (!students.length) { toast.error('No data to export'); return }
     const headers = ['Student Name', 'Department', 'Admission No', ...expectedSubjects.map(getDisplaySubjectName), 'Total', 'Average', 'Grade', 'Report Status']
     const rows = students.map(s => [
-      s.name, 
-      s.department || '—', 
-      s.admission_number, 
-      ...expectedSubjects.map(sub => { 
-        const sc = s.subjectMap[sub]; 
-        return sc ? `${sc.total}(${sc.grade})` : '—' 
-      }), 
-      s.totalScore, 
-      `${s.averageScore}%`, 
-      s.grade, 
-      s.reportCardStatus || 'None'
+      s.name, s.department || '—', s.admission_number, 
+      ...expectedSubjects.map(sub => { const sc = s.subjectMap[sub]; return sc ? `${sc.total}(${sc.grade})` : '—' }), 
+      s.totalScore, `${s.averageScore}%`, s.grade, s.reportCardStatus || 'None'
     ])
     const csv = [headers, ...rows].map(r => r.join(',')).join('\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }))
@@ -911,38 +710,24 @@ export default function BroadSheetPage() {
     toast.success('Exported!')
   }
 
-  // ── View Report Card ──────────────────────────────────────────────────────
   const handleViewReportCard = async (student: StudentRecord) => {
-    if (student.reportCardId) {
-      router.push(`/admin/report-cards/${student.reportCardId}/view`)
-      return
-    }
+    if (student.reportCardId) { router.push(`/admin/report-cards/${student.reportCardId}/view`); return }
 
     try {
-      const { data: reportCard, error } = await supabase
-        .from('report_cards')
-        .select('id')
-        .eq('student_id', student.id)
-        .eq('term', selectedTerm)
-        .eq('academic_year', selectedYear)
-        .maybeSingle()
-
+      const { data: reportCard, error } = await supabase.from('report_cards').select('id').eq('student_id', student.id).eq('term', selectedTerm).eq('academic_year', selectedYear).maybeSingle()
       if (error) throw error
 
-      if (reportCard) {
-        router.push(`/admin/report-cards/${reportCard.id}/view`)
-      } else {
+      if (reportCard) { router.push(`/admin/report-cards/${reportCard.id}/view`) }
+      else {
         toast.info('No report card generated for this student yet.')
         router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
       }
     } catch (error) {
-      console.error('Error finding report card:', error)
       toast.error('Failed to load report card')
       router.push(`/admin/report-cards/view?student=${student.id}&term=${selectedTerm}&year=${selectedYear}`)
     }
   }
 
-  // ── Compute stats ──────────────────────────────────────────────────────────
   const stats = useMemo(() => {
     const ready = students.filter(s => s.meetsMinimum && s.allSubmitted)
     const generated = students.filter(s => s.reportCardStatus === 'generated')
@@ -950,12 +735,8 @@ export default function BroadSheetPage() {
     const approved = students.filter(s => s.reportCardStatus === 'approved')
     const avgs = ready.map(s => s.averageScore).filter(a => a > 0)
     return {
-      total: students.length, 
-      complete: students.filter(s => s.hasAllSubjects).length,
-      readyForReport: ready.length, 
-      generated: generated.length, 
-      published: published.length,
-      approved: approved.length,
+      total: students.length, complete: students.filter(s => s.hasAllSubjects).length,
+      readyForReport: ready.length, generated: generated.length, published: published.length, approved: approved.length,
       incomplete: students.filter(s => !s.meetsMinimum).length,
       classAvg: avgs.length ? Math.round(avgs.reduce((a, b) => a + b, 0) / avgs.length) : 0,
       topScore: ready.length ? Math.max(...ready.map(s => s.totalScore)) : 0,
@@ -978,16 +759,15 @@ export default function BroadSheetPage() {
     return [`${year - 1}/${year}`, `${year}/${year + 1}`, `${year + 1}/${year + 2}`]
   }, [currentSession])
 
-  // ── Loading ───────────────────────────────────────────────────────────────
   if (!isMounted || isLoadingTerm || (loading && students.length === 0 && !loadError)) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="text-center space-y-3">
           <div className="inline-flex p-4 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 mb-2">
             <FileSpreadsheet className="h-10 w-10 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <Loader2 className="h-6 w-6 animate-spin text-emerald-600 mx-auto" />
-          <p className="text-sm text-slate-500">{isLoadingTerm ? 'Loading term settings…' : 'Loading broad sheet…'}</p>
+          <Loader2 className="h-6 w-6 animate-spin text-emerald-600 dark:text-emerald-400 mx-auto" />
+          <p className="text-sm text-slate-500 dark:text-slate-400">{isLoadingTerm ? 'Loading term settings…' : 'Loading broad sheet…'}</p>
         </div>
       </div>
     )
@@ -995,13 +775,13 @@ export default function BroadSheetPage() {
 
   if (loadError && students.length === 0) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
+      <div className="flex items-center justify-center min-h-[60vh] bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="text-center space-y-3">
           <div className="inline-flex p-4 rounded-2xl bg-red-100 dark:bg-red-900/30">
-            <AlertCircle className="h-10 w-10 text-red-500" />
+            <AlertCircle className="h-10 w-10 text-red-500 dark:text-red-400" />
           </div>
           <p className="text-base font-semibold text-slate-700 dark:text-slate-200">Failed to load broad sheet</p>
-          <Button onClick={() => { setLoadError(false); setLoading(true); loadBroadSheet() }} className="bg-emerald-600 hover:bg-emerald-700 gap-2">
+          <Button onClick={() => { setLoadError(false); setLoading(true); loadBroadSheet() }} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
             <RefreshCw className="h-4 w-4" /> Retry
           </Button>
         </div>
@@ -1010,10 +790,9 @@ export default function BroadSheetPage() {
   }
 
   return (
-    <div className="w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 min-h-screen print:bg-white">
+    <div className="w-full max-w-full overflow-x-hidden bg-slate-50 dark:bg-slate-950 min-h-screen print:bg-white transition-colors duration-300">
       <div className="px-3 sm:px-5 lg:px-6 py-4 sm:py-6 space-y-4 max-w-[1800px] mx-auto">
 
-        {/* Live alert banner */}
         <AnimatePresence>
           {newScoreAlert && (
             <motion.div initial={{ opacity: 0, y: -12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
@@ -1023,20 +802,19 @@ export default function BroadSheetPage() {
                 <span className="text-sm font-medium text-emerald-700 dark:text-emerald-300">{newScoreAlert}</span>
               </div>
               <Button size="sm" variant="ghost" onClick={() => { setNewScoreAlert(null); loadBroadSheet() }}
-                className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 flex-shrink-0">
+                className="h-7 text-xs text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 flex-shrink-0">
                 Refresh <RefreshCw className="h-3 w-3 ml-1" />
               </Button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Page header */}
         <div className="no-print flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
-            <button onClick={() => router.back()} className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 mb-2 transition-colors">
+            <button onClick={() => router.back()} className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 mb-2 transition-colors">
               <ChevronLeft className="h-3.5 w-3.5" /> Back
             </button>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
               <FileSpreadsheet className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
               Broad Sheet
             </h1>
@@ -1051,28 +829,27 @@ export default function BroadSheetPage() {
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline"
               onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear }); router.push(`/admin/report-cards?${p}`) }}
-              className="h-8 text-xs gap-1.5">
+              className="h-8 text-xs gap-1.5 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
               <FileText className="h-3.5 w-3.5" /> Report Cards
             </Button>
             <Button size="sm" variant={autoRefreshEnabled ? 'default' : 'outline'}
               onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
-              className={cn('h-8 text-xs gap-1.5', autoRefreshEnabled && 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600')}>
+              className={cn('h-8 text-xs gap-1.5', autoRefreshEnabled ? 'bg-emerald-600 hover:bg-emerald-700 border-emerald-600 text-white' : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300')}>
               <Zap className="h-3.5 w-3.5" /> {autoRefreshEnabled ? 'Live ON' : 'Live OFF'}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => { setLoadError(false); loadBroadSheet() }} disabled={loading}
-              className="h-8 text-xs gap-1.5 text-slate-500 hover:text-slate-700">
+              className="h-8 text-xs gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} /> Refresh
             </Button>
-            <Button size="sm" variant="ghost" onClick={handleExportCSV} className="h-8 text-xs gap-1.5 text-slate-500 hover:text-slate-700">
+            <Button size="sm" variant="ghost" onClick={handleExportCSV} className="h-8 text-xs gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <FileDown className="h-3.5 w-3.5" /> CSV
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => window.print()} className="h-8 text-xs gap-1.5 text-slate-500 hover:text-slate-700">
+            <Button size="sm" variant="ghost" onClick={() => window.print()} className="h-8 text-xs gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
               <Printer className="h-3.5 w-3.5" /> Print
             </Button>
           </div>
         </div>
 
-        {/* Stat cards */}
         <div className="no-print grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Total Students" value={stats.total} icon={Users} accent="bg-slate-500" />
           <StatCard label="Ready for Report" value={stats.readyForReport} icon={CheckCircle2} accent="bg-emerald-500" sub={`min ${minRequired} subjects`} />
@@ -1082,48 +859,30 @@ export default function BroadSheetPage() {
           <StatCard label="Published" value={stats.published} icon={Send} accent="bg-teal-500" sub="visible to students" />
         </div>
 
-        {/* Config + actions card */}
-        <Card className="no-print border-0 shadow-sm bg-white dark:bg-slate-900">
+        <Card className="no-print border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-4 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-md bg-slate-100 dark:bg-slate-800">
                 <Settings2 className="h-4 w-4 text-slate-600 dark:text-slate-400" />
               </div>
-              <CardTitle className="text-sm font-semibold text-slate-800 dark:text-slate-100">Filters & Actions</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-800 dark:text-white">Filters & Actions</CardTitle>
             </div>
           </CardHeader>
           <CardContent className="pt-4 space-y-5">
-            {/* Filters */}
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
               {[
                 { label: 'Class', value: selectedClass, onChange: setSelectedClass, items: ALL_CLASSES.map(c => ({ value: c, label: c })) },
-                { 
-                  label: 'Term', 
-                  value: selectedTerm, 
-                  onChange: setSelectedTerm, 
-                  items: TERMS.map(t => ({ 
-                    value: t.value, 
-                    label: t.label + (t.value === currentTerm ? ' (current)' : '') 
-                  }))
-                },
-                { 
-                  label: 'Session', 
-                  value: selectedYear, 
-                  onChange: setSelectedYear, 
-                  items: availableSessions.map(y => ({ 
-                    value: y, 
-                    label: y + (y === currentSession ? ' (current)' : '') 
-                  }))
-                },
+                { label: 'Term', value: selectedTerm, onChange: setSelectedTerm, items: TERMS.map(t => ({ value: t.value, label: t.label + (t.value === currentTerm ? ' (current)' : '') })) },
+                { label: 'Session', value: selectedYear, onChange: setSelectedYear, items: availableSessions.map(y => ({ value: y, label: y + (y === currentSession ? ' (current)' : '') })) },
                 { label: 'Department', value: selectedDepartment, onChange: setSelectedDepartment, items: DEPARTMENTS.map(d => ({ value: d.value, label: d.label })) },
               ].map(({ label, value, onChange, items }) => (
                 <div key={label} className="space-y-1.5">
                   <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">{label}</Label>
                   <Select value={value} onValueChange={onChange}>
-                    <SelectTrigger className="h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                    <SelectTrigger className="h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                       {items.map(i => <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
@@ -1132,22 +891,21 @@ export default function BroadSheetPage() {
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Search</Label>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                   <Input placeholder="Name, Admission No…" value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-8 h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700" />
+                    className="pl-8 h-9 text-sm bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500" />
                   {searchQuery && (
                     <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600" />
+                      <X className="h-3.5 w-3.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" />
                     </button>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Action buttons */}
             <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
               <Button onClick={handleGenerateReportCards} disabled={generating || publishing || stats.readyForReport === 0}
-                className="bg-violet-600 hover:bg-violet-700 text-white shadow-sm gap-2 h-9">
+                className="bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white shadow-sm gap-2 h-9">
                 {generating
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Generating… {genProgress.current}/{genProgress.total}</>
                   : <><Sparkles className="h-4 w-4" /> Generate Reports <span className="ml-0.5 bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full">{stats.readyForReport}</span></>}
@@ -1155,7 +913,7 @@ export default function BroadSheetPage() {
 
               {stats.generated > 0 && (
                 <Button onClick={handlePublishReportCards} disabled={generating || publishing}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm gap-2 h-9">
+                  className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm gap-2 h-9">
                   {publishing
                     ? <><Loader2 className="h-4 w-4 animate-spin" /> Publishing…</>
                     : <><Send className="h-4 w-4" /> Publish <span className="ml-0.5 bg-white/20 text-white text-xs px-1.5 py-0.5 rounded-full">{stats.generated}</span></>}
@@ -1164,25 +922,24 @@ export default function BroadSheetPage() {
 
               {stats.published > 0 && (
                 <Button onClick={handleUnpublishReportCards} disabled={generating || publishing} variant="outline"
-                  className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-950/30 gap-2 h-9">
+                  className="border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 gap-2 h-9">
                   <Shield className="h-4 w-4" /> Unpublish <span className="ml-0.5 text-xs">({stats.published})</span>
                 </Button>
               )}
 
               <Button onClick={handleRegenerateComments} disabled={regenerating || generating || publishing}
-                className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm gap-2 h-9">
+                className="bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white shadow-sm gap-2 h-9">
                 {regenerating
                   ? <><Loader2 className="h-4 w-4 animate-spin" /> Regenerating… {genProgress.current}/{genProgress.total}</>
                   : <><RefreshCw className="h-4 w-4" /> Regen Comments</>}
               </Button>
 
-              <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-slate-500 hover:text-slate-700 ml-auto"
+              <Button variant="ghost" size="sm" className="h-9 gap-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 ml-auto"
                 onClick={() => { const p = new URLSearchParams({ class: selectedClass, term: selectedTerm, year: selectedYear, status: 'generated' }); router.push(`/admin/report-cards?${p}`) }}>
                 <Eye className="h-4 w-4" /> View Report Cards
               </Button>
             </div>
 
-            {/* Status pills */}
             {(stats.generated > 0 || stats.published > 0 || stats.approved > 0) && (
               <div className="flex flex-wrap gap-2">
                 {stats.generated > 0 && (
@@ -1203,7 +960,6 @@ export default function BroadSheetPage() {
               </div>
             )}
 
-            {/* Department breakdown */}
             {Object.keys(stats.deptBreakdown).length > 0 && (
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(stats.deptBreakdown).map(([dept, count]) => (
@@ -1216,7 +972,6 @@ export default function BroadSheetPage() {
           </CardContent>
         </Card>
 
-        {/* Generation progress bar */}
         <AnimatePresence>
           {(generating || regenerating) && (
             <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
@@ -1241,26 +996,23 @@ export default function BroadSheetPage() {
           )}
         </AnimatePresence>
 
-        {/* Broad sheet table */}
-        <Card className="border-0 shadow-sm bg-white dark:bg-slate-900 overflow-hidden print:shadow-none">
-          {/* Print header */}
-          <div className="hidden print:block p-6 text-center border-b border-slate-200">
-            <h1 className="text-xl font-bold text-slate-800">VINCOLLINS COLLEGE</h1>
-            <p className="text-base font-semibold text-slate-700 mt-1">Broad Sheet — {selectedClass}</p>
-            <p className="text-sm text-slate-500">{getTermLabel(selectedTerm)} · {selectedYear}</p>
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden print:shadow-none">
+          <div className="hidden print:block p-6 text-center border-b border-slate-200 dark:border-slate-800">
+            <h1 className="text-xl font-bold text-slate-800 dark:text-white">VINCOLLINS COLLEGE</h1>
+            <p className="text-base font-semibold text-slate-700 dark:text-slate-200 mt-1">Broad Sheet — {selectedClass}</p>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{getTermLabel(selectedTerm)} · {selectedYear}</p>
           </div>
 
-          {/* Table header bar */}
           <div className="no-print flex items-center justify-between px-5 py-3 bg-slate-50 dark:bg-slate-800/60 border-b border-slate-100 dark:border-slate-800">
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-              <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">Students</span>
+              <span className="font-semibold text-sm text-slate-800 dark:text-white">Students</span>
               <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-medium">
                 {displayedStudents.length}
               </span>
             </div>
             {loading && (
-              <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" /> Refreshing…
               </div>
             )}
@@ -1294,7 +1046,7 @@ export default function BroadSheetPage() {
                   <tr>
                     <td colSpan={expectedSubjects.length + 6} className="text-center py-16">
                       <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-3">
-                        <Users className="h-8 w-8 text-slate-400" />
+                        <Users className="h-8 w-8 text-slate-400 dark:text-slate-500" />
                       </div>
                       <p className="text-sm font-medium text-slate-500 dark:text-slate-400">No active students found</p>
                     </td>
@@ -1312,7 +1064,7 @@ export default function BroadSheetPage() {
                         )}>
                         <td className="sticky left-0 z-10 bg-inherit px-4 py-3">
                           <div>
-                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 leading-snug">{student.name}</p>
+                            <p className="font-semibold text-sm text-slate-800 dark:text-white leading-snug">{student.name}</p>
                             <div className="flex flex-wrap items-center gap-1 mt-1">
                               <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{deptLabel}</span>
                               {student.meetsMinimum && (
@@ -1339,7 +1091,7 @@ export default function BroadSheetPage() {
                             <td key={subject} className="px-2 py-3 text-center">
                               {score && isExpected ? (
                                 <div className="flex flex-col items-center gap-0.5">
-                                  <span className="font-bold text-xs text-slate-800 dark:text-slate-100">{score.total}</span>
+                                  <span className="font-bold text-xs text-slate-800 dark:text-white">{score.total}</span>
                                   <span className={cn('text-[9px] font-semibold px-1.5 py-0.5 rounded-full', gradeChipClass(score.grade))}>
                                     {score.grade}
                                   </span>
@@ -1353,8 +1105,8 @@ export default function BroadSheetPage() {
                           )
                         })}
 
-                        <td className="px-3 py-3 text-center font-bold text-sm text-slate-800 dark:text-slate-100">{student.totalScore || '—'}</td>
-                        <td className="px-3 py-3 text-center font-semibold text-sm text-slate-700 dark:text-slate-200">{student.averageScore > 0 ? `${student.averageScore}%` : '—'}</td>
+                        <td className="px-3 py-3 text-center font-bold text-sm text-slate-800 dark:text-white">{student.totalScore || '—'}</td>
+                        <td className="px-3 py-3 text-center font-semibold text-sm text-slate-700 dark:text-slate-300">{student.averageScore > 0 ? `${student.averageScore}%` : '—'}</td>
                         <td className="px-3 py-3 text-center">
                           {student.grade !== '—' ? (
                             <span className={cn('text-xs font-bold px-2 py-1 rounded-full', overallChipClass(student.grade))}>
@@ -1372,7 +1124,7 @@ export default function BroadSheetPage() {
                             variant="ghost" 
                             size="sm" 
                             onClick={() => handleViewReportCard(student)}
-                            className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-950/30 gap-1"
+                            className="h-7 px-2.5 text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:text-blue-300 dark:hover:bg-blue-950/30 gap-1"
                           >
                             <Eye className="h-3 w-3" /> View
                           </Button>

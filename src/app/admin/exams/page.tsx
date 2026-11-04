@@ -1,4 +1,4 @@
-// app/admin/exams/page.tsx
+// app/admin/exams/page.tsx - FULLY DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -138,17 +138,17 @@ const isCurrentTerm = (exam: Exam, current: { term: string; session_year: string
 }
 
 const classColors: Record<string, { bg: string; text: string; ring: string; dot: string; gradient: string }> = {
-  'JSS 1': { bg: 'bg-amber-50', text: 'text-amber-700', ring: 'ring-amber-200', dot: 'bg-amber-500', gradient: 'from-amber-500 to-orange-500' },
-  'JSS 2': { bg: 'bg-rose-50', text: 'text-rose-700', ring: 'ring-rose-200', dot: 'bg-rose-500', gradient: 'from-rose-500 to-pink-500' },
-  'JSS 3': { bg: 'bg-cyan-50', text: 'text-cyan-700', ring: 'ring-cyan-200', dot: 'bg-cyan-500', gradient: 'from-cyan-500 to-teal-500' },
-  'SS 1':  { bg: 'bg-emerald-50', text: 'text-emerald-700', ring: 'ring-emerald-200', dot: 'bg-emerald-500', gradient: 'from-emerald-500 to-green-500' },
-  'SS 2':  { bg: 'bg-blue-50', text: 'text-blue-700', ring: 'ring-blue-200', dot: 'bg-blue-500', gradient: 'from-blue-500 to-indigo-500' },
-  'SS 3':  { bg: 'bg-violet-50', text: 'text-violet-700', ring: 'ring-violet-200', dot: 'bg-violet-500', gradient: 'from-violet-500 to-purple-500' },
+  'JSS 1': { bg: 'bg-amber-50 dark:bg-amber-500/10', text: 'text-amber-700 dark:text-amber-300', ring: 'ring-amber-200 dark:ring-amber-500/30', dot: 'bg-amber-500', gradient: 'from-amber-500 to-orange-500' },
+  'JSS 2': { bg: 'bg-rose-50 dark:bg-rose-500/10', text: 'text-rose-700 dark:text-rose-300', ring: 'ring-rose-200 dark:ring-rose-500/30', dot: 'bg-rose-500', gradient: 'from-rose-500 to-pink-500' },
+  'JSS 3': { bg: 'bg-cyan-50 dark:bg-cyan-500/10', text: 'text-cyan-700 dark:text-cyan-300', ring: 'ring-cyan-200 dark:ring-cyan-500/30', dot: 'bg-cyan-500', gradient: 'from-cyan-500 to-teal-500' },
+  'SS 1':  { bg: 'bg-emerald-50 dark:bg-emerald-500/10', text: 'text-emerald-700 dark:text-emerald-300', ring: 'ring-emerald-200 dark:ring-emerald-500/30', dot: 'bg-emerald-500', gradient: 'from-emerald-500 to-green-500' },
+  'SS 2':  { bg: 'bg-blue-50 dark:bg-blue-500/10', text: 'text-blue-700 dark:text-blue-300', ring: 'ring-blue-200 dark:ring-blue-500/30', dot: 'bg-blue-500', gradient: 'from-blue-500 to-indigo-500' },
+  'SS 3':  { bg: 'bg-violet-50 dark:bg-violet-500/10', text: 'text-violet-700 dark:text-violet-300', ring: 'ring-violet-200 dark:ring-violet-500/30', dot: 'bg-violet-500', gradient: 'from-violet-500 to-purple-500' },
 }
 
 const ClassBadge = ({ cls }: { cls: string }) => {
   const year = extractYear(cls)
-  const c = classColors[year] || { bg: 'bg-slate-100', text: 'text-slate-600', ring: 'ring-slate-200', dot: 'bg-slate-400', gradient: 'from-slate-400 to-slate-500' }
+  const c = classColors[year] || { bg: 'bg-slate-100 dark:bg-slate-800', text: 'text-slate-600 dark:text-slate-300', ring: 'ring-slate-200 dark:ring-slate-700', dot: 'bg-slate-400', gradient: 'from-slate-400 to-slate-500' }
   return (
     <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ring-1', c.bg, c.text, c.ring)}>
       <span className={cn('h-1.5 w-1.5 rounded-full', c.dot)} />
@@ -158,16 +158,16 @@ const ClassBadge = ({ cls }: { cls: string }) => {
 }
 
 const statusConfig: Record<string, { label: string; icon: any; cls: string }> = {
-  published: { label: 'Published', icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200' },
-  pending:   { label: 'Pending',   icon: Clock,        cls: 'bg-amber-50 text-amber-700 border border-amber-200' },
-  draft:     { label: 'Draft',     icon: FileText,     cls: 'bg-slate-100 text-slate-600 border border-slate-200' },
-  submitted: { label: 'Submitted', icon: Send,         cls: 'bg-blue-50 text-blue-700 border border-blue-200' },
-  rejected:  { label: 'Rejected',  icon: XCircle,      cls: 'bg-red-50 text-red-600 border border-red-200' },
-  archived:  { label: 'Archived',  icon: Archive,      cls: 'bg-slate-100 text-slate-500 border border-slate-200' },
+  published: { label: 'Published', icon: CheckCircle2, cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
+  pending:   { label: 'Pending',   icon: Clock,        cls: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30' },
+  draft:     { label: 'Draft',     icon: FileText,     cls: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' },
+  submitted: { label: 'Submitted', icon: Send,         cls: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30' },
+  rejected:  { label: 'Rejected',  icon: XCircle,      cls: 'bg-red-50 text-red-600 border border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30' },
+  archived:  { label: 'Archived',  icon: Archive,      cls: 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700' },
 }
 
 const StatusPill = ({ status }: { status: string }) => {
-  const cfg = statusConfig[status] || { label: status, icon: FileText, cls: 'bg-slate-100 text-slate-600 border border-slate-200' }
+  const cfg = statusConfig[status] || { label: status, icon: FileText, cls: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' }
   const Icon = cfg.icon
   return (
     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium', cfg.cls)}>
@@ -179,13 +179,13 @@ const StatusPill = ({ status }: { status: string }) => {
 const DeptPill = ({ exam }: { exam: Exam }) => {
   const dept = getExamDept(exam)
   const map: Record<string, string> = {
-    'All Students': 'bg-teal-50 text-teal-700 border-teal-200',
-    'Science':      'bg-blue-50 text-blue-700 border-blue-200',
-    'Arts':         'bg-violet-50 text-violet-700 border-violet-200',
-    'Commercial':   'bg-amber-50 text-amber-700 border-amber-200',
+    'All Students': 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-500/10 dark:text-teal-300 dark:border-teal-500/30',
+    'Science':      'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30',
+    'Arts':         'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/30',
+    'Commercial':   'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30',
   }
   return (
-    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border', map[dept] || 'bg-slate-100 text-slate-600 border-slate-200')}>
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border', map[dept] || 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700')}>
       {dept}
     </span>
   )
@@ -200,14 +200,14 @@ const renderSubQuestions = (subs: TheorySubQuestion[], prefix: string = '', dept
       {subs.map((sub, idx) => {
         const label = depth === 0 ? `(${labels[idx] ?? idx + 1})` : `(${romans[idx] ?? idx + 1})`
         return (
-          <li key={idx} className="text-sm text-slate-700">
+          <li key={idx} className="text-sm text-slate-700 dark:text-slate-300">
             <div className="flex gap-2">
-              <span className="font-semibold text-slate-600 min-w-[24px]">{label}</span>
+              <span className="font-semibold text-slate-600 dark:text-slate-400 min-w-[24px]">{label}</span>
               <div className="flex-1">
                 <div className="flex items-start justify-between gap-3">
                   <p className="leading-relaxed">{sub.text}</p>
                   {sub.marks > 0 && (
-                    <span className="text-[10px] font-semibold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded whitespace-nowrap">
+                    <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 px-1.5 py-0.5 rounded whitespace-nowrap">
                       {sub.marks} mk{sub.marks !== 1 ? 's' : ''}
                     </span>
                   )}
@@ -287,7 +287,6 @@ export default function AdminExamsPage() {
       const { data, error } = await supabase.from('exams').select('*').order('created_at', { ascending: false }).limit(500)
       if (error) throw error
 
-      // Fetch teacher names
       const creatorIds = Array.from(new Set((data || []).map((e: any) => e.created_by).filter(Boolean)))
       let teacherMap: Record<string, string> = {}
       if (creatorIds.length > 0) {
@@ -321,7 +320,6 @@ export default function AdminExamsPage() {
       setExamQs(Array.isArray(qs) ? qs : [])
       setTheoryQs(Array.isArray(tqs) ? tqs : [])
 
-      // Decide default tab
       if (Array.isArray(qs) && qs.length > 0) setPreviewTab('objective')
       else if (Array.isArray(tqs) && tqs.length > 0) setPreviewTab('theory')
       else setPreviewTab('info')
@@ -540,7 +538,6 @@ export default function AdminExamsPage() {
     return acc
   }, {} as Record<string, Exam[]>), [filtered])
 
-  // Standard classes first, then any unrecognised class names so no exam is hidden
   const groupKeys = useMemo(
     () => [...CLASS_ORDER, ...Object.keys(grouped).filter(k => !CLASS_ORDER.includes(k))],
     [grouped]
@@ -579,50 +576,50 @@ export default function AdminExamsPage() {
     <div className="flex items-center justify-end gap-1">
       <button
         onClick={() => { setSelectedExam(exam); loadQs(exam); setShowPreview(true) }}
-        className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors"
+        className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
         title="Preview"
       >
-        <Eye className="h-3.5 w-3.5 text-slate-600" />
+        <Eye className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
       </button>
 
       {activeTab === 'pending' && (
         <>
-          <button onClick={() => { setSelectedExam(exam); setShowApprove(true) }} className="h-8 w-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center justify-center transition-colors" title="Approve & Publish">
-            <CheckCircle className="h-3.5 w-3.5 text-emerald-600" />
+          <button onClick={() => { setSelectedExam(exam); setShowApprove(true) }} className="h-8 w-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 flex items-center justify-center transition-colors" title="Approve & Publish">
+            <CheckCircle className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
           </button>
-          <button onClick={() => { setSelectedExam(exam); setShowReject(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors" title="Reject">
-            <XCircle className="h-3.5 w-3.5 text-red-500" />
+          <button onClick={() => { setSelectedExam(exam); setShowReject(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors" title="Reject">
+            <XCircle className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
           </button>
-          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" title="Delete">
-            <Trash2 className="h-3.5 w-3.5 text-slate-500" />
+          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors" title="Delete">
+            <Trash2 className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
           </button>
         </>
       )}
 
       {activeTab === 'published' && (
         <>
-          <button onClick={() => openRetryDialog(exam)} className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors" title="Allow Retry">
-            <RotateCcw className="h-3.5 w-3.5 text-blue-600" />
+          <button onClick={() => openRetryDialog(exam)} className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 flex items-center justify-center transition-colors" title="Allow Retry">
+            <RotateCcw className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
           </button>
-          <button onClick={() => { setSelectedExam(exam); setShowReturn(true) }} className="h-8 w-8 rounded-lg bg-amber-50 hover:bg-amber-100 flex items-center justify-center transition-colors" title="Return to Teacher">
-            <Edit3 className="h-3.5 w-3.5 text-amber-600" />
+          <button onClick={() => { setSelectedExam(exam); setShowReturn(true) }} className="h-8 w-8 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 flex items-center justify-center transition-colors" title="Return to Teacher">
+            <Edit3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           </button>
-          <button onClick={() => { setSelectedExam(exam); setShowArchive(true) }} className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" title="Archive">
-            <Archive className="h-3.5 w-3.5 text-slate-600" />
+          <button onClick={() => { setSelectedExam(exam); setShowArchive(true) }} className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors" title="Archive">
+            <Archive className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
           </button>
-          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors" title="Delete">
-            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors" title="Delete">
+            <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
           </button>
         </>
       )}
 
       {activeTab === 'archived' && (
         <>
-          <button onClick={() => handleUnarchive(exam)} disabled={processing} className="h-8 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 transition-colors" title="Restore">
+          <button onClick={() => handleUnarchive(exam)} disabled={processing} className="h-8 px-2.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/20 flex items-center gap-1 text-[11px] font-semibold text-emerald-700 dark:text-emerald-300 transition-colors" title="Restore">
             <RotateCcw className="h-3 w-3" /> Restore
           </button>
-          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 flex items-center justify-center transition-colors" title="Delete">
-            <Trash2 className="h-3.5 w-3.5 text-red-500" />
+          <button onClick={() => { setSelectedExam(exam); setShowDelete(true) }} className="h-8 w-8 rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-500/10 dark:hover:bg-red-500/20 flex items-center justify-center transition-colors" title="Delete">
+            <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
           </button>
         </>
       )}
@@ -632,24 +629,24 @@ export default function AdminExamsPage() {
   // Shared table head + row renderers
   const renderTableHead = () => (
     <TableHeader>
-      <TableRow className="bg-slate-50/50 hover:bg-slate-50/50">
-        <TableHead className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Exam</TableHead>
-        <TableHead className="text-[10px] font-bold uppercase text-slate-500 tracking-wider hidden md:table-cell">Teacher</TableHead>
-        <TableHead className="text-[10px] font-bold uppercase text-slate-500 tracking-wider hidden lg:table-cell">Details</TableHead>
-        <TableHead className="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Status</TableHead>
-        <TableHead className="text-[10px] font-bold uppercase text-slate-500 tracking-wider text-right">Actions</TableHead>
+      <TableRow className="bg-slate-50/50 dark:bg-slate-900/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 border-slate-200 dark:border-slate-800">
+        <TableHead className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Exam</TableHead>
+        <TableHead className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider hidden md:table-cell">Teacher</TableHead>
+        <TableHead className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider hidden lg:table-cell">Details</TableHead>
+        <TableHead className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">Status</TableHead>
+        <TableHead className="text-[10px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider text-right">Actions</TableHead>
       </TableRow>
     </TableHeader>
   )
 
   const renderExamRow = (exam: Exam) => (
-    <TableRow key={exam.id} className="hover:bg-slate-50/50 transition-colors">
+    <TableRow key={exam.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors border-slate-200 dark:border-slate-800">
       <TableCell className="py-3">
         <div>
-          <p className="font-semibold text-sm text-slate-900 line-clamp-1">{exam.title}</p>
+          <p className="font-semibold text-sm text-slate-900 dark:text-slate-100 line-clamp-1">{exam.title}</p>
           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-            <span className="text-[11px] text-slate-500 font-medium">{exam.subject}</span>
-            <span className="text-slate-300">·</span>
+            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">{exam.subject}</span>
+            <span className="text-slate-300 dark:text-slate-600">·</span>
             <ClassBadge cls={exam.class} />
             <DeptPill exam={exam} />
           </div>
@@ -657,17 +654,17 @@ export default function AdminExamsPage() {
       </TableCell>
       <TableCell className="hidden md:table-cell">
         <div className="flex items-center gap-2">
-          <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center">
-            <User className="h-3.5 w-3.5 text-slate-500" />
+          <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+            <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
           </div>
           <div>
-            <p className="text-xs font-medium text-slate-700">{exam.teacher_name}</p>
-            <p className="text-[10px] text-slate-400">{formatDateShort(exam.created_at)}</p>
+            <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{exam.teacher_name}</p>
+            <p className="text-[10px] text-slate-400 dark:text-slate-500">{formatDateShort(exam.created_at)}</p>
           </div>
         </div>
       </TableCell>
       <TableCell className="hidden lg:table-cell">
-        <div className="flex items-center gap-3 text-[11px] text-slate-500">
+        <div className="flex items-center gap-3 text-[11px] text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1" title="Duration">
             <Timer className="h-3 w-3" /> {exam.duration}m
           </span>
@@ -687,55 +684,55 @@ export default function AdminExamsPage() {
   )
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
       <div className="text-center">
-        <Loader2 className="animate-spin h-10 w-10 text-violet-600 mx-auto mb-3" />
-        <p className="text-sm text-slate-500">Loading exam management...</p>
+        <Loader2 className="animate-spin h-10 w-10 text-violet-600 dark:text-violet-400 mx-auto mb-3" />
+        <p className="text-sm text-slate-500 dark:text-slate-400">Loading exam management...</p>
       </div>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
 
         {/* HEADER */}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-3 pb-2">
           <div className="flex items-center gap-3">
-            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-200">
+            <div className="h-11 w-11 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-200 dark:shadow-violet-900/40">
               <Shield className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">Exam Management</h1>
-              <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Exam Management</h1>
+              <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1.5 mt-0.5 flex-wrap">
                 <Sparkles className="h-3 w-3" />
                 Review, publish, and manage all teacher submissions
                 {currentTermInfo && (
-                  <span className="ml-2 px-2 py-0.5 bg-violet-50 text-violet-700 rounded-full text-[10px] font-semibold">
+                  <span className="ml-1 px-2 py-0.5 bg-violet-50 dark:bg-violet-500/10 text-violet-700 dark:text-violet-300 rounded-full text-[10px] font-semibold">
                     {currentTermInfo.term.toUpperCase()} · {currentTermInfo.session_year}
                   </span>
                 )}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="hidden sm:flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-0.5">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="hidden sm:flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('grouped')}
-                className={cn('h-7 w-7 rounded flex items-center justify-center transition-colors', viewMode === 'grouped' ? 'bg-violet-100 text-violet-700' : 'text-slate-400 hover:text-slate-600')}
+                className={cn('h-7 w-7 rounded flex items-center justify-center transition-colors', viewMode === 'grouped' ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')}
                 title="Grouped view"
               >
                 <LayoutGrid className="h-3.5 w-3.5" />
               </button>
               <button
                 onClick={() => setViewMode('list')}
-                className={cn('h-7 w-7 rounded flex items-center justify-center transition-colors', viewMode === 'list' ? 'bg-violet-100 text-violet-700' : 'text-slate-400 hover:text-slate-600')}
+                className={cn('h-7 w-7 rounded flex items-center justify-center transition-colors', viewMode === 'list' ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300')}
                 title="List view"
               >
                 <List className="h-3.5 w-3.5" />
               </button>
             </div>
-            <Button variant="outline" size="sm" onClick={() => { setRefreshing(true); loadExams() }} disabled={refreshing} className="h-8">
+            <Button variant="outline" size="sm" onClick={() => { setRefreshing(true); loadExams() }} disabled={refreshing} className="h-8 flex-1 sm:flex-initial dark:bg-slate-900 dark:border-slate-800 dark:hover:bg-slate-800 dark:text-slate-200">
               <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
               Refresh
             </Button>
@@ -743,112 +740,120 @@ export default function AdminExamsPage() {
         </header>
 
         {/* STATS CARDS */}
-        <section className="grid grid-cols-3 gap-3">
+        <section className="grid grid-cols-3 gap-2 sm:gap-3">
           <button
             onClick={() => setActiveTab('pending')}
             className={cn(
-              'relative bg-white p-4 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
-              activeTab === 'pending' ? 'ring-2 ring-amber-400 border-amber-200 shadow-lg shadow-amber-100' : 'border-slate-200 hover:border-amber-200 hover:shadow-md'
+              'relative bg-white dark:bg-slate-900 p-3 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
+              activeTab === 'pending'
+                ? 'ring-2 ring-amber-400 dark:ring-amber-500 border-amber-200 dark:border-amber-500/30 shadow-lg shadow-amber-100 dark:shadow-amber-900/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-amber-200 dark:hover:border-amber-500/30 hover:shadow-md'
             )}
           >
-            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-amber-400 to-orange-400 opacity-10 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
+            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-amber-400 to-orange-400 opacity-10 dark:opacity-20 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pending Review</p>
-                <Clock className="h-4 w-4 text-amber-500" />
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Pending</p>
+                <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-500 dark:text-amber-400" />
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-amber-600 tracking-tight">{pendingCount}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Awaiting approval</p>
+              <p className="text-2xl sm:text-3xl font-bold text-amber-600 dark:text-amber-400 tracking-tight">{pendingCount}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Awaiting approval</p>
             </div>
           </button>
 
           <button
             onClick={() => setActiveTab('published')}
             className={cn(
-              'relative bg-white p-4 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
-              activeTab === 'published' ? 'ring-2 ring-emerald-400 border-emerald-200 shadow-lg shadow-emerald-100' : 'border-slate-200 hover:border-emerald-200 hover:shadow-md'
+              'relative bg-white dark:bg-slate-900 p-3 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
+              activeTab === 'published'
+                ? 'ring-2 ring-emerald-400 dark:ring-emerald-500 border-emerald-200 dark:border-emerald-500/30 shadow-lg shadow-emerald-100 dark:shadow-emerald-900/20'
+                : 'border-slate-200 dark:border-slate-800 hover:border-emerald-200 dark:hover:border-emerald-500/30 hover:shadow-md'
             )}
           >
-            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-emerald-400 to-green-400 opacity-10 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
+            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-emerald-400 to-green-400 opacity-10 dark:opacity-20 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Published</p>
-                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Published</p>
+                <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-500 dark:text-emerald-400" />
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-emerald-600 tracking-tight">{publishedCount}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Live & active</p>
+              <p className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">{publishedCount}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Live & active</p>
             </div>
           </button>
 
           <button
             onClick={() => setActiveTab('archived')}
             className={cn(
-              'relative bg-white p-4 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
-              activeTab === 'archived' ? 'ring-2 ring-slate-400 border-slate-300 shadow-lg shadow-slate-100' : 'border-slate-200 hover:border-slate-300 hover:shadow-md'
+              'relative bg-white dark:bg-slate-900 p-3 sm:p-5 rounded-2xl border transition-all text-left group overflow-hidden',
+              activeTab === 'archived'
+                ? 'ring-2 ring-slate-400 dark:ring-slate-500 border-slate-300 dark:border-slate-600 shadow-lg shadow-slate-100 dark:shadow-slate-900/40'
+                : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md'
             )}
           >
-            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-slate-400 to-slate-500 opacity-10 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
+            <div className="absolute top-0 right-0 h-16 w-16 bg-gradient-to-br from-slate-400 to-slate-500 opacity-10 dark:opacity-20 rounded-full -mr-4 -mt-4 group-hover:scale-150 transition-transform" />
             <div className="relative">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Archived</p>
-                <Archive className="h-4 w-4 text-slate-500" />
+                <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Archived</p>
+                <Archive className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-500 dark:text-slate-400" />
               </div>
-              <p className="text-2xl sm:text-3xl font-bold text-slate-600 tracking-tight">{archivedCount}</p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Past exams</p>
+              <p className="text-2xl sm:text-3xl font-bold text-slate-600 dark:text-slate-300 tracking-tight">{archivedCount}</p>
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 hidden sm:block">Past exams</p>
             </div>
           </button>
         </section>
 
         {/* SEARCH & FILTERS */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="flex items-center gap-2 flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-              <Search className="h-4 w-4 text-slate-400 flex-shrink-0" />
+            <div className="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
+              <Search className="h-4 w-4 text-slate-400 dark:text-slate-500 flex-shrink-0" />
               <input
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 placeholder="Search by title, subject, or teacher..."
-                className="text-sm outline-none w-full bg-transparent placeholder:text-slate-400"
+                className="text-sm outline-none w-full bg-transparent placeholder:text-slate-400 dark:placeholder:text-slate-500 text-slate-900 dark:text-slate-100"
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="text-slate-400 hover:text-slate-600">
+                <button onClick={() => setSearchQuery('')} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300">
                   <X className="h-4 w-4" />
                 </button>
               )}
             </div>
 
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-full sm:w-[140px] h-10 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Classes</SelectItem>
-                {CLASS_ORDER.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="w-full sm:w-[140px] h-10 text-sm dark:bg-slate-800/60 dark:border-slate-700 dark:text-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-slate-900 dark:border-slate-800">
+                  <SelectItem value="all">All Classes</SelectItem>
+                  {CLASS_ORDER.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
 
-            <Select value={selectedDept} onValueChange={setSelectedDept}>
-              <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DEPT_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+              <Select value={selectedDept} onValueChange={setSelectedDept}>
+                <SelectTrigger className="w-full sm:w-[160px] h-10 text-sm dark:bg-slate-800/60 dark:border-slate-700 dark:text-slate-200">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="dark:bg-slate-900 dark:border-slate-800">
+                  {DEPT_OPTIONS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
 
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 text-slate-500">
-                <X className="h-3.5 w-3.5 mr-1" /> Clear
-              </Button>
-            )}
+              {hasActiveFilters && (
+                <Button variant="ghost" size="sm" onClick={clearFilters} className="h-10 text-slate-500 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200">
+                  <X className="h-3.5 w-3.5 mr-1" /> Clear
+                </Button>
+              )}
+            </div>
           </div>
 
           {viewMode === 'grouped' && filtered.length > 0 && (
-            <div className="px-4 py-2 border-t border-slate-100 flex items-center justify-between bg-slate-50/50 rounded-b-2xl">
-              <p className="text-[11px] text-slate-500">
-                <span className="font-semibold text-slate-700">{filtered.length}</span> exam{filtered.length !== 1 ? 's' : ''} found
+            <div className="px-4 py-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/60 rounded-b-2xl">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                <span className="font-semibold text-slate-700 dark:text-slate-200">{filtered.length}</span> exam{filtered.length !== 1 ? 's' : ''} found
               </p>
-              <button onClick={toggleAllClasses} className="text-[11px] text-violet-600 hover:text-violet-700 font-semibold">
+              <button onClick={toggleAllClasses} className="text-[11px] text-violet-600 dark:text-violet-400 hover:text-violet-700 dark:hover:text-violet-300 font-semibold">
                 {groupKeys.every(c => expandedClasses.has(c)) ? 'Collapse All' : 'Expand All'}
               </button>
             </div>
@@ -858,16 +863,16 @@ export default function AdminExamsPage() {
         {/* LIST */}
         <section className="space-y-3">
           {filtered.length === 0 ? (
-            <div className="bg-white rounded-2xl border border-slate-200 py-16 px-6 text-center">
-              <div className="h-16 w-16 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                <FileText className="h-8 w-8 text-slate-400" />
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 py-16 px-6 text-center">
+              <div className="h-16 w-16 mx-auto rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                <FileText className="h-8 w-8 text-slate-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-base font-semibold text-slate-800 mb-1">No exams found</h3>
-              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+              <h3 className="text-base font-semibold text-slate-800 dark:text-slate-100 mb-1">No exams found</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
                 {hasActiveFilters ? 'Try adjusting your filters or search query.' : `No ${activeTab} exams at the moment.`}
               </p>
               {hasActiveFilters && (
-                <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4">
+                <Button variant="outline" size="sm" onClick={clearFilters} className="mt-4 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">
                   Clear Filters
                 </Button>
               )}
@@ -879,21 +884,21 @@ export default function AdminExamsPage() {
               const isOpen = expandedClasses.has(yr)
               const color = classColors[yr]
               return (
-                <div key={yr} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+                <div key={yr} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                   <button
                     onClick={() => toggleClass(yr)}
-                    className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                    className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
                       <div className={cn('h-9 w-9 rounded-xl bg-gradient-to-br flex items-center justify-center text-white shadow-sm', color?.gradient || 'from-slate-400 to-slate-500')}>
                         <GraduationCap className="h-4 w-4" />
                       </div>
                       <div className="text-left">
-                        <h3 className="font-bold text-sm text-slate-900">{yr || 'Unassigned'}</h3>
-                        <p className="text-[11px] text-slate-500">{cls.length} exam{cls.length !== 1 ? 's' : ''}</p>
+                        <h3 className="font-bold text-sm text-slate-900 dark:text-slate-100">{yr || 'Unassigned'}</h3>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{cls.length} exam{cls.length !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
-                    <ChevronDown className={cn('h-4 w-4 text-slate-400 transition-transform', isOpen && 'rotate-180')} />
+                    <ChevronDown className={cn('h-4 w-4 text-slate-400 dark:text-slate-500 transition-transform', isOpen && 'rotate-180')} />
                   </button>
 
                   <AnimatePresence initial={false}>
@@ -903,7 +908,7 @@ export default function AdminExamsPage() {
                         animate={{ height: 'auto', opacity: 1 }}
                         exit={{ height: 0, opacity: 0 }}
                         transition={{ duration: 0.2 }}
-                        className="overflow-hidden border-t border-slate-100"
+                        className="overflow-hidden border-t border-slate-100 dark:border-slate-800"
                       >
                         <div className="overflow-x-auto">
                           <Table>
@@ -920,7 +925,7 @@ export default function AdminExamsPage() {
               )
             })
           ) : (
-            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
               <div className="overflow-x-auto">
                 <Table>
                   {renderTableHead()}
@@ -937,9 +942,9 @@ export default function AdminExamsPage() {
         {/* PREVIEW DIALOG                                                       */}
         {/* ═══════════════════════════════════════════════════════════════════ */}
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
-          <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden flex flex-col">
+          <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden flex flex-col dark:bg-slate-900 dark:border-slate-800">
             {/* Hero Header */}
-            <div className="relative bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-6 py-5 text-white overflow-hidden flex-shrink-0">
+            <div className="relative bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-4 sm:px-6 py-5 text-white overflow-hidden flex-shrink-0">
               <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl" />
               <div className="absolute bottom-0 left-0 h-32 w-32 bg-white/5 rounded-full -ml-16 -mb-16 blur-xl" />
 
@@ -947,12 +952,12 @@ export default function AdminExamsPage() {
                 <DialogHeader className="space-y-0 text-left">
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-2">
-                      <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                      <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
                         <BookOpen className="h-5 w-5 text-white" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Exam Preview</p>
-                        <DialogTitle className="text-lg sm:text-xl font-bold leading-tight text-white">
+                        <DialogTitle className="text-base sm:text-xl font-bold leading-tight text-white">
                           {selectedExam?.title || 'Loading...'}
                         </DialogTitle>
                         <DialogDescription className="sr-only">
@@ -981,13 +986,15 @@ export default function AdminExamsPage() {
             </div>
 
             {/* Tabs */}
-            <div className="border-b border-slate-200 bg-white px-4 flex-shrink-0">
-              <div className="flex gap-1">
+            <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-4 flex-shrink-0 overflow-x-auto">
+              <div className="flex gap-1 min-w-max">
                 <button
                   onClick={() => setPreviewTab('info')}
                   className={cn(
-                    'px-4 py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5',
-                    previewTab === 'info' ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                    'px-3 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap',
+                    previewTab === 'info'
+                      ? 'border-violet-600 dark:border-violet-400 text-violet-700 dark:text-violet-300'
+                      : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                   )}
                 >
                   <HelpCircle className="h-3.5 w-3.5" /> Overview
@@ -996,100 +1003,104 @@ export default function AdminExamsPage() {
                   <button
                     onClick={() => setPreviewTab('objective')}
                     className={cn(
-                      'px-4 py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5',
-                      previewTab === 'objective' ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                      'px-3 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap',
+                      previewTab === 'objective'
+                        ? 'border-violet-600 dark:border-violet-400 text-violet-700 dark:text-violet-300'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     )}
                   >
                     <Layers className="h-3.5 w-3.5" />
                     Objective
-                    <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{examQs.length}</span>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{examQs.length}</span>
                   </button>
                 )}
                 {theoryQs.length > 0 && (
                   <button
                     onClick={() => setPreviewTab('theory')}
                     className={cn(
-                      'px-4 py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5',
-                      previewTab === 'theory' ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+                      'px-3 sm:px-4 py-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap',
+                      previewTab === 'theory'
+                        ? 'border-violet-600 dark:border-violet-400 text-violet-700 dark:text-violet-300'
+                        : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
                     )}
                   >
                     <PenTool className="h-3.5 w-3.5" />
                     Theory
-                    <span className="bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{theoryQs.length}</span>
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{theoryQs.length}</span>
                   </button>
                 )}
               </div>
             </div>
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto bg-slate-50">
+            <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
               {loadingQs ? (
                 <div className="flex flex-col items-center justify-center py-20">
-                  <Loader2 className="h-8 w-8 animate-spin text-violet-500 mb-3" />
-                  <p className="text-sm text-slate-500">Loading questions...</p>
+                  <Loader2 className="h-8 w-8 animate-spin text-violet-500 dark:text-violet-400 mb-3" />
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Loading questions...</p>
                 </div>
               ) : (
                 <>
                   {/* OVERVIEW TAB */}
                   {previewTab === 'info' && selectedExam && (
-                    <div className="p-6 space-y-4">
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                        <div className="bg-white rounded-xl p-3 border border-slate-200">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Objective</p>
-                          <p className="text-xl font-bold text-violet-600">{examQs.length}</p>
+                    <div className="p-4 sm:p-6 space-y-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Objective</p>
+                          <p className="text-xl font-bold text-violet-600 dark:text-violet-400">{examQs.length}</p>
                         </div>
-                        <div className="bg-white rounded-xl p-3 border border-slate-200">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Theory</p>
-                          <p className="text-xl font-bold text-blue-600">{theoryQs.length}</p>
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Theory</p>
+                          <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{theoryQs.length}</p>
                         </div>
-                        <div className="bg-white rounded-xl p-3 border border-slate-200">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Pass Mark</p>
-                          <p className="text-xl font-bold text-emerald-600">{selectedExam.pass_mark || selectedExam.passing_percentage || 40}%</p>
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pass Mark</p>
+                          <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{selectedExam.pass_mark || selectedExam.passing_percentage || 40}%</p>
                         </div>
-                        <div className="bg-white rounded-xl p-3 border border-slate-200">
-                          <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Duration</p>
-                          <p className="text-xl font-bold text-amber-600">{selectedExam.duration}m</p>
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                          <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Duration</p>
+                          <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{selectedExam.duration}m</p>
                         </div>
                       </div>
 
                       {selectedExam.instructions && (
-                        <div className="bg-white rounded-xl p-4 border border-slate-200">
-                          <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <AlertCircle className="h-3.5 w-3.5 text-amber-500" /> Instructions
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                          <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                            <AlertCircle className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" /> Instructions
                           </h4>
-                          <p className="text-sm text-slate-600 whitespace-pre-wrap leading-relaxed">{selectedExam.instructions}</p>
+                          <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{selectedExam.instructions}</p>
                         </div>
                       )}
 
-                      <div className="bg-white rounded-xl p-4 border border-slate-200">
-                        <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Exam Details</h4>
+                      <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-3">Exam Details</h4>
                         <div className="grid grid-cols-2 gap-3 text-sm">
                           <div>
-                            <p className="text-[11px] text-slate-500">Teacher</p>
-                            <p className="font-medium text-slate-800">{selectedExam.teacher_name}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Teacher</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">{selectedExam.teacher_name}</p>
                           </div>
                           <div>
-                            <p className="text-[11px] text-slate-500">Status</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Status</p>
                             <div className="mt-0.5"><StatusPill status={selectedExam.is_archived ? 'archived' : selectedExam.status} /></div>
                           </div>
                           <div>
-                            <p className="text-[11px] text-slate-500">Target</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Target</p>
                             <div className="mt-0.5"><DeptPill exam={selectedExam} /></div>
                           </div>
                           <div>
-                            <p className="text-[11px] text-slate-500">Created</p>
-                            <p className="font-medium text-slate-800">{formatDateShort(selectedExam.created_at)}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Created</p>
+                            <p className="font-medium text-slate-800 dark:text-slate-100">{formatDateShort(selectedExam.created_at)}</p>
                           </div>
                           {selectedExam.term && (
                             <div>
-                              <p className="text-[11px] text-slate-500">Term</p>
-                              <p className="font-medium text-slate-800">{selectedExam.term} · {selectedExam.session_year}</p>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">Term</p>
+                              <p className="font-medium text-slate-800 dark:text-slate-100">{selectedExam.term} · {selectedExam.session_year}</p>
                             </div>
                           )}
                           {selectedExam.randomize_questions && (
                             <div>
-                              <p className="text-[11px] text-slate-500">Randomize</p>
-                              <p className="font-medium text-emerald-600 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Enabled</p>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400">Randomize</p>
+                              <p className="font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Enabled</p>
                             </div>
                           )}
                         </div>
@@ -1099,25 +1110,25 @@ export default function AdminExamsPage() {
 
                   {/* OBJECTIVE TAB */}
                   {previewTab === 'objective' && examQs.length > 0 && (
-                    <div className="p-4 sm:p-6">
+                    <div className="p-3 sm:p-6">
                       {/* Question Pagination */}
-                      <div className="bg-white rounded-xl p-3 border border-slate-200 mb-4">
+                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 mb-4">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-bold text-slate-700">
+                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
                             Question {currentQIdx + 1} of {examQs.length}
                           </p>
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setCurrentQIdx(i => Math.max(0, i - 1))}
                               disabled={currentQIdx === 0}
-                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center"
+                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                             >
                               <ChevronLeft className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => setCurrentQIdx(i => Math.min(examQs.length - 1, i + 1))}
                               disabled={currentQIdx === examQs.length - 1}
-                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center"
+                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                             >
                               <ChevronRightIcon className="h-3.5 w-3.5" />
                             </button>
@@ -1132,7 +1143,7 @@ export default function AdminExamsPage() {
                                 'w-7 h-7 rounded-md text-[11px] font-bold transition-all',
                                 i === currentQIdx
                                   ? 'bg-violet-600 text-white shadow-sm scale-110'
-                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                               )}
                             >
                               {i + 1}
@@ -1149,17 +1160,17 @@ export default function AdminExamsPage() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
-                          className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
                         >
-                          <div className="bg-gradient-to-r from-violet-50 to-indigo-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                          <div className="bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-500/10 dark:to-indigo-500/10 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <div className="h-7 w-7 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-bold">
                                 {currentQIdx + 1}
                               </div>
-                              <p className="text-xs font-semibold text-slate-700">Multiple Choice</p>
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Multiple Choice</p>
                             </div>
                             {examQs[currentQIdx]?.marks && (
-                              <span className="text-[10px] font-bold text-violet-700 bg-violet-100 px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 rounded-full">
                                 {examQs[currentQIdx].marks} mark{examQs[currentQIdx].marks !== 1 ? 's' : ''}
                               </span>
                             )}
@@ -1167,7 +1178,7 @@ export default function AdminExamsPage() {
 
                           <div className="p-4 sm:p-5">
                             {examQs[currentQIdx]?.image_url && (
-                              <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                              <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                                 <img
                                   src={examQs[currentQIdx].image_url}
                                   alt="Question"
@@ -1176,7 +1187,7 @@ export default function AdminExamsPage() {
                               </div>
                             )}
 
-                            <p className="text-sm sm:text-base font-medium text-slate-900 leading-relaxed mb-5">
+                            <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-5">
                               {examQs[currentQIdx]?.question || 'Question text missing'}
                             </p>
 
@@ -1191,21 +1202,21 @@ export default function AdminExamsPage() {
                                     className={cn(
                                       'p-3 rounded-lg border text-sm flex items-start gap-3 transition-colors',
                                       isCorrect
-                                        ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-200'
-                                        : 'bg-white border-slate-200 hover:border-slate-300'
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40 ring-1 ring-emerald-200 dark:ring-emerald-500/30'
+                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
                                     )}
                                   >
                                     <div className={cn(
                                       'h-6 w-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0',
-                                      isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-500'
+                                      isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                                     )}>
                                       {letter}
                                     </div>
-                                    <p className={cn('flex-1 leading-relaxed', isCorrect ? 'text-emerald-800 font-medium' : 'text-slate-700')}>
+                                    <p className={cn('flex-1 leading-relaxed', isCorrect ? 'text-emerald-800 dark:text-emerald-200 font-medium' : 'text-slate-700 dark:text-slate-300')}>
                                       {opt}
                                     </p>
                                     {isCorrect && (
-                                      <CheckCircle className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                                      <CheckCircle className="h-4 w-4 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
                                     )}
                                   </div>
                                 )
@@ -1213,9 +1224,9 @@ export default function AdminExamsPage() {
                             </div>
 
                             {examQs[currentQIdx]?.explanation && (
-                              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                                <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider mb-1">Explanation</p>
-                                <p className="text-xs text-blue-900 leading-relaxed">{examQs[currentQIdx].explanation}</p>
+                              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
+                                <p className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">Explanation</p>
+                                <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed">{examQs[currentQIdx].explanation}</p>
                               </div>
                             )}
                           </div>
@@ -1226,25 +1237,25 @@ export default function AdminExamsPage() {
 
                   {/* THEORY TAB */}
                   {previewTab === 'theory' && theoryQs.length > 0 && (
-                    <div className="p-4 sm:p-6">
+                    <div className="p-3 sm:p-6">
                       {/* Pagination */}
-                      <div className="bg-white rounded-xl p-3 border border-slate-200 mb-4">
+                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 mb-4">
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-bold text-slate-700">
+                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
                             Theory Question {currentTheoryIdx + 1} of {theoryQs.length}
                           </p>
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => setCurrentTheoryIdx(i => Math.max(0, i - 1))}
                               disabled={currentTheoryIdx === 0}
-                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center"
+                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                             >
                               <ChevronLeft className="h-3.5 w-3.5" />
                             </button>
                             <button
                               onClick={() => setCurrentTheoryIdx(i => Math.min(theoryQs.length - 1, i + 1))}
                               disabled={currentTheoryIdx === theoryQs.length - 1}
-                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 flex items-center justify-center"
+                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
                             >
                               <ChevronRightIcon className="h-3.5 w-3.5" />
                             </button>
@@ -1259,7 +1270,7 @@ export default function AdminExamsPage() {
                                 'w-7 h-7 rounded-md text-[11px] font-bold transition-all',
                                 i === currentTheoryIdx
                                   ? 'bg-blue-600 text-white shadow-sm scale-110'
-                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
                               )}
                             >
                               {i + 1}
@@ -1275,17 +1286,17 @@ export default function AdminExamsPage() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
                           transition={{ duration: 0.2 }}
-                          className="bg-white rounded-xl border border-slate-200 overflow-hidden"
+                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
                         >
-                          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 px-4 py-3 border-b border-slate-200 flex items-center justify-between">
+                          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-500/10 dark:to-cyan-500/10 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                               <div className="h-7 w-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
                                 {currentTheoryIdx + 1}
                               </div>
-                              <p className="text-xs font-semibold text-slate-700">Theory / Essay</p>
+                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theory / Essay</p>
                             </div>
                             {theoryQs[currentTheoryIdx]?.marks > 0 && (
-                              <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 px-2 py-0.5 rounded-full">
                                 {theoryQs[currentTheoryIdx].marks} mark{theoryQs[currentTheoryIdx].marks !== 1 ? 's' : ''}
                               </span>
                             )}
@@ -1293,26 +1304,26 @@ export default function AdminExamsPage() {
 
                           <div className="p-4 sm:p-5">
                             {theoryQs[currentTheoryIdx]?.image_url && (
-                              <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 bg-slate-50">
+                              <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
                                 <img
                                   src={theoryQs[currentTheoryIdx].image_url}
                                   alt={theoryQs[currentTheoryIdx].image_caption || 'Question image'}
                                   className="w-full max-h-64 object-contain"
                                 />
                                 {theoryQs[currentTheoryIdx]?.image_caption && (
-                                  <p className="text-[10px] text-center text-slate-500 py-1.5 px-2 bg-slate-50 border-t border-slate-200">
+                                  <p className="text-[10px] text-center text-slate-500 dark:text-slate-400 py-1.5 px-2 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
                                     {theoryQs[currentTheoryIdx].image_caption}
                                   </p>
                                 )}
                               </div>
                             )}
 
-                            <p className="text-sm sm:text-base font-medium text-slate-900 leading-relaxed mb-4">
+                            <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-4">
                               {theoryQs[currentTheoryIdx]?.question || 'Question text missing'}
                             </p>
 
                             {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
-                              <div className="pl-2 border-l-2 border-blue-200">
+                              <div className="pl-2 border-l-2 border-blue-200 dark:border-blue-500/40">
                                 {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
                               </div>
                             )}
@@ -1325,11 +1336,11 @@ export default function AdminExamsPage() {
                   {/* EMPTY STATE */}
                   {!loadingQs && examQs.length === 0 && theoryQs.length === 0 && previewTab !== 'info' && (
                     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                      <div className="h-14 w-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-3">
-                        <FileText className="h-7 w-7 text-slate-400" />
+                      <div className="h-14 w-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
+                        <FileText className="h-7 w-7 text-slate-400 dark:text-slate-500" />
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-800">No questions available</h3>
-                      <p className="text-xs text-slate-500 mt-1">This exam does not contain any questions yet.</p>
+                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">No questions available</h3>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">This exam does not contain any questions yet.</p>
                     </div>
                   )}
                 </>
@@ -1337,12 +1348,12 @@ export default function AdminExamsPage() {
             </div>
 
             {/* Footer Actions */}
-            <div className="border-t border-slate-200 bg-white px-4 py-3 flex items-center justify-between flex-shrink-0">
-              <p className="text-[11px] text-slate-500">
-                Created by <span className="font-semibold text-slate-700">{selectedExam?.teacher_name}</span>
+            <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 flex-shrink-0">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center sm:text-left">
+                Created by <span className="font-semibold text-slate-700 dark:text-slate-200">{selectedExam?.teacher_name}</span>
               </p>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowPreview(false)}>Close</Button>
+              <div className="flex items-center gap-2 justify-end">
+                <Button variant="outline" size="sm" onClick={() => setShowPreview(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Close</Button>
                 {selectedExam && ['pending', 'draft', 'submitted'].includes(selectedExam.status) && (
                   <Button
                     size="sm"
@@ -1363,19 +1374,19 @@ export default function AdminExamsPage() {
 
         {/* DELETE */}
         <Dialog open={showDelete} onOpenChange={setShowDelete}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-red-100 flex items-center justify-center mb-2">
-                <Trash2 className="h-5 w-5 text-red-600" />
+              <div className="h-11 w-11 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center mb-2">
+                <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
-              <DialogTitle>Delete Exam Permanently</DialogTitle>
-              <DialogDescription>This action cannot be undone.</DialogDescription>
+              <DialogTitle className="dark:text-white">Delete Exam Permanently</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">This action cannot be undone.</DialogDescription>
             </DialogHeader>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-800">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-lg p-3 text-sm text-red-800 dark:text-red-200">
               <p>You are about to delete <strong>{selectedExam?.title}</strong>. All associated student attempts and CA scores will be permanently removed.</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowDelete(false)} disabled={processing}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowDelete(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
               <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDelete} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Deleting...</> : 'Delete Permanently'}
               </Button>
@@ -1385,19 +1396,19 @@ export default function AdminExamsPage() {
 
         {/* APPROVE */}
         <Dialog open={showApprove} onOpenChange={setShowApprove}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-emerald-100 flex items-center justify-center mb-2">
-                <CheckCircle className="h-5 w-5 text-emerald-600" />
+              <div className="h-11 w-11 rounded-xl bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center mb-2">
+                <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <DialogTitle>Publish Exam</DialogTitle>
-              <DialogDescription>Make this exam available to students immediately.</DialogDescription>
+              <DialogTitle className="dark:text-white">Publish Exam</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Make this exam available to students immediately.</DialogDescription>
             </DialogHeader>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-3 text-sm text-emerald-800">
+            <div className="bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/30 rounded-lg p-3 text-sm text-emerald-800 dark:text-emerald-200">
               <p>Publishing <strong>{selectedExam?.title}</strong> will make it live for all eligible students in <strong>{selectedExam?.class}</strong>.</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowApprove(false)} disabled={processing}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowApprove(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
               <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleApprove} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Publishing...</> : <><Send className="h-4 w-4 mr-1.5" /> Publish Now</>}
               </Button>
@@ -1407,13 +1418,13 @@ export default function AdminExamsPage() {
 
         {/* RETRY */}
         <Dialog open={showRetry} onOpenChange={setShowRetry}>
-          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
+          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-blue-100 flex items-center justify-center mb-2">
-                <RotateCcw className="h-5 w-5 text-blue-600" />
+              <div className="h-11 w-11 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center mb-2">
+                <RotateCcw className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
-              <DialogTitle>Allow Retake</DialogTitle>
-              <DialogDescription>Clear existing attempts so students can take this exam again.</DialogDescription>
+              <DialogTitle className="dark:text-white">Allow Retake</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Clear existing attempts so students can take this exam again.</DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3 flex-1 overflow-y-auto">
@@ -1422,74 +1433,78 @@ export default function AdminExamsPage() {
                   onClick={() => setRetryScope('class')}
                   className={cn(
                     'p-3 border-2 rounded-xl text-left transition-all',
-                    retryScope === 'class' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+                    retryScope === 'class'
+                      ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-500 dark:border-blue-400 ring-2 ring-blue-100 dark:ring-blue-500/30'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/40'
                   )}
                 >
-                  <Users className={cn('h-5 w-5 mb-1.5', retryScope === 'class' ? 'text-blue-600' : 'text-slate-400')} />
-                  <p className="text-sm font-bold text-slate-800">Entire Class</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Reset all attempts</p>
+                  <Users className={cn('h-5 w-5 mb-1.5', retryScope === 'class' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500')} />
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Entire Class</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Reset all attempts</p>
                 </button>
                 <button
                   onClick={() => setRetryScope('individual')}
                   className={cn(
                     'p-3 border-2 rounded-xl text-left transition-all',
-                    retryScope === 'individual' ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-100' : 'border-slate-200 hover:border-slate-300'
+                    retryScope === 'individual'
+                      ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-500 dark:border-blue-400 ring-2 ring-blue-100 dark:ring-blue-500/30'
+                      : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/40'
                   )}
                 >
-                  <User className={cn('h-5 w-5 mb-1.5', retryScope === 'individual' ? 'text-blue-600' : 'text-slate-400')} />
-                  <p className="text-sm font-bold text-slate-800">Select Students</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">Choose specific students</p>
+                  <User className={cn('h-5 w-5 mb-1.5', retryScope === 'individual' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500')} />
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Select Students</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Choose specific students</p>
                 </button>
               </div>
 
               {retryScope === 'individual' && (
                 <>
-                  <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                    <Search className="h-3.5 w-3.5 text-slate-400" />
+                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                    <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                     <input
                       value={studentSearch}
                       onChange={e => setStudentSearch(e.target.value)}
                       placeholder="Search students..."
-                      className="text-xs outline-none w-full bg-transparent"
+                      className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
                     />
                   </div>
 
                   {loadingStudents ? (
                     <div className="py-8 text-center">
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-500 mx-auto" />
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500 dark:text-blue-400 mx-auto" />
                     </div>
                   ) : filteredStudents.length === 0 ? (
-                    <p className="text-xs text-slate-500 text-center py-6">No students found</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">No students found</p>
                   ) : (
                     <>
                       <div className="flex items-center justify-between px-1">
-                        <p className="text-[11px] text-slate-500">
-                          <span className="font-bold text-slate-700">{selectedStudentIds.size}</span> selected
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                          <span className="font-bold text-slate-700 dark:text-slate-200">{selectedStudentIds.size}</span> selected
                         </p>
-                        <button onClick={toggleAllStudents} className="text-[11px] text-blue-600 font-semibold hover:text-blue-700">
+                        <button onClick={toggleAllStudents} className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-700 dark:hover:text-blue-300">
                           {selectedStudentIds.size === filteredStudents.length ? 'Deselect All' : 'Select All'}
                         </button>
                       </div>
-                      <div className="max-h-[240px] overflow-y-auto border border-slate-200 rounded-lg divide-y divide-slate-100">
+                      <div className="max-h-[240px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
                         {filteredStudents.map(s => {
                           const attempts = attemptCounts[s.id] || 0
                           return (
-                            <label key={s.id} className="flex items-center gap-2.5 p-2.5 hover:bg-slate-50 cursor-pointer">
+                            <label key={s.id} className="flex items-center gap-2.5 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={selectedStudentIds.has(s.id)}
                                 onChange={() => toggleStudent(s.id)}
-                                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 dark:bg-slate-800"
                               />
-                              <div className="h-7 w-7 rounded-full bg-slate-100 flex items-center justify-center">
-                                <User className="h-3.5 w-3.5 text-slate-500" />
+                              <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-slate-800 truncate">{s.full_name}</p>
-                                <p className="text-[10px] text-slate-500">{s.admission_number || s.class}</p>
+                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{s.full_name}</p>
+                                <p className="text-[10px] text-slate-500 dark:text-slate-400">{s.admission_number || s.class}</p>
                               </div>
                               {attempts > 0 && (
-                                <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-full">
+                                <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-full">
                                   {attempts} attempt{attempts !== 1 ? 's' : ''}
                                 </span>
                               )}
@@ -1503,8 +1518,8 @@ export default function AdminExamsPage() {
               )}
             </div>
 
-            <DialogFooter className="pt-3 border-t border-slate-200">
-              <Button variant="outline" onClick={() => setShowRetry(false)} disabled={processing}>Cancel</Button>
+            <DialogFooter className="pt-3 border-t border-slate-200 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setShowRetry(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleRetry} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Clearing...</> : <><RotateCcw className="h-4 w-4 mr-1.5" /> Clear Attempts</>}
               </Button>
@@ -1514,23 +1529,23 @@ export default function AdminExamsPage() {
 
         {/* REJECT */}
         <Dialog open={showReject} onOpenChange={setShowReject}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-red-100 flex items-center justify-center mb-2">
-                <XCircle className="h-5 w-5 text-red-600" />
+              <div className="h-11 w-11 rounded-xl bg-red-100 dark:bg-red-500/20 flex items-center justify-center mb-2">
+                <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
               </div>
-              <DialogTitle>Reject Exam</DialogTitle>
-              <DialogDescription>Send this exam back to the teacher with feedback.</DialogDescription>
+              <DialogTitle className="dark:text-white">Reject Exam</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Send this exam back to the teacher with feedback.</DialogDescription>
             </DialogHeader>
             <Textarea
               value={rejectionReason}
               onChange={e => setRejectionReason(e.target.value)}
               placeholder="Explain what needs to be revised..."
               rows={4}
-              className="text-sm resize-none"
+              className="text-sm resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowReject(false)} disabled={processing}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowReject(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
               <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleReject} disabled={processing || !rejectionReason.trim()}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Sending...</> : 'Send Back'}
               </Button>
@@ -1540,23 +1555,23 @@ export default function AdminExamsPage() {
 
         {/* RETURN */}
         <Dialog open={showReturn} onOpenChange={setShowReturn}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-amber-100 flex items-center justify-center mb-2">
-                <Edit3 className="h-5 w-5 text-amber-600" />
+              <div className="h-11 w-11 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center mb-2">
+                <Edit3 className="h-5 w-5 text-amber-600 dark:text-amber-400" />
               </div>
-              <DialogTitle>Return for Editing</DialogTitle>
-              <DialogDescription>Unpublish and return <strong>{selectedExam?.title}</strong> to the teacher.</DialogDescription>
+              <DialogTitle className="dark:text-white">Return for Editing</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Unpublish and return <strong>{selectedExam?.title}</strong> to the teacher.</DialogDescription>
             </DialogHeader>
             <Textarea
               value={returnReason}
               onChange={e => setReturnReason(e.target.value)}
               placeholder="Reason for return (optional)..."
               rows={3}
-              className="text-sm resize-none"
+              className="text-sm resize-none dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
             />
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowReturn(false)} disabled={processing}>Cancel</Button>
+              <Button variant="outline" onClick={() => setShowReturn(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
               <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={handleReturn} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Returning...</> : 'Return to Teacher'}
               </Button>
@@ -1566,20 +1581,20 @@ export default function AdminExamsPage() {
 
         {/* ARCHIVE */}
         <Dialog open={showArchive} onOpenChange={setShowArchive}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
-              <div className="h-11 w-11 rounded-xl bg-slate-100 flex items-center justify-center mb-2">
-                <Archive className="h-5 w-5 text-slate-600" />
+              <div className="h-11 w-11 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-2">
+                <Archive className="h-5 w-5 text-slate-600 dark:text-slate-300" />
               </div>
-              <DialogTitle>Archive Exam</DialogTitle>
-              <DialogDescription>Move this exam out of active circulation.</DialogDescription>
+              <DialogTitle className="dark:text-white">Archive Exam</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">Move this exam out of active circulation.</DialogDescription>
             </DialogHeader>
-            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm text-slate-700">
+            <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg p-3 text-sm text-slate-700 dark:text-slate-300">
               <p>Archive <strong>{selectedExam?.title}</strong>? Students will lose access, but all scores and data will be preserved for records.</p>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setShowArchive(false)} disabled={processing}>Cancel</Button>
-              <Button className="bg-slate-700 hover:bg-slate-800 text-white" onClick={handleArchive} disabled={processing}>
+              <Button variant="outline" onClick={() => setShowArchive(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
+              <Button className="bg-slate-700 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white" onClick={handleArchive} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Archiving...</> : <><Archive className="h-4 w-4 mr-1.5" /> Archive</>}
               </Button>
             </DialogFooter>

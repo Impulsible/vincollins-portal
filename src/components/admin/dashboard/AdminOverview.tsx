@@ -1,4 +1,4 @@
-// components/admin/dashboard/AdminOverview.tsx - WITHOUT RecentActivityFeed
+// components/admin/dashboard/AdminOverview.tsx - WITH DARK MODE
 
 'use client'
 
@@ -48,16 +48,19 @@ export function AdminOverview({ profile, stats, students, pendingExamsCount, onN
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 bg-amber-50 border-2 border-amber-300 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+          className="p-4 bg-amber-50 dark:bg-amber-950/30 border-2 border-amber-300 dark:border-amber-900/50 rounded-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
         >
           <div className="flex items-center gap-3">
-            <Bell className="h-6 w-6 text-amber-600" />
+            <Bell className="h-6 w-6 text-amber-600 dark:text-amber-400" />
             <div>
-              <p className="font-bold text-amber-800">{pendingExamsCount} exam(s) pending approval</p>
-              <p className="text-sm text-amber-600">Review and publish exams submitted by teachers</p>
+              <p className="font-bold text-amber-800 dark:text-amber-300">{pendingExamsCount} exam(s) pending approval</p>
+              <p className="text-sm text-amber-600 dark:text-amber-400">Review and publish exams submitted by teachers</p>
             </div>
           </div>
-          <Button onClick={() => onNavigate('exams')} className="bg-amber-600 hover:bg-amber-700 shrink-0">
+          <Button 
+            onClick={() => onNavigate('exams')} 
+            className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 text-white shrink-0"
+          >
             Review Now <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </motion.div>

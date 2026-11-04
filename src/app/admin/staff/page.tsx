@@ -1,4 +1,4 @@
-// app/admin/staff/page.tsx
+// app/admin/staff/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -6,7 +6,6 @@ import { StaffManagement } from '@/components/admin/staff/StaffManagement'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
-// Interface matching the Staff type in StaffManagement component
 interface Staff {
   id: string
   vin_id: string
@@ -27,7 +26,6 @@ export default function StaffPage() {
   const [staff, setStaff] = useState<Staff[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Fetch staff members
   const fetchStaff = useCallback(async () => {
     console.log('🔄 Fetching staff...')
     try {
@@ -53,16 +51,11 @@ export default function StaffPage() {
     fetchStaff()
   }, [fetchStaff])
 
-  // StaffManagement now calls the API directly, so this is a no-op
-  // but kept for interface compatibility
   const handleAddStaff = async (staffData: any): Promise<{ email: string; password: string; vin_id: string } | void> => {
-    // The StaffManagement component handles the API call directly
-    // This function exists only for the interface contract
     console.log('ℹ️ handleAddStaff called (API handled by StaffManagement directly)')
     return
   }
 
-  // Handle updating a staff member
   const handleUpdateStaff = async (updatedStaff: Staff): Promise<void> => {
     try {
       const { error } = await supabase
@@ -88,7 +81,6 @@ export default function StaffPage() {
     }
   }
 
-  // Handle deleting a staff member
   const handleDeleteStaff = async (staffMember: Staff): Promise<void> => {
     try {
       const { error: profileError } = await supabase
@@ -107,7 +99,6 @@ export default function StaffPage() {
     }
   }
 
-  // Handle resetting password
   const handleResetPassword = async (staffMember: Staff): Promise<void> => {
     try {
       const { error } = await supabase.auth.admin.updateUserById(
@@ -127,21 +118,21 @@ export default function StaffPage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-6 min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <div className="flex justify-between items-center">
           <div>
-            <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-            <div className="h-4 w-32 bg-muted animate-pulse rounded mt-1" />
+            <div className="h-8 w-48 bg-slate-200 dark:bg-slate-800 animate-pulse rounded" />
+            <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 animate-pulse rounded mt-1" />
           </div>
-          <div className="h-10 w-32 bg-muted animate-pulse rounded" />
+          <div className="h-10 w-32 bg-slate-200 dark:bg-slate-800 animate-pulse rounded" />
         </div>
-        <div className="h-96 bg-muted animate-pulse rounded-xl" />
+        <div className="h-96 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-xl" />
       </div>
     )
   }
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6 min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <StaffManagement
         {...({
           staff,

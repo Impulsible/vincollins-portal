@@ -1,4 +1,4 @@
-// app/admin/settings/page.tsx
+// app/admin/settings/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -62,8 +62,8 @@ function SectionHeader({
         <Icon className="h-4 w-4" />
       </div>
       <div>
-        <h3 className="font-semibold text-slate-800 text-sm">{title}</h3>
-        <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+        <h3 className="font-semibold text-slate-800 dark:text-white text-sm">{title}</h3>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{description}</p>
       </div>
     </div>
   )
@@ -82,10 +82,10 @@ function ToggleRow({
   onChange: (v: boolean) => void
 }) {
   return (
-    <div className="flex items-center justify-between py-3 border-b border-slate-100 last:border-0">
+    <div className="flex items-center justify-between py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
       <div>
-        <p className="text-sm font-medium text-slate-700">{label}</p>
-        <p className="text-xs text-slate-400 mt-0.5">{description}</p>
+        <p className="text-sm font-medium text-slate-700 dark:text-slate-200">{label}</p>
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{description}</p>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
     </div>
@@ -113,12 +113,12 @@ function PasswordInput({
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
-        className="h-9 text-sm pr-9 border-slate-200 focus-visible:ring-violet-500"
+        className="h-9 text-sm pr-9 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-violet-500"
       />
       <button
         type="button"
         onClick={onToggle}
-        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
       >
         {show ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
       </button>
@@ -132,7 +132,9 @@ function TermStatusBadge({ term, currentTerm }: { term: string; currentTerm: str
   return (
     <span className={cn(
       'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium whitespace-nowrap',
-      isCurrent ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500 border border-slate-200'
+      isCurrent 
+        ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800' 
+        : 'bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
     )}>
       {isCurrent ? <Zap className="h-2.5 w-2.5" /> : <Clock className="h-2.5 w-2.5" />}
       {isCurrent ? 'current' : 'not current'}
@@ -173,9 +175,9 @@ export default function AdminSettingsPage() {
   const [schoolLoaded, setSchoolLoaded] = useState(false)
 
   // ✅ DYNAMIC: Current term from term_settings (master source)
-  const [currentTerm, setCurrentTerm] = useState('')       // e.g. "third"
-  const [currentTermName, setCurrentTermName] = useState('') // e.g. "Third Term"
-  const [currentSession, setCurrentSession] = useState('') // e.g. "2025/2026"
+  const [currentTerm, setCurrentTerm] = useState('')
+  const [currentTermName, setCurrentTermName] = useState('')
+  const [currentSession, setCurrentSession] = useState('')
   const [isLoadingTerm, setIsLoadingTerm] = useState(true)
 
   // Next-term date
@@ -195,10 +197,8 @@ export default function AdminSettingsPage() {
   // DB status
   const [dbConnected, setDbConnected] = useState<boolean | null>(null)
 
-  // ── Fetch current term from database (term_settings → terms → academic_sessions) ──
   const fetchCurrentTerm = async () => {
     try {
-      // 1) Preferred source: term_settings
       const { data: ts, error: tsErr } = await supabase
         .from('term_settings')
         .select('term, term_name, session_year')
@@ -212,7 +212,6 @@ export default function AdminSettingsPage() {
         return
       }
 
-      // 2) Fallback: terms
       const { data: t, error: tErr } = await supabase
         .from('terms')
         .select('term_code, term_name, session_year')
@@ -226,16 +225,13 @@ export default function AdminSettingsPage() {
         return
       }
 
-      // 3) Last resort: academic_sessions (session only)
       const { data: s } = await supabase
         .from('academic_sessions')
         .select('session_year')
         .eq('is_current', true)
         .maybeSingle()
 
-      if (s?.session_year) {
-        setCurrentSession(s.session_year)
-      }
+      if (s?.session_year) setCurrentSession(s.session_year)
     } catch (err) {
       console.error('Error fetching current term:', err)
     } finally {
@@ -243,14 +239,11 @@ export default function AdminSettingsPage() {
     }
   }
 
-  // ── Initialise ─────────────────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
-        // 1. Fetch current term
         await fetchCurrentTerm()
 
-        // 2. Auth session
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.user) {
           const { data: profileData } = await supabase
@@ -268,7 +261,6 @@ export default function AdminSettingsPage() {
           }
         }
 
-        // 3. School settings from system_settings table
         const { data: sysRows, error: sysErr } = await supabase
           .from('system_settings')
           .select('key, value')
@@ -303,7 +295,6 @@ export default function AdminSettingsPage() {
 
         setSchoolLoaded(true)
 
-        // 4. localStorage prefs
         try {
           const stored = localStorage.getItem('admin-notification-prefs')
           if (stored) {
@@ -327,7 +318,6 @@ export default function AdminSettingsPage() {
     init()
   }, [])
 
-  // ── Helpers ────────────────────────────────────────────────────────────────
   const formatDate = (d: string) => {
     if (!d) return 'Not set'
     return new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'long', year: 'numeric' })
@@ -340,7 +330,6 @@ export default function AdminSettingsPage() {
     if (error) throw error
   }
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
   const handleSaveProfile = async () => {
     if (!profile) return
     setSaving(true)
@@ -374,15 +363,12 @@ export default function AdminSettingsPage() {
   const handleSaveSchoolSettings = async () => {
     setSaving(true)
     try {
-      // 1) Save all school settings keys to system_settings
       const entries = Object.entries(schoolSettings) as [string, string][]
       await Promise.all(entries.map(([k, v]) => upsertSetting(k, v)))
 
-      // 2) ✅ If admin typed a NEW current term / session, update the master tables
       const normalizedTerm = (schoolSettings.current_term || '').trim().toLowerCase().replace(/\s*term$/, '')
       const normalizedSession = (schoolSettings.current_session || '').trim()
 
-      // Only run if we actually have values (don't wipe on empty)
       if (normalizedTerm && normalizedSession) {
         const { error: tsUpdateErr } = await supabase
           .from('term_settings')
@@ -433,7 +419,6 @@ export default function AdminSettingsPage() {
     toast.success('Appearance settings saved — reload to apply fully')
   }
 
-  // ── Password strength ──────────────────────────────────────────────────────
   const passwordStrength = (() => {
     const l = newPassword.length
     if (l === 0) return null
@@ -443,40 +428,37 @@ export default function AdminSettingsPage() {
     return { label: 'Strong', color: 'bg-emerald-500', width: '100%' }
   })()
 
-  // ── Loading skeleton ───────────────────────────────────────────────────────
   if (loading || isLoadingTerm) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
-          <Loader2 className="h-7 w-7 animate-spin text-violet-600" />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-4 transition-colors duration-300">
+        <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-violet-600 dark:text-violet-400" />
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
             {isLoadingTerm ? 'Loading term settings…' : 'Loading settings…'}
           </p>
-          <p className="text-xs text-slate-400 mt-0.5">Fetching your configuration…</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Fetching your configuration…</p>
         </div>
       </div>
     )
   }
 
-  // ── Initials helper ────────────────────────────────────────────────────────
   const initials = profile?.full_name
     ?.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || 'AD'
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         {/* Page header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Settings</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Manage your profile, school configuration, and preferences
               {currentTermName && currentSession && (
-                <span className="ml-2 text-emerald-600 text-xs font-medium">
+                <span className="ml-2 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
                   (Current term: {currentTermName} • {currentSession})
                 </span>
               )}
@@ -485,10 +467,10 @@ export default function AdminSettingsPage() {
           <div className={cn(
             'hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border',
             dbConnected === true
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
               : dbConnected === false
-                ? 'bg-red-50 text-red-600 border-red-200'
-                : 'bg-slate-100 text-slate-500 border-slate-200'
+                ? 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800'
+                : 'bg-slate-100 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'
           )}>
             <Wifi className="h-3 w-3" />
             {dbConnected === true ? 'DB Connected' : dbConnected === false ? 'DB Offline' : 'Checking…'}
@@ -497,21 +479,21 @@ export default function AdminSettingsPage() {
 
         {/* Current term banner */}
         {currentTermName && (
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
+          <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50 rounded-2xl p-4 flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-xl">
-                <GraduationCap className="h-4 w-4 text-emerald-600" />
+              <div className="p-2 bg-emerald-100 dark:bg-emerald-900/50 rounded-xl">
+                <GraduationCap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-emerald-800">
+                <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
                   Current Term: <span className="capitalize">{currentTermName}</span>
                 </p>
-                <p className="text-xs text-emerald-600">
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
                   Session: {currentSession || '—'}
                 </p>
               </div>
             </div>
-            <Badge className="bg-emerald-200 text-emerald-700 border-0 text-xs font-medium px-3 py-1">
+            <Badge className="bg-emerald-200 dark:bg-emerald-900/60 text-emerald-700 dark:text-emerald-400 border-0 text-xs font-medium px-3 py-1">
               <CheckCircle2 className="h-3 w-3 mr-1" /> Live
             </Badge>
           </div>
@@ -519,7 +501,7 @@ export default function AdminSettingsPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* Tab bar */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-1.5 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-1.5 shadow-sm">
             <TabsList className="w-full grid grid-cols-5 bg-transparent gap-1 h-auto">
               {[
                 { value: 'profile', label: 'Profile', icon: User },
@@ -536,8 +518,8 @@ export default function AdminSettingsPage() {
                     value={tab.value}
                     className={cn(
                       'flex flex-col sm:flex-row items-center gap-1 sm:gap-1.5 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-medium transition-all h-auto',
-                      'data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm',
-                      'data-[state=inactive]:text-slate-500 data-[state=inactive]:hover:bg-slate-50'
+                      'data-[state=active]:bg-slate-900 dark:data-[state=active]:bg-slate-700 data-[state=active]:text-white data-[state=active]:shadow-sm',
+                      'data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 data-[state=inactive]:hover:bg-slate-50 dark:data-[state=inactive]:hover:bg-slate-800'
                     )}
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -551,26 +533,25 @@ export default function AdminSettingsPage() {
 
           {/* ── Profile ─────────────────────────────────────────────────────── */}
           <TabsContent value="profile" className="mt-4 space-y-4">
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
-                {/* Avatar row */}
-                <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100 mb-6">
+                <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 mb-6">
                   <div className="relative shrink-0">
-                    <Avatar className="h-16 w-16 ring-2 ring-white shadow-md">
+                    <Avatar className="h-16 w-16 ring-2 ring-white dark:ring-slate-800 shadow-md">
                       <AvatarImage src={profile?.photo_url} />
                       <AvatarFallback className="bg-gradient-to-br from-violet-500 to-indigo-600 text-white text-xl font-bold">
                         {initials}
                       </AvatarFallback>
                     </Avatar>
-                    <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center">
+                    <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 flex items-center justify-center">
                       <CheckCircle2 className="h-2.5 w-2.5 text-white" />
                     </div>
                   </div>
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">{profile?.full_name}</p>
-                    <p className="text-xs text-slate-400 mt-0.5 truncate">{profile?.email}</p>
+                    <p className="font-semibold text-slate-800 dark:text-white">{profile?.full_name}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">{profile?.email}</p>
                     <div className="flex items-center gap-2 mt-1.5">
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 text-[10px] font-semibold border border-violet-200">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-400 text-[10px] font-semibold border border-violet-200 dark:border-violet-800">
                         <Shield className="h-2.5 w-2.5" /> Administrator
                       </span>
                     </div>
@@ -579,60 +560,60 @@ export default function AdminSettingsPage() {
 
                 <SectionHeader
                   icon={User}
-                  iconClass="bg-violet-100 text-violet-600"
+                  iconClass="bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400"
                   title="Personal Information"
                   description="Update your name and contact details"
                 />
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Full Name</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Full Name</Label>
                     <Input
                       value={fullName}
                       onChange={e => setFullName(e.target.value)}
-                      className="h-9 text-sm border-slate-200 focus-visible:ring-violet-500"
+                      className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-violet-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Email Address</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Email Address</Label>
                     <div className="relative">
                       <Input
                         value={email}
                         disabled
-                        className="h-9 text-sm bg-slate-50 border-slate-200 text-slate-400 pr-8"
+                        className="h-9 text-sm bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-500 pr-8"
                       />
-                      <Lock className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-300" />
+                      <Lock className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-300 dark:text-slate-600" />
                     </div>
-                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
                       <Info className="h-3 w-3" /> Email cannot be changed here
                     </p>
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Phone Number</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Phone Number</Label>
                     <Input
                       value={phone}
                       onChange={e => setPhone(e.target.value)}
                       placeholder="+234 XXX XXX XXXX"
-                      className="h-9 text-sm border-slate-200 focus-visible:ring-violet-500"
+                      className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-violet-500"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Address</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Address</Label>
                     <Input
                       value={address}
                       onChange={e => setAddress(e.target.value)}
                       placeholder="Your address"
-                      className="h-9 text-sm border-slate-200 focus-visible:ring-violet-500"
+                      className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-violet-500"
                     />
                   </div>
                 </div>
 
-                <div className="flex justify-end mt-6 pt-4 border-t border-slate-100">
+                <div className="flex justify-end mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     onClick={handleSaveProfile}
                     disabled={saving}
                     size="sm"
-                    className="bg-violet-600 hover:bg-violet-700 text-white shadow-sm h-8 text-xs px-4"
+                    className="bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white shadow-sm h-8 text-xs px-4"
                   >
                     {saving
                       ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -646,18 +627,18 @@ export default function AdminSettingsPage() {
 
           {/* ── Password ─────────────────────────────────────────────────────── */}
           <TabsContent value="password" className="mt-4">
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <SectionHeader
                   icon={Key}
-                  iconClass="bg-amber-100 text-amber-600"
+                  iconClass="bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400"
                   title="Change Password"
                   description="Update your account password — use a strong, unique password"
                 />
 
                 <div className="max-w-sm space-y-4">
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">New Password</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">New Password</Label>
                     <PasswordInput
                       value={newPassword}
                       onChange={setNewPassword}
@@ -667,19 +648,19 @@ export default function AdminSettingsPage() {
                     />
                     {passwordStrength && (
                       <div className="mt-1.5 space-y-1">
-                        <div className="h-1 rounded-full bg-slate-100 overflow-hidden">
+                        <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
                             className={cn('h-full rounded-full transition-all duration-300', passwordStrength.color)}
                             style={{ width: passwordStrength.width }}
                           />
                         </div>
-                        <p className="text-[10px] text-slate-400">{passwordStrength.label}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500">{passwordStrength.label}</p>
                       </div>
                     )}
                   </div>
 
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Confirm Password</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Confirm Password</Label>
                     <PasswordInput
                       value={confirmPassword}
                       onChange={setConfirmPassword}
@@ -693,7 +674,7 @@ export default function AdminSettingsPage() {
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -4 }}
-                          className="text-[11px] text-red-500 flex items-center gap-1 mt-1"
+                          className="text-[11px] text-red-500 dark:text-red-400 flex items-center gap-1 mt-1"
                         >
                           <AlertTriangle className="h-3 w-3" /> Passwords do not match
                         </motion.p>
@@ -702,7 +683,7 @@ export default function AdminSettingsPage() {
                         <motion.p
                           initial={{ opacity: 0, y: -4 }}
                           animate={{ opacity: 1, y: 0 }}
-                          className="text-[11px] text-emerald-600 flex items-center gap-1 mt-1"
+                          className="text-[11px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1 mt-1"
                         >
                           <CheckCircle2 className="h-3 w-3" /> Passwords match
                         </motion.p>
@@ -715,7 +696,7 @@ export default function AdminSettingsPage() {
                       onClick={handleChangePassword}
                       disabled={saving || !newPassword || newPassword !== confirmPassword || newPassword.length < 6}
                       size="sm"
-                      className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm h-8 text-xs px-4"
+                      className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 text-white shadow-sm h-8 text-xs px-4"
                     >
                       {saving
                         ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -725,15 +706,15 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
 
-                <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200">
-                  <p className="text-xs font-medium text-amber-700 mb-1">Security tips</p>
+                <div className="mt-6 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50">
+                  <p className="text-xs font-medium text-amber-700 dark:text-amber-400 mb-1">Security tips</p>
                   <ul className="space-y-0.5">
                     {[
                       'Use at least 8 characters',
                       'Mix uppercase, lowercase, numbers and symbols',
                       'Avoid reusing old passwords',
                     ].map(tip => (
-                      <li key={tip} className="text-[11px] text-amber-600 flex items-start gap-1.5">
+                      <li key={tip} className="text-[11px] text-amber-600 dark:text-amber-400 flex items-start gap-1.5">
                         <CheckCircle2 className="h-3 w-3 mt-0.5 shrink-0" /> {tip}
                       </li>
                     ))}
@@ -745,17 +726,17 @@ export default function AdminSettingsPage() {
 
           {/* ── School ───────────────────────────────────────────────────────── */}
           <TabsContent value="school" className="mt-4">
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <SectionHeader
                   icon={GraduationCap}
-                  iconClass="bg-emerald-100 text-emerald-600"
+                  iconClass="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
                   title="School Information"
                   description="Manage school details — saved directly to the database"
                 />
 
                 {!schoolLoaded && (
-                  <div className="flex items-center gap-2 mb-4 text-xs text-slate-400">
+                  <div className="flex items-center gap-2 mb-4 text-xs text-slate-400 dark:text-slate-500">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading from database…
                   </div>
                 )}
@@ -769,72 +750,71 @@ export default function AdminSettingsPage() {
                     { label: 'School Phone', key: 'school_phone' as const, placeholder: '+234 XXX XXX XXXX' },
                   ].map(field => (
                     <div key={field.key} className="space-y-1.5">
-                      <Label className="text-xs font-medium text-slate-600">{field.label}</Label>
+                      <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">{field.label}</Label>
                       <Input
                         value={schoolSettings[field.key]}
                         onChange={e => setSchoolSettings(s => ({ ...s, [field.key]: e.target.value }))}
                         placeholder={field.placeholder}
-                        className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500"
+                        className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-emerald-500"
                       />
                     </div>
                   ))}
 
                   <div className="sm:col-span-2 space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">School Address</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">School Address</Label>
                     <Textarea
                       value={schoolSettings.school_address}
                       onChange={e => setSchoolSettings(s => ({ ...s, school_address: e.target.value }))}
                       rows={2}
-                      className="text-sm border-slate-200 focus-visible:ring-emerald-500 resize-none"
+                      className="text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-emerald-500 resize-none"
                     />
                   </div>
 
-                  {/* ✅ DYNAMIC: Current term and session */}
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Current Term</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Current Term</Label>
                     <div className="flex items-center gap-2">
                       <Input
                         value={schoolSettings.current_term}
                         onChange={e => setSchoolSettings(s => ({ ...s, current_term: e.target.value }))}
                         placeholder="e.g. first, second, third"
-                        className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500 flex-1"
+                        className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-emerald-500 flex-1"
                       />
                       <TermStatusBadge 
                         term={schoolSettings.current_term} 
                         currentTerm={currentTerm} 
                       />
                     </div>
-                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Info className="h-3 w-3" /> Must match a <code className="bg-slate-100 px-1 rounded">term_settings.term</code> value
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Must match a <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">term_settings.term</code> value
                     </p>
                   </div>
                   
                   <div className="space-y-1.5">
-                    <Label className="text-xs font-medium text-slate-600">Current Session</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Current Session</Label>
                     <div className="flex items-center gap-2">
                       <Input
                         value={schoolSettings.current_session}
                         onChange={e => setSchoolSettings(s => ({ ...s, current_session: e.target.value }))}
                         placeholder="e.g. 2025/2026"
-                        className="h-9 text-sm border-slate-200 focus-visible:ring-emerald-500 flex-1"
+                        className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-emerald-500 flex-1"
                       />
                       <TermStatusBadge 
                         term={schoolSettings.current_session} 
                         currentTerm={currentSession} 
                       />
                     </div>
-                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
-                      <Info className="h-3 w-3" /> Must match a <code className="bg-slate-100 px-1 rounded">term_settings.session_year</code> value
+                    <p className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                      <Info className="h-3 w-3" /> Must match a <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">term_settings.session_year</code> value
                     </p>
                   </div>
                 </div>
 
-                <div className="flex justify-end mt-6 pt-4 border-t border-slate-100">
+                <div className="flex justify-end mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     onClick={handleSaveSchoolSettings}
                     disabled={saving}
                     size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-8 text-xs px-4"
+                    className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm h-8 text-xs px-4"
                   >
                     {saving
                       ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -848,31 +828,30 @@ export default function AdminSettingsPage() {
 
           {/* ── System ───────────────────────────────────────────────────────── */}
           <TabsContent value="system" className="mt-4 space-y-4">
-            {/* Next term date */}
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <SectionHeader
                   icon={Calendar}
-                  iconClass="bg-blue-100 text-blue-600"
+                  iconClass="bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"
                   title="Next Term Resumption Date"
                   description="Appears automatically on every generated report card"
                 />
 
                 <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
                   <div className="space-y-1.5 flex-1 max-w-xs">
-                    <Label className="text-xs font-medium text-slate-600">Select Date</Label>
+                    <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Select Date</Label>
                     <Input
                       type="date"
                       value={nextTermDate}
                       onChange={e => setNextTermDate(e.target.value)}
-                      className="h-9 text-sm border-slate-200 focus-visible:ring-blue-500"
+                      className="h-9 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-blue-500"
                     />
                   </div>
                   <Button
                     onClick={handleSaveNextTermDate}
                     disabled={savingNextTerm}
                     size="sm"
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm h-9 text-xs px-4"
+                    className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shadow-sm h-9 text-xs px-4"
                   >
                     {savingNextTerm
                       ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
@@ -886,16 +865,16 @@ export default function AdminSettingsPage() {
                     <motion.div
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200 flex items-start gap-3"
+                      className="mt-4 p-4 rounded-xl bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 flex items-start gap-3"
                     >
-                      <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                      <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div>
-                        <p className="text-sm font-semibold text-blue-800">
+                        <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">
                           Next term begins: {formatDate(nextTermDate)}
                         </p>
-                        <p className="text-xs text-blue-600 mt-0.5">
+                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-0.5">
                           This date will appear on all report cards generated for the current term.
                         </p>
                       </div>
@@ -905,12 +884,11 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* DB status */}
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <SectionHeader
                   icon={Database}
-                  iconClass="bg-emerald-100 text-emerald-600"
+                  iconClass="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
                   title="Database Status"
                   description="Live connection and storage information"
                 />
@@ -918,26 +896,28 @@ export default function AdminSettingsPage() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div className={cn(
                     'p-4 rounded-xl border',
-                    dbConnected ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'
+                    dbConnected 
+                      ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50' 
+                      : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900/50'
                   )}>
                     <p className={cn('text-[10px] font-medium uppercase tracking-wider mb-1',
-                      dbConnected ? 'text-emerald-600' : 'text-red-500')}>Connection</p>
+                      dbConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>Connection</p>
                     <p className={cn('text-sm font-semibold flex items-center gap-1',
-                      dbConnected ? 'text-emerald-700' : 'text-red-600')}>
+                      dbConnected ? 'text-emerald-700 dark:text-emerald-300' : 'text-red-600 dark:text-red-400')}>
                       {dbConnected
                         ? <><CheckCircle2 className="h-3.5 w-3.5" /> Connected</>
                         : <><AlertTriangle className="h-3.5 w-3.5" /> Offline</>}
                     </p>
                   </div>
-                  <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-blue-500 mb-1">Last Sync</p>
-                    <p className="text-sm font-semibold text-blue-700">
+                  <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-blue-500 dark:text-blue-400 mb-1">Last Sync</p>
+                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
                       {new Date().toLocaleDateString('en-NG', { day: 'numeric', month: 'short' })}
                     </p>
                   </div>
-                  <div className="p-4 rounded-xl bg-violet-50 border border-violet-200 col-span-2 sm:col-span-1">
-                    <p className="text-[10px] font-medium uppercase tracking-wider text-violet-500 mb-1">Provider</p>
-                    <p className="text-sm font-semibold text-violet-700">Supabase</p>
+                  <div className="p-4 rounded-xl bg-violet-50 dark:bg-violet-950/30 border border-violet-200 dark:border-violet-900/50 col-span-2 sm:col-span-1">
+                    <p className="text-[10px] font-medium uppercase tracking-wider text-violet-500 dark:text-violet-400 mb-1">Provider</p>
+                    <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">Supabase</p>
                   </div>
                 </div>
               </CardContent>
@@ -946,17 +926,16 @@ export default function AdminSettingsPage() {
 
           {/* ── Preferences ──────────────────────────────────────────────────── */}
           <TabsContent value="preferences" className="mt-4 space-y-4">
-            {/* Notifications */}
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <SectionHeader
                   icon={Bell}
-                  iconClass="bg-blue-100 text-blue-600"
+                  iconClass="bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"
                   title="Notification Preferences"
                   description="Control which alerts you receive"
                 />
 
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   <ToggleRow
                     label="Email Notifications"
                     description="Receive system alerts via email"
@@ -983,12 +962,12 @@ export default function AdminSettingsPage() {
                   />
                 </div>
 
-                <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
+                <div className="flex justify-end mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     onClick={handleSaveNotifications}
                     size="sm"
                     variant="outline"
-                    className="border-slate-200 h-8 text-xs"
+                    className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs"
                   >
                     <Save className="h-3.5 w-3.5 mr-1.5" />Save Preferences
                   </Button>
@@ -996,17 +975,16 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Appearance */}
-            <Card className="border border-slate-200/80 shadow-sm bg-white">
+            <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <SectionHeader
                   icon={Palette}
-                  iconClass="bg-pink-100 text-pink-600"
+                  iconClass="bg-pink-100 dark:bg-pink-950/50 text-pink-600 dark:text-pink-400"
                   title="Appearance"
                   description="Personalise your portal experience"
                 />
 
-                <div className="divide-y divide-slate-100">
+                <div className="divide-y divide-slate-100 dark:divide-slate-800">
                   <ToggleRow
                     label="Compact Mode"
                     description="Reduce spacing and font sizes across the interface"
@@ -1021,12 +999,12 @@ export default function AdminSettingsPage() {
                   />
                 </div>
 
-                <div className="flex justify-end mt-4 pt-4 border-t border-slate-100">
+                <div className="flex justify-end mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     onClick={handleSaveAppearance}
                     size="sm"
                     variant="outline"
-                    className="border-slate-200 h-8 text-xs"
+                    className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs"
                   >
                     <Save className="h-3.5 w-3.5 mr-1.5" />Save Appearance
                   </Button>
@@ -1034,16 +1012,15 @@ export default function AdminSettingsPage() {
               </CardContent>
             </Card>
 
-            {/* Danger zone */}
-            <Card className="border border-red-200/80 shadow-sm bg-white">
+            <Card className="border border-red-200/80 dark:border-red-900/50 shadow-sm bg-white dark:bg-slate-900">
               <CardContent className="p-6">
                 <div className="flex items-start gap-3 mb-5">
-                  <div className="h-9 w-9 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-                    <AlertTriangle className="h-4 w-4 text-red-600" />
+                  <div className="h-9 w-9 rounded-xl bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400" />
                   </div>
                   <div>
-                    <h3 className="font-semibold text-red-700 text-sm">Danger Zone</h3>
-                    <p className="text-xs text-red-400 mt-0.5">These actions are irreversible — proceed with caution</p>
+                    <h3 className="font-semibold text-red-700 dark:text-red-400 text-sm">Danger Zone</h3>
+                    <p className="text-xs text-red-400 dark:text-red-500 mt-0.5">These actions are irreversible — proceed with caution</p>
                   </div>
                 </div>
 
@@ -1060,16 +1037,16 @@ export default function AdminSettingsPage() {
                   ].map(item => (
                     <div
                       key={item.title}
-                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-red-100 bg-red-50/50"
+                      className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-4 rounded-xl border border-red-100 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20"
                     >
                       <div>
-                        <p className="text-sm font-semibold text-slate-800">{item.title}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">{item.desc}</p>
+                        <p className="text-sm font-semibold text-slate-800 dark:text-white">{item.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{item.desc}</p>
                       </div>
                       <Button
                         variant="outline"
                         size="sm"
-                        className="shrink-0 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 h-8 text-xs"
+                        className="shrink-0 border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 hover:border-red-300 dark:hover:border-red-800 h-8 text-xs"
                       >
                         <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                         {item.title.split(' ')[0]}

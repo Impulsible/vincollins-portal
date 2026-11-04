@@ -32,9 +32,10 @@ function RouteProgressBar({ active }: { active: boolean }) {
     <div
       className={cn(
         'fixed top-0 left-0 right-0 z-[99999] h-0.5',
-        'bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400',
+        // Added dark mode variants for the gradient and shadow
+        'bg-gradient-to-r from-emerald-400 via-emerald-500 to-emerald-400 dark:from-emerald-500 dark:via-emerald-400 dark:to-emerald-500',
         'transition-all duration-300 ease-out',
-        'shadow-sm shadow-emerald-500/50',
+        'shadow-sm shadow-emerald-500/50 dark:shadow-emerald-400/50',
       )}
       style={{ width: `${width}%` }}
     />

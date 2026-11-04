@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/dashboard/StatsCards.tsx - UPDATED WITH ACTIVE STATUS SUBTITLES
+// components/admin/dashboard/StatsCards.tsx - UPDATED WITH ACTIVE STATUS SUBTITLES + DARK MODE
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -43,7 +43,7 @@ const StatCard = memo(({
       onClick={onClick}
       className="block group cursor-pointer"
     >
-      <Card className="relative h-full overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-white to-gray-50/50 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl dark:from-gray-900 dark:to-gray-800/50">
+      <Card className="relative h-full overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-white to-gray-50/50 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl dark:from-slate-900 dark:to-slate-800/50 dark:border dark:border-slate-800">
         <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-5', bgGradient)} />
         <div className={cn('absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', bgGradient)} />
         {live && (
@@ -58,23 +58,23 @@ const StatCard = memo(({
           <div className="flex items-start justify-between gap-3 lg:gap-4">
             <div className="flex-1 space-y-2 lg:space-y-3">
               <div>
-                <p className="text-xs lg:text-sm font-semibold uppercase tracking-wider text-muted-foreground">{title}</p>
-                {subtitle && <p className="text-[10px] lg:text-xs text-muted-foreground/60 mt-0.5">{subtitle}</p>}
+                <p className="text-xs lg:text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{title}</p>
+                {subtitle && <p className="text-[10px] lg:text-xs text-slate-400 dark:text-slate-500 mt-0.5">{subtitle}</p>}
               </div>
               <div>
-                <h3 className="text-2xl lg:text-4xl font-bold tracking-tight text-foreground">
+                <h3 className="text-2xl lg:text-4xl font-bold tracking-tight text-slate-900 dark:text-white">
                   {typeof displayValue === 'number' ? displayValue.toLocaleString() : displayValue}
                 </h3>
                 {trend !== undefined && (
-                  <div className="mt-2 lg:mt-3 inline-flex items-center gap-1.5 rounded-full bg-muted/50 px-2 py-0.5 lg:px-2.5 lg:py-1 text-[10px] lg:text-xs font-medium backdrop-blur-sm">
+                  <div className="mt-2 lg:mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 lg:px-2.5 lg:py-1 text-[10px] lg:text-xs font-medium backdrop-blur-sm">
                     {trend >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-500" /> : <TrendingDown className="h-3 w-3 text-red-500" />}
                     <span className={cn('font-semibold', trend >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{Math.abs(trend)}%</span>
-                    <span className="text-muted-foreground hidden sm:inline">{trendLabel}</span>
+                    <span className="text-slate-500 dark:text-slate-400 hidden sm:inline">{trendLabel}</span>
                   </div>
                 )}
               </div>
               <div className="pt-1 lg:pt-2">
-                <span className="inline-flex items-center gap-1 text-[10px] lg:text-xs font-medium text-muted-foreground transition-all duration-200 group-hover:gap-2 group-hover:text-primary">
+                <span className="inline-flex items-center gap-1 text-[10px] lg:text-xs font-medium text-slate-500 dark:text-slate-400 transition-all duration-200 group-hover:gap-2 group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
                   View Details <ArrowRight className="h-2.5 w-2.5 lg:h-3 lg:w-3 transition-transform group-hover:translate-x-0.5" />
                 </span>
               </div>
@@ -126,7 +126,6 @@ export function StatsCards({
   const [activeExamsCount, setActiveExamsCount] = useState(initialStats.activeExams)
   const [pendingReportsCount, setPendingReportsCount] = useState(initialStats.pendingReports || 0)
 
-  // Real-time presence tracking
   useEffect(() => {
     const presenceChannel = supabase.channel('stats-presence')
     presenceChannel
@@ -146,7 +145,6 @@ export function StatsCards({
     return () => { presenceChannel.unsubscribe() }
   }, [])
 
-  // Fetch active exams
   useEffect(() => {
     const fetchActiveExams = async () => {
       const { count } = await supabase
@@ -167,7 +165,6 @@ export function StatsCards({
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Fetch pending report cards
   useEffect(() => {
     const fetchPendingReports = async () => {
       const { count } = await supabase
@@ -188,7 +185,6 @@ export function StatsCards({
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  // Fetch pending exams (for submissions count)
   const [pendingSubmissionsCount, setPendingSubmissionsCount] = useState(initialStats.pendingSubmissions)
   
   useEffect(() => {
@@ -213,12 +209,12 @@ export function StatsCards({
 
   const cards = useMemo(() => [
     {
-      title: 'Active Students', // 👈 Changed from Total Students
+      title: 'Active Students',
       value: liveStats.totalStudents || 0,
       trend: 12,
       color: 'bg-emerald-500',
       bgGradient: 'from-emerald-500 via-emerald-600 to-teal-600',
-      subtitle: onlineCounts.students > 0 ? `${onlineCounts.students} online now` : 'Active students', // 👈 Changed description
+      subtitle: onlineCounts.students > 0 ? `${onlineCounts.students} online now` : 'Active students',
       delay: 0,
       onClick: onStudentClick,
       live: onlineCounts.students > 0,

@@ -1,4 +1,4 @@
-// components/admin/AdminLoading.tsx - NO SKELETON LOADER
+// components/admin/AdminLoading.tsx - WITH DARK MODE
 // ============================================
 // ADMIN DASHBOARD LOADING STATE
 // ============================================
@@ -31,7 +31,7 @@ export default function AdminLoading({ profile, onLogout }: AdminLoadingProps) {
 
   // ✅ NO SKELETON - Just the beautiful animated loading
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 overflow-x-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 overflow-x-hidden transition-colors duration-300">
       <Header user={formatProfileForHeader(profile)} onLogout={onLogout} />
       <div className="flex items-center justify-center min-h-[calc(100vh-64px)] px-4">
         <div className="text-center">
@@ -40,13 +40,13 @@ export default function AdminLoading({ profile, onLogout }: AdminLoadingProps) {
             transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
             className="inline-block"
           >
-            <Shield className="h-16 w-16 text-purple-600 mx-auto" />
+            <Shield className="h-16 w-16 text-purple-600 dark:text-purple-400 mx-auto" />
           </motion.div>
           <motion.p 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="mt-4 text-slate-600 text-lg font-medium"
+            className="mt-4 text-slate-600 dark:text-slate-300 text-lg font-medium"
           >
             Loading Admin Dashboard...
           </motion.p>
@@ -54,7 +54,7 @@ export default function AdminLoading({ profile, onLogout }: AdminLoadingProps) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
-            className="mt-2 text-slate-500 text-sm"
+            className="mt-2 text-slate-500 dark:text-slate-400 text-sm"
           >
             Preparing your administrative workspace 🛡️
           </motion.p>
@@ -62,7 +62,7 @@ export default function AdminLoading({ profile, onLogout }: AdminLoadingProps) {
             {[0, 1, 2].map((i) => (
               <motion.div
                 key={i}
-                className="h-2.5 w-2.5 rounded-full bg-purple-400"
+                className="h-2.5 w-2.5 rounded-full bg-purple-400 dark:bg-purple-500"
                 animate={{ y: [0, -10, 0] }}
                 transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15 }}
               />

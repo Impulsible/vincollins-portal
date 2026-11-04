@@ -1,5 +1,4 @@
 // app/admin/layout.tsx - WITH LOADING STATE & DARK MODE
-
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -25,8 +24,11 @@ interface AdminProfile {
   role?: string
 }
 
+// ✅ FIXED: Added missing routes so the layout knows how to highlight them
 const routeToTabMap: Record<string, string> = {
   '/admin': 'overview',
+  '/admin/notifications': 'notifications',
+  '/admin/teacher-classes': 'teacher-classes',
   '/admin/broad-sheet': 'broad-sheet',
   '/admin/students': 'students',
   '/admin/staff': 'staff',
@@ -42,6 +44,8 @@ const routeToTabMap: Record<string, string> = {
 
 const tabToRouteMap: Record<string, string> = {
   'overview': '/admin',
+  'notifications': '/admin/notifications',
+  'teacher-classes': '/admin/teacher-classes',
   'broad-sheet': '/admin/broad-sheet',
   'students': '/admin/students',
   'staff': '/admin/staff',
@@ -58,7 +62,7 @@ const tabToRouteMap: Record<string, string> = {
 const getTabFromPathname = (pathname: string): string => {
   if (routeToTabMap[pathname]) return routeToTabMap[pathname]
   for (const [route, tab] of Object.entries(routeToTabMap)) {
-    if (pathname?.startsWith(route + '/')) return tab
+    if (route !== '/admin' && pathname?.startsWith(route + '/')) return tab
   }
   return 'overview'
 }

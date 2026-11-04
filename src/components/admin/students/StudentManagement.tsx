@@ -1,4 +1,4 @@
-// components/admin/students/StudentManagement.tsx
+// components/admin/students/StudentManagement.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useCallback } from 'react'
@@ -116,7 +116,6 @@ export function StudentManagement({
     setShowDelete(true)
   }, [])
 
-  // ✅ Direct, verified save in database
   const handleSaveEdit = useCallback(async () => {
     if (!selectedStudent) return
     setIsSavingEdit(true)
@@ -138,16 +137,13 @@ export function StudentManagement({
           phone: selectedStudent.phone,
           address: selectedStudent.address,
           next_term_begins: selectedStudent.next_term_begins,
-          is_active: selectedStudent.is_active === false ? false : true // 👈 Explicit persistence
+          is_active: selectedStudent.is_active === false ? false : true
         })
         .eq('id', selectedStudent.id)
         .select()
 
       if (error) throw error
-
-      if (!data || data.length === 0) {
-        throw new Error('Update failed. Ensure admin RLS policy is enabled in Supabase.')
-      }
+      if (!data || data.length === 0) throw new Error('Update failed. Ensure admin RLS policy is enabled in Supabase.')
 
       toast.success('Student profile updated successfully!')
       setShowEdit(false)
@@ -200,11 +196,11 @@ export function StudentManagement({
 
   if (loading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-48 bg-slate-200 animate-pulse rounded-lg" />
+      <div className="space-y-6 transition-colors duration-300">
+        <div className="h-8 w-48 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {[1, 2, 3, 4].map(i => (
-            <div key={i} className="h-24 bg-slate-200 animate-pulse rounded-xl" />
+            <div key={i} className="h-24 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-xl" />
           ))}
         </div>
       </div>
@@ -212,7 +208,7 @@ export function StudentManagement({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 transition-colors duration-300">
       <motion.div
         className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"
         initial={{ opacity: 0, y: -10 }}
@@ -220,11 +216,11 @@ export function StudentManagement({
         transition={{ duration: 0.3 }}
       >
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 flex items-center gap-2">
-            <School className="h-7 w-7 text-emerald-600" />
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <School className="h-7 w-7 text-emerald-600 dark:text-emerald-400" />
             Student Management
           </h1>
-          <p className="text-slate-500 mt-1">Manage student profiles, credentials, and class assignments</p>
+          <p className="text-slate-500 dark:text-slate-400 mt-1">Manage student profiles, credentials, and class assignments</p>
         </div>
 
         <div className="flex gap-3">
@@ -239,57 +235,57 @@ export function StudentManagement({
 
       {/* Stats Board */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-l-4 border-l-emerald-500 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-emerald-500 dark:border-l-emerald-500 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Total Students</p>
-                <p className="text-2xl font-bold text-slate-800">{totalStudents}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Total Students</p>
+                <p className="text-2xl font-bold text-slate-800 dark:text-white">{totalStudents}</p>
               </div>
-              <div className="h-10 w-10 bg-emerald-100 rounded-lg flex items-center justify-center">
-                <Users className="h-5 w-5 text-emerald-600" />
+              <div className="h-10 w-10 bg-emerald-100 dark:bg-emerald-950/50 rounded-lg flex items-center justify-center">
+                <Users className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-green-500 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-green-500 dark:border-l-green-500 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Active</p>
-                <p className="text-2xl font-bold text-green-600">{activeCount}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Active</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{activeCount}</p>
               </div>
-              <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Shield className="h-5 w-5 text-green-600" />
+              <div className="h-10 w-10 bg-green-100 dark:bg-green-950/50 rounded-lg flex items-center justify-center">
+                <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-slate-500 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-slate-500 dark:border-l-slate-500 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Inactive</p>
-                <p className="text-2xl font-bold text-slate-600">{inactiveCount}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Inactive</p>
+                <p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{inactiveCount}</p>
               </div>
-              <div className="h-10 w-10 bg-slate-100 rounded-lg flex items-center justify-center">
-                <Circle className="h-5 w-5 text-slate-500" />
+              <div className="h-10 w-10 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
+                <Circle className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-l-4 border-l-purple-500 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 border-l-4 border-l-purple-500 dark:border-l-purple-500 shadow-sm bg-white dark:bg-slate-900">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-500 font-medium">Classes</p>
-                <p className="text-2xl font-bold text-purple-600">{classCount}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Classes</p>
+                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{classCount}</p>
               </div>
-              <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Building className="h-5 w-5 text-purple-600" />
+              <div className="h-10 w-10 bg-purple-100 dark:bg-purple-950/50 rounded-lg flex items-center justify-center">
+                <Building className="h-5 w-5 text-purple-600 dark:text-purple-400" />
               </div>
             </div>
           </CardContent>
@@ -301,7 +297,12 @@ export function StudentManagement({
           variant={filters.viewMode === 'classes' ? 'default' : 'outline'}
           size="sm"
           onClick={() => filters.setViewMode('classes')}
-          className={cn('transition-all', filters.viewMode === 'classes' && 'bg-emerald-600 hover:bg-emerald-700')}
+          className={cn(
+            'transition-all', 
+            filters.viewMode === 'classes' 
+              ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white' 
+              : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+          )}
         >
           Class View
         </Button>
@@ -309,12 +310,17 @@ export function StudentManagement({
           variant={filters.viewMode === 'list' ? 'default' : 'outline'}
           size="sm"
           onClick={() => filters.setViewMode('list')}
-          className={cn('transition-all', filters.viewMode === 'list' && 'bg-emerald-600 hover:bg-emerald-700')}
+          className={cn(
+            'transition-all', 
+            filters.viewMode === 'list' 
+              ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white' 
+              : 'border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300'
+          )}
         >
           List View
         </Button>
         {filters.viewMode === 'list' && filters.selectedClass && (
-          <Button variant="ghost" size="sm" onClick={handleClearSelection}>
+          <Button variant="ghost" size="sm" onClick={handleClearSelection} className="text-slate-600 dark:text-slate-400">
             Clear Filter
           </Button>
         )}

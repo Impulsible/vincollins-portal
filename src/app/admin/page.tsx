@@ -1,4 +1,4 @@
-// app/admin/page.tsx - FULLY CORRECTED WITH PERSISTENT DEACTIVATION & ROSTER EXCLUSIONS
+// app/admin/page.tsx - FULLY CORRECTED + DARK MODE
 'use client'
 
 import React, { Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
@@ -148,10 +148,10 @@ function mapToStaff(p: Record<string, unknown>): Staff {
 
 const TabFallback = () => (
   <div className="flex flex-col items-center justify-center py-20 gap-3">
-    <div className="w-10 h-10 rounded-2xl bg-white shadow-md flex items-center justify-center">
-      <Loader2 className="h-5 w-5 animate-spin text-violet-600" />
+    <div className="w-10 h-10 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center">
+      <Loader2 className="h-5 w-5 animate-spin text-violet-600 dark:text-violet-400" />
     </div>
-    <p className="text-sm text-slate-400 font-medium">Loading…</p>
+    <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">Loading…</p>
   </div>
 )
 
@@ -165,12 +165,12 @@ interface QuickActionCardProps {
 }
 
 const quickActionColors: Record<string, { bg: string; icon: string; ring: string }> = {
-  violet: { bg: 'bg-violet-50', icon: 'text-violet-600', ring: 'hover:ring-violet-200' },
-  emerald: { bg: 'bg-emerald-50', icon: 'text-emerald-600', ring: 'hover:ring-emerald-200' },
-  blue: { bg: 'bg-blue-50', icon: 'text-blue-600', ring: 'hover:ring-blue-200' },
-  amber: { bg: 'bg-amber-50', icon: 'text-amber-600', ring: 'hover:ring-amber-200' },
-  rose: { bg: 'bg-rose-50', icon: 'text-rose-600', ring: 'hover:ring-rose-200' },
-  purple: { bg: 'bg-purple-50', icon: 'text-purple-600', ring: 'hover:ring-purple-200' },
+  violet: { bg: 'bg-violet-50 dark:bg-violet-950/30', icon: 'text-violet-600 dark:text-violet-400', ring: 'hover:ring-violet-200 dark:hover:ring-violet-800' },
+  emerald: { bg: 'bg-emerald-50 dark:bg-emerald-950/30', icon: 'text-emerald-600 dark:text-emerald-400', ring: 'hover:ring-emerald-200 dark:hover:ring-emerald-800' },
+  blue: { bg: 'bg-blue-50 dark:bg-blue-950/30', icon: 'text-blue-600 dark:text-blue-400', ring: 'hover:ring-blue-200 dark:hover:ring-blue-800' },
+  amber: { bg: 'bg-amber-50 dark:bg-amber-950/30', icon: 'text-amber-600 dark:text-amber-400', ring: 'hover:ring-amber-200 dark:hover:ring-amber-800' },
+  rose: { bg: 'bg-rose-50 dark:bg-rose-950/30', icon: 'text-rose-600 dark:text-rose-400', ring: 'hover:ring-rose-200 dark:hover:ring-rose-800' },
+  purple: { bg: 'bg-purple-50 dark:bg-purple-950/30', icon: 'text-purple-600 dark:text-purple-400', ring: 'hover:ring-purple-200 dark:hover:ring-purple-800' },
 }
 
 function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'violet' }: QuickActionCardProps) {
@@ -180,31 +180,31 @@ function QuickActionCard({ icon: Icon, label, desc, onClick, alert, color = 'vio
       onClick={onClick}
       style={cardIsolationStyle}
       className={cn(
-        'group relative w-full text-left p-4 rounded-2xl border border-slate-200/80 bg-white',
-        'hover:border-slate-300 hover:shadow-md transition-all duration-200',
+        'group relative w-full text-left p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900',
+        'hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md transition-all duration-200',
         'focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500',
         'ring-2 ring-transparent',
         colors.ring,
-        alert && 'border-amber-200 bg-amber-50/30'
+        alert && 'border-amber-200 dark:border-amber-900/50 bg-amber-50/30 dark:bg-amber-950/20'
       )}
       aria-label={`${label}: ${desc}`}
     >
       <div className="flex items-center gap-3">
         <div className={cn(
           'h-10 w-10 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-110',
-          alert ? 'bg-amber-100' : colors.bg
+          alert ? 'bg-amber-100 dark:bg-amber-950/50' : colors.bg
         )}>
-          <Icon className={cn('h-5 w-5', alert ? 'text-amber-600' : colors.icon)} />
+          <Icon className={cn('h-5 w-5', alert ? 'text-amber-600 dark:text-amber-400' : colors.icon)} />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-slate-800 truncate">{label}</p>
-          <p className="text-xs text-slate-400 truncate mt-0.5">{desc}</p>
+          <p className="text-sm font-semibold text-slate-800 dark:text-white truncate">{label}</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 truncate mt-0.5">{desc}</p>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           {alert && (
             <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" aria-label="Alert" />
           )}
-          <ChevronRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
+          <ChevronRight className="h-3.5 w-3.5 text-slate-300 dark:text-slate-600 group-hover:text-slate-500 dark:group-hover:text-slate-400 group-hover:translate-x-0.5 transition-all" />
         </div>
       </div>
     </button>
@@ -222,18 +222,18 @@ function PendingExamCard({
   return (
     <div
       style={cardIsolationStyle}
-      className="group rounded-2xl border border-slate-200/80 bg-white p-4 sm:p-5 hover:shadow-md transition-all duration-200"
+      className="group rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 hover:shadow-md transition-all duration-200"
     >
       <div className="flex flex-col sm:flex-row gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-3">
-            <h3 className="font-bold text-sm sm:text-base text-slate-800 break-words min-w-0 flex-1">{exam.title}</h3>
+            <h3 className="font-bold text-sm sm:text-base text-slate-800 dark:text-white break-words min-w-0 flex-1">{exam.title}</h3>
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50 whitespace-nowrap">
                 <Clock className="h-3 w-3" /> Pending
               </span>
               {exam.has_theory && (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 text-violet-700 border border-violet-200 whitespace-nowrap">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-violet-50 dark:bg-violet-950/50 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-900/50 whitespace-nowrap">
                   Theory
                 </span>
               )}
@@ -247,8 +247,8 @@ function PendingExamCard({
               { label: 'Teacher', value: exam.teacher_name },
             ].map(({ label, value }) => (
               <div key={label} className="min-w-0">
-                <p className="text-slate-400 mb-0.5 uppercase tracking-wider text-[10px] font-medium">{label}</p>
-                <p className="font-semibold text-slate-700 truncate">{value}</p>
+                <p className="text-slate-400 dark:text-slate-500 mb-0.5 uppercase tracking-wider text-[10px] font-medium">{label}</p>
+                <p className="font-semibold text-slate-700 dark:text-slate-200 truncate">{value}</p>
               </div>
             ))}
           </div>
@@ -262,7 +262,7 @@ function PendingExamCard({
             ].map(label => (
               <span
                 key={label}
-                className="px-2 sm:px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 text-[10px] sm:text-[11px] font-medium border border-slate-200 whitespace-nowrap"
+                className="px-2 sm:px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-[10px] sm:text-[11px] font-medium border border-slate-200 dark:border-slate-700 whitespace-nowrap"
               >
                 {label}
               </span>
@@ -275,7 +275,7 @@ function PendingExamCard({
             onClick={() => onApprove(exam)}
             disabled={approving}
             size="sm"
-            className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-8 text-xs px-4"
+            className="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm h-8 text-xs px-4"
           >
             {approving
               ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
@@ -286,7 +286,7 @@ function PendingExamCard({
             variant="outline"
             onClick={() => onReject(exam)}
             size="sm"
-            className="flex-1 sm:flex-none border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 h-8 text-xs px-4"
+            className="flex-1 sm:flex-none border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 h-8 text-xs px-4"
           >
             <XCircle className="h-3.5 w-3.5 mr-1.5" />
             Reject
@@ -460,7 +460,6 @@ function AdminDashboardContent() {
         setStudents(newStudents)
         setStaff(newStaff)
         
-        // 🚫 CRITICAL: Exclude inactive/withdrawn students from metric calculations
         const activeStudentsCount = newStudents.filter(s => s.is_active !== false).length
         setStats(prev => ({ ...prev, totalStudents: activeStudentsCount, totalStaff: newStaff.length }))
       }
@@ -497,7 +496,6 @@ function AdminDashboardContent() {
 
       await fetchPendingPromotions()
 
-      // Calculate active student metric count for caching
       const activeStudentsCountForCache = newStudents.filter(s => s.is_active !== false).length
 
       cacheRef.current.set('dashboardData', {
@@ -535,7 +533,6 @@ function AdminDashboardContent() {
     toast.success('Dashboard refreshed')
   }, [loadAllData])
 
-  // ✅ Toggle Active / Inactive state inside database with guaranteed select confirmation
   const handleToggleStatus = useCallback(async (studentId: string, currentStatus: boolean) => {
     const nextStatus = !currentStatus
     try {
@@ -551,7 +548,6 @@ function AdminDashboardContent() {
         throw new Error('Database denied update. Verify Row-Level Security policies.')
       }
 
-      // Synchronize the complete student array & active metrics atomically
       setStudents(prev => {
         const updated = prev.map(s => (s.id === studentId ? { ...s, is_active: nextStatus } : s))
         const activeCount = updated.filter(s => s.is_active !== false).length
@@ -622,12 +618,12 @@ function AdminDashboardContent() {
       return (
         <div className="flex items-center justify-center min-h-[50vh] px-4">
           <div className="text-center max-w-sm">
-            <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="h-8 w-8 text-red-400" />
+            <div className="w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-950/50 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="h-8 w-8 text-red-400 dark:text-red-500" />
             </div>
-            <h3 className="text-lg font-semibold text-slate-800 mb-1">Failed to load dashboard</h3>
-            <p className="text-sm text-slate-400 mb-6">{error.message}</p>
-            <Button onClick={handleRetry} className="bg-slate-900 hover:bg-slate-800 text-white">
+            <h3 className="text-lg font-semibold text-slate-800 dark:text-white mb-1">Failed to load dashboard</h3>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mb-6">{error.message}</p>
+            <Button onClick={handleRetry} className="bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white">
               <RefreshCw className="mr-2 h-4 w-4" /> Try Again
             </Button>
           </div>
@@ -662,26 +658,26 @@ function AdminDashboardContent() {
                 >
                   <div
                     style={cardIsolationStyle}
-                    className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 shadow-sm"
+                    className="relative p-3 sm:p-4 rounded-2xl bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-200 dark:border-amber-900/50 shadow-sm"
                   >
                     <button
                       onClick={() => setDismissedBanner(true)}
-                      className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 rounded-lg hover:bg-amber-100 transition-colors z-10"
+                      className="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 rounded-lg hover:bg-amber-100 dark:hover:bg-amber-900/50 transition-colors z-10"
                       aria-label="Dismiss"
                     >
-                      <X className="h-3.5 w-3.5 text-amber-500" />
+                      <X className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
                     </button>
 
                     <div className="flex flex-col sm:flex-row sm:items-center gap-3 pr-6 sm:pr-8">
                       <div className="flex items-start sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
-                        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-                          <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600" />
+                        <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+                          <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-amber-800 text-xs sm:text-sm leading-tight break-words">
+                          <p className="font-semibold text-amber-800 dark:text-amber-300 text-xs sm:text-sm leading-tight break-words">
                             {pendingExamsCount} Exam{pendingExamsCount !== 1 ? 's' : ''} Awaiting Approval
                           </p>
-                          <p className="text-[11px] sm:text-xs text-amber-600 mt-0.5 break-words">
+                          <p className="text-[11px] sm:text-xs text-amber-600 dark:text-amber-400/80 mt-0.5 break-words">
                             Review and publish teacher-submitted exams
                           </p>
                         </div>
@@ -690,7 +686,7 @@ function AdminDashboardContent() {
                       <Button
                         onClick={() => handleTabChange('exams')}
                         size="sm"
-                        className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm h-8 text-xs w-full sm:w-auto shrink-0"
+                        className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 text-white shadow-sm h-8 text-xs w-full sm:w-auto shrink-0"
                       >
                         Review Now
                         <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
@@ -713,7 +709,7 @@ function AdminDashboardContent() {
 
             <div>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-xs sm:text-sm font-semibold text-slate-700 uppercase tracking-wider">Quick Actions</h2>
+                <h2 className="text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider">Quick Actions</h2>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3">
                 <QuickActionCard
@@ -772,7 +768,6 @@ function AdminDashboardContent() {
       case 'students':
         return (
           <Suspense fallback={<TabFallback />}>
-            {/* ✅ FIXED: Passed handleToggleStatus callback here */}
             <StudentManagement 
               students={students} 
               onRefresh={handleRefresh} 
@@ -804,8 +799,8 @@ function AdminDashboardContent() {
           >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
               <div className="min-w-0 flex-1">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 break-words">Exam Approvals</h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5 break-words">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white break-words">Exam Approvals</h1>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5 break-words">
                   {pendingExamsCount > 0
                     ? `${pendingExamsCount} exam${pendingExamsCount !== 1 ? 's' : ''} awaiting review`
                     : 'All exams reviewed'} · {publishedExams.length} published
@@ -816,24 +811,24 @@ function AdminDashboardContent() {
                 variant="outline"
                 size="sm"
                 disabled={refreshing}
-                className="border-slate-200 hover:bg-slate-50 h-8 text-xs w-full sm:w-auto"
+                className="border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-8 text-xs w-full sm:w-auto text-slate-700 dark:text-slate-300"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
                 Refresh
               </Button>
             </div>
 
-            <Card style={cardIsolationStyle} className="border border-slate-200/80 shadow-sm">
-              <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
+            <Card style={cardIsolationStyle} className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+              <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
                 <div className="flex items-center justify-between gap-2">
-                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
-                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600" />
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white min-w-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center shrink-0">
+                      <Clock className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" />
                     </div>
                     <span className="truncate">Pending Approval</span>
                   </CardTitle>
                   {pendingExamsCount > 0 && (
-                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold border border-amber-200 shrink-0">
+                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-xs font-semibold border border-amber-200 dark:border-amber-900/50 shrink-0">
                       {pendingExamsCount}
                     </span>
                   )}
@@ -842,11 +837,11 @@ function AdminDashboardContent() {
               <CardContent className="p-4 sm:p-5">
                 {pendingExams.length === 0 ? (
                   <div className="text-center py-10 sm:py-12">
-                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 flex items-center justify-center mx-auto mb-4">
-                      <CheckCircle2 className="h-7 w-7 text-emerald-500" />
+                    <div className="w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-950/50 flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 className="h-7 w-7 text-emerald-500 dark:text-emerald-400" />
                     </div>
-                    <p className="font-medium text-slate-700 text-sm">All caught up!</p>
-                    <p className="text-xs text-slate-400 mt-1">No exams pending review</p>
+                    <p className="font-medium text-slate-700 dark:text-slate-200 text-sm">All caught up!</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">No exams pending review</p>
                   </div>
                 ) : (
                   <div className="space-y-2.5 sm:space-y-3">
@@ -865,16 +860,16 @@ function AdminDashboardContent() {
             </Card>
 
             {publishedExams.length > 0 && (
-              <Card style={cardIsolationStyle} className="border border-slate-200/80 shadow-sm">
-                <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
+              <Card style={cardIsolationStyle} className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
+                <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
                   <div className="flex items-center justify-between gap-2">
-                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                        <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white min-w-0">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
                       </div>
                       <span className="truncate">Published Exams</span>
                     </CardTitle>
-                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold border border-emerald-200 shrink-0">
+                    <span className="px-2 sm:px-2.5 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-xs font-semibold border border-emerald-200 dark:border-emerald-900/50 shrink-0">
                       {publishedExams.length}
                     </span>
                   </div>
@@ -885,21 +880,21 @@ function AdminDashboardContent() {
                       <div
                         key={exam.id}
                         style={cardIsolationStyle}
-                        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-3 sm:p-3.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 p-3 sm:p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
                       >
                         <div className="min-w-0 w-full sm:w-auto sm:flex-1">
-                          <p className="font-semibold text-xs sm:text-sm text-slate-800 truncate">{exam.title}</p>
-                          <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate">
+                          <p className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-white truncate">{exam.title}</p>
+                          <p className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">
                             {exam.subject} · {exam.class} · {exam.teacher_name}
                           </p>
                         </div>
-                        <span className="shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px] font-medium border border-emerald-200 whitespace-nowrap">
+                        <span className="shrink-0 inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 text-[10px] sm:text-[11px] font-medium border border-emerald-200 dark:border-emerald-900/50 whitespace-nowrap">
                           <CheckCircle2 className="h-3 w-3" /> Published
                         </span>
                       </div>
                     ))}
                     {publishedExams.length > 10 && (
-                      <p className="text-center text-xs text-slate-400 pt-2">
+                      <p className="text-center text-xs text-slate-400 dark:text-slate-500 pt-2">
                         + {publishedExams.length - 10} more published exams
                       </p>
                     )}
@@ -934,13 +929,13 @@ function AdminDashboardContent() {
       default:
         return (
           <div className="flex flex-col items-center justify-center py-16 sm:py-20 px-4">
-            <div className="w-16 h-16 rounded-2xl bg-violet-50 flex items-center justify-center mx-auto mb-4">
-              <School className="h-8 w-8 text-violet-400" />
+            <div className="w-16 h-16 rounded-2xl bg-violet-50 dark:bg-violet-950/50 flex items-center justify-center mx-auto mb-4">
+              <School className="h-8 w-8 text-violet-400 dark:text-violet-500" />
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-800 capitalize text-center">
+            <h2 className="text-lg sm:text-xl font-bold text-slate-800 dark:text-white capitalize text-center">
               {activeTab.replace('-', ' ')}
             </h2>
-            <p className="text-sm text-slate-400 mt-1">Coming soon</p>
+            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Coming soon</p>
           </div>
         )
     }
@@ -958,7 +953,7 @@ function AdminDashboardContent() {
   }
 
   return (
-    <div className="w-full overflow-x-hidden min-h-screen bg-slate-50">
+    <div className="w-full overflow-x-hidden min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 pt-2 sm:pt-4 pb-4 sm:pb-6">
         {tabContent}
       </div>
@@ -970,11 +965,11 @@ export default function AdminDashboard() {
   return (
     <AuthGuard allowedRoles={['admin']}>
       <Suspense fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-50">
-          <div className="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center">
-            <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
+        <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+          <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center">
+            <Loader2 className="h-6 w-6 animate-spin text-violet-600 dark:text-violet-400" />
           </div>
-          <p className="text-sm text-slate-400 font-medium">Loading admin dashboard…</p>
+          <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">Loading admin dashboard…</p>
         </div>
       }>
         <AdminDashboardContent />

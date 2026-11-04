@@ -1,4 +1,4 @@
-// app/admin/students/page.tsx
+// app/admin/students/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -22,7 +22,6 @@ export default function StudentsPage() {
 
       if (error) throw error
 
-      // Strict boolean mapping: only default to true if is_active is null/undefined
       const mappedStudents: Student[] = (data || []).map((profile: any) => ({
         id: profile.id,
         vin_id: profile.vin_id || '',
@@ -35,7 +34,7 @@ export default function StudentsPage() {
         last_name: profile.last_name || '',
         class: profile.class || 'Not Assigned',
         department: profile.department || 'General',
-        is_active: profile.is_active === false ? false : true, // 👈 Strictly preserves false
+        is_active: profile.is_active === false ? false : true,
         password_changed: profile.password_changed ?? false,
         created_at: profile.created_at || '',
         photo_url: profile.photo_url || profile.avatar_url || '',
@@ -57,12 +56,9 @@ export default function StudentsPage() {
     }
   }, [])
 
-  // ✅ Verified database status toggle
   const handleToggleStatus = async (studentId: string, currentStatus: boolean) => {
     const nextStatus = !currentStatus
-
     try {
-      // 1. Send update and demand returned record via .select()
       const { data, error } = await supabase
         .from('profiles')
         .update({ is_active: nextStatus })
@@ -70,22 +66,13 @@ export default function StudentsPage() {
         .select()
 
       if (error) throw error
+      if (!data || data.length === 0) throw new Error('Database rejected update. Ensure your admin user has permission in Supabase RLS.')
 
-      // 2. If data is empty, RLS silently blocked the update
-      if (!data || data.length === 0) {
-        throw new Error('Database rejected update. Ensure your admin user has permission in Supabase RLS.')
-      }
-
-      // 3. Update local state upon confirmed DB write
       setStudents(prev =>
         prev.map(s => (s.id === studentId ? { ...s, is_active: nextStatus } : s))
       )
 
-      toast.success(
-        nextStatus
-          ? 'Student reactivated and visible in class lists.'
-          : 'Student marked inactive (hidden across system rosters).'
-      )
+      toast.success(nextStatus ? 'Student reactivated and visible in class lists.' : 'Student marked inactive (hidden across system rosters).')
     } catch (err: any) {
       console.error('❌ Error toggling status:', err)
       toast.error(err.message || 'Failed to update status in database')
@@ -97,7 +84,7 @@ export default function StudentsPage() {
   }, [fetchStudents])
 
   return (
-    <div className="p-6">
+    <div className="p-4 sm:p-6 min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <StudentManagement
         students={students}
         onRefresh={fetchStudents}

@@ -1,7 +1,7 @@
 /* eslint-disable react/no-unescaped-entities */
 'use client'
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { instantLogout } from '@/lib/auth-utils'
@@ -55,48 +55,42 @@ export function AdminSidebar({
   const pathname = usePathname()
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false)
   const [mounted, setMounted] = useState(false)
-  
-  const isUpdatingRef = useRef(false)
-  const previousTabRef = useRef(activeTab)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
+  // 1. Derive the tab strictly from the current URL
   const getTabFromPathname = useCallback((path: string): string => {
-    if (!path) return 'overview'
-    if (path === '/admin') return 'overview'
-    if (path === '/admin/settings') return 'settings'
-    if (path === '/admin/help') return 'help'
+    if (!path || path === '/admin') return 'overview'
     if (path.startsWith('/admin/notifications')) return 'notifications'
     if (path.startsWith('/admin/announcements')) return 'announcements'
     if (path.startsWith('/admin/broad-sheet')) return 'broad-sheet'
     if (path.startsWith('/admin/students')) return 'students'
     if (path.startsWith('/admin/staff')) return 'staff'
+    if (path.startsWith('/admin/teacher-classes')) return 'teacher-classes'
     if (path.startsWith('/admin/exams')) return 'exams'
     if (path.startsWith('/admin/report-cards')) return 'report-cards'
     if (path.startsWith('/admin/inquiries')) return 'inquiries'
     if (path.startsWith('/admin/monitor')) return 'cbt-monitor'
     if (path.startsWith('/admin/promotions')) return 'promotions'
-    if (path.startsWith('/admin/teacher-classes')) return 'teacher-classes'
+    if (path === '/admin/settings') return 'settings'
+    if (path === '/admin/help') return 'help'
     return 'overview'
   }, [])
 
+  // 2. Single source of truth for the active tab highlight
+  const currentTab = useMemo(
+    () => getTabFromPathname(pathname || '/admin'),
+    [pathname, getTabFromPathname]
+  )
+
+  // 3. Keep the parent component's state in sync just in case it needs it
   useEffect(() => {
-    if (isUpdatingRef.current) return
-    
-    const tab = getTabFromPathname(pathname || '/admin')
-    
-    if (tab !== previousTabRef.current && tab !== activeTab) {
-      isUpdatingRef.current = true
-      previousTabRef.current = tab
-      setActiveTab(tab)
-      
-      setTimeout(() => {
-        isUpdatingRef.current = false
-      }, 50)
+    if (activeTab !== currentTab) {
+      setActiveTab(currentTab)
     }
-  }, [pathname, getTabFromPathname, activeTab, setActiveTab])
+  }, [currentTab, activeTab, setActiveTab])
 
   const primaryNavigation = useMemo<NavigationItem[]>(() => [
     { id: 'overview', name: 'Overview', icon: LayoutDashboard, description: 'Dashboard & Analytics', routePatterns: ['/admin'] },
@@ -139,25 +133,18 @@ export function AdminSidebar({
     instantLogout()
   }, [])
 
+  // 4. Clean navigation handler - just push the route, the URL change handles the rest
   const handleNavClick = useCallback((tabId: string, routePatterns?: string[]) => {
-    if (isUpdatingRef.current) return
-    isUpdatingRef.current = true
-    
-    setActiveTab(tabId)
-    if (routePatterns && routePatterns.length > 0) {
-      const targetRoute = routePatterns[0]
-      if (pathname !== targetRoute) {
-        router.push(targetRoute)
-      }
+    if (!routePatterns?.length) return
+    const targetRoute = routePatterns[0]
+    if (pathname !== targetRoute) {
+      router.push(targetRoute)
     }
-    
-    setTimeout(() => {
-      isUpdatingRef.current = false
-    }, 50)
-  }, [setActiveTab, pathname, router])
+  }, [pathname, router])
 
   const renderNavItem = useCallback((item: NavigationItem) => {
-    const isActive = activeTab === item.id
+    // 5. Check against currentTab (URL derived) instead of state
+    const isActive = currentTab === item.id
     const Icon = item.icon
     
     const buttonContent = (
@@ -229,7 +216,7 @@ export function AdminSidebar({
     }
 
     return buttonContent;
-  }, [activeTab, collapsed, handleNavClick])
+  }, [currentTab, collapsed, handleNavClick])
 
   // Group navigation items with a separator
   const navigationGroups = useMemo(() => {

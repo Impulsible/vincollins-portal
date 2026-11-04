@@ -1,4 +1,4 @@
-// app/admin/monitor/page.tsx - LIVE CBT MONITOR + CLEAR TERM RECORDS
+// app/admin/monitor/page.tsx - LIVE CBT MONITOR + CLEAR TERM RECORDS + DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -82,7 +82,6 @@ const getCurrentSession = (): string => {
   const now = new Date()
   const year = now.getFullYear()
   const month = now.getMonth() + 1
-  // Academic year starts September
   return month >= 9 ? `${year}/${year + 1}` : `${year - 1}/${year}`
 }
 
@@ -331,11 +330,11 @@ export default function LiveCbtMonitorPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'in_progress': return <Badge className="bg-emerald-100 text-emerald-700"><Activity className="h-3 w-3 mr-1" />Active</Badge>
-      case 'completed': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle2 className="h-3 w-3 mr-1" />Completed</Badge>
-      case 'submitted': return <Badge className="bg-blue-100 text-blue-700"><CheckCircle2 className="h-3 w-3 mr-1" />Submitted</Badge>
-      case 'auto_submitted': return <Badge className="bg-red-100 text-red-700"><XCircle className="h-3 w-3 mr-1" />Auto-Submitted</Badge>
-      default: return <Badge variant="outline">{status}</Badge>
+      case 'in_progress': return <Badge className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-0"><Activity className="h-3 w-3 mr-1" />Active</Badge>
+      case 'completed': return <Badge className="bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-0"><CheckCircle2 className="h-3 w-3 mr-1" />Completed</Badge>
+      case 'submitted': return <Badge className="bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-400 border-0"><CheckCircle2 className="h-3 w-3 mr-1" />Submitted</Badge>
+      case 'auto_submitted': return <Badge className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 border-0"><XCircle className="h-3 w-3 mr-1" />Auto-Submitted</Badge>
+      default: return <Badge variant="outline" className="dark:border-slate-700 dark:text-slate-300">{status}</Badge>
     }
   }
 
@@ -407,26 +406,26 @@ export default function LiveCbtMonitorPage() {
   // ─── Loading ─────────────────────────────────────────
   if (!isMounted || loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
         <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
-          <MonitorPlay className="h-12 w-12 text-red-500" />
+          <MonitorPlay className="h-12 w-12 text-red-500 dark:text-red-400" />
         </motion.div>
-        <p className="text-slate-500 font-medium">Loading live monitor...</p>
+        <p className="text-slate-500 dark:text-slate-400 font-medium">Loading live monitor...</p>
       </div>
     )
   }
 
   // ─── Render ──────────────────────────────────────────
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4 bg-slate-50 dark:bg-slate-950 min-h-screen p-4 sm:p-6 transition-colors duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-            <MonitorPlay className="h-5 w-5 text-red-500" />
+          <h2 className="text-lg font-bold text-slate-800 dark:text-white flex items-center gap-2">
+            <MonitorPlay className="h-5 w-5 text-red-500 dark:text-red-400" />
             Live CBT Monitor
           </h2>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
             {stats.active} active • {stats.total} total • {stats.violations} with violations
           </p>
         </div>
@@ -435,19 +434,19 @@ export default function LiveCbtMonitorPage() {
             variant={autoRefresh ? "default" : "outline"}
             size="sm"
             onClick={() => setAutoRefresh(!autoRefresh)}
-            className={cn("h-8 text-xs", autoRefresh && "bg-red-600 hover:bg-red-700")}
+            className={cn("h-8 text-xs", autoRefresh ? "bg-red-600 hover:bg-red-700" : "dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300")}
           >
             {autoRefresh ? <Zap className="h-3.5 w-3.5 mr-1 animate-pulse" /> : <ZapOff className="h-3.5 w-3.5 mr-1" />}
             Live {autoRefresh ? 'ON' : 'OFF'}
           </Button>
-          <Button variant="outline" size="sm" onClick={loadLiveData} className="h-8 text-xs">
+          <Button variant="outline" size="sm" onClick={loadLiveData} className="h-8 text-xs dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
             <RefreshCw className="h-3.5 w-3.5 mr-1" />Refresh
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowClearDialog(true)}
-            className="h-8 text-xs border-red-300 text-red-700 hover:bg-red-50 hover:border-red-400"
+            className="h-8 text-xs border-red-300 dark:border-red-900/50 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
           >
             <Archive className="h-3.5 w-3.5 mr-1" />Clear Term Records
           </Button>
@@ -457,12 +456,12 @@ export default function LiveCbtMonitorPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
         {[
-          { label: 'Total', value: stats.total, icon: Users, color: 'bg-slate-50 text-slate-700' },
-          { label: 'Active', value: stats.active, icon: Activity, color: 'bg-emerald-50 text-emerald-700' },
-          { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'bg-blue-50 text-blue-700' },
-          { label: 'Auto-Sub', value: stats.autoSubmitted, icon: XCircle, color: 'bg-red-50 text-red-700' },
-          { label: 'Violations', value: stats.violations, icon: AlertTriangle, color: 'bg-orange-50 text-orange-700' },
-          { label: 'Avg Score', value: `${stats.avgScore}%`, icon: MonitorPlay, color: 'bg-purple-50 text-purple-700' },
+          { label: 'Total', value: stats.total, icon: Users, color: 'bg-slate-50 dark:bg-slate-800/50 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700' },
+          { label: 'Active', value: stats.active, icon: Activity, color: 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/50' },
+          { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/50' },
+          { label: 'Auto-Sub', value: stats.autoSubmitted, icon: XCircle, color: 'bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/50' },
+          { label: 'Violations', value: stats.violations, icon: AlertTriangle, color: 'bg-orange-50 dark:bg-orange-950/30 text-orange-700 dark:text-orange-400 border-orange-100 dark:border-orange-900/50' },
+          { label: 'Avg Score', value: `${stats.avgScore}%`, icon: MonitorPlay, color: 'bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/50' },
         ].map((s, i) => (
           <div key={i} className={cn("rounded-lg p-2.5 text-center border", s.color)}>
             <p className="text-[9px] uppercase opacity-70">{s.label}</p>
@@ -474,12 +473,12 @@ export default function LiveCbtMonitorPage() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
-          <Input placeholder="Search student, VIN, or subject..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-xs" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+          <Input placeholder="Search student, VIN, or subject..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-8 h-8 text-xs bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="h-8 text-xs w-full sm:w-[130px]"><SelectValue placeholder="Status" /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="h-8 text-xs w-full sm:w-[130px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
             <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="in_progress">Active</SelectItem>
             <SelectItem value="completed">Completed</SelectItem>
@@ -487,8 +486,8 @@ export default function LiveCbtMonitorPage() {
           </SelectContent>
         </Select>
         <Select value={classFilter} onValueChange={setClassFilter}>
-          <SelectTrigger className="h-8 text-xs w-full sm:w-[120px]"><SelectValue placeholder="Class" /></SelectTrigger>
-          <SelectContent>
+          <SelectTrigger className="h-8 text-xs w-full sm:w-[120px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue placeholder="Class" /></SelectTrigger>
+          <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
             <SelectItem value="all">All Classes</SelectItem>
             {allClasses.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
@@ -497,25 +496,25 @@ export default function LiveCbtMonitorPage() {
 
       {/* Two Column Layout: Students Table + Violation Feed */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        <Card className="lg:col-span-2 border-0 shadow-sm overflow-hidden">
+        <Card className="lg:col-span-2 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
           <CardContent className="p-0">
             {filteredStudents.length === 0 ? (
               <div className="text-center py-12">
-                <Shield className="h-10 w-10 text-slate-300 mx-auto mb-2" />
-                <p className="text-slate-500 text-sm">No students found</p>
+                <Shield className="h-10 w-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-500 dark:text-slate-400 text-sm">No students found</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="bg-slate-50 border-b">
-                      <th className="text-left p-2 font-semibold text-slate-600">Student</th>
-                      <th className="text-left p-2 font-semibold text-slate-600">Exam</th>
-                      <th className="text-center p-2 font-semibold text-slate-600">Progress</th>
-                      <th className="text-center p-2 font-semibold text-slate-600">Time Left</th>
-                      <th className="text-center p-2 font-semibold text-slate-600">Violations</th>
-                      <th className="text-center p-2 font-semibold text-slate-600">Status</th>
-                      <th className="text-center p-2 font-semibold text-slate-600">Actions</th>
+                    <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                      <th className="text-left p-2 font-semibold text-slate-600 dark:text-slate-400">Student</th>
+                      <th className="text-left p-2 font-semibold text-slate-600 dark:text-slate-400">Exam</th>
+                      <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Progress</th>
+                      <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Time Left</th>
+                      <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Violations</th>
+                      <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Status</th>
+                      <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -523,61 +522,61 @@ export default function LiveCbtMonitorPage() {
                       const violation = getViolationLevel(s)
                       const progressPct = s.total_questions > 0 ? Math.round((s.current_question / s.total_questions) * 100) : 0
                       return (
-                        <tr key={s.id} className={cn("border-b hover:bg-slate-50/50 transition-colors",
-                          s.status === 'in_progress' && "bg-emerald-50/20",
-                          s.is_auto_submitted && "bg-red-50/30"
+                        <tr key={s.id} className={cn("border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors",
+                          s.status === 'in_progress' && "bg-emerald-50/20 dark:bg-emerald-950/10",
+                          s.is_auto_submitted && "bg-red-50/30 dark:bg-red-950/10"
                         )}>
                           <td className="p-2">
                             <div className="flex items-center gap-2">
                               <div className={cn("h-2 w-2 rounded-full shrink-0", violation.color)} />
                               <div>
-                                <p className="font-medium text-slate-800">{s.student_name}</p>
-                                <p className="text-[10px] text-slate-400">{s.student_class} • {s.vin_id}</p>
+                                <p className="font-medium text-slate-800 dark:text-slate-100">{s.student_name}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500">{s.student_class} • {s.vin_id}</p>
                               </div>
                             </div>
                           </td>
                           <td className="p-2">
-                            <p className="font-medium">{s.exam_subject}</p>
-                            <p className="text-[10px] text-slate-400 truncate max-w-[120px]">{s.exam_title}</p>
+                            <p className="font-medium text-slate-700 dark:text-slate-200">{s.exam_subject}</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[120px]">{s.exam_title}</p>
                           </td>
                           <td className="p-2 text-center">
                             <div>
-                              <span className="font-mono text-xs">{s.current_question}/{s.total_questions}</span>
-                              <div className="w-full bg-slate-200 rounded-full h-1 mt-1">
+                              <span className="font-mono text-xs text-slate-700 dark:text-slate-300">{s.current_question}/{s.total_questions}</span>
+                              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1 mt-1">
                                 <div className="bg-blue-500 h-1 rounded-full" style={{ width: `${progressPct}%` }} />
                               </div>
                             </div>
                           </td>
                           <td className="p-2 text-center">
-                            <span className={cn("font-mono font-bold", s.time_remaining < 300 ? "text-red-600 animate-pulse" : "text-slate-600")}>
+                            <span className={cn("font-mono font-bold", s.time_remaining < 300 ? "text-red-600 dark:text-red-400 animate-pulse" : "text-slate-600 dark:text-slate-300")}>
                               {s.status === 'in_progress' ? formatTime(s.time_remaining) : '—'}
                             </span>
                           </td>
                           <td className="p-2 text-center">
                             <div className="flex items-center justify-center gap-1.5">
                               {s.tab_switches > 0 && (
-                                <span className="flex items-center gap-0.5 text-red-600" title="Tab switches">
+                                <span className="flex items-center gap-0.5 text-red-600 dark:text-red-400" title="Tab switches">
                                   <MousePointer className="h-3 w-3" />{s.tab_switches}
                                 </span>
                               )}
                               {s.fullscreen_exits > 0 && (
-                                <span className="flex items-center gap-0.5 text-orange-600" title="Fullscreen exits">
+                                <span className="flex items-center gap-0.5 text-orange-600 dark:text-orange-400" title="Fullscreen exits">
                                   <Minimize2 className="h-3 w-3" />{s.fullscreen_exits}
                                 </span>
                               )}
                               {s.tab_switches === 0 && s.fullscreen_exits === 0 && (
-                                <Shield className="h-3 w-3 text-emerald-400" />
+                                <Shield className="h-3 w-3 text-emerald-400 dark:text-emerald-500" />
                               )}
                             </div>
                           </td>
                           <td className="p-2 text-center">{getStatusBadge(s.status)}</td>
                           <td className="p-2 text-center">
                             <div className="flex items-center justify-center gap-1">
-                              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setSelectedStudent(s); setShowDetailDialog(true) }}>
+                              <Button variant="ghost" size="icon" className="h-7 w-7 text-slate-500 dark:text-slate-400" onClick={() => { setSelectedStudent(s); setShowDetailDialog(true) }}>
                                 <Eye className="h-3.5 w-3.5" />
                               </Button>
                               {s.status === 'in_progress' && (
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600" onClick={() => handleEndExam(s.student_id, s.id)}>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-red-600 dark:text-red-400" onClick={() => handleEndExam(s.student_id, s.id)}>
                                   <StopCircle className="h-3.5 w-3.5" />
                                 </Button>
                               )}
@@ -594,36 +593,36 @@ export default function LiveCbtMonitorPage() {
         </Card>
 
         {/* Violation Feed */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <AlertTriangle className="h-4 w-4 text-red-500" />
+            <CardTitle className="text-sm flex items-center gap-2 text-slate-800 dark:text-white">
+              <AlertTriangle className="h-4 w-4 text-red-500 dark:text-red-400" />
               Live Violation Feed
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 max-h-[500px] overflow-y-auto">
             {violationEvents.length === 0 ? (
               <div className="text-center py-8">
-                <Shield className="h-8 w-8 text-emerald-300 mx-auto mb-2" />
-                <p className="text-xs text-slate-400">No violations detected</p>
+                <Shield className="h-8 w-8 text-emerald-300 dark:text-emerald-500/50 mx-auto mb-2" />
+                <p className="text-xs text-slate-400 dark:text-slate-500">No violations detected</p>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {violationEvents.map(v => (
-                  <div key={v.id} className="p-3 hover:bg-slate-50 transition-colors">
+                  <div key={v.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
                     <div className="flex items-start gap-2">
                       {v.violation_type === 'auto_submitted' ? (
-                        <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                        <XCircle className="h-4 w-4 text-red-500 dark:text-red-400 mt-0.5 shrink-0" />
                       ) : v.violation_type === 'tab_switch' ? (
-                        <MousePointer className="h-4 w-4 text-orange-500 mt-0.5 shrink-0" />
+                        <MousePointer className="h-4 w-4 text-orange-500 dark:text-orange-400 mt-0.5 shrink-0" />
                       ) : (
-                        <Minimize2 className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                        <Minimize2 className="h-4 w-4 text-amber-500 dark:text-amber-400 mt-0.5 shrink-0" />
                       )}
                       <div className="min-w-0">
-                        <p className="text-xs font-medium text-slate-700">{v.student_name}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{v.exam_title}</p>
-                        <p className="text-[10px] text-slate-600 mt-0.5">{v.details}</p>
-                        <p className="text-[9px] text-slate-400 mt-0.5">{formatDate(v.created_at)}</p>
+                        <p className="text-xs font-medium text-slate-700 dark:text-slate-200">{v.student_name}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{v.exam_title}</p>
+                        <p className="text-[10px] text-slate-600 dark:text-slate-300 mt-0.5">{v.details}</p>
+                        <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-0.5">{formatDate(v.created_at)}</p>
                       </div>
                     </div>
                   </div>
@@ -636,43 +635,43 @@ export default function LiveCbtMonitorPage() {
 
       {/* Exam Sessions Summary */}
       {examSessions.length > 0 && (
-        <Card className="border-0 shadow-sm">
+        <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Active Exam Sessions</CardTitle>
+            <CardTitle className="text-sm text-slate-800 dark:text-white">Active Exam Sessions</CardTitle>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead>
-                  <tr className="bg-slate-50 border-b">
-                    <th className="text-left p-2 font-semibold text-slate-600">Exam</th>
-                    <th className="text-center p-2 font-semibold text-slate-600">Students</th>
-                    <th className="text-center p-2 font-semibold text-slate-600">Active</th>
-                    <th className="text-center p-2 font-semibold text-slate-600">Completed</th>
-                    <th className="text-center p-2 font-semibold text-slate-600">Auto-Sub</th>
-                    <th className="text-center p-2 font-semibold text-slate-600">Avg Score</th>
+                  <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
+                    <th className="text-left p-2 font-semibold text-slate-600 dark:text-slate-400">Exam</th>
+                    <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Students</th>
+                    <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Active</th>
+                    <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Completed</th>
+                    <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Auto-Sub</th>
+                    <th className="text-center p-2 font-semibold text-slate-600 dark:text-slate-400">Avg Score</th>
                   </tr>
                 </thead>
                 <tbody>
                   {examSessions.map(session => (
-                    <tr key={session.exam_id} className="border-b hover:bg-slate-50/50">
+                    <tr key={session.exam_id} className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50/50 dark:hover:bg-slate-800/40">
                       <td className="p-2">
-                        <p className="font-medium">{session.exam_subject}</p>
-                        <p className="text-[10px] text-slate-400 truncate max-w-[200px]">{session.exam_title}</p>
+                        <p className="font-medium text-slate-700 dark:text-slate-200">{session.exam_subject}</p>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[200px]">{session.exam_title}</p>
                       </td>
-                      <td className="p-2 text-center font-bold">{session.student_count}</td>
+                      <td className="p-2 text-center font-bold text-slate-700 dark:text-slate-300">{session.student_count}</td>
                       <td className="p-2 text-center">
-                        <Badge className="bg-emerald-100 text-emerald-700 text-[10px]">{session.active_count} active</Badge>
+                        <Badge className="bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 text-[10px] border-0">{session.active_count} active</Badge>
                       </td>
-                      <td className="p-2 text-center">{session.completed_count}</td>
+                      <td className="p-2 text-center text-slate-700 dark:text-slate-300">{session.completed_count}</td>
                       <td className="p-2 text-center">
                         {session.auto_submitted_count > 0 ? (
-                          <Badge className="bg-red-100 text-red-700 text-[10px]">{session.auto_submitted_count}</Badge>
+                          <Badge className="bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-400 text-[10px] border-0">{session.auto_submitted_count}</Badge>
                         ) : (
-                          <span className="text-slate-300">0</span>
+                          <span className="text-slate-300 dark:text-slate-600">0</span>
                         )}
                       </td>
-                      <td className="p-2 text-center font-bold">{session.avg_score}%</td>
+                      <td className="p-2 text-center font-bold text-slate-700 dark:text-slate-200">{session.avg_score}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -682,84 +681,68 @@ export default function LiveCbtMonitorPage() {
         </Card>
       )}
 
-      {/* ─── CLEAR TERM RECORDS DIALOG (Fixed Scrolling & Layout) ─── */}
+      {/* ─── CLEAR TERM RECORDS DIALOG ─── */}
       <Dialog open={showClearDialog} onOpenChange={(open) => {
         setShowClearDialog(open)
         if (!open) setClearConfirmText('')
       }}>
-        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
-          {/* Sticky Header */}
-          <div className="shrink-0 px-6 pt-6 pb-4 border-b">
+        <DialogContent className="sm:max-w-md max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+          <div className="shrink-0 px-6 pt-6 pb-4 border-b border-slate-200 dark:border-slate-800">
             <DialogHeader>
-              <DialogTitle className="flex items-center gap-2 text-red-600">
+              <DialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
                 <Archive className="h-5 w-5" />
                 Clear Term Records
               </DialogTitle>
-              <DialogDescription>
-                Archive and/or delete previous term&apos;s exam records when a new term begins.
+              <DialogDescription className="text-slate-500 dark:text-slate-400">
+                Archive and/or delete previous term's exam records when a new term begins.
               </DialogDescription>
             </DialogHeader>
           </div>
 
-          {/* Scrollable Body */}
           <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-            {/* Term */}
             <div>
-              <Label className="text-xs text-slate-600">Term Being Cleared</Label>
+              <Label className="text-xs text-slate-600 dark:text-slate-400">Term Being Cleared</Label>
               <Select value={clearTerm} onValueChange={setClearTerm}>
-                <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="h-9 mt-1 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                   {terms.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Session */}
             <div>
-              <Label className="text-xs text-slate-600">Academic Session</Label>
-              <Input
-                value={clearSession}
-                onChange={e => setClearSession(e.target.value)}
-                placeholder="e.g. 2024/2025"
-                className="h-9 mt-1"
-              />
+              <Label className="text-xs text-slate-600 dark:text-slate-400">Academic Session</Label>
+              <Input value={clearSession} onChange={e => setClearSession(e.target.value)} placeholder="e.g. 2024/2025" className="h-9 mt-1 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
             </div>
 
-            {/* Date cutoff */}
             <div>
-              <Label className="text-xs text-slate-600">Clear Records Before (Optional)</Label>
-              <Input
-                type="date"
-                value={clearBeforeDate}
-                onChange={e => setClearBeforeDate(e.target.value)}
-                className="h-9 mt-1"
-              />
-              <p className="text-[10px] text-slate-400 mt-1">
+              <Label className="text-xs text-slate-600 dark:text-slate-400">Clear Records Before (Optional)</Label>
+              <Input type="date" value={clearBeforeDate} onChange={e => setClearBeforeDate(e.target.value)} className="h-9 mt-1 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
+              <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1">
                 Leave empty to clear ALL exam attempt records
               </p>
             </div>
 
-            {/* Action */}
             <div>
-              <Label className="text-xs text-slate-600">Action</Label>
+              <Label className="text-xs text-slate-600 dark:text-slate-400">Action</Label>
               <Select value={clearAction} onValueChange={(v: any) => setClearAction(v)}>
-                <SelectTrigger className="h-9 mt-1"><SelectValue /></SelectTrigger>
-                <SelectContent>
+                <SelectTrigger className="h-9 mt-1 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                   <SelectItem value="archive">
                     <div className="flex items-center gap-2">
-                      <Archive className="h-3.5 w-3.5 text-blue-500" />
+                      <Archive className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
                       Archive Only (keep original)
                     </div>
                   </SelectItem>
                   <SelectItem value="archive_and_delete">
                     <div className="flex items-center gap-2">
-                      <Database className="h-3.5 w-3.5 text-purple-500" />
+                      <Database className="h-3.5 w-3.5 text-purple-500 dark:text-purple-400" />
                       Archive & Delete (recommended)
                     </div>
                   </SelectItem>
                   <SelectItem value="delete">
                     <div className="flex items-center gap-2">
-                      <Trash2 className="h-3.5 w-3.5 text-red-500" />
+                      <Trash2 className="h-3.5 w-3.5 text-red-500 dark:text-red-400" />
                       Delete Only (permanent!)
                     </div>
                   </SelectItem>
@@ -767,11 +750,10 @@ export default function LiveCbtMonitorPage() {
               </Select>
             </div>
 
-            {/* Warning */}
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+            <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 rounded-lg p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
-                <div className="text-xs text-red-700">
+                <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                <div className="text-xs text-red-700 dark:text-red-300">
                   <p className="font-semibold">This action cannot be undone!</p>
                   <p className="mt-1">
                     All exam attempt records {clearBeforeDate ? `before ${clearBeforeDate}` : '(ALL time)'} will be processed.
@@ -781,36 +763,19 @@ export default function LiveCbtMonitorPage() {
               </div>
             </div>
 
-            {/* Confirmation */}
             <div>
-              <Label className="text-xs text-slate-600">
-                Type <span className="font-mono font-bold text-red-600">CLEAR</span> to confirm
+              <Label className="text-xs text-slate-600 dark:text-slate-400">
+                Type <span className="font-mono font-bold text-red-600 dark:text-red-400">CLEAR</span> to confirm
               </Label>
-              <Input
-                value={clearConfirmText}
-                onChange={e => setClearConfirmText(e.target.value)}
-                placeholder="CLEAR"
-                className="h-9 mt-1 font-mono"
-              />
+              <Input value={clearConfirmText} onChange={e => setClearConfirmText(e.target.value)} placeholder="CLEAR" className="h-9 mt-1 font-mono bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white" />
             </div>
           </div>
 
-          {/* Sticky Footer — always visible */}
-          <div className="shrink-0 border-t bg-white dark:bg-slate-950 px-6 py-4 flex justify-end gap-2">
-            <Button
-              variant="outline"
-              onClick={() => { setShowClearDialog(false); setClearConfirmText('') }}
-              className="h-9"
-              disabled={isClearing}
-            >
+          <div className="shrink-0 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-6 py-4 flex justify-end gap-2">
+            <Button variant="outline" onClick={() => { setShowClearDialog(false); setClearConfirmText('') }} className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300" disabled={isClearing}>
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleClearTermRecords}
-              disabled={isClearing || clearConfirmText !== 'CLEAR'}
-              className="h-9"
-            >
+            <Button variant="destructive" onClick={handleClearTermRecords} disabled={isClearing || clearConfirmText !== 'CLEAR'} className="h-9">
               {isClearing ? (
                 <><Loader2 className="h-4 w-4 animate-spin mr-2" />Processing...</>
               ) : (
@@ -823,43 +788,43 @@ export default function LiveCbtMonitorPage() {
 
       {/* Student Detail Dialog */}
       <Dialog open={showDetailDialog} onOpenChange={setShowDetailDialog}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-slate-900 dark:text-white">
               {selectedStudent?.status === 'in_progress' ? (
-                <Activity className="h-5 w-5 text-emerald-500" />
+                <Activity className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
               ) : selectedStudent?.is_auto_submitted ? (
-                <XCircle className="h-5 w-5 text-red-500" />
+                <XCircle className="h-5 w-5 text-red-500 dark:text-red-400" />
               ) : (
-                <CheckCircle2 className="h-5 w-5 text-blue-500" />
+                <CheckCircle2 className="h-5 w-5 text-blue-500 dark:text-blue-400" />
               )}
               Student Details
             </DialogTitle>
           </DialogHeader>
           {selectedStudent && (
             <div className="space-y-3 py-2">
-              <div className="bg-slate-50 rounded-lg p-3 space-y-1.5 text-sm">
-                <div className="flex justify-between"><span className="text-slate-500">Name:</span><span className="font-medium">{selectedStudent.student_name}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">VIN:</span><span className="font-mono">{selectedStudent.vin_id}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Email:</span><span className="text-xs">{selectedStudent.student_email}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Class:</span><span>{selectedStudent.student_class}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Exam:</span><span>{selectedStudent.exam_title}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Subject:</span><span>{selectedStudent.exam_subject}</span></div>
-                <div className="flex justify-between"><span className="text-slate-500">Status:</span>{getStatusBadge(selectedStudent.status)}</div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-3 space-y-1.5 text-sm">
+                <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Name:</span><span className="font-medium text-slate-900 dark:text-white">{selectedStudent.student_name}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">VIN:</span><span className="font-mono text-slate-700 dark:text-slate-300">{selectedStudent.vin_id}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Email:</span><span className="text-xs text-slate-700 dark:text-slate-300">{selectedStudent.student_email}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Class:</span><span className="text-slate-700 dark:text-slate-300">{selectedStudent.student_class}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Exam:</span><span className="text-slate-700 dark:text-slate-300">{selectedStudent.exam_title}</span></div>
+                <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Subject:</span><span className="text-slate-700 dark:text-slate-300">{selectedStudent.exam_subject}</span></div>
+                <div className="flex justify-between items-center"><span className="text-slate-500 dark:text-slate-400">Status:</span>{getStatusBadge(selectedStudent.status)}</div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <div className="bg-blue-50 rounded-lg p-2 text-center">
-                  <p className="text-[10px] text-blue-600">Progress</p>
-                  <p className="font-bold text-blue-700">{selectedStudent.current_question}/{selectedStudent.total_questions}</p>
+                <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-blue-600 dark:text-blue-400">Progress</p>
+                  <p className="font-bold text-blue-700 dark:text-blue-300">{selectedStudent.current_question}/{selectedStudent.total_questions}</p>
                 </div>
-                <div className="bg-purple-50 rounded-lg p-2 text-center">
-                  <p className="text-[10px] text-purple-600">Score</p>
-                  <p className="font-bold text-purple-700">{selectedStudent.percentage}%</p>
+                <div className="bg-purple-50 dark:bg-purple-950/30 rounded-lg p-2 text-center">
+                  <p className="text-[10px] text-purple-600 dark:text-purple-400">Score</p>
+                  <p className="font-bold text-purple-700 dark:text-purple-300">{selectedStudent.percentage}%</p>
                 </div>
-                <div className={cn("rounded-lg p-2 text-center", selectedStudent.time_remaining < 300 ? "bg-red-50" : "bg-emerald-50")}>
-                  <p className={cn("text-[10px]", selectedStudent.time_remaining < 300 ? "text-red-600" : "text-emerald-600")}>Time Left</p>
-                  <p className={cn("font-bold", selectedStudent.time_remaining < 300 ? "text-red-700" : "text-emerald-700")}>
+                <div className={cn("rounded-lg p-2 text-center", selectedStudent.time_remaining < 300 ? "bg-red-50 dark:bg-red-950/30" : "bg-emerald-50 dark:bg-emerald-950/30")}>
+                  <p className={cn("text-[10px]", selectedStudent.time_remaining < 300 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400")}>Time Left</p>
+                  <p className={cn("font-bold", selectedStudent.time_remaining < 300 ? "text-red-700 dark:text-red-300" : "text-emerald-700 dark:text-emerald-300")}>
                     {selectedStudent.status === 'in_progress' ? formatTime(selectedStudent.time_remaining) : '—'}
                   </p>
                 </div>
@@ -873,22 +838,22 @@ export default function LiveCbtMonitorPage() {
                   { label: 'Unloads', value: selectedStudent.unload_count, color: 'purple' },
                 ].map((v, i) => (
                   <div key={i} className={cn("rounded-lg p-2 text-center",
-                    v.color === 'red' ? "bg-red-50" : v.color === 'orange' ? "bg-orange-50" : v.color === 'amber' ? "bg-amber-50" : "bg-purple-50")}>
+                    v.color === 'red' ? "bg-red-50 dark:bg-red-950/30" : v.color === 'orange' ? "bg-orange-50 dark:bg-orange-950/30" : v.color === 'amber' ? "bg-amber-50 dark:bg-amber-950/30" : "bg-purple-50 dark:bg-purple-950/30")}>
                     <p className={cn("text-[9px]",
-                      v.color === 'red' ? "text-red-600" : v.color === 'orange' ? "text-orange-600" : v.color === 'amber' ? "text-amber-600" : "text-purple-600")}>{v.label}</p>
+                      v.color === 'red' ? "text-red-600 dark:text-red-400" : v.color === 'orange' ? "text-orange-600 dark:text-orange-400" : v.color === 'amber' ? "text-amber-600 dark:text-amber-400" : "text-purple-600 dark:text-purple-400")}>{v.label}</p>
                     <p className={cn("text-lg font-bold",
-                      v.color === 'red' ? "text-red-700" : v.color === 'orange' ? "text-orange-700" : v.color === 'amber' ? "text-amber-700" : "text-purple-700")}>{v.value}</p>
+                      v.color === 'red' ? "text-red-700 dark:text-red-300" : v.color === 'orange' ? "text-orange-700 dark:text-orange-300" : v.color === 'amber' ? "text-amber-700 dark:text-amber-300" : "text-purple-700 dark:text-purple-300")}>{v.value}</p>
                   </div>
                 ))}
               </div>
 
               {selectedStudent.is_auto_submitted && (
-                <div className="bg-red-100 rounded-lg p-2 text-xs text-red-700">
+                <div className="bg-red-100 dark:bg-red-950/40 rounded-lg p-2 text-xs text-red-700 dark:text-red-300">
                   <strong>Auto-Submitted:</strong> {selectedStudent.auto_submit_reason}
                 </div>
               )}
 
-              <div className="text-[10px] text-slate-400 space-y-0.5">
+              <div className="text-[10px] text-slate-400 dark:text-slate-500 space-y-0.5">
                 <p>Started: {formatDate(selectedStudent.started_at)}</p>
                 <p>Last Activity: {formatDate(selectedStudent.last_activity)}</p>
                 <p>Time Spent: {formatTime(selectedStudent.time_spent)}</p>

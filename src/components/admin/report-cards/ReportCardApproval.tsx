@@ -1,4 +1,4 @@
-// components/admin/report-cards/ReportCardApproval.tsx - UPDATED WITH ACTIVE STUDENT ISOLATION
+// components/admin/report-cards/ReportCardApproval.tsx - FULL DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
@@ -124,23 +124,23 @@ const getOverallGrade = (score: number): string => {
 
 const getOverallGradeColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'bg-emerald-100 text-emerald-700 border-emerald-200'
-    case 'B': return 'bg-blue-100 text-blue-700 border-blue-200'
-    case 'C': return 'bg-cyan-100 text-cyan-700 border-cyan-200'
-    case 'P': return 'bg-amber-100 text-amber-700 border-amber-200'
-    case 'F': return 'bg-red-100 text-red-700 border-red-200'
-    default: return 'bg-gray-100 text-gray-600 border-gray-200'
+    case 'A': return 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800'
+    case 'B': return 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800'
+    case 'C': return 'bg-cyan-100 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-400 dark:border-cyan-800'
+    case 'P': return 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800'
+    case 'F': return 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800'
+    default: return 'bg-gray-100 text-gray-600 border-gray-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
   }
 }
 
 const getOverallGradeTextColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'text-emerald-700 font-bold'
-    case 'B': return 'text-blue-700 font-bold'
-    case 'C': return 'text-cyan-700 font-bold'
-    case 'P': return 'text-amber-700 font-bold'
-    case 'F': return 'text-red-700 font-bold'
-    default: return 'text-gray-700'
+    case 'A': return 'text-emerald-700 dark:text-emerald-400 font-bold'
+    case 'B': return 'text-blue-700 dark:text-blue-400 font-bold'
+    case 'C': return 'text-cyan-700 dark:text-cyan-400 font-bold'
+    case 'P': return 'text-amber-700 dark:text-amber-400 font-bold'
+    case 'F': return 'text-red-700 dark:text-red-400 font-bold'
+    default: return 'text-gray-700 dark:text-slate-300'
   }
 }
 
@@ -192,15 +192,15 @@ const isPublishedToStudent = (status: ReportCardStatus) => status === 'published
 
 // ── Status config ──────────────────────────────────────────────────────────────
 const statusConfig: Record<string, { label: string; className: string; icon: any }> = {
-  published: { label: 'Published', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200', icon: CheckCircle2 },
-  approved: { label: 'Approved', className: 'bg-blue-50 text-blue-700 border border-blue-200', icon: CheckCircle },
-  generated: { label: 'Generated', className: 'bg-violet-50 text-violet-700 border border-violet-200', icon: FileText },
-  pending: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border border-amber-200', icon: Clock },
-  rejected: { label: 'Rejected', className: 'bg-red-50 text-red-700 border border-red-200', icon: XCircle },
+  published: { label: 'Published', className: 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800', icon: CheckCircle2 },
+  approved: { label: 'Approved', className: 'bg-blue-50 text-blue-700 border border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800', icon: CheckCircle },
+  generated: { label: 'Generated', className: 'bg-violet-50 text-violet-700 border border-violet-200 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-800', icon: FileText },
+  pending: { label: 'Pending', className: 'bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800', icon: Clock },
+  rejected: { label: 'Rejected', className: 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800', icon: XCircle },
 }
 
 const StatusPill = ({ status }: { status: string }) => {
-  const cfg = statusConfig[status] || { label: status, className: 'bg-slate-100 text-slate-600 border border-slate-200', icon: FileText }
+  const cfg = statusConfig[status] || { label: status, className: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700', icon: FileText }
   const Icon = cfg.icon
   return (
     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium', cfg.className)}>
@@ -220,14 +220,16 @@ const StatCard = ({
   <button
     onClick={onClick}
     className={cn(
-      'w-full text-left p-4 rounded-2xl border bg-white hover:shadow-md transition-all duration-200',
-      active ? 'border-slate-900 shadow-md ring-2 ring-slate-900/10' : 'border-slate-200/80 shadow-sm',
+      'w-full text-left p-4 rounded-2xl border bg-white dark:bg-slate-900 hover:shadow-md dark:hover:shadow-slate-950/40 transition-all duration-200',
+      active 
+        ? 'border-slate-900 dark:border-slate-400 shadow-md ring-2 ring-slate-900/10 dark:ring-slate-400/20' 
+        : 'border-slate-200/80 dark:border-slate-800 shadow-sm',
     )}
   >
     <div className="flex items-start justify-between">
       <div>
-        <p className="text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-        <p className={cn('text-2xl font-bold', valueClass || 'text-slate-900')}>{value}</p>
+        <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+        <p className={cn('text-2xl font-bold', valueClass || 'text-slate-900 dark:text-white')}>{value}</p>
       </div>
       <div className={cn('p-2.5 rounded-xl shrink-0', iconClass)}>
         <Icon className="h-4 w-4" />
@@ -287,7 +289,7 @@ function ReportCardPreview({
   const canEdit = !isPublishedToStudent(card.status)
 
   return (
-    <div className="bg-white w-full text-black border border-gray-200 md:border-2 md:border-blue-900 rounded-lg md:rounded-none p-3 sm:p-5 print:p-3 print:border-2 print:border-blue-900 print:rounded-none">
+    <div className="bg-white text-black border border-gray-200 md:border-2 md:border-blue-900 rounded-lg md:rounded-none p-3 sm:p-5 print:p-3 print:border-2 print:border-blue-900 print:rounded-none">
       {isPublishedToStudent(card.status) && (
         <div className="no-print mb-3 flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-700 font-medium">
           <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
@@ -700,7 +702,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         .single()
 
       if (error) {
-        console.error('Error fetching term settings:', error)
         setCurrentTerm('third')
         setCurrentSession('2025/2026')
         setIsLoadingTerm(false)
@@ -714,16 +715,10 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         setCurrentTerm(term)
         setCurrentSession(session)
         
-        if (!selectedTerm || selectedTerm === '') {
-          const termLabel = getTermLabel(term)
-          setSelectedTerm(termLabel)
-        }
-        if (!selectedYear || selectedYear === '') {
-          setSelectedYear(session)
-        }
+        if (!selectedTerm || selectedTerm === '') setSelectedTerm(getTermLabel(term))
+        if (!selectedYear || selectedYear === '') setSelectedYear(session)
       }
     } catch (error) {
-      console.error('Error fetching current term:', error)
       setCurrentTerm('third')
       setCurrentSession('2025/2026')
     } finally {
@@ -773,7 +768,6 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
     fetchCurrentTerm()
   }, [fetchCurrentTerm])
 
-  // ── LOAD REPORT CARDS (STRICT ACTIVE ISOLATION) ───────────────────────────
   const loadReportCards = useCallback(async () => {
     setLoading(true)
     try {
@@ -792,12 +786,11 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
       let studentData: Record<string, any> = {}
       
       if (studentIds.length > 0) {
-        // 🚫 CRITICAL: Exclude students who are inactive (marked as left)
         const { data: students } = await supabase
           .from('profiles')
           .select('id, email, photo_url, admission_number, display_name, full_name, is_active')
           .in('id', studentIds)
-          .eq('is_active', true) // 👈 Safe active-only filter
+          .eq('is_active', true)
         
         studentData = (students || []).reduce((acc: any, s: any) => {
           acc[s.id] = {
@@ -810,9 +803,8 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         }, {})
       }
 
-      // Filter out report cards of inactive/withdrawn students
       const cards: ReportCard[] = (data || [])
-        .filter((rc: any) => studentData[rc.student_id] !== undefined) // 👈 Drop left student records
+        .filter((rc: any) => studentData[rc.student_id] !== undefined)
         .map((rc: any) => {
           const rawSubjects = rc.subjects_data || []
           const normalizedSubjectsMap = new Map<string, any>()
@@ -1087,11 +1079,11 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
   if (isLoadingTerm || loading) {
     return (
-      <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3">
-        <div className="w-12 h-12 rounded-2xl bg-white shadow-md flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-violet-600" />
+      <div className="min-h-[40vh] flex flex-col items-center justify-center gap-3 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-violet-600 dark:text-violet-400" />
         </div>
-        <p className="text-sm text-slate-400 font-medium">
+        <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">
           {isLoadingTerm ? 'Loading term settings…' : 'Loading report cards…'}
         </p>
       </div>
@@ -1099,14 +1091,14 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         {/* Back */}
         {!hideBackButton && (
           <button
             onClick={() => router.push('/admin/broad-sheet')}
-            className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-slate-900 transition-colors"
+            className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" /> Back to Broad Sheet
           </button>
@@ -1115,17 +1107,17 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         {/* Page header */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Report Card Approval</h1>
-            <p className="text-sm text-slate-500 mt-0.5">
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Report Card Approval</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
               Review, approve, and publish student report cards
               {currentTerm && (
-                <span className="ml-2 text-emerald-600 text-xs font-medium">
+                <span className="ml-2 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
                   (Current term: {getTermLabel(currentTerm)} • {currentSession})
                 </span>
               )}
             </p>
             <div className="flex items-center gap-1.5 mt-1.5">
-              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-xs font-medium">
+              <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-amber-700 dark:text-amber-400 text-xs font-medium">
                 <Shield className="h-3 w-3" />
                 Only <strong>Published</strong> cards are visible to students
               </div>
@@ -1135,27 +1127,27 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           <div className="flex items-center gap-2 flex-wrap">
             {stats.generated > 0 && (
               <Button onClick={handleBulkApprove} disabled={processingAction} size="sm"
-                className="bg-violet-600 hover:bg-violet-700 text-white shadow-sm h-8 text-xs">
+                className="bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white shadow-sm h-8 text-xs">
                 {processingAction ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
                 Approve All ({stats.generated})
               </Button>
             )}
             {stats.approved > 0 && (
               <Button onClick={handleBulkPublish} disabled={processingAction} size="sm"
-                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm h-8 text-xs">
+                className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm h-8 text-xs">
                 {processingAction ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
                 Publish All ({stats.approved})
               </Button>
             )}
             {unpublishedCount > 0 && (
               <Button onClick={handleBulkPublishAll} disabled={processingAction} size="sm"
-                className="bg-slate-900 hover:bg-slate-800 text-white shadow-sm h-8 text-xs">
+                className="bg-slate-900 hover:bg-slate-800 dark:bg-slate-700 dark:hover:bg-slate-600 text-white shadow-sm h-8 text-xs">
                 {processingAction ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
                 Publish All Now ({unpublishedCount})
               </Button>
             )}
             <Button variant="outline" onClick={loadReportCards} size="sm"
-              className="border-slate-200 h-8 text-xs">
+              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs">
               <RefreshCw className="h-3.5 w-3.5 mr-1.5" />Refresh
             </Button>
           </div>
@@ -1164,39 +1156,44 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
         {/* Stats grid */}
         <div className="grid grid-cols-3 lg:grid-cols-6 gap-3">
           <StatCard label="Total" value={stats.total} icon={FileText}
-            iconClass="bg-slate-100 text-slate-600"
+            iconClass="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
             onClick={() => setSelectedStatus('all')} active={selectedStatus === 'all'} />
           <StatCard label="Generated" value={stats.generated} icon={FileText}
-            iconClass="bg-violet-100 text-violet-600" valueClass="text-violet-700"
+            iconClass="bg-violet-100 dark:bg-violet-950/50 text-violet-600 dark:text-violet-400" 
+            valueClass="text-violet-700 dark:text-violet-400"
             onClick={() => setSelectedStatus('generated')} active={selectedStatus === 'generated'} />
           <StatCard label="Pending" value={stats.pending} icon={Clock}
-            iconClass="bg-amber-100 text-amber-600" valueClass="text-amber-700"
+            iconClass="bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400" 
+            valueClass="text-amber-700 dark:text-amber-400"
             onClick={() => setSelectedStatus('pending')} active={selectedStatus === 'pending'} />
           <StatCard label="Approved" value={stats.approved} icon={CheckCircle}
-            iconClass="bg-blue-100 text-blue-600" valueClass="text-blue-700"
+            iconClass="bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400" 
+            valueClass="text-blue-700 dark:text-blue-400"
             onClick={() => setSelectedStatus('approved')} active={selectedStatus === 'approved'} />
           <StatCard label="Published" value={stats.published} icon={CheckCircle2}
-            iconClass="bg-emerald-100 text-emerald-600" valueClass="text-emerald-700"
+            iconClass="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400" 
+            valueClass="text-emerald-700 dark:text-emerald-400"
             onClick={() => setSelectedStatus('published')} active={selectedStatus === 'published'} />
           <StatCard label="Rejected" value={stats.rejected} icon={XCircle}
-            iconClass="bg-red-100 text-red-500" valueClass="text-red-600"
+            iconClass="bg-red-100 dark:bg-red-950/50 text-red-500 dark:text-red-400" 
+            valueClass="text-red-600 dark:text-red-400"
             onClick={() => setSelectedStatus('rejected')} active={selectedStatus === 'rejected'} />
         </div>
 
         {/* Filters */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm p-4">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm p-4">
           <div className="flex flex-wrap gap-2 items-center">
-            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 mr-1">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-slate-400 mr-1">
               <Filter className="h-3.5 w-3.5" /> Filters
             </div>
 
             <Select value={selectedTerm} onValueChange={setSelectedTerm}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[130px]">
+              <SelectTrigger className="h-8 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-[130px]">
                 <SelectValue>
                   {selectedTerm && (
                     <span className={cn(
                       "font-medium",
-                      getTermValue(selectedTerm) === currentTerm ? "text-emerald-600" : "text-slate-700"
+                      getTermValue(selectedTerm) === currentTerm ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
                     )}>
                       {selectedTerm}
                       {getTermValue(selectedTerm) === currentTerm && " (current)"}
@@ -1204,10 +1201,10 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   )}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 {TERMS.map(t => (
                   <SelectItem key={t} value={t} className="text-xs">
-                    <span className={getTermValue(t) === currentTerm ? 'font-medium text-emerald-600' : ''}>
+                    <span className={getTermValue(t) === currentTerm ? 'font-medium text-emerald-600 dark:text-emerald-400' : ''}>
                       {t}
                       {getTermValue(t) === currentTerm && " (current)"}
                     </span>
@@ -1217,12 +1214,12 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
             </Select>
 
             <Select value={selectedYear} onValueChange={setSelectedYear}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]">
+              <SelectTrigger className="h-8 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-[110px]">
                 <SelectValue>
                   {selectedYear && (
                     <span className={cn(
                       "font-medium",
-                      selectedYear === currentSession ? "text-emerald-600" : "text-slate-700"
+                      selectedYear === currentSession ? "text-emerald-600 dark:text-emerald-400" : "text-slate-700 dark:text-slate-300"
                     )}>
                       {selectedYear}
                       {selectedYear === currentSession && " (current)"}
@@ -1230,10 +1227,10 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   )}
                 </SelectValue>
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 {ACADEMIC_YEARS.map(y => (
                   <SelectItem key={y} value={y} className="text-xs">
-                    <span className={y === currentSession ? 'font-medium text-emerald-600' : ''}>
+                    <span className={y === currentSession ? 'font-medium text-emerald-600 dark:text-emerald-400' : ''}>
                       {y}
                       {y === currentSession && " (current)"}
                     </span>
@@ -1243,10 +1240,10 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
             </Select>
 
             <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[110px]">
+              <SelectTrigger className="h-8 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-[110px]">
                 <SelectValue placeholder="Class" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 {CLASSES.map(c => (
                   <SelectItem key={c} value={c} className="text-xs">
                     {c === 'all' ? 'All Classes' : c}
@@ -1256,10 +1253,10 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
             </Select>
 
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-              <SelectTrigger className="h-8 text-xs border-slate-200 w-[120px]">
+              <SelectTrigger className="h-8 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 w-[120px]">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 {['all', 'generated', 'pending', 'approved', 'published', 'rejected'].map(s => (
                   <SelectItem key={s} value={s} className="text-xs">
                     {s === 'all' ? 'All Status' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -1269,37 +1266,37 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
             </Select>
 
             <div className="relative flex-1 min-w-[180px]">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-slate-500 pointer-events-none" />
               <Input placeholder="Search student…" value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
-                className="pl-8 h-8 text-xs border-slate-200 focus-visible:ring-violet-500" />
+                className="pl-8 h-8 text-xs border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus-visible:ring-violet-500" />
             </div>
           </div>
         </div>
 
         {/* Table */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-5 py-3.5 border-b border-slate-100 flex items-center justify-between">
+        <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-5 py-3.5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                <Users className="h-4 w-4 text-slate-600" />
+              <div className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                <Users className="h-4 w-4 text-slate-600 dark:text-slate-400" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-slate-800">
+                <p className="text-sm font-semibold text-slate-800 dark:text-white">
                   {selectedClass === 'all' ? 'All Classes' : selectedClass}
                 </p>
-                <p className="text-xs text-slate-400">{reportCards.length} report card{reportCards.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">{reportCards.length} report card{reportCards.length !== 1 ? 's' : ''}</p>
               </div>
             </div>
             {stats.total > 0 && (
               <div className="hidden sm:flex items-center gap-2">
-                <div className="h-1.5 w-28 rounded-full bg-slate-100 overflow-hidden">
+                <div className="h-1.5 w-28 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all"
                     style={{ width: `${Math.round((stats.published / stats.total) * 100)}%` }}
                   />
                 </div>
-                <span className="text-xs text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   {Math.round((stats.published / stats.total) * 100)}% published
                 </span>
               </div>
@@ -1308,26 +1305,26 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
           {reportCards.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                <FileCheck className="h-7 w-7 text-slate-400" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                <FileCheck className="h-7 w-7 text-slate-400 dark:text-slate-500" />
               </div>
-              <p className="text-sm font-medium text-slate-600">No report cards found</p>
-              <p className="text-xs text-slate-400 mt-1">Try adjusting your filters</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No report cards found</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try adjusting your filters</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider pl-5">Student</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider hidden sm:table-cell">VIN</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Class</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center">Avg</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center hidden sm:table-cell">Grade</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center hidden md:table-cell">Visible</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider hidden lg:table-cell">Teacher</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right pr-5">Actions</TableHead>
+                  <TableRow className="bg-slate-50/70 dark:bg-slate-800/40 hover:bg-slate-50/70 dark:hover:bg-slate-800/40 border-slate-100 dark:border-slate-800">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-5">Student</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden sm:table-cell">VIN</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Class</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center">Avg</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center hidden sm:table-cell">Grade</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Status</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center hidden md:table-cell">Visible</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden lg:table-cell">Teacher</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right pr-5">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1335,28 +1332,28 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                     const grade = getOverallGrade(card.average_score)
                     const visible = isPublishedToStudent(card.status)
                     return (
-                      <TableRow key={card.id} className="hover:bg-slate-50/60 border-b border-slate-100 last:border-0">
+                      <TableRow key={card.id} className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 border-b border-slate-100 dark:border-slate-800 last:border-0">
                         <TableCell className="pl-5 py-3">
                           <div className="flex items-center gap-2.5">
-                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 flex items-center justify-center shrink-0 text-violet-600 font-bold text-xs">
+                            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-violet-100 to-blue-100 dark:from-violet-950/50 dark:to-blue-950/50 flex items-center justify-center shrink-0 text-violet-600 dark:text-violet-400 font-bold text-xs">
                               {getDisplayName(card).charAt(0).toUpperCase()}
                             </div>
                             <div>
-                              <p className="text-sm font-semibold text-slate-800">{getDisplayName(card)}</p>
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{getDisplayName(card)}</p>
                               {card.student_admission_number && (
-                                <p className="text-[10px] text-slate-400">Adm: {card.student_admission_number}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500">Adm: {card.student_admission_number}</p>
                               )}
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-xs text-slate-500 hidden sm:table-cell">{card.student_vin}</TableCell>
+                        <TableCell className="font-mono text-xs text-slate-500 dark:text-slate-400 hidden sm:table-cell">{card.student_vin}</TableCell>
                         <TableCell>
-                          <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 text-slate-700 border border-slate-200">
+                          <span className="text-xs font-medium px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
                             {card.class}
                           </span>
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={cn('text-sm font-bold', card.average_score >= 50 ? 'text-emerald-600' : 'text-red-600')}>
+                          <span className={cn('text-sm font-bold', card.average_score >= 50 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>
                             {card.average_score}%
                           </span>
                         </TableCell>
@@ -1368,21 +1365,21 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                         <TableCell><StatusPill status={card.status} /></TableCell>
                         <TableCell className="text-center hidden md:table-cell">
                           {visible ? (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                               <Eye className="h-3 w-3" /> Yes
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-slate-500">
                               <EyeOff className="h-3 w-3" /> Hidden
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500 hidden lg:table-cell">{card.class_teacher}</TableCell>
+                        <TableCell className="text-xs text-slate-500 dark:text-slate-400 hidden lg:table-cell">{card.class_teacher}</TableCell>
                         <TableCell className="text-right pr-5">
                           <div className="flex items-center justify-end gap-1.5">
                             <button
                               onClick={() => handleViewCard(card)}
-                              className="h-7 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium flex items-center gap-1 transition-colors"
+                              className="h-7 px-2.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium flex items-center gap-1 transition-colors"
                             >
                               <Eye className="h-3 w-3" />
                               <span className="hidden sm:inline">Review</span>
@@ -1390,7 +1387,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
                             {card.status === 'generated' && (
                               <button
-                                className="h-7 px-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-xs font-medium hidden sm:flex items-center gap-1 transition-colors"
+                                className="h-7 px-2.5 rounded-lg bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white text-xs font-medium hidden sm:flex items-center gap-1 transition-colors"
                                 onClick={async () => {
                                   await supabase.from('report_cards').update({
                                     status: 'approved', approved_by: profile?.id,
@@ -1407,7 +1404,7 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
                             {card.status === 'approved' && (
                               <button
-                                className="h-7 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium hidden sm:flex items-center gap-1 transition-colors"
+                                className="h-7 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white text-xs font-medium hidden sm:flex items-center gap-1 transition-colors"
                                 onClick={async () => {
                                   await supabase.from('report_cards').update({
                                     status: 'published', published_by: profile?.id,
@@ -1441,18 +1438,18 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
           )}
 
           {reportCards.length > 0 && (
-            <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
-              <p className="text-xs text-slate-400">
+            <div className="px-5 py-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between bg-slate-50/50 dark:bg-slate-800/30">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
                 {stats.published} of {stats.total} cards published to students
               </p>
               <div className="flex items-center gap-3">
                 <div className="hidden sm:flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <span className="text-xs text-slate-500">{stats.published} published</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{stats.published} published</span>
                 </div>
                 <div className="hidden sm:flex items-center gap-1.5">
                   <div className="w-2 h-2 rounded-full bg-amber-400" />
-                  <span className="text-xs text-slate-500">{stats.generated + stats.approved} pending</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">{stats.generated + stats.approved} pending</span>
                 </div>
               </div>
             </div>
@@ -1461,40 +1458,40 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
         {/* Review dialog */}
         <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-          <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] overflow-y-auto p-0">
+          <DialogContent className="w-[95vw] max-w-4xl max-h-[92vh] overflow-y-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             {selectedCard && (
               <div className="p-4 sm:p-6 space-y-4">
                 <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2 text-base">
-                    <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                      <User className="h-4 w-4 text-blue-600" />
+                  <DialogTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-white">
+                    <div className="h-8 w-8 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     <span className="truncate">{getDisplayName(selectedCard)} — {selectedCard.class}</span>
                   </DialogTitle>
-                  <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <DialogDescription className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                     <span>{getTermLabel(selectedCard.term)} {selectedCard.academic_year}</span>
-                    <span className="text-slate-300">·</span>
+                    <span className="text-slate-300 dark:text-slate-600">·</span>
                     <span>VIN: {selectedCard.student_vin}</span>
-                    <span className="text-slate-300 hidden sm:inline">·</span>
+                    <span className="text-slate-300 dark:text-slate-600 hidden sm:inline">·</span>
                     <span className="hidden sm:inline">Teacher: {selectedCard.class_teacher}</span>
                   </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="flex flex-wrap items-center justify-between gap-3 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center gap-2 flex-wrap">
                     <StatusPill status={selectedCard.status} />
                     {isPublishedToStudent(selectedCard.status) ? (
-                      <span className="text-xs text-emerald-600 flex items-center gap-1 font-medium">
+                      <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1 font-medium">
                         <Eye className="h-3 w-3" /> Visible to student
                       </span>
                     ) : (
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
+                      <span className="text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1">
                         <EyeOff className="h-3 w-3" /> Hidden from student
                       </span>
                     )}
                   </div>
                   <Button variant="outline" size="sm" onClick={() => handleDownloadPDF()}
-                    className="h-8 text-xs border-slate-200">
+                    className="h-8 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800">
                     <Download className="h-3.5 w-3.5 mr-1.5" />Download PDF
                   </Button>
                 </div>
@@ -1514,18 +1511,18 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   />
                 </div>
 
-                <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-100">
+                <DialogFooter className="flex flex-col sm:flex-row gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex gap-2 flex-1">
                     {(selectedCard.status === 'generated' || selectedCard.status === 'pending') && (
                       <Button variant="outline"
-                        className="border-red-200 text-red-600 hover:bg-red-50 text-xs h-9"
+                        className="border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs h-9 bg-white dark:bg-slate-900"
                         onClick={() => { setShowReviewDialog(false); setShowRejectDialog(true) }}>
                         <XCircle className="h-3.5 w-3.5 mr-1.5" />Reject
                       </Button>
                     )}
                     {selectedCard.status === 'published' && (
                       <Button variant="outline"
-                        className="border-amber-200 text-amber-600 hover:bg-amber-50 text-xs h-9"
+                        className="border-amber-200 dark:border-amber-900/50 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 text-xs h-9 bg-white dark:bg-slate-900"
                         onClick={() => setShowUnpublishDialog(true)} disabled={processingAction}>
                         <EyeOff className="h-3.5 w-3.5 mr-1.5" />Unpublish
                       </Button>
@@ -1533,19 +1530,19 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
                   </div>
 
                   <div className="flex gap-2 justify-end flex-wrap">
-                    <Button variant="outline" onClick={() => setShowReviewDialog(false)} className="text-xs h-9 border-slate-200">
+                    <Button variant="outline" onClick={() => setShowReviewDialog(false)} className="text-xs h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900">
                       Close
                     </Button>
                     {(selectedCard.status === 'generated' || selectedCard.status === 'pending') && (
                       <Button onClick={handleApproveCard} disabled={processingAction}
-                        className="bg-violet-600 hover:bg-violet-700 text-white text-xs h-9 shadow-sm">
+                        className="bg-violet-600 hover:bg-violet-700 dark:bg-violet-600 dark:hover:bg-violet-500 text-white text-xs h-9 shadow-sm">
                         {processingAction ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="h-3.5 w-3.5 mr-1.5" />}
                         Approve
                       </Button>
                     )}
                     {selectedCard.status !== 'published' && selectedCard.status !== 'rejected' && (
                       <Button onClick={handlePublishCard} disabled={processingAction}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-9 shadow-sm">
+                        className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white text-xs h-9 shadow-sm">
                         {processingAction ? <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> : <Send className="h-3.5 w-3.5 mr-1.5" />}
                         Publish to Student
                       </Button>
@@ -1559,28 +1556,28 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
         {/* Reject dialog */}
         <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-          <AlertDialogContent className="max-w-md mx-4">
+          <AlertDialogContent className="max-w-md mx-4 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-red-600">
-                <div className="h-8 w-8 rounded-lg bg-red-100 flex items-center justify-center">
-                  <XCircle className="h-4 w-4 text-red-600" />
+              <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <div className="h-8 w-8 rounded-lg bg-red-100 dark:bg-red-950/50 flex items-center justify-center">
+                  <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
                 </div>
                 Reject Report Card?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm">
+              <AlertDialogDescription className="text-sm text-slate-500 dark:text-slate-400">
                 Please provide a reason. The student will be notified.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-3">
-              <Label className="text-xs font-medium text-slate-600">Rejection Reason *</Label>
+              <Label className="text-xs font-medium text-slate-600 dark:text-slate-400">Rejection Reason *</Label>
               <Textarea placeholder="e.g. Scores need review, Missing subjects…"
                 value={rejectReason} onChange={e => setRejectReason(e.target.value)}
-                rows={3} className="mt-2 text-sm border-slate-200 focus-visible:ring-red-500" />
+                rows={3} className="mt-2 text-sm bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white focus-visible:ring-red-500" />
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel className="text-sm border-slate-200">Cancel</AlertDialogCancel>
+              <AlertDialogCancel className="text-sm border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800">Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleRejectCard} disabled={processingAction || !rejectReason}
-                className="bg-red-600 hover:bg-red-700 text-white text-sm">
+                className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white text-sm">
                 {processingAction && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                 Confirm Reject
               </AlertDialogAction>
@@ -1590,23 +1587,23 @@ export function ReportCardApproval({ onRefresh, hideBackButton = false }: Report
 
         {/* Unpublish dialog */}
         <AlertDialog open={showUnpublishDialog} onOpenChange={setShowUnpublishDialog}>
-          <AlertDialogContent className="max-w-md mx-4">
+          <AlertDialogContent className="max-w-md mx-4 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
             <AlertDialogHeader>
-              <AlertDialogTitle className="flex items-center gap-2 text-amber-600">
-                <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                  <EyeOff className="h-4 w-4 text-amber-600" />
+              <AlertDialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <div className="h-8 w-8 rounded-lg bg-amber-100 dark:bg-amber-950/50 flex items-center justify-center">
+                  <EyeOff className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 </div>
                 Unpublish Report Card?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-sm">
+              <AlertDialogDescription className="text-sm text-slate-500 dark:text-slate-400">
                 This will immediately hide the report card from the student.
                 They won&apos;t be able to view it until you publish it again.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="text-sm border-slate-200">Cancel</AlertDialogCancel>
+              <AlertDialogCancel className="text-sm border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800">Cancel</AlertDialogCancel>
               <AlertDialogAction onClick={handleUnpublishCard} disabled={processingAction}
-                className="bg-amber-600 hover:bg-amber-700 text-white text-sm">
+                className="bg-amber-600 hover:bg-amber-700 dark:bg-amber-600 dark:hover:bg-amber-500 text-white text-sm">
                 {processingAction && <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />}
                 Unpublish
               </AlertDialogAction>
