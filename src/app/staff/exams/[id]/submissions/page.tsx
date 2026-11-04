@@ -1,5 +1,4 @@
-// app/staff/exams/[id]/submissions/page.tsx
-
+// app/staff/exams/[id]/submissions/page.tsx - FULLY UPDATED WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -34,44 +33,44 @@ const getWAECGrade = (pct: number): string => {
 }
 
 const getGradeColor = (pct: number) => {
-  if (pct >= 70) return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', dot: 'bg-emerald-500' }
-  if (pct >= 50) return { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200', dot: 'bg-blue-500' }
-  if (pct >= 40) return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', dot: 'bg-amber-500' }
-  return { bg: 'bg-red-50', text: 'text-red-700', border: 'border-red-200', dot: 'bg-red-500' }
+  if (pct >= 70) return { 
+    bg: 'bg-emerald-50 dark:bg-emerald-950/40', 
+    text: 'text-emerald-700 dark:text-emerald-400', 
+    border: 'border-emerald-200 dark:border-emerald-900/50', 
+    dot: 'bg-emerald-500' 
+  }
+  if (pct >= 50) return { 
+    bg: 'bg-blue-50 dark:bg-blue-950/40', 
+    text: 'text-blue-700 dark:text-blue-400', 
+    border: 'border-blue-200 dark:border-blue-900/50', 
+    dot: 'bg-blue-500' 
+  }
+  if (pct >= 40) return { 
+    bg: 'bg-amber-50 dark:bg-amber-950/40', 
+    text: 'text-amber-700 dark:text-amber-400', 
+    border: 'border-amber-200 dark:border-amber-900/50', 
+    dot: 'bg-amber-500' 
+  }
+  return { 
+    bg: 'bg-red-50 dark:bg-red-950/40', 
+    text: 'text-red-700 dark:text-red-400', 
+    border: 'border-red-200 dark:border-red-900/50', 
+    dot: 'bg-red-500' 
+  }
 }
 
 const getStatusConfig = (status: string) => {
   switch (status) {
     case 'in_progress':
-      return {
-        label: 'In Progress',
-        icon: Clock,
-        className: 'bg-blue-50 text-blue-700 border border-blue-200',
-      }
+      return { label: 'In Progress', icon: Clock, className: 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50' }
     case 'completed':
-      return {
-        label: 'Completed',
-        icon: CheckCircle,
-        className: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-      }
+      return { label: 'Completed', icon: CheckCircle, className: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50' }
     case 'pending_theory':
-      return {
-        label: 'Pending Theory',
-        icon: AlertCircle,
-        className: 'bg-amber-50 text-amber-700 border border-amber-200',
-      }
+      return { label: 'Pending Theory', icon: AlertCircle, className: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50' }
     case 'graded':
-      return {
-        label: 'Graded',
-        icon: Award,
-        className: 'bg-purple-50 text-purple-700 border border-purple-200',
-      }
+      return { label: 'Graded', icon: Award, className: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50' }
     default:
-      return {
-        label: status || 'Unknown',
-        icon: Clock,
-        className: 'bg-slate-50 text-slate-600 border border-slate-200',
-      }
+      return { label: status || 'Unknown', icon: Clock, className: 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700' }
   }
 }
 
@@ -79,10 +78,7 @@ const StatusBadge = ({ status }: { status: string }) => {
   const config = getStatusConfig(status)
   const Icon = config.icon
   return (
-    <span className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium',
-      config.className
-    )}>
+    <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium', config.className)}>
       <Icon className="h-3 w-3" />
       {config.label}
     </span>
@@ -121,21 +117,21 @@ interface StatCardProps {
 }
 
 const StatCard = ({ label, value, sub, icon: Icon, iconClass, valueClass, trend }: StatCardProps) => (
-  <Card className="border border-slate-200/80 shadow-sm bg-white hover:shadow-md transition-shadow duration-200">
+  <Card className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 hover:shadow-md dark:hover:shadow-slate-950/50 transition-shadow duration-200">
     <CardContent className="p-4 sm:p-5">
       <div className="flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{label}</p>
-          <p className={cn('text-2xl font-bold text-slate-900', valueClass)}>{value}</p>
-          {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">{label}</p>
+          <p className={cn('text-2xl font-bold text-slate-900 dark:text-white', valueClass)}>{value}</p>
+          {sub && <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{sub}</p>}
         </div>
         <div className={cn('p-2.5 rounded-xl shrink-0 ml-3', iconClass)}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
       {trend && (
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <span className="text-xs text-slate-500">{trend}</span>
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+          <span className="text-xs text-slate-500 dark:text-slate-400">{trend}</span>
         </div>
       )}
     </CardContent>
@@ -306,15 +302,15 @@ export default function ExamSubmissionsPage() {
   // ── Error ──────────────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <Card className="max-w-md w-full border border-red-100 shadow-lg">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center p-6 transition-colors duration-300">
+        <Card className="max-w-md w-full border border-red-100 dark:border-red-900/50 shadow-lg bg-white dark:bg-slate-900">
           <CardContent className="p-8 text-center">
-            <div className="w-14 h-14 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <AlertCircle className="h-7 w-7 text-red-500" />
+            <div className="w-14 h-14 rounded-full bg-red-50 dark:bg-red-950/50 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle className="h-7 w-7 text-red-500 dark:text-red-400" />
             </div>
-            <h2 className="text-lg font-semibold text-slate-800 mb-2">Unable to Load Submissions</h2>
-            <p className="text-sm text-slate-500 mb-6">{error}</p>
-            <Button onClick={handleBack} className="bg-slate-900 hover:bg-slate-800 text-white">
+            <h2 className="text-lg font-semibold text-slate-800 dark:text-white mb-2">Unable to Load Submissions</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">{error}</p>
+            <Button onClick={handleBack} className="bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white">
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Exam
             </Button>
@@ -327,20 +323,20 @@ export default function ExamSubmissionsPage() {
   // ── Loading ────────────────────────────────────────────────────────
   if (loading && submissions.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
-          <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-4 transition-colors duration-300">
+        <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-emerald-600 dark:text-emerald-400" />
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-slate-700">Loading submissions</p>
-          <p className="text-xs text-slate-400 mt-0.5">Fetching student data…</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Loading submissions</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Fetching student data…</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
         {/* ── Header ──────────────────────────────────────────────── */}
@@ -350,31 +346,31 @@ export default function ExamSubmissionsPage() {
               variant="outline"
               size="sm"
               onClick={handleBack}
-              className="mt-0.5 shrink-0 border-slate-200 hover:bg-slate-100 text-slate-700 h-8"
+              className="mt-0.5 shrink-0 border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 h-8"
             >
               <ArrowLeft className="h-3.5 w-3.5 mr-1" />
               Back
             </Button>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-slate-900">
+                <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">
                   {exam?.title || 'Exam Submissions'}
                 </h1>
-                <Badge className="bg-slate-100 text-slate-600 border-0 font-medium text-xs">
+                <Badge className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-0 font-medium text-xs">
                   {submissions.length} student{submissions.length !== 1 ? 's' : ''}
                 </Badge>
               </div>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 {exam?.subject && (
-                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                  <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                     <BookOpen className="h-3 w-3" />
                     {exam.subject}
                   </span>
                 )}
                 {exam?.class && (
                   <>
-                    <span className="text-slate-300">•</span>
-                    <span className="flex items-center gap-1 text-xs text-slate-500">
+                    <span className="text-slate-300 dark:text-slate-600">•</span>
+                    <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
                       <GraduationCap className="h-3 w-3" />
                       {exam.class}
                     </span>
@@ -382,8 +378,8 @@ export default function ExamSubmissionsPage() {
                 )}
                 {exam?.total_marks && (
                   <>
-                    <span className="text-slate-300">•</span>
-                    <span className="text-xs text-slate-500">{exam.total_marks} marks</span>
+                    <span className="text-slate-300 dark:text-slate-600">•</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{exam.total_marks} marks</span>
                   </>
                 )}
               </div>
@@ -395,7 +391,7 @@ export default function ExamSubmissionsPage() {
             size="sm"
             onClick={handleRefresh}
             disabled={refreshing}
-            className="shrink-0 border-slate-200 hover:bg-white text-slate-700 h-8 self-start sm:self-auto"
+            className="shrink-0 border-slate-200 dark:border-slate-700 hover:bg-white dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 h-8 self-start sm:self-auto"
           >
             <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
             Refresh
@@ -408,49 +404,49 @@ export default function ExamSubmissionsPage() {
             label="Total Students"
             value={submissions.length}
             icon={Users}
-            iconClass="bg-slate-100 text-slate-600"
+            iconClass="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
           />
           <StatCard
             label="Completed"
             value={completedCount}
             sub={`${submissions.length > 0 ? Math.round((completedCount / submissions.length) * 100) : 0}% of total`}
             icon={CheckCircle}
-            iconClass="bg-emerald-100 text-emerald-600"
-            valueClass="text-emerald-700"
+            iconClass="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
+            valueClass="text-emerald-700 dark:text-emerald-400"
           />
           <StatCard
             label="Graded"
             value={gradedCount}
             icon={Award}
-            iconClass="bg-purple-100 text-purple-600"
-            valueClass="text-purple-700"
+            iconClass="bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400"
+            valueClass="text-purple-700 dark:text-purple-400"
           />
           <StatCard
             label="Pending Theory"
             value={pendingCount}
             icon={AlertCircle}
-            iconClass="bg-amber-100 text-amber-600"
-            valueClass="text-amber-700"
+            iconClass="bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400"
+            valueClass="text-amber-700 dark:text-amber-400"
           />
           <StatCard
             label="Average Score"
             value={`${averageScore}%`}
             sub={`Pass rate: ${passRate}%`}
             icon={BarChart3}
-            iconClass="bg-blue-100 text-blue-600"
-            valueClass="text-blue-700"
+            iconClass="bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"
+            valueClass="text-blue-700 dark:text-blue-400"
           />
         </div>
 
         {/* ── Filters ─────────────────────────────────────────────── */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 dark:text-slate-500 pointer-events-none" />
             <Input
               placeholder="Search by name or email…"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="pl-9 h-9 bg-white border-slate-200 text-sm focus-visible:ring-emerald-500"
+              className="pl-9 h-9 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus-visible:ring-emerald-500 dark:focus-visible:ring-emerald-400"
             />
           </div>
           <div className="flex gap-2 flex-wrap">
@@ -461,15 +457,17 @@ export default function ExamSubmissionsPage() {
                 className={cn(
                   'px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
                   statusFilter === s
-                    ? 'bg-slate-900 text-white border-slate-900'
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-slate-900 dark:bg-emerald-600 text-white border-slate-900 dark:border-emerald-600'
+                    : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800'
                 )}
               >
                 {s === 'all' ? 'All' : getStatusConfig(s).label}
                 {s !== 'all' && (
                   <span className={cn(
                     'ml-1.5 px-1.5 py-0.5 rounded-full text-[10px]',
-                    statusFilter === s ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                    statusFilter === s 
+                      ? 'bg-white/20 text-white' 
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
                   )}>
                     {submissions.filter(sub => sub.status === s).length}
                   </span>
@@ -481,13 +479,13 @@ export default function ExamSubmissionsPage() {
 
         {/* ── Table ───────────────────────────────────────────────── */}
         {filtered.length === 0 ? (
-          <Card className="border border-slate-200 shadow-sm bg-white">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
             <CardContent className="py-16 text-center">
-              <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
-                <Users className="h-7 w-7 text-slate-400" />
+              <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
+                <Users className="h-7 w-7 text-slate-400 dark:text-slate-500" />
               </div>
-              <p className="text-sm font-medium text-slate-600">No submissions found</p>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No submissions found</p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
                 {searchQuery || statusFilter !== 'all'
                   ? 'Try adjusting your search or filters'
                   : 'No students have submitted this exam yet'}
@@ -496,7 +494,7 @@ export default function ExamSubmissionsPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="mt-4 text-xs"
+                  className="mt-4 text-xs border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"
                   onClick={() => { setSearchQuery(''); setStatusFilter('all') }}
                 >
                   Clear filters
@@ -505,48 +503,48 @@ export default function ExamSubmissionsPage() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="border border-slate-200 shadow-sm bg-white overflow-hidden">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden transition-colors duration-300">
             {/* Table header info */}
-            <div className="px-4 sm:px-6 py-3 border-b border-slate-100 flex items-center justify-between">
-              <p className="text-xs text-slate-500 font-medium">
-                Showing <span className="text-slate-700">{filtered.length}</span> of{' '}
-                <span className="text-slate-700">{submissions.length}</span> submissions
+            <div className="px-4 sm:px-6 py-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+                Showing <span className="text-slate-700 dark:text-slate-200">{filtered.length}</span> of{' '}
+                <span className="text-slate-700 dark:text-slate-200">{submissions.length}</span> submissions
               </p>
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                <span className="text-xs text-slate-500">{passCount} passing</span>
-                <span className="text-slate-300 mx-1">·</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{passCount} passing</span>
+                <span className="text-slate-300 dark:text-slate-600 mx-1">·</span>
                 <div className="w-2 h-2 rounded-full bg-red-400" />
-                <span className="text-xs text-slate-500">{submissions.length - passCount} failing</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{submissions.length - passCount} failing</span>
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider pl-4 sm:pl-6 py-3">
+                  <TableRow className="bg-slate-50/70 dark:bg-slate-800/50 hover:bg-slate-50/70 dark:hover:bg-slate-800/50 border-slate-100 dark:border-slate-800">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider pl-4 sm:pl-6 py-3">
                       Student
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center py-3">
                       CA Score
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center py-3">
                       Exam Score
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center py-3">
                       Total
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center py-3">
                       Grade
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center py-3">
                       Status
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-center py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center py-3">
                       Submitted
                     </TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider text-right pr-4 sm:pr-6 py-3">
+                    <TableHead className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-right pr-4 sm:pr-6 py-3">
                       Action
                     </TableHead>
                   </TableRow>
@@ -564,7 +562,7 @@ export default function ExamSubmissionsPage() {
                     return (
                       <TableRow
                         key={submission.id}
-                        className="hover:bg-slate-50/60 transition-colors border-b border-slate-100 last:border-0"
+                        className="hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-colors border-b border-slate-100 dark:border-slate-800 last:border-0"
                       >
                         {/* Student */}
                         <TableCell className="pl-4 sm:pl-6 py-3.5">
@@ -586,15 +584,15 @@ export default function ExamSubmissionsPage() {
                                 </div>
                               )}
                               <div className={cn(
-                                'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white',
+                                'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white dark:border-slate-900',
                                 colors.dot
                               )} />
                             </div>
                             <div className="min-w-0">
-                              <p className="text-sm font-semibold text-slate-800 truncate max-w-[140px] sm:max-w-[200px]">
+                              <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate max-w-[140px] sm:max-w-[200px]">
                                 {submission.student_name}
                               </p>
-                              <p className="text-xs text-slate-400 truncate max-w-[140px] sm:max-w-[200px]">
+                              <p className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[140px] sm:max-w-[200px]">
                                 {submission.student_class}
                                 {submission.student_email && (
                                   <span className="hidden sm:inline"> · {submission.student_email}</span>
@@ -606,13 +604,13 @@ export default function ExamSubmissionsPage() {
 
                         {/* CA Score */}
                         <TableCell className="text-center py-3.5">
-                          <span className="text-sm font-medium text-slate-600">
+                          <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
                             {caTotal > 0 ? (
-                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-semibold text-xs">
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs">
                                 {caTotal}
                               </span>
                             ) : (
-                              <span className="text-slate-300">—</span>
+                              <span className="text-slate-300 dark:text-slate-600">—</span>
                             )}
                           </span>
                         </TableCell>
@@ -620,11 +618,11 @@ export default function ExamSubmissionsPage() {
                         {/* Exam Score */}
                         <TableCell className="text-center py-3.5">
                           {examScore > 0 ? (
-                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 font-semibold text-xs">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold text-xs">
                               {examScore}
                             </span>
                           ) : (
-                            <span className="text-slate-300 text-sm">—</span>
+                            <span className="text-slate-300 dark:text-slate-600 text-sm">—</span>
                           )}
                         </TableCell>
 
@@ -634,7 +632,7 @@ export default function ExamSubmissionsPage() {
                             <span className={cn('text-sm font-bold', colors.text)}>
                               {submission.display_score}
                             </span>
-                            <span className="text-[10px] text-slate-400">{pct}%</span>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">{pct}%</span>
                           </div>
                         </TableCell>
 
@@ -655,7 +653,7 @@ export default function ExamSubmissionsPage() {
 
                         {/* Submitted */}
                         <TableCell className="text-center py-3.5">
-                          <span className="text-xs text-slate-500">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
                             {formatDate(submission.submitted_at)}
                           </span>
                         </TableCell>
@@ -670,8 +668,8 @@ export default function ExamSubmissionsPage() {
                             className={cn(
                               'h-7 text-xs px-3 font-medium transition-all',
                               isGraded
-                                ? 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
+                                ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700'
+                                : 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm'
                             )}
                           >
                             <Eye className="h-3 w-3 mr-1" />
@@ -686,18 +684,18 @@ export default function ExamSubmissionsPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-4 sm:px-6 py-3 border-t border-slate-100 bg-slate-50/50 flex items-center justify-between">
-              <p className="text-xs text-slate-400">
+            <div className="px-4 sm:px-6 py-3 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 flex items-center justify-between">
+              <p className="text-xs text-slate-400 dark:text-slate-500">
                 {gradedCount} of {submissions.length} submissions graded
               </p>
               <div className="flex items-center gap-2">
-                <div className="h-1.5 w-24 sm:w-40 rounded-full bg-slate-200 overflow-hidden">
+                <div className="h-1.5 w-24 sm:w-40 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
                     style={{ width: `${submissions.length > 0 ? (gradedCount / submissions.length) * 100 : 0}%` }}
                   />
                 </div>
-                <span className="text-xs text-slate-500 font-medium">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
                   {submissions.length > 0 ? Math.round((gradedCount / submissions.length) * 100) : 0}% graded
                 </span>
               </div>

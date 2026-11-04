@@ -1,7 +1,4 @@
-// ============================================
-// GRADING TAB - Complete with Responsive Layout
-// ============================================
-
+// components/staff/GradingTab.tsx - FULLY UPDATED WITH DARK MODE
 'use client'
 
 import { useState, useEffect } from 'react'
@@ -97,12 +94,12 @@ const calculateGrade = (percentage: number): string => {
 
 const getGradeColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'bg-green-100 text-green-700'
-    case 'B': return 'bg-blue-100 text-blue-700'
-    case 'C': return 'bg-yellow-100 text-yellow-700'
-    case 'P': return 'bg-orange-100 text-orange-700'
-    case 'F': return 'bg-red-100 text-red-700'
-    default: return 'bg-gray-100 text-gray-700'
+    case 'A': return 'bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400'
+    case 'B': return 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400'
+    case 'C': return 'bg-yellow-100 dark:bg-yellow-950/50 text-yellow-700 dark:text-yellow-400'
+    case 'P': return 'bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400'
+    case 'F': return 'bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400'
+    default: return 'bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-slate-300'
   }
 }
 
@@ -404,8 +401,8 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
   if (!mounted) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      <div className="flex items-center justify-center h-96 bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400" />
       </div>
     )
   }
@@ -414,25 +411,30 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
     <motion.div 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 sm:space-y-6"
+      className="space-y-4 sm:space-y-6 transition-colors duration-300"
     >
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-800 dark:text-white">
             Grading Center
           </h1>
-          <p className="text-xs sm:text-sm text-gray-500 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-1">
             Grade student submissions and provide feedback
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleRefresh}>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
           {pendingCount > 0 && (
-            <Badge className="bg-amber-100 text-amber-700 px-3 py-1.5">
+            <Badge className="bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 px-3 py-1.5">
               <AlertCircle className="h-4 w-4 mr-1" />
               {pendingCount} Pending
             </Badge>
@@ -442,64 +444,64 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3">
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-amber-50 to-yellow-50">
+        <Card className="border border-amber-100 dark:border-amber-900/50 shadow-sm bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-amber-600">Pending Assignments</p>
-            <p className="text-lg sm:text-xl font-bold text-amber-700">{stats.pendingAssignments}</p>
+            <p className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-400">Pending Assignments</p>
+            <p className="text-lg sm:text-xl font-bold text-amber-700 dark:text-amber-300">{stats.pendingAssignments}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50">
+        <Card className="border border-purple-100 dark:border-purple-900/50 shadow-sm bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/30 dark:to-pink-950/30">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-purple-600">Pending Theory</p>
-            <p className="text-lg sm:text-xl font-bold text-purple-700">{stats.pendingTheory}</p>
+            <p className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400">Pending Theory</p>
+            <p className="text-lg sm:text-xl font-bold text-purple-700 dark:text-purple-300">{stats.pendingTheory}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-50">
+        <Card className="border border-green-100 dark:border-green-900/50 shadow-sm bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-green-600">Graded Today</p>
-            <p className="text-lg sm:text-xl font-bold text-green-700">{stats.gradedToday}</p>
+            <p className="text-[10px] sm:text-xs text-green-600 dark:text-green-400">Graded Today</p>
+            <p className="text-lg sm:text-xl font-bold text-green-700 dark:text-green-300">{stats.gradedToday}</p>
           </CardContent>
         </Card>
-        <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50">
+        <Card className="border border-blue-100 dark:border-blue-900/50 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
           <CardContent className="p-3 sm:p-4">
-            <p className="text-[10px] sm:text-xs text-blue-600">Avg Score</p>
-            <p className="text-lg sm:text-xl font-bold text-blue-700">{stats.averageScore}%</p>
+            <p className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-400">Avg Score</p>
+            <p className="text-lg sm:text-xl font-bold text-blue-700 dark:text-blue-300">{stats.averageScore}%</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Grade Scale Card */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+      <Card className="border border-blue-200 dark:border-blue-900/50 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30">
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <span className="text-xs sm:text-sm font-medium text-gray-700">Grade Scale:</span>
-            <Badge className="bg-green-100 text-green-700 text-xs">A: 80-100%</Badge>
-            <Badge className="bg-blue-100 text-blue-700 text-xs">B: 70-79%</Badge>
-            <Badge className="bg-yellow-100 text-yellow-700 text-xs">C: 60-69%</Badge>
-            <Badge className="bg-orange-100 text-orange-700 text-xs">P: 50-59%</Badge>
-            <Badge className="bg-red-100 text-red-700 text-xs">F: 0-49%</Badge>
+            <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-slate-300">Grade Scale:</span>
+            <Badge className="bg-green-100 dark:bg-green-950/50 text-green-700 dark:text-green-400 text-xs">A: 80-100%</Badge>
+            <Badge className="bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 text-xs">B: 70-79%</Badge>
+            <Badge className="bg-yellow-100 dark:bg-yellow-950/50 text-yellow-700 dark:text-yellow-400 text-xs">C: 60-69%</Badge>
+            <Badge className="bg-orange-100 dark:bg-orange-950/50 text-orange-700 dark:text-orange-400 text-xs">P: 50-59%</Badge>
+            <Badge className="bg-red-100 dark:bg-red-950/50 text-red-700 dark:text-red-400 text-xs">F: 0-49%</Badge>
           </div>
         </CardContent>
       </Card>
 
       {/* Filters */}
-      <Card className="border-0 shadow-sm bg-white">
+      <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
         <CardContent className="p-3 sm:p-4">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 dark:text-slate-500" />
               <Input
                 placeholder="Search by student or title..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-9 sm:h-10 text-sm"
+                className="pl-10 h-9 sm:h-10 text-sm bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
               />
             </div>
             <Select value={filterClass} onValueChange={setFilterClass}>
-              <SelectTrigger className="w-full sm:w-40 h-9 sm:h-10">
+              <SelectTrigger className="w-full sm:w-40 h-9 sm:h-10 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white">
                 <SelectValue placeholder="All Classes" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 <SelectItem value="all">All Classes</SelectItem>
                 {classes.map(cls => (
                   <SelectItem key={cls} value={cls}>{cls}</SelectItem>
@@ -512,22 +514,22 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-transparent border-b rounded-none h-auto p-0 w-full overflow-x-auto flex-nowrap">
-          <TabsTrigger value="assignments" className="data-[state=active]:border-blue-600 rounded-none px-4 py-2 text-sm whitespace-nowrap">
+        <TabsList className="bg-transparent border-b border-slate-200 dark:border-slate-800 rounded-none h-auto p-0 w-full overflow-x-auto flex-nowrap">
+          <TabsTrigger value="assignments" className="data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 rounded-none px-4 py-2 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400 data-[state=active]:bg-transparent border-b-2 border-transparent">
             <FileText className="h-4 w-4 mr-2" />
             Assignments
             {stats.pendingAssignments > 0 && (
-              <Badge className="ml-2 bg-amber-100 text-amber-700 text-xs">{stats.pendingAssignments}</Badge>
+              <Badge className="ml-2 bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 text-xs">{stats.pendingAssignments}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="theory" className="data-[state=active]:border-blue-600 rounded-none px-4 py-2 text-sm whitespace-nowrap">
+          <TabsTrigger value="theory" className="data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 rounded-none px-4 py-2 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400 data-[state=active]:bg-transparent border-b-2 border-transparent">
             <MonitorPlay className="h-4 w-4 mr-2" />
             Theory Answers
             {stats.pendingTheory > 0 && (
-              <Badge className="ml-2 bg-purple-100 text-purple-700 text-xs">{stats.pendingTheory}</Badge>
+              <Badge className="ml-2 bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 text-xs">{stats.pendingTheory}</Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="graded" className="data-[state=active]:border-blue-600 rounded-none px-4 py-2 text-sm whitespace-nowrap">
+          <TabsTrigger value="graded" className="data-[state=active]:border-blue-600 data-[state=active]:text-blue-600 dark:data-[state=active]:text-blue-400 rounded-none px-4 py-2 text-sm whitespace-nowrap text-slate-600 dark:text-slate-400 data-[state=active]:bg-transparent border-b-2 border-transparent">
             <CheckCircle2 className="h-4 w-4 mr-2" />
             Recently Graded
           </TabsTrigger>
@@ -535,43 +537,47 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
         {/* Assignments Tab */}
         <TabsContent value="assignments">
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
             {loading ? (
               <div className="text-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
-                <p className="text-gray-500">Loading submissions...</p>
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-3" />
+                <p className="text-gray-500 dark:text-slate-400">Loading submissions...</p>
               </div>
             ) : filteredAssignments.length === 0 ? (
               <div className="text-center py-12">
-                <FileText className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No pending assignment submissions</p>
+                <FileText className="h-12 w-12 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+                <p className="text-gray-500 dark:text-slate-400">No pending assignment submissions</p>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredAssignments.map((submission) => (
-                  <div key={submission.id} className="p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                  <div key={submission.id} className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                        <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                          <FileText className="h-5 w-5 text-emerald-600" />
+                        <div className="h-10 w-10 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                          <FileText className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-gray-800">{submission.assignment?.title}</p>
-                            <Badge variant="outline" className="text-xs">{submission.assignment?.subject}</Badge>
-                            <Badge className="text-xs">{submission.student?.class}</Badge>
+                            <p className="font-semibold text-gray-800 dark:text-white">{submission.assignment?.title}</p>
+                            <Badge variant="outline" className="text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">{submission.assignment?.subject}</Badge>
+                            <Badge className="text-xs bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">{submission.student?.class}</Badge>
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">
                             <User className="inline h-3.5 w-3.5 mr-1" />
                             {submission.student?.full_name} • VIN: {submission.student?.vin_id}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                             <Clock className="inline h-3 w-3 mr-1" />
                             Submitted: {new Date(submission.submitted_at).toLocaleDateString()}
                           </p>
                         </div>
                       </div>
-                      <Button size="sm" onClick={() => handleGradeSubmission(submission)} className="bg-blue-600 hover:bg-blue-700 shrink-0">
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleGradeSubmission(submission)} 
+                        className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shrink-0"
+                      >
                         Grade Now <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
                     </div>
@@ -584,48 +590,52 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
         {/* Theory Tab */}
         <TabsContent value="theory">
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
             {loading ? (
               <div className="text-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto mb-3" />
-                <p className="text-gray-500">Loading theory answers...</p>
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600 dark:text-blue-400 mx-auto mb-3" />
+                <p className="text-gray-500 dark:text-slate-400">Loading theory answers...</p>
               </div>
             ) : filteredTheory.length === 0 ? (
               <div className="text-center py-12">
-                <MonitorPlay className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500">No pending theory answers</p>
+                <MonitorPlay className="h-12 w-12 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+                <p className="text-gray-500 dark:text-slate-400">No pending theory answers</p>
               </div>
             ) : (
-              <div className="divide-y">
+              <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredTheory.map((answer) => (
-                  <div key={answer.id} className="p-3 sm:p-4 hover:bg-gray-50 transition-colors">
+                  <div key={answer.id} className="p-3 sm:p-4 hover:bg-gray-50 dark:hover:bg-slate-800/50 transition-colors">
                     <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                       <div className="flex items-start gap-3 flex-1">
-                        <div className="h-10 w-10 rounded-lg bg-purple-100 flex items-center justify-center shrink-0">
-                          <MessageSquare className="h-5 w-5 text-purple-600" />
+                        <div className="h-10 w-10 rounded-lg bg-purple-100 dark:bg-purple-950/50 flex items-center justify-center shrink-0">
+                          <MessageSquare className="h-5 w-5 text-purple-600 dark:text-purple-400" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-gray-800">{answer.attempt?.exam?.title}</p>
-                            <Badge variant="outline" className="text-xs">{answer.attempt?.exam?.subject}</Badge>
+                            <p className="font-semibold text-gray-800 dark:text-white">{answer.attempt?.exam?.title}</p>
+                            <Badge variant="outline" className="text-xs border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300">{answer.attempt?.exam?.subject}</Badge>
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600 dark:text-slate-400 mt-1">
                             <User className="inline h-3.5 w-3.5 mr-1" />
                             {answer.attempt?.student?.full_name}
                           </p>
-                          <p className="text-sm text-gray-700 mt-1 line-clamp-2">
+                          <p className="text-sm text-gray-700 dark:text-slate-300 mt-1 line-clamp-2">
                             <span className="font-medium">Q:</span> {answer.question?.question_text}
                           </p>
-                          <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                          <p className="text-sm text-gray-600 dark:text-slate-400 mt-1 line-clamp-2">
                             <span className="font-medium">A:</span> {answer.answer_text}
                           </p>
-                          <p className="text-xs text-gray-500 mt-1">
+                          <p className="text-xs text-gray-500 dark:text-slate-500 mt-1">
                             <Star className="inline h-3 w-3 mr-1" />
                             Max Points: {answer.question?.points}
                           </p>
                         </div>
                       </div>
-                      <Button size="sm" onClick={() => handleGradeTheory(answer)} className="bg-purple-600 hover:bg-purple-700 shrink-0">
+                      <Button 
+                        size="sm" 
+                        onClick={() => handleGradeTheory(answer)} 
+                        className="bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white shrink-0"
+                      >
                         Grade Answer <ChevronRight className="ml-1 h-4 w-4" />
                       </Button>
                     </div>
@@ -638,22 +648,22 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
         {/* Graded Tab */}
         <TabsContent value="graded">
-          <Card className="border-0 shadow-sm bg-white overflow-hidden">
+          <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
             <CardContent className="p-0">
               {gradedSubmissions.length === 0 ? (
                 <div className="text-center py-12">
-                  <CheckCircle2 className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">No recently graded submissions</p>
+                  <CheckCircle2 className="h-12 w-12 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+                  <p className="text-gray-500 dark:text-slate-400">No recently graded submissions</p>
                 </div>
               ) : (
                 <Table>
                   <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="text-xs sm:text-sm">Student</TableHead>
-                      <TableHead className="text-xs sm:text-sm">Assignment</TableHead>
-                      <TableHead className="text-center text-xs sm:text-sm">Score</TableHead>
-                      <TableHead className="text-center text-xs sm:text-sm">Grade</TableHead>
-                      <TableHead className="text-xs sm:text-sm">Graded</TableHead>
+                    <TableRow className="bg-gray-50 dark:bg-slate-800/50 hover:bg-gray-50 dark:hover:bg-slate-800/50 border-slate-100 dark:border-slate-800">
+                      <TableHead className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Student</TableHead>
+                      <TableHead className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Assignment</TableHead>
+                      <TableHead className="text-center text-xs sm:text-sm text-slate-500 dark:text-slate-400">Score</TableHead>
+                      <TableHead className="text-center text-xs sm:text-sm text-slate-500 dark:text-slate-400">Grade</TableHead>
+                      <TableHead className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">Graded</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -663,16 +673,16 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
                       const letterGrade = calculateGrade(percentage)
                       
                       return (
-                        <TableRow key={sub.id}>
-                          <TableCell className="text-xs sm:text-sm">{sub.student?.full_name}</TableCell>
-                          <TableCell className="text-xs sm:text-sm">{sub.assignment?.title}</TableCell>
-                          <TableCell className="text-center text-xs sm:text-sm font-semibold">
+                        <TableRow key={sub.id} className="border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                          <TableCell className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">{sub.student?.full_name}</TableCell>
+                          <TableCell className="text-xs sm:text-sm text-slate-700 dark:text-slate-300">{sub.assignment?.title}</TableCell>
+                          <TableCell className="text-center text-xs sm:text-sm font-semibold text-slate-700 dark:text-slate-200">
                             {sub.grade}/{maxMarks}
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge className={cn("text-xs", getGradeColor(letterGrade))}>{letterGrade}</Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-gray-500">
+                          <TableCell className="text-xs text-gray-500 dark:text-slate-400">
                             {sub.graded_at ? new Date(sub.graded_at).toLocaleDateString() : '-'}
                           </TableCell>
                         </TableRow>
@@ -688,10 +698,10 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
       {/* Assignment Grading Dialog */}
       <Dialog open={showGradingDialog} onOpenChange={setShowGradingDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>Grade Assignment</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-800 dark:text-white">Grade Assignment</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
               {selectedSubmission?.student?.full_name} - {selectedSubmission?.assignment?.title}
             </DialogDescription>
           </DialogHeader>
@@ -699,8 +709,8 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
           <div className="space-y-4 py-4">
             {selectedSubmission?.submission_text && (
               <div>
-                <Label className="text-sm font-semibold">Student's Answer:</Label>
-                <div className="mt-2 p-4 bg-gray-50 rounded-lg text-sm max-h-48 overflow-y-auto">
+                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Student's Answer:</Label>
+                <div className="mt-2 p-4 bg-gray-50 dark:bg-slate-800/60 rounded-lg text-sm max-h-48 overflow-y-auto text-slate-700 dark:text-slate-300">
                   {selectedSubmission.submission_text}
                 </div>
               </div>
@@ -708,8 +718,8 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
             
             {selectedSubmission?.file_url && (
               <div>
-                <Label className="text-sm font-semibold">Attached File:</Label>
-                <Button variant="outline" size="sm" className="mt-2" asChild>
+                <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Attached File:</Label>
+                <Button variant="outline" size="sm" className="mt-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300" asChild>
                   <a href={selectedSubmission.file_url} target="_blank" rel="noopener noreferrer">
                     <Eye className="h-4 w-4 mr-2" /> View Attachment
                   </a>
@@ -718,7 +728,7 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
             )}
             
             <div>
-              <Label className="text-sm font-semibold">Grade</Label>
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Grade</Label>
               <div className="flex items-center gap-3 mt-2">
                 <Input
                   type="number"
@@ -727,9 +737,9 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
                   step="0.5"
                   value={grade}
                   onChange={(e) => setGrade(parseFloat(e.target.value) || 0)}
-                  className="w-32"
+                  className="w-32 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 />
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 dark:text-slate-400">
                   / {selectedSubmission?.assignment?.total_marks || 100} marks
                 </span>
                 {grade > 0 && (
@@ -741,20 +751,22 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
             </div>
             
             <div>
-              <Label className="text-sm font-semibold">Feedback</Label>
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Feedback</Label>
               <Textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder="Provide feedback to the student..."
-                className="mt-2"
+                className="mt-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 rows={4}
               />
             </div>
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowGradingDialog(false)}>Cancel</Button>
-            <Button onClick={saveAssignmentGrade} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+            <Button variant="outline" onClick={() => setShowGradingDialog(false)} className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              Cancel
+            </Button>
+            <Button onClick={saveAssignmentGrade} disabled={saving} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white">
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
               {saving ? 'Saving...' : 'Save Grade'}
             </Button>
@@ -764,31 +776,31 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
 
       {/* Theory Grading Dialog */}
       <Dialog open={showTheoryDialog} onOpenChange={setShowTheoryDialog}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>Grade Theory Answer</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-slate-800 dark:text-white">Grade Theory Answer</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
               {selectedTheory?.attempt?.student?.full_name} - {selectedTheory?.attempt?.exam?.title}
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4 py-4">
             <div>
-              <Label className="text-sm font-semibold">Question:</Label>
-              <div className="mt-2 p-4 bg-blue-50 rounded-lg text-sm">
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Question:</Label>
+              <div className="mt-2 p-4 bg-blue-50 dark:bg-blue-950/20 rounded-lg text-sm text-slate-700 dark:text-slate-300 border border-blue-100 dark:border-blue-900/40">
                 {selectedTheory?.question?.question_text}
               </div>
             </div>
             
             <div>
-              <Label className="text-sm font-semibold">Student's Answer:</Label>
-              <div className="mt-2 p-4 bg-gray-50 rounded-lg text-sm max-h-64 overflow-y-auto">
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Student's Answer:</Label>
+              <div className="mt-2 p-4 bg-gray-50 dark:bg-slate-800/60 rounded-lg text-sm max-h-64 overflow-y-auto text-slate-700 dark:text-slate-300">
                 {selectedTheory?.answer_text}
               </div>
             </div>
             
             <div>
-              <Label className="text-sm font-semibold">Points to Award</Label>
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Points to Award</Label>
               <div className="flex items-center gap-3 mt-2">
                 <Input
                   type="number"
@@ -797,29 +809,31 @@ export function GradingTab({ staffProfile }: GradingTabProps) {
                   step="0.5"
                   value={grade}
                   onChange={(e) => setGrade(parseFloat(e.target.value) || 0)}
-                  className="w-32"
+                  className="w-32 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
                 />
-                <span className="text-sm text-gray-500">
+                <span className="text-sm text-gray-500 dark:text-slate-400">
                   / {selectedTheory?.question?.points || 10} points
                 </span>
               </div>
             </div>
             
             <div>
-              <Label className="text-sm font-semibold">Feedback</Label>
+              <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Feedback</Label>
               <Textarea
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
                 placeholder="Provide feedback on this answer..."
-                className="mt-2"
+                className="mt-2 bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500"
                 rows={4}
               />
             </div>
           </div>
           
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowTheoryDialog(false)}>Cancel</Button>
-            <Button onClick={saveTheoryGrade} disabled={saving} className="bg-purple-600 hover:bg-purple-700">
+            <Button variant="outline" onClick={() => setShowTheoryDialog(false)} className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+              Cancel
+            </Button>
+            <Button onClick={saveTheoryGrade} disabled={saving} className="bg-purple-600 hover:bg-purple-700 dark:bg-purple-600 dark:hover:bg-purple-500 text-white">
               {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Send className="h-4 w-4 mr-2" />}
               {saving ? 'Saving...' : 'Save Grade'}
             </Button>
