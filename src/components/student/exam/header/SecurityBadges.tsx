@@ -11,22 +11,22 @@ interface SecurityBadgesProps {
 
 function getColor(count: number, limit: number) {
   if (count === 0) return {
-    bg: 'bg-emerald-50',
-    ring: 'ring-emerald-200',
-    text: 'text-emerald-700',
-    icon: 'text-emerald-500',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    ring: 'ring-emerald-200 dark:ring-emerald-900/50',
+    text: 'text-emerald-700 dark:text-emerald-400',
+    icon: 'text-emerald-500 dark:text-emerald-400',
   }
   if (count >= limit - 1) return {
-    bg: 'bg-rose-50',
-    ring: 'ring-rose-200',
-    text: 'text-rose-700',
-    icon: 'text-rose-500',
+    bg: 'bg-rose-50 dark:bg-rose-950/40',
+    ring: 'ring-rose-200 dark:ring-rose-900/50',
+    text: 'text-rose-700 dark:text-rose-400',
+    icon: 'text-rose-500 dark:text-rose-400',
   }
   return {
-    bg: 'bg-amber-50',
-    ring: 'ring-amber-200',
-    text: 'text-amber-700',
-    icon: 'text-amber-500',
+    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    ring: 'ring-amber-200 dark:ring-amber-900/50',
+    text: 'text-amber-700 dark:text-amber-400',
+    icon: 'text-amber-500 dark:text-amber-400',
   }
 }
 

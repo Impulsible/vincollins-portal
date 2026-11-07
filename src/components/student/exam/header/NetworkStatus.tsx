@@ -9,10 +9,10 @@ interface NetworkStatusProps {
 export function NetworkStatus({ isOnline }: NetworkStatusProps) {
   return (
     <Badge
-      className={`px-2 py-0.5 text-xs ${
+      className={`px-2 py-0.5 text-xs border-0 ${
         isOnline
-          ? 'bg-green-500/20 text-green-400'
-          : 'bg-red-500/20 text-red-400'
+          ? 'bg-green-500/20 dark:bg-green-950/40 text-green-700 dark:text-green-400'
+          : 'bg-red-500/20 dark:bg-red-950/40 text-red-700 dark:text-red-400'
       }`}
     >
       {isOnline ? (

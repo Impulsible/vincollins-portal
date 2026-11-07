@@ -14,7 +14,6 @@ interface FullscreenPromptProps {
   onReturnToFullscreen: () => void
 }
 
-// Real visible height of the browser viewport (ignores parents, transforms, taskbars)
 const getVisibleHeight = () =>
   typeof window === 'undefined'
     ? 0
@@ -48,29 +47,28 @@ export function FullscreenPrompt({
     buttonRef.current?.focus()
   }, [mounted])
 
-  // Short windows get a tighter layout
   const compact = vh > 0 && vh < 760
 
   const theme = isCritical
     ? {
-        gradient: 'from-rose-600 via-red-600 to-orange-600',
-        buttonGradient: 'from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800',
-        buttonShadow: 'shadow-rose-500/40',
+        gradient: 'from-rose-600 via-red-600 to-orange-600 dark:from-rose-700 dark:via-red-700 dark:to-orange-700',
+        buttonGradient: 'from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 dark:from-rose-700 dark:to-red-800 dark:hover:from-rose-800 dark:hover:to-red-900',
+        buttonShadow: 'shadow-rose-500/40 dark:shadow-rose-950/50',
         progressFill: 'from-rose-500 to-red-500',
-        alertBg: 'from-rose-50 to-red-50',
-        alertRing: 'ring-rose-200',
-        alertText: 'text-rose-800',
+        alertBg: 'from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/40',
+        alertRing: 'ring-rose-200 dark:ring-rose-900/50',
+        alertText: 'text-rose-800 dark:text-rose-200',
         icon: AlertTriangle,
         iconLabel: 'Critical',
       }
     : {
-        gradient: 'from-amber-500 via-orange-500 to-amber-600',
-        buttonGradient: 'from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800',
-        buttonShadow: 'shadow-amber-500/40',
+        gradient: 'from-amber-500 via-orange-500 to-amber-600 dark:from-amber-600 dark:via-orange-600 dark:to-amber-700',
+        buttonGradient: 'from-amber-600 to-orange-700 hover:from-amber-700 hover:to-orange-800 dark:from-amber-700 dark:to-orange-800 dark:hover:from-amber-800 dark:hover:to-orange-900',
+        buttonShadow: 'shadow-amber-500/40 dark:shadow-amber-950/50',
         progressFill: 'from-amber-500 to-orange-500',
-        alertBg: 'from-amber-50 to-orange-50',
-        alertRing: 'ring-amber-200',
-        alertText: 'text-amber-800',
+        alertBg: 'from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40',
+        alertRing: 'ring-amber-200 dark:ring-amber-900/50',
+        alertText: 'text-amber-800 dark:text-amber-200',
         icon: ShieldAlert,
         iconLabel: 'Warning',
       }
@@ -81,7 +79,7 @@ export function FullscreenPrompt({
 
   const content = (
     <div
-      className="bg-slate-950/85 backdrop-blur-xl overflow-y-auto overflow-x-hidden"
+      className="bg-slate-950/85 dark:bg-black/90 backdrop-blur-xl overflow-y-auto overflow-x-hidden"
       style={{
         position: 'fixed',
         top: 0,
@@ -91,17 +89,13 @@ export function FullscreenPrompt({
         zIndex: 2147483000,
       }}
     >
-      <div
-        className="flex items-center justify-center p-3"
-        style={{ minHeight: '100%' }}
-      >
+      <div className="flex items-center justify-center p-3" style={{ minHeight: '100%' }}>
         <motion.div
           initial={{ opacity: 0, scale: 0.97, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
           className="relative w-full max-w-md"
         >
-          {/* Soft outer glow */}
           <div
             className={cn(
               'pointer-events-none absolute inset-0 -z-10 bg-gradient-to-br rounded-[2rem] blur-2xl opacity-40',
@@ -109,9 +103,8 @@ export function FullscreenPrompt({
             )}
           />
 
-          {/* Card is capped to the real visible height; only the body scrolls inside it */}
           <div
-            className="relative flex flex-col overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200"
+            className="relative flex flex-col overflow-hidden rounded-2xl bg-white dark:bg-slate-900 shadow-2xl dark:shadow-black/60 ring-1 ring-slate-200 dark:ring-slate-800"
             style={{ maxHeight: vh ? vh - 24 : 'calc(100dvh - 1.5rem)' }}
           >
             {/* HERO */}
@@ -173,7 +166,7 @@ export function FullscreenPrompt({
               </div>
             </div>
 
-            {/* BODY (scrolls inside the card) */}
+            {/* BODY */}
             <div
               className={cn(
                 'flex-1 min-h-0 overflow-y-auto overscroll-contain',
@@ -183,7 +176,7 @@ export function FullscreenPrompt({
               {/* Violation counter */}
               <div
                 className={cn(
-                  'relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 ring-1 ring-slate-200 px-4 text-center',
+                  'relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 dark:from-slate-800 dark:to-slate-800/70 ring-1 ring-slate-200 dark:ring-slate-800 px-4 text-center',
                   compact ? 'py-2.5' : 'py-4'
                 )}
               >
@@ -196,18 +189,18 @@ export function FullscreenPrompt({
                     className={cn(
                       'font-extrabold tabular-nums bg-clip-text text-transparent bg-gradient-to-br',
                       compact ? 'text-3xl' : 'text-4xl sm:text-5xl',
-                      isCritical ? 'from-rose-600 to-red-700' : 'from-amber-600 to-orange-700'
+                      isCritical ? 'from-rose-600 to-red-700 dark:from-rose-400 dark:to-red-500' : 'from-amber-600 to-orange-700 dark:from-amber-400 dark:to-orange-500'
                     )}
                   >
                     {fullscreenExits}
                   </motion.span>
-                  <span className="text-xl text-slate-300 font-light">/</span>
-                  <span className="text-xl text-slate-500 font-bold tabular-nums">
+                  <span className="text-xl text-slate-300 dark:text-slate-600 font-light">/</span>
+                  <span className="text-xl text-slate-500 dark:text-slate-400 font-bold tabular-nums">
                     {FULLSCREEN_EXIT_LIMIT}
                   </span>
                 </div>
 
-                <p className={cn('text-[10px] font-bold text-slate-500 uppercase tracking-[0.12em]', compact ? 'mb-2' : 'mb-3')}>
+                <p className={cn('text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.12em]', compact ? 'mb-2' : 'mb-3')}>
                   Fullscreen exits detected
                 </p>
 
@@ -222,15 +215,15 @@ export function FullscreenPrompt({
                         'h-2 rounded-full transition-all duration-300',
                         i < fullscreenExits
                           ? cn('w-6 sm:w-7 bg-gradient-to-r shadow-sm', theme.progressFill)
-                          : 'w-2 bg-slate-200'
+                          : 'w-2 bg-slate-200 dark:bg-slate-700'
                       )}
                     />
                   ))}
                 </div>
 
                 {remaining > 0 && (
-                  <p className="text-center text-[11px] text-slate-500 mt-2.5 font-medium">
-                    <span className={cn('font-bold', isCritical ? 'text-rose-600' : 'text-amber-600')}>
+                  <p className="text-center text-[11px] text-slate-500 dark:text-slate-400 mt-2.5 font-medium">
+                    <span className={cn('font-bold', isCritical ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400')}>
                       {remaining}
                     </span>{' '}
                     warning{remaining !== 1 ? 's' : ''} remaining
@@ -273,9 +266,9 @@ export function FullscreenPrompt({
               </div>
 
               {/* Security badge */}
-              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500">
-                <div className="h-5 w-5 rounded-md bg-slate-100 flex items-center justify-center">
-                  <Shield className="h-3 w-3 text-slate-500" />
+              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+                <div className="h-5 w-5 rounded-md bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                  <Shield className="h-3 w-3 text-slate-500 dark:text-slate-400" />
                 </div>
                 <span className="font-semibold uppercase tracking-wider">
                   Security violation #{fullscreenExits}
@@ -283,8 +276,8 @@ export function FullscreenPrompt({
               </div>
             </div>
 
-            {/* FOOTER (always visible) */}
-            <div className={cn('shrink-0 border-t border-slate-100 bg-white', compact ? 'p-3' : 'p-4 sm:p-5')}>
+            {/* FOOTER */}
+            <div className={cn('shrink-0 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900', compact ? 'p-3' : 'p-4 sm:p-5')}>
               <Button
                 ref={buttonRef}
                 onClick={onReturnToFullscreen}
@@ -300,11 +293,11 @@ export function FullscreenPrompt({
                 <span>Return to Fullscreen Now</span>
               </Button>
 
-              <div className={cn('flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400', compact ? 'mt-1.5' : 'mt-2.5')}>
+              <div className={cn('flex items-center justify-center gap-1.5 text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500', compact ? 'mt-1.5' : 'mt-2.5')}>
                 <Lock className="h-3 w-3 shrink-0" />
                 <span>
                   Press{' '}
-                  <kbd className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[10px] font-bold ring-1 ring-slate-200">
+                  <kbd className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-mono text-[10px] font-bold ring-1 ring-slate-200 dark:ring-slate-700">
                     F11
                   </kbd>{' '}
                   or click the button above
@@ -317,6 +310,5 @@ export function FullscreenPrompt({
     </div>
   )
 
-  // Render at the root of the document so no parent transform/overflow/height can clip it
   return createPortal(content, document.fullscreenElement ?? document.body)
 }

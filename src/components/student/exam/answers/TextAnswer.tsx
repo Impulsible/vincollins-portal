@@ -20,7 +20,7 @@ export function TextAnswer({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       rows={rows}
-      className="w-full bg-[#0a0f1a] border-gray-700 text-gray-200 rounded-md focus:border-[#c41e3a] focus:ring-[#c41e3a] resize-none text-base"
+      className="w-full bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-slate-100 rounded-md focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-indigo-500 dark:focus:ring-indigo-400 resize-none text-base placeholder:text-slate-400 dark:placeholder:text-slate-500 transition-colors duration-300"
     />
   )
 }

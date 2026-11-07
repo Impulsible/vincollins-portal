@@ -13,7 +13,6 @@ interface ExamTimerOptions {
   onTimeUp: () => void
   onTimeWarning?: (timeLeft: number) => void
   autoSubmit?: boolean
-  /** Absolute epoch ms when the attempt timer started. REQUIRED to start ticking. */
   startTime?: number
   examId?: string
   attemptId?: string
@@ -48,7 +47,6 @@ export function useExamTimer({
 }: ExamTimerOptions) {
   const totalSeconds = Math.max(0, Math.floor(durationMinutes * 60))
 
-  // Initialize from startTime if available; otherwise 0 until startTime arrives.
   const [timeLeft, setTimeLeft] = useState<number>(() => {
     if (startTime != null && Number.isFinite(startTime)) {
       const elapsed = Math.floor((Date.now() - startTime) / 1000)
@@ -70,6 +68,7 @@ export function useExamTimer({
   )
   const extensionSecondsRef = useRef(0)
   const durationSecondsRef = useRef(totalSeconds)
+  const prevDurationRef = useRef(totalSeconds)
 
   const hasAutoSubmittedRef = useRef(false)
   const warningTriggeredRef = useRef(false)
@@ -78,8 +77,21 @@ export function useExamTimer({
   useEffect(() => { onTimeUpRef.current = onTimeUp }, [onTimeUp])
   useEffect(() => { onTimeWarningRef.current = onTimeWarning }, [onTimeWarning])
   useEffect(() => { onTimeSyncRef.current = onTimeSync }, [onTimeSync])
+
+  // ✅ Live-extension: react to `durationMinutes` prop changes
   useEffect(() => {
-    durationSecondsRef.current = Math.max(0, Math.floor(durationMinutes * 60))
+    const next = Math.max(0, Math.floor(durationMinutes * 60))
+    const prev = prevDurationRef.current
+    if (next > prev) {
+      // Treat as an extension
+      extensionSecondsRef.current += next - prev
+      // If we had already auto-submitted / stopped, revive the timer
+      if (hasAutoSubmittedRef.current) hasAutoSubmittedRef.current = false
+      if (stoppedRef.current) stoppedRef.current = false
+      warningTriggeredRef.current = false
+    }
+    prevDurationRef.current = next
+    durationSecondsRef.current = next
   }, [durationMinutes])
 
   const calculateTimeLeft = useCallback(() => {
@@ -121,7 +133,7 @@ export function useExamTimer({
   useEffect(() => {
     if (!examStarted || examEndedRef.current) { stopTimer(); return }
 
-    // 🛑 CRITICAL: Do NOT default to Date.now(). Wait for a real startTime.
+    // Wait for a real startTime
     if (startTime == null || !Number.isFinite(startTime)) {
       return
     }
@@ -152,10 +164,26 @@ export function useExamTimer({
     stoppedRef.current = false
 
     timerRef.current = setInterval(() => {
-      if (examEndedRef.current || stoppedRef.current) { stopTimer(); return }
+      // If extension un-stopped us, resume; otherwise kill
+      if (examEndedRef.current || stoppedRef.current) {
+        if (stoppedRef.current && !examEndedRef.current) {
+          stoppedRef.current = false
+        } else {
+          stopTimer()
+          return
+        }
+      }
+
       const remaining = calculateTimeLeft()
       setTimeLeft(remaining)
       onTimeSyncRef.current?.(remaining)
+
+      // ✅ Revived after extension
+      if (remaining > 0 && hasAutoSubmittedRef.current && !examEndedRef.current) {
+        hasAutoSubmittedRef.current = false
+        setIsTimeUp(false)
+        warningTriggeredRef.current = false
+      }
 
       if (remaining <= 300 && remaining > 0 && !warningTriggeredRef.current) {
         warningTriggeredRef.current = true
@@ -172,7 +200,7 @@ export function useExamTimer({
       if (remaining <= 0 && !hasAutoSubmittedRef.current && !examEndedRef.current) {
         hasAutoSubmittedRef.current = true
         setIsTimeUp(true)
-        stopTimer()
+        // ✅ Do NOT kill the interval — allow an extension to revive us
         if (autoSubmit) {
           toast.error("⏰ Time's up! Auto-submitting your exam...")
           setTimeout(() => onTimeUpRef.current(), 1200)
@@ -189,7 +217,6 @@ export function useExamTimer({
     return () => { stopTimer() }
   }, [
     examStarted,
-    durationMinutes,
     startTime,
     autoSubmit,
     calculateTimeLeft,
@@ -240,6 +267,7 @@ export function useExamTimer({
     (newDurationMinutes?: number, newStartTime?: number) => {
       if (newDurationMinutes != null && Number.isFinite(newDurationMinutes)) {
         durationSecondsRef.current = Math.max(0, Math.floor(newDurationMinutes * 60))
+        prevDurationRef.current = durationSecondsRef.current
       }
       extensionSecondsRef.current = 0
       startTimeRef.current =

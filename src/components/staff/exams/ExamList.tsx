@@ -1,4 +1,4 @@
-// components/staff/exams/ExamList.tsx - COMPLETE FIXED VERSION + DARK MODE
+// components/staff/exams/ExamList.tsx
 
 'use client'
 
@@ -89,6 +89,10 @@ const formatDate = (date: string) => {
   })
 }
 
+// Reusable class string for dropdown items to ensure text is visible in light mode
+const dropdownItemClass = "text-slate-700 dark:text-slate-300 focus:bg-slate-100 focus:text-slate-900 dark:focus:bg-slate-800 dark:focus:text-white cursor-pointer"
+const dropdownDestructiveClass = "text-red-600 dark:text-red-400 focus:bg-red-50 focus:text-red-700 dark:focus:bg-red-950/40 dark:focus:text-red-400 cursor-pointer"
+
 export function ExamList({
   exams,
   searchQuery,
@@ -111,6 +115,7 @@ export function ExamList({
 }: ExamListProps) {
   const router = useRouter()
   const [duplicating, setDuplicating] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [examToDelete, setExamToDelete] = useState<Exam | null>(null)
 
@@ -119,9 +124,13 @@ export function ExamList({
     setDeleteDialogOpen(true)
   }
 
-  const handleConfirmDelete = () => {
-    if (examToDelete) {
-      onDeleteExam(examToDelete.id)
+  const handleConfirmDelete = async () => {
+    if (!examToDelete) return
+    setDeleting(examToDelete.id)
+    try {
+      await onDeleteExam(examToDelete.id)
+    } finally {
+      setDeleting(null)
       setDeleteDialogOpen(false)
       setExamToDelete(null)
     }
@@ -129,8 +138,11 @@ export function ExamList({
 
   const handleDuplicate = async (exam: Exam) => {
     setDuplicating(exam.id)
-    await onDuplicateExam(exam.id)
-    setDuplicating(null)
+    try {
+      await onDuplicateExam(exam.id)
+    } finally {
+      setDuplicating(null)
+    }
   }
 
   const handleViewSubmissions = (examId: string) => {
@@ -252,13 +264,13 @@ export function ExamList({
                 No exams found
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400">
-                {termInfo && termInfo.termName 
+                {termInfo && termInfo.termName
                   ? `No exams for ${termInfo.termName} ${termInfo.sessionYear}`
                   : 'Try adjusting your search or create a new exam'}
               </p>
-              <Button 
-                onClick={onCreateExam} 
-                variant="link" 
+              <Button
+                onClick={onCreateExam}
+                variant="link"
                 className="mt-3 text-emerald-600 dark:text-emerald-400"
               >
                 <PlusCircle className="mr-1 h-3.5 w-3.5" />
@@ -294,28 +306,28 @@ export function ExamList({
                       <span className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500">{formatDate(exam.created_at)}</span>
                       <div className="flex items-center gap-0.5 sm:gap-1">
                         {(exam.status === 'published' || exam.status === 'pending') && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleViewSubmissions(exam.id)} 
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleViewSubmissions(exam.id)}
                             className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                           >
                             <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                           </Button>
                         )}
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          onClick={() => onViewExam(exam.id)} 
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => onViewExam(exam.id)}
                           className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                         >
                           <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </Button>
                         {exam.status === 'draft' && (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => onEditExam(exam.id)} 
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => onEditExam(exam.id)}
                             className="h-7 w-7 sm:h-8 sm:w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                           >
                             <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -327,31 +339,32 @@ export function ExamList({
                               <MoreVertical className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                            <DropdownMenuItem onClick={() => onViewExam(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                          {/* FIXED: Explicit text color to prevent invisible text */}
+                          <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-lg">
+                            <DropdownMenuItem onClick={() => onViewExam(exam.id)} className={dropdownItemClass}>
                               <Eye className="mr-2 h-3.5 w-3.5" /> View Details
                             </DropdownMenuItem>
                             {(exam.status === 'published' || exam.status === 'pending') && (
-                              <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                              <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)} className={dropdownItemClass}>
                                 <Users className="mr-2 h-3.5 w-3.5" /> View Submissions
                               </DropdownMenuItem>
                             )}
                             {exam.status === 'published' && (
-                              <DropdownMenuItem onClick={() => handleEnterScores(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                              <DropdownMenuItem onClick={() => handleEnterScores(exam.id)} className={dropdownItemClass}>
                                 <Award className="mr-2 h-3.5 w-3.5" /> Enter Scores
                               </DropdownMenuItem>
                             )}
-                            <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                            <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id} className={dropdownItemClass}>
                               <Copy className="mr-2 h-3.5 w-3.5" />
                               {duplicating === exam.id ? 'Duplicating...' : 'Duplicate'}
                             </DropdownMenuItem>
                             {exam.status === 'draft' && (
-                              <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                              <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)} className={dropdownItemClass}>
                                 <Send className="mr-2 h-3.5 w-3.5" /> Submit for Approval
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
-                            <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/40" onClick={() => handleDeleteClick(exam)}>
+                            <DropdownMenuItem className={dropdownDestructiveClass} onClick={() => handleDeleteClick(exam)}>
                               <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                             </DropdownMenuItem>
                           </DropdownMenuContent>
@@ -402,28 +415,28 @@ export function ExamList({
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
                             {(exam.status === 'published' || exam.status === 'pending') && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => handleViewSubmissions(exam.id)} 
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleViewSubmissions(exam.id)}
                                 className="h-8 w-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-950/40"
                               >
                                 <Users className="h-4 w-4" />
                               </Button>
                             )}
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => onViewExam(exam.id)} 
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => onViewExam(exam.id)}
                               className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
                             {exam.status === 'draft' && (
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => onEditExam(exam.id)} 
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => onEditExam(exam.id)}
                                 className="h-8 w-8 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
                               >
                                 <Edit className="h-4 w-4" />
@@ -435,33 +448,34 @@ export function ExamList({
                                   <MoreVertical className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
-                                <DropdownMenuLabel className="text-xs text-slate-500 dark:text-slate-400">Actions</DropdownMenuLabel>
+                              {/* FIXED: Explicit text color to prevent invisible text */}
+                              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-lg">
+                                <DropdownMenuLabel className="text-xs font-semibold text-slate-500 dark:text-slate-400">Actions</DropdownMenuLabel>
                                 <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
-                                <DropdownMenuItem onClick={() => onViewExam(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                                <DropdownMenuItem onClick={() => onViewExam(exam.id)} className={dropdownItemClass}>
                                   <Eye className="mr-2 h-3.5 w-3.5" /> View Details
                                 </DropdownMenuItem>
                                 {(exam.status === 'published' || exam.status === 'pending') && (
-                                  <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                                  <DropdownMenuItem onClick={() => handleViewSubmissions(exam.id)} className={dropdownItemClass}>
                                     <Users className="mr-2 h-3.5 w-3.5" /> View Submissions
                                   </DropdownMenuItem>
                                 )}
                                 {exam.status === 'published' && (
-                                  <DropdownMenuItem onClick={() => handleEnterScores(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                                  <DropdownMenuItem onClick={() => handleEnterScores(exam.id)} className={dropdownItemClass}>
                                     <Award className="mr-2 h-3.5 w-3.5" /> Enter Scores
                                   </DropdownMenuItem>
                                 )}
-                                <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                                <DropdownMenuItem onClick={() => handleDuplicate(exam)} disabled={duplicating === exam.id} className={dropdownItemClass}>
                                   <Copy className="mr-2 h-3.5 w-3.5" />
                                   {duplicating === exam.id ? 'Duplicating...' : 'Duplicate'}
                                 </DropdownMenuItem>
                                 {exam.status === 'draft' && (
-                                  <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)} className="text-slate-700 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800">
+                                  <DropdownMenuItem onClick={() => onSubmitForApproval(exam.id)} className={dropdownItemClass}>
                                     <Send className="mr-2 h-3.5 w-3.5" /> Submit for Approval
                                   </DropdownMenuItem>
                                 )}
                                 <DropdownMenuSeparator className="bg-slate-100 dark:bg-slate-800" />
-                                <DropdownMenuItem className="text-red-600 dark:text-red-400 focus:bg-red-50 dark:focus:bg-red-950/40" onClick={() => handleDeleteClick(exam)}>
+                                <DropdownMenuItem className={dropdownDestructiveClass} onClick={() => handleDeleteClick(exam)}>
                                   <Trash2 className="mr-2 h-3.5 w-3.5" /> Delete
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
@@ -488,18 +502,20 @@ export function ExamList({
               This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2 sm:gap-3">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setDeleteDialogOpen(false)}
+                disabled={deleting !== null}
                 className="h-8 sm:h-9 text-sm border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
               >
                 Cancel
               </Button>
-              <Button 
-                onClick={handleConfirmDelete} 
+              <Button
+                onClick={handleConfirmDelete}
+                disabled={deleting !== null}
                 className="bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white h-8 sm:h-9 text-sm"
               >
-                Delete Exam
+                {deleting !== null ? 'Deleting...' : 'Delete Exam'}
               </Button>
             </div>
           </div>

@@ -11,17 +11,17 @@ interface ErrorViewProps {
 
 export function ErrorView({ message, onBack }: ErrorViewProps) {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50/20 to-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50/20 to-slate-100 dark:from-slate-950 dark:via-rose-950/20 dark:to-slate-950 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
       {/* Background decorations */}
       <div
-        className="absolute inset-0 opacity-[0.02]"
+        className="absolute inset-0 opacity-[0.02] dark:opacity-[0.05] text-slate-900 dark:text-white"
         style={{
           backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
           backgroundSize: '24px 24px',
         }}
       />
-      <div className="absolute -top-48 -right-48 h-[500px] w-[500px] bg-rose-200/20 rounded-full blur-[100px]" />
-      <div className="absolute -bottom-48 -left-48 h-[500px] w-[500px] bg-slate-200/30 rounded-full blur-[100px]" />
+      <div className="absolute -top-48 -right-48 h-[500px] w-[500px] bg-rose-200/20 dark:bg-rose-900/20 rounded-full blur-[100px]" />
+      <div className="absolute -bottom-48 -left-48 h-[500px] w-[500px] bg-slate-200/30 dark:bg-slate-800/30 rounded-full blur-[100px]" />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -29,9 +29,9 @@ export function ErrorView({ message, onBack }: ErrorViewProps) {
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="relative max-w-md w-full"
       >
-        <div className="rounded-3xl bg-white shadow-2xl shadow-rose-500/10 overflow-hidden ring-1 ring-slate-200/60">
+        <div className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl shadow-rose-500/10 dark:shadow-rose-950/30 overflow-hidden ring-1 ring-slate-200/60 dark:ring-slate-700/60">
           {/* Hero */}
-          <div className="relative bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 px-6 py-8 text-center overflow-hidden">
+          <div className="relative bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 dark:from-rose-700 dark:via-red-700 dark:to-orange-700 px-6 py-8 text-center overflow-hidden">
             <div className="absolute -top-16 -right-16 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-black/10 rounded-full blur-3xl" />
             <div
@@ -74,8 +74,8 @@ export function ErrorView({ message, onBack }: ErrorViewProps) {
           {/* Body */}
           <div className="p-6 space-y-5">
             {/* Error message */}
-            <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 ring-1 ring-slate-200 p-4">
-              <p className="text-sm text-slate-700 leading-relaxed text-center font-medium">
+            <div className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 dark:from-slate-800 dark:to-slate-800/70 ring-1 ring-slate-200 dark:ring-slate-700 p-4">
+              <p className="text-sm text-slate-700 dark:text-slate-300 leading-relaxed text-center font-medium">
                 {message}
               </p>
             </div>
@@ -83,7 +83,7 @@ export function ErrorView({ message, onBack }: ErrorViewProps) {
             {/* CTA */}
             <Button
               onClick={onBack}
-              className="relative w-full h-13 rounded-2xl font-bold text-sm text-white gap-2 shadow-lg shadow-rose-500/25 overflow-hidden group bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 hover:from-rose-700 hover:via-red-700 hover:to-orange-700 transition-all"
+              className="relative w-full h-13 rounded-2xl font-bold text-sm text-white gap-2 shadow-lg shadow-rose-500/25 dark:shadow-rose-950/50 overflow-hidden group bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 hover:from-rose-700 hover:via-red-700 hover:to-orange-700 dark:from-rose-700 dark:via-red-700 dark:to-orange-700 dark:hover:from-rose-800 dark:hover:via-red-800 dark:hover:to-orange-800 transition-all"
               style={{ height: '3.25rem' }}
             >
               <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
@@ -91,7 +91,7 @@ export function ErrorView({ message, onBack }: ErrorViewProps) {
               <span>Back to Dashboard</span>
             </Button>
 
-            <p className="text-center text-[11px] text-slate-400">
+            <p className="text-center text-[11px] text-slate-400 dark:text-slate-500">
               If this problem persists, contact your teacher or administrator
             </p>
           </div>

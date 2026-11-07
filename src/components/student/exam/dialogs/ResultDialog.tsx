@@ -71,9 +71,9 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
   const isPassed = examResult.is_passed
   const isTerminated = examResult.status === 'terminated'
   const isPendingTheory = examResult.status === 'pending_theory'
-  
+
   const questionsAttempted = (examResult.correct ?? 0) + (examResult.incorrect ?? 0) + (examResult.unanswered ?? 0)
-  
+
   let objectiveMax = examResult.objective_total || 20
   const objectiveScore = examResult.objective_score ?? 0
 
@@ -88,7 +88,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
   const currentPct = objectiveMax > 0 ? Math.round((currentScore / (objectiveMax + theoryMax)) * 100) : 0
   const objectivePct = (objectiveMax + theoryMax) > 0 ? Math.round((objectiveScore / (objectiveMax + theoryMax)) * 100) : 0
   const theoryPotentialPct = (objectiveMax + theoryMax) > 0 ? Math.round((theoryMax / (objectiveMax + theoryMax)) * 100) : 0
-  
+
   const grade = isPendingTheory ? '—' : getWAECGrade(currentPct)
   const remark = isPendingTheory ? 'Pending Review' : getGradeRemark(grade)
 
@@ -104,43 +104,43 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
 
   // 🎨 Theme configuration based on status
   const theme = isTerminated ? {
-    gradient: 'from-slate-700 via-slate-800 to-slate-900',
+    gradient: 'from-slate-700 via-slate-800 to-slate-900 dark:from-slate-800 dark:via-slate-900 dark:to-slate-950',
     accent: 'bg-slate-500',
     accentText: 'text-slate-100',
     icon: AlertTriangle,
     label: 'Session Terminated',
     sub: 'Security violation detected',
-    glow: 'shadow-slate-500/20',
+    glow: 'shadow-slate-500/20 dark:shadow-slate-950/40',
     chipBg: 'bg-slate-100 dark:bg-slate-800',
     chipText: 'text-slate-700 dark:text-slate-300',
   } : isPendingTheory ? {
-    gradient: 'from-blue-500 via-indigo-600 to-violet-600',
+    gradient: 'from-blue-500 via-indigo-600 to-violet-600 dark:from-blue-600 dark:via-indigo-700 dark:to-violet-700',
     accent: 'bg-blue-500',
     accentText: 'text-blue-100',
     icon: Clock,
     label: 'Awaiting Review',
     sub: 'Theory answers pending grade',
-    glow: 'shadow-blue-500/30',
+    glow: 'shadow-blue-500/30 dark:shadow-blue-950/50',
     chipBg: 'bg-blue-50 dark:bg-blue-950/40',
     chipText: 'text-blue-700 dark:text-blue-300',
   } : isPassed ? {
-    gradient: 'from-emerald-500 via-teal-600 to-green-600',
+    gradient: 'from-emerald-500 via-teal-600 to-green-600 dark:from-emerald-600 dark:via-teal-700 dark:to-green-700',
     accent: 'bg-emerald-500',
     accentText: 'text-emerald-100',
     icon: Trophy,
     label: 'Congratulations!',
     sub: 'You have passed this examination',
-    glow: 'shadow-emerald-500/30',
+    glow: 'shadow-emerald-500/30 dark:shadow-emerald-950/50',
     chipBg: 'bg-emerald-50 dark:bg-emerald-950/40',
     chipText: 'text-emerald-700 dark:text-emerald-300',
   } : {
-    gradient: 'from-rose-500 via-red-600 to-orange-600',
+    gradient: 'from-rose-500 via-red-600 to-orange-600 dark:from-rose-600 dark:via-red-700 dark:to-orange-700',
     accent: 'bg-rose-500',
     accentText: 'text-rose-100',
     icon: XCircle,
     label: 'Not Passed',
     sub: 'Below the required pass mark',
-    glow: 'shadow-rose-500/30',
+    glow: 'shadow-rose-500/30 dark:shadow-rose-950/50',
     chipBg: 'bg-rose-50 dark:bg-rose-950/40',
     chipText: 'text-rose-700 dark:text-rose-300',
   }
@@ -149,7 +149,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[440px] w-[95vw] p-0 gap-0 bg-white dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xl rounded-3xl overflow-hidden max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-[440px] w-[95vw] p-0 gap-0 bg-white dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xl dark:shadow-black/60 rounded-3xl overflow-hidden max-h-[92vh] overflow-y-auto">
         <DialogHeader className="sr-only">
           <DialogTitle>Exam Result</DialogTitle>
           <DialogDescription>
@@ -158,9 +158,9 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
         </DialogHeader>
 
         {/* Close button */}
-        <button 
-          onClick={handleClose} 
-          className="absolute top-4 right-4 z-30 h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md flex items-center justify-center transition-all" 
+        <button
+          onClick={handleClose}
+          className="absolute top-4 right-4 z-30 h-8 w-8 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md flex items-center justify-center transition-all"
           aria-label="Close"
         >
           <X className="h-4 w-4 text-white" />
@@ -174,9 +174,9 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
           <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl" />
           <div className="absolute bottom-0 left-0 h-32 w-32 bg-white/5 rounded-full -ml-16 -mb-10 blur-xl" />
           <div className="absolute top-1/2 left-1/4 h-24 w-24 bg-white/5 rounded-full blur-2xl" />
-          
+
           {/* Subtle grid pattern */}
-          <div 
+          <div
             className="absolute inset-0 opacity-[0.08]"
             style={{
               backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
@@ -186,7 +186,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
 
           <div className="relative px-6 pt-8 pb-7 text-white">
             {/* Icon with pulsing glow */}
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
@@ -275,14 +275,14 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
         {/* 📊 BODY                                              */}
         {/* ═══════════════════════════════════════════════════ */}
         <div className="px-6 py-5 space-y-4">
-          
+
           {/* Progress bar with pass mark */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[10px] text-zinc-500 dark:text-zinc-400 font-bold uppercase tracking-widest">
                 Score Progress
               </span>
-              <span className="text-[10px] font-medium text-zinc-500 flex items-center gap-1">
+              <span className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 flex items-center gap-1">
                 <Target className="h-2.5 w-2.5" />
                 Pass: {examResult.passing_percentage}%
               </span>
@@ -296,10 +296,10 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 transition={{ duration: 0.9, ease: 'easeOut', delay: 0.3 }}
                 className={cn(
                   'absolute inset-y-0 left-0 rounded-full z-10',
-                  isTerminated ? 'bg-gradient-to-r from-slate-400 to-slate-500' 
-                  : isPendingTheory ? 'bg-gradient-to-r from-blue-400 to-indigo-500'
-                  : isPassed ? 'bg-gradient-to-r from-emerald-400 to-teal-500' 
-                  : 'bg-gradient-to-r from-rose-400 to-red-500'
+                  isTerminated ? 'bg-gradient-to-r from-slate-400 to-slate-500 dark:from-slate-500 dark:to-slate-600'
+                  : isPendingTheory ? 'bg-gradient-to-r from-blue-400 to-indigo-500 dark:from-blue-500 dark:to-indigo-600'
+                  : isPassed ? 'bg-gradient-to-r from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600'
+                  : 'bg-gradient-to-r from-rose-400 to-red-500 dark:from-rose-500 dark:to-red-600'
                 )}
               />
               {/* Pending theory ghost bar */}
@@ -313,15 +313,15 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 />
               )}
               {/* Pass mark line */}
-              <div 
-                className="absolute inset-y-0 w-0.5 bg-zinc-900 dark:bg-white z-20 rounded-full" 
-                style={{ left: `${examResult.passing_percentage}%` }} 
+              <div
+                className="absolute inset-y-0 w-0.5 bg-zinc-900 dark:bg-white z-20 rounded-full"
+                style={{ left: `${examResult.passing_percentage}%` }}
               >
                 <div className="absolute -top-1 -left-[3px] h-2 w-2 rounded-full bg-zinc-900 dark:bg-white" />
               </div>
             </div>
 
-            <div className="flex justify-between text-[10px] text-zinc-400 font-medium">
+            <div className="flex justify-between text-[10px] text-zinc-400 dark:text-zinc-500 font-medium">
               <span>0%</span>
               <span>50%</span>
               <span>100%</span>
@@ -343,18 +343,18 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 transition={{ delay: 0.4 + i * 0.05 }}
                 className="relative bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-2.5 overflow-hidden"
               >
-                <stat.icon className={cn("h-3 w-3 mb-1.5", 
-                  stat.color === 'emerald' && 'text-emerald-500',
-                  stat.color === 'rose' && 'text-rose-500',
-                  stat.color === 'amber' && 'text-amber-500',
-                  stat.color === 'violet' && 'text-violet-500',
+                <stat.icon className={cn("h-3 w-3 mb-1.5",
+                  stat.color === 'emerald' && 'text-emerald-500 dark:text-emerald-400',
+                  stat.color === 'rose' && 'text-rose-500 dark:text-rose-400',
+                  stat.color === 'amber' && 'text-amber-500 dark:text-amber-400',
+                  stat.color === 'violet' && 'text-violet-500 dark:text-violet-400',
                 )} />
                 <div className="flex items-baseline gap-0.5">
                   <span className="text-base font-bold text-zinc-900 dark:text-zinc-50 tabular-nums leading-none">
                     {stat.value}
                   </span>
                   {stat.sub && (
-                    <span className="text-[10px] text-zinc-400 font-medium tabular-nums">{stat.sub}</span>
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500 font-medium tabular-nums">{stat.sub}</span>
                   )}
                 </div>
                 <span className="text-[9px] text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider block mt-0.5">
@@ -374,7 +374,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50 tabular-nums leading-none">
                   {accuracy}<span className="text-xs text-zinc-400">%</span>
                 </p>
-                <p className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider mt-1">Accuracy</p>
+                <p className="text-[9px] text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider mt-1">Accuracy</p>
               </div>
             </div>
             <div className="flex items-center gap-2.5 px-3 py-2.5 bg-zinc-50 dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl">
@@ -385,7 +385,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50 tabular-nums leading-none">
                   {formatDuration(parseSeconds(examResult.time_spent))}
                 </p>
-                <p className="text-[9px] text-zinc-500 font-semibold uppercase tracking-wider mt-1">Duration</p>
+                <p className="text-[9px] text-zinc-500 dark:text-zinc-400 font-semibold uppercase tracking-wider mt-1">Duration</p>
               </div>
             </div>
           </div>
@@ -397,7 +397,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 Score Breakdown
               </span>
             </div>
-            
+
             {objectiveMax > 0 && (
               <div className="flex items-center justify-between px-3.5 py-3 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center gap-3">
@@ -406,7 +406,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Objective</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Auto-graded</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Auto-graded</p>
                   </div>
                 </div>
                 <div className="text-right">
@@ -414,13 +414,13 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                     {objectiveScore}
                     <span className="text-zinc-400 dark:text-zinc-600 font-medium"> / {objectiveMax}</span>
                   </p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                     {Math.round((objectiveScore / objectiveMax) * 100)}%
                   </p>
                 </div>
               </div>
             )}
-            
+
             {theoryMax > 0 && (
               <div className="flex items-center justify-between px-3.5 py-3 border-b border-zinc-100 dark:border-zinc-800">
                 <div className="flex items-center gap-3">
@@ -429,7 +429,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Theory</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">Teacher graded</p>
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Teacher graded</p>
                   </div>
                 </div>
                 {isPendingTheory ? (
@@ -442,14 +442,14 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                       {theoryScore}
                       <span className="text-zinc-400 dark:text-zinc-600 font-medium"> / {theoryMax}</span>
                     </p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                       {theoryMax > 0 ? Math.round((theoryScore / theoryMax) * 100) : 0}%
                     </p>
                   </div>
                 )}
               </div>
             )}
-            
+
             <div className="flex items-center justify-between px-3.5 py-3 bg-zinc-50/60 dark:bg-zinc-900/60">
               <div className="flex items-center gap-3">
                 <div className="h-8 w-8 rounded-lg bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
@@ -457,7 +457,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 </div>
                 <div>
                   <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">Required</p>
-                  <p className="text-[10px] text-zinc-500 mt-0.5">Pass mark</p>
+                  <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">Pass mark</p>
                 </div>
               </div>
               <p className="text-sm font-bold text-zinc-900 dark:text-zinc-50 tabular-nums">
@@ -468,12 +468,12 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
 
           {/* Status Messages */}
           {(isPendingTheory || isTerminated) && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
-              className={cn("flex items-start gap-3 px-3.5 py-3 rounded-xl border", 
-                isTerminated 
-                  ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800" 
+              className={cn("flex items-start gap-3 px-3.5 py-3 rounded-xl border",
+                isTerminated
+                  ? "bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800"
                   : "bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900/50"
               )}
             >
@@ -483,7 +483,7 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               )}
               <div>
-                <p className={cn("text-xs font-semibold", 
+                <p className={cn("text-xs font-semibold",
                   isTerminated ? "text-slate-800 dark:text-slate-200" : "text-amber-900 dark:text-amber-200"
                 )}>
                   {isTerminated ? 'Session terminated' : 'Awaiting theory review'}
@@ -491,8 +491,8 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
                 <p className={cn("text-[11px] mt-0.5 leading-relaxed",
                   isTerminated ? "text-slate-600 dark:text-slate-400" : "text-amber-700 dark:text-amber-400"
                 )}>
-                  {isTerminated 
-                    ? 'Your exam was terminated due to a policy violation. Contact your teacher for further details.' 
+                  {isTerminated
+                    ? 'Your exam was terminated due to a policy violation. Contact your teacher for further details.'
                     : 'Theory answers are under review. Your final grade will update automatically once marked.'}
                 </p>
               </div>
@@ -517,8 +517,8 @@ export function ResultDialog({ open, onOpenChange, examResult }: ResultDialogPro
 
         {/* Footer CTA */}
         <div className="px-6 pb-6 pt-1">
-          <Button 
-            onClick={handleClose} 
+          <Button
+            onClick={handleClose}
             className={cn(
               "w-full h-12 text-sm font-bold rounded-xl text-white shadow-lg transition-all",
               "bg-gradient-to-r hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]",

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-// components/admin/dashboard/StatsCards.tsx - UPDATED WITH ACTIVE STATUS SUBTITLES + DARK MODE
+// components/admin/dashboard/StatsCards.tsx - FULLY DARK MODE READY
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -43,14 +43,18 @@ const StatCard = memo(({
       onClick={onClick}
       className="block group cursor-pointer"
     >
-      <Card className="relative h-full overflow-hidden rounded-2xl border-0 bg-gradient-to-br from-white to-gray-50/50 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl dark:from-slate-900 dark:to-slate-800/50 dark:border dark:border-slate-800">
-        <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-5', bgGradient)} />
+      <Card className="relative h-full overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-gradient-to-br from-white to-gray-50/50 dark:from-slate-900 dark:to-slate-800/50 shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl dark:hover:shadow-slate-950/50">
+        {/* Accent glow on hover */}
+        <div className={cn('absolute inset-0 bg-gradient-to-br opacity-0 transition-opacity duration-300 group-hover:opacity-5 dark:group-hover:opacity-10', bgGradient)} />
+        
+        {/* Top accent bar */}
         <div className={cn('absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r', bgGradient)} />
+        
         {live && (
           <div className="absolute top-2 right-2">
             <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 dark:bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500 dark:bg-emerald-400"></span>
             </span>
           </div>
         )}
@@ -67,7 +71,7 @@ const StatCard = memo(({
                 </h3>
                 {trend !== undefined && (
                   <div className="mt-2 lg:mt-3 inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 lg:px-2.5 lg:py-1 text-[10px] lg:text-xs font-medium backdrop-blur-sm">
-                    {trend >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-500" /> : <TrendingDown className="h-3 w-3 text-red-500" />}
+                    {trend >= 0 ? <TrendingUp className="h-3 w-3 text-emerald-500 dark:text-emerald-400" /> : <TrendingDown className="h-3 w-3 text-red-500 dark:text-red-400" />}
                     <span className={cn('font-semibold', trend >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400')}>{Math.abs(trend)}%</span>
                     <span className="text-slate-500 dark:text-slate-400 hidden sm:inline">{trendLabel}</span>
                   </div>
@@ -80,8 +84,8 @@ const StatCard = memo(({
               </div>
             </div>
             <div className="relative shrink-0">
-              <div className={cn('absolute inset-0 rounded-2xl opacity-20 animate-pulse', color)} />
-              <div className={cn('relative flex h-12 w-12 lg:h-16 lg:w-16 items-center justify-center rounded-xl lg:rounded-2xl shadow-lg transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl', bgGradient)}>
+              <div className={cn('absolute inset-0 rounded-2xl opacity-20 dark:opacity-30 animate-pulse', color)} />
+              <div className={cn('relative flex h-12 w-12 lg:h-16 lg:w-16 items-center justify-center rounded-xl lg:rounded-2xl shadow-lg dark:shadow-slate-950/40 transition-all duration-300 group-hover:scale-105 group-hover:shadow-xl', bgGradient)}>
                 <Icon className="h-5 w-5 lg:h-7 lg:w-7 text-white drop-shadow-sm" />
               </div>
             </div>

@@ -1,4 +1,4 @@
-// app/staff/exams/[id]/page.tsx
+// app/staff/exams/[id]/page.tsx - WITH DARK MODE
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
@@ -85,21 +85,21 @@ const formatDateShort = (date?: string) => {
 const getStatusConfig = (status?: string) => {
   switch (status) {
     case 'draft':
-      return { label: 'Draft', className: 'bg-slate-100 text-slate-600 border border-slate-200' }
+      return { label: 'Draft', className: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700' }
     case 'pending':
-      return { label: 'Pending Approval', className: 'bg-amber-100 text-amber-700 border border-amber-200' }
+      return { label: 'Pending Approval', className: 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50' }
     case 'published':
-      return { label: 'Published', className: 'bg-blue-100 text-blue-700 border border-blue-200' }
+      return { label: 'Published', className: 'bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50' }
     case 'active':
-      return { label: 'Active', className: 'bg-emerald-100 text-emerald-700 border border-emerald-200' }
+      return { label: 'Active', className: 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50' }
     case 'completed':
-      return { label: 'Completed', className: 'bg-purple-100 text-purple-700 border border-purple-200' }
+      return { label: 'Completed', className: 'bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50' }
     case 'archived':
-      return { label: 'Archived', className: 'bg-gray-100 text-gray-500 border border-gray-200' }
+      return { label: 'Archived', className: 'bg-gray-100 dark:bg-slate-800 text-gray-500 dark:text-slate-400 border border-gray-200 dark:border-slate-700' }
     case 'rejected':
-      return { label: 'Rejected', className: 'bg-red-100 text-red-600 border border-red-200' }
+      return { label: 'Rejected', className: 'bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50' }
     default:
-      return { label: status || 'Unknown', className: 'bg-slate-100 text-slate-600 border border-slate-200' }
+      return { label: status || 'Unknown', className: 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700' }
   }
 }
 
@@ -124,15 +124,15 @@ interface StatCardProps {
 
 const StatCard = ({ label, value, sub, iconClass, icon: Icon, valueClass }: StatCardProps) => (
   <Card 
-    className="border border-slate-200/80 shadow-sm bg-white"
+    className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
     style={cardIsolationStyle}
   >
     <CardContent className="p-3 sm:p-4">
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 uppercase tracking-wider mb-1 truncate">{label}</p>
-          <p className={cn('text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 leading-none', valueClass)}>{value}</p>
-          {sub && <p className="text-[10px] sm:text-[11px] text-slate-400 mt-1 truncate">{sub}</p>}
+          <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 truncate">{label}</p>
+          <p className={cn('text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 dark:text-white leading-none', valueClass)}>{value}</p>
+          {sub && <p className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 mt-1 truncate">{sub}</p>}
         </div>
         <div className={cn('p-2 sm:p-2.5 rounded-xl shrink-0', iconClass)}>
           <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -144,20 +144,20 @@ const StatCard = ({ label, value, sub, iconClass, icon: Icon, valueClass }: Stat
 
 // ── Info row - MOBILE FIXED ────────────────────────────────────────────────────
 const InfoRow = ({ label, value }: { label: string; value: React.ReactNode }) => (
-  <div className="flex items-start justify-between gap-3 py-2.5 border-b border-slate-100 last:border-0">
-    <span className="text-xs sm:text-sm text-slate-500 shrink-0">{label}</span>
-    <span className="text-xs sm:text-sm font-medium text-slate-800 text-right min-w-0 break-words">{value}</span>
+  <div className="flex items-start justify-between gap-3 py-2.5 border-b border-slate-100 dark:border-slate-800 last:border-0">
+    <span className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 shrink-0">{label}</span>
+    <span className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200 text-right min-w-0 break-words">{value}</span>
   </div>
 )
 
 // ── Submission row ─────────────────────────────────────────────────────────────
 const getSubStatusConfig = (status: string) => {
   switch (status) {
-    case 'in_progress': return { label: 'In Progress', cls: 'bg-blue-50 text-blue-700 border border-blue-200' }
-    case 'completed': return { label: 'Completed', cls: 'bg-emerald-50 text-emerald-700 border border-emerald-200' }
-    case 'pending_theory': return { label: 'Pending Theory', cls: 'bg-amber-50 text-amber-700 border border-amber-200' }
-    case 'graded': return { label: 'Graded', cls: 'bg-purple-50 text-purple-700 border border-purple-200' }
-    default: return { label: status || '—', cls: 'bg-slate-50 text-slate-600 border border-slate-200' }
+    case 'in_progress': return { label: 'In Progress', cls: 'bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900/50' }
+    case 'completed': return { label: 'Completed', cls: 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900/50' }
+    case 'pending_theory': return { label: 'Pending Theory', cls: 'bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-900/50' }
+    case 'graded': return { label: 'Graded', cls: 'bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-400 border border-purple-200 dark:border-purple-900/50' }
+    default: return { label: status || '—', cls: 'bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700' }
   }
 }
 
@@ -283,13 +283,13 @@ export default function ExamDetailPage() {
   // ── Loading ────────────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 overflow-x-hidden">
-        <div className="w-14 h-14 rounded-2xl bg-white shadow-md flex items-center justify-center">
-          <Loader2 className="h-7 w-7 animate-spin text-emerald-600" />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-4 overflow-x-hidden transition-colors duration-300">
+        <div className="w-14 h-14 rounded-2xl bg-white dark:bg-slate-900 shadow-md flex items-center justify-center">
+          <Loader2 className="h-7 w-7 animate-spin text-emerald-600 dark:text-emerald-400" />
         </div>
         <div className="text-center">
-          <p className="text-sm font-medium text-slate-700">Loading exam details</p>
-          <p className="text-xs text-slate-400 mt-0.5">Fetching data from database…</p>
+          <p className="text-sm font-medium text-slate-700 dark:text-slate-200">Loading exam details</p>
+          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Fetching data from database…</p>
         </div>
       </div>
     )
@@ -297,15 +297,15 @@ export default function ExamDetailPage() {
 
   if (!exam) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center gap-4 p-6 overflow-x-hidden">
-        <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
-          <AlertCircle className="h-7 w-7 text-slate-400" />
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-4 p-6 overflow-x-hidden transition-colors duration-300">
+        <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+          <AlertCircle className="h-7 w-7 text-slate-400 dark:text-slate-500" />
         </div>
         <div className="text-center">
-          <h2 className="text-lg font-semibold text-slate-800">Exam Not Found</h2>
-          <p className="text-sm text-slate-500 mt-1">This exam doesn&apos;t exist or has been removed.</p>
+          <h2 className="text-lg font-semibold text-slate-800 dark:text-white">Exam Not Found</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">This exam doesn&apos;t exist or has been removed.</p>
         </div>
-        <Button onClick={() => router.push('/staff/exams')} className="bg-slate-900 hover:bg-slate-800 text-white">
+        <Button onClick={() => router.push('/staff/exams')} className="bg-slate-900 hover:bg-slate-800 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Exams
         </Button>
       </div>
@@ -315,10 +315,10 @@ export default function ExamDetailPage() {
   const passingScore = exam.passing_percentage ?? exam.pass_mark ?? 50
 
   return (
-    <div className="min-h-screen bg-slate-50 overflow-x-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 overflow-x-hidden transition-colors duration-300">
 
       {/* ── Sticky header - MOBILE OPTIMIZED ─────────────────────────────── */}
-      <div className="bg-white border-b border-slate-200/80 sticky top-0 z-20 shadow-sm">
+      <div className="bg-white dark:bg-slate-900 border-b border-slate-200/80 dark:border-slate-800 sticky top-0 z-20 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 sm:py-4">
 
           {/* Top row: back + title + mobile menu */}
@@ -326,14 +326,14 @@ export default function ExamDetailPage() {
             <Button
               variant="outline" size="sm"
               onClick={() => router.push('/staff/exams')}
-              className="mt-0.5 shrink-0 border-slate-200 hover:bg-slate-50 h-8 w-8 p-0"
+              className="mt-0.5 shrink-0 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 h-8 w-8 p-0 text-slate-700 dark:text-slate-300"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
             </Button>
 
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2 flex-wrap">
-                <h1 className="text-sm sm:text-lg lg:text-xl font-bold text-slate-900 break-words min-w-0 flex-1 leading-tight">
+                <h1 className="text-sm sm:text-lg lg:text-xl font-bold text-slate-900 dark:text-white break-words min-w-0 flex-1 leading-tight">
                   {exam.title}
                 </h1>
                 <div className="shrink-0">
@@ -349,8 +349,8 @@ export default function ExamDetailPage() {
                   `${exam.duration} min`,
                 ].map((item, i, arr) => (
                   <React.Fragment key={String(item)}>
-                    <span className="text-[10px] sm:text-xs text-slate-500 truncate max-w-[100px]">{item}</span>
-                    {i < arr.length - 1 && <span className="text-slate-300 text-[10px] sm:text-xs">·</span>}
+                    <span className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 truncate max-w-[100px]">{item}</span>
+                    {i < arr.length - 1 && <span className="text-slate-300 dark:text-slate-600 text-[10px] sm:text-xs">·</span>}
                   </React.Fragment>
                 ))}
               </div>
@@ -361,7 +361,7 @@ export default function ExamDetailPage() {
               <Button
                 variant="outline" size="sm"
                 onClick={() => setShowMobileActions(!showMobileActions)}
-                className="border-slate-200 h-8 w-8 p-0"
+                className="border-slate-200 dark:border-slate-700 h-8 w-8 p-0 text-slate-700 dark:text-slate-300"
               >
                 <MoreVertical className="h-3.5 w-3.5" />
               </Button>
@@ -373,7 +373,7 @@ export default function ExamDetailPage() {
             <Button
               variant="outline" size="sm"
               onClick={handleRefresh} disabled={refreshing}
-              className="border-slate-200 h-8 text-xs"
+              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs"
             >
               <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
               Refresh
@@ -381,7 +381,7 @@ export default function ExamDetailPage() {
             <Button
               variant="outline" size="sm"
               onClick={() => router.push(`/staff/exams/${examId}/edit`)}
-              className="border-slate-200 h-8 text-xs"
+              className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs"
             >
               <Pencil className="h-3.5 w-3.5 mr-1.5" />
               Edit
@@ -389,7 +389,7 @@ export default function ExamDetailPage() {
             <Button
               variant="outline" size="sm"
               onClick={handleDeleteExam}
-              className="border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs"
+              className="border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 text-xs"
             >
               <Trash2 className="h-3.5 w-3.5 mr-1.5" />
               Delete
@@ -398,12 +398,12 @@ export default function ExamDetailPage() {
 
           {/* Mobile actions dropdown */}
           {showMobileActions && (
-            <div className="sm:hidden mt-2 pt-2 border-t border-slate-100 flex gap-2 flex-wrap">
+            <div className="sm:hidden mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 flex gap-2 flex-wrap">
               <Button
                 variant="outline" size="sm"
                 onClick={() => { handleRefresh(); setShowMobileActions(false) }}
                 disabled={refreshing}
-                className="border-slate-200 h-8 text-xs flex-1 min-w-[80px]"
+                className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs flex-1 min-w-[80px]"
               >
                 <RefreshCw className={cn('h-3.5 w-3.5 mr-1.5', refreshing && 'animate-spin')} />
                 Refresh
@@ -411,7 +411,7 @@ export default function ExamDetailPage() {
               <Button
                 variant="outline" size="sm"
                 onClick={() => { router.push(`/staff/exams/${examId}/edit`); setShowMobileActions(false) }}
-                className="border-slate-200 h-8 text-xs flex-1 min-w-[80px]"
+                className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 h-8 text-xs flex-1 min-w-[80px]"
               >
                 <Pencil className="h-3.5 w-3.5 mr-1.5" />
                 Edit
@@ -419,7 +419,7 @@ export default function ExamDetailPage() {
               <Button
                 variant="outline" size="sm"
                 onClick={() => { handleDeleteExam(); setShowMobileActions(false) }}
-                className="border-red-200 text-red-600 hover:bg-red-50 h-8 text-xs flex-1 min-w-[80px]"
+                className="border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 h-8 text-xs flex-1 min-w-[80px]"
               >
                 <Trash2 className="h-3.5 w-3.5 mr-1.5" />
                 Delete
@@ -436,40 +436,40 @@ export default function ExamDetailPage() {
         <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
           <StatCard
             label="Submissions" value={stats.total}
-            icon={Users} iconClass="bg-slate-100 text-slate-600"
+            icon={Users} iconClass="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
           />
           <StatCard
             label="Completed" value={stats.completed}
             sub={`${stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0}%`}
-            icon={CheckCircle} iconClass="bg-emerald-100 text-emerald-600"
-            valueClass="text-emerald-700"
+            icon={CheckCircle} iconClass="bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400"
+            valueClass="text-emerald-700 dark:text-emerald-400"
           />
           <StatCard
             label="In Progress" value={stats.inProgress}
-            icon={Clock} iconClass="bg-blue-100 text-blue-600"
-            valueClass="text-blue-700"
+            icon={Clock} iconClass="bg-blue-100 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400"
+            valueClass="text-blue-700 dark:text-blue-400"
           />
           <StatCard
             label="Pending" value={stats.pendingTheory}
-            icon={AlertCircle} iconClass="bg-amber-100 text-amber-600"
-            valueClass="text-amber-700"
+            icon={AlertCircle} iconClass="bg-amber-100 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400"
+            valueClass="text-amber-700 dark:text-amber-400"
           />
           <StatCard
             label="Graded" value={stats.graded}
-            icon={Award} iconClass="bg-purple-100 text-purple-600"
-            valueClass="text-purple-700"
+            icon={Award} iconClass="bg-purple-100 dark:bg-purple-950/50 text-purple-600 dark:text-purple-400"
+            valueClass="text-purple-700 dark:text-purple-400"
           />
           <StatCard
             label="Pass Rate" value={`${stats.passRate}%`}
             sub={`Avg: ${stats.averageScore}`}
-            icon={TrendingUp} iconClass="bg-teal-100 text-teal-600"
-            valueClass="text-teal-700"
+            icon={TrendingUp} iconClass="bg-teal-100 dark:bg-teal-950/50 text-teal-600 dark:text-teal-400"
+            valueClass="text-teal-700 dark:text-teal-400"
           />
         </div>
 
         {/* Tabs */}
         <Tabs defaultValue="overview" className="space-y-4 sm:space-y-5">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-1 sm:p-1.5 shadow-sm">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-1 sm:p-1.5 shadow-sm">
             <TabsList className="w-full grid grid-cols-3 bg-transparent gap-1 h-auto">
               {[
                 { value: 'overview', label: 'Overview', icon: BarChart3 },
@@ -483,8 +483,8 @@ export default function ExamDetailPage() {
                     value={tab.value}
                     className={cn(
                       'flex items-center justify-center gap-1 sm:gap-1.5 py-2 px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs font-medium transition-all h-auto min-w-0',
-                      'data-[state=active]:bg-slate-900 data-[state=active]:text-white data-[state=active]:shadow-sm',
-                      'data-[state=inactive]:text-slate-500 data-[state=inactive]:hover:bg-slate-50',
+                      'data-[state=active]:bg-slate-900 dark:data-[state=active]:bg-emerald-600 data-[state=active]:text-white data-[state=active]:shadow-sm',
+                      'data-[state=inactive]:text-slate-500 dark:data-[state=inactive]:text-slate-400 data-[state=inactive]:hover:bg-slate-50 dark:data-[state=inactive]:hover:bg-slate-800',
                     )}
                   >
                     <Icon className="h-3.5 w-3.5 shrink-0" />
@@ -506,13 +506,13 @@ export default function ExamDetailPage() {
 
               {/* Exam info card */}
               <Card 
-                className="lg:col-span-2 border border-slate-200/80 shadow-sm bg-white"
+                className="lg:col-span-2 border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
                 style={cardIsolationStyle}
               >
-                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                      <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                      <BookOpen className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     Exam Information
                   </CardTitle>
@@ -528,7 +528,7 @@ export default function ExamDetailPage() {
                       <InfoRow label="Status" value={<StatusBadge status={exam.status} />} />
                     </div>
                     <div>
-                      <InfoRow label="Total Marks" value={<span className="font-bold text-slate-900">{exam.total_marks}</span>} />
+                      <InfoRow label="Total Marks" value={<span className="font-bold text-slate-900 dark:text-white">{exam.total_marks}</span>} />
                       <InfoRow label="Total Questions" value={exam.total_questions} />
                       <InfoRow label="Objective Max" value={exam.objective_max ?? '—'} />
                       <InfoRow label="Theory Max" value={exam.theory_max ?? '—'} />
@@ -538,8 +538,8 @@ export default function ExamDetailPage() {
                           <span className={cn(
                             'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-medium whitespace-nowrap',
                             exam.has_theory
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-slate-100 text-slate-500',
+                              ? 'bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-400'
+                              : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400',
                           )}>
                             {exam.has_theory ? 'Yes' : 'No'}
                           </span>
@@ -550,34 +550,34 @@ export default function ExamDetailPage() {
                   </div>
 
                   {/* Dates */}
-                  <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                    <div className="flex items-start gap-2.5 sm:gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="flex items-start gap-2.5 sm:gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium uppercase tracking-wider">Start Date</p>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5 break-words">{formatDate(exam.start_date)}</p>
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Start Date</p>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5 break-words">{formatDate(exam.start_date)}</p>
                       </div>
                     </div>
-                    <div className="flex items-start gap-2.5 sm:gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
-                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
-                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500" />
+                    <div className="flex items-start gap-2.5 sm:gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                      <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0">
+                        <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 dark:text-red-400" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium uppercase tracking-wider">End Date</p>
-                        <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5 break-words">{formatDate(exam.end_date)}</p>
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">End Date</p>
+                        <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 mt-0.5 break-words">{formatDate(exam.end_date)}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Instructions */}
                   {exam.instructions && (
-                    <div className="mt-4 pt-4 border-t border-slate-100">
-                      <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                    <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                      <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">
                         Instructions
                       </p>
-                      <p className="text-xs sm:text-sm text-slate-600 leading-relaxed bg-slate-50 rounded-xl p-3 border border-slate-100 break-words">
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed bg-slate-50 dark:bg-slate-800/50 rounded-xl p-3 border border-slate-100 dark:border-slate-800 break-words">
                         {exam.instructions}
                       </p>
                     </div>
@@ -589,11 +589,11 @@ export default function ExamDetailPage() {
               <div className="space-y-4">
                 {/* Quick actions */}
                 <Card 
-                  className="border border-slate-200/80 shadow-sm bg-white"
+                  className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
                   style={cardIsolationStyle}
                 >
-                  <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
-                    <CardTitle className="text-sm font-semibold text-slate-700">Quick Actions</CardTitle>
+                  <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
+                    <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Quick Actions</CardTitle>
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 space-y-2">
                     <button
@@ -602,8 +602,8 @@ export default function ExamDetailPage() {
                       className={cn(
                         'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all',
                         stats.total > 0
-                          ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm'
-                          : 'bg-slate-100 text-slate-400 cursor-not-allowed',
+                          ? 'bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white shadow-sm'
+                          : 'bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed',
                       )}
                     >
                       <Eye className="h-4 w-4 shrink-0" />
@@ -622,23 +622,23 @@ export default function ExamDetailPage() {
                       <button
                         key={label}
                         onClick={() => router.push(path)}
-                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-all"
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all"
                       >
-                        <Icon className="h-4 w-4 text-slate-500 shrink-0" />
+                        <Icon className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
                         <span className="flex-1 text-left truncate">{label}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                       </button>
                     ))}
 
-                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-all">
-                      <Download className="h-4 w-4 text-slate-500 shrink-0" />
+                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all">
+                      <Download className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
                       <span className="flex-1 text-left truncate">Export Data</span>
-                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                     </button>
-                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 transition-all">
-                      <Share2 className="h-4 w-4 text-slate-500 shrink-0" />
+                    <button className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all">
+                      <Share2 className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0" />
                       <span className="flex-1 text-left truncate">Share Exam</span>
-                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <ChevronRight className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                     </button>
                   </CardContent>
                 </Card>
@@ -646,33 +646,33 @@ export default function ExamDetailPage() {
                 {/* Score summary */}
                 {stats.total > 0 && (
                   <Card 
-                    className="border border-slate-200/80 shadow-sm bg-white"
+                    className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
                     style={cardIsolationStyle}
                   >
-                    <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
-                      <CardTitle className="text-sm font-semibold text-slate-700">Score Summary</CardTitle>
+                    <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
+                      <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">Score Summary</CardTitle>
                     </CardHeader>
                     <CardContent className="p-3 sm:p-4 space-y-3">
                       {[
-                        { label: 'Average', value: `${stats.averageScore} pts`, icon: TrendingUp, color: 'text-blue-600' },
-                        { label: 'Highest', value: `${stats.highestScore} pts`, icon: TrendingUp, color: 'text-emerald-600' },
-                        { label: 'Lowest', value: `${stats.lowestScore} pts`, icon: TrendingDown, color: 'text-red-500' },
-                        { label: 'Pass Rate', value: `${stats.passRate}%`, icon: Target, color: 'text-violet-600' },
+                        { label: 'Average', value: `${stats.averageScore} pts`, icon: TrendingUp, color: 'text-blue-600 dark:text-blue-400' },
+                        { label: 'Highest', value: `${stats.highestScore} pts`, icon: TrendingUp, color: 'text-emerald-600 dark:text-emerald-400' },
+                        { label: 'Lowest', value: `${stats.lowestScore} pts`, icon: TrendingDown, color: 'text-red-500 dark:text-red-400' },
+                        { label: 'Pass Rate', value: `${stats.passRate}%`, icon: Target, color: 'text-violet-600 dark:text-violet-400' },
                       ].map(({ label, value, icon: Icon, color }) => (
                         <div key={label} className="flex items-center justify-between gap-2">
-                          <span className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 min-w-0">
+                          <span className="flex items-center gap-1.5 text-xs sm:text-sm text-slate-600 dark:text-slate-400 min-w-0">
                             <Icon className={cn('h-3.5 w-3.5 shrink-0', color)} />
                             <span className="truncate">{label}</span>
                           </span>
                           <span className={cn('text-xs sm:text-sm font-bold shrink-0', color)}>{value}</span>
                         </div>
                       ))}
-                      <div className="pt-2 border-t border-slate-100">
-                        <div className="flex justify-between text-[10px] sm:text-[11px] text-slate-400 mb-1.5">
+                      <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex justify-between text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 mb-1.5">
                           <span>Grading progress</span>
                           <span>{stats.graded}/{stats.total}</span>
                         </div>
-                        <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
+                        <div className="h-1.5 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
                           <div
                             className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500"
                             style={{ width: `${stats.total > 0 ? (stats.graded / stats.total) * 100 : 0}%` }}
@@ -689,14 +689,14 @@ export default function ExamDetailPage() {
           {/* ── Submissions ───────────────────────────────────────────────── */}
           <TabsContent value="submissions">
             <Card 
-              className="border border-slate-200/80 shadow-sm bg-white"
+              className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
               style={cardIsolationStyle}
             >
-              <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 p-4 sm:p-6">
+              <CardHeader className="pb-3 sm:pb-4 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 min-w-0">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
-                      <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600" />
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white min-w-0">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-emerald-100 dark:bg-emerald-950/50 flex items-center justify-center shrink-0">
+                      <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-emerald-600 dark:text-emerald-400" />
                     </div>
                     <span className="truncate">Student Submissions</span>
                   </CardTitle>
@@ -704,7 +704,7 @@ export default function ExamDetailPage() {
                     size="sm"
                     onClick={handleViewSubmissions}
                     disabled={stats.total === 0}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white h-8 text-xs shrink-0"
+                    className="bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 text-white h-8 text-xs shrink-0"
                   >
                     <Eye className="h-3.5 w-3.5 mr-1.5" />
                     View All
@@ -715,13 +715,13 @@ export default function ExamDetailPage() {
                 {/* Mini stat pills */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4 sm:mb-5">
                   {[
-                    { label: 'Total', value: stats.total, cls: 'bg-slate-50 border-slate-200', vCls: 'text-slate-800' },
-                    { label: 'Completed', value: stats.completed, cls: 'bg-emerald-50 border-emerald-200', vCls: 'text-emerald-700' },
-                    { label: 'In Progress', value: stats.inProgress, cls: 'bg-blue-50 border-blue-200', vCls: 'text-blue-700' },
-                    { label: 'Graded', value: stats.graded, cls: 'bg-purple-50 border-purple-200', vCls: 'text-purple-700' },
+                    { label: 'Total', value: stats.total, cls: 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700', vCls: 'text-slate-800 dark:text-slate-100' },
+                    { label: 'Completed', value: stats.completed, cls: 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-900/50', vCls: 'text-emerald-700 dark:text-emerald-400' },
+                    { label: 'In Progress', value: stats.inProgress, cls: 'bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50', vCls: 'text-blue-700 dark:text-blue-400' },
+                    { label: 'Graded', value: stats.graded, cls: 'bg-purple-50 dark:bg-purple-950/30 border-purple-200 dark:border-purple-900/50', vCls: 'text-purple-700 dark:text-purple-400' },
                   ].map(({ label, value, cls, vCls }) => (
                     <div key={label} className={cn('rounded-xl border p-2.5 sm:p-3', cls)}>
-                      <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 truncate">{label}</p>
+                      <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400 truncate">{label}</p>
                       <p className={cn('text-lg sm:text-xl font-bold mt-0.5', vCls)}>{value}</p>
                     </div>
                   ))}
@@ -730,22 +730,22 @@ export default function ExamDetailPage() {
                 {/* Recent list */}
                 {recentSubmissions.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 sm:py-14 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
-                      <Users className="h-7 w-7 text-slate-400" />
+                    <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                      <Users className="h-7 w-7 text-slate-400 dark:text-slate-500" />
                     </div>
-                    <p className="text-sm font-medium text-slate-600">No submissions yet</p>
-                    <p className="text-xs text-slate-400 mt-1">Students haven&apos;t started this exam</p>
+                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300">No submissions yet</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Students haven&apos;t started this exam</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Recent Submissions</p>
+                    <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Recent Submissions</p>
                     {recentSubmissions.map(sub => {
                       const statusCfg = getSubStatusConfig(sub.status)
                       const score = (sub.objective_score || 0) + (sub.theory_score || 0)
                       return (
                         <div
                           key={sub.id}
-                          className="flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl border border-slate-100 hover:border-slate-200 hover:bg-slate-50/60 transition-all"
+                          className="flex items-center justify-between gap-2 p-2.5 sm:p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700 hover:bg-slate-50/60 dark:hover:bg-slate-800/40 transition-all"
                         >
                           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                             {sub.photo_url ? (
@@ -763,9 +763,9 @@ export default function ExamDetailPage() {
                               </div>
                             )}
                             <div className="min-w-0 flex-1">
-                              <p className="text-xs sm:text-sm font-semibold text-slate-800 truncate">{sub.student_name}</p>
+                              <p className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">{sub.student_name}</p>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <p className="text-[10px] sm:text-xs text-slate-400 truncate">{sub.student_class}</p>
+                                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-slate-500 truncate">{sub.student_class}</p>
                                 <span className={cn('sm:hidden inline-flex items-center px-1.5 py-0 rounded-full text-[9px] font-medium whitespace-nowrap', statusCfg.cls)}>
                                   {statusCfg.label}
                                 </span>
@@ -776,14 +776,14 @@ export default function ExamDetailPage() {
                             <span className={cn('hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium whitespace-nowrap', statusCfg.cls)}>
                               {statusCfg.label}
                             </span>
-                            <span className="text-[10px] sm:text-xs font-bold text-slate-700 bg-slate-100 px-1.5 sm:px-2 py-0.5 rounded-lg whitespace-nowrap">
+                            <span className="text-[10px] sm:text-xs font-bold text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-1.5 sm:px-2 py-0.5 rounded-lg whitespace-nowrap">
                               {score} pts
                             </span>
                             <button
                               onClick={() => router.push(`/staff/exams/${examId}/submissions/${sub.id}`)}
-                              className="h-7 w-7 rounded-lg bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors shrink-0"
+                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 flex items-center justify-center transition-colors shrink-0"
                             >
-                              <Eye className="h-3.5 w-3.5 text-slate-600" />
+                              <Eye className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
                             </button>
                           </div>
                         </div>
@@ -792,7 +792,7 @@ export default function ExamDetailPage() {
                     {stats.total > 6 && (
                       <button
                         onClick={handleViewSubmissions}
-                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-slate-300 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:border-slate-400 transition-all mt-2"
+                        className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 text-xs font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/40 hover:border-slate-400 dark:hover:border-slate-600 transition-all mt-2"
                       >
                         View all {stats.total} submissions
                         <ChevronRight className="h-3.5 w-3.5" />
@@ -810,19 +810,19 @@ export default function ExamDetailPage() {
 
               {/* Exam options */}
               <Card 
-                className="border border-slate-200/80 shadow-sm bg-white"
+                className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
                 style={cardIsolationStyle}
               >
-                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-                      <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0">
+                      <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-slate-600 dark:text-slate-400" />
                     </div>
                     Exam Options
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-5">
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {[
                       { label: 'Allow Retakes', value: 'Disabled', enabled: false, icon: RotateCcw },
                       { label: 'Show Results Instantly', value: 'Enabled', enabled: true, icon: Eye },
@@ -830,15 +830,15 @@ export default function ExamDetailPage() {
                       { label: 'Has Theory Section', value: exam.has_theory ? 'Yes' : 'No', enabled: !!exam.has_theory, icon: FileText },
                     ].map(({ label, value, enabled, icon: Icon }) => (
                       <div key={label} className="flex items-center justify-between gap-2 py-3">
-                        <span className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 min-w-0">
-                          <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300 min-w-0">
+                          <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                           <span className="truncate">{label}</span>
                         </span>
                         <span className={cn(
                           'text-[10px] sm:text-[11px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap shrink-0',
                           enabled
-                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                            : 'bg-slate-100 text-slate-500 border-slate-200',
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/50'
+                            : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-700',
                         )}>
                           {value}
                         </span>
@@ -850,19 +850,19 @@ export default function ExamDetailPage() {
 
               {/* Grading settings */}
               <Card 
-                className="border border-slate-200/80 shadow-sm bg-white"
+                className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900"
                 style={cardIsolationStyle}
               >
-                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-violet-100 flex items-center justify-center shrink-0">
-                      <GraduationCap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-violet-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-violet-100 dark:bg-violet-950/50 flex items-center justify-center shrink-0">
+                      <GraduationCap className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-violet-600 dark:text-violet-400" />
                     </div>
                     Grading Settings
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-5">
-                  <div className="divide-y divide-slate-100">
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {[
                       { label: 'Passing Score', value: `${passingScore}%`, icon: Target },
                       { label: 'Grading System', value: 'WAEC', icon: Award },
@@ -871,11 +871,11 @@ export default function ExamDetailPage() {
                       { label: 'Theory Max', value: `${exam.theory_max ?? '—'} marks`, icon: FileText },
                     ].map(({ label, value, icon: Icon }) => (
                       <div key={label} className="flex items-center justify-between gap-2 py-3">
-                        <span className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 min-w-0">
-                          <Icon className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                        <span className="flex items-center gap-2 text-xs sm:text-sm text-slate-700 dark:text-slate-300 min-w-0">
+                          <Icon className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500 shrink-0" />
                           <span className="truncate">{label}</span>
                         </span>
-                        <span className="text-xs sm:text-sm font-semibold text-slate-800 whitespace-nowrap shrink-0">{value}</span>
+                        <span className="text-xs sm:text-sm font-semibold text-slate-800 dark:text-slate-200 whitespace-nowrap shrink-0">{value}</span>
                       </div>
                     ))}
                   </div>
@@ -884,13 +884,13 @@ export default function ExamDetailPage() {
 
               {/* Metadata */}
               <Card 
-                className="border border-slate-200/80 shadow-sm bg-white md:col-span-2"
+                className="border border-slate-200/80 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 md:col-span-2"
                 style={cardIsolationStyle}
               >
-                <CardHeader className="pb-3 border-b border-slate-100 p-4 sm:p-6">
-                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800">
-                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                      <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600" />
+                <CardHeader className="pb-3 border-b border-slate-100 dark:border-slate-800 p-4 sm:p-6">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-white">
+                    <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg bg-blue-100 dark:bg-blue-950/50 flex items-center justify-center shrink-0">
+                      <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
                     </div>
                     Metadata
                   </CardTitle>
@@ -902,18 +902,18 @@ export default function ExamDetailPage() {
                       { label: 'Last Updated', value: formatDate(exam.updated_at) },
                       { label: 'Exam ID', value: exam.id },
                     ].map(({ label, value }) => (
-                      <div key={label} className="p-3 rounded-xl bg-slate-50 border border-slate-100 min-w-0">
-                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">{label}</p>
-                        <p className="text-[11px] sm:text-xs font-medium text-slate-700 break-all">{value}</p>
+                      <div key={label} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 min-w-0">
+                        <p className="text-[10px] sm:text-[11px] font-medium text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-1">{label}</p>
+                        <p className="text-[11px] sm:text-xs font-medium text-slate-700 dark:text-slate-300 break-all">{value}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 flex-wrap">
-                    <Button variant="outline" size="sm" className="border-slate-200 text-xs h-8 flex-1 sm:flex-none min-w-[120px]">
+                  <div className="flex gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 flex-wrap">
+                    <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs h-8 flex-1 sm:flex-none min-w-[120px]">
                       <FileText className="h-3.5 w-3.5 mr-1.5" />
                       Export Settings
                     </Button>
-                    <Button variant="outline" size="sm" className="border-slate-200 text-xs h-8 flex-1 sm:flex-none min-w-[120px]">
+                    <Button variant="outline" size="sm" className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 text-xs h-8 flex-1 sm:flex-none min-w-[120px]">
                       <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
                       Reset to Default
                     </Button>

@@ -16,54 +16,56 @@ export function formatPoints(points: number): string {
 
 export function calculateQuestionScore(
   question: Question,
-  answer: string | undefined
+  answer: string | undefined,
 ): { score: number; isCorrect: boolean | null; isAnswered: boolean } {
-  const studentAnswer = (answer || '').trim()
-  
+  const studentAnswer = (answer ?? '').trim()
+
   if (!studentAnswer) {
     return { score: 0, isCorrect: null, isAnswered: false }
   }
-  
+
   if (question.type === 'theory') {
-    return { score: 0, isCorrect: null, isAnswered: true } 
+    return { score: 0, isCorrect: null, isAnswered: true }
   }
-  
-  const correctAnswer = String(question.correct_answer || '').trim()
+
+  const correctAnswer = String(question.correct_answer ?? '').trim()
   const isCorrect = studentAnswer.toLowerCase() === correctAnswer.toLowerCase()
-  
-  // 🛠️ FIX: Strictly use the marks the teacher set
-  const marks = Number(question.marks || question.points || 1) 
-  
+  const marks = Number(question.marks ?? question.points ?? 1)
+
   return {
     score: isCorrect ? marks : 0,
     isCorrect,
-    isAnswered: true
+    isAnswered: true,
   }
 }
 
 export function calculateObjectiveScore(
   questions: Question[],
-  answers: Record<string, string>
-): { score: number; total: number; correct: number; incorrect: number; unanswered: number } {
-  const safeQuestions = questions || []
-  const safeAnswers = answers || {}
-  
-  const objectiveQuestions = safeQuestions.filter((q: Question) => q.type !== 'theory')
-  
+  answers: Record<string, string>,
+): {
+  score: number
+  total: number
+  correct: number
+  incorrect: number
+  unanswered: number
+} {
+  const safeQuestions = questions ?? []
+  const safeAnswers = answers ?? {}
+
+  const objectiveQuestions = safeQuestions.filter((q) => q.type !== 'theory')
+
   let score = 0
   let total = 0
   let correct = 0
   let incorrect = 0
   let unanswered = 0
 
-  objectiveQuestions.forEach((q: Question) => {
-    // 🛠️ FIX: Use the exact teacher mark
-    const pts = Number(q.marks || q.points || 1)
+  for (const q of objectiveQuestions) {
+    const pts = Number(q.marks ?? q.points ?? 1)
     total += pts
-    
-    const answer = safeAnswers[q.id]
-    const studentAnswer = (answer || '').trim()
-    const correctAnswer = String(q.correct_answer || '').trim()
+
+    const studentAnswer = (safeAnswers[q.id] ?? '').trim()
+    const correctAnswer = String(q.correct_answer ?? '').trim()
 
     if (studentAnswer) {
       if (studentAnswer.toLowerCase() === correctAnswer.toLowerCase()) {
@@ -75,70 +77,63 @@ export function calculateObjectiveScore(
     } else {
       unanswered++
     }
-  })
+  }
 
   return { score, total, correct, incorrect, unanswered }
 }
 
 export function calculateTheoryScore(
   questions: Question[],
-  answers: Record<string, string>
+  answers: Record<string, string>,
 ): { score: number; total: number; answered: number } {
-  const safeQuestions = questions || []
-  const safeAnswers = answers || {}
-  
-  const theoryQuestions = safeQuestions.filter((q: Question) => q.type === 'theory')
-  
+  const safeQuestions = questions ?? []
+  const safeAnswers = answers ?? {}
+
+  const theoryQuestions = safeQuestions.filter((q) => q.type === 'theory')
+
   let score = 0
   let total = 0
   let answered = 0
 
-  theoryQuestions.forEach((q: Question) => {
+  for (const q of theoryQuestions) {
     if (q.sub_questions && q.sub_questions.length > 0) {
-      q.sub_questions.forEach((subQ: TheorySubQuestion) => {
-        const subMarks = Number(subQ.marks || 1)
+      for (const subQ of q.sub_questions as TheorySubQuestion[]) {
+        const subMarks = Number(subQ.marks ?? 1)
         total += subMarks
-        
-        const answer = safeAnswers[`${q.id}_${subQ.id || subQ.text}`] || safeAnswers[q.id]
-        if (answer?.trim()) {
-          answered++
-        }
-      })
-    } else {
-      const pts = Number(q.marks || q.points || 10)
-      total += pts
-      
-      const answer = safeAnswers[q.id]
-      if (answer?.trim()) {
-        answered++
+
+        const key = `${q.id}_${subQ.id ?? subQ.text}`
+        const answer = safeAnswers[key] ?? safeAnswers[q.id]
+        if (answer?.trim()) answered++
       }
+    } else {
+      const pts = Number(q.marks ?? q.points ?? 10)
+      total += pts
+      if (safeAnswers[q.id]?.trim()) answered++
     }
-  })
+  }
 
   return { score, total, answered }
 }
 
 export function calculateTotalScore(
   questions: Question[],
-  answers: Record<string, string>
+  answers: Record<string, string>,
 ) {
   const objective = calculateObjectiveScore(questions, answers)
   const theory = calculateTheoryScore(questions, answers)
-  
+
   const totalScore = objective.score
   const totalMarks = objective.total
-  const percentage = totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0
+  const percentage =
+    totalMarks > 0 ? Math.round((totalScore / totalMarks) * 100) : 0
 
-  return {
-    objective,
-    theory,
-    totalScore,
-    totalMarks,
-    percentage
-  }
+  return { objective, theory, totalScore, totalMarks, percentage }
 }
 
-export function calculateScore(questions: Question[], answers: Record<string, string>) {
+export function calculateScore(
+  questions: Question[],
+  answers: Record<string, string>,
+) {
   const result = calculateTotalScore(questions, answers)
   return {
     score: result.totalScore,
@@ -150,7 +145,7 @@ export function calculateScore(questions: Question[], answers: Record<string, st
   }
 }
 
-export function getGrade(percentage: number, passingThreshold: number = 50): string {
+export function getGrade(percentage: number, passingThreshold = 50): string {
   if (percentage >= 80) return 'A'
   if (percentage >= 70) return 'B'
   if (percentage >= 60) return 'C'

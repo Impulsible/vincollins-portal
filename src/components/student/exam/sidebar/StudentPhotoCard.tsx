@@ -3,8 +3,15 @@
 import { Badge } from '@/components/ui/badge'
 import { Camera, User, Hash, BookOpen, ShieldCheck } from 'lucide-react'
 import Image from 'next/image'
-import type { StudentProfile } from '@/app/student/exam/[id]/types'
 import { cn } from '@/lib/utils'
+
+interface StudentProfile {
+  photo_url?: string | null
+  full_name?: string | null
+  vin_id?: string | null
+  admission_number?: string | null
+  class?: string | null
+}
 
 interface StudentPhotoCardProps {
   profile: StudentProfile | null
@@ -18,9 +25,9 @@ export function StudentPhotoCard({
   const isLarge = size === 'large'
 
   return (
-    <div className="rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-sm overflow-hidden">
+    <div className="rounded-2xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm overflow-hidden transition-colors duration-300">
       {/* Header strip */}
-      <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 px-3 py-2 overflow-hidden">
+      <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 dark:from-indigo-700 dark:via-blue-700 dark:to-violet-700 px-3 py-2 overflow-hidden">
         <div className="absolute -top-6 -right-6 h-16 w-16 bg-white/10 rounded-full blur-xl" />
         <div className="relative flex items-center justify-center gap-1.5">
           <Camera className="h-3 w-3 text-white/80" />
@@ -48,11 +55,11 @@ export function StudentPhotoCard({
           </div>
         ) : (
           <div className={cn(
-            'bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center',
+            'bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-700 flex items-center justify-center',
             isLarge ? 'h-56' : 'h-44'
           )}>
             <User className={cn(
-              'text-slate-300',
+              'text-slate-300 dark:text-slate-600',
               isLarge ? 'h-20 w-20' : 'h-16 w-16'
             )} />
           </div>
@@ -76,25 +83,25 @@ export function StudentPhotoCard({
       </div>
 
       {/* Details */}
-      <div className="px-3 py-3 text-center bg-gradient-to-br from-slate-50 to-white">
-        <p className="font-bold text-slate-900 text-sm truncate">
+      <div className="px-3 py-3 text-center bg-gradient-to-br from-slate-50 to-white dark:from-slate-800/60 dark:to-slate-900">
+        <p className="font-bold text-slate-900 dark:text-slate-100 text-sm truncate">
           {profile?.full_name || 'Student'}
         </p>
-        <div className="flex items-center justify-center gap-3 mt-1.5 text-slate-500 text-[11px]">
+        <div className="flex items-center justify-center gap-3 mt-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
           {profile?.class && (
             <span className="flex items-center gap-1 font-medium">
-              <BookOpen className="h-3 w-3 text-indigo-500" />
+              <BookOpen className="h-3 w-3 text-indigo-500 dark:text-indigo-400" />
               {profile.class}
             </span>
           )}
           {profile?.admission_number && (
             <span className="flex items-center gap-1 font-medium">
-              <Hash className="h-3 w-3 text-indigo-500" />
+              <Hash className="h-3 w-3 text-indigo-500 dark:text-indigo-400" />
               {profile.admission_number}
             </span>
           )}
         </div>
-        <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-emerald-600 font-semibold">
+        <div className="flex items-center justify-center gap-1 mt-2 text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold">
           <ShieldCheck className="h-3 w-3" />
           Verified
         </div>

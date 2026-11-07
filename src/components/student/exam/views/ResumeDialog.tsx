@@ -52,9 +52,9 @@ function TerminatedView({ resumeData }: { resumeData: ResumeData | null }) {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50/30 to-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute -top-48 -right-48 h-[500px] w-[500px] bg-rose-200/20 rounded-full blur-[100px]" />
-      <div className="absolute -bottom-48 -left-48 h-[500px] w-[500px] bg-red-200/20 rounded-full blur-[100px]" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-rose-50/30 to-slate-100 dark:from-slate-950 dark:via-rose-950/20 dark:to-slate-950 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
+      <div className="absolute -top-48 -right-48 h-[500px] w-[500px] bg-rose-200/20 dark:bg-rose-900/20 rounded-full blur-[100px]" />
+      <div className="absolute -bottom-48 -left-48 h-[500px] w-[500px] bg-red-200/20 dark:bg-red-900/20 rounded-full blur-[100px]" />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -62,8 +62,8 @@ function TerminatedView({ resumeData }: { resumeData: ResumeData | null }) {
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="relative max-w-md w-full"
       >
-        <div className="rounded-3xl bg-white shadow-2xl shadow-rose-500/10 overflow-hidden ring-1 ring-rose-200/60">
-          <div className="relative bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 px-6 py-8 text-center overflow-hidden">
+        <div className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl shadow-rose-500/10 dark:shadow-rose-950/30 overflow-hidden ring-1 ring-rose-200/60 dark:ring-rose-900/40">
+          <div className="relative bg-gradient-to-br from-rose-600 via-red-600 to-orange-600 dark:from-rose-700 dark:via-red-700 dark:to-orange-700 px-6 py-8 text-center overflow-hidden">
             <div className="absolute -top-16 -right-16 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-black/10 rounded-full blur-3xl" />
             <div
@@ -111,25 +111,25 @@ function TerminatedView({ resumeData }: { resumeData: ResumeData | null }) {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 + i * 0.08 }}
-                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 ring-1 ring-slate-200 p-3 text-center"
+                  className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 dark:from-slate-800 dark:to-slate-800/70 ring-1 ring-slate-200 dark:ring-slate-700 p-3 text-center"
                 >
                   <div className={cn('h-8 w-8 rounded-xl bg-gradient-to-br mx-auto mb-2 flex items-center justify-center shadow-sm', v.gradient)}>
                     <v.icon className="h-4 w-4 text-white" />
                   </div>
-                  <div className="text-xl font-extrabold text-slate-900 tabular-nums">{v.value}</div>
-                  <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5">{v.label}</div>
+                  <div className="text-xl font-extrabold text-slate-900 dark:text-slate-50 tabular-nums">{v.value}</div>
+                  <div className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-0.5">{v.label}</div>
                 </motion.div>
               ))}
             </div>
 
-            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-50 to-red-50 ring-1 ring-rose-200 p-4">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/40 ring-1 ring-rose-200 dark:ring-rose-900/50 p-4">
               <div className="flex items-start gap-3">
                 <div className="flex-shrink-0 h-8 w-8 rounded-xl bg-gradient-to-br from-rose-500 to-red-600 flex items-center justify-center shadow-sm">
                   <Shield className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <p className="text-sm font-bold text-rose-800 leading-tight">Security policy enforced</p>
-                  <p className="text-xs text-rose-700/80 mt-1 leading-relaxed">
+                  <p className="text-sm font-bold text-rose-800 dark:text-rose-200 leading-tight">Security policy enforced</p>
+                  <p className="text-xs text-rose-700/80 dark:text-rose-300/80 mt-1 leading-relaxed">
                     Your responses have been saved and submitted automatically.
                     Please contact your teacher or exam administrator for assistance.
                   </p>
@@ -181,10 +181,31 @@ export function ResumeDialog({
   }
 
   const timeTheme = isCriticalTime
-    ? { gradient: 'from-rose-500 to-red-600', bg: 'from-rose-50 to-red-50', ring: 'ring-rose-200', text: 'text-rose-700', value: 'text-rose-600', icon: 'text-rose-500' }
+    ? {
+        gradient: 'from-rose-500 to-red-600',
+        bg: 'from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/40',
+        ring: 'ring-rose-200 dark:ring-rose-900/50',
+        text: 'text-rose-700 dark:text-rose-300',
+        value: 'text-rose-600 dark:text-rose-400',
+        icon: 'text-rose-500 dark:text-rose-400',
+      }
     : isLowTime
-      ? { gradient: 'from-amber-500 to-orange-600', bg: 'from-amber-50 to-orange-50', ring: 'ring-amber-200', text: 'text-amber-700', value: 'text-amber-600', icon: 'text-amber-500' }
-      : { gradient: 'from-blue-500 to-indigo-600', bg: 'from-blue-50 to-indigo-50', ring: 'ring-blue-200', text: 'text-blue-700', value: 'text-blue-700', icon: 'text-blue-500' }
+      ? {
+          gradient: 'from-amber-500 to-orange-600',
+          bg: 'from-amber-50 to-orange-50 dark:from-amber-950/40 dark:to-orange-950/40',
+          ring: 'ring-amber-200 dark:ring-amber-900/50',
+          text: 'text-amber-700 dark:text-amber-300',
+          value: 'text-amber-600 dark:text-amber-400',
+          icon: 'text-amber-500 dark:text-amber-400',
+        }
+      : {
+          gradient: 'from-blue-500 to-indigo-600',
+          bg: 'from-blue-50 to-indigo-50 dark:from-blue-950/40 dark:to-indigo-950/40',
+          ring: 'ring-blue-200 dark:ring-blue-900/50',
+          text: 'text-blue-700 dark:text-blue-300',
+          value: 'text-blue-700 dark:text-blue-300',
+          icon: 'text-blue-500 dark:text-blue-400',
+        }
 
   const securityItems = [
     { label: 'Tab Switches', value: resumeData?.tabSwitches || 0, limit: 3, icon: Globe, warn: (resumeData?.tabSwitches || 0) >= 2 },
@@ -193,9 +214,9 @@ export function ResumeDialog({
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/20 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute -top-48 -right-48 h-[500px] w-[500px] bg-indigo-200/20 rounded-full blur-[100px]" />
-      <div className="absolute -bottom-48 -left-48 h-[500px] w-[500px] bg-violet-200/20 rounded-full blur-[100px]" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/30 to-violet-50/20 dark:from-slate-950 dark:via-indigo-950/20 dark:to-violet-950/20 flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300">
+      <div className="absolute -top-48 -right-48 h-[500px] w-[500px] bg-indigo-200/20 dark:bg-indigo-900/20 rounded-full blur-[100px]" />
+      <div className="absolute -bottom-48 -left-48 h-[500px] w-[500px] bg-violet-200/20 dark:bg-violet-900/20 rounded-full blur-[100px]" />
 
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.97 }}
@@ -203,8 +224,8 @@ export function ResumeDialog({
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         className="relative max-w-md w-full"
       >
-        <div className="rounded-3xl bg-white shadow-2xl shadow-indigo-500/10 overflow-hidden ring-1 ring-slate-200/60">
-          <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 px-6 py-8 text-center overflow-hidden">
+        <div className="rounded-3xl bg-white dark:bg-slate-900 shadow-2xl shadow-indigo-500/10 dark:shadow-indigo-950/30 overflow-hidden ring-1 ring-slate-200/60 dark:ring-slate-700/60">
+          <div className="relative bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 dark:from-indigo-700 dark:via-blue-700 dark:to-violet-700 px-6 py-8 text-center overflow-hidden">
             <div className="absolute -top-16 -right-16 h-40 w-40 bg-white/10 rounded-full blur-3xl" />
             <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-violet-300/20 rounded-full blur-3xl" />
             <div
@@ -259,10 +280,10 @@ export function ResumeDialog({
                 {formatTime(timeLeft)}
               </p>
               {isCriticalTime && (
-                <p className="text-rose-600 text-xs mt-1.5 font-bold animate-pulse">⚠ Time is critically low!</p>
+                <p className="text-rose-600 dark:text-rose-400 text-xs mt-1.5 font-bold animate-pulse">⚠ Time is critically low!</p>
               )}
               {isLowTime && !isCriticalTime && (
-                <p className="text-amber-600 text-xs mt-1.5 font-semibold">Time is running low — stay focused</p>
+                <p className="text-amber-600 dark:text-amber-400 text-xs mt-1.5 font-semibold">Time is running low — stay focused</p>
               )}
             </motion.div>
 
@@ -270,17 +291,17 @@ export function ResumeDialog({
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
-              className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 ring-1 ring-slate-200 p-4"
+              className="rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100/70 dark:from-slate-800 dark:to-slate-800/70 ring-1 ring-slate-200 dark:ring-slate-700 p-4"
             >
               <div className="flex items-center justify-between mb-2.5">
-                <span className="text-sm font-semibold text-slate-700">Progress</span>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">
+                <span className="text-sm font-semibold text-slate-700 dark:text-slate-300">Progress</span>
+                <span className="text-sm font-bold text-slate-900 dark:text-slate-50 tabular-nums">
                   {answeredCount}
-                  <span className="text-slate-400 font-normal mx-0.5">/</span>
+                  <span className="text-slate-400 dark:text-slate-500 font-normal mx-0.5">/</span>
                   {totalQuestions}
                 </span>
               </div>
-              <div className="relative h-2.5 bg-slate-200 rounded-full overflow-hidden">
+              <div className="relative h-2.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
                 <motion.div
                   initial={{ width: 0 }}
                   animate={{ width: `${progressPercent}%` }}
@@ -288,10 +309,10 @@ export function ResumeDialog({
                   className="absolute inset-y-0 left-0 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500 rounded-full shadow-sm"
                 />
               </div>
-              <p className="text-[11px] text-slate-500 mt-2 font-medium tabular-nums">
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-2 font-medium tabular-nums">
                 {Math.round(progressPercent)}% complete
-                <span className="text-slate-300 mx-1.5">·</span>
-                <span className="text-emerald-600 font-semibold">{totalQuestions - answeredCount} remaining</span>
+                <span className="text-slate-300 dark:text-slate-600 mx-1.5">·</span>
+                <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{totalQuestions - answeredCount} remaining</span>
               </p>
             </motion.div>
 
@@ -301,8 +322,8 @@ export function ResumeDialog({
               transition={{ delay: 0.25 }}
             >
               <div className="flex items-center gap-2 mb-2.5 px-0.5">
-                <Shield className="h-3.5 w-3.5 text-slate-400" />
-                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.14em]">
+                <Shield className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.14em]">
                   Security Status
                 </span>
               </div>
@@ -313,41 +334,41 @@ export function ResumeDialog({
                     className={cn(
                       'relative overflow-hidden rounded-xl p-2.5 text-center ring-1 transition-colors',
                       item.warn
-                        ? 'bg-gradient-to-br from-rose-50 to-red-50 ring-rose-200'
-                        : 'bg-gradient-to-br from-slate-50 to-white ring-slate-200'
+                        ? 'bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-950/40 dark:to-red-950/40 ring-rose-200 dark:ring-rose-900/50'
+                        : 'bg-gradient-to-br from-slate-50 to-white dark:from-slate-800 dark:to-slate-800/50 ring-slate-200 dark:ring-slate-700'
                     )}
                   >
                     <div className={cn(
                       'h-7 w-7 rounded-lg mx-auto mb-1.5 flex items-center justify-center',
                       item.warn
                         ? 'bg-gradient-to-br from-rose-500 to-red-600 shadow-sm'
-                        : 'bg-gradient-to-br from-slate-200 to-slate-300'
+                        : 'bg-gradient-to-br from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-600'
                     )}>
-                      <item.icon className={cn('h-3.5 w-3.5', item.warn ? 'text-white' : 'text-slate-600')} />
+                      <item.icon className={cn('h-3.5 w-3.5', item.warn ? 'text-white' : 'text-slate-600 dark:text-slate-300')} />
                     </div>
-                    <div className={cn('text-base font-extrabold tabular-nums', item.warn ? 'text-rose-600' : 'text-slate-800')}>
+                    <div className={cn('text-base font-extrabold tabular-nums', item.warn ? 'text-rose-600 dark:text-rose-400' : 'text-slate-800 dark:text-slate-200')}>
                       {item.value}
-                      <span className="text-slate-400 text-xs font-normal">/{item.limit}</span>
+                      <span className="text-slate-400 dark:text-slate-500 text-xs font-normal">/{item.limit}</span>
                     </div>
-                    <div className="text-[9px] font-semibold text-slate-500 uppercase tracking-wider mt-0.5 leading-tight">
+                    <div className="text-[9px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mt-0.5 leading-tight">
                       {item.label}
                     </div>
                   </div>
                 ))}
               </div>
               {isLastUnload && (
-                <p className="text-[11px] text-rose-600 font-bold mt-2 text-center animate-pulse">
+                <p className="text-[11px] text-rose-600 dark:text-rose-400 font-bold mt-2 text-center animate-pulse">
                   ⚠ Next page refresh will terminate your exam!
                 </p>
               )}
             </motion.div>
 
             <div className="flex items-center justify-between text-xs px-1">
-              <span className="text-slate-500 font-medium">
-                Attempt <span className="font-bold text-slate-700">{attemptsUsed + 1}</span>
-                <span className="text-slate-400 mx-0.5">of</span>{maxAttempts}
+              <span className="text-slate-500 dark:text-slate-400 font-medium">
+                Attempt <span className="font-bold text-slate-700 dark:text-slate-300">{attemptsUsed + 1}</span>
+                <span className="text-slate-400 dark:text-slate-500 mx-0.5">of</span>{maxAttempts}
               </span>
-              <span className="flex items-center gap-1 text-amber-600 font-semibold">
+              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-semibold">
                 <AlertTriangle className="h-3 w-3" />
                 Must resume to continue
               </span>
@@ -360,7 +381,7 @@ export function ResumeDialog({
             >
               <Button
                 onClick={onResume}
-                className="relative w-full h-14 rounded-2xl font-bold text-base text-white gap-2.5 shadow-xl shadow-indigo-500/30 overflow-hidden group bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 hover:from-indigo-700 hover:via-blue-700 hover:to-violet-700 transition-all"
+                className="relative w-full h-14 rounded-2xl font-bold text-base text-white gap-2.5 shadow-xl shadow-indigo-500/30 dark:shadow-indigo-950/50 overflow-hidden group bg-gradient-to-br from-indigo-600 via-blue-600 to-violet-600 hover:from-indigo-700 hover:via-blue-700 hover:to-violet-700 dark:from-indigo-700 dark:via-blue-700 dark:to-violet-700 dark:hover:from-indigo-800 dark:hover:via-blue-800 dark:hover:to-violet-800 transition-all"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700" />
                 <RotateCcw className="h-5 w-5" />
@@ -369,11 +390,11 @@ export function ResumeDialog({
               </Button>
             </motion.div>
 
-            <div className="flex items-start gap-2.5 bg-gradient-to-br from-amber-50 to-orange-50/50 ring-1 ring-amber-200 rounded-2xl p-3.5">
+            <div className="flex items-start gap-2.5 bg-gradient-to-br from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 ring-1 ring-amber-200 dark:ring-amber-900/50 rounded-2xl p-3.5">
               <div className="flex-shrink-0 h-7 w-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm mt-0.5">
                 <AlertTriangle className="h-3.5 w-3.5 text-white" />
               </div>
-              <p className="text-xs text-amber-800 leading-relaxed font-medium">
+              <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed font-medium">
                 Once resumed, you must complete the exam. Closing the page or switching
                 tabs will be recorded as a security violation.
               </p>

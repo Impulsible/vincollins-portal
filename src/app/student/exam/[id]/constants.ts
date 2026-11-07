@@ -1,11 +1,8 @@
 // src/app/student/exam/constants.ts
 
 // ============================================
-// ✅ ACADEMIC TERM & SESSION
+// ACADEMIC TERM & SESSION
 // ============================================
-// Removed hardcoded values. 
-// These are now fetched dynamically from your database (exams table/settings).
-// Import them from your DB fetcher instead of here.
 
 export type Term = 'first' | 'second' | 'third'
 export const TERMS: Term[] = ['first', 'second', 'third']
@@ -17,24 +14,24 @@ export const TERM_NAMES: Record<Term, string> = {
 } as const
 
 // ============================================
-// ✅ SECURITY LIMITS
+// SECURITY LIMITS
 // ============================================
-// If you want these to be set per-exam by the teacher, 
-// you will need to pass them via the exam object.
-// For now, these are kept as safe fallbacks if the exam doesn't specify.
+
 export const TAB_SWITCH_LIMIT = 3
 export const FULLSCREEN_EXIT_LIMIT = 3
 
 // ============================================
-// ✅ TIMING
+// TIMING
 // ============================================
-export const AUTO_SAVE_INTERVAL = 30000 // 30 seconds
-export const TIME_WARNING_THRESHOLD = 300 // 5 minutes
-export const TIME_SYNC_INTERVAL = 60000 // 60 seconds
+
+export const AUTO_SAVE_INTERVAL = 30000
+export const TIME_WARNING_THRESHOLD = 300
+export const TIME_SYNC_INTERVAL = 60000
 
 // ============================================
-// ✅ EXAM STATUS
+// EXAM STATUS
 // ============================================
+
 export const EXAM_STATUS = {
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
@@ -54,8 +51,9 @@ export const EXAM_STATUS_LABELS: Record<ExamStatus, string> = {
 } as const
 
 // ============================================
-// ✅ QUESTION TYPES
+// QUESTION TYPES
 // ============================================
+
 export const QUESTION_TYPES = {
   OBJECTIVE: 'objective',
   THEORY: 'theory',
@@ -64,8 +62,9 @@ export const QUESTION_TYPES = {
 export type QuestionType = typeof QUESTION_TYPES[keyof typeof QUESTION_TYPES]
 
 // ============================================
-// ✅ GRADES
+// GRADES
 // ============================================
+
 export const GRADES = {
   A: 'A',
   B: 'B',
@@ -91,9 +90,9 @@ export const WAEC_GRADES = {
 export type WAECGrade = typeof WAEC_GRADES[keyof typeof WAEC_GRADES]
 
 // ============================================
-// ✅ GRADE THRESHOLDS
+// GRADE THRESHOLDS
 // ============================================
-// Kept as system logic since grading policies are generally static
+
 export const GRADE_THRESHOLDS = {
   A: 80,
   B: 70,
@@ -115,8 +114,9 @@ export const WAEC_GRADE_THRESHOLDS = {
 } as const
 
 // ============================================
-// ✅ GRADE REMARKS
+// GRADE REMARKS
 // ============================================
+
 export const GRADE_REMARKS: Record<string, string> = {
   A: 'Excellent',
   B: 'Very Good',
@@ -135,8 +135,9 @@ export const GRADE_REMARKS: Record<string, string> = {
 } as const
 
 // ============================================
-// ✅ GRADE COLORS
+// GRADE COLORS
 // ============================================
+
 export const GRADE_COLORS = {
   A: 'text-emerald-600 bg-emerald-50 border-emerald-200',
   B: 'text-blue-600 bg-blue-50 border-blue-200',
@@ -158,45 +159,65 @@ export const WAEC_GRADE_COLORS = {
 } as const
 
 // ============================================
-// ✅ DEFAULT VALUES
+// DEFAULT VALUES
 // ============================================
-// These act as fallbacks only if the teacher did not provide 
-// a custom setting when creating the exam.
+
 export const DEFAULT_PASSING_PERCENTAGE = 50
 export const DEFAULT_MAX_ATTEMPTS = 1
-export const DEFAULT_EXAM_DURATION = 30 // minutes
+export const DEFAULT_EXAM_DURATION = 30
 export const DEFAULT_OBJECTIVE_MARKS = 0.5
 export const DEFAULT_THEORY_MARKS = 10
 
 // ============================================
-// ✅ HELPER FUNCTIONS
+// EXAM CONFIG (aggregate for runtime use)
 // ============================================
 
-/**
- * Get the display name for a term
- */
+export const EXAM_CONFIG = {
+  EXAM_PORTION_MAX: 60,
+  CA_PORTION_MAX: 40,
+  DEFAULT_DURATION_MINUTES: DEFAULT_EXAM_DURATION,
+  DEFAULT_PASSING_PERCENTAGE,
+  DEFAULT_MAX_ATTEMPTS,
+  TIMER_INTERVAL_MS: 1000,
+  FULLSCREEN_RESTORE_DELAY_MS: 200,
+  FULLSCREEN_PROMPT_DISMISS_MS: 300,
+  AUTO_SUBMIT_TOAST_DURATION_MS: 6000,
+  AUTO_SAVE_INTERVAL_MS: AUTO_SAVE_INTERVAL,
+  TIME_SYNC_INTERVAL_MS: TIME_SYNC_INTERVAL,
+  TIME_WARNING_THRESHOLD_S: TIME_WARNING_THRESHOLD,
+} as const
+
+// ============================================
+// TERMINAL STATUSES
+// ============================================
+
+export const TERMINAL_STATUSES = [
+  EXAM_STATUS.COMPLETED,
+  EXAM_STATUS.GRADED,
+  EXAM_STATUS.PENDING_THEORY,
+  EXAM_STATUS.TERMINATED,
+  "submitted",
+] as const
+
+export type TerminalStatus = (typeof TERMINAL_STATUSES)[number]
+
+// ============================================
+// HELPER FUNCTIONS
+// ============================================
+
 export function getTermName(term: string): string {
   return TERM_NAMES[term as Term] || term
 }
 
-/**
- * Get exam status label
- */
 export function getExamStatusLabel(status: string): string {
   return EXAM_STATUS_LABELS[status as ExamStatus] || status
 }
 
-/**
- * Check if a grade is a passing grade
- */
 export function isPassingGrade(grade: string): boolean {
   const passingGrades = ['A', 'B', 'C', 'P', 'A1', 'B2', 'B3', 'C4', 'C5', 'C6']
   return passingGrades.includes(grade)
 }
 
-/**
- * Check if a WAEC grade is a passing grade
- */
 export function isPassingWAECGrade(grade: string): boolean {
   const passingGrades = ['A1', 'B2', 'B3', 'C4', 'C5', 'C6']
   return passingGrades.includes(grade)

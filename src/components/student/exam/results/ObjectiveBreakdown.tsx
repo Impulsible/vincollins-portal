@@ -18,54 +18,54 @@ export function ObjectiveBreakdown({ examResult }: ObjectiveBreakdownProps) {
   const unansweredPercent = total > 0 ? ((examResult.unanswered || 0) / total) * 100 : 0
 
   return (
-    <Card className="border border-slate-200 shadow-sm bg-white rounded-2xl overflow-hidden">
+    <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 rounded-2xl overflow-hidden transition-colors duration-300">
       <CardContent className="p-5 sm:p-6">
-        <h3 className="font-semibold text-slate-800 mb-4 flex items-center gap-2">
-          <CheckCircle className="h-5 w-5 text-blue-500" />
+        <h3 className="font-semibold text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2">
+          <CheckCircle className="h-5 w-5 text-blue-500 dark:text-blue-400" />
           Objective Breakdown
         </h3>
 
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
-            <div className="inline-flex h-10 w-10 rounded-full bg-emerald-100 items-center justify-center mb-2">
-              <CheckCircle className="h-5 w-5 text-emerald-600" />
+          <div className="bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-100 dark:border-emerald-900/50 rounded-xl p-4 text-center">
+            <div className="inline-flex h-10 w-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 items-center justify-center mb-2">
+              <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
             </div>
-            <p className="text-2xl font-bold text-emerald-700">{examResult.correct || 0}</p>
-            <p className="text-xs text-emerald-500 font-medium uppercase tracking-wider">Correct</p>
-            <div className="mt-2 h-1.5 bg-emerald-100 rounded-full overflow-hidden">
+            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{examResult.correct || 0}</p>
+            <p className="text-xs text-emerald-500 dark:text-emerald-400 font-medium uppercase tracking-wider">Correct</p>
+            <div className="mt-2 h-1.5 bg-emerald-100 dark:bg-emerald-900/60 rounded-full overflow-hidden">
               <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${correctPercent}%` }} />
             </div>
           </div>
 
-          <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-center">
-            <div className="inline-flex h-10 w-10 rounded-full bg-red-100 items-center justify-center mb-2">
-              <XCircle className="h-5 w-5 text-red-500" />
+          <div className="bg-red-50 dark:bg-red-950/40 border border-red-100 dark:border-red-900/50 rounded-xl p-4 text-center">
+            <div className="inline-flex h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/50 items-center justify-center mb-2">
+              <XCircle className="h-5 w-5 text-red-500 dark:text-red-400" />
             </div>
-            <p className="text-2xl font-bold text-red-600">{examResult.incorrect || 0}</p>
-            <p className="text-xs text-red-400 font-medium uppercase tracking-wider">Wrong</p>
-            <div className="mt-2 h-1.5 bg-red-100 rounded-full overflow-hidden">
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{examResult.incorrect || 0}</p>
+            <p className="text-xs text-red-400 dark:text-red-400 font-medium uppercase tracking-wider">Wrong</p>
+            <div className="mt-2 h-1.5 bg-red-100 dark:bg-red-900/60 rounded-full overflow-hidden">
               <div className="h-full bg-red-500 rounded-full" style={{ width: `${incorrectPercent}%` }} />
             </div>
           </div>
 
-          <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center">
-            <div className="inline-flex h-10 w-10 rounded-full bg-slate-100 items-center justify-center mb-2">
-              <HelpCircle className="h-5 w-5 text-slate-400" />
+          <div className="bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 rounded-xl p-4 text-center">
+            <div className="inline-flex h-10 w-10 rounded-full bg-slate-100 dark:bg-slate-800 items-center justify-center mb-2">
+              <HelpCircle className="h-5 w-5 text-slate-400 dark:text-slate-500" />
             </div>
-            <p className="text-2xl font-bold text-slate-500">{examResult.unanswered || 0}</p>
-            <p className="text-xs text-slate-400 font-medium uppercase tracking-wider">Skipped</p>
-            <div className="mt-2 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-              <div className="h-full bg-slate-300 rounded-full" style={{ width: `${unansweredPercent}%` }} />
+            <p className="text-2xl font-bold text-slate-500 dark:text-slate-400">{examResult.unanswered || 0}</p>
+            <p className="text-xs text-slate-400 dark:text-slate-500 font-medium uppercase tracking-wider">Skipped</p>
+            <div className="mt-2 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-slate-300 dark:bg-slate-600 rounded-full" style={{ width: `${unansweredPercent}%` }} />
             </div>
           </div>
         </div>
 
-        <div className="mt-4 flex h-2 rounded-full overflow-hidden bg-slate-100">
+        <div className="mt-4 flex h-2 rounded-full overflow-hidden bg-slate-100 dark:bg-slate-800">
           <div className="bg-emerald-500 h-full" style={{ width: `${correctPercent}%` }} />
           <div className="bg-red-500 h-full" style={{ width: `${incorrectPercent}%` }} />
-          <div className="bg-slate-300 h-full" style={{ width: `${unansweredPercent}%` }} />
+          <div className="bg-slate-300 dark:bg-slate-600 h-full" style={{ width: `${unansweredPercent}%` }} />
         </div>
-        <div className="flex justify-between text-xs text-slate-400 mt-1.5 px-1">
+        <div className="flex justify-between text-xs text-slate-400 dark:text-slate-500 mt-1.5 px-1">
           <span>{Math.round(correctPercent)}% correct</span>
           <span>{Math.round(incorrectPercent)}% wrong</span>
           <span>{Math.round(unansweredPercent)}% skipped</span>

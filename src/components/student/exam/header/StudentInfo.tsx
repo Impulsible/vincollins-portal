@@ -1,8 +1,13 @@
+// src/components/student/exam/header/StudentInfo.tsx
+
 'use client'
 
-import Image from 'next/image'
-import { User } from 'lucide-react'
-import type { StudentProfile } from '@/app/student/exam/[id]/types'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+
+interface StudentProfile {
+  full_name?: string | null
+  photo_url?: string | null
+}
 
 interface StudentInfoProps {
   profile: StudentProfile | null
@@ -17,37 +22,18 @@ export function StudentInfo({ profile, examTitle, termName }: StudentInfoProps) 
 
   return (
     <div className="flex items-center gap-3">
-      <div className="relative shrink-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-violet-500 rounded-full blur-md opacity-30" />
-        {profile?.photo_url ? (
-          <Image
-            src={profile.photo_url}
-            alt={profile.full_name || 'Student'}
-            width={36}
-            height={36}
-            className="relative h-9 w-9 rounded-full object-cover ring-2 ring-white shadow-md"
-            unoptimized
-          />
-        ) : (
-          <div className="relative h-9 w-9 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-full flex items-center justify-center shadow-md ring-2 ring-white">
-            <span className="text-white font-bold text-xs">{initials}</span>
-          </div>
-        )}
-      </div>
+      <Avatar className="h-8 w-8 border border-slate-200 dark:border-slate-700">
+        <AvatarImage src={profile?.photo_url || undefined} alt={profile?.full_name || 'Student'} />
+        <AvatarFallback className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
       <div className="hidden sm:block min-w-0">
-        <p className="text-sm font-bold text-slate-900 leading-tight truncate">
-          {examTitle || profile?.full_name || 'Student'}
+        <p className="text-sm font-medium text-slate-900 dark:text-slate-100 leading-tight truncate">
+          {profile?.full_name || 'Student'}
         </p>
-        <p className="text-[11px] text-slate-500 truncate mt-0.5">
-          <span className="font-medium text-slate-600">
-            {profile?.full_name || 'Student'}
-          </span>
-          {termName && (
-            <>
-              <span className="text-slate-300 mx-1.5">·</span>
-              {termName}
-            </>
-          )}
+        <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">
+          {examTitle || 'Exam'} · {termName || 'Term'}
         </p>
       </div>
     </div>

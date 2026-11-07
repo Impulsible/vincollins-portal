@@ -31,13 +31,13 @@ export function SecurityCard({
   ]
 
   return (
-    <div className="rounded-2xl bg-white ring-1 ring-slate-200/80 shadow-sm overflow-hidden">
+    <div className="rounded-2xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm overflow-hidden transition-colors duration-300">
       <div className="p-4">
         <div className="flex items-center gap-2 mb-3">
           <div className="h-6 w-6 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-sm">
             <Shield className="h-3 w-3 text-white" />
           </div>
-          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.14em]">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-[0.14em]">
             Security Status
           </span>
         </div>
@@ -52,22 +52,22 @@ export function SecurityCard({
                 className={cn(
                   'flex items-center justify-between px-3 py-2 rounded-xl ring-1',
                   warn
-                    ? 'bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200'
+                    ? 'bg-gradient-to-r from-rose-50 to-red-50/50 dark:from-rose-950/40 dark:to-red-950/30 ring-rose-200 dark:ring-rose-900/50'
                     : active
-                      ? 'bg-gradient-to-r from-amber-50 to-orange-50/50 ring-amber-200'
-                      : 'bg-slate-50 ring-slate-100'
+                      ? 'bg-gradient-to-r from-amber-50 to-orange-50/50 dark:from-amber-950/40 dark:to-orange-950/30 ring-amber-200 dark:ring-amber-900/50'
+                      : 'bg-slate-50 dark:bg-slate-800/60 ring-slate-100 dark:ring-slate-800'
                 )}
               >
                 <div className="flex items-center gap-2">
                   <item.icon className={cn(
                     'h-3.5 w-3.5',
-                    warn ? 'text-rose-500' : active ? 'text-amber-500' : 'text-slate-400'
+                    warn ? 'text-rose-500 dark:text-rose-400' : active ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500'
                   )} />
-                  <span className="text-xs text-slate-600 font-medium">{item.label}</span>
+                  <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">{item.label}</span>
                 </div>
                 <span className={cn(
                   'text-xs font-bold tabular-nums',
-                  warn ? 'text-rose-600' : active ? 'text-amber-600' : 'text-emerald-600'
+                  warn ? 'text-rose-600 dark:text-rose-400' : active ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                 )}>
                   {item.value}/{item.limit}
                 </span>
@@ -79,16 +79,16 @@ export function SecurityCard({
           <div className={cn(
             'flex items-center justify-between px-3 py-2 rounded-xl ring-1',
             isOnline
-              ? 'bg-gradient-to-r from-emerald-50 to-teal-50/50 ring-emerald-200'
-              : 'bg-gradient-to-r from-rose-50 to-red-50/50 ring-rose-200'
+              ? 'bg-gradient-to-r from-emerald-50 to-teal-50/50 dark:from-emerald-950/40 dark:to-teal-950/30 ring-emerald-200 dark:ring-emerald-900/50'
+              : 'bg-gradient-to-r from-rose-50 to-red-50/50 dark:from-rose-950/40 dark:to-red-950/30 ring-rose-200 dark:ring-rose-900/50'
           )}>
             <div className="flex items-center gap-2">
               {isOnline ? (
-                <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+                <Wifi className="h-3.5 w-3.5 text-emerald-500 dark:text-emerald-400" />
               ) : (
-                <WifiOff className="h-3.5 w-3.5 text-rose-500" />
+                <WifiOff className="h-3.5 w-3.5 text-rose-500 dark:text-rose-400" />
               )}
-              <span className="text-xs text-slate-600 font-medium">Network</span>
+              <span className="text-xs text-slate-600 dark:text-slate-300 font-medium">Network</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className={cn(
@@ -97,7 +97,7 @@ export function SecurityCard({
               )} />
               <span className={cn(
                 'text-xs font-bold',
-                isOnline ? 'text-emerald-600' : 'text-rose-600'
+                isOnline ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'
               )}>
                 {isOnline ? 'Connected' : 'Offline'}
               </span>

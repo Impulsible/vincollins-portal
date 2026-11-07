@@ -41,6 +41,8 @@ export interface Question {
 }
 
 export interface TheoryQuestion {
+  image_url: null
+  image_caption: null
   id: string
   exam_id?: string
   question_text: string

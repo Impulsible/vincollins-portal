@@ -40,7 +40,7 @@ const hasTable = (t: string) => detect.mdTable(t) || detect.htmlTable(t) || dete
 const hasImage = (t: string) => detect.mdImage(t) || detect.htmlImage(t)
 
 // ═════════════════════════════════════════════════════════════════════════════
-// SANITIZATION — prevents XSS in dangerouslySetInnerHTML
+// SANITIZATION
 // ═════════════════════════════════════════════════════════════════════════════
 
 const sanitizeHtml = (html: string): string => {
@@ -88,9 +88,7 @@ const extractMarkdownTables = (text: string): { html: string; remaining: string 
         j++
       }
 
-      // Build HTML
       const parseCells = (ln: string) => ln.split('|').map(c => c.trim()).filter((_, idx, arr) => {
-        // drop leading/trailing empty cells created by | pipes
         return !(idx === 0 && arr[0] === '') && !(idx === arr.length - 1 && arr[arr.length - 1] === '')
       })
 
@@ -103,15 +101,17 @@ const extractMarkdownTables = (text: string): { html: string; remaining: string 
 
       let tableHtml = '<table class="min-w-full border-collapse"><thead><tr>'
       headers.forEach((h, idx) => {
-        tableHtml += `<th class="px-4 py-2.5 text-${alignments[idx] || 'left'} text-xs font-bold text-slate-700 uppercase tracking-wider bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200">${escapeHtml(h)}</th>`
+        tableHtml += `<th class="px-4 py-2.5 text-${alignments[idx] || 'left'} text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/70 border border-slate-200 dark:border-slate-700">${escapeHtml(h)}</th>`
       })
       tableHtml += '</tr></thead><tbody>'
       rows.forEach((row, rowIdx) => {
         const cells = parseCells(row)
-        const bg = rowIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'
-        tableHtml += `<tr class="${bg} hover:bg-indigo-50/40 transition-colors">`
+        const bg = rowIdx % 2 === 0 
+          ? 'bg-white dark:bg-slate-900' 
+          : 'bg-slate-50/40 dark:bg-slate-800/40'
+        tableHtml += `<tr class="${bg} hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition-colors">`
         cells.forEach((c, idx) => {
-          tableHtml += `<td class="px-4 py-2.5 text-${alignments[idx] || 'left'} text-sm text-slate-700 border border-slate-200">${escapeHtml(c)}</td>`
+          tableHtml += `<td class="px-4 py-2.5 text-${alignments[idx] || 'left'} text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">${escapeHtml(c)}</td>`
         })
         tableHtml += '</tr>'
       })
@@ -133,11 +133,10 @@ const extractMarkdownTables = (text: string): { html: string; remaining: string 
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
-// INLINE MARKDOWN FORMATTING (bold, italic, code, links)
+// INLINE MARKDOWN FORMATTING
 // ═════════════════════════════════════════════════════════════════════════════
 
 const renderInline = (text: string): React.ReactNode => {
-  // Split by code first, then handle other formatting
   const parts: Array<{ type: string; content: string }> = []
   let remaining = text
   let safety = 0
@@ -175,18 +174,18 @@ const renderInline = (text: string): React.ReactNode => {
     switch (p.type) {
       case 'code':
         return (
-          <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 font-mono text-[13px] ring-1 ring-slate-200">
+          <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-[13px] ring-1 ring-slate-200 dark:ring-slate-700">
             {p.content}
           </code>
         )
       case 'bold':
-        return <strong key={i} className="font-bold text-slate-900">{p.content}</strong>
+        return <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">{p.content}</strong>
       case 'italic':
-        return <em key={i} className="italic text-slate-800">{p.content}</em>
+        return <em key={i} className="italic text-slate-800 dark:text-slate-200">{p.content}</em>
       case 'link': {
         const { text, href } = JSON.parse(p.content)
         return (
-          <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:text-indigo-700 underline underline-offset-2 font-medium">
+          <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline underline-offset-2 font-medium">
             {text}
           </a>
         )
@@ -202,15 +201,15 @@ const renderInline = (text: string): React.ReactNode => {
 // ═════════════════════════════════════════════════════════════════════════════
 
 const renderCodeBlock = (code: string, lang?: string, key?: React.Key) => (
-  <div key={key} className="my-3 relative overflow-hidden rounded-xl bg-slate-900 ring-1 ring-slate-800 shadow-sm">
+  <div key={key} className="my-3 relative overflow-hidden rounded-xl bg-slate-900 dark:bg-slate-950 ring-1 ring-slate-800 dark:ring-slate-700 shadow-sm">
     {lang && (
-      <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 border-b border-slate-700">
-        <Code2 className="h-3 w-3 text-slate-400" />
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">{lang}</span>
+      <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 dark:bg-slate-900/50 border-b border-slate-700 dark:border-slate-800">
+        <Code2 className="h-3 w-3 text-slate-400 dark:text-slate-500" />
+        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{lang}</span>
       </div>
     )}
     <pre className="p-4 overflow-x-auto">
-      <code className="text-[13px] font-mono text-slate-100 leading-relaxed whitespace-pre">
+      <code className="text-[13px] font-mono text-slate-100 dark:text-slate-200 leading-relaxed whitespace-pre">
         {code}
       </code>
     </pre>
@@ -218,17 +217,17 @@ const renderCodeBlock = (code: string, lang?: string, key?: React.Key) => (
 )
 
 const renderBlockquote = (text: string, key?: React.Key) => (
-  <blockquote key={key} className="my-3 pl-4 py-2 border-l-4 border-indigo-400 bg-gradient-to-r from-indigo-50/60 to-transparent rounded-r-lg">
+  <blockquote key={key} className="my-3 pl-4 py-2 border-l-4 border-indigo-400 dark:border-indigo-600 bg-gradient-to-r from-indigo-50/60 to-transparent dark:from-indigo-950/40 rounded-r-lg">
     <div className="flex gap-2.5">
-      <Quote className="h-4 w-4 text-indigo-400 shrink-0 mt-0.5" />
-      <p className="text-slate-700 italic text-[15px] leading-relaxed">{renderInline(text)}</p>
+      <Quote className="h-4 w-4 text-indigo-400 dark:text-indigo-500 shrink-0 mt-0.5" />
+      <p className="text-slate-700 dark:text-slate-300 italic text-[15px] leading-relaxed">{renderInline(text)}</p>
     </div>
   </blockquote>
 )
 
 const renderHeading = (level: number, text: string, key?: React.Key) => {
   const sizes = ['text-xl', 'text-lg', 'text-base', 'text-sm', 'text-sm', 'text-xs']
-  const cls = cn('font-bold text-slate-900 mt-3 mb-1.5 leading-tight', sizes[level - 1])
+  const cls = cn('font-bold text-slate-900 dark:text-slate-100 mt-3 mb-1.5 leading-tight', sizes[level - 1])
   return <div key={key} className={cls}>{renderInline(text)}</div>
 }
 
@@ -237,13 +236,13 @@ const renderList = (items: string[], ordered: boolean, key?: React.Key) => (
     {items.map((item, i) => (
       <div key={i} className="flex gap-2.5 pl-1">
         {ordered ? (
-          <span className="flex-shrink-0 min-w-[20px] text-indigo-600 font-bold text-sm tabular-nums">
+          <span className="flex-shrink-0 min-w-[20px] text-indigo-600 dark:text-indigo-400 font-bold text-sm tabular-nums">
             {i + 1}.
           </span>
         ) : (
           <span className="flex-shrink-0 mt-2 h-1.5 w-1.5 rounded-full bg-gradient-to-br from-indigo-500 to-blue-500" />
         )}
-        <span className="text-slate-700 text-[15px] leading-relaxed flex-1">
+        <span className="text-slate-700 dark:text-slate-300 text-[15px] leading-relaxed flex-1">
           {renderInline(item)}
         </span>
       </div>
@@ -257,12 +256,12 @@ const renderMarkdownImage = (text: string, key?: React.Key) => {
   const [, alt, src] = match
   return (
     <figure key={key} className="my-3 flex flex-col items-center">
-      <div className="relative rounded-xl overflow-hidden ring-1 ring-slate-200 shadow-sm bg-slate-50 max-w-full">
+      <div className="relative rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm bg-slate-50 dark:bg-slate-800 max-w-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={src} alt={alt || 'Image'} className="max-h-[320px] max-w-full object-contain" />
       </div>
       {alt && (
-        <figcaption className="text-xs text-slate-500 italic mt-2 text-center">
+        <figcaption className="text-xs text-slate-500 dark:text-slate-400 italic mt-2 text-center">
           {alt}
         </figcaption>
       )}
@@ -277,26 +276,22 @@ const renderMarkdownImage = (text: string, key?: React.Key) => {
 const renderContent = (text: string): React.ReactNode => {
   if (!text) return null
 
-  // Extract code blocks first (``` ``` protects their content)
   const codeBlocks: Array<{ lang: string; code: string }> = []
   let processed = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, lang, code) => {
     codeBlocks.push({ lang: lang || '', code: code.trimEnd() })
     return `[[CODE_${codeBlocks.length - 1}]]`
   })
 
-  // Extract markdown tables
   const { html: tablesHtml, remaining } = extractMarkdownTables(processed)
   const tableBlocks = tablesHtml ? tablesHtml.split('\n').filter(Boolean) : []
   processed = remaining
 
-  // Extract HTML tables
   const htmlTables: string[] = []
   processed = processed.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
     htmlTables.push(match)
     return `[[HTMLTABLE_${htmlTables.length - 1}]]`
   })
 
-  // Extract ASCII tables (blocks of consecutive +--/|-- lines)
   const asciiTables: string[] = []
   const asciiTableRegex = /((?:^[+|].*$\n?){2,})/gm
   processed = processed.replace(asciiTableRegex, (match) => {
@@ -307,28 +302,24 @@ const renderContent = (text: string): React.ReactNode => {
     return match
   })
 
-  // Extract markdown images
   const images: string[] = []
   processed = processed.replace(/!\[[^\]]*\]\([^)]+\)/g, (match) => {
     images.push(match)
     return `[[IMG_${images.length - 1}]]`
   })
 
-  // Extract HTML images
   const htmlImages: string[] = []
   processed = processed.replace(/<img[^>]+>/gi, (match) => {
     htmlImages.push(match)
     return `[[HTMLIMG_${htmlImages.length - 1}]]`
   })
 
-  // Now split into blocks (paragraphs separated by blank lines)
   const blocks = processed.split(/\n\s*\n/).filter(b => b.trim())
   const rendered: React.ReactNode[] = []
 
   blocks.forEach((block, blockIdx) => {
     const trimmed = block.trim()
 
-    // Placeholder for extracted elements
     const placeholderMatch = /^\[\[(CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_(\d+)\]\]$/.exec(trimmed)
     if (placeholderMatch) {
       const [, kind, idxStr] = placeholderMatch
@@ -338,16 +329,16 @@ const renderContent = (text: string): React.ReactNode => {
         rendered.push(renderCodeBlock(cb.code, cb.lang, `cb-${blockIdx}`))
       } else if (kind === 'HTMLTABLE') {
         rendered.push(
-          <div key={`htmltbl-${blockIdx}`} className="my-3 overflow-x-auto rounded-xl ring-1 ring-slate-200 shadow-sm">
+          <div key={`htmltbl-${blockIdx}`} className="my-3 overflow-x-auto rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm">
             <div
-              className="w-full text-sm [&_table]:w-full [&_table]:border-collapse [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:text-slate-700 [&_th]:uppercase [&_th]:tracking-wider [&_th]:bg-gradient-to-br [&_th]:from-slate-50 [&_th]:to-slate-100 [&_th]:border [&_th]:border-slate-200 [&_td]:px-4 [&_td]:py-2.5 [&_td]:text-sm [&_td]:text-slate-700 [&_td]:border [&_td]:border-slate-200 [&_tr:nth-child(even)]:bg-slate-50/40"
+              className="w-full text-sm [&_table]:w-full [&_table]:border-collapse [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:text-slate-700 [&_th]:dark:text-slate-300 [&_th]:uppercase [&_th]:tracking-wider [&_th]:bg-gradient-to-br [&_th]:from-slate-50 [&_th]:dark:from-slate-800 [&_th]:to-slate-100 [&_th]:dark:to-slate-800/70 [&_th]:border [&_th]:border-slate-200 [&_th]:dark:border-slate-700 [&_td]:px-4 [&_td]:py-2.5 [&_td]:text-sm [&_td]:text-slate-700 [&_td]:dark:text-slate-300 [&_td]:border [&_td]:border-slate-200 [&_td]:dark:border-slate-700 [&_tr:nth-child(even)]:bg-slate-50/40 [&_tr:nth-child(even)]:dark:bg-slate-800/40"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlTables[idx]) }}
             />
           </div>
         )
       } else if (kind === 'ASCIITABLE') {
         rendered.push(
-          <pre key={`ascii-${blockIdx}`} className="my-3 p-4 rounded-xl bg-slate-900 text-slate-100 text-[13px] font-mono overflow-x-auto ring-1 ring-slate-800 whitespace-pre leading-relaxed">
+          <pre key={`ascii-${blockIdx}`} className="my-3 p-4 rounded-xl bg-slate-900 dark:bg-slate-950 text-slate-100 dark:text-slate-200 text-[13px] font-mono overflow-x-auto ring-1 ring-slate-800 dark:ring-slate-700 whitespace-pre leading-relaxed">
             {asciiTables[idx]}
           </pre>
         )
@@ -357,7 +348,7 @@ const renderContent = (text: string): React.ReactNode => {
         rendered.push(
           <div key={`htmlimg-${blockIdx}`} className="my-3 flex justify-center">
             <div
-              className="rounded-xl overflow-hidden ring-1 ring-slate-200 shadow-sm [&_img]:max-h-[320px] [&_img]:max-w-full [&_img]:object-contain"
+              className="rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm [&_img]:max-h-[320px] [&_img]:max-w-full [&_img]:object-contain"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlImages[idx]) }}
             />
           </div>
@@ -366,21 +357,18 @@ const renderContent = (text: string): React.ReactNode => {
       return
     }
 
-    // Blockquote
     if (/^>\s+/m.test(trimmed)) {
       const quoted = trimmed.split('\n').map(l => l.replace(/^>\s?/, '')).join(' ')
       rendered.push(renderBlockquote(quoted, `bq-${blockIdx}`))
       return
     }
 
-    // Heading
     const hMatch = /^(#{1,6})\s+(.+)$/m.exec(trimmed)
     if (hMatch && trimmed === hMatch[0]) {
       rendered.push(renderHeading(hMatch[1].length, hMatch[2], `h-${blockIdx}`))
       return
     }
 
-    // Lists
     const lines = trimmed.split('\n')
     const unorderedItems = lines.filter(l => /^\s*[-*+]\s+/.test(l))
     const orderedItems = lines.filter(l => /^\s*\d+\.\s+/.test(l))
@@ -396,7 +384,6 @@ const renderContent = (text: string): React.ReactNode => {
       return
     }
 
-    // Mixed content block: handle inline placeholders within paragraphs
     const parts = trimmed.split(/(\[\[(?:CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_\d+\]\])/)
     const nodes: React.ReactNode[] = []
     parts.forEach((part, i) => {
@@ -407,11 +394,10 @@ const renderContent = (text: string): React.ReactNode => {
         if (kind === 'CODE') nodes.push(renderCodeBlock(codeBlocks[idx].code, codeBlocks[idx].lang, `inline-cb-${blockIdx}-${i}`))
         else if (kind === 'IMG') nodes.push(renderMarkdownImage(images[idx], `inline-img-${blockIdx}-${i}`))
       } else if (part) {
-        // Regular paragraph with inline formatting
         const paraLines = part.split('\n').filter(l => l.trim())
         paraLines.forEach((pl, pi) => {
           nodes.push(
-            <p key={`p-${blockIdx}-${i}-${pi}`} className="text-slate-700 leading-relaxed text-[15px]">
+            <p key={`p-${blockIdx}-${i}-${pi}`} className="text-slate-700 dark:text-slate-300 leading-relaxed text-[15px]">
               {renderInline(pl)}
             </p>
           )
@@ -492,33 +478,32 @@ export function QuestionCard({
     hasList: detect.list(questionText),
   }
 
-  // Theme
   const theme = isTheory
     ? {
-        heroGradient: 'from-fuchsia-600 via-purple-600 to-indigo-600',
+        heroGradient: 'from-fuchsia-600 via-purple-600 to-indigo-600 dark:from-fuchsia-700 dark:via-purple-700 dark:to-indigo-700',
         accentGradient: 'from-fuchsia-500 via-purple-500 to-indigo-500',
         iconBg: 'bg-gradient-to-br from-fuchsia-500 to-purple-600',
-        iconShadow: 'shadow-purple-500/30',
+        iconShadow: 'shadow-purple-500/30 dark:shadow-purple-950/50',
         label: 'Theory',
         labelLong: 'Written Response',
         Icon: FileText,
-        questionBg: 'bg-gradient-to-br from-fuchsia-50/60 via-purple-50/40 to-indigo-50/30',
-        questionRing: 'ring-fuchsia-200/50',
+        questionBg: 'bg-gradient-to-br from-fuchsia-50/60 via-purple-50/40 to-indigo-50/30 dark:from-fuchsia-950/30 dark:via-purple-950/20 dark:to-indigo-950/20',
+        questionRing: 'ring-fuchsia-200/50 dark:ring-fuchsia-900/50',
         numberBg: 'bg-gradient-to-br from-fuchsia-500 to-purple-600',
-        numberShadow: 'shadow-fuchsia-500/30',
+        numberShadow: 'shadow-fuchsia-500/30 dark:shadow-fuchsia-950/50',
       }
     : {
-        heroGradient: 'from-blue-600 via-indigo-600 to-violet-600',
+        heroGradient: 'from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-700',
         accentGradient: 'from-blue-500 via-indigo-500 to-violet-500',
         iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
-        iconShadow: 'shadow-indigo-500/30',
+        iconShadow: 'shadow-indigo-500/30 dark:shadow-indigo-950/50',
         label: 'MCQ',
         labelLong: 'Multiple Choice',
         Icon: Hash,
-        questionBg: 'bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-violet-50/30',
-        questionRing: 'ring-indigo-200/50',
+        questionBg: 'bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-violet-50/30 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-violet-950/20',
+        questionRing: 'ring-indigo-200/50 dark:ring-indigo-900/50',
         numberBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
-        numberShadow: 'shadow-indigo-500/30',
+        numberShadow: 'shadow-indigo-500/30 dark:shadow-indigo-950/50',
       }
 
   return (
@@ -526,9 +511,8 @@ export function QuestionCard({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="relative rounded-3xl bg-white ring-1 ring-slate-200/80 shadow-sm overflow-hidden"
+      className="relative rounded-3xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm overflow-hidden transition-colors duration-300"
     >
-      {/* Top accent */}
       <div className={cn('h-1 bg-gradient-to-r', theme.accentGradient)} />
 
       {/* HEADER */}
@@ -578,7 +562,6 @@ export function QuestionCard({
           </div>
         </div>
 
-        {/* Content type pills row */}
         {(contentTypes.hasTable || contentTypes.hasChart || contentTypes.hasImage ||
           contentTypes.hasCode || contentTypes.hasMath || contentTypes.hasList) && (
           <div className="relative mt-3 flex flex-wrap items-center gap-1.5">
@@ -606,7 +589,6 @@ export function QuestionCard({
 
       {/* QUESTION BODY */}
       <div className="p-5 sm:p-6 space-y-5">
-        {/* Question card */}
         <div className={cn(
           'relative rounded-2xl p-5 ring-1 overflow-hidden',
           theme.questionBg,
@@ -626,7 +608,6 @@ export function QuestionCard({
           </div>
         </div>
 
-        {/* Answer area */}
         <div>
           {isTheory ? (
             <TheoryAnswer

@@ -46,7 +46,7 @@ export function SubmitDialog({
 }: SubmitDialogProps) {
   const theoryComplete =
     theoryInfo ? theoryInfo.answered >= theoryInfo.required : true
-  const allAnswered     = unansweredCount === 0
+  const allAnswered = unansweredCount === 0
   const isFullyComplete = allAnswered && theoryComplete
 
   const progressPct =
@@ -60,24 +60,24 @@ export function SubmitDialog({
 
   // 🎨 Theme
   const theme = isFullyComplete ? {
-    gradient: 'from-emerald-500 via-teal-600 to-green-600',
+    gradient: 'from-emerald-500 via-teal-600 to-green-600 dark:from-emerald-600 dark:via-teal-700 dark:to-green-700',
     iconBg: 'bg-emerald-100 dark:bg-emerald-950/50',
     iconColor: 'text-emerald-600 dark:text-emerald-400',
-    glow: 'shadow-emerald-500/30',
+    glow: 'shadow-emerald-500/30 dark:shadow-emerald-950/50',
     label: 'Ready to Submit',
     sub: 'All required questions answered',
   } : {
-    gradient: 'from-amber-500 via-orange-500 to-rose-500',
+    gradient: 'from-amber-500 via-orange-500 to-rose-500 dark:from-amber-600 dark:via-orange-600 dark:to-rose-600',
     iconBg: 'bg-amber-100 dark:bg-amber-950/50',
     iconColor: 'text-amber-600 dark:text-amber-400',
-    glow: 'shadow-amber-500/30',
+    glow: 'shadow-amber-500/30 dark:shadow-amber-950/50',
     label: 'Review Submission',
     sub: `${unansweredCount} question${unansweredCount !== 1 ? 's' : ''} remaining`,
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[440px] w-[95vw] p-0 gap-0 bg-white dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xl rounded-3xl overflow-hidden max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-[440px] w-[95vw] p-0 gap-0 bg-white dark:bg-zinc-950 border border-zinc-200/60 dark:border-zinc-800/60 shadow-2xl dark:shadow-black/60 rounded-3xl overflow-hidden max-h-[92vh] overflow-y-auto">
 
         <DialogDescription className="sr-only">
           Confirm your exam submission.
@@ -100,9 +100,9 @@ export function SubmitDialog({
           {/* Decorative orbs */}
           <div className="absolute top-0 right-0 h-32 w-32 bg-white/10 rounded-full -mr-16 -mt-16 blur-2xl" />
           <div className="absolute bottom-0 left-0 h-24 w-24 bg-white/5 rounded-full -ml-12 -mb-8 blur-xl" />
-          
+
           {/* Subtle grid pattern */}
-          <div 
+          <div
             className="absolute inset-0 opacity-[0.08]"
             style={{
               backgroundImage: `radial-gradient(circle at 1px 1px, white 1px, transparent 0)`,
@@ -111,7 +111,7 @@ export function SubmitDialog({
           />
 
           <DialogHeader className="relative px-6 pt-7 pb-6 text-white text-center">
-            <motion.div 
+            <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: 'spring', stiffness: 200, damping: 20 }}
@@ -166,7 +166,7 @@ export function SubmitDialog({
                 Overall Progress
               </span>
               <span className="text-xs font-semibold text-zinc-900 dark:text-zinc-50 tabular-nums">
-                {answeredCount}<span className="text-zinc-400 font-normal"> / {totalQuestions}</span>
+                {answeredCount}<span className="text-zinc-400 dark:text-zinc-500 font-normal"> / {totalQuestions}</span>
               </span>
             </div>
 
@@ -178,8 +178,8 @@ export function SubmitDialog({
                 className={cn(
                   'absolute inset-y-0 left-0 rounded-full',
                   isFullyComplete
-                    ? 'bg-gradient-to-r from-emerald-400 to-teal-500'
-                    : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                    ? 'bg-gradient-to-r from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600'
+                    : 'bg-gradient-to-r from-amber-400 to-orange-500 dark:from-amber-500 dark:to-orange-600'
                 )}
               />
             </div>
@@ -188,24 +188,24 @@ export function SubmitDialog({
           {/* Stat cards */}
           <div className="grid grid-cols-3 gap-2">
             {[
-              { 
-                label: 'Answered', 
-                value: answeredCount, 
-                icon: CheckCircle2, 
+              {
+                label: 'Answered',
+                value: answeredCount,
+                icon: CheckCircle2,
                 color: 'emerald',
                 highlight: true,
               },
-              { 
-                label: 'Skipped',  
-                value: unansweredCount, 
-                icon: AlertTriangle, 
+              {
+                label: 'Skipped',
+                value: unansweredCount,
+                icon: AlertTriangle,
                 color: 'amber',
                 highlight: unansweredCount > 0,
               },
-              { 
-                label: 'Total',    
-                value: totalQuestions,  
-                icon: Target, 
+              {
+                label: 'Total',
+                value: totalQuestions,
+                icon: Target,
                 color: 'zinc',
                 highlight: false,
               },
@@ -217,15 +217,15 @@ export function SubmitDialog({
                 transition={{ delay: 0.1 + i * 0.05 }}
                 className="relative bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 rounded-xl p-3 overflow-hidden"
               >
-                <stat.icon className={cn("h-3.5 w-3.5 mb-2", 
-                  stat.color === 'emerald' && 'text-emerald-500',
-                  stat.color === 'amber' && stat.highlight && 'text-amber-500',
+                <stat.icon className={cn("h-3.5 w-3.5 mb-2",
+                  stat.color === 'emerald' && 'text-emerald-500 dark:text-emerald-400',
+                  stat.color === 'amber' && stat.highlight && 'text-amber-500 dark:text-amber-400',
                   stat.color === 'amber' && !stat.highlight && 'text-zinc-300 dark:text-zinc-600',
-                  stat.color === 'zinc' && 'text-zinc-400',
+                  stat.color === 'zinc' && 'text-zinc-400 dark:text-zinc-500',
                 )} />
                 <p className={cn(
                   "text-xl font-bold tabular-nums leading-none",
-                  stat.highlight ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400"
+                  stat.highlight ? "text-zinc-900 dark:text-zinc-50" : "text-zinc-400 dark:text-zinc-500"
                 )}>
                   {stat.value}
                 </p>
@@ -238,7 +238,7 @@ export function SubmitDialog({
 
           {/* Theory section */}
           {theoryInfo && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.25 }}
@@ -253,7 +253,7 @@ export function SubmitDialog({
                     <p className="text-xs font-semibold text-zinc-800 dark:text-zinc-200">
                       Theory Questions
                     </p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">
+                    <p className="text-[10px] text-zinc-500 dark:text-zinc-400 mt-0.5">
                       {theoryInfo.required} required to submit
                     </p>
                   </div>
@@ -279,8 +279,8 @@ export function SubmitDialog({
                     className={cn(
                       'h-full rounded-full',
                       theoryComplete
-                        ? 'bg-gradient-to-r from-emerald-400 to-teal-500'
-                        : 'bg-gradient-to-r from-amber-400 to-orange-500'
+                        ? 'bg-gradient-to-r from-emerald-400 to-teal-500 dark:from-emerald-500 dark:to-teal-600'
+                        : 'bg-gradient-to-r from-amber-400 to-orange-500 dark:from-amber-500 dark:to-orange-600'
                     )}
                   />
                 </div>
@@ -297,7 +297,7 @@ export function SubmitDialog({
 
           {/* Status alerts */}
           {unansweredCount > 0 && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex items-start gap-3 px-3.5 py-3 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50"
@@ -317,7 +317,7 @@ export function SubmitDialog({
           )}
 
           {isFullyComplete && (
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               className="flex items-start gap-3 px-3.5 py-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/50"

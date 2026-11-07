@@ -1,5 +1,4 @@
-// src/components/staff/exams/edit/QuestionPreviewModal.tsx - UPDATED WITH MARK SYSTEM
-
+// src/components/staff/exams/edit/QuestionPreviewModal.tsx - WITH DARK MODE
 'use client'
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -14,254 +13,174 @@ interface QuestionPreviewModalProps {
   onOpenChange: (open: boolean) => void
   index: number
   type?: 'objective' | 'theory'
-  // ✅ Added: mark configuration from database
   defaultMark?: number
   totalTheoryMarks?: number
   examTotal?: number
 }
 
 export function QuestionPreviewModal({ 
-  question, 
-  open, 
-  onOpenChange, 
-  index,
-  type = 'objective',
-  defaultMark = 0.5,
-  totalTheoryMarks = 0,
-  examTotal = 60,
+  question, open, onOpenChange, index, type = 'objective', defaultMark = 0.5, totalTheoryMarks = 0, examTotal = 60,
 }: QuestionPreviewModalProps) {
   const isObjective = type === 'objective' || question.type === 'objective'
   const isTheory = type === 'theory' || question.type === 'theory'
   const isDraft = question.is_draft === true
   
-  // Determine if question is complete
   const isComplete = isObjective 
     ? question.correct_answer && question.options?.some((opt: string) => opt.trim())
     : question.question_text?.trim()
 
-  // ✅ Get the question's marks - from question or default
   const questionMarks = question.points || (isObjective ? defaultMark : 0)
-  
-  // ✅ For theory, show the marks breakdown
-  const theoryMarks = isTheory ? (question.points || 0) : 0
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
         <DialogHeader className="flex flex-row items-center justify-between">
           <div className="flex items-center gap-3">
-            <DialogTitle className="text-lg">
-              Question {index} Preview
-            </DialogTitle>
-            <Badge variant={isObjective ? 'default' : 'secondary'}>
+            <DialogTitle className="text-lg text-slate-900 dark:text-slate-100">Question {index} Preview</DialogTitle>
+            <Badge className={cn("border-0", isObjective ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400")}>
               {isObjective ? 'Objective' : 'Theory'}
             </Badge>
             {isDraft ? (
-              <Badge variant="outline" className="text-amber-600 border-amber-300">
-                📝 Draft
-              </Badge>
+              <Badge variant="outline" className="text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-100 dark:bg-amber-900/30">📝 Draft</Badge>
             ) : isComplete ? (
-              <Badge className="bg-emerald-100 text-emerald-700">
-                ✅ Complete
-              </Badge>
+              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0">✅ Complete</Badge>
             ) : (
-              <Badge variant="outline" className="text-amber-500 border-amber-300">
-                ⚠️ Incomplete
-              </Badge>
+              <Badge variant="outline" className="text-amber-500 dark:text-amber-400 border-amber-300 dark:border-amber-800">⚠️ Incomplete</Badge>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Badge className="bg-purple-100 text-purple-700">
-              {questionMarks} marks
-            </Badge>
-            {isObjective && defaultMark > 0 && (
-              <Badge variant="outline" className="text-blue-600 border-blue-200 text-[10px]">
-                {defaultMark} mark each
-              </Badge>
-            )}
+            <Badge className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0">{questionMarks} marks</Badge>
+            {isObjective && defaultMark > 0 && <Badge variant="outline" className="text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800 text-[10px]">{defaultMark} mark each</Badge>}
           </div>
         </DialogHeader>
         
         <div className="space-y-4 mt-2">
-          {/* Question Text */}
-          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+          <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-transparent dark:border-slate-800">
             <div className="flex items-start gap-2">
-              <span className="font-semibold text-blue-600">{index}.</span>
-              <div className="prose prose-sm max-w-none">
+              <span className="font-semibold text-blue-600 dark:text-blue-400">{index}.</span>
+              <div className="prose prose-sm dark:prose-invert max-w-none">
                 {question.question_text ? (
                   <div dangerouslySetInnerHTML={{ __html: question.question_text }} />
-                ) : (
-                  <p className="text-slate-500 italic">No question text</p>
-                )}
+                ) : (<p className="text-slate-500 dark:text-slate-400 italic">No question text</p>)}
               </div>
             </div>
           </div>
 
-          {/* Objective Question Options */}
           {isObjective && question.options && question.options.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-600">Options:</p>
-                <Badge variant="outline" className="text-[10px] text-blue-600 border-blue-200">
-                  {questionMarks} mark{questionMarks !== 1 ? 's' : ''} each
-                </Badge>
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">Options:</p>
+                <Badge variant="outline" className="text-[10px] text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-800">{questionMarks} mark{questionMarks !== 1 ? 's' : ''} each</Badge>
               </div>
               <div className="space-y-1.5">
                 {question.options.map((opt: string, idx: number) => {
                   const isCorrect = opt === question.correct_answer
                   return (
-                    <div 
-                      key={idx}
-                      className={cn(
-                        "flex items-center gap-2 p-2 rounded-lg border text-sm",
-                        isCorrect 
-                          ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20" 
-                          : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                      )}
-                    >
-                      <span className="font-medium text-slate-500 min-w-[24px]">
-                        {String.fromCharCode(65 + idx)}.
-                      </span>
-                      <span className={isCorrect ? "text-emerald-700 dark:text-emerald-400" : ""}>
-                        {opt || <span className="text-slate-400 italic">Empty option</span>}
-                      </span>
-                      {isCorrect && (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500 ml-auto" />
-                      )}
+                    <div key={idx} className={cn("flex items-center gap-2 p-2 rounded-lg border text-sm", isCorrect ? "bg-emerald-50 border-emerald-200 dark:bg-emerald-950/20 dark:border-emerald-800/50" : "bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800")}>
+                      <span className="font-medium text-slate-500 dark:text-slate-400 min-w-[24px]">{String.fromCharCode(65 + idx)}.</span>
+                      <span className={isCorrect ? "text-emerald-700 dark:text-emerald-400" : "text-slate-800 dark:text-slate-200"}>{opt || <span className="text-slate-400 italic">Empty option</span>}</span>
+                      {isCorrect && <CheckCircle2 className="h-4 w-4 text-emerald-500 dark:text-emerald-400 ml-auto" />}
                     </div>
                   )
                 })}
               </div>
               {question.correct_answer && (
-                <div className="flex items-center gap-2 mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">
-                    Correct Answer: {question.correct_answer}
-                  </span>
+                <div className="flex items-center gap-2 mt-2 p-2 bg-emerald-50 dark:bg-emerald-950/20 rounded-lg border border-transparent dark:border-emerald-800/50">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
+                  <span className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Correct Answer: {question.correct_answer}</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* Theory Question Sub-questions */}
           {isTheory && question.sub_questions && question.sub_questions.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-                  <Brain className="h-4 w-4 text-purple-500" />
-                  Sub-questions:
+                <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 flex items-center gap-2">
+                  <Brain className="h-4 w-4 text-purple-500 dark:text-purple-400" />Sub-questions:
                 </p>
-                <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-200">
-                  Total: {questionMarks} marks
-                </Badge>
+                <Badge variant="outline" className="text-[10px] text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-800">Total: {questionMarks} marks</Badge>
               </div>
               <div className="space-y-2 ml-2">
                 {question.sub_questions.map((sq: any, sqIdx: number) => (
-                  <div key={sq.id || sqIdx} className="border-l-2 border-purple-200 pl-4 py-1">
+                  <div key={sq.id || sqIdx} className="border-l-2 border-purple-200 dark:border-purple-800 pl-4 py-1">
                     <div className="flex items-start gap-2">
-                      <span className="font-semibold text-purple-600 text-sm">
-                        {String.fromCharCode(97 + sqIdx)}.
-                      </span>
-                      <div className="prose prose-sm max-w-none">
+                      <span className="font-semibold text-purple-600 dark:text-purple-400 text-sm">{String.fromCharCode(97 + sqIdx)}.</span>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
                         <div dangerouslySetInnerHTML={{ __html: sq.text || 'No sub-question text' }} />
                       </div>
                     </div>
-                    <div className="text-xs text-slate-400 mt-0.5">
-                      [{sq.points || 0} marks]
-                    </div>
+                    <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">[{sq.points || 0} marks]</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Theory Model Answer */}
           {isTheory && question.model_answer && (
-            <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800">
-              <p className="text-sm font-semibold text-green-800 dark:text-green-400 flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4" />
-                Model Answer:
-              </p>
-              <div className="text-sm mt-1 prose prose-sm max-w-none">
+            <div className="p-3 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-800/50">
+              <p className="text-sm font-semibold text-green-800 dark:text-green-400 flex items-center gap-2"><CheckCircle2 className="h-4 w-4" />Model Answer:</p>
+              <div className="text-sm mt-1 prose prose-sm dark:prose-invert max-w-none">
                 <div dangerouslySetInnerHTML={{ __html: question.model_answer }} />
               </div>
             </div>
           )}
 
-          {/* Keywords */}
           {question.keywords && question.keywords.length > 0 && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                Grading Keywords:
-              </p>
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-400 flex items-center gap-2"><AlertCircle className="h-4 w-4" />Grading Keywords:</p>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {question.keywords.map((k: string) => (
-                  <Badge key={k} variant="outline" className="text-xs bg-white dark:bg-slate-900">
-                    {k}
-                  </Badge>
+                  <Badge key={k} variant="outline" className="text-xs bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">{k}</Badge>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Image */}
           {question.image_url && (
             <div className="mt-3">
-              <p className="text-sm font-semibold text-slate-600 mb-1">Diagram/Image:</p>
-              <div className="border rounded-lg p-2 bg-white dark:bg-slate-900">
-                <img 
-                  src={question.image_url} 
-                  alt={question.image_caption || 'Question diagram'} 
-                  className="max-w-full max-h-[200px] mx-auto object-contain"
-                />
-                {question.image_caption && (
-                  <p className="text-xs text-center text-slate-500 mt-1">{question.image_caption}</p>
-                )}
+              <p className="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-1">Diagram/Image:</p>
+              <div className="border border-slate-200 dark:border-slate-800 rounded-lg p-2 bg-white dark:bg-slate-950">
+                <img src={question.image_url} alt={question.image_caption || 'Question diagram'} className="max-w-full max-h-[200px] mx-auto object-contain rounded" />
+                {question.image_caption && <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">{question.image_caption}</p>}
               </div>
             </div>
           )}
 
-          {/* Mark Summary */}
-          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-800">
             <div className="flex items-center gap-2">
-              <Calculator className="h-4 w-4 text-slate-500" />
-              <span className="text-sm font-medium text-slate-600">Mark Summary:</span>
+              <Calculator className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+              <span className="text-sm font-medium text-slate-600 dark:text-slate-300">Mark Summary:</span>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-              <div className="text-center p-2 bg-white dark:bg-slate-900 rounded border">
-                <p className="text-xs text-slate-400">Question</p>
-                <p className="text-sm font-bold text-slate-700">{questionMarks} marks</p>
+              <div className="text-center p-2 bg-white dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800">
+                <p className="text-xs text-slate-400 dark:text-slate-500">Question</p>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-200">{questionMarks} marks</p>
               </div>
               {isTheory && totalTheoryMarks > 0 && (
-                <div className="text-center p-2 bg-white dark:bg-slate-900 rounded border">
-                  <p className="text-xs text-slate-400">Theory Total</p>
-                  <p className="text-sm font-bold text-purple-700">{totalTheoryMarks} marks</p>
+                <div className="text-center p-2 bg-white dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800">
+                  <p className="text-xs text-slate-400 dark:text-slate-500">Theory Total</p>
+                  <p className="text-sm font-bold text-purple-700 dark:text-purple-400">{totalTheoryMarks} marks</p>
                 </div>
               )}
-              <div className="text-center p-2 bg-white dark:bg-slate-900 rounded border">
-                <p className="text-xs text-slate-400">Exam Total</p>
-                <p className="text-sm font-bold text-emerald-700">{examTotal} marks</p>
+              <div className="text-center p-2 bg-white dark:bg-slate-950 rounded border border-slate-200 dark:border-slate-800">
+                <p className="text-xs text-slate-400 dark:text-slate-500">Exam Total</p>
+                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">{examTotal} marks</p>
               </div>
             </div>
           </div>
 
-          {/* Draft Warning */}
           {isDraft && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800/50">
               <p className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
-                <AlertCircle className="h-4 w-4" />
-                This question is a draft. Complete it before publishing the exam.
+                <AlertCircle className="h-4 w-4" />This question is a draft. Complete it before publishing the exam.
               </p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close Preview
-          </Button>
+        <div className="flex justify-end gap-2 mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+          <Button variant="outline" onClick={() => onOpenChange(false)} className="border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300">Close Preview</Button>
         </div>
       </DialogContent>
     </Dialog>

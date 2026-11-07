@@ -25,7 +25,7 @@ import {
   Sparkles, Shield,
   RotateCcw, Edit3, Archive, Send, User, Trash2,
   X, PenTool, HelpCircle, Hash,
-  Timer, Target, Layers
+  Timer, Target, Layers, Hourglass, Plus
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -83,6 +83,26 @@ interface Student {
   admission_number?: string
 }
 
+// ✅ ends_at REMOVED — not a real column on exam_attempts
+interface ExamAttempt {
+  id: string
+  student_id: string
+  exam_id: string
+  status: string
+  score?: number
+  started_at?: string
+  submitted_at?: string
+  extra_time_minutes?: number
+  extra_time_updated_at?: string | null
+  is_auto_submitted?: boolean | null
+  created_at?: string
+  profiles?: {
+    full_name: string
+    class: string
+    admission_number?: string
+  }
+}
+
 // ── Helpers ────────────────────────────────────────────────────────────────────
 const extractYear = (cls: string): string => {
   if (!cls) return ''
@@ -114,9 +134,52 @@ const DEPT_OPTIONS = [
   { value: 'Commercial', label: 'Commercial' },
 ]
 
+/**
+ * Statuses that can NEVER be extended. If an attempt reaches one of these,
+ * granting extra time would corrupt the result (flip a submitted exam back
+ * to in_progress). This guard runs in BOTH the handler and the dialog.
+ */
+const TERMINAL_ATTEMPT_STATUSES = [
+  'completed',
+  'pending_theory',
+  'graded',
+  'terminated',
+  'submitted',
+] as const
+
+const isAttemptExtendable = (a: ExamAttempt): boolean =>
+  a.status === 'in_progress' && a.is_auto_submitted !== true
+
+const isAttemptTerminal = (a: ExamAttempt): boolean =>
+  (TERMINAL_ATTEMPT_STATUSES as readonly string[]).includes(String(a.status))
+
 const formatDateShort = (d: string) => {
   if (!d) return 'N/A'
   return new Date(d).toLocaleDateString('en-NG', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+const formatDateTime = (d: string) => {
+  if (!d) return 'N/A'
+  return new Date(d).toLocaleString('en-NG', {
+    month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  })
+}
+
+/**
+ * ✅ Derive effective end time from started_at + duration + extra_time_minutes.
+ * Never read `ends_at` from DB — it doesn't exist.
+ */
+const computeEffectiveEndMs = (
+  startedAt: string | undefined,
+  durationMinutes: number,
+  extraMinutes: number,
+): number | null => {
+  if (!startedAt) return null
+  const startMs = new Date(startedAt).getTime()
+  if (!Number.isFinite(startMs)) return null
+  const dur = Math.max(0, Number(durationMinutes) || 0)
+  const extra = Math.max(0, Number(extraMinutes) || 0)
+  return startMs + (dur + extra) * 60_000
 }
 
 const fetchCurrentTerm = async (): Promise<{ term: string; session_year: string }> => {
@@ -172,6 +235,25 @@ const StatusPill = ({ status }: { status: string }) => {
   return (
     <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium', cfg.cls)}>
       <Icon className="h-3 w-3" />{cfg.label}
+    </span>
+  )
+}
+
+const attemptStatusConfig: Record<string, { label: string; cls: string }> = {
+  in_progress:    { label: 'In Progress',    cls: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-500/10 dark:text-blue-300 dark:border-blue-500/30' },
+  timed_out:      { label: 'Timed Out',      cls: 'bg-red-50 text-red-700 border-red-200 dark:bg-red-500/10 dark:text-red-300 dark:border-red-500/30' },
+  completed:      { label: 'Completed',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
+  submitted:      { label: 'Submitted',      cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:border-emerald-500/30' },
+  pending_theory: { label: 'Pending Theory', cls: 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30' },
+  graded:         { label: 'Graded',         cls: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:border-violet-500/30' },
+  terminated:     { label: 'Terminated',     cls: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:border-rose-500/30' },
+}
+
+const AttemptStatusPill = ({ status }: { status: string }) => {
+  const cfg = attemptStatusConfig[status] || { label: status, cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700' }
+  return (
+    <span className={cn('inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold border', cfg.cls)}>
+      {cfg.label}
     </span>
   )
 }
@@ -248,6 +330,7 @@ export default function AdminExamsPage() {
   const [showReturn, setShowReturn] = useState(false)
   const [showArchive, setShowArchive] = useState(false)
   const [showDelete, setShowDelete] = useState(false)
+  const [showExtraTime, setShowExtraTime] = useState(false)
 
   // Form states
   const [rejectionReason, setRejectionReason] = useState('')
@@ -256,11 +339,22 @@ export default function AdminExamsPage() {
 
   // Retry states
   const [retryScope, setRetryScope] = useState<'class' | 'individual'>('class')
-  const [classStudents, setClassStudents] = useState<Student[]>([])
+  const [allStudents, setAllStudents] = useState<Student[]>([])
+  const [studentsByClass, setStudentsByClass] = useState<Record<string, Student[]>>({})
+  const [retrySelectedClass, setRetrySelectedClass] = useState<string>('')
   const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set())
   const [studentSearch, setStudentSearch] = useState('')
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [attemptCounts, setAttemptCounts] = useState<Record<string, number>>({})
+  const [expandedRetryClasses, setExpandedRetryClasses] = useState<Set<string>>(new Set())
+
+  // Extra time states
+  const [extraTimeAttempts, setExtraTimeAttempts] = useState<ExamAttempt[]>([])
+  const [loadingAttempts, setLoadingAttempts] = useState(false)
+  const [selectedAttemptId, setSelectedAttemptId] = useState<string | null>(null)
+  const [extraMinutes, setExtraMinutes] = useState<number>(10)
+  const [customMinutes, setCustomMinutes] = useState<string>('')
+  const [extraTimeSearch, setExtraTimeSearch] = useState('')
 
   // Preview states
   const [previewTab, setPreviewTab] = useState<'objective' | 'theory' | 'info'>('info')
@@ -439,34 +533,71 @@ export default function AdminExamsPage() {
     finally { setProcessing(false) }
   }
 
+  // ── RETRY ─────────────────────────────────────────────────────────────────
   const openRetryDialog = async (exam: Exam) => {
     setSelectedExam(exam)
     setRetryScope('class')
     setSelectedStudentIds(new Set())
     setStudentSearch('')
-    setClassStudents([])
+    setAllStudents([])
+    setStudentsByClass({})
     setAttemptCounts({})
+    setExpandedRetryClasses(new Set())
     setShowRetry(true)
     setLoadingStudents(true)
     try {
-      const { data: students } = await supabase
-        .from('profiles').select('id, full_name, class, admission_number')
-        .eq('role', 'student').ilike('class', `%${extractYear(exam.class)}%`).order('full_name')
-      if (students) setClassStudents(students as Student[])
+      // ✅ Only ACTIVE students (is_active = true AND not soft-deleted).
+      // Deactivated / deleted students never see retry actions and never
+      // have their attempts touched by class-wide or individual resets.
+      const { data: students, error: studentsError } = await supabase
+        .from('profiles')
+        .select('id, full_name, class, admission_number')
+        .eq('role', 'student')
+        .eq('is_active', true)
+        .is('deleted_at', null)
+        .order('class')
+        .order('full_name')
 
-      const { data: attempts } = await supabase.from('exam_attempts').select('student_id').eq('exam_id', exam.id)
+      if (studentsError) throw studentsError
+
+      const allStu = (students || []) as Student[]
+      setAllStudents(allStu)
+
+      const grouped: Record<string, Student[]> = {}
+      allStu.forEach(s => {
+        const cls = extractYear(s.class) || 'Unassigned'
+        if (!grouped[cls]) grouped[cls] = []
+        grouped[cls].push(s)
+      })
+      setStudentsByClass(grouped)
+
+      const examClass = extractYear(exam.class)
+      setRetrySelectedClass(grouped[examClass] ? examClass : (Object.keys(grouped)[0] || ''))
+      setExpandedRetryClasses(new Set([examClass]))
+
+      const { data: attempts } = await supabase
+        .from('exam_attempts')
+        .select('student_id')
+        .eq('exam_id', exam.id)
       if (attempts) {
         const counts: Record<string, number> = {}
         attempts.forEach((a: any) => { counts[a.student_id] = (counts[a.student_id] || 0) + 1 })
         setAttemptCounts(counts)
       }
-    } catch (err: any) { toast.error('Failed to load students') }
+    } catch (err: any) {
+      console.error('Retry load error:', err)
+      toast.error('Failed to load students')
+    }
     finally { setLoadingStudents(false) }
   }
 
   const handleRetry = async () => {
     if (!selectedExam) return
 
+    if (retryScope === 'class' && !retrySelectedClass) {
+      toast.error('Select a class')
+      return
+    }
     if (retryScope === 'individual' && selectedStudentIds.size === 0) {
       toast.error('Select at least one student')
       return
@@ -476,16 +607,33 @@ export default function AdminExamsPage() {
 
     try {
       let deletedCount = 0
+      let targetLabel = ''
 
       if (retryScope === 'class') {
+        const classStudentIds = (studentsByClass[retrySelectedClass] || []).map(s => s.id)
+        if (classStudentIds.length === 0) {
+          toast.error(`No students found in ${retrySelectedClass}`)
+          setProcessing(false)
+          return
+        }
+        targetLabel = `${retrySelectedClass} (${classStudentIds.length} students)`
         const { data: deletedData, error } = await supabase
-          .from('exam_attempts').delete().eq('exam_id', selectedExam.id).select('id')
+          .from('exam_attempts')
+          .delete()
+          .eq('exam_id', selectedExam.id)
+          .in('student_id', classStudentIds)
+          .select('id')
         if (error) throw error
         deletedCount = deletedData?.length || 0
       } else {
         const ids = Array.from(selectedStudentIds)
+        targetLabel = `${ids.length} selected student(s)`
         const { data: deletedData, error } = await supabase
-          .from('exam_attempts').delete().eq('exam_id', selectedExam.id).in('student_id', ids).select('id')
+          .from('exam_attempts')
+          .delete()
+          .eq('exam_id', selectedExam.id)
+          .in('student_id', ids)
+          .select('id')
         if (error) throw error
         deletedCount = deletedData?.length || 0
       }
@@ -493,9 +641,9 @@ export default function AdminExamsPage() {
       await supabase.from('exams').update({ is_active: true, is_published: true, status: 'published' }).eq('id', selectedExam.id)
 
       if (deletedCount === 0) {
-        toast.info('No active attempts were found to clear.')
+        toast.info(`No active attempts found for ${targetLabel}.`)
       } else {
-        toast.success(`Cleared ${deletedCount} attempt(s). Students can retake.`)
+        toast.success(`Cleared ${deletedCount} attempt(s) for ${targetLabel}. Students can retake.`)
       }
 
       setShowRetry(false); setSelectedExam(null); setSelectedStudentIds(new Set())
@@ -503,6 +651,118 @@ export default function AdminExamsPage() {
     } catch (err: any) {
       console.error('Retry Error:', err)
       toast.error(err.message || 'Failed to reset exam')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  // ── EXTRA TIME ────────────────────────────────────────────────────────────
+  const openExtraTimeDialog = async (exam: Exam) => {
+    setSelectedExam(exam)
+    setShowExtraTime(true)
+    setLoadingAttempts(true)
+    setSelectedAttemptId(null)
+    setExtraMinutes(10)
+    setCustomMinutes('')
+    setExtraTimeSearch('')
+    try {
+      const { data: rawAttempts, error } = await supabase
+        .from('exam_attempts')
+        .select('*')
+        .eq('exam_id', exam.id)
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      const studentIds = Array.from(new Set((rawAttempts || []).map((a: any) => a.student_id)))
+      let profileMap: Record<string, any> = {}
+      if (studentIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name, class, admission_number')
+          .in('id', studentIds)
+        profileMap = (profiles || []).reduce((acc: any, p: any) => { acc[p.id] = p; return acc }, {})
+      }
+
+      const enriched = (rawAttempts || []).map((a: any) => ({
+        ...a,
+        profiles: profileMap[a.student_id] || { full_name: 'Unknown Student', class: '' },
+      }))
+      setExtraTimeAttempts(enriched as ExamAttempt[])
+    } catch (err: any) {
+      console.error('Extra time load error:', err)
+      toast.error('Failed to load exam attempts')
+    } finally {
+      setLoadingAttempts(false)
+    }
+  }
+
+  /**
+   * ✅ 2a — Grant extra time ONLY to genuine in-progress attempts.
+   * Refuses terminal attempts (completed / pending_theory / graded /
+   * terminated / submitted) and auto-submitted attempts. Granting to a
+   * terminal attempt would flip its status back to `in_progress` and
+   * corrupt its result — exactly the bug that caused the
+   * "Resume → Terminated → Back → Resume" infinite loop.
+   */
+  const handleGrantExtraTime = async () => {
+    if (!selectedAttemptId) {
+      toast.error('Select a student attempt first')
+      return
+    }
+
+    const minutes = customMinutes ? parseInt(customMinutes) : extraMinutes
+    if (!minutes || minutes <= 0 || minutes > 180) {
+      toast.error('Enter valid extra minutes (1–180)')
+      return
+    }
+
+    setProcessing(true)
+    try {
+      const { data: attempt, error: fetchErr } = await supabase
+        .from('exam_attempts')
+        .select('id, status, is_auto_submitted, extra_time_minutes')
+        .eq('id', selectedAttemptId)
+        .single()
+
+      if (fetchErr || !attempt) throw new Error('Attempt not found')
+
+      const isTerminal = (TERMINAL_ATTEMPT_STATUSES as readonly string[]).includes(String(attempt.status))
+      const wasAutoSubmitted = attempt.is_auto_submitted === true
+
+      if (isTerminal || wasAutoSubmitted) {
+        const why = isTerminal
+          ? `this attempt is already "${attempt.status}"`
+          : 'this attempt was already auto-submitted'
+        toast.error(
+          `Cannot grant extra time: ${why}. Only in-progress attempts can be extended.`,
+        )
+        setProcessing(false)
+        return
+      }
+
+      const currentExtra = attempt.extra_time_minutes || 0
+      const newExtra = currentExtra + minutes
+
+      const { error } = await supabase
+        .from('exam_attempts')
+        .update({
+          extra_time_minutes: newExtra,
+          extra_time_updated_at: new Date().toISOString(),
+          status: 'in_progress',
+        })
+        .eq('id', selectedAttemptId)
+
+      if (error) throw error
+
+      const attemptData = extraTimeAttempts.find(a => a.id === selectedAttemptId)
+      const studentName = attemptData?.profiles?.full_name || 'Student'
+      toast.success(`Granted ${minutes} extra min to ${studentName}. They can resume from where they stopped.`)
+      setShowExtraTime(false)
+      setSelectedExam(null)
+    } catch (err: any) {
+      console.error('Extra time error:', err)
+      toast.error(err.message || 'Failed to grant extra time')
     } finally {
       setProcessing(false)
     }
@@ -547,7 +807,55 @@ export default function AdminExamsPage() {
   const publishedCount = exams.filter(e => e.status === 'published' && !e.is_archived && isCurrentTerm(e, currentTermInfo)).length
   const archivedCount = exams.filter(e => e.is_archived === true || e.status === 'archived' || (e.status === 'published' && !isCurrentTerm(e, currentTermInfo))).length
 
-  const filteredStudents = classStudents.filter(s => !studentSearch || s.full_name?.toLowerCase().includes(studentSearch.toLowerCase()))
+  const filteredStudents = useMemo(() => {
+    if (!studentSearch) return allStudents
+    const q = studentSearch.toLowerCase()
+    return allStudents.filter(s =>
+      s.full_name?.toLowerCase().includes(q) ||
+      s.admission_number?.toLowerCase().includes(q) ||
+      s.class?.toLowerCase().includes(q)
+    )
+  }, [allStudents, studentSearch])
+
+  const filteredStudentsByClass = useMemo(() => {
+    const g: Record<string, Student[]> = {}
+    filteredStudents.forEach(s => {
+      const cls = extractYear(s.class) || 'Unassigned'
+      if (!g[cls]) g[cls] = []
+      g[cls].push(s)
+    })
+    return g
+  }, [filteredStudents])
+
+  const retryClassKeys = useMemo(() => {
+    const keys = Object.keys(studentsByClass)
+    return [...CLASS_ORDER.filter(c => keys.includes(c)), ...keys.filter(k => !CLASS_ORDER.includes(k))]
+  }, [studentsByClass])
+
+  const filteredRetryClassKeys = useMemo(() => {
+    const keys = Object.keys(filteredStudentsByClass)
+    return [...CLASS_ORDER.filter(c => keys.includes(c)), ...keys.filter(k => !CLASS_ORDER.includes(k))]
+  }, [filteredStudentsByClass])
+
+  const filteredAttempts = useMemo(() => {
+    if (!extraTimeSearch) return extraTimeAttempts
+    const q = extraTimeSearch.toLowerCase()
+    return extraTimeAttempts.filter(a =>
+      a.profiles?.full_name?.toLowerCase().includes(q) ||
+      a.profiles?.class?.toLowerCase().includes(q) ||
+      a.status?.toLowerCase().includes(q)
+    )
+  }, [extraTimeAttempts, extraTimeSearch])
+
+  // ✅ 2b — split filtered attempts into extendable vs terminal for the dialog
+  const extendableAttempts = useMemo(
+    () => filteredAttempts.filter(isAttemptExtendable),
+    [filteredAttempts],
+  )
+  const nonExtendableAttempts = useMemo(
+    () => filteredAttempts.filter(a => !isAttemptExtendable(a)),
+    [filteredAttempts],
+  )
 
   const toggleClass = (yr: string) => {
     setExpandedClasses(prev => { const next = new Set(prev); next.has(yr) ? next.delete(yr) : next.add(yr); return next })
@@ -562,6 +870,9 @@ export default function AdminExamsPage() {
   const toggleAllStudents = () => {
     if (selectedStudentIds.size === filteredStudents.length) setSelectedStudentIds(new Set())
     else setSelectedStudentIds(new Set(filteredStudents.map(s => s.id)))
+  }
+  const toggleRetryClass = (cls: string) => {
+    setExpandedRetryClasses(prev => { const next = new Set(prev); next.has(cls) ? next.delete(cls) : next.add(cls); return next })
   }
 
   const clearFilters = () => {
@@ -601,6 +912,9 @@ export default function AdminExamsPage() {
           <button onClick={() => openRetryDialog(exam)} className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 dark:bg-blue-500/10 dark:hover:bg-blue-500/20 flex items-center justify-center transition-colors" title="Allow Retry">
             <RotateCcw className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
           </button>
+          <button onClick={() => openExtraTimeDialog(exam)} className="h-8 w-8 rounded-lg bg-orange-50 hover:bg-orange-100 dark:bg-orange-500/10 dark:hover:bg-orange-500/20 flex items-center justify-center transition-colors" title="Grant Extra Time">
+            <Hourglass className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+          </button>
           <button onClick={() => { setSelectedExam(exam); setShowReturn(true) }} className="h-8 w-8 rounded-lg bg-amber-50 hover:bg-amber-100 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 flex items-center justify-center transition-colors" title="Return to Teacher">
             <Edit3 className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
           </button>
@@ -626,7 +940,6 @@ export default function AdminExamsPage() {
     </div>
   )
 
-  // Shared table head + row renderers
   const renderTableHead = () => (
     <TableHeader>
       <TableRow className="bg-slate-50/50 dark:bg-slate-900/50 hover:bg-slate-50/50 dark:hover:bg-slate-900/50 border-slate-200 dark:border-slate-800">
@@ -739,7 +1052,7 @@ export default function AdminExamsPage() {
           </div>
         </header>
 
-        {/* STATS CARDS */}
+        {/* STATS */}
         <section className="grid grid-cols-3 gap-2 sm:gap-3">
           <button
             onClick={() => setActiveTab('pending')}
@@ -802,7 +1115,7 @@ export default function AdminExamsPage() {
           </button>
         </section>
 
-        {/* SEARCH & FILTERS */}
+        {/* SEARCH */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
@@ -938,16 +1251,11 @@ export default function AdminExamsPage() {
           )}
         </section>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* PREVIEW DIALOG                                                       */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* PREVIEW DIALOG */}
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
           <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden flex flex-col dark:bg-slate-900 dark:border-slate-800">
-            {/* Hero Header */}
             <div className="relative bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-4 sm:px-6 py-5 text-white overflow-hidden flex-shrink-0">
               <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl" />
-              <div className="absolute bottom-0 left-0 h-32 w-32 bg-white/5 rounded-full -ml-16 -mb-16 blur-xl" />
-
               <div className="relative">
                 <DialogHeader className="space-y-0 text-left">
                   <div className="flex items-start justify-between gap-3 mb-3">
@@ -960,14 +1268,11 @@ export default function AdminExamsPage() {
                         <DialogTitle className="text-base sm:text-xl font-bold leading-tight text-white">
                           {selectedExam?.title || 'Loading...'}
                         </DialogTitle>
-                        <DialogDescription className="sr-only">
-                          Preview of exam questions and details
-                        </DialogDescription>
+                        <DialogDescription className="sr-only">Preview of exam</DialogDescription>
                       </div>
                     </div>
                   </div>
                 </DialogHeader>
-
                 <div className="flex items-center gap-2 flex-wrap mt-3">
                   <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold">
                     <BookOpen className="h-3 w-3" /> {selectedExam?.subject}
@@ -985,7 +1290,6 @@ export default function AdminExamsPage() {
               </div>
             </div>
 
-            {/* Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-4 flex-shrink-0 overflow-x-auto">
               <div className="flex gap-1 min-w-max">
                 <button
@@ -1032,7 +1336,6 @@ export default function AdminExamsPage() {
               </div>
             </div>
 
-            {/* Content */}
             <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
               {loadingQs ? (
                 <div className="flex flex-col items-center justify-center py-20">
@@ -1041,7 +1344,6 @@ export default function AdminExamsPage() {
                 </div>
               ) : (
                 <>
-                  {/* OVERVIEW TAB */}
                   {previewTab === 'info' && selectedExam && (
                     <div className="p-4 sm:p-6 space-y-4">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
@@ -1071,47 +1373,11 @@ export default function AdminExamsPage() {
                           <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{selectedExam.instructions}</p>
                         </div>
                       )}
-
-                      <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
-                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-3">Exam Details</h4>
-                        <div className="grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Teacher</p>
-                            <p className="font-medium text-slate-800 dark:text-slate-100">{selectedExam.teacher_name}</p>
-                          </div>
-                          <div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Status</p>
-                            <div className="mt-0.5"><StatusPill status={selectedExam.is_archived ? 'archived' : selectedExam.status} /></div>
-                          </div>
-                          <div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Target</p>
-                            <div className="mt-0.5"><DeptPill exam={selectedExam} /></div>
-                          </div>
-                          <div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">Created</p>
-                            <p className="font-medium text-slate-800 dark:text-slate-100">{formatDateShort(selectedExam.created_at)}</p>
-                          </div>
-                          {selectedExam.term && (
-                            <div>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">Term</p>
-                              <p className="font-medium text-slate-800 dark:text-slate-100">{selectedExam.term} · {selectedExam.session_year}</p>
-                            </div>
-                          )}
-                          {selectedExam.randomize_questions && (
-                            <div>
-                              <p className="text-[11px] text-slate-500 dark:text-slate-400">Randomize</p>
-                              <p className="font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1"><CheckCircle className="h-3 w-3" /> Enabled</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   )}
 
-                  {/* OBJECTIVE TAB */}
                   {previewTab === 'objective' && examQs.length > 0 && (
                     <div className="p-3 sm:p-6">
-                      {/* Question Pagination */}
                       <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 mb-4">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
@@ -1134,25 +1400,8 @@ export default function AdminExamsPage() {
                             </button>
                           </div>
                         </div>
-                        <div className="flex gap-1 flex-wrap">
-                          {examQs.map((_, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setCurrentQIdx(i)}
-                              className={cn(
-                                'w-7 h-7 rounded-md text-[11px] font-bold transition-all',
-                                i === currentQIdx
-                                  ? 'bg-violet-600 text-white shadow-sm scale-110'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                              )}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                        </div>
                       </div>
 
-                      {/* Current Question */}
                       <AnimatePresence mode="wait">
                         <motion.div
                           key={currentQIdx}
@@ -1162,35 +1411,10 @@ export default function AdminExamsPage() {
                           transition={{ duration: 0.2 }}
                           className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
                         >
-                          <div className="bg-gradient-to-r from-violet-50 to-indigo-50 dark:from-violet-500/10 dark:to-indigo-500/10 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="h-7 w-7 rounded-lg bg-violet-600 text-white flex items-center justify-center text-xs font-bold">
-                                {currentQIdx + 1}
-                              </div>
-                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Multiple Choice</p>
-                            </div>
-                            {examQs[currentQIdx]?.marks && (
-                              <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-100 dark:bg-violet-500/20 px-2 py-0.5 rounded-full">
-                                {examQs[currentQIdx].marks} mark{examQs[currentQIdx].marks !== 1 ? 's' : ''}
-                              </span>
-                            )}
-                          </div>
-
                           <div className="p-4 sm:p-5">
-                            {examQs[currentQIdx]?.image_url && (
-                              <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
-                                <img
-                                  src={examQs[currentQIdx].image_url}
-                                  alt="Question"
-                                  className="w-full max-h-64 object-contain"
-                                />
-                              </div>
-                            )}
-
                             <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-5">
                               {examQs[currentQIdx]?.question || 'Question text missing'}
                             </p>
-
                             <div className="space-y-2">
                               {(examQs[currentQIdx]?.options || []).map((opt: string, i: number) => {
                                 const letter = String.fromCharCode(65 + i)
@@ -1200,10 +1424,10 @@ export default function AdminExamsPage() {
                                   <div
                                     key={i}
                                     className={cn(
-                                      'p-3 rounded-lg border text-sm flex items-start gap-3 transition-colors',
+                                      'p-3 rounded-lg border text-sm flex items-start gap-3',
                                       isCorrect
-                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40 ring-1 ring-emerald-200 dark:ring-emerald-500/30'
-                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700'
+                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40'
+                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
                                     )}
                                   >
                                     <div className={cn(
@@ -1212,33 +1436,22 @@ export default function AdminExamsPage() {
                                     )}>
                                       {letter}
                                     </div>
-                                    <p className={cn('flex-1 leading-relaxed', isCorrect ? 'text-emerald-800 dark:text-emerald-200 font-medium' : 'text-slate-700 dark:text-slate-300')}>
+                                    <p className={cn('flex-1', isCorrect ? 'text-emerald-800 dark:text-emerald-200 font-medium' : 'text-slate-700 dark:text-slate-300')}>
                                       {opt}
                                     </p>
-                                    {isCorrect && (
-                                      <CheckCircle className="h-4 w-4 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
-                                    )}
+                                    {isCorrect && <CheckCircle className="h-4 w-4 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />}
                                   </div>
                                 )
                               })}
                             </div>
-
-                            {examQs[currentQIdx]?.explanation && (
-                              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-lg">
-                                <p className="text-[10px] font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-1">Explanation</p>
-                                <p className="text-xs text-blue-900 dark:text-blue-200 leading-relaxed">{examQs[currentQIdx].explanation}</p>
-                              </div>
-                            )}
                           </div>
                         </motion.div>
                       </AnimatePresence>
                     </div>
                   )}
 
-                  {/* THEORY TAB */}
                   {previewTab === 'theory' && theoryQs.length > 0 && (
                     <div className="p-3 sm:p-6">
-                      {/* Pagination */}
                       <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 mb-4">
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
@@ -1261,116 +1474,34 @@ export default function AdminExamsPage() {
                             </button>
                           </div>
                         </div>
-                        <div className="flex gap-1 flex-wrap">
-                          {theoryQs.map((_, i) => (
-                            <button
-                              key={i}
-                              onClick={() => setCurrentTheoryIdx(i)}
-                              className={cn(
-                                'w-7 h-7 rounded-md text-[11px] font-bold transition-all',
-                                i === currentTheoryIdx
-                                  ? 'bg-blue-600 text-white shadow-sm scale-110'
-                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                              )}
-                            >
-                              {i + 1}
-                            </button>
-                          ))}
-                        </div>
                       </div>
 
-                      <AnimatePresence mode="wait">
-                        <motion.div
-                          key={currentTheoryIdx}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
-                        >
-                          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 dark:from-blue-500/10 dark:to-cyan-500/10 px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="h-7 w-7 rounded-lg bg-blue-600 text-white flex items-center justify-center text-xs font-bold">
-                                {currentTheoryIdx + 1}
-                              </div>
-                              <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Theory / Essay</p>
-                            </div>
-                            {theoryQs[currentTheoryIdx]?.marks > 0 && (
-                              <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 px-2 py-0.5 rounded-full">
-                                {theoryQs[currentTheoryIdx].marks} mark{theoryQs[currentTheoryIdx].marks !== 1 ? 's' : ''}
-                              </span>
-                            )}
+                      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden p-4 sm:p-5">
+                        <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-4">
+                          {theoryQs[currentTheoryIdx]?.question || 'Question text missing'}
+                        </p>
+                        {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
+                          <div className="pl-2 border-l-2 border-blue-200 dark:border-blue-500/40">
+                            {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
                           </div>
-
-                          <div className="p-4 sm:p-5">
-                            {theoryQs[currentTheoryIdx]?.image_url && (
-                              <div className="mb-4 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-800">
-                                <img
-                                  src={theoryQs[currentTheoryIdx].image_url}
-                                  alt={theoryQs[currentTheoryIdx].image_caption || 'Question image'}
-                                  className="w-full max-h-64 object-contain"
-                                />
-                                {theoryQs[currentTheoryIdx]?.image_caption && (
-                                  <p className="text-[10px] text-center text-slate-500 dark:text-slate-400 py-1.5 px-2 bg-slate-50 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700">
-                                    {theoryQs[currentTheoryIdx].image_caption}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-4">
-                              {theoryQs[currentTheoryIdx]?.question || 'Question text missing'}
-                            </p>
-
-                            {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
-                              <div className="pl-2 border-l-2 border-blue-200 dark:border-blue-500/40">
-                                {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
-                              </div>
-                            )}
-                          </div>
-                        </motion.div>
-                      </AnimatePresence>
-                    </div>
-                  )}
-
-                  {/* EMPTY STATE */}
-                  {!loadingQs && examQs.length === 0 && theoryQs.length === 0 && previewTab !== 'info' && (
-                    <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
-                      <div className="h-14 w-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-3">
-                        <FileText className="h-7 w-7 text-slate-400 dark:text-slate-500" />
+                        )}
                       </div>
-                      <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-100">No questions available</h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">This exam does not contain any questions yet.</p>
                     </div>
                   )}
                 </>
               )}
             </div>
 
-            {/* Footer Actions */}
-            <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 flex-shrink-0">
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center sm:text-left">
-                Created by <span className="font-semibold text-slate-700 dark:text-slate-200">{selectedExam?.teacher_name}</span>
-              </p>
-              <div className="flex items-center gap-2 justify-end">
-                <Button variant="outline" size="sm" onClick={() => setShowPreview(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Close</Button>
-                {selectedExam && ['pending', 'draft', 'submitted'].includes(selectedExam.status) && (
-                  <Button
-                    size="sm"
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                    onClick={() => { setShowPreview(false); setShowApprove(true) }}
-                  >
-                    <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve & Publish
-                  </Button>
-                )}
-              </div>
+            <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-end gap-2 flex-shrink-0">
+              <Button variant="outline" size="sm" onClick={() => setShowPreview(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Close</Button>
+              {selectedExam && ['pending', 'draft', 'submitted'].includes(selectedExam.status) && (
+                <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { setShowPreview(false); setShowApprove(true) }}>
+                  <CheckCircle className="h-3.5 w-3.5 mr-1.5" /> Approve & Publish
+                </Button>
+              )}
             </div>
           </DialogContent>
         </Dialog>
-
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* ACTION MODALS                                                        */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
 
         {/* DELETE */}
         <Dialog open={showDelete} onOpenChange={setShowDelete}>
@@ -1418,13 +1549,15 @@ export default function AdminExamsPage() {
 
         {/* RETRY */}
         <Dialog open={showRetry} onOpenChange={setShowRetry}>
-          <DialogContent className="max-w-lg max-h-[85vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
               <div className="h-11 w-11 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center mb-2">
                 <RotateCcw className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <DialogTitle className="dark:text-white">Allow Retake</DialogTitle>
-              <DialogDescription className="dark:text-slate-400">Clear existing attempts so students can take this exam again.</DialogDescription>
+              <DialogDescription className="dark:text-slate-400">
+                Reset attempts for <strong className="text-slate-700 dark:text-slate-200">{selectedExam?.title}</strong>. Only active students are shown.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-3 flex-1 overflow-y-auto">
@@ -1439,8 +1572,8 @@ export default function AdminExamsPage() {
                   )}
                 >
                   <Users className={cn('h-5 w-5 mb-1.5', retryScope === 'class' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500')} />
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Entire Class</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Reset all attempts</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">By Class</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Reset entire class</p>
                 </button>
                 <button
                   onClick={() => setRetryScope('individual')}
@@ -1452,65 +1585,148 @@ export default function AdminExamsPage() {
                   )}
                 >
                   <User className={cn('h-5 w-5 mb-1.5', retryScope === 'individual' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-500')} />
-                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Select Students</p>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Choose specific students</p>
+                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">Individual</p>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">Pick specific students</p>
                 </button>
               </div>
 
-              {retryScope === 'individual' && (
+              {loadingStudents ? (
+                <div className="py-10 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-blue-500 dark:text-blue-400 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loading students...</p>
+                </div>
+              ) : (
                 <>
-                  <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
-                    <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-                    <input
-                      value={studentSearch}
-                      onChange={e => setStudentSearch(e.target.value)}
-                      placeholder="Search students..."
-                      className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    />
-                  </div>
-
-                  {loadingStudents ? (
-                    <div className="py-8 text-center">
-                      <Loader2 className="h-5 w-5 animate-spin text-blue-500 dark:text-blue-400 mx-auto" />
+                  {retryScope === 'class' && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-semibold text-slate-700 dark:text-slate-200">Select which class to reset:</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                        {retryClassKeys.map(cls => {
+                          const students = studentsByClass[cls] || []
+                          if (students.length === 0) return null
+                          const color = classColors[cls]
+                          const isSelected = retrySelectedClass === cls
+                          const attemptedCount = students.filter(s => (attemptCounts[s.id] || 0) > 0).length
+                          return (
+                            <button
+                              key={cls}
+                              onClick={() => setRetrySelectedClass(cls)}
+                              className={cn(
+                                'p-3 rounded-xl border-2 text-left transition-all',
+                                isSelected
+                                  ? 'border-blue-500 dark:border-blue-400 bg-blue-50 dark:bg-blue-500/10 ring-2 ring-blue-100 dark:ring-blue-500/30'
+                                  : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 bg-white dark:bg-slate-800/40'
+                              )}
+                            >
+                              <div className="flex items-center gap-2 mb-1.5">
+                                <div className={cn('h-7 w-7 rounded-lg bg-gradient-to-br flex items-center justify-center text-white', color?.gradient || 'from-slate-400 to-slate-500')}>
+                                  <GraduationCap className="h-3.5 w-3.5" />
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm font-bold text-slate-800 dark:text-slate-100">{cls}</p>
+                                </div>
+                                {isSelected && <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />}
+                              </div>
+                              <div className="flex items-center gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                <span>{students.length} student{students.length !== 1 ? 's' : ''}</span>
+                                {attemptedCount > 0 && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="font-semibold text-blue-600 dark:text-blue-400">{attemptedCount} attempted</span>
+                                  </>
+                                )}
+                              </div>
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
-                  ) : filteredStudents.length === 0 ? (
-                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">No students found</p>
-                  ) : (
+                  )}
+
+                  {retryScope === 'individual' && (
                     <>
+                      <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                        <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                        <input
+                          value={studentSearch}
+                          onChange={e => setStudentSearch(e.target.value)}
+                          placeholder="Search students by name, admission or class..."
+                          className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                        />
+                      </div>
+
                       <div className="flex items-center justify-between px-1">
                         <p className="text-[11px] text-slate-500 dark:text-slate-400">
                           <span className="font-bold text-slate-700 dark:text-slate-200">{selectedStudentIds.size}</span> selected
                         </p>
                         <button onClick={toggleAllStudents} className="text-[11px] text-blue-600 dark:text-blue-400 font-semibold hover:text-blue-700 dark:hover:text-blue-300">
-                          {selectedStudentIds.size === filteredStudents.length ? 'Deselect All' : 'Select All'}
+                          {selectedStudentIds.size === filteredStudents.length ? 'Deselect All' : 'Select All Visible'}
                         </button>
                       </div>
-                      <div className="max-h-[240px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
-                        {filteredStudents.map(s => {
-                          const attempts = attemptCounts[s.id] || 0
+
+                      <div className="max-h-[380px] overflow-y-auto space-y-2 border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-slate-50/50 dark:bg-slate-950/50">
+                        {filteredRetryClassKeys.map(cls => {
+                          const students = filteredStudentsByClass[cls] || []
+                          if (students.length === 0) return null
+                          const isOpen = expandedRetryClasses.has(cls)
+                          const color = classColors[cls]
+                          const selectedInClass = students.filter(s => selectedStudentIds.has(s.id)).length
                           return (
-                            <label key={s.id} className="flex items-center gap-2.5 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={selectedStudentIds.has(s.id)}
-                                onChange={() => toggleStudent(s.id)}
-                                className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 dark:bg-slate-800"
-                              />
-                              <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                                <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{s.full_name}</p>
-                                <p className="text-[10px] text-slate-500 dark:text-slate-400">{s.admission_number || s.class}</p>
-                              </div>
-                              {attempts > 0 && (
-                                <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-full">
-                                  {attempts} attempt{attempts !== 1 ? 's' : ''}
-                                </span>
+                            <div key={cls} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800 overflow-hidden">
+                              <button
+                                onClick={() => toggleRetryClass(cls)}
+                                className="w-full px-3 py-2 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                              >
+                                <div className="flex items-center gap-2">
+                                  <div className={cn('h-6 w-6 rounded-md bg-gradient-to-br flex items-center justify-center text-white', color?.gradient || 'from-slate-400 to-slate-500')}>
+                                    <GraduationCap className="h-3 w-3" />
+                                  </div>
+                                  <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{cls}</p>
+                                  <span className="text-[10px] text-slate-500 dark:text-slate-400">({students.length})</span>
+                                  {selectedInClass > 0 && (
+                                    <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-full">
+                                      {selectedInClass} selected
+                                    </span>
+                                  )}
+                                </div>
+                                <ChevronDown className={cn('h-3.5 w-3.5 text-slate-400 transition-transform', isOpen && 'rotate-180')} />
+                              </button>
+
+                              {isOpen && (
+                                <div className="border-t border-slate-100 dark:border-slate-800 divide-y divide-slate-100 dark:divide-slate-800">
+                                  {students.map(s => {
+                                    const attempts = attemptCounts[s.id] || 0
+                                    return (
+                                      <label key={s.id} className="flex items-center gap-2.5 p-2.5 hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={selectedStudentIds.has(s.id)}
+                                          onChange={() => toggleStudent(s.id)}
+                                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-blue-600 focus:ring-blue-500 dark:bg-slate-800"
+                                        />
+                                        <div className="h-7 w-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                          <User className="h-3.5 w-3.5 text-slate-500 dark:text-slate-400" />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-xs font-semibold text-slate-800 dark:text-slate-100 truncate">{s.full_name}</p>
+                                          <p className="text-[10px] text-slate-500 dark:text-slate-400">{s.admission_number || s.class}</p>
+                                        </div>
+                                        {attempts > 0 && (
+                                          <span className="text-[10px] font-bold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/20 px-1.5 py-0.5 rounded-full">
+                                            {attempts} attempt{attempts !== 1 ? 's' : ''}
+                                          </span>
+                                        )}
+                                      </label>
+                                    )
+                                  })}
+                                </div>
                               )}
-                            </label>
+                            </div>
                           )
                         })}
+                        {filteredRetryClassKeys.length === 0 && (
+                          <p className="text-xs text-slate-500 dark:text-slate-400 text-center py-6">No active students found</p>
+                        )}
                       </div>
                     </>
                   )}
@@ -1522,6 +1738,209 @@ export default function AdminExamsPage() {
               <Button variant="outline" onClick={() => setShowRetry(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
               <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={handleRetry} disabled={processing}>
                 {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Clearing...</> : <><RotateCcw className="h-4 w-4 mr-1.5" /> Clear Attempts</>}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* EXTRA TIME                                                        */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        <Dialog open={showExtraTime} onOpenChange={setShowExtraTime}>
+          <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
+            <DialogHeader>
+              <div className="h-11 w-11 rounded-xl bg-orange-100 dark:bg-orange-500/20 flex items-center justify-center mb-2">
+                <Hourglass className="h-5 w-5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <DialogTitle className="dark:text-white">Grant Extra Time</DialogTitle>
+              <DialogDescription className="dark:text-slate-400">
+                Extend the exam timer for a student. Updates are sent live and their timer extends instantly. Only in-progress attempts can be extended.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 flex-1 overflow-y-auto">
+              <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                <input
+                  value={extraTimeSearch}
+                  onChange={e => setExtraTimeSearch(e.target.value)}
+                  placeholder="Search by student name or class..."
+                  className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                />
+              </div>
+
+              {loadingAttempts ? (
+                <div className="py-10 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-orange-500 dark:text-orange-400 mx-auto mb-2" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Loading attempts...</p>
+                </div>
+              ) : filteredAttempts.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Hourglass className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No attempts yet</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">No students have started this exam.</p>
+                </div>
+              ) : extendableAttempts.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Hourglass className="h-10 w-10 text-slate-300 dark:text-slate-700 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-600 dark:text-slate-300">No extendable attempts</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm mx-auto">
+                    All attempts for this exam are already submitted, graded, or terminated. Only in-progress attempts can be extended.
+                  </p>
+                </div>
+              ) : (
+                <div className="max-h-[320px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
+                  {/* ── Extendable attempts (selectable) ───────────────────── */}
+                  {extendableAttempts.map(a => {
+                    const isSelected = selectedAttemptId === a.id
+                    const nowMs = Date.now()
+                    const effectiveEndMs = computeEffectiveEndMs(
+                      a.started_at,
+                      selectedExam?.duration ?? 0,
+                      a.extra_time_minutes ?? 0,
+                    )
+                    const isExpired = effectiveEndMs !== null && effectiveEndMs < nowMs
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => setSelectedAttemptId(a.id)}
+                        className={cn(
+                          'w-full flex items-center gap-2.5 p-3 text-left transition-colors',
+                          isSelected
+                            ? 'bg-orange-50 dark:bg-orange-500/10'
+                            : 'hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                        )}
+                      >
+                        <input
+                          type="radio"
+                          checked={isSelected}
+                          onChange={() => setSelectedAttemptId(a.id)}
+                          className="h-4 w-4 text-orange-600 focus:ring-orange-500"
+                        />
+                        <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+                          <User className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100 truncate">
+                              {a.profiles?.full_name || 'Unknown'}
+                            </p>
+                            <AttemptStatusPill status={a.status} />
+                            {isExpired && (
+                              <span className="text-[10px] font-bold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/20 px-1.5 py-0.5 rounded-full">
+                                TIMER EXPIRED
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-500 dark:text-slate-400 flex-wrap">
+                            {a.profiles?.class && <span>{a.profiles.class}</span>}
+                            {effectiveEndMs !== null && (
+                              <span>Ends: {formatDateTime(new Date(effectiveEndMs).toISOString())}</span>
+                            )}
+                            {(a.extra_time_minutes ?? 0) > 0 && (
+                              <span className="text-orange-600 dark:text-orange-400 font-bold">
+                                +{a.extra_time_minutes}m granted
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+
+                  {/* ── Non-extendable attempts (greyed, informational) ────── */}
+                  {nonExtendableAttempts.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 bg-slate-50/70 dark:bg-slate-800/40">
+                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                          Submitted / Locked — cannot extend
+                        </p>
+                      </div>
+                      {nonExtendableAttempts.map(a => (
+                        <div
+                          key={a.id}
+                          className="w-full flex items-center gap-2.5 p-3 opacity-60 cursor-not-allowed"
+                          title="This attempt is already submitted and cannot be extended."
+                        >
+                          <div className="h-4 w-4 rounded-full border-2 border-slate-300 dark:border-slate-600 flex-shrink-0" />
+                          <div className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center flex-shrink-0">
+                            <User className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-semibold text-slate-500 dark:text-slate-400 truncate">
+                                {a.profiles?.full_name || 'Unknown'}
+                              </p>
+                              <AttemptStatusPill status={a.status} />
+                              {a.is_auto_submitted === true && (
+                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-full">
+                                  AUTO-SUBMITTED
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1 text-[10px] text-slate-400 dark:text-slate-500 flex-wrap">
+                              {a.profiles?.class && <span>{a.profiles.class}</span>}
+                              <span className="italic">Already submitted — cannot be extended</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+
+              {selectedAttemptId && (
+                <div className="bg-orange-50 dark:bg-orange-500/10 border border-orange-200 dark:border-orange-500/30 rounded-xl p-3 space-y-3">
+                  <p className="text-xs font-bold text-orange-800 dark:text-orange-300 uppercase tracking-wider">
+                    Extra time to grant
+                  </p>
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {[5, 10, 15, 20, 30].map(m => (
+                      <button
+                        key={m}
+                        onClick={() => { setExtraMinutes(m); setCustomMinutes('') }}
+                        className={cn(
+                          'py-2 rounded-lg text-xs font-bold border-2 transition-all',
+                          !customMinutes && extraMinutes === m
+                            ? 'bg-orange-600 border-orange-600 text-white shadow-sm'
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:border-orange-300 dark:hover:border-orange-500/40'
+                        )}
+                      >
+                        +{m}m
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 flex items-center gap-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2">
+                      <Plus className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                      <input
+                        type="number"
+                        value={customMinutes}
+                        onChange={e => setCustomMinutes(e.target.value)}
+                        placeholder="Custom minutes (1-180)"
+                        min={1}
+                        max={180}
+                        className="text-xs outline-none w-full bg-transparent text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                      <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">min</span>
+                    </div>
+                  </div>
+                  <div className="bg-white dark:bg-slate-900 rounded-lg p-2 border border-orange-200 dark:border-orange-500/30">
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                      Granting <strong className="text-orange-600 dark:text-orange-400">
+                        +{customMinutes ? parseInt(customMinutes) || 0 : extraMinutes} minutes
+                      </strong> — timer updates on the student's device within ~1 second. If their timer already expired, they'll be able to resume.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter className="pt-3 border-t border-slate-200 dark:border-slate-800">
+              <Button variant="outline" onClick={() => setShowExtraTime(false)} disabled={processing} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</Button>
+              <Button className="bg-orange-600 hover:bg-orange-700 text-white" onClick={handleGrantExtraTime} disabled={processing || !selectedAttemptId}>
+                {processing ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" /> Granting...</> : <><Hourglass className="h-4 w-4 mr-1.5" /> Grant Extra Time</>}
               </Button>
             </DialogFooter>
           </DialogContent>

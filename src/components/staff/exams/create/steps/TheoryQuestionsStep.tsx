@@ -65,7 +65,7 @@ export function TheoryQuestionsStep({
 }: TheoryQuestionsStepProps) {
   const [manualQ, setManualQ] = useState({
     question: "",
-    marks: 10,
+    marks: 10, // Defaults to 10 and stays at user's input
     image_url: "",
     image_caption: "",
   });
@@ -87,12 +87,6 @@ export function TheoryQuestionsStep({
     if (!questionsToAnswer || questionsToAnswer <= 0) return totalQ;
     return Math.min(questionsToAnswer, totalQ);
   }, [questionsToAnswer, totalQ]);
-
-  // suggested mark per question so that N × mark = remaining
-  const suggestedMark = useMemo(() => {
-    const n = questionsToAnswer > 0 ? questionsToAnswer : 1;
-    return Math.round((theoryRemaining / n) * 100) / 100;
-  }, [theoryRemaining, questionsToAnswer]);
 
   // theory section total = sum of marks for the N questions student will answer
   // (sorted descending so student picks highest-value ones)
@@ -131,15 +125,16 @@ export function TheoryQuestionsStep({
         image_caption: manualQ.image_caption || undefined,
       },
     ]);
+    
+    // Reset inputs EXCEPT marks, so user's manual mark persists
     setManualQ((p) => ({
       ...p,
       question: "",
       image_url: "",
       image_caption: "",
-      marks: suggestedMark > 0 ? suggestedMark : p.marks,
     }));
     toast.success("Theory question added");
-  }, [manualQ, questions, onQuestionsChange, suggestedMark]);
+  }, [manualQ, questions, onQuestionsChange]);
 
   const handleImageUpload = async (file: File) => {
     setIsUploadingImage(true);
@@ -443,9 +438,9 @@ export function TheoryQuestionsStep({
               <Plus className="h-3.5 w-3.5" />
               Add Theory Question
             </Label>
-            {suggestedMark > 0 && (
+            {theoryRemaining > 0 && (
               <Badge className="text-[10px] bg-purple-100 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-0">
-                Suggested: {suggestedMark} marks each
+                Target: {theoryRemaining} marks remaining
               </Badge>
             )}
           </div>
@@ -463,7 +458,7 @@ export function TheoryQuestionsStep({
 
           {/* marks + image row */}
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* marks input */}
+            {/* marks input - fully manual */}
             <div className="flex-1 sm:max-w-[180px]">
               <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                 Marks for this question
@@ -486,16 +481,6 @@ export function TheoryQuestionsStep({
                   marks
                 </span>
               </div>
-              {suggestedMark > 0 && manualQ.marks !== suggestedMark && (
-                <button
-                  onClick={() =>
-                    setManualQ((p) => ({ ...p, marks: suggestedMark }))
-                  }
-                  className="text-[10px] text-purple-500 dark:text-purple-400 hover:underline mt-0.5"
-                >
-                  Use suggested ({suggestedMark})
-                </button>
-              )}
             </div>
 
             {/* image upload */}
