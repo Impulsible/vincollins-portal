@@ -87,8 +87,6 @@ const SS_SUBJECTS = [
 
 /* ─── HELPERS ─── */
 
-/** True if the row represents an objective question regardless of which
- *  column the create flow used to mark it. */
 function isObjectiveRow(q: any): boolean {
   return (
     q?.type === "objective" ||
@@ -97,7 +95,6 @@ function isObjectiveRow(q: any): boolean {
   );
 }
 
-/** True if the row represents a theory question. */
 function isTheoryRow(q: any): boolean {
   return q?.type === "theory" || q?.question_type === "theory";
 }
@@ -106,9 +103,9 @@ function isTheoryRow(q: any): boolean {
 
 function StatTile({ value, label, accent }: { value: string | number; label: string; accent: string }) {
   return (
-    <div className={cn("rounded-lg p-3 text-center", accent)}>
-      <p className="text-2xl font-bold leading-none mb-1">{value}</p>
-      <p className="text-[11px] font-medium opacity-70 leading-tight">{label}</p>
+    <div className={cn("rounded-lg p-2.5 sm:p-3 text-center", accent)}>
+      <p className="text-lg sm:text-2xl font-bold leading-none mb-0.5 sm:mb-1">{value}</p>
+      <p className="text-[10px] sm:text-[11px] font-medium opacity-70 leading-tight">{label}</p>
     </div>
   );
 }
@@ -138,37 +135,37 @@ function QuestionCard({ question, index, type, onEdit, onDelete }: QuestionCardP
   const StatusIcon = statusConfig.icon;
 
   return (
-    <div className={cn("rounded-xl border p-4 transition-all hover:shadow-sm group", statusConfig.classes)}>
-      <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5">
+    <div className={cn("rounded-xl border p-3 sm:p-4 transition-all hover:shadow-sm active:scale-[0.99] group", statusConfig.classes)}>
+      <div className="flex items-start gap-2 sm:gap-3">
+        <div className="flex-shrink-0 w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-[10px] sm:text-xs font-bold text-slate-500 dark:text-slate-400 mt-0.5">
           {index}
         </div>
         <div className="flex-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-1.5 mb-2">
-            <Badge variant="outline" className={cn("text-xs font-medium gap-1 border-0", type === "objective" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400")}>
-              {type === "objective" ? <BookOpen className="h-3 w-3" /> : <FlaskConical className="h-3 w-3" />}
-              {type === "objective" ? "Objective" : "Theory"}
+          <div className="flex flex-wrap items-center gap-1 sm:gap-1.5 mb-2">
+            <Badge variant="outline" className={cn("text-[10px] sm:text-xs font-medium gap-1 border-0 px-1.5 py-0.5", type === "objective" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" : "bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400")}>
+              {type === "objective" ? <BookOpen className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> : <FlaskConical className="h-2.5 w-2.5 sm:h-3 sm:w-3" />}
+              {type === "objective" ? "Obj" : "Theory"}
             </Badge>
-            <Badge className={cn("text-xs font-medium gap-1 border-0", statusConfig.badge)}>
-              <StatusIcon className="h-3 w-3" />
+            <Badge className={cn("text-[10px] sm:text-xs font-medium gap-1 border-0 px-1.5 py-0.5", statusConfig.badge)}>
+              <StatusIcon className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
               {statusConfig.label}
             </Badge>
-            <Badge variant="outline" className="text-xs font-medium text-slate-600 dark:text-slate-400 dark:border-slate-700">
+            <Badge variant="outline" className="text-[10px] sm:text-xs font-medium text-slate-600 dark:text-slate-400 dark:border-slate-700 px-1.5 py-0.5">
               {question.points} pt{question.points !== 1 ? "s" : ""}
             </Badge>
           </div>
-          <p className="text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug line-clamp-3">
+          <p className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-100 leading-snug line-clamp-3 break-words">
             {question.question_text}
           </p>
 
           {type === "objective" && objQ?.options && (
-            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1">
+            <div className="mt-2 sm:mt-2.5 grid grid-cols-1 sm:grid-cols-2 gap-1">
               {objQ.options.map((opt: string, idx: number) => {
                 const letter = String.fromCharCode(65 + idx);
                 const isCorrect = objQ.correct_answer === letter || objQ.correct_answer === opt;
                 return (
-                  <div key={idx} className={cn("flex items-center gap-1.5 text-xs px-2 py-1 rounded-md", isCorrect ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-medium" : "text-slate-500 dark:text-slate-400")}>
-                    <span className={cn("w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold flex-shrink-0", isCorrect ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400")}>{letter}</span>
+                  <div key={idx} className={cn("flex items-center gap-1.5 text-[11px] sm:text-xs px-1.5 sm:px-2 py-1 rounded-md", isCorrect ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 font-medium" : "text-slate-500 dark:text-slate-400")}>
+                    <span className={cn("w-3.5 h-3.5 sm:w-4 sm:h-4 rounded-full flex items-center justify-center text-[9px] sm:text-[10px] font-bold flex-shrink-0", isCorrect ? "bg-emerald-500 text-white" : "bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400")}>{letter}</span>
                     <span className="truncate">{opt || <span className="italic opacity-50">Empty</span>}</span>
                   </div>
                 );
@@ -177,12 +174,23 @@ function QuestionCard({ question, index, type, onEdit, onDelete }: QuestionCardP
           )}
 
           {type === "theory" && theoryQ?.sub_questions && theoryQ.sub_questions.length > 0 && (
-            <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1.5 text-[11px] sm:text-xs text-slate-500 dark:text-slate-400">
               {theoryQ.sub_questions.length} sub-question{theoryQ.sub_questions.length !== 1 ? "s" : ""}
             </p>
           )}
+
+          {/* Mobile action buttons - always visible */}
+          <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800 sm:hidden">
+            <Button variant="ghost" size="sm" onClick={onEdit} className="flex-1 h-8 text-xs text-slate-600 dark:text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
+              <Edit className="h-3 w-3 mr-1" /> Edit
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onDelete} className="flex-1 h-8 text-xs text-slate-600 dark:text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+              <Trash2 className="h-3 w-3 mr-1" /> Delete
+            </Button>
+          </div>
         </div>
-        <div className="flex-shrink-0 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        {/* Desktop action buttons - hover reveal */}
+        <div className="flex-shrink-0 hidden sm:flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Button variant="ghost" size="sm" onClick={onEdit} className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30">
             <Edit className="h-3.5 w-3.5" />
           </Button>
@@ -268,7 +276,6 @@ export function EditExamPage({ examId }: { examId: string }) {
     }));
   }, [theoryQuestions, theoryTotalMarks, theoryCount]);
 
-  /* ── FIX #1: resilient loading ─────────────────────────── */
   const loadQuestions = useCallback(async (silent = false) => {
     try {
       if (!silent) setRefreshing(true);
@@ -363,12 +370,9 @@ export function EditExamPage({ examId }: { examId: string }) {
 
   useEffect(() => { if (examId) loadExamData(); }, [examId, loadExamData]);
 
-  /* ── FIX #2: never overwrite real counts with 0 ─────────── */
   const updateExamTotals = useCallback(async () => {
     if (!examId || loading || !initialLoadDoneRef.current) return;
 
-    // If we currently hold zero questions but the exam previously reported
-    // more than zero, skip — a transient empty load must not clobber totals.
     if (totalQuestions === 0 && (exam?.total_questions ?? 0) > 0) return;
 
     const questionsJSON = buildQuestionsJSON();
@@ -435,7 +439,6 @@ export function EditExamPage({ examId }: { examId: string }) {
     const isDraft = data.is_draft ?? true;
     const { error } = await supabase.from("questions").insert([{
       exam_id: examId, question_text: data.question_text.trim(),
-      /* write BOTH columns so every reader agrees */
       question_type: "mcq", type: "objective",
       options: opts.length ? opts : ["", "", "", ""],
       correct_answer: data.correct_answer?.trim() || "", points: defaultMark,
@@ -460,7 +463,6 @@ export function EditExamPage({ examId }: { examId: string }) {
       options: opts.length ? opts : ["", "", "", ""],
       correct_answer: data.correct_answer?.trim() || "",
       points: data.points || defaultMark, is_draft: isDraft,
-      /* keep BOTH columns in sync on update too */
       question_type: "mcq", type: "objective",
       updated_at: new Date().toISOString(),
     }).eq("id", id);
@@ -531,25 +533,25 @@ export function EditExamPage({ examId }: { examId: string }) {
 
   if (loading) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 space-y-5 max-w-[1600px] mx-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
-        <Skeleton className="h-14 w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
-        <Skeleton className="h-28 w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
+      <div className="p-3 sm:p-6 lg:p-8 space-y-4 sm:space-y-5 max-w-[1600px] mx-auto bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
+        <Skeleton className="h-12 sm:h-14 w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <Skeleton className="h-24 sm:h-28 w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
         <div className="grid grid-cols-3 gap-2">
           {[0, 1, 2].map((i) => (<Skeleton key={i} className="h-10 rounded-lg bg-slate-200 dark:bg-slate-800" />))}
         </div>
-        <Skeleton className="h-[420px] w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
+        <Skeleton className="h-[320px] sm:h-[420px] w-full rounded-xl bg-slate-200 dark:bg-slate-800" />
       </div>
     );
   }
 
   if (loadError || !exam) {
     return (
-      <div className="p-4 sm:p-6 lg:p-8 max-w-lg mx-auto mt-10 bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors duration-300">
+      <div className="p-3 sm:p-6 lg:p-8 max-w-lg mx-auto mt-6 sm:mt-10 bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors duration-300">
         <Alert variant="destructive" className="rounded-xl border-2 dark:bg-red-950/30 dark:border-red-900/50">
           <AlertCircle className="h-5 w-5" />
-          <AlertDescription className="space-y-3 text-slate-700 dark:text-slate-300">
+          <AlertDescription className="space-y-3 text-sm text-slate-700 dark:text-slate-300">
             <p>{loadError || "Exam not found"}</p>
-            <Button size="sm" variant="outline" onClick={() => router.push("/staff/exams")} className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
+            <Button size="sm" variant="outline" onClick={() => router.push("/staff/exams")} className="border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 w-full sm:w-auto">
               ← Back to Exams
             </Button>
           </AlertDescription>
@@ -560,7 +562,7 @@ export function EditExamPage({ examId }: { examId: string }) {
 
   return (
     <div className="relative w-full h-full overflow-y-auto bg-slate-50 dark:bg-slate-950 min-h-screen transition-colors duration-300">
-      <div className="p-3 sm:p-5 lg:p-6 space-y-4 max-w-[1600px] mx-auto">
+      <div className="p-3 sm:p-5 lg:p-6 space-y-3 sm:space-y-4 max-w-[1600px] mx-auto pb-24 sm:pb-6">
         <ExamHeader
           examId={examId}
           examTitle={exam?.title}
@@ -571,12 +573,14 @@ export function EditExamPage({ examId }: { examId: string }) {
           onSave={handleSaveExam}
         />
 
-        {/* Controls Row */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Controls Row - stack on mobile */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           {/* Mark Selector */}
-          <div className="flex items-center gap-3 p-2 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/50">
-            <Target className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <span className="text-xs font-medium text-blue-700 dark:text-blue-300">Mark per question:</span>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2.5 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800/50">
+            <div className="flex items-center gap-2 min-w-0">
+              <Target className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <span className="text-xs font-medium text-blue-700 dark:text-blue-300 whitespace-nowrap">Mark/Q:</span>
+            </div>
             <div className="flex gap-1">
               {[0.5, 1, 2].map((mark) => (
                 <button
@@ -587,7 +591,7 @@ export function EditExamPage({ examId }: { examId: string }) {
                     toast.info(`Default mark set to ${mark}`);
                   }}
                   className={cn(
-                    "px-3 py-1 rounded-md text-xs font-semibold transition-all",
+                    "px-3 py-1 rounded-md text-xs font-semibold transition-all min-w-[40px]",
                     defaultMark === mark
                       ? "bg-blue-600 text-white shadow-sm"
                       : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 border border-slate-200 dark:border-slate-700"
@@ -597,24 +601,26 @@ export function EditExamPage({ examId }: { examId: string }) {
                 </button>
               ))}
             </div>
-            <span className="text-xs text-blue-600 dark:text-blue-400 ml-auto">
-              {objectiveCount} Qs × {defaultMark} = {totalObjectivePoints} marks
+            <span className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-400 w-full sm:w-auto sm:ml-auto">
+              {objectiveCount} × {defaultMark} = <strong>{totalObjectivePoints}</strong>
             </span>
           </div>
 
           {/* Theory Total Input */}
           {hasTheory && (
-            <div className="flex items-center gap-3 p-2 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800/50">
-              <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-              <span className="text-xs font-medium text-purple-700 dark:text-purple-300">Theory Total:</span>
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 p-2.5 bg-purple-50 dark:bg-purple-950/30 rounded-lg border border-purple-200 dark:border-purple-800/50">
+              <div className="flex items-center gap-2 min-w-0">
+                <Brain className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                <span className="text-xs font-medium text-purple-700 dark:text-purple-300 whitespace-nowrap">Theory:</span>
+              </div>
               <Input
                 type="number" min="0" max={EXAM_TOTAL_MARKS - totalObjectivePoints} value={theoryTotalMarks}
                 onChange={(e) => { const val = parseInt(e.target.value) || 0; setTheoryTotalMarks(Math.min(val, EXAM_TOTAL_MARKS - totalObjectivePoints)); }}
-                className="w-20 h-8 text-center text-sm font-bold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
+                className="w-16 h-8 text-center text-sm font-bold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white"
               />
-              <span className="text-xs text-purple-600 dark:text-purple-400">/ {EXAM_TOTAL_MARKS - totalObjectivePoints} remaining</span>
-              <span className="text-xs text-purple-600 dark:text-purple-400 ml-auto">
-                {theoryCount} Qs × {theoryCount > 0 ? (theoryTotalMarks / theoryCount).toFixed(2) : 0} marks each
+              <span className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400">/ {EXAM_TOTAL_MARKS - totalObjectivePoints}</span>
+              <span className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-400 w-full sm:w-auto sm:ml-auto">
+                {theoryCount} × {theoryCount > 0 ? (theoryTotalMarks / theoryCount).toFixed(2) : 0}
               </span>
             </div>
           )}
@@ -623,17 +629,17 @@ export function EditExamPage({ examId }: { examId: string }) {
         {/* Points Summary */}
         <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-950/50">
+          <CardContent className="p-3 sm:p-4">
+            <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="p-1.5 rounded-md bg-blue-100 dark:bg-blue-950/50 flex-shrink-0">
                   <Calculator className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
-                <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-200">Points Summary</h3>
+                <h3 className="font-semibold text-xs sm:text-sm text-slate-700 dark:text-slate-200 truncate">Points Summary</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge className={cn("text-[10px]", isBalanced ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400")}>
-                  {isBalanced ? `✅ ${EXAM_TOTAL_MARKS} marks` : `⚠️ ${totalExamPoints} marks`}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                <Badge className={cn("text-[10px] whitespace-nowrap", isBalanced ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400" : "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400")}>
+                  {isBalanced ? `✅ ${EXAM_TOTAL_MARKS}` : `⚠️ ${totalExamPoints}`}
                 </Badge>
                 <Button variant="ghost" size="sm" onClick={() => loadQuestions(false)} disabled={refreshing} className="h-8 w-8 p-0 text-slate-400 hover:text-blue-600 dark:text-slate-500 dark:hover:text-blue-400">
                   <RefreshCw className={cn("h-4 w-4", refreshing && "animate-spin")} />
@@ -646,23 +652,23 @@ export function EditExamPage({ examId }: { examId: string }) {
               <StatTile value={theoryCount} label="Theory Qs" accent="bg-violet-50 text-violet-700 dark:bg-violet-950/30 dark:text-violet-300" />
               <StatTile value={totalTheoryPoints} label="Theory Points" accent="bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300" />
             </div>
-            <div className="flex flex-wrap items-center justify-between pt-3 border-t border-slate-100 dark:border-slate-800 gap-2">
-              <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center sm:justify-between pt-3 border-t border-slate-100 dark:border-slate-800 gap-3">
+              <div className="flex items-center justify-between sm:justify-start gap-4 sm:gap-6">
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Default Mark</p>
-                  <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{defaultMark}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Default Mark</p>
+                  <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">{defaultMark}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Obj / Theory</p>
-                  <p className="text-lg font-bold text-slate-800 dark:text-slate-100">{totalObjectivePoints} / {totalTheoryPoints}</p>
+                  <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Obj / Theory</p>
+                  <p className="text-base sm:text-lg font-bold text-slate-800 dark:text-slate-100">{totalObjectivePoints} / {totalTheoryPoints}</p>
                 </div>
               </div>
-              <div className="text-right space-y-0.5">
-                <p className="text-xs text-slate-500 dark:text-slate-400">Pass Mark</p>
-                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">
+              <div className="text-left sm:text-right space-y-0.5">
+                <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400">Pass Mark</p>
+                <p className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-200">
                   {examDetails.pass_mark}
-                  <span className="text-sm font-normal text-slate-400 dark:text-slate-500"> / {totalExamPoints}</span>
-                  <span className="ml-1.5 text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-semibold">
+                  <span className="text-xs sm:text-sm font-normal text-slate-400 dark:text-slate-500"> / {totalExamPoints}</span>
+                  <span className="ml-1.5 text-[10px] sm:text-xs bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-full font-semibold">
                     {totalExamPoints > 0 ? Math.round(passMarkPercentage) : 0}%
                   </span>
                 </p>
@@ -673,11 +679,11 @@ export function EditExamPage({ examId }: { examId: string }) {
 
         {/* Passage Editor */}
         <div className="space-y-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               variant={hasPassage ? "default" : "outline"} size="sm"
               onClick={() => setHasPassage(!hasPassage)}
-              className={cn("text-xs", hasPassage && "bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-500 border-0")}
+              className={cn("text-xs w-full sm:w-auto", hasPassage && "bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-500 border-0")}
             >
               <BookOpen className="h-3 w-3 mr-1" />
               {hasPassage ? "📖 Passage Enabled" : "Add Comprehension Passage"}
@@ -685,7 +691,7 @@ export function EditExamPage({ examId }: { examId: string }) {
             {hasPassage && <span className="text-[10px] text-amber-600 dark:text-amber-400 hidden sm:inline">Students will see this during the exam</span>}
           </div>
           {hasPassage && (
-            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900/50">
+            <div className="p-2.5 sm:p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-900/50">
               <Label className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 uppercase">Comprehension Passage</Label>
               <Textarea
                 value={passageText} onChange={(e) => setPassageText(e.target.value)}
@@ -698,22 +704,23 @@ export function EditExamPage({ examId }: { examId: string }) {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-1 mb-4">
+          <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-1 mb-3 sm:mb-4 sticky top-0 z-10">
             <TabsList className="w-full grid grid-cols-3 bg-transparent gap-1 h-auto">
               {[
-                { value: "questions", label: `Questions`, count: totalQuestions, icon: LayoutList },
-                { value: "details", label: "Exam Details", icon: FileText },
-                { value: "preview", label: "Preview", icon: Eye },
-              ].map(({ value, label, count, icon: Icon }) => (
+                { value: "questions", label: `Questions`, shortLabel: "Qs", count: totalQuestions, icon: LayoutList },
+                { value: "details", label: "Exam Details", shortLabel: "Details", icon: FileText },
+                { value: "preview", label: "Preview", shortLabel: "Preview", icon: Eye },
+              ].map(({ value, label, shortLabel, count, icon: Icon }) => (
                 <TabsTrigger key={value} value={value} className={cn(
-                  "flex items-center justify-center gap-2 text-sm py-2.5 px-3 rounded-lg transition-all font-medium",
+                  "flex items-center justify-center gap-1 sm:gap-2 text-xs sm:text-sm py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg transition-all font-medium",
                   "data-[state=active]:bg-blue-600 data-[state=active]:text-white data-[state=active]:shadow-sm",
                   "data-[state=inactive]:text-slate-500 data-[state=inactive]:hover:text-slate-700 dark:data-[state=inactive]:text-slate-400 dark:data-[state=inactive]:hover:text-slate-200"
                 )}>
-                  <Icon className="h-4 w-4 flex-shrink-0" />
-                  <span className="hidden xs:inline">{label}</span>
+                  <Icon className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="hidden sm:inline">{label}</span>
+                  <span className="sm:hidden">{shortLabel}</span>
                   {count !== undefined && count > 0 && (
-                    <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-semibold", activeTab === value ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400")}>{count}</span>
+                    <span className={cn("text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 rounded-full font-semibold", activeTab === value ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400")}>{count}</span>
                   )}
                 </TabsTrigger>
               ))}
@@ -723,40 +730,40 @@ export function EditExamPage({ examId }: { examId: string }) {
           <TabsContent value="questions" className="mt-0">
             {totalQuestions === 0 ? (
               <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900">
-                <CardContent className="py-16 text-center">
-                  <div className="inline-flex p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-4">
-                    <FileQuestion className="h-10 w-10 text-slate-400 dark:text-slate-500" />
+                <CardContent className="py-10 sm:py-16 text-center px-4">
+                  <div className="inline-flex p-3 sm:p-4 rounded-2xl bg-slate-100 dark:bg-slate-800 mb-3 sm:mb-4">
+                    <FileQuestion className="h-8 w-8 sm:h-10 sm:w-10 text-slate-400 dark:text-slate-500" />
                   </div>
-                  <p className="text-base font-semibold text-slate-700 dark:text-slate-200 mb-1">No questions yet</p>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Start building your exam by adding questions below.</p>
-                  <div className="flex flex-wrap gap-3 justify-center">
-                    <Button onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shadow-sm gap-2"><Plus className="h-4 w-4" /> Add Objective Question</Button>
-                    {hasTheory && (<Button variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }} className="gap-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"><Plus className="h-4 w-4" /> Add Theory Question</Button>)}
+                  <p className="text-sm sm:text-base font-semibold text-slate-700 dark:text-slate-200 mb-1">No questions yet</p>
+                  <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mb-4 sm:mb-6">Start building your exam by adding questions below.</p>
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 justify-center">
+                    <Button onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }} className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white shadow-sm gap-2 w-full sm:w-auto"><Plus className="h-4 w-4" /> Add Objective Question</Button>
+                    {hasTheory && (<Button variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }} className="gap-2 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 w-full sm:w-auto"><Plus className="h-4 w-4" /> Add Theory Question</Button>)}
                   </div>
                 </CardContent>
               </Card>
             ) : (
               <Card className="border border-slate-200 dark:border-slate-800 shadow-sm bg-white dark:bg-slate-900 overflow-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-5 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
-                  <div className="flex items-center gap-2">
-                    <LayoutList className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                    <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">All Questions</span>
-                    <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-medium">{totalQuestions}</span>
-                    {draftCount > 0 && <span className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">{draftCount} draft{draftCount !== 1 ? "s" : ""}</span>}
+                <div className="flex flex-col gap-3 px-3 sm:px-5 py-3 sm:py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/60">
+                  <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                    <LayoutList className="h-4 w-4 text-slate-500 dark:text-slate-400 flex-shrink-0" />
+                    <span className="font-semibold text-xs sm:text-sm text-slate-800 dark:text-slate-100">All Questions</span>
+                    <span className="text-[10px] sm:text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full font-medium">{totalQuestions}</span>
+                    {draftCount > 0 && <span className="text-[10px] sm:text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full font-medium">{draftCount} draft{draftCount !== 1 ? "s" : ""}</span>}
                   </div>
                   <div className="flex gap-2">
-                    <Button size="sm" onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }} className="h-8 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-xs gap-1.5 shadow-sm"><Plus className="h-3.5 w-3.5" /> Objective</Button>
-                    {hasTheory && (<Button size="sm" variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }} className="h-8 text-xs gap-1.5 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"><Plus className="h-3.5 w-3.5" /> Theory</Button>)}
+                    <Button size="sm" onClick={() => { setEditingQuestion(null); setShowQuestionDialog(true); }} className="flex-1 sm:flex-none h-8 bg-blue-600 hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500 text-white text-xs gap-1.5 shadow-sm"><Plus className="h-3.5 w-3.5" /> Objective</Button>
+                    {hasTheory && (<Button size="sm" variant="outline" onClick={() => { setEditingTheoryQuestion(null); setShowTheoryDialog(true); }} className="flex-1 sm:flex-none h-8 text-xs gap-1.5 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300"><Plus className="h-3.5 w-3.5" /> Theory</Button>)}
                   </div>
                 </div>
-                <CardContent className="p-4">
-                  <ScrollArea className="h-[520px] pr-2">
-                    <div className="space-y-2.5 pr-2">
+                <CardContent className="p-2 sm:p-4">
+                  <ScrollArea className="h-[460px] sm:h-[520px] pr-1 sm:pr-2">
+                    <div className="space-y-2 sm:space-y-2.5 pr-1 sm:pr-2">
                       {objectiveCount > 0 && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2 py-1">
-                            <BookOpen className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400" />
-                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Objective Questions ({objectiveCount})</span>
+                            <BookOpen className="h-3.5 w-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                            <span className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Objective ({objectiveCount})</span>
                             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                           </div>
                           {questions.map((q, idx) => (
@@ -772,8 +779,8 @@ export function EditExamPage({ examId }: { examId: string }) {
                       {theoryCount > 0 && (
                         <div className="space-y-2 mt-4">
                           <div className="flex items-center gap-2 py-1">
-                            <FlaskConical className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400" />
-                            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Theory Questions ({theoryCount})</span>
+                            <FlaskConical className="h-3.5 w-3.5 text-violet-500 dark:text-violet-400 flex-shrink-0" />
+                            <span className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">Theory ({theoryCount})</span>
                             <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
                           </div>
                           {theoryQuestions.map((q, idx) => (
@@ -818,6 +825,25 @@ export function EditExamPage({ examId }: { examId: string }) {
           </TabsContent>
         </Tabs>
 
+        {/* Mobile Sticky Save Bar */}
+        <div className="fixed bottom-0 left-0 right-0 z-20 sm:hidden bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-3 shadow-lg">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">Total Marks</p>
+              <p className={cn("text-sm font-bold", isBalanced ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600 dark:text-amber-400")}>
+                {totalExamPoints} / {EXAM_TOTAL_MARKS}
+              </p>
+            </div>
+            <Button
+              onClick={handleSaveExam}
+              disabled={saving}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-sm h-10"
+            >
+              {saving ? "Saving..." : "Save Exam"}
+            </Button>
+          </div>
+        </div>
+
         {/* Dialogs */}
         <QuestionFormDialog
           open={showQuestionDialog}
@@ -836,23 +862,23 @@ export function EditExamPage({ examId }: { examId: string }) {
         />
 
         <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-          <DialogContent className="max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl">
+          <DialogContent className="max-w-[calc(100vw-2rem)] sm:max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl">
             <DialogHeader>
               <div className="flex items-center gap-3 mb-1">
-                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30 flex-shrink-0">
                   <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
                 </div>
                 <DialogTitle className="text-base font-bold text-slate-800 dark:text-slate-100">Delete Question?</DialogTitle>
               </div>
-              <DialogDescription className="text-sm text-slate-500 dark:text-slate-400 pl-11">
+              <DialogDescription className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 pl-0 sm:pl-11">
                 This action is permanent and cannot be undone. The question will be removed from this exam.
               </DialogDescription>
             </DialogHeader>
-            <DialogFooter className="gap-2 mt-2">
-              <Button variant="outline" size="sm" className="h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setDeleteDialogOpen(false)}>
+            <DialogFooter className="flex-col-reverse sm:flex-row gap-2 mt-2">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto h-9 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setDeleteDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button size="sm" className="h-9 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white gap-1.5" onClick={handleDeleteQuestion}>
+              <Button size="sm" className="w-full sm:w-auto h-9 bg-red-600 hover:bg-red-700 dark:bg-red-600 dark:hover:bg-red-500 text-white gap-1.5" onClick={handleDeleteQuestion}>
                 <Trash2 className="h-3.5 w-3.5" /> Delete
               </Button>
             </DialogFooter>
