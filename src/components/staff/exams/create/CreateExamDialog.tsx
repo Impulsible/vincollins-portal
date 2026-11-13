@@ -41,12 +41,15 @@ import type {
 } from "./types";
 
 /* ═══════════════════════════════════════════════════════════
-   SCORING ENGINE — equal-marks theory enforcement
+   SCORING ENGINE — reconciled model
    ─────────────────────────────────────────────────────────
    Objective total  = Σ objective question marks
-   Theory total     = effectiveN × theoryMarksPerQuestion
-                      (ALL theory Qs must carry the same mark —
-                       any N a student picks yields the same max)
+   Theory total     = effectiveN × resolvedMarksPerQ
+                      • resolvedMarksPerQ is derived from the
+                        actual questions when they are equal,
+                        else falls back to the parent-held value
+                      • Mixed-mark theory is draftable but blocked
+                        at submit to guarantee fairness
    Exam total       = objective + theory  →  must equal 60
    CA1 = 20, CA2 = 20, CA total = 40, Grand = 100
    ═══════════════════════════════════════════════════════════ */
@@ -77,12 +80,35 @@ const calculateMarkDistribution = (
       )
     : 0;
 
-  const theoryTotal = hasTheory ? effectiveN * theoryMarksPerQuestion : 0;
-
-  /* ── fairness gate ─────────────────────────────────── */
   const theoryMarksEqual =
     theoryQuestionCount === 0 ||
-    theoryQuestions.every((q) => q.marks === theoryMarksPerQuestion);
+    theoryQuestions.every((q) => q.marks === theoryQuestions[0]?.marks);
+
+  /* resolvedMarksPerQ = the number we actually trust for display
+     & for computing the theory total. */
+  let resolvedMarksPerQ = theoryMarksPerQuestion;
+  let theoryTotal = 0;
+
+  if (hasTheory && theoryQuestionCount > 0) {
+    if (theoryMarksEqual) {
+      // All questions carry the same mark — use it as truth
+      resolvedMarksPerQ = theoryQuestions[0].marks;
+      theoryTotal = effectiveN * resolvedMarksPerQ;
+    } else {
+      // Mixed marks → sum top-N (draft-only path, blocked at submit)
+      const sorted = [...theoryQuestions].sort((a, b) => b.marks - a.marks);
+      theoryTotal = sorted
+        .slice(0, effectiveN)
+        .reduce((s, q) => s + q.marks, 0);
+      resolvedMarksPerQ =
+        effectiveN > 0
+          ? Math.round((theoryTotal / effectiveN) * 10) / 10
+          : theoryMarksPerQuestion;
+    }
+  } else if (hasTheory) {
+    // No theory Qs yet — project what they'd be worth at current settings
+    theoryTotal = effectiveN * theoryMarksPerQuestion;
+  }
 
   /* ── totals ────────────────────────────────────────── */
   const examTotal = objectiveTotal + theoryTotal;
@@ -97,17 +123,17 @@ const calculateMarkDistribution = (
     grandTotal: MARK_CONSTANTS.GRAND_TOTAL, // 100
     questionCount: questions.length,
     theoryQuestionCount,
-    theoryMarksPerQuestion,
-    marksPerTheoryQuestion: theoryMarksPerQuestion, // back-compat alias
+    theoryMarksPerQuestion: resolvedMarksPerQ,
+    marksPerTheoryQuestion: resolvedMarksPerQ, // back-compat alias
     isBalanced:
       examTotal === MARK_CONSTANTS.EXAM_TOTAL &&
-      (!hasTheory || theoryMarksEqual),
+      (!hasTheory || theoryQuestionCount === 0 || theoryMarksEqual),
     theoryMarksEqual,
   };
 };
 
 /* ═══════════════════════════════════════════════════════════
-   VALIDATION GATE — runs before save
+   VALIDATION GATE — runs before submit
    ═══════════════════════════════════════════════════════════ */
 
 const validateExam = (
@@ -173,7 +199,8 @@ export function CreateExamDialog({
     number | null
   >(null);
 
-  /* Master marks per theory question — single source of truth */
+  /* Master marks per theory question — kept in sync with questions
+     whenever all theory questions share one value. */
   const [theoryMarksPerQuestion, setTheoryMarksPerQuestion] =
     useState<number>(10);
 
@@ -220,6 +247,19 @@ export function CreateExamDialog({
     setTheoryMax(markDistribution.theoryTotal);
   }, [markDistribution.objectiveTotal, markDistribution.theoryTotal]);
 
+  /* keep parent theoryMarksPerQuestion in sync with equal-mark questions.
+     This closes the drift loophole: any time all Qs share a value,
+     the parent adopts it immediately. */
+  useEffect(() => {
+    if (
+      theoryQuestions.length > 0 &&
+      theoryQuestions.every((q) => q.marks === theoryQuestions[0].marks) &&
+      theoryQuestions[0].marks !== theoryMarksPerQuestion
+    ) {
+      setTheoryMarksPerQuestion(theoryQuestions[0].marks);
+    }
+  }, [theoryQuestions, theoryMarksPerQuestion]);
+
   const examProgress = useMemo(() => {
     let score = 0;
     if (examDetails.title) score += 25;
@@ -239,6 +279,14 @@ export function CreateExamDialog({
     () => validateExam(examDetails, markDistribution, hasTheory),
     [examDetails, markDistribution, hasTheory],
   );
+
+  /* effective N for footer display */
+  const effectiveTheoryN = useMemo(() => {
+    if (!hasTheory || theoryQuestions.length === 0) return 0;
+    if (!theoryQuestionsToAnswer || theoryQuestionsToAnswer <= 0)
+      return theoryQuestions.length;
+    return Math.min(theoryQuestionsToAnswer, theoryQuestions.length);
+  }, [hasTheory, theoryQuestions.length, theoryQuestionsToAnswer]);
 
   /* ── auto-save draft ── */
 
@@ -265,7 +313,7 @@ export function CreateExamDialog({
       passageText,
       hasPassage,
       theoryQuestionsTotal: theoryQuestions.length,
-      theoryMarksPerQuestion,
+      theoryMarksPerQuestion: markDistribution.theoryMarksPerQuestion,
       bulkTheoryText: "",
       theoryTotalMarks: markDistribution.theoryTotal,
     });
@@ -276,7 +324,6 @@ export function CreateExamDialog({
     questions,
     theoryQuestions,
     theoryQuestionsToAnswer,
-    theoryMarksPerQuestion,
     scoringRule,
     defaultMark,
     bulkQuestionsText,
@@ -284,6 +331,7 @@ export function CreateExamDialog({
     hasPassage,
     markDistribution.objectiveTotal,
     markDistribution.theoryTotal,
+    markDistribution.theoryMarksPerQuestion,
     debouncedSave,
   ]);
 
@@ -389,7 +437,7 @@ export function CreateExamDialog({
         theoryMax: markDistribution.theoryTotal,
         theoryQuestionsTotal: theoryQuestions.length,
         theoryQuestionsToAnswer: effectiveN || null,
-        theoryMarksPerQuestion,
+        theoryMarksPerQuestion: markDistribution.theoryMarksPerQuestion,
         scoringRule,
         teacherProfile,
         submitForApproval,
@@ -411,7 +459,6 @@ export function CreateExamDialog({
       theoryQuestions,
       hasTheory,
       theoryQuestionsToAnswer,
-      theoryMarksPerQuestion,
       scoringRule,
       teacherProfile,
       clearStorage,
@@ -582,7 +629,6 @@ export function CreateExamDialog({
               hasTheory={hasTheory}
               onHasTheoryChange={setHasTheory}
               objectiveTotal={markDistribution.objectiveTotal}
-              /* equal-marks enforcement props */
               questionsToAnswer={theoryQuestionsToAnswer ?? 0}
               onQuestionsToAnswerChange={setTheoryQuestionsToAnswer}
             />
@@ -637,16 +683,16 @@ export function CreateExamDialog({
                 Theory: {markDistribution.theoryTotal.toFixed(1)}mk
                 {hasTheory &&
                   theoryQuestions.length > 0 &&
-                  ` (${Math.min(
-                    theoryQuestionsToAnswer ?? theoryQuestions.length,
-                    theoryQuestions.length,
-                  )}/${theoryQuestions.length} × ${theoryMarksPerQuestion})`}
+                  (markDistribution.theoryMarksEqual
+                    ? ` (${effectiveTheoryN}/${theoryQuestions.length} × ${markDistribution.theoryMarksPerQuestion})`
+                    : ` (top ${effectiveTheoryN} of ${theoryQuestions.length}, mixed ⚠️)`)}
               </span>
               <span className="text-slate-300 dark:text-slate-600">|</span>
               <span
                 className={cn(
                   "font-semibold",
-                  totalMarks === MARK_CONSTANTS.EXAM_TOTAL
+                  totalMarks === MARK_CONSTANTS.EXAM_TOTAL &&
+                    (!hasTheory || markDistribution.theoryMarksEqual)
                     ? "text-emerald-600 dark:text-emerald-400"
                     : isOver
                       ? "text-red-600 dark:text-red-400"
