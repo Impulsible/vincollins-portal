@@ -1,7 +1,7 @@
-// components/admin/students/components/dialogs/EditStudentDialog.tsx - WITH DARK MODE
+// components/admin/students/components/dialogs/EditStudentDialog.tsx - WITH DARK MODE & PHOTO UPLOAD
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
@@ -9,13 +9,77 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
-import { Loader2, Hash, Fingerprint, User, Calendar, Phone, School, Users, GraduationCap } from 'lucide-react'
+import {
+  Loader2, Hash, Fingerprint, User, Calendar, Phone, School,
+  Users, GraduationCap, Camera, Upload, X, ImageIcon,
+} from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import { Student } from '../../types'
 import { CLASSES, DEPARTMENTS, GENDERS, generateAdmissionYears } from '../../constants'
 
+// ── Photo upload constants (matches student profile page) ─────────────────────
+const MAX_PHOTO_SIZE = 5 * 1024 * 1024 // 5MB (matches profile page)
+
+const GRADIENTS = [
+  'from-rose-500 to-pink-600', 'from-orange-500 to-amber-600',
+  'from-emerald-500 to-teal-600', 'from-blue-500 to-cyan-600',
+  'from-violet-500 to-purple-600', 'from-indigo-500 to-blue-600',
+  'from-fuchsia-500 to-pink-600', 'from-lime-500 to-green-600',
+]
+
+const getAvatarGradient = (name: string) => {
+  const hash = (name || 'x').split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+  return GRADIENTS[hash % GRADIENTS.length]
+}
+
+const getInitials = (name: string) =>
+  name ? name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2) : '?'
+
+// ── Upload helper (matches student profile page exactly) ──────────────────────
+const uploadPhotoToStorage = async (file: File, ownerId: string): Promise<string> => {
+  // Validation — same limits as profile page
+  if (file.size > MAX_PHOTO_SIZE) {
+    throw new Error('Image size should be less than 5MB')
+  }
+  if (!file.type.startsWith('image/')) {
+    throw new Error('Please select an image file')
+  }
+
+  // Same filename pattern as profile page: avatar-{id}-{timestamp}.{ext}
+  const fileExt = file.name.split('.').pop() || 'jpg'
+  const fileName = `avatar-${ownerId}-${Date.now()}.${fileExt}`
+
+  // Same bucket + options (upsert: false to match profile page)
+  const { error: uploadError } = await supabase.storage
+    .from('student-photos')
+    .upload(fileName, file, { cacheControl: '3600', upsert: false })
+
+  if (uploadError) throw uploadError
+
+  // Same public URL retrieval as profile page
+  const { data: urlData } = supabase.storage
+    .from('student-photos')
+    .getPublicUrl(fileName)
+
+  const publicUrl = urlData.publicUrl
+
+  // Guard: ensure bucket is actually public (prevents silent 400 errors)
+  if (!publicUrl.includes('/object/public/')) {
+    throw new Error(
+      'Storage bucket "student-photos" is not public. Enable public access in Supabase Dashboard → Storage.'
+    )
+  }
+
+  return publicUrl
+}
+
+// ── Props ─────────────────────────────────────────────────────────────────────
 interface EditStudentDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -25,24 +89,35 @@ interface EditStudentDialogProps {
   isSubmitting: boolean
 }
 
-export function EditStudentDialog({ open, onOpenChange, student, onStudentChange, onSave, isSubmitting }: EditStudentDialogProps) {
+export function EditStudentDialog({
+  open, onOpenChange, student, onStudentChange, onSave, isSubmitting,
+}: EditStudentDialogProps) {
   const admissionYears = generateAdmissionYears()
   const [firstName, setFirstName] = useState('')
   const [middleName, setMiddleName] = useState('')
   const [lastName, setLastName] = useState('')
+
+  // ── Photo upload state ────────────────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     if (open && student) {
       setFirstName(student.first_name || '')
       setMiddleName(student.middle_name || '')
       setLastName(student.last_name || '')
+      setPreviewUrl(student.photo_url || undefined)
     }
   }, [open, student])
 
   if (!student) return null
 
-  const update = (updates: Partial<Student>) => { onStudentChange({ ...student, ...updates }) }
+  const update = (updates: Partial<Student>) => {
+    onStudentChange({ ...student, ...updates })
+  }
 
+  // ── Name handlers ─────────────────────────────────────────────────────────
   const handleFirstNameChange = (value: string) => {
     setFirstName(value)
     const fullName = buildFullName(value, middleName, lastName)
@@ -62,6 +137,72 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
     update({ last_name: value, full_name: fullName, display_name: displayName })
   }
 
+  // ── Photo handlers ────────────────────────────────────────────────────────
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Same validation order & wording as profile page
+    if (file.size > MAX_PHOTO_SIZE) {
+      toast.error('Image size should be less than 5MB')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file')
+      return
+    }
+
+    setIsUploadingPhoto(true)
+    try {
+      // Upload to Supabase Storage (matches profile page exactly)
+      const publicUrl = await uploadPhotoToStorage(file, student.id)
+
+      // Update BOTH photo_url and avatar_url (matches profile page)
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          photo_url: publicUrl,
+          avatar_url: publicUrl,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', student.id)
+
+      if (updateError) throw new Error(updateError.message)
+
+      // Update local state
+      setPreviewUrl(publicUrl)
+      update({ photo_url: publicUrl } as any)
+      toast.success('Profile photo updated!')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload photo')
+    } finally {
+      setIsUploadingPhoto(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const handleRemovePhoto = async () => {
+    try {
+      // Clear BOTH columns (matches profile page behaviour)
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          photo_url: null,
+          avatar_url: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', student.id)
+
+      if (error) throw new Error(error.message)
+
+      setPreviewUrl(undefined)
+      update({ photo_url: undefined } as any)
+      toast.success('Photo removed')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to remove photo')
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[650px] max-h-[85vh] overflow-y-auto p-0 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
@@ -76,7 +217,87 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
         </div>
 
         <div className="space-y-6 px-6 py-5">
-          {/* Name Section */}
+
+          {/* ══ Photo Upload Section ══════════════════════════════════════════ */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Camera className="h-4 w-4 text-pink-600 dark:text-pink-400" />
+              <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Profile Photo</h3>
+              <Badge variant="outline" className="text-[10px] border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">Report Card</Badge>
+            </div>
+
+            <div className="flex items-center gap-4 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700">
+              {/* Avatar preview */}
+              <div className="relative shrink-0">
+                <Avatar className="h-20 w-20 border-2 border-white dark:border-slate-700 shadow-md ring-1 ring-slate-200 dark:ring-slate-600">
+                  <AvatarImage src={previewUrl} />
+                  <AvatarFallback
+                    className={cn(
+                      'text-white font-bold bg-gradient-to-br text-xl',
+                      getAvatarGradient(student.full_name || student.display_name || '')
+                    )}
+                  >
+                    {getInitials(student.full_name || student.display_name || '') || (
+                      <ImageIcon className="w-6 h-6" />
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                {isUploadingPhoto && (
+                  <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 text-white animate-spin" />
+                  </div>
+                )}
+              </div>
+
+              {/* Upload controls */}
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploadingPhoto || isSubmitting}
+                    className="h-9 rounded-lg text-xs gap-1.5 font-semibold bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700"
+                  >
+                    {isUploadingPhoto ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : previewUrl ? (
+                      <Camera className="w-3.5 h-3.5" />
+                    ) : (
+                      <Upload className="w-3.5 h-3.5" />
+                    )}
+                    {isUploadingPhoto ? 'Uploading…' : previewUrl ? 'Change Photo' : 'Upload Photo'}
+                  </Button>
+
+                  {previewUrl && !isUploadingPhoto && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleRemovePhoto}
+                      disabled={isSubmitting}
+                      className="h-9 rounded-lg text-xs gap-1.5 font-semibold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    >
+                      <X className="w-3.5 h-3.5" /> Remove
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 leading-tight">
+                  JPG, PNG · Max 5MB · Appears on report card
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handlePhotoSelect}
+                  className="hidden"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* ══ Name Section ══════════════════════════════════════════════════ */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -102,7 +323,7 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
             </div>
           </div>
 
-          {/* Academic Section */}
+          {/* ══ Academic Section ══════════════════════════════════════════════ */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <GraduationCap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -145,7 +366,7 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
             </div>
           </div>
 
-          {/* Identification */}
+          {/* ══ Identification ════════════════════════════════════════════════ */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Hash className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
@@ -161,7 +382,7 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
             </div>
           </div>
 
-          {/* Personal Info */}
+          {/* ══ Personal Info ═════════════════════════════════════════════════ */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
@@ -187,7 +408,7 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
             </div>
           </div>
 
-          {/* Contact Info */}
+          {/* ══ Contact Info ══════════════════════════════════════════════════ */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <Phone className="h-4 w-4 text-slate-500 dark:text-slate-400" />
@@ -210,7 +431,7 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
             </div>
           </div>
 
-          {/* Status Toggle */}
+          {/* ══ Status Toggle ═════════════════════════════════════════════════ */}
           <div className="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
             <span className="text-sm text-slate-600 dark:text-slate-300">Account Status</span>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -232,6 +453,7 @@ export function EditStudentDialog({ open, onOpenChange, student, onStudentChange
   )
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function buildFullName(firstName: string, middleName: string, lastName: string): string {
   const first = firstName.trim(), middle = middleName.trim(), last = lastName.trim()
   if (!first || !last) return ''

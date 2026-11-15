@@ -75,7 +75,7 @@ const JSS_SUBJECTS = [
   'English Studies', 'Mathematics', 'Basic Science', 'Basic Technology',
   'Social Studies', 'Civic Education', 'Business Studies', 'Information Technology',
   'Agricultural Science', 'Home Economics', 'Physical and Health Education', 'Christian Religious Studies',
-  'French', 'Yoruba', 'Cultural and Creative Arts', 'Music', 'Security Education',
+  'French', 'Yoruba', 'Cultural and Creative Arts', 'Music', 'Security Education', 'History',
 ]
 const SS_SUBJECTS_SCIENCE = ['English Language', 'Mathematics', 'Biology', 'Chemistry', 'Physics', 'Further Mathematics', 'Agricultural Science', 'Data Processing', 'Civic Education', 'Economics']
 const SS_SUBJECTS_ARTS = ['English Language', 'Mathematics', 'Literature in English', 'Government', 'Christian Religious Studies', 'Economics', 'Data Processing', 'Agricultural Science', 'Civic Education', 'Biology']

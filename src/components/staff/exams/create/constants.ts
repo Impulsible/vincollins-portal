@@ -77,6 +77,7 @@ export const JSS_SUBJECTS = [
   "Cultural and Creative Arts",
   "French",
   "Security Education",
+  "History",
 ];
 
 export const SS_SUBJECTS = [
@@ -102,9 +103,9 @@ export const SS_SUBJECTS = [
 // ✅ Mark constants - NO HARDCODED LIMITS
 export const MARK_CONSTANTS = {
   EXAM_TOTAL: 60,
-  CA1_MAX: 10,
-  CA2_MAX: 10,
-  CA_TOTAL: 20,
+  CA1_MAX: 20,
+  CA2_MAX: 20,
+  CA_TOTAL: 40,
   GRAND_TOTAL: 100,
   DEFAULT_MARK: 0.5,
   DEFAULT_THEORY_TOTAL: 40,

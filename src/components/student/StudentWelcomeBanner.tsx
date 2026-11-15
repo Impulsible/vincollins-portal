@@ -48,7 +48,8 @@ const STORAGE_KEY = 'student_session_start'
 const getSubjectCountByClassLevel = (className: string): number => {
   if (!className) return 0
   const normalizedClass = className.trim().toUpperCase().replace(/\s/g, '')
-  if (normalizedClass.includes('JSS1') || normalizedClass.includes('JSS2') || normalizedClass.includes('JSS3')) return 17
+  // 👇 UPDATED to 18
+  if (normalizedClass.includes('JSS1') || normalizedClass.includes('JSS2') || normalizedClass.includes('JSS3')) return 18
   if (normalizedClass.includes('SS1') || normalizedClass.includes('SS2') || normalizedClass.includes('SS3')) return 10
   return 0
 }
@@ -590,8 +591,9 @@ export function StudentWelcomeBanner({ profile, stats, onRefresh }: StudentWelco
 
           <div className={cn("group cursor-default bg-white/5 border rounded-xl p-3 hover:bg-white/10 transition-colors", hasProgress ? "border-teal-500/30" : "border-slate-700/50")}>
             <div className="flex items-center justify-between mb-1">
+              {/* 👇 UPDATED to toFixed(2) */}
               <p className={cn("text-2xl md:text-3xl font-bold transition-colors", hasProgress ? "text-white group-hover:text-emerald-300" : "text-slate-500")}>
-                {hasProgress ? `${averageScore.toFixed(1)}%` : '—'}
+                {hasProgress ? `${averageScore.toFixed(2)}%` : '—'}
               </p>
               <TrendingUp className="h-5 w-5 text-teal-400 opacity-80 shrink-0" />
             </div>

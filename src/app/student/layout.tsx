@@ -38,6 +38,16 @@ const PATH_TO_TAB: Record<string, string> = {
   '/student/report-card': 'report-card',
 }
 
+// ✅ Tabs that inactive (archived) students can still access.
+// Report cards are historical records — former students should always be able
+// to view, print, and download them.
+const INACTIVE_ALLOWED_TABS = [
+  'overview',
+  'results',
+  'profile',
+  'report-card',
+] as const
+
 function getTabFromPath(pathname: string): string {
   if (PATH_TO_TAB[pathname]) return PATH_TO_TAB[pathname]
   for (const [path, tab] of Object.entries(PATH_TO_TAB)) {
@@ -117,12 +127,13 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     loadProfile()
   }, [loadProfile])
 
+  // ✅ Enforce tab restrictions for archived (inactive) students.
+  // Allowed tabs are defined in INACTIVE_ALLOWED_TABS above.
   useEffect(() => {
     if (profile && profile.is_active === false) {
-      const allowedTabs = ['overview', 'results', 'profile']
       const currentTab = getTabFromPath(pathname || '/student')
 
-      if (!allowedTabs.includes(currentTab)) {
+      if (!INACTIVE_ALLOWED_TABS.includes(currentTab as typeof INACTIVE_ALLOWED_TABS[number])) {
         toast.error('This section is disabled for archived student accounts.')
         router.replace('/student')
       }
@@ -174,9 +185,9 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }, [userId, router])
 
   const handleTabChange = useCallback((tab: string) => {
+    // ✅ Block archived students from clicking into restricted tabs
     if (profile && profile.is_active === false) {
-      const allowedTabs = ['overview', 'results', 'profile']
-      if (!allowedTabs.includes(tab)) {
+      if (!INACTIVE_ALLOWED_TABS.includes(tab as typeof INACTIVE_ALLOWED_TABS[number])) {
         toast.error('This action is disabled for archived accounts.')
         return
       }
@@ -206,6 +217,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
   }
 
   if (isExamPage) {
+    // Archived students cannot access exam pages
     if (profile && profile.is_active === false) {
       router.replace('/student')
       return null

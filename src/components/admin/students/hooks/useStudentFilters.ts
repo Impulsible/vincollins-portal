@@ -28,12 +28,17 @@ const ALL_CLASS_KEYS = [
   'SS1 Commercial', 'SS2 Commercial', 'SS3 Commercial',
 ]
 
-// Helper: check if a class belongs to an SS year group
+// Helper: check if a class belongs to an SS year group (excludes JSS)
 const isSSYear = (studentClass: string, year: string): boolean => {
-  const upper = studentClass.toUpperCase()
-  if (year === 'SS1') return upper.includes('SS1') || upper.includes('SS 1')
-  if (year === 'SS2') return upper.includes('SS2') || upper.includes('SS 2')
-  if (year === 'SS3') return upper.includes('SS3') || upper.includes('SS 3')
+  // Normalize by removing all spaces and making uppercase (e.g., "JSS 1" -> "JSS1", "SS 1 Science" -> "SS1SCIENCE")
+  const normalized = studentClass.toUpperCase().replace(/\s+/g, '')
+  
+  // JSS must never match SS year filters
+  if (normalized.startsWith('JSS')) return false
+
+  if (year === 'SS1') return normalized.startsWith('SS1')
+  if (year === 'SS2') return normalized.startsWith('SS2')
+  if (year === 'SS3') return normalized.startsWith('SS3')
   return false
 }
 
