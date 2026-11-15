@@ -1,3 +1,4 @@
+// src/app/student/exam/[id]/page.tsx
 "use client"
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"
@@ -66,8 +67,7 @@ export default function TakeExamPage() {
   const examEndedRef = useRef(false)
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // ✅ Keeps LoadingView mounted for the full 2-minute calming period
-  //    regardless of how fast the API responds.
+  // ✅ Keeps LoadingView mounted for the calming period
   const [calmingDone, setCalmingDone] = useState(false)
 
   const {
@@ -118,7 +118,6 @@ export default function TakeExamPage() {
     },
   })
 
-  // Reflect external change into state that feeds the timer
   useEffect(() => {
     if (liveExtraMinutes !== dbExtraMinutes) {
       setDbExtraMinutes(liveExtraMinutes)
@@ -183,7 +182,6 @@ export default function TakeExamPage() {
 
   handleSubmitRef.current = handleSubmit
 
-  // ✅ Timer total = base duration + live extra minutes
   const baseDurationMinutes = Number(exam?.duration) || DEFAULT_EXAM_DURATION
   const durationMinutes = baseDurationMinutes + dbExtraMinutes
 
@@ -242,13 +240,11 @@ export default function TakeExamPage() {
       existingAttemptId: string,
       fallbackAnswers: Record<string, string> = {},
       knownStartMs?: number | null,
-      /** @deprecated always re-read from DB for the freshest extra time */
       _knownExtraMinutes?: number,
     ): Promise<boolean> => {
       let startMs = knownStartMs ?? null
       let extraMin = _knownExtraMinutes ?? 0
 
-      // Always fetch fresh extra minutes + canonical start from DB
       if (
         startMs == null ||
         !Number.isFinite(startMs) ||
@@ -285,7 +281,6 @@ export default function TakeExamPage() {
 
       if (remaining <= 0) {
         dispatch({ type: "SET_FULLY_RESTORED" })
-        // 3s grace — if admin grants extra in that window, live sync revives us
         setTimeout(() => {
           if (!examEndedRef.current) {
             void handleSubmitRef.current(true, "Time already expired on resume")
@@ -388,17 +383,22 @@ export default function TakeExamPage() {
 
   const isTerminated = examTerminated || securityViolated
 
-  // ✅ Resolve a friendly first name for the LoadingView greeting.
-  //    Supports several common profile shapes; falls back gracefully.
+  // ✅ Extract explicitly First Name first (ensuring we avoid surname)
   const studentDisplayName = useMemo<string | undefined>(() => {
     if (!profile) return undefined
     const p = profile as Record<string, unknown>
+    
+    // Priority 1: Check explicit first name fields in DB
+    const explicitFirst =
+      (p.first_name as string | undefined) ??
+      (p.firstName as string | undefined)
+    if (explicitFirst?.trim()) return explicitFirst.trim()
+
+    // Priority 2: Fallback to full name (LoadingView will parse it)
     const candidate =
       (p.full_name as string | undefined) ??
       (p.fullName as string | undefined) ??
-      (p.name as string | undefined) ??
-      (p.first_name as string | undefined) ??
-      (p.firstName as string | undefined)
+      (p.name as string | undefined)
     return candidate?.toString().trim() || undefined
   }, [profile])
 
@@ -406,10 +406,6 @@ export default function TakeExamPage() {
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════
 
-  // ✅ Keep LoadingView mounted until BOTH conditions are true:
-  //    1. API has finished loading (or errored)
-  //    2. The 2-minute calming phase has completed
-  //    If there's a load error, skip the calming wait and show the error ASAP.
   if (loading || (!calmingDone && !loadError)) {
     return (
       <LoadingView
@@ -522,10 +518,6 @@ export default function TakeExamPage() {
       </div>
     )
   }
-
-  // ═══════════════════════════════════════════════════════════════════════
-  // MAIN EXAM UI
-  // ═══════════════════════════════════════════════════════════════════════
 
   return (
     <>

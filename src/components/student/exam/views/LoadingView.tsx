@@ -42,7 +42,7 @@ const LOADING_STEPS: LoadingStep[] = [
   { label: 'Almost ready', icon: CheckCircle2, duration: 2500 },
 ]
 
-// No hyphens or em-dashes in any quote
+// No hyphens or dashes in any quote
 const CALMING_MESSAGES = [
   'Take a slow, deep breath in and let it out gently.',
   'It is completely normal to feel a little nervous right now.',
@@ -58,10 +58,29 @@ const CALMING_MESSAGE_INTERVAL = 3500
    Helpers
    ────────────────────────────────────────────── */
 
+/**
+ * Extracts and formats only the student's FIRST name.
+ * Handles "Surname, Firstname", ALL-CAPS ("CHIDI" -> "Chidi"), etc.
+ */
 const getFirstName = (name?: string): string => {
   if (!name) return ''
-  const trimmed = name.trim()
-  return trimmed ? trimmed.split(/\s+/)[0] : ''
+  let trimmed = name.trim()
+  if (!trimmed) return ''
+
+  // If format is "Surname, Firstname", take the part after the comma
+  if (trimmed.includes(',')) {
+    const parts = trimmed.split(',').map((s) => s.trim()).filter(Boolean)
+    if (parts.length > 1) {
+      trimmed = parts[1]
+    }
+  }
+
+  // Take the first word
+  const rawFirst = trimmed.split(/\s+/)[0] || ''
+  if (!rawFirst) return ''
+
+  // Convert to Title Case (e.g., "ADEBAYO" -> "Adebayo", "chidi" -> "Chidi")
+  return rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase()
 }
 
 const formatCountdown = (ms: number): string => {
@@ -160,7 +179,7 @@ export default function LoadingView({ studentName, onComplete }: LoadingViewProp
         />
       </div>
 
-      {/* ── Main card: constrained height, scrolls if needed, never clipped ── */}
+      {/* ── Main card (scrollable container if screen is very short) ── */}
       <motion.div
         initial={{ opacity: 0, y: 16, scale: 0.97 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -218,7 +237,7 @@ export default function LoadingView({ studentName, onComplete }: LoadingViewProp
           )}
         </div>
 
-        {/* ── Heading ── */}
+        {/* ── Heading (First Name) ── */}
         <h1 className="mb-1 shrink-0 text-center text-lg font-bold tracking-tight text-slate-800 dark:text-slate-100 sm:text-xl md:text-2xl px-1">
           {isCalmingPhase ? (
             "You're almost there"
@@ -315,7 +334,7 @@ export default function LoadingView({ studentName, onComplete }: LoadingViewProp
               transition={{ duration: 0.6, ease: 'easeOut' }}
               className="flex w-full flex-col items-center shrink-0"
             >
-              {/* Breathing circle — slightly smaller on short screens */}
+              {/* Breathing circle */}
               <div className="relative mb-2 flex h-20 w-20 items-center justify-center sm:mb-3 sm:h-24 sm:w-24">
                 <motion.div
                   className="absolute inset-0 rounded-full bg-gradient-to-br from-teal-300/30 to-emerald-300/30 dark:from-teal-400/25 dark:to-emerald-400/25"
@@ -341,7 +360,7 @@ export default function LoadingView({ studentName, onComplete }: LoadingViewProp
                 Breathe in and out
               </motion.p>
 
-              {/* ── QUOTE DISPLAY (no hyphens, no overflow clip) ── */}
+              {/* ── QUOTE DISPLAY (No hyphens) ── */}
               <div className="relative mb-3 flex min-h-[3.25rem] w-full items-center justify-center px-1 sm:min-h-[3.75rem]">
                 <AnimatePresence mode="wait">
                   <motion.p
@@ -379,7 +398,7 @@ export default function LoadingView({ studentName, onComplete }: LoadingViewProp
                 onClick={() => onComplete?.()}
                 className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold text-xs px-5 py-2.5 transition-all shadow-md shadow-emerald-200/60 dark:shadow-emerald-950/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
               >
-                <span>I&apos;m Ready — Continue</span>
+                <span>I am Ready, Continue</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </motion.button>
             </motion.div>
