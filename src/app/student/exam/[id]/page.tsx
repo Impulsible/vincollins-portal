@@ -1,4 +1,3 @@
-// src/app/student/exam/[id]/page.tsx
 "use client"
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react"

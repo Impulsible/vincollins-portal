@@ -18,7 +18,6 @@ import {
 
 interface LoadingViewProps {
   studentName?: string
-  /** Fires exactly after 2 minutes — parent transitions to InstructionsView */
   onComplete?: () => void
 }
 
@@ -32,7 +31,7 @@ interface LoadingStep {
    Constants
    ────────────────────────────────────────────── */
 
-const TOTAL_DURATION_MS = 120_000 // 2 minutes exactly
+const TOTAL_DURATION_MS = 120_000
 
 const LOADING_STEPS: LoadingStep[] = [
   { label: 'Verifying your identity', icon: Shield, duration: 4000 },
