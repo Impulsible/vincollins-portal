@@ -26,7 +26,7 @@ import {
 
 import type { ExamResult } from "./types"
 
-import { LoadingView } from "@/components/student/exam/views/LoadingView"
+import LoadingView from "@/components/student/exam/views/LoadingView"
 import { ErrorView } from "@/components/student/exam/views/ErrorView"
 import { InstructionsView } from "@/components/student/exam/views/InstructionsView"
 import { ResumeDialog } from "@/components/student/exam/views/ResumeDialog"
