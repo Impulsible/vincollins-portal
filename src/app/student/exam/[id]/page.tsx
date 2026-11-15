@@ -67,6 +67,10 @@ export default function TakeExamPage() {
   const examEndedRef = useRef(false)
   const restoreTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // ✅ Keeps LoadingView mounted for the full 2-minute calming period
+  //    regardless of how fast the API responds.
+  const [calmingDone, setCalmingDone] = useState(false)
+
   const {
     state,
     dispatch,
@@ -385,11 +389,36 @@ export default function TakeExamPage() {
 
   const isTerminated = examTerminated || securityViolated
 
+  // ✅ Resolve a friendly first name for the LoadingView greeting.
+  //    Supports several common profile shapes; falls back gracefully.
+  const studentDisplayName = useMemo<string | undefined>(() => {
+    if (!profile) return undefined
+    const p = profile as Record<string, unknown>
+    const candidate =
+      (p.full_name as string | undefined) ??
+      (p.fullName as string | undefined) ??
+      (p.name as string | undefined) ??
+      (p.first_name as string | undefined) ??
+      (p.firstName as string | undefined)
+    return candidate?.toString().trim() || undefined
+  }, [profile])
+
   // ═══════════════════════════════════════════════════════════════════════
   // RENDER
   // ═══════════════════════════════════════════════════════════════════════
 
-  if (loading) return <LoadingView />
+  // ✅ Keep LoadingView mounted until BOTH conditions are true:
+  //    1. API has finished loading (or errored)
+  //    2. The 2-minute calming phase has completed
+  //    If there's a load error, skip the calming wait and show the error ASAP.
+  if (loading || (!calmingDone && !loadError)) {
+    return (
+      <LoadingView
+        studentName={studentDisplayName}
+        onComplete={() => setCalmingDone(true)}
+      />
+    )
+  }
 
   if (loadError) {
     return (
