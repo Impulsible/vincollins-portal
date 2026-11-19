@@ -108,6 +108,9 @@ export function ObjectiveQuestionsStep({
     return Math.floor(remaining / defaultMark);
   }, [remaining, defaultMark]);
 
+  const objectivePercent = Math.min((objectiveTotal / EXAM_TOTAL) * 100, 100);
+  const theoryPercent = Math.min((theoryTotal / EXAM_TOTAL) * 100, 100);
+
   /* ── handlers ── */
 
   const handleMarkUpdate = useCallback(
@@ -307,9 +310,7 @@ export function ObjectiveQuestionsStep({
           <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
             <div
               className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
-              style={{
-                width: `${Math.min((objectiveTotal / EXAM_TOTAL) * 100, 100)}%`,
-              }}
+              style={{ width: `${objectivePercent}%` }}
               title={`Objective: ${objectiveTotal}`}
             />
             <div
@@ -321,20 +322,14 @@ export function ObjectiveQuestionsStep({
                   ? "bg-red-500 dark:bg-red-400"
                   : "bg-purple-400 dark:bg-purple-500"
               )}
-              style={{
-                width: `${Math.min((theoryTotal / EXAM_TOTAL) * 100, 100)}%`,
-              }}
+              style={{ width: `${theoryPercent}%` }}
               title={`Theory: ${theoryTotal}`}
             />
           </div>
 
           {/* stat grid */}
           <div className="grid grid-cols-4 gap-2">
-            <StatBlock
-              value={questions.length}
-              label="Questions"
-              color="blue"
-            />
+            <StatBlock value={questions.length} label="Questions" color="blue" />
             <StatBlock
               value={objectiveTotal.toFixed(1)}
               label="Objective"
@@ -592,7 +587,6 @@ export function ObjectiveQuestionsStep({
                         setManualQ((p) => ({
                           ...p,
                           options: opts,
-                          // keep correct_answer synced with new text
                           correct_answer:
                             p.correct_answer === oldVal
                               ? e.target.value

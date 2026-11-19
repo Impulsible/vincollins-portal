@@ -1,12 +1,12 @@
 // src/components/staff/exams/create/steps/TheoryQuestionsStep.tsx
-// REDESIGNED: Manual-only, per-question marks, Answer-N-of-M scoring
+// REDESIGNED: Manual-only, per-question marks, Answer-N-of-M scoring with bulletproof table & diagram support
 
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
 import {
   Plus, Brain, Calculator, ImageIcon, X, Loader2,
-  Pencil, Check, Users, Target, Trash2, GripVertical,
+  Pencil, Check, Users, Target, Trash2, AlertCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,27 +14,57 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { clipboardToMarkdown } from "@/lib/table-paste";
+import { QuestionContent, hasTable } from "@/components/shared/QuestionContent";
 import type { TheoryQuestion } from "../types";
 
 /* ─── helpers ─── */
 
-const uploadImage = async (file: File): Promise<string | null> => {
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+};
+
+const uploadImage = async (file: File): Promise<{ url: string; isFallback: boolean }> => {
   try {
-    const ext = file.name.split(".").pop();
-    const filePath = `exam-images/temp/${crypto.randomUUID()}.${ext}`;
+    const ext = file.name.split(".").pop() || "png";
+    const cleanExt = ext.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const filePath = `exam-images/temp/${Date.now()}-${crypto.randomUUID()}.${cleanExt}`;
+
     const { error } = await supabase.storage
       .from("exam-assets")
-      .upload(filePath, file);
-    if (error) throw error;
-    return supabase.storage
+      .upload(filePath, file, {
+        contentType: file.type || "image/png",
+        upsert: true,
+      });
+
+    if (error) {
+      console.warn("Storage upload failed, using Base64 fallback:", error.message);
+      const base64 = await fileToBase64(file);
+      return { url: base64, isFallback: true };
+    }
+
+    const { data } = supabase.storage
       .from("exam-assets")
-      .getPublicUrl(filePath).data.publicUrl;
-  } catch {
-    return null;
+      .getPublicUrl(filePath);
+
+    if (!data?.publicUrl) {
+      const base64 = await fileToBase64(file);
+      return { url: base64, isFallback: true };
+    }
+
+    return { url: data.publicUrl, isFallback: false };
+  } catch (err) {
+    console.warn("Storage exception, using Base64 fallback:", err);
+    const base64 = await fileToBase64(file);
+    return { url: base64, isFallback: true };
   }
 };
 
@@ -65,7 +95,7 @@ export function TheoryQuestionsStep({
 }: TheoryQuestionsStepProps) {
   const [manualQ, setManualQ] = useState({
     question: "",
-    marks: 10, // Defaults to 10 and stays at user's input
+    marks: 10,
     image_url: "",
     image_caption: "",
   });
@@ -82,20 +112,15 @@ export function TheoryQuestionsStep({
 
   const totalQ = questions.length;
 
-  // effective "answer N" — clamp to actual count
   const effectiveN = useMemo(() => {
     if (!questionsToAnswer || questionsToAnswer <= 0) return totalQ;
     return Math.min(questionsToAnswer, totalQ);
   }, [questionsToAnswer, totalQ]);
 
-  // theory section total = sum of marks for the N questions student will answer
-  // (sorted descending so student picks highest-value ones)
   const theoryTotal = useMemo(() => {
     if (totalQ === 0) return 0;
     const sorted = [...questions].sort((a, b) => b.marks - a.marks);
-    return sorted
-      .slice(0, effectiveN)
-      .reduce((s, q) => s + q.marks, 0);
+    return sorted.slice(0, effectiveN).reduce((s, q) => s + q.marks, 0);
   }, [questions, effectiveN, totalQ]);
 
   const grandTotal = objectiveTotal + theoryTotal;
@@ -125,27 +150,70 @@ export function TheoryQuestionsStep({
         image_caption: manualQ.image_caption || undefined,
       },
     ]);
-    
-    // Reset inputs EXCEPT marks, so user's manual mark persists
-    setManualQ((p) => ({
-      ...p,
+
+    setManualQ({
       question: "",
+      marks: 10,
       image_url: "",
       image_caption: "",
-    }));
+    });
     toast.success("Theory question added");
   }, [manualQ, questions, onQuestionsChange]);
 
-  const handleImageUpload = async (file: File) => {
+  const handleImageFile = async (file: File) => {
     setIsUploadingImage(true);
-    const url = await uploadImage(file);
-    if (url) {
+    try {
+      const { url, isFallback } = await uploadImage(file);
       setManualQ((p) => ({ ...p, image_url: url }));
-      toast.success("Image uploaded");
-    } else {
-      toast.error("Image upload failed");
+      if (isFallback) {
+        toast.info("Diagram attached locally");
+      } else {
+        toast.success("Diagram attached successfully");
+      }
+    } catch {
+      toast.error("Failed to attach diagram");
+    } finally {
+      setIsUploadingImage(false);
     }
-    setIsUploadingImage(false);
+  };
+
+  const handleQuestionPaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    // 1. Direct Screenshot/Image Paste Detection
+    const items = Array.from(e.clipboardData.items);
+    const imageItem = items.find((item) => item.type.startsWith("image/"));
+    if (imageItem) {
+      const file = imageItem.getAsFile();
+      if (file) {
+        e.preventDefault();
+        await handleImageFile(file);
+        return;
+      }
+    }
+
+    // 2. Table Paste Detection
+    const md = clipboardToMarkdown(e.clipboardData);
+    if (!md) return; // normal text paste
+
+    e.preventDefault();
+    const el = e.currentTarget;
+    const { selectionStart: s, selectionEnd: en, value } = el;
+    const before = value.slice(0, s);
+    const after = value.slice(en);
+
+    const pre = !before
+      ? ""
+      : before.endsWith("\n\n")
+      ? ""
+      : before.endsWith("\n")
+      ? "\n"
+      : "\n\n";
+    const post = !after || after.startsWith("\n") ? "" : "\n\n";
+    const insert = pre + md + post;
+
+    setManualQ((p) => ({ ...p, question: before + insert + after }));
+    const pos = (before + insert).length;
+    requestAnimationFrame(() => el.setSelectionRange(pos, pos));
+    toast.success("Table automatically parsed & formatted");
   };
 
   const startEditMark = (q: TheoryQuestion) => {
@@ -208,9 +276,7 @@ export function TheoryQuestionsStep({
     <div className="flex-1 overflow-y-auto bg-white dark:bg-slate-950 transition-colors duration-300">
       <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto w-full space-y-4">
 
-        {/* ════════════════════════════════════════════
-            SCORING DASHBOARD
-            ════════════════════════════════════════════ */}
+        {/* SCORING DASHBOARD */}
         <div
           className={cn(
             "rounded-xl border p-4 space-y-3",
@@ -221,7 +287,6 @@ export function TheoryQuestionsStep({
               : "bg-gradient-to-br from-amber-50 to-yellow-50 dark:from-amber-950/30 dark:to-yellow-950/30 border-amber-200 dark:border-amber-800/50"
           )}
         >
-          {/* title row */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Calculator
@@ -265,7 +330,6 @@ export function TheoryQuestionsStep({
             </Badge>
           </div>
 
-          {/* visual bar */}
           <div className="h-3 bg-gray-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
             <div
               className="h-full bg-blue-500 dark:bg-blue-400 transition-all duration-500"
@@ -288,7 +352,6 @@ export function TheoryQuestionsStep({
             />
           </div>
 
-          {/* stat cards */}
           <div className="grid grid-cols-3 gap-2">
             <div className="bg-white dark:bg-slate-900 rounded-lg p-2.5 text-center border border-blue-100 dark:border-blue-900/50">
               <p className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">
@@ -335,13 +398,10 @@ export function TheoryQuestionsStep({
               >
                 {EXAM_TOTAL - grandTotal}
               </p>
-              <p className="text-[9px] text-slate-400 dark:text-slate-500">
-                marks
-              </p>
+              <p className="text-[9px] text-slate-400 dark:text-slate-500">marks</p>
             </div>
           </div>
 
-          {/* Answer N of M config */}
           <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-200 dark:border-slate-700">
             <div className="flex flex-col sm:flex-row sm:items-center gap-3">
               <div className="flex items-center gap-2 flex-1">
@@ -423,15 +483,14 @@ export function TheoryQuestionsStep({
           <Alert className="bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-800/50">
             <AlertCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
             <AlertDescription className="text-blue-700 dark:text-blue-300 text-xs">
-              "Answer {questionsToAnswer}" exceeds available questions ({totalQ}
-              ). Add {questionsToAnswer - totalQ} more or reduce the count.
+              "Answer {questionsToAnswer}" exceeds available questions (
+              {totalQ}). Add {questionsToAnswer - totalQ} more or reduce the
+              count.
             </AlertDescription>
           </Alert>
         )}
 
-        {/* ════════════════════════════════════════════
-            ADD QUESTION FORM (manual only)
-            ════════════════════════════════════════════ */}
+        {/* ADD QUESTION FORM */}
         <div className="p-4 bg-gray-50 dark:bg-slate-900/60 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
           <div className="flex items-center justify-between">
             <Label className="text-xs font-bold text-gray-700 dark:text-slate-300 uppercase tracking-wide flex items-center gap-1.5">
@@ -445,20 +504,33 @@ export function TheoryQuestionsStep({
             )}
           </div>
 
-          {/* question text */}
           <Textarea
             value={manualQ.question}
             onChange={(e) =>
               setManualQ((p) => ({ ...p, question: e.target.value }))
             }
+            onPaste={handleQuestionPaste}
             rows={5}
             className="resize-y text-sm leading-relaxed min-h-[120px] bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-            placeholder={`e.g. 1. Explain the process of photosynthesis and its importance to the ecosystem.\n\na. Define photosynthesis\nb. List three factors affecting the rate`}
+            placeholder={`e.g. 1. Explain the process of photosynthesis and its importance to the ecosystem.\n\na. Define photosynthesis\nb. List three factors affecting the rate\n\nOr paste a table from Word / Excel / Google Sheets or a screenshot directly.`}
           />
 
-          {/* marks + image row */}
+          {/* LIVE PREVIEW FOR TABLE AND DIAGRAM */}
+          {(hasTable(manualQ.question) || manualQ.image_url) && (
+            <div className="rounded-lg border border-dashed border-purple-300 dark:border-purple-800 p-3 bg-white dark:bg-slate-950">
+              <p className="text-[10px] font-bold uppercase text-purple-600 dark:text-purple-400 mb-2">
+                Formatting & Diagram Preview
+              </p>
+              <QuestionContent
+                text={manualQ.question}
+                imageUrl={manualQ.image_url}
+                imageCaption={manualQ.image_caption}
+                className="text-slate-700 dark:text-slate-300 max-h-64 overflow-y-auto"
+              />
+            </div>
+          )}
+
           <div className="flex flex-col sm:flex-row gap-3">
-            {/* marks input - fully manual */}
             <div className="flex-1 sm:max-w-[180px]">
               <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                 Marks for this question
@@ -483,7 +555,6 @@ export function TheoryQuestionsStep({
               </div>
             </div>
 
-            {/* image upload */}
             <div className="flex-1">
               <Label className="text-[10px] font-semibold text-gray-600 dark:text-slate-400 uppercase">
                 Image / Diagram (Optional)
@@ -495,7 +566,7 @@ export function TheoryQuestionsStep({
                 id="theory-img"
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) handleImageUpload(f);
+                  if (f) handleImageFile(f);
                 }}
               />
               {manualQ.image_url ? (
@@ -503,7 +574,7 @@ export function TheoryQuestionsStep({
                   <img
                     src={manualQ.image_url}
                     alt="preview"
-                    className="h-10 w-10 rounded border border-slate-200 dark:border-slate-700 object-cover"
+                    className="h-9 w-9 rounded border border-slate-200 dark:border-slate-700 object-cover"
                   />
                   <button
                     onClick={() =>
@@ -515,13 +586,13 @@ export function TheoryQuestionsStep({
                     }
                     className="text-[10px] text-red-500 hover:underline"
                   >
-                    Remove
+                    Remove Diagram
                   </button>
                 </div>
               ) : (
                 <label
                   htmlFor="theory-img"
-                  className="mt-1 cursor-pointer flex items-center gap-2 p-2 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg hover:border-purple-400 dark:hover:border-purple-600 hover:bg-purple-50/30 dark:hover:bg-purple-950/20 transition-colors"
+                  className="mt-1 cursor-pointer flex items-center justify-center gap-2 h-9 border border-dashed border-slate-300 dark:border-slate-700 rounded-lg hover:border-purple-400 dark:hover:border-purple-600 hover:bg-purple-50/30 dark:hover:bg-purple-950/20 transition-colors"
                 >
                   {isUploadingImage ? (
                     <Loader2 className="h-3.5 w-3.5 animate-spin text-purple-500" />
@@ -529,14 +600,13 @@ export function TheoryQuestionsStep({
                     <ImageIcon className="h-3.5 w-3.5 text-gray-400 dark:text-slate-500" />
                   )}
                   <span className="text-xs text-gray-500 dark:text-slate-400">
-                    {isUploadingImage ? "Uploading…" : "Upload image"}
+                    {isUploadingImage ? "Attaching diagram…" : "Upload Diagram or Paste Screenshot"}
                   </span>
                 </label>
               )}
             </div>
           </div>
 
-          {/* add button */}
           <Button
             onClick={handleAdd}
             disabled={isOver}
@@ -552,9 +622,7 @@ export function TheoryQuestionsStep({
           </Button>
         </div>
 
-        {/* ════════════════════════════════════════════
-            QUESTION LIST
-            ════════════════════════════════════════════ */}
+        {/* QUESTION LIST */}
         {totalQ > 0 && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -596,7 +664,6 @@ export function TheoryQuestionsStep({
                         : "bg-gray-50 dark:bg-slate-900/40 border-slate-100 dark:border-slate-800/50 opacity-60"
                     )}
                   >
-                    {/* number */}
                     <div
                       className={cn(
                         "w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold flex-shrink-0 mt-0.5",
@@ -608,23 +675,24 @@ export function TheoryQuestionsStep({
                       {i + 1}
                     </div>
 
-                    {/* content */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-2">
-                        {q.question}
-                      </p>
+                      <QuestionContent
+                        text={q.question}
+                        imageUrl={q.image_url}
+                        imageCaption={q.image_caption}
+                        className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 max-h-48 overflow-auto"
+                      />
                       {q.image_url && (
                         <Badge
                           variant="outline"
                           className="text-[9px] mt-1 h-4 border-slate-200 dark:border-slate-700"
                         >
                           <ImageIcon className="h-2.5 w-2.5 mr-0.5" />
-                          Image
+                          Diagram
                         </Badge>
                       )}
                     </div>
 
-                    {/* marks badge (click to edit) */}
                     <div className="flex items-center gap-1 flex-shrink-0">
                       {isEditing ? (
                         <div className="flex items-center gap-0.5">
@@ -661,7 +729,6 @@ export function TheoryQuestionsStep({
                         </button>
                       )}
 
-                      {/* delete */}
                       <button
                         onClick={() => deleteQuestion(q.id)}
                         className="p-1 text-gray-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded opacity-0 group-hover:opacity-100 transition-all"
@@ -674,7 +741,6 @@ export function TheoryQuestionsStep({
               })}
             </div>
 
-            {/* running total footer */}
             <div className="flex items-center justify-between px-2 py-1.5 bg-slate-50 dark:bg-slate-900/60 rounded-lg border border-slate-200 dark:border-slate-800">
               <span className="text-[10px] text-slate-500 dark:text-slate-400">
                 {totalQ} questions total • student answers {effectiveN}
@@ -695,7 +761,6 @@ export function TheoryQuestionsStep({
           </div>
         )}
 
-        {/* empty state */}
         {totalQ === 0 && (
           <div className="text-center py-8 text-slate-400 dark:text-slate-500">
             <Brain className="h-8 w-8 mx-auto mb-2 opacity-30" />

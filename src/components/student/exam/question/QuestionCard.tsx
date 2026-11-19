@@ -1,211 +1,239 @@
-'use client'
+// src/components/student/exam/StudentQuestionCard.tsx
 
-import { Badge } from '@/components/ui/badge'
+"use client";
+
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { formatPoints } from "@/app/student/exam/[id]/utils/scoring";
 import {
   Award, Flag, Hash, FileText, Table as TableIcon,
   BarChart3, Image as ImageIcon, Code2, Sigma,
   ListOrdered, Quote,
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
-import { formatPoints } from '@/app/student/exam/[id]/utils/scoring'
-import { ObjectiveAnswer } from '../answers/ObjectiveAnswer'
-import { TheoryAnswer } from '../answers/TheoryAnswer'
-import { TextAnswer } from '../answers/TextAnswer'
-import type { Question } from '@/app/student/exam/[id]/types'
-import { motion } from 'framer-motion'
-import React from 'react'
+} from "lucide-react";
+import { motion } from "framer-motion";
+import React from "react";
 
 // ═════════════════════════════════════════════════════════════════════════════
 // CONTENT DETECTION
 // ═════════════════════════════════════════════════════════════════════════════
 
 const detect = {
-  mdTable: (t: string) => !!t && t.includes('|') && /\n\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?/.test(t),
+  mdTable: (t: string) => !!t && t.includes("|") && /\n\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?/.test(t),
   htmlTable: (t: string) => !!t && /<table[\s\S]*?<\/table>/i.test(t),
-  asciiTable: (t: string) => !!t && t.includes('+--') && t.includes('--+'),
+  asciiTable: (t: string) => !!t && t.includes("+--") && t.includes("--+"),
   codeBlock: (t: string) => !!t && /```[\s\S]*?```/.test(t),
   inlineCode: (t: string) => !!t && /`[^`\n]+`/.test(t),
   mdImage: (t: string) => !!t && /!\[[^\]]*\]\([^)]+\)/.test(t),
   htmlImage: (t: string) => !!t && /<img[^>]+>/i.test(t),
-  math: (t: string) => !!t && (/\$\$[\s\S]+?\$\$/.test(t) || /\\\([\s\S]+?\\\)/.test(t) || /\\\[[\s\S]+?\\\]/.test(t)),
-  chart: (t: string) => !!t && /\b(chart|graph|diagram|plot|histogram|bar chart|pie chart|line graph|scatter plot)\b/i.test(t),
+  math: (t: string) =>
+    !!t &&
+    (/\$\$[\s\S]+?\$\$/.test(t) ||
+      /\\\([\s\S]+?\\\)/.test(t) ||
+      /\\\[[\s\S]+?\\\]/.test(t)),
+  chart: (t: string) =>
+    !!t &&
+    /\b(chart|graph|diagram|plot|histogram|bar chart|pie chart|line graph|scatter plot)\b/i.test(t),
   list: (t: string) => !!t && (/^\s*[-*+]\s+/m.test(t) || /^\s*\d+\.\s+/m.test(t)),
-  heading: (t: string) => !!t && /^#{1,6}\s+/m.test(t),
-  blockquote: (t: string) => !!t && /^>\s+/m.test(t),
-  bold: (t: string) => !!t && /\*\*[^*\n]+\*\*/.test(t),
-  italic: (t: string) => !!t && /(?<!\*)\*[^*\n]+\*(?!\*)/.test(t),
-}
+};
 
-const hasTable = (t: string) => detect.mdTable(t) || detect.htmlTable(t) || detect.asciiTable(t)
-const hasImage = (t: string) => detect.mdImage(t) || detect.htmlImage(t)
+const hasTable = (t: string) =>
+  detect.mdTable(t) || detect.htmlTable(t) || detect.asciiTable(t);
+const hasImage = (t: string) => detect.mdImage(t) || detect.htmlImage(t);
 
 // ═════════════════════════════════════════════════════════════════════════════
 // SANITIZATION
 // ═════════════════════════════════════════════════════════════════════════════
 
-const sanitizeHtml = (html: string): string => {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
-    .replace(/\s*on\w+\s*=\s*(["'])[\s\S]*?\1/gi, '')
-    .replace(/javascript:/gi, '')
-}
+const sanitizeHtml = (html: string): string =>
+  html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, "")
+    .replace(/\s*on\w+\s*=\s*(["'])[\s\S]*?\1/gi, "")
+    .replace(/javascript:/gi, "");
 
-const escapeHtml = (text: string): string => {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;')
-}
+const escapeHtml = (text: string): string =>
+  text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MARKDOWN TABLE → HTML
 // ═════════════════════════════════════════════════════════════════════════════
 
 const extractMarkdownTables = (text: string): { html: string; remaining: string } => {
-  const lines = text.split('\n')
-  const output: string[] = []
-  const tables: string[] = []
-  let i = 0
+  const lines = text.split("\n");
+  const output: string[] = [];
+  const tables: string[] = [];
+  let i = 0;
 
   while (i < lines.length) {
-    const line = lines[i]
-    const next = lines[i + 1]
+    const line = lines[i];
+    const next = lines[i + 1];
     const isTableStart =
-      line.includes('|') &&
+      line.includes("|") &&
       next &&
-      /^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/.test(next)
+      /^\s*\|?[\s:|-]*-{3,}[\s:|-]*\|?\s*$/.test(next);
 
     if (isTableStart) {
-      const headerLine = line
-      const separator = next
-      const rows: string[] = []
-      let j = i + 2
-      while (j < lines.length && lines[j].includes('|') && lines[j].trim() !== '') {
-        rows.push(lines[j])
-        j++
+      const headerLine = line;
+      const separator = next;
+      const rows: string[] = [];
+      let j = i + 2;
+      while (j < lines.length && lines[j].includes("|") && lines[j].trim() !== "") {
+        rows.push(lines[j]);
+        j++;
       }
 
-      const parseCells = (ln: string) => ln.split('|').map(c => c.trim()).filter((_, idx, arr) => {
-        return !(idx === 0 && arr[0] === '') && !(idx === arr.length - 1 && arr[arr.length - 1] === '')
-      })
+      const parseCells = (ln: string) =>
+        ln
+          .split("|")
+          .map((c) => c.trim())
+          .filter((_, idx, arr) => {
+            return !(idx === 0 && arr[0] === "") && !(idx === arr.length - 1 && arr[arr.length - 1] === "");
+          });
 
-      const headers = parseCells(headerLine)
-      const alignments = parseCells(separator).map(s => {
-        if (/^:-+:$/.test(s)) return 'center'
-        if (/^-+:$/.test(s)) return 'right'
-        return 'left'
-      })
+      const headers = parseCells(headerLine);
+      const alignments = parseCells(separator).map((s) => {
+        if (/^:-+:$/.test(s)) return "center";
+        if (/^-+:$/.test(s)) return "right";
+        return "left";
+      });
 
-      let tableHtml = '<table class="min-w-full border-collapse"><thead><tr>'
+      let tableHtml = '<table class="min-w-full border-collapse"><thead><tr>';
       headers.forEach((h, idx) => {
-        tableHtml += `<th class="px-4 py-2.5 text-${alignments[idx] || 'left'} text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/70 border border-slate-200 dark:border-slate-700">${escapeHtml(h)}</th>`
-      })
-      tableHtml += '</tr></thead><tbody>'
+        tableHtml += `<th class="px-4 py-2.5 text-${alignments[idx] || "left"} text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-800/70 border border-slate-200 dark:border-slate-700">${escapeHtml(h)}</th>`;
+      });
+      tableHtml += "</tr></thead><tbody>";
       rows.forEach((row, rowIdx) => {
-        const cells = parseCells(row)
-        const bg = rowIdx % 2 === 0 
-          ? 'bg-white dark:bg-slate-900' 
-          : 'bg-slate-50/40 dark:bg-slate-800/40'
-        tableHtml += `<tr class="${bg} hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition-colors">`
+        const cells = parseCells(row);
+        const bg =
+          rowIdx % 2 === 0
+            ? "bg-white dark:bg-slate-900"
+            : "bg-slate-50/40 dark:bg-slate-800/40";
+        tableHtml += `<tr class="${bg} hover:bg-indigo-50/40 dark:hover:bg-indigo-950/20 transition-colors">`;
         cells.forEach((c, idx) => {
-          tableHtml += `<td class="px-4 py-2.5 text-${alignments[idx] || 'left'} text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">${escapeHtml(c)}</td>`
-        })
-        tableHtml += '</tr>'
-      })
-      tableHtml += '</tbody></table>'
-      tables.push(tableHtml)
-      output.push(`[[TABLE_${tables.length - 1}]]`)
+          tableHtml += `<td class="px-4 py-2.5 text-${alignments[idx] || "left"} text-sm text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">${escapeHtml(c)}</td>`;
+        });
+        tableHtml += "</tr>";
+      });
+      tableHtml += "</tbody></table>";
+      tables.push(tableHtml);
+      output.push(`[[TABLE_${tables.length - 1}]]`);
 
-      i = j
+      i = j;
     } else {
-      output.push(line)
-      i++
+      output.push(line);
+      i++;
     }
   }
 
   return {
-    html: tables.join('\n'),
-    remaining: output.join('\n'),
-  }
-}
+    html: tables.join("\n"),
+    remaining: output.join("\n"),
+  };
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // INLINE MARKDOWN FORMATTING
 // ═════════════════════════════════════════════════════════════════════════════
 
 const renderInline = (text: string): React.ReactNode => {
-  const parts: Array<{ type: string; content: string }> = []
-  let remaining = text
-  let safety = 0
+  const parts: Array<{ type: string; content: string }> = [];
+  let remaining = text;
+  let safety = 0;
 
   const patterns: { type: string; re: RegExp }[] = [
-    { type: 'code', re: /`([^`\n]+)`/ },
-    { type: 'bold', re: /\*\*([^*\n]+)\*\*/ },
-    { type: 'italic', re: /(?<!\*)\*([^*\n]+)\*(?!\*)/ },
-    { type: 'link', re: /\[([^\]]+)\]\(([^)]+)\)/ },
-  ]
+    { type: "code", re: /`([^`\n]+)`/ },
+    { type: "bold", re: /\*\*([^*\n]+)\*\*/ },
+    { type: "italic", re: /(?<!\*)\*([^*\n]+)\*(?!\*)/ },
+    { type: "link", re: /\[([^\]]+)\]\(([^)]+)\)/ },
+  ];
 
   while (remaining && safety++ < 500) {
-    let earliest: { match: RegExpExecArray; type: string } | null = null
+    let earliest: { match: RegExpExecArray; type: string } | null = null;
     for (const p of patterns) {
-      const m = p.re.exec(remaining)
+      const m = p.re.exec(remaining);
       if (m && (!earliest || m.index < earliest.match.index)) {
-        earliest = { match: m, type: p.type }
+        earliest = { match: m, type: p.type };
       }
     }
     if (!earliest) {
-      parts.push({ type: 'text', content: remaining })
-      break
+      parts.push({ type: "text", content: remaining });
+      break;
     }
     if (earliest.match.index > 0) {
-      parts.push({ type: 'text', content: remaining.slice(0, earliest.match.index) })
+      parts.push({ type: "text", content: remaining.slice(0, earliest.match.index) });
     }
-    const content = earliest.type === 'link'
-      ? JSON.stringify({ text: earliest.match[1], href: earliest.match[2] })
-      : earliest.match[1]
-    parts.push({ type: earliest.type, content })
-    remaining = remaining.slice(earliest.match.index + earliest.match[0].length)
+    const content =
+      earliest.type === "link"
+        ? JSON.stringify({ text: earliest.match[1], href: earliest.match[2] })
+        : earliest.match[1];
+    parts.push({ type: earliest.type, content });
+    remaining = remaining.slice(earliest.match.index + earliest.match[0].length);
   }
 
   return parts.map((p, i) => {
     switch (p.type) {
-      case 'code':
+      case "code":
         return (
-          <code key={i} className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-[13px] ring-1 ring-slate-200 dark:ring-slate-700">
+          <code
+            key={i}
+            className="px-1.5 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 font-mono text-[13px] ring-1 ring-slate-200 dark:ring-slate-700"
+          >
             {p.content}
           </code>
-        )
-      case 'bold':
-        return <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">{p.content}</strong>
-      case 'italic':
-        return <em key={i} className="italic text-slate-800 dark:text-slate-200">{p.content}</em>
-      case 'link': {
-        const { text, href } = JSON.parse(p.content)
+        );
+      case "bold":
         return (
-          <a key={i} href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline underline-offset-2 font-medium">
+          <strong key={i} className="font-bold text-slate-900 dark:text-slate-100">
+            {p.content}
+          </strong>
+        );
+      case "italic":
+        return (
+          <em key={i} className="italic text-slate-800 dark:text-slate-200">
+            {p.content}
+          </em>
+        );
+      case "link": {
+        const { text, href } = JSON.parse(p.content);
+        return (
+          <a
+            key={i}
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 underline underline-offset-2 font-medium"
+          >
             {text}
           </a>
-        )
+        );
       }
       default:
-        return <React.Fragment key={i}>{p.content}</React.Fragment>
+        return <React.Fragment key={i}>{p.content}</React.Fragment>;
     }
-  })
-}
+  });
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // BLOCK RENDERERS
 // ═════════════════════════════════════════════════════════════════════════════
 
 const renderCodeBlock = (code: string, lang?: string, key?: React.Key) => (
-  <div key={key} className="my-3 relative overflow-hidden rounded-xl bg-slate-900 dark:bg-slate-950 ring-1 ring-slate-800 dark:ring-slate-700 shadow-sm">
+  <div
+    key={key}
+    className="my-3 relative overflow-hidden rounded-xl bg-slate-900 dark:bg-slate-950 ring-1 ring-slate-800 dark:ring-slate-700 shadow-sm"
+  >
     {lang && (
       <div className="flex items-center gap-2 px-4 py-2 bg-slate-800/50 dark:bg-slate-900/50 border-b border-slate-700 dark:border-slate-800">
         <Code2 className="h-3 w-3 text-slate-400 dark:text-slate-500" />
-        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">{lang}</span>
+        <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          {lang}
+        </span>
       </div>
     )}
     <pre className="p-4 overflow-x-auto">
@@ -214,22 +242,34 @@ const renderCodeBlock = (code: string, lang?: string, key?: React.Key) => (
       </code>
     </pre>
   </div>
-)
+);
 
 const renderBlockquote = (text: string, key?: React.Key) => (
-  <blockquote key={key} className="my-3 pl-4 py-2 border-l-4 border-indigo-400 dark:border-indigo-600 bg-gradient-to-r from-indigo-50/60 to-transparent dark:from-indigo-950/40 rounded-r-lg">
+  <blockquote
+    key={key}
+    className="my-3 pl-4 py-2 border-l-4 border-indigo-400 dark:border-indigo-600 bg-gradient-to-r from-indigo-50/60 to-transparent dark:from-indigo-950/40 rounded-r-lg"
+  >
     <div className="flex gap-2.5">
       <Quote className="h-4 w-4 text-indigo-400 dark:text-indigo-500 shrink-0 mt-0.5" />
-      <p className="text-slate-700 dark:text-slate-300 italic text-[15px] leading-relaxed">{renderInline(text)}</p>
+      <p className="text-slate-700 dark:text-slate-300 italic text-[15px] leading-relaxed">
+        {renderInline(text)}
+      </p>
     </div>
   </blockquote>
-)
+);
 
 const renderHeading = (level: number, text: string, key?: React.Key) => {
-  const sizes = ['text-xl', 'text-lg', 'text-base', 'text-sm', 'text-sm', 'text-xs']
-  const cls = cn('font-bold text-slate-900 dark:text-slate-100 mt-3 mb-1.5 leading-tight', sizes[level - 1])
-  return <div key={key} className={cls}>{renderInline(text)}</div>
-}
+  const sizes = ["text-xl", "text-lg", "text-base", "text-sm", "text-sm", "text-xs"];
+  const cls = cn(
+    "font-bold text-slate-900 dark:text-slate-100 mt-3 mb-1.5 leading-tight",
+    sizes[level - 1]
+  );
+  return (
+    <div key={key} className={cls}>
+      {renderInline(text)}
+    </div>
+  );
+};
 
 const renderList = (items: string[], ordered: boolean, key?: React.Key) => (
   <div key={key} className="my-2 space-y-1.5">
@@ -248,17 +288,17 @@ const renderList = (items: string[], ordered: boolean, key?: React.Key) => (
       </div>
     ))}
   </div>
-)
+);
 
 const renderMarkdownImage = (text: string, key?: React.Key) => {
-  const match = /!\[([^\]]*)\]\(([^)]+)\)/.exec(text)
-  if (!match) return null
-  const [, alt, src] = match
+  const match = /!\[([^\]]*)\]\(([^)]+)\)/.exec(text);
+  if (!match) return null;
+  const [, alt, src] = match;
   return (
     <figure key={key} className="my-3 flex flex-col items-center">
       <div className="relative rounded-xl overflow-hidden ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm bg-slate-50 dark:bg-slate-800 max-w-full">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={src} alt={alt || 'Image'} className="max-h-[320px] max-w-full object-contain" />
+        <img src={src} alt={alt || "Image"} className="max-h-[320px] max-w-full object-contain" />
       </div>
       {alt && (
         <figcaption className="text-xs text-slate-500 dark:text-slate-400 italic mt-2 text-center">
@@ -266,85 +306,91 @@ const renderMarkdownImage = (text: string, key?: React.Key) => {
         </figcaption>
       )}
     </figure>
-  )
-}
+  );
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN CONTENT RENDERER
 // ═════════════════════════════════════════════════════════════════════════════
 
 const renderContent = (text: string): React.ReactNode => {
-  if (!text) return null
+  if (!text) return null;
 
-  const codeBlocks: Array<{ lang: string; code: string }> = []
+  const codeBlocks: Array<{ lang: string; code: string }> = [];
   let processed = text.replace(/```(\w+)?\n?([\s\S]*?)```/g, (_, lang, code) => {
-    codeBlocks.push({ lang: lang || '', code: code.trimEnd() })
-    return `[[CODE_${codeBlocks.length - 1}]]`
-  })
+    codeBlocks.push({ lang: lang || "", code: code.trimEnd() });
+    return `[[CODE_${codeBlocks.length - 1}]]`;
+  });
 
-  const { html: tablesHtml, remaining } = extractMarkdownTables(processed)
-  const tableBlocks = tablesHtml ? tablesHtml.split('\n').filter(Boolean) : []
-  processed = remaining
+  const { html: tablesHtml, remaining } = extractMarkdownTables(processed);
+  const tableBlocks = tablesHtml ? tablesHtml.split("\n").filter(Boolean) : [];
+  processed = remaining;
 
-  const htmlTables: string[] = []
+  const htmlTables: string[] = [];
   processed = processed.replace(/<table[\s\S]*?<\/table>/gi, (match) => {
-    htmlTables.push(match)
-    return `[[HTMLTABLE_${htmlTables.length - 1}]]`
-  })
+    htmlTables.push(match);
+    return `[[HTMLTABLE_${htmlTables.length - 1}]]`;
+  });
 
-  const asciiTables: string[] = []
-  const asciiTableRegex = /((?:^[+|].*$\n?){2,})/gm
+  const asciiTables: string[] = [];
+  const asciiTableRegex = /((?:^[+|].*$\n?){2,})/gm;
   processed = processed.replace(asciiTableRegex, (match) => {
-    if (match.includes('+--') || match.includes('--+')) {
-      asciiTables.push(match)
-      return `[[ASCIITABLE_${asciiTables.length - 1}]]`
+    if (match.includes("+--") || match.includes("--+")) {
+      asciiTables.push(match);
+      return `[[ASCIITABLE_${asciiTables.length - 1}]]`;
     }
-    return match
-  })
+    return match;
+  });
 
-  const images: string[] = []
+  const images: string[] = [];
   processed = processed.replace(/!\[[^\]]*\]\([^)]+\)/g, (match) => {
-    images.push(match)
-    return `[[IMG_${images.length - 1}]]`
-  })
+    images.push(match);
+    return `[[IMG_${images.length - 1}]]`;
+  });
 
-  const htmlImages: string[] = []
+  const htmlImages: string[] = [];
   processed = processed.replace(/<img[^>]+>/gi, (match) => {
-    htmlImages.push(match)
-    return `[[HTMLIMG_${htmlImages.length - 1}]]`
-  })
+    htmlImages.push(match);
+    return `[[HTMLIMG_${htmlImages.length - 1}]]`;
+  });
 
-  const blocks = processed.split(/\n\s*\n/).filter(b => b.trim())
-  const rendered: React.ReactNode[] = []
+  const blocks = processed.split(/\n\s*\n/).filter((b) => b.trim());
+  const rendered: React.ReactNode[] = [];
 
   blocks.forEach((block, blockIdx) => {
-    const trimmed = block.trim()
+    const trimmed = block.trim();
 
-    const placeholderMatch = /^\[\[(CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_(\d+)\]\]$/.exec(trimmed)
+    const placeholderMatch = /^\[\[(CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_(\d+)\]\]$/.exec(trimmed);
     if (placeholderMatch) {
-      const [, kind, idxStr] = placeholderMatch
-      const idx = parseInt(idxStr, 10)
-      if (kind === 'CODE') {
-        const cb = codeBlocks[idx]
-        rendered.push(renderCodeBlock(cb.code, cb.lang, `cb-${blockIdx}`))
-      } else if (kind === 'HTMLTABLE') {
+      const [, kind, idxStr] = placeholderMatch;
+      const idx = parseInt(idxStr, 10);
+      if (kind === "CODE") {
+        const cb = codeBlocks[idx];
+        rendered.push(renderCodeBlock(cb.code, cb.lang, `cb-${blockIdx}`));
+      } else if (kind === "HTMLTABLE") {
         rendered.push(
-          <div key={`htmltbl-${blockIdx}`} className="my-3 overflow-x-auto rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm">
+          <div
+            key={`htmltbl-${blockIdx}`}
+            className="my-3 overflow-x-auto rounded-xl ring-1 ring-slate-200 dark:ring-slate-700 shadow-sm"
+          >
             <div
               className="w-full text-sm [&_table]:w-full [&_table]:border-collapse [&_th]:px-4 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-bold [&_th]:text-slate-700 [&_th]:dark:text-slate-300 [&_th]:uppercase [&_th]:tracking-wider [&_th]:bg-gradient-to-br [&_th]:from-slate-50 [&_th]:dark:from-slate-800 [&_th]:to-slate-100 [&_th]:dark:to-slate-800/70 [&_th]:border [&_th]:border-slate-200 [&_th]:dark:border-slate-700 [&_td]:px-4 [&_td]:py-2.5 [&_td]:text-sm [&_td]:text-slate-700 [&_td]:dark:text-slate-300 [&_td]:border [&_td]:border-slate-200 [&_td]:dark:border-slate-700 [&_tr:nth-child(even)]:bg-slate-50/40 [&_tr:nth-child(even)]:dark:bg-slate-800/40"
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlTables[idx]) }}
             />
           </div>
-        )
-      } else if (kind === 'ASCIITABLE') {
+        );
+      } else if (kind === "ASCIITABLE") {
         rendered.push(
-          <pre key={`ascii-${blockIdx}`} className="my-3 p-4 rounded-xl bg-slate-900 dark:bg-slate-950 text-slate-100 dark:text-slate-200 text-[13px] font-mono overflow-x-auto ring-1 ring-slate-800 dark:ring-slate-700 whitespace-pre leading-relaxed">
+          <pre
+            key={`ascii-${blockIdx}`}
+            className="my-3 p-4 rounded-xl bg-slate-900 dark:bg-slate-950 text-slate-100 dark:text-slate-200 text-[13px] font-mono overflow-x-auto ring-1 ring-slate-800 dark:ring-slate-700 whitespace-pre leading-relaxed"
+          >
             {asciiTables[idx]}
           </pre>
-        )
-      } else if (kind === 'IMG') {
-        rendered.push(renderMarkdownImage(images[idx], `img-${blockIdx}`))
-      } else if (kind === 'HTMLIMG') {
+        );
+      } else if (kind === "IMG") {
+        rendered.push(renderMarkdownImage(images[idx], `img-${blockIdx}`));
+      } else if (kind === "HTMLIMG") {
         rendered.push(
           <div key={`htmlimg-${blockIdx}`} className="my-3 flex justify-center">
             <div
@@ -352,67 +398,77 @@ const renderContent = (text: string): React.ReactNode => {
               dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlImages[idx]) }}
             />
           </div>
-        )
+        );
       }
-      return
+      return;
     }
 
     if (/^>\s+/m.test(trimmed)) {
-      const quoted = trimmed.split('\n').map(l => l.replace(/^>\s?/, '')).join(' ')
-      rendered.push(renderBlockquote(quoted, `bq-${blockIdx}`))
-      return
+      const quoted = trimmed
+        .split("\n")
+        .map((l) => l.replace(/^>\s?/, ""))
+        .join(" ");
+      rendered.push(renderBlockquote(quoted, `bq-${blockIdx}`));
+      return;
     }
 
-    const hMatch = /^(#{1,6})\s+(.+)$/m.exec(trimmed)
+    const hMatch = /^(#{1,6})\s+(.+)$/m.exec(trimmed);
     if (hMatch && trimmed === hMatch[0]) {
-      rendered.push(renderHeading(hMatch[1].length, hMatch[2], `h-${blockIdx}`))
-      return
+      rendered.push(renderHeading(hMatch[1].length, hMatch[2], `h-${blockIdx}`));
+      return;
     }
 
-    const lines = trimmed.split('\n')
-    const unorderedItems = lines.filter(l => /^\s*[-*+]\s+/.test(l))
-    const orderedItems = lines.filter(l => /^\s*\d+\.\s+/.test(l))
+    const lines = trimmed.split("\n");
+    const unorderedItems = lines.filter((l) => /^\s*[-*+]\s+/.test(l));
+    const orderedItems = lines.filter((l) => /^\s*\d+\.\s+/.test(l));
 
     if (unorderedItems.length === lines.length && unorderedItems.length > 0) {
-      const items = unorderedItems.map(l => l.replace(/^\s*[-*+]\s+/, ''))
-      rendered.push(renderList(items, false, `ul-${blockIdx}`))
-      return
+      const items = unorderedItems.map((l) => l.replace(/^\s*[-*+]\s+/, ""));
+      rendered.push(renderList(items, false, `ul-${blockIdx}`));
+      return;
     }
     if (orderedItems.length === lines.length && orderedItems.length > 0) {
-      const items = orderedItems.map(l => l.replace(/^\s*\d+\.\s+/, ''))
-      rendered.push(renderList(items, true, `ol-${blockIdx}`))
-      return
+      const items = orderedItems.map((l) => l.replace(/^\s*\d+\.\s+/, ""));
+      rendered.push(renderList(items, true, `ol-${blockIdx}`));
+      return;
     }
 
-    const parts = trimmed.split(/(\[\[(?:CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_\d+\]\])/)
-    const nodes: React.ReactNode[] = []
+    const parts = trimmed.split(/(\[\[(?:CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_\d+\]\])/);
+    const nodes: React.ReactNode[] = [];
     parts.forEach((part, i) => {
-      const pm = /^\[\[(CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_(\d+)\]\]$/.exec(part)
+      const pm = /^\[\[(CODE|HTMLTABLE|ASCIITABLE|IMG|HTMLIMG)_(\d+)\]\]$/.exec(part);
       if (pm) {
-        const [, kind, idxStr] = pm
-        const idx = parseInt(idxStr, 10)
-        if (kind === 'CODE') nodes.push(renderCodeBlock(codeBlocks[idx].code, codeBlocks[idx].lang, `inline-cb-${blockIdx}-${i}`))
-        else if (kind === 'IMG') nodes.push(renderMarkdownImage(images[idx], `inline-img-${blockIdx}-${i}`))
+        const [, kind, idxStr] = pm;
+        const idx = parseInt(idxStr, 10);
+        if (kind === "CODE")
+          nodes.push(
+            renderCodeBlock(codeBlocks[idx].code, codeBlocks[idx].lang, `inline-cb-${blockIdx}-${i}`)
+          );
+        else if (kind === "IMG")
+          nodes.push(renderMarkdownImage(images[idx], `inline-img-${blockIdx}-${i}`));
       } else if (part) {
-        const paraLines = part.split('\n').filter(l => l.trim())
+        const paraLines = part.split("\n").filter((l) => l.trim());
         paraLines.forEach((pl, pi) => {
           nodes.push(
-            <p key={`p-${blockIdx}-${i}-${pi}`} className="text-slate-700 dark:text-slate-300 leading-relaxed text-[15px]">
+            <p
+              key={`p-${blockIdx}-${i}-${pi}`}
+              className="text-slate-700 dark:text-slate-300 leading-relaxed text-[15px]"
+            >
               {renderInline(pl)}
             </p>
-          )
-        })
+          );
+        });
       }
-    })
+    });
     rendered.push(
       <div key={`block-${blockIdx}`} className="space-y-2">
         {nodes}
       </div>
-    )
-  })
+    );
+  });
 
-  return <div className="space-y-2">{rendered}</div>
-}
+  return <div className="space-y-2">{rendered}</div>;
+};
 
 // ═════════════════════════════════════════════════════════════════════════════
 // CONTENT TYPE PILL
@@ -423,88 +479,110 @@ function ContentPill({
   label,
   gradient,
 }: {
-  icon: React.ElementType
-  label: string
-  gradient: string
+  icon: React.ElementType;
+  label: string;
+  gradient: string;
 }) {
   return (
-    <div className={cn(
-      'inline-flex items-center gap-1 px-2 py-0.5 rounded-md ring-1 text-[10px] font-bold uppercase tracking-wider',
-      gradient
-    )}>
+    <div
+      className={cn(
+        "inline-flex items-center gap-1 px-2 py-0.5 rounded-md ring-1 text-[10px] font-bold uppercase tracking-wider",
+        gradient
+      )}
+    >
       <Icon className="h-2.5 w-2.5" />
       <span>{label}</span>
     </div>
-  )
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// PROPS
+// ═════════════════════════════════════════════════════════════════════════════
+
+interface StudentQuestionCardProps {
+  questionNumber: number;
+  questionText: string;
+  marks: number;
+  imageUrl?: string;
+  imageCaption?: string;
+  type: "objective" | "theory";
+  options?: string[];
+  selectedOption?: string;
+  onSelectOption?: (option: string) => void;
+  theoryAnswer?: string;
+  onTheoryAnswerChange?: (answer: string) => void;
+  isFlagged?: boolean;
+  onToggleFlag?: () => void;
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 
-interface QuestionCardProps {
-  question: Question
-  questionIndex: number
-  answer: string
-  isFlagged: boolean
-  examId: string
-  studentId?: string
-  onAnswer: (value: string) => void
-  onToggleFlag: () => void
-}
-
-export function QuestionCard({
-  question,
-  questionIndex,
-  answer,
-  isFlagged,
-  examId,
-  studentId,
-  onAnswer,
+export function StudentQuestionCard({
+  questionNumber,
+  questionText,
+  marks,
+  imageUrl,
+  imageCaption,
+  type,
+  options = [],
+  selectedOption,
+  onSelectOption,
+  theoryAnswer = "",
+  onTheoryAnswerChange,
+  isFlagged = false,
   onToggleFlag,
-}: QuestionCardProps) {
-  const questionType = question.type || 'objective'
-  const isTheory = questionType === 'theory'
-  const displayNumber = questionIndex + 1
+}: StudentQuestionCardProps) {
+  const isTheory = type === "theory";
 
-  const questionText = question.question_text || question.question || ''
+  // Append image markdown if imageUrl provided but no markdown image is embedded.
+  const combinedText =
+    imageUrl && !detect.mdImage(questionText) && !detect.htmlImage(questionText)
+      ? `${questionText}\n\n![${imageCaption || "Diagram"}](${imageUrl})`
+      : questionText;
 
   const contentTypes = {
-    hasTable: hasTable(questionText),
-    hasChart: detect.chart(questionText),
-    hasImage: hasImage(questionText),
-    hasCode: detect.codeBlock(questionText) || detect.inlineCode(questionText),
-    hasMath: detect.math(questionText),
-    hasList: detect.list(questionText),
-  }
+    hasTable: hasTable(combinedText),
+    hasChart: detect.chart(combinedText),
+    hasImage: hasImage(combinedText),
+    hasCode: detect.codeBlock(combinedText) || detect.inlineCode(combinedText),
+    hasMath: detect.math(combinedText),
+    hasList: detect.list(combinedText),
+  };
 
   const theme = isTheory
     ? {
-        heroGradient: 'from-fuchsia-600 via-purple-600 to-indigo-600 dark:from-fuchsia-700 dark:via-purple-700 dark:to-indigo-700',
-        accentGradient: 'from-fuchsia-500 via-purple-500 to-indigo-500',
-        iconBg: 'bg-gradient-to-br from-fuchsia-500 to-purple-600',
-        iconShadow: 'shadow-purple-500/30 dark:shadow-purple-950/50',
-        label: 'Theory',
-        labelLong: 'Written Response',
+        heroGradient:
+          "from-fuchsia-600 via-purple-600 to-indigo-600 dark:from-fuchsia-700 dark:via-purple-700 dark:to-indigo-700",
+        accentGradient: "from-fuchsia-500 via-purple-500 to-indigo-500",
+        iconBg: "bg-gradient-to-br from-fuchsia-500 to-purple-600",
+        iconShadow: "shadow-purple-500/30 dark:shadow-purple-950/50",
+        label: "Theory",
+        labelLong: "Written Response",
         Icon: FileText,
-        questionBg: 'bg-gradient-to-br from-fuchsia-50/60 via-purple-50/40 to-indigo-50/30 dark:from-fuchsia-950/30 dark:via-purple-950/20 dark:to-indigo-950/20',
-        questionRing: 'ring-fuchsia-200/50 dark:ring-fuchsia-900/50',
-        numberBg: 'bg-gradient-to-br from-fuchsia-500 to-purple-600',
-        numberShadow: 'shadow-fuchsia-500/30 dark:shadow-fuchsia-950/50',
+        questionBg:
+          "bg-gradient-to-br from-fuchsia-50/60 via-purple-50/40 to-indigo-50/30 dark:from-fuchsia-950/30 dark:via-purple-950/20 dark:to-indigo-950/20",
+        questionRing: "ring-fuchsia-200/50 dark:ring-fuchsia-900/50",
+        numberBg: "bg-gradient-to-br from-fuchsia-500 to-purple-600",
+        numberShadow: "shadow-fuchsia-500/30 dark:shadow-fuchsia-950/50",
       }
     : {
-        heroGradient: 'from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-700',
-        accentGradient: 'from-blue-500 via-indigo-500 to-violet-500',
-        iconBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
-        iconShadow: 'shadow-indigo-500/30 dark:shadow-indigo-950/50',
-        label: 'MCQ',
-        labelLong: 'Multiple Choice',
+        heroGradient:
+          "from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-700",
+        accentGradient: "from-blue-500 via-indigo-500 to-violet-500",
+        iconBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
+        iconShadow: "shadow-indigo-500/30 dark:shadow-indigo-950/50",
+        label: "MCQ",
+        labelLong: "Multiple Choice",
         Icon: Hash,
-        questionBg: 'bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-violet-50/30 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-violet-950/20',
-        questionRing: 'ring-indigo-200/50 dark:ring-indigo-900/50',
-        numberBg: 'bg-gradient-to-br from-blue-500 to-indigo-600',
-        numberShadow: 'shadow-indigo-500/30 dark:shadow-indigo-950/50',
-      }
+        questionBg:
+          "bg-gradient-to-br from-blue-50/60 via-indigo-50/40 to-violet-50/30 dark:from-blue-950/30 dark:via-indigo-950/20 dark:to-violet-950/20",
+        questionRing: "ring-indigo-200/50 dark:ring-indigo-900/50",
+        numberBg: "bg-gradient-to-br from-blue-500 to-indigo-600",
+        numberShadow: "shadow-indigo-500/30 dark:shadow-indigo-950/50",
+      };
 
   return (
     <motion.div
@@ -513,13 +591,10 @@ export function QuestionCard({
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className="relative rounded-3xl bg-white dark:bg-slate-900 ring-1 ring-slate-200/80 dark:ring-slate-800 shadow-sm overflow-hidden transition-colors duration-300"
     >
-      <div className={cn('h-1 bg-gradient-to-r', theme.accentGradient)} />
+      <div className={cn("h-1 bg-gradient-to-r", theme.accentGradient)} />
 
       {/* HEADER */}
-      <div className={cn(
-        'relative bg-gradient-to-br px-5 py-4 overflow-hidden',
-        theme.heroGradient
-      )}>
+      <div className={cn("relative bg-gradient-to-br px-5 py-4 overflow-hidden", theme.heroGradient)}>
         <div className="absolute -top-10 -right-10 h-32 w-32 bg-white/10 rounded-full blur-2xl" />
         <div className="absolute -bottom-10 -left-10 h-32 w-32 bg-black/10 rounded-full blur-2xl" />
 
@@ -529,13 +604,11 @@ export function QuestionCard({
               <theme.Icon className="h-5 w-5 text-white" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="text-[10px] font-bold text-white/70 uppercase tracking-[0.14em]">
-                  {theme.labelLong}
-                </div>
+              <div className="text-[10px] font-bold text-white/70 uppercase tracking-[0.14em]">
+                {theme.labelLong}
               </div>
               <div className="text-sm font-bold text-white leading-tight">
-                {theme.label} Question {displayNumber}
+                {theme.label} Question {questionNumber}
               </div>
             </div>
           </div>
@@ -544,26 +617,32 @@ export function QuestionCard({
             <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20">
               <Award className="h-3.5 w-3.5 text-white" />
               <span className="text-xs font-bold text-white tabular-nums">
-                {formatPoints(question.points || 1)}
+                {formatPoints(marks || 1)}
               </span>
             </div>
-            <button
-              onClick={onToggleFlag}
-              className={cn(
-                'relative p-2 rounded-xl transition-all',
-                isFlagged
-                  ? 'bg-amber-400 text-amber-900 shadow-md shadow-amber-400/40 ring-1 ring-amber-300'
-                  : 'bg-white/10 text-white/80 hover:bg-white/20 ring-1 ring-white/20'
-              )}
-              title={isFlagged ? 'Unflag' : 'Flag for review'}
-            >
-              <Flag className="h-4 w-4" fill={isFlagged ? 'currentColor' : 'none'} />
-            </button>
+            {onToggleFlag && (
+              <button
+                onClick={onToggleFlag}
+                className={cn(
+                  "relative p-2 rounded-xl transition-all",
+                  isFlagged
+                    ? "bg-amber-400 text-amber-900 shadow-md shadow-amber-400/40 ring-1 ring-amber-300"
+                    : "bg-white/10 text-white/80 hover:bg-white/20 ring-1 ring-white/20"
+                )}
+                title={isFlagged ? "Unflag" : "Flag for review"}
+              >
+                <Flag className="h-4 w-4" fill={isFlagged ? "currentColor" : "none"} />
+              </button>
+            )}
           </div>
         </div>
 
-        {(contentTypes.hasTable || contentTypes.hasChart || contentTypes.hasImage ||
-          contentTypes.hasCode || contentTypes.hasMath || contentTypes.hasList) && (
+        {(contentTypes.hasTable ||
+          contentTypes.hasChart ||
+          contentTypes.hasImage ||
+          contentTypes.hasCode ||
+          contentTypes.hasMath ||
+          contentTypes.hasList) && (
           <div className="relative mt-3 flex flex-wrap items-center gap-1.5">
             {contentTypes.hasTable && (
               <ContentPill icon={TableIcon} label="Table" gradient="bg-white/15 text-white ring-white/20 backdrop-blur-sm" />
@@ -587,47 +666,83 @@ export function QuestionCard({
         )}
       </div>
 
-      {/* QUESTION BODY */}
+      {/* BODY */}
       <div className="p-5 sm:p-6 space-y-5">
-        <div className={cn(
-          'relative rounded-2xl p-5 ring-1 overflow-hidden',
-          theme.questionBg,
-          theme.questionRing
-        )}>
+        <div
+          className={cn(
+            "relative rounded-2xl p-5 ring-1 overflow-hidden",
+            theme.questionBg,
+            theme.questionRing
+          )}
+        >
           <div className="flex gap-3 sm:gap-4">
-            <div className={cn(
-              'flex-shrink-0 w-9 h-9 rounded-xl text-white text-sm font-bold flex items-center justify-center shadow-md',
-              theme.numberBg,
-              theme.numberShadow
-            )}>
-              {displayNumber}
+            <div
+              className={cn(
+                "flex-shrink-0 w-9 h-9 rounded-xl text-white text-sm font-bold flex items-center justify-center shadow-md",
+                theme.numberBg,
+                theme.numberShadow
+              )}
+            >
+              {questionNumber}
             </div>
             <div className="flex-1 min-w-0 pt-1 overflow-x-auto">
-              {renderContent(questionText)}
+              {renderContent(combinedText)}
             </div>
           </div>
         </div>
 
-        <div>
-          {isTheory ? (
-            <TheoryAnswer
-              key={question.id}
-              answer={answer}
-              onChange={onAnswer}
-              examId={examId}
-              studentId={studentId}
+        {/* OBJECTIVE: MCQ OPTIONS */}
+        {!isTheory && options.length > 0 && (
+          <div className="pt-2 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            {options.map((opt, idx) => {
+              const letter = String.fromCharCode(65 + idx);
+              const isSelected = selectedOption === opt;
+
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => onSelectOption?.(opt)}
+                  className={cn(
+                    "flex items-center gap-3 p-3 rounded-xl border text-left text-sm transition-all",
+                    isSelected
+                      ? "bg-purple-50 dark:bg-purple-950/40 border-purple-500 text-purple-900 dark:text-purple-100 font-semibold ring-1 ring-purple-500"
+                      : "bg-slate-50/50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 hover:border-slate-300 text-slate-800 dark:text-slate-200"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0",
+                      isSelected
+                        ? "bg-purple-600 text-white"
+                        : "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300"
+                    )}
+                  >
+                    {letter}
+                  </span>
+                  <span className="flex-1">{opt}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* THEORY: ANSWER TEXTAREA */}
+        {isTheory && (
+          <div className="pt-2 space-y-1.5">
+            <label className="text-xs font-bold uppercase tracking-wide text-slate-600 dark:text-slate-400">
+              Your Answer:
+            </label>
+            <Textarea
+              value={theoryAnswer}
+              onChange={(e) => onTheoryAnswerChange?.(e.target.value)}
+              rows={8}
+              className="w-full text-sm leading-relaxed p-3.5 bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 rounded-xl"
+              placeholder="Type your answer here..."
             />
-          ) : question.options && question.options.length > 0 ? (
-            <ObjectiveAnswer
-              options={question.options}
-              selectedValue={answer}
-              onChange={onAnswer}
-            />
-          ) : (
-            <TextAnswer answer={answer} onChange={onAnswer} />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </motion.div>
-  )
+  );
 }

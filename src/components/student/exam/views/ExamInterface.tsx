@@ -1,10 +1,18 @@
 // src/components/student/exam/views/ExamInterface.tsx
-
 "use client";
 
+import { useState, useEffect, type ComponentProps } from "react";
+import Image from "next/image";
+import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
+import { QuestionContent } from "@/components/shared/QuestionContent";
 import { TheoryAnswer } from "../answers/TheoryAnswer";
+import { ExamSidebar } from "../sidebar/ExamSidebar";
+import { QuestionPalette } from "../palette/QuestionPalette";
+import { formatTime } from "@/app/student/exam/[id]/utils/scoring";
+import { cn } from "@/lib/utils";
 import type {
   Exam,
   Question,
@@ -23,20 +31,12 @@ import {
   ChevronRight,
   Flag,
   Layers,
-  Brain,
   FileText,
   BookOpen,
   Sparkles,
   Circle,
+  Image as ImageIcon,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { formatTime } from "@/app/student/exam/[id]/utils/scoring";
-import Image from "next/image";
-import { ExamSidebar } from "../sidebar/ExamSidebar";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { QuestionPalette } from "../palette/QuestionPalette";
-import { useState, useEffect, type ComponentProps } from "react";
-import { motion, AnimatePresence } from "framer-motion";
 
 type StudentProfile = ComponentProps<typeof ExamSidebar>["profile"];
 
@@ -56,117 +56,11 @@ const removeMarksFromText = (text: string): string => {
     .trim();
 };
 
-const convertTableToHtml = (tableLines: string[]): string => {
-  let html = `<div class="overflow-x-auto my-4 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
-    <table class="min-w-full bg-white dark:bg-slate-900 text-sm">`;
-  let isHeader = true;
-  let hasSeparator = false;
-
-  for (const line of tableLines) {
-    if (line.includes("---") || line.includes("===")) {
-      isHeader = false;
-      hasSeparator = true;
-      continue;
-    }
-    if (!line.startsWith("|")) continue;
-    const cells = line.split("|").filter((c) => c.trim() !== "");
-    if (!cells.length) continue;
-    const rowClass =
-      isHeader && !hasSeparator
-        ? "bg-slate-50 dark:bg-slate-800/60"
-        : "bg-white dark:bg-slate-900 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 transition-colors";
-    html += `<tr class="${rowClass} border-b border-slate-100 dark:border-slate-700">`;
-    cells.forEach((cell) => {
-      const tag = isHeader && !hasSeparator ? "th" : "td";
-      const cls =
-        isHeader && !hasSeparator
-          ? "px-4 py-2.5 text-left text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider border-r border-slate-100 dark:border-slate-700 last:border-0"
-          : "px-4 py-2.5 text-sm text-slate-700 dark:text-slate-300 border-r border-slate-100 dark:border-slate-700 last:border-0";
-      html += `<${tag} class="${cls}">${cell.trim()}</${tag}>`;
-    });
-    html += "</tr>";
-    if (isHeader && hasSeparator) isHeader = false;
-  }
-  html += "</table></div>";
-  return html;
-};
-
-const renderContent = (text: string) => {
-  if (!text) return null;
-  const cleanedText = removeMarksFromText(text);
-  const tableRegex = /(\n?\|[^\n]+\|\n\|[-:\s|]+\|\n(?:\|[^\n]+\|\n?)+)/g;
-  const match = tableRegex.exec(cleanedText);
-
-  if (match) {
-    const tableLines = match[0].split("\n").filter((l) => l.trim());
-    const tableHtml = convertTableToHtml(tableLines);
-    const rest = cleanedText.replace(match[0], "");
-    return (
-      <div className="space-y-3">
-        {rest && (
-          <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed text-[15px]">
-            {rest}
-          </p>
-        )}
-        <div dangerouslySetInnerHTML={{ __html: tableHtml }} />
-      </div>
-    );
-  }
-
-  return (
-    <p className="whitespace-pre-wrap text-slate-700 dark:text-slate-300 leading-relaxed text-[15px]">
-      {cleanedText}
-    </p>
-  );
-};
-
-const renderSubQuestions = (subQuestions: TheorySubQuestion[], level = 0) => {
-  if (!subQuestions?.length) return null;
-  const startCode = level === 0 ? 97 : 105;
-
-  return (
-    <div className={cn("space-y-3 mt-3", level > 0 ? "ml-6" : "ml-2")}>
-      <p className="text-[10px] font-bold text-fuchsia-600 dark:text-fuchsia-400 uppercase tracking-[0.14em]">
-        {level === 0 ? "Sub-questions" : "Parts"}
-      </p>
-      {subQuestions.map((sq, idx) => {
-        const nestedRaw = (sq as { sub_sub_questions?: unknown })
-          .sub_sub_questions;
-        const nested: TheorySubQuestion[] | null = Array.isArray(nestedRaw)
-          ? (nestedRaw as TheorySubQuestion[])
-          : null;
-
-        return (
-          <div
-            key={sq.id ?? idx}
-            className="flex gap-3 pl-3 border-l-2 border-fuchsia-200 dark:border-fuchsia-800"
-          >
-            <span className="flex-shrink-0 w-6 h-6 rounded-lg bg-gradient-to-br from-fuchsia-100 to-purple-100 dark:from-fuchsia-950/50 dark:to-purple-950/50 text-fuchsia-700 dark:text-fuchsia-300 text-[11px] font-bold flex items-center justify-center mt-0.5 ring-1 ring-fuchsia-200/60 dark:ring-fuchsia-900/50">
-              {String.fromCharCode(startCode + idx)}
-            </span>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm text-slate-800 dark:text-slate-200 leading-relaxed">
-                {renderContent(sq.text)}
-              </div>
-              {typeof sq.marks === "number" && sq.marks > 0 && (
-                <span className="inline-block mt-1.5 text-[10px] text-slate-500 dark:text-slate-400 font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800">
-                  {sq.marks} mark{sq.marks !== 1 ? "s" : ""}
-                </span>
-              )}
-              {nested && nested.length > 0 && renderSubQuestions(nested, level + 1)}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-};
+const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OBJECTIVE QUESTION CARD
+// OBJECTIVE QUESTION CARD (WITH TABLE & DIAGRAM SUPPORT)
 // ─────────────────────────────────────────────────────────────────────────────
-
-const OPTION_LETTERS = ["A", "B", "C", "D", "E", "F"];
 
 function ObjectiveQuestionCard({
   question,
@@ -181,18 +75,21 @@ function ObjectiveQuestionCard({
   onAnswer: (v: string) => void;
   marks: number;
 }) {
-  const objectiveQuestionText = removeMarksFromText(
-    question?.question || question?.question_text || "",
-  );
+  const rawQuestionText = question?.question || question?.question_text || "";
+  const cleanedText = removeMarksFromText(rawQuestionText);
   const options: string[] = (question?.options || []).filter(Boolean);
+  
+  const imageUrl = question?.image_url || (question as any)?.imageUrl;
+  const imageCaption = question?.image_caption || (question as any)?.imageCaption;
 
   return (
     <div className="relative rounded-3xl border border-indigo-200/70 dark:border-indigo-800/50 shadow-sm overflow-hidden bg-white dark:bg-slate-900">
       <div className="h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-violet-500" />
 
+      {/* Card Header Banner */}
       <div className="relative bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 dark:from-blue-700 dark:via-indigo-700 dark:to-violet-700 px-5 py-4 overflow-hidden">
-        <div className="absolute -top-10 -right-10 h-32 w-32 bg-white/10 rounded-full blur-2xl" />
-        <div className="absolute -bottom-10 -left-10 h-32 w-32 bg-violet-300/20 rounded-full blur-2xl" />
+        <div className="absolute -top-10 -right-10 h-32 w-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute -bottom-10 -left-10 h-32 w-32 bg-violet-300/20 rounded-full blur-2xl pointer-events-none" />
         <div className="relative flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-white/15 backdrop-blur-sm ring-1 ring-white/20 flex items-center justify-center shadow-lg">
@@ -200,16 +97,21 @@ function ObjectiveQuestionCard({
             </div>
             <div>
               <div className="text-[10px] font-bold text-white/70 uppercase tracking-[0.14em]">
-                Objective
+                Objective Section
               </div>
               <div className="text-sm font-semibold text-white leading-tight">
-                Multiple Choice
+                Multiple Choice Question
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {imageUrl && (
+              <Badge className="bg-white/20 backdrop-blur-sm text-white border-0 text-[11px] font-semibold ring-1 ring-white/20 hidden xs:inline-flex items-center gap-1">
+                <ImageIcon className="h-3 w-3" /> Diagram
+              </Badge>
+            )}
             <Badge className="bg-white/20 backdrop-blur-sm text-white border-0 text-xs font-bold ring-1 ring-white/20">
-              {marks} mark{marks !== 1 ? "s" : ""}
+              {marks} mk{marks !== 1 ? "s" : ""}
             </Badge>
             <div className="px-2.5 py-1 rounded-lg bg-black/20 backdrop-blur-sm">
               <span className="text-white text-[11px] font-bold">
@@ -220,21 +122,27 @@ function ObjectiveQuestionCard({
         </div>
       </div>
 
-      <div className="p-5 sm:p-6 space-y-5">
-        <div className="flex gap-3">
+      {/* Card Content Body */}
+      <div className="p-5 sm:p-6 space-y-6">
+        <div className="flex items-start gap-3">
           <div className="flex-shrink-0 w-8 h-8 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white text-sm font-bold flex items-center justify-center shadow-md shadow-indigo-500/30">
             {questionIndex + 1}
           </div>
-          <div className="flex-1 min-w-0 pt-1">
-            <p className="text-[15px] text-slate-800 dark:text-slate-200 font-medium leading-relaxed">
-              {objectiveQuestionText}
-            </p>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <QuestionContent
+              text={cleanedText}
+              imageUrl={imageUrl}
+              imageCaption={imageCaption}
+            />
           </div>
         </div>
 
+        {/* Option Choices */}
         <div className="space-y-2.5 pl-0 sm:pl-11">
           {options.map((option, idx) => {
             const selected = answer === option;
+            const letter = OPTION_LETTERS[idx] || String.fromCharCode(65 + idx);
+
             return (
               <motion.label
                 key={idx}
@@ -242,13 +150,15 @@ function ObjectiveQuestionCard({
                 className={cn(
                   "group relative flex items-start gap-3.5 p-4 rounded-2xl border-2 cursor-pointer transition-all duration-200 select-none overflow-hidden",
                   selected
-                    ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-50 to-blue-50/50 dark:from-indigo-950/40 dark:to-blue-950/30 shadow-md shadow-indigo-500/10"
-                    : "border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 bg-white dark:bg-slate-900",
+                    ? "border-indigo-500 dark:border-indigo-400 bg-gradient-to-br from-indigo-50/90 to-blue-50/50 dark:from-indigo-950/40 dark:to-blue-950/30 shadow-md shadow-indigo-500/10"
+                    : "border-slate-200 dark:border-slate-800 hover:border-indigo-300 dark:hover:border-indigo-600 hover:bg-indigo-50/30 dark:hover:bg-indigo-950/20 bg-white dark:bg-slate-900",
                 )}
               >
                 {selected && (
-                  <div className="absolute top-0 right-0 h-full w-1 bg-gradient-to-b from-indigo-500 to-blue-500" />
+                  <div className="absolute top-0 right-0 h-full w-1.5 bg-gradient-to-b from-indigo-500 to-blue-500" />
                 )}
+
+                {/* Radio Indicator */}
                 <div
                   className={cn(
                     "flex-shrink-0 mt-0.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all",
@@ -265,6 +175,7 @@ function ObjectiveQuestionCard({
                     />
                   )}
                 </div>
+
                 <input
                   type="radio"
                   name={`q-${question.id}`}
@@ -273,27 +184,22 @@ function ObjectiveQuestionCard({
                   onChange={(e) => onAnswer(e.target.value)}
                   className="sr-only"
                 />
-                <div className="flex-1 flex items-start gap-2.5">
+
+                {/* Option Letter & Formatted Text */}
+                <div className="flex-1 flex items-start gap-3 min-w-0">
                   <span
                     className={cn(
                       "flex-shrink-0 h-7 min-w-[28px] px-1.5 rounded-lg text-xs font-bold flex items-center justify-center transition-all",
                       selected
                         ? "bg-gradient-to-br from-indigo-500 to-blue-500 text-white shadow-sm"
-                        : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:group-hover:text-indigo-400",
+                        : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 group-hover:bg-indigo-100 dark:group-hover:bg-indigo-950/40 group-hover:text-indigo-600 dark:group-hover:text-indigo-400",
                     )}
                   >
-                    {OPTION_LETTERS[idx]}
+                    {letter}
                   </span>
-                  <span
-                    className={cn(
-                      "text-[14px] leading-relaxed pt-1 transition-colors",
-                      selected
-                        ? "text-slate-900 dark:text-slate-100 font-medium"
-                        : "text-slate-700 dark:text-slate-300",
-                    )}
-                  >
-                    {option}
-                  </span>
+                  <div className="flex-1 min-w-0 pt-0.5">
+                    <QuestionContent text={option} />
+                  </div>
                 </div>
               </motion.label>
             );
@@ -435,7 +341,7 @@ function QuestionCounter({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// MAIN EXAM INTERFACE
+// MAIN EXAM INTERFACE COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface ExamInterfaceProps {
@@ -522,7 +428,7 @@ export function ExamInterface({
             No questions available
           </p>
           <p className="text-slate-500 dark:text-slate-400 text-sm mt-1.5">
-            This exam has no questions yet.
+            This exam has no questions loaded.
           </p>
         </div>
       </div>
@@ -566,18 +472,18 @@ export function ExamInterface({
           : 10,
     sub_questions: currentSubQuestions,
     image_url:
-      typeof currentQuestion.image_url === "string"
-        ? currentQuestion.image_url
-        : undefined,
+      currentQuestion.image_url ||
+      (currentQuestion as any).imageUrl ||
+      undefined,
     image_caption:
-      typeof currentQuestion.image_caption === "string"
-        ? currentQuestion.image_caption
-        : undefined,
+      currentQuestion.image_caption ||
+      (currentQuestion as any).imageCaption ||
+      undefined,
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/30 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 transition-colors duration-300">
-      {/* TOP BAR */}
+      {/* ── TOP BAR ──────────────────────────────────────────────────────── */}
       <header className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/70 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-5 py-2.5">
           <div className="flex items-center gap-3">
@@ -686,35 +592,35 @@ export function ExamInterface({
         </div>
       </header>
 
-      {/* COMPREHENSION PASSAGE */}
+      {/* ── COMPREHENSION READING PASSAGE (WITH TABLE & DIAGRAM SUPPORT) ───── */}
       {passageText && (
         <div className="max-w-7xl mx-auto px-3 sm:px-5 pt-4 sm:pt-5">
           <div className="relative overflow-hidden rounded-3xl border border-amber-200/70 dark:border-amber-800/50 bg-gradient-to-br from-amber-50 via-orange-50/50 to-yellow-50 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-yellow-950/20 shadow-sm">
-            <div className="absolute -top-16 -right-16 h-40 w-40 bg-orange-200/40 dark:bg-orange-900/30 rounded-full blur-3xl" />
-            <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-amber-200/40 dark:bg-amber-900/30 rounded-full blur-3xl" />
+            <div className="absolute -top-16 -right-16 h-40 w-40 bg-orange-200/40 dark:bg-orange-900/30 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 h-40 w-40 bg-amber-200/40 dark:bg-amber-900/30 rounded-full blur-3xl pointer-events-none" />
             <div className="relative p-5 sm:p-6">
-              <div className="flex items-center gap-2.5 mb-4">
+              <div className="flex items-center gap-2.5 mb-3">
                 <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-sm shadow-amber-500/30">
                   <BookOpen className="h-4 w-4 text-white" />
                 </div>
                 <div>
                   <div className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-[0.14em]">
-                    Reading Passage
+                    Reading Passage / Case Study
                   </div>
                   <div className="text-xs text-amber-900/80 dark:text-amber-300/80 font-medium">
-                    Read carefully then answer the questions
+                    Read the reference material carefully before answering
                   </div>
                 </div>
               </div>
-              <div className="prose prose-sm max-w-none text-slate-800 dark:text-slate-200 leading-relaxed font-serif text-[15px] whitespace-pre-wrap bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-amber-100 dark:border-amber-900/40">
-                {passageText}
+              <div className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-amber-200/60 dark:border-amber-900/40">
+                <QuestionContent text={passageText} />
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* MAIN CONTENT */}
+      {/* ── MAIN CONTENT ─────────────────────────────────────────────────── */}
       <main className="max-w-7xl mx-auto px-3 sm:px-5 py-5 sm:py-7">
         <div className="flex flex-col lg:flex-row gap-6">
           <div className="flex-1 min-w-0 space-y-4">
@@ -724,7 +630,7 @@ export function ExamInterface({
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: 0.18 }}
               >
                 {isTheory ? (
                   <TheoryAnswer
@@ -757,7 +663,7 @@ export function ExamInterface({
                 variant="outline"
                 onClick={() => onNavigate("prev")}
                 disabled={isFirst}
-                className="flex-1 h-12 rounded-2xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 gap-2 font-semibold text-sm disabled:opacity-40 shadow-sm"
+                className="flex-1 h-12 rounded-2xl border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-600 gap-2 font-semibold text-sm disabled:opacity-40 shadow-sm transition-colors"
               >
                 <ChevronLeft className="h-4 w-4" />
                 <span className="hidden xs:inline">Previous</span>
@@ -800,7 +706,7 @@ export function ExamInterface({
               </Button>
             </div>
 
-            {/* Question Palette expand panel */}
+            {/* Question Palette Drawer Accordion */}
             <AnimatePresence>
               {showQuestionPalette && (
                 <motion.div
@@ -833,7 +739,7 @@ export function ExamInterface({
               )}
             </AnimatePresence>
 
-            {/* Mobile question info */}
+            {/* Mobile Question Info Footer */}
             <div className="flex md:hidden items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400 py-2">
               <Circle className="h-2 w-2 fill-indigo-500 text-indigo-500" />
               <span>
@@ -850,7 +756,7 @@ export function ExamInterface({
             </div>
           </div>
 
-          {/* Sidebar */}
+          {/* Desktop Right Sidebar */}
           <aside className="hidden lg:block lg:w-72 xl:w-80 shrink-0">
             <div className="sticky top-[94px]">
               <ExamSidebar
@@ -869,11 +775,11 @@ export function ExamInterface({
         </div>
       </main>
 
-      {/* Mobile sidebar sheet */}
+      {/* Mobile Sidebar Sheet */}
       <Sheet open={mobileSidebarOpen} onOpenChange={setMobileSidebarOpen}>
         <SheetContent
           side="right"
-          className="w-[88vw] max-w-[340px] p-0 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950"
+          className="w-[88vw] max-w-[340px] p-0 bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-950 border-slate-200 dark:border-slate-800"
         >
           <div className="h-full overflow-y-auto p-4">
             <ExamSidebar

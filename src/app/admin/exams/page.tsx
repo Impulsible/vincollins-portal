@@ -1,4 +1,4 @@
-// app/admin/exams/page.tsx - FULLY DARK MODE
+// app/admin/exams/page.tsx - FULLY DARK MODE WITH TABLE & DIAGRAM RENDERING
 'use client'
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -13,6 +13,7 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { QuestionContent } from '@/components/shared/QuestionContent'
 import { toast } from 'sonner'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
@@ -25,13 +26,17 @@ import {
   Sparkles, Shield,
   RotateCcw, Edit3, Archive, Send, User, Trash2,
   X, PenTool, HelpCircle, Hash,
-  Timer, Target, Layers, Hourglass, Plus
+  Timer, Target, Layers, Hourglass, Plus, Image as ImageIcon
 } from 'lucide-react'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface TheorySubQuestion {
   text: string
   marks: number
+  image_url?: string
+  imageUrl?: string
+  image_caption?: string
+  imageCaption?: string
   sub_sub_questions?: TheorySubQuestion[]
 }
 
@@ -41,7 +46,9 @@ interface TheoryQuestion {
   marks: number
   sub_questions?: TheorySubQuestion[]
   image_url?: string
+  imageUrl?: string
   image_caption?: string
+  imageCaption?: string
   type?: string
 }
 
@@ -83,7 +90,6 @@ interface Student {
   admission_number?: string
 }
 
-// ✅ ends_at REMOVED — not a real column on exam_attempts
 interface ExamAttempt {
   id: string
   student_id: string
@@ -134,11 +140,6 @@ const DEPT_OPTIONS = [
   { value: 'Commercial', label: 'Commercial' },
 ]
 
-/**
- * Statuses that can NEVER be extended. If an attempt reaches one of these,
- * granting extra time would corrupt the result (flip a submitted exam back
- * to in_progress). This guard runs in BOTH the handler and the dialog.
- */
 const TERMINAL_ATTEMPT_STATUSES = [
   'completed',
   'pending_theory',
@@ -149,9 +150,6 @@ const TERMINAL_ATTEMPT_STATUSES = [
 
 const isAttemptExtendable = (a: ExamAttempt): boolean =>
   a.status === 'in_progress' && a.is_auto_submitted !== true
-
-const isAttemptTerminal = (a: ExamAttempt): boolean =>
-  (TERMINAL_ATTEMPT_STATUSES as readonly string[]).includes(String(a.status))
 
 const formatDateShort = (d: string) => {
   if (!d) return 'N/A'
@@ -165,10 +163,6 @@ const formatDateTime = (d: string) => {
   })
 }
 
-/**
- * ✅ Derive effective end time from started_at + duration + extra_time_minutes.
- * Never read `ends_at` from DB — it doesn't exist.
- */
 const computeEffectiveEndMs = (
   startedAt: string | undefined,
   durationMinutes: number,
@@ -273,23 +267,33 @@ const DeptPill = ({ exam }: { exam: Exam }) => {
   )
 }
 
-// ── Theory Question Renderer (recursive) ───────────────────────────────────────
+// ── Theory Question Recursive Sub-question Renderer ──────────────────────────
 const renderSubQuestions = (subs: TheorySubQuestion[], prefix: string = '', depth: number = 0) => {
   const labels = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']
   const romans = ['i', 'ii', 'iii', 'iv', 'v', 'vi', 'vii', 'viii', 'ix', 'x']
   return (
-    <ol className={cn('space-y-2', depth === 0 ? 'ml-4' : 'ml-6 mt-2')}>
+    <ol className={cn('space-y-3', depth === 0 ? 'ml-1 sm:ml-3' : 'ml-3 sm:ml-5 mt-2')}>
       {subs.map((sub, idx) => {
         const label = depth === 0 ? `(${labels[idx] ?? idx + 1})` : `(${romans[idx] ?? idx + 1})`
+        const subImage = sub.imageUrl || sub.image_url
+        const subCaption = sub.imageCaption || sub.image_caption
         return (
           <li key={idx} className="text-sm text-slate-700 dark:text-slate-300">
-            <div className="flex gap-2">
-              <span className="font-semibold text-slate-600 dark:text-slate-400 min-w-[24px]">{label}</span>
-              <div className="flex-1">
+            <div className="flex items-start gap-2.5">
+              <span className="font-bold text-violet-600 dark:text-violet-400 min-w-[24px] pt-0.5 text-xs">
+                {label}
+              </span>
+              <div className="flex-1 space-y-2 min-w-0">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="leading-relaxed">{sub.text}</p>
+                  <div className="flex-1">
+                    <QuestionContent
+                      text={sub.text}
+                      imageUrl={subImage}
+                      imageCaption={subCaption}
+                    />
+                  </div>
                   {sub.marks > 0 && (
-                    <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 px-1.5 py-0.5 rounded whitespace-nowrap">
+                    <span className="text-[10px] font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-200 dark:ring-violet-500/30 px-2 py-0.5 rounded-full whitespace-nowrap self-start">
                       {sub.marks} mk{sub.marks !== 1 ? 's' : ''}
                     </span>
                   )}
@@ -546,9 +550,6 @@ export default function AdminExamsPage() {
     setShowRetry(true)
     setLoadingStudents(true)
     try {
-      // ✅ Only ACTIVE students (is_active = true AND not soft-deleted).
-      // Deactivated / deleted students never see retry actions and never
-      // have their attempts touched by class-wide or individual resets.
       const { data: students, error: studentsError } = await supabase
         .from('profiles')
         .select('id, full_name, class, admission_number')
@@ -697,14 +698,6 @@ export default function AdminExamsPage() {
     }
   }
 
-  /**
-   * ✅ 2a — Grant extra time ONLY to genuine in-progress attempts.
-   * Refuses terminal attempts (completed / pending_theory / graded /
-   * terminated / submitted) and auto-submitted attempts. Granting to a
-   * terminal attempt would flip its status back to `in_progress` and
-   * corrupt its result — exactly the bug that caused the
-   * "Resume → Terminated → Back → Resume" infinite loop.
-   */
   const handleGrantExtraTime = async () => {
     if (!selectedAttemptId) {
       toast.error('Select a student attempt first')
@@ -757,7 +750,7 @@ export default function AdminExamsPage() {
 
       const attemptData = extraTimeAttempts.find(a => a.id === selectedAttemptId)
       const studentName = attemptData?.profiles?.full_name || 'Student'
-      toast.success(`Granted ${minutes} extra min to ${studentName}. They can resume from where they stopped.`)
+      toast.success(`Granted ${minutes} extra min to ${studentName}. They can resume immediately.`)
       setShowExtraTime(false)
       setSelectedExam(null)
     } catch (err: any) {
@@ -847,7 +840,6 @@ export default function AdminExamsPage() {
     )
   }, [extraTimeAttempts, extraTimeSearch])
 
-  // ✅ 2b — split filtered attempts into extendable vs terminal for the dialog
   const extendableAttempts = useMemo(
     () => filteredAttempts.filter(isAttemptExtendable),
     [filteredAttempts],
@@ -888,7 +880,7 @@ export default function AdminExamsPage() {
       <button
         onClick={() => { setSelectedExam(exam); loadQs(exam); setShowPreview(true) }}
         className="h-8 w-8 rounded-lg bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center transition-colors"
-        title="Preview"
+        title="Preview Exam"
       >
         <Eye className="h-3.5 w-3.5 text-slate-600 dark:text-slate-300" />
       </button>
@@ -1115,7 +1107,7 @@ export default function AdminExamsPage() {
           </button>
         </section>
 
-        {/* SEARCH */}
+        {/* SEARCH & FILTERS */}
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
           <div className="p-3 sm:p-4 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
             <div className="flex items-center gap-2 flex-1 bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2">
@@ -1173,7 +1165,7 @@ export default function AdminExamsPage() {
           )}
         </div>
 
-        {/* LIST */}
+        {/* LIST / GROUPED VIEW */}
         <section className="space-y-3">
           {filtered.length === 0 ? (
             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 py-16 px-6 text-center">
@@ -1251,45 +1243,50 @@ export default function AdminExamsPage() {
           )}
         </section>
 
-        {/* PREVIEW DIALOG */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* PREVIEW DIALOG (WITH TABLE & DIAGRAM RENDERING)                     */}
+        {/* ═══════════════════════════════════════════════════════════════════ */}
         <Dialog open={showPreview} onOpenChange={setShowPreview}>
           <DialogContent className="max-w-4xl max-h-[92vh] p-0 overflow-hidden flex flex-col dark:bg-slate-900 dark:border-slate-800">
+            {/* Modal Header */}
             <div className="relative bg-gradient-to-br from-violet-600 via-indigo-600 to-blue-600 px-4 sm:px-6 py-5 text-white overflow-hidden flex-shrink-0">
-              <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl" />
+              <div className="absolute top-0 right-0 h-40 w-40 bg-white/10 rounded-full -mr-20 -mt-20 blur-2xl pointer-events-none" />
               <div className="relative">
                 <DialogHeader className="space-y-0 text-left">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="flex items-center gap-2">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <div className="flex items-center gap-2.5">
                       <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center flex-shrink-0">
                         <BookOpen className="h-5 w-5 text-white" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Exam Preview</p>
+                        <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest">Admin Review & Preview</p>
                         <DialogTitle className="text-base sm:text-xl font-bold leading-tight text-white">
-                          {selectedExam?.title || 'Loading...'}
+                          {selectedExam?.title || 'Loading exam...'}
                         </DialogTitle>
-                        <DialogDescription className="sr-only">Preview of exam</DialogDescription>
+                        <DialogDescription className="sr-only">Detailed exam preview with formatted tables and diagrams</DialogDescription>
                       </div>
                     </div>
                   </div>
                 </DialogHeader>
+
                 <div className="flex items-center gap-2 flex-wrap mt-3">
-                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
                     <BookOpen className="h-3 w-3" /> {selectedExam?.subject}
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
                     <GraduationCap className="h-3 w-3" /> {selectedExam?.class}
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
                     <Timer className="h-3 w-3" /> {selectedExam?.duration} mins
                   </span>
-                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold">
+                  <span className="inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm px-2.5 py-1 rounded-full text-[11px] font-semibold text-white">
                     <Target className="h-3 w-3" /> {selectedExam?.total_marks} marks
                   </span>
                 </div>
               </div>
             </div>
 
+            {/* Modal Tabs */}
             <div className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 sm:px-4 flex-shrink-0 overflow-x-auto">
               <div className="flex gap-1 min-w-max">
                 <button
@@ -1314,8 +1311,8 @@ export default function AdminExamsPage() {
                     )}
                   >
                     <Layers className="h-3.5 w-3.5" />
-                    Objective
-                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{examQs.length}</span>
+                    Objective Questions
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{examQs.length}</span>
                   </button>
                 )}
                 {theoryQs.length > 0 && (
@@ -1329,13 +1326,14 @@ export default function AdminExamsPage() {
                     )}
                   >
                     <PenTool className="h-3.5 w-3.5" />
-                    Theory
-                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{theoryQs.length}</span>
+                    Theory Questions
+                    <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-bold">{theoryQs.length}</span>
                   </button>
                 )}
               </div>
             </div>
 
+            {/* Modal Content */}
             <div className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-950">
               {loadingQs ? (
                 <div className="flex flex-col items-center justify-center py-20">
@@ -1344,31 +1342,32 @@ export default function AdminExamsPage() {
                 </div>
               ) : (
                 <>
+                  {/* OVERVIEW TAB */}
                   {previewTab === 'info' && selectedExam && (
                     <div className="p-4 sm:p-6 space-y-4">
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
                           <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Objective</p>
                           <p className="text-xl font-bold text-violet-600 dark:text-violet-400">{examQs.length}</p>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
                           <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Theory</p>
                           <p className="text-xl font-bold text-blue-600 dark:text-blue-400">{theoryQs.length}</p>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
                           <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pass Mark</p>
                           <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{selectedExam.pass_mark || selectedExam.passing_percentage || 40}%</p>
                         </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm">
                           <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Duration</p>
                           <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{selectedExam.duration}m</p>
                         </div>
                       </div>
 
                       {selectedExam.instructions && (
-                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 border border-slate-200 dark:border-slate-800">
+                        <div className="bg-white dark:bg-slate-900 rounded-xl p-4 sm:p-5 border border-slate-200 dark:border-slate-800 shadow-sm">
                           <h4 className="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-                            <AlertCircle className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" /> Instructions
+                            <AlertCircle className="h-4 w-4 text-amber-500 dark:text-amber-400" /> Instructions for Candidates
                           </h4>
                           <p className="text-sm text-slate-600 dark:text-slate-300 whitespace-pre-wrap leading-relaxed">{selectedExam.instructions}</p>
                         </div>
@@ -1376,46 +1375,59 @@ export default function AdminExamsPage() {
                     </div>
                   )}
 
+                  {/* OBJECTIVE TAB */}
                   {previewTab === 'objective' && examQs.length > 0 && (
-                    <div className="p-3 sm:p-6">
-                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                    <div className="p-3 sm:p-6 space-y-4">
+                      {/* Question Navigation Bar */}
+                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                             Question {currentQIdx + 1} of {examQs.length}
-                          </p>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setCurrentQIdx(i => Math.max(0, i - 1))}
-                              disabled={currentQIdx === 0}
-                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
-                            >
-                              <ChevronLeft className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setCurrentQIdx(i => Math.min(examQs.length - 1, i + 1))}
-                              disabled={currentQIdx === examQs.length - 1}
-                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
-                            >
-                              <ChevronRightIcon className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                          </span>
+                          {(examQs[currentQIdx]?.imageUrl || examQs[currentQIdx]?.image_url) && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-violet-600 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 px-2 py-0.5 rounded-full">
+                              <ImageIcon className="h-3 w-3" /> Diagram Attached
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentQIdx(i => Math.max(0, i - 1))}
+                            disabled={currentQIdx === 0}
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentQIdx(i => Math.min(examQs.length - 1, i + 1))}
+                            disabled={currentQIdx === examQs.length - 1}
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                          >
+                            <ChevronRightIcon className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
 
+                      {/* Question Body */}
                       <AnimatePresence mode="wait">
                         <motion.div
                           key={currentQIdx}
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: -10 }}
-                          transition={{ duration: 0.2 }}
-                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+                          transition={{ duration: 0.18 }}
+                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm"
                         >
-                          <div className="p-4 sm:p-5">
-                            <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-5">
-                              {examQs[currentQIdx]?.question || 'Question text missing'}
-                            </p>
-                            <div className="space-y-2">
+                          <div className="p-4 sm:p-6 space-y-4">
+                            {/* Render Table, Text, Diagram via QuestionContent */}
+                            <QuestionContent
+                              text={examQs[currentQIdx]?.question || 'Question text missing'}
+                              imageUrl={examQs[currentQIdx]?.imageUrl || examQs[currentQIdx]?.image_url}
+                              imageCaption={examQs[currentQIdx]?.imageCaption || examQs[currentQIdx]?.image_caption}
+                            />
+
+                            {/* Options */}
+                            <div className="space-y-2 pt-2">
                               {(examQs[currentQIdx]?.options || []).map((opt: string, i: number) => {
                                 const letter = String.fromCharCode(65 + i)
                                 const correctAnswer = examQs[currentQIdx]?.correct_answer ?? examQs[currentQIdx]?.answer
@@ -1424,22 +1436,26 @@ export default function AdminExamsPage() {
                                   <div
                                     key={i}
                                     className={cn(
-                                      'p-3 rounded-lg border text-sm flex items-start gap-3',
+                                      'p-3.5 rounded-xl border text-sm flex items-start gap-3 transition-colors',
                                       isCorrect
-                                        ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40'
-                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                                        ? 'bg-emerald-50/90 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-500/40 text-emerald-950 dark:text-emerald-100'
+                                        : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200'
                                     )}
                                   >
                                     <div className={cn(
-                                      'h-6 w-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0',
-                                      isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                      'h-6 w-6 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5',
+                                      isCorrect ? 'bg-emerald-600 text-white dark:bg-emerald-500' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
                                     )}>
                                       {letter}
                                     </div>
-                                    <p className={cn('flex-1', isCorrect ? 'text-emerald-800 dark:text-emerald-200 font-medium' : 'text-slate-700 dark:text-slate-300')}>
-                                      {opt}
-                                    </p>
-                                    {isCorrect && <CheckCircle className="h-4 w-4 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />}
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                      <QuestionContent text={opt} />
+                                    </div>
+                                    {isCorrect && (
+                                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100/80 dark:bg-emerald-500/20 px-2 py-0.5 rounded-full flex-shrink-0">
+                                        <CheckCircle className="h-3.5 w-3.5" /> Correct
+                                      </span>
+                                    )}
                                   </div>
                                 )
                               })}
@@ -1450,48 +1466,81 @@ export default function AdminExamsPage() {
                     </div>
                   )}
 
+                  {/* THEORY TAB */}
                   {previewTab === 'theory' && theoryQs.length > 0 && (
-                    <div className="p-3 sm:p-6">
-                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                    <div className="p-3 sm:p-6 space-y-4">
+                      {/* Theory Navigation Bar */}
+                      <div className="bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                             Theory Question {currentTheoryIdx + 1} of {theoryQs.length}
-                          </p>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => setCurrentTheoryIdx(i => Math.max(0, i - 1))}
-                              disabled={currentTheoryIdx === 0}
-                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
-                            >
-                              <ChevronLeft className="h-3.5 w-3.5" />
-                            </button>
-                            <button
-                              onClick={() => setCurrentTheoryIdx(i => Math.min(theoryQs.length - 1, i + 1))}
-                              disabled={currentTheoryIdx === theoryQs.length - 1}
-                              className="h-7 w-7 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300"
-                            >
-                              <ChevronRightIcon className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
+                          </span>
+                          {(theoryQs[currentTheoryIdx]?.image_url || theoryQs[currentTheoryIdx]?.imageUrl) && (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-600 dark:text-blue-300 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-full">
+                              <ImageIcon className="h-3 w-3" /> Diagram Attached
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setCurrentTheoryIdx(i => Math.max(0, i - 1))}
+                            disabled={currentTheoryIdx === 0}
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => setCurrentTheoryIdx(i => Math.min(theoryQs.length - 1, i + 1))}
+                            disabled={currentTheoryIdx === theoryQs.length - 1}
+                            className="h-8 w-8 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 flex items-center justify-center text-slate-600 dark:text-slate-300 transition-colors"
+                          >
+                            <ChevronRightIcon className="h-4 w-4" />
+                          </button>
                         </div>
                       </div>
 
-                      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden p-4 sm:p-5">
-                        <p className="text-sm sm:text-base font-medium text-slate-900 dark:text-slate-100 leading-relaxed mb-4">
-                          {theoryQs[currentTheoryIdx]?.question || 'Question text missing'}
-                        </p>
-                        {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
-                          <div className="pl-2 border-l-2 border-blue-200 dark:border-blue-500/40">
-                            {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
+                      {/* Theory Body */}
+                      <AnimatePresence mode="wait">
+                        <motion.div
+                          key={currentTheoryIdx}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          transition={{ duration: 0.18 }}
+                          className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-4 sm:p-6 space-y-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex-1 min-w-0">
+                              <QuestionContent
+                                text={theoryQs[currentTheoryIdx]?.question || 'Question text missing'}
+                                imageUrl={theoryQs[currentTheoryIdx]?.image_url || theoryQs[currentTheoryIdx]?.imageUrl}
+                                imageCaption={theoryQs[currentTheoryIdx]?.image_caption || theoryQs[currentTheoryIdx]?.imageCaption}
+                              />
+                            </div>
+                            {theoryQs[currentTheoryIdx]?.marks > 0 && (
+                              <span className="text-xs font-bold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-500/10 ring-1 ring-violet-200 dark:ring-violet-500/30 px-2.5 py-1 rounded-full whitespace-nowrap self-start">
+                                {theoryQs[currentTheoryIdx].marks} Marks
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
+
+                          {/* Recursive Sub-questions */}
+                          {theoryQs[currentTheoryIdx]?.sub_questions && theoryQs[currentTheoryIdx].sub_questions!.length > 0 && (
+                            <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                              <div className="pl-2 sm:pl-3 border-l-2 border-violet-400 dark:border-violet-500/60">
+                                {renderSubQuestions(theoryQs[currentTheoryIdx].sub_questions!)}
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      </AnimatePresence>
                     </div>
                   )}
                 </>
               )}
             </div>
 
+            {/* Modal Actions */}
             <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3 flex items-center justify-end gap-2 flex-shrink-0">
               <Button variant="outline" size="sm" onClick={() => setShowPreview(false)} className="dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-700">Close</Button>
               {selectedExam && ['pending', 'draft', 'submitted'].includes(selectedExam.status) && (
@@ -1503,7 +1552,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* DELETE */}
+        {/* DELETE MODAL */}
         <Dialog open={showDelete} onOpenChange={setShowDelete}>
           <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1525,7 +1574,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* APPROVE */}
+        {/* APPROVE / PUBLISH MODAL */}
         <Dialog open={showApprove} onOpenChange={setShowApprove}>
           <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1547,7 +1596,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* RETRY */}
+        {/* RETRY / RETAKE MODAL */}
         <Dialog open={showRetry} onOpenChange={setShowRetry}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1743,9 +1792,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* ═══════════════════════════════════════════════════════════════════ */}
-        {/* EXTRA TIME                                                        */}
-        {/* ═══════════════════════════════════════════════════════════════════ */}
+        {/* EXTRA TIME MODAL */}
         <Dialog open={showExtraTime} onOpenChange={setShowExtraTime}>
           <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1790,7 +1837,6 @@ export default function AdminExamsPage() {
                 </div>
               ) : (
                 <div className="max-h-[320px] overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg divide-y divide-slate-100 dark:divide-slate-800">
-                  {/* ── Extendable attempts (selectable) ───────────────────── */}
                   {extendableAttempts.map(a => {
                     const isSelected = selectedAttemptId === a.id
                     const nowMs = Date.now()
@@ -1848,7 +1894,6 @@ export default function AdminExamsPage() {
                     )
                   })}
 
-                  {/* ── Non-extendable attempts (greyed, informational) ────── */}
                   {nonExtendableAttempts.length > 0 && (
                     <>
                       <div className="px-3 py-2 bg-slate-50/70 dark:bg-slate-800/40">
@@ -1926,11 +1971,11 @@ export default function AdminExamsPage() {
                       <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">min</span>
                     </div>
                   </div>
-                  <div className="bg-white dark:bg-slate-900 rounded-lg p-2 border border-orange-200 dark:border-orange-500/30">
-                    <p className="text-[11px] text-slate-600 dark:text-slate-300">
+                  <div className="bg-white dark:bg-slate-900 rounded-lg p-2.5 border border-orange-200 dark:border-orange-500/30">
+                    <p className="text-[11px] text-slate-600 dark:text-slate-300 leading-relaxed">
                       Granting <strong className="text-orange-600 dark:text-orange-400">
                         +{customMinutes ? parseInt(customMinutes) || 0 : extraMinutes} minutes
-                      </strong> — timer updates on the student's device within ~1 second. If their timer already expired, they'll be able to resume.
+                      </strong> — the student's timer will extend immediately without resetting their exam state.
                     </p>
                   </div>
                 </div>
@@ -1946,7 +1991,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* REJECT */}
+        {/* REJECT MODAL */}
         <Dialog open={showReject} onOpenChange={setShowReject}>
           <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1972,7 +2017,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* RETURN */}
+        {/* RETURN MODAL */}
         <Dialog open={showReturn} onOpenChange={setShowReturn}>
           <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
@@ -1998,7 +2043,7 @@ export default function AdminExamsPage() {
           </DialogContent>
         </Dialog>
 
-        {/* ARCHIVE */}
+        {/* ARCHIVE MODAL */}
         <Dialog open={showArchive} onOpenChange={setShowArchive}>
           <DialogContent className="max-w-md dark:bg-slate-900 dark:border-slate-800">
             <DialogHeader>
