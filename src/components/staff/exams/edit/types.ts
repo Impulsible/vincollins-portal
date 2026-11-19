@@ -38,11 +38,17 @@ export interface Question {
   is_draft?: boolean
   created_at?: string
   updated_at?: string
+  // ✅ Added — used by EditExamPage & QuestionContent
+  image_url?: string | null
+  image_caption?: string | null
+  // ✅ Optional fields referenced in the edit page
+  sub_questions?: TheorySubQuestion[]
+  keywords?: string[]
+  model_answer?: string
+  question_type?: string
 }
 
 export interface TheoryQuestion {
-  image_url: null
-  image_caption: null
   id: string
   exam_id?: string
   question_text: string
@@ -55,11 +61,21 @@ export interface TheoryQuestion {
   sub_questions?: TheorySubQuestion[]
   keywords?: string[]
   model_answer?: string
+  // ✅ Added — used by EditExamPage & QuestionContent
+  image_url?: string | null
+  image_caption?: string | null
+  question_type?: string
 }
 
+/**
+ * ✅ FIXED: Added `label` and `question_text` (used by EditExamPage),
+ * kept `text` for backward compatibility with any existing code.
+ */
 export interface TheorySubQuestion {
   id: string
-  text: string
+  label?: string
+  question_text: string
+  text?: string
   points: number
   keywords?: string[]
   model_answer?: string

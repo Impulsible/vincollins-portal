@@ -1,4 +1,4 @@
-// src/components/staff/exams/edit/TheoryQuestionsTab.tsx - WITH DARK MODE
+// src/components/staff/exams/edit/TheoryQuestionsTab.tsx - WITH DARK MODE & TABLE SUPPORT
 
 "use client";
 
@@ -38,7 +38,6 @@ import {
   Trash2,
   FileText,
   Search,
-  Copy,
   Upload,
   Loader2,
   CheckCircle2,
@@ -46,7 +45,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Layers,
-  AlertTriangle,
   Sparkles,
   FileCode2,
   Split,
@@ -73,7 +71,6 @@ interface TheoryQuestionsTabProps {
 }
 
 const QUESTIONS_PER_PAGE = 10;
-const BATCH_SIZE = 5;
 const OPTIMAL_BATCH_SIZE = 8;
 
 // ==================== RENDER CONTENT WITH PROPER TABLE HANDLING ====================
@@ -106,12 +103,15 @@ const convertMarkdownTableToHtml = (tableLines: string[]): string => {
   return html;
 };
 
-const hasTable = (text: string): boolean => {
+const hasTable = (text?: string): boolean => {
   if (!text) return false;
-  return text.includes("<table") && text.includes("</table>");
+  return (
+    (text.includes("<table") && text.includes("</table>")) ||
+    (text.includes("|") && text.includes("---"))
+  );
 };
 
-const renderContent = (text: string, maxLength?: number) => {
+const renderContent = (text?: string, maxLength?: number) => {
   if (!text) return null;
 
   if (text.includes("<table") && text.includes("</table>")) {
@@ -207,30 +207,30 @@ const renderSubQuestions = (
       <p className="text-xs font-semibold text-purple-600 dark:text-purple-400">
         {level === 0 ? "Sub-questions:" : "Parts:"}
       </p>
-      {subQuestions.map((sq, idx) => (
-        <div
-          key={sq.id}
-          className="pl-3 border-l-2 border-purple-200 dark:border-purple-800"
-        >
-          <div className="text-sm">
-            <span className="font-medium text-purple-600 dark:text-purple-400">
-              {level === 0
-                ? String.fromCharCode(startCharCode + idx)
-                : String.fromCharCode(startCharCode + idx)}
-              .
-            </span>
-            <div className="inline ml-1">{renderContent(sq.text, 150)}</div>
-            {sq.points && (
-              <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
-                ({sq.points} marks)
+      {subQuestions.map((sq, idx) => {
+        const textToDisplay = sq.question_text || sq.text || "";
+        return (
+          <div
+            key={sq.id || idx}
+            className="pl-3 border-l-2 border-purple-200 dark:border-purple-800"
+          >
+            <div className="text-sm">
+              <span className="font-medium text-purple-600 dark:text-purple-400">
+                {sq.label || `${String.fromCharCode(startCharCode + idx)}.`}
               </span>
-            )}
+              <div className="inline ml-1">{renderContent(textToDisplay, 150)}</div>
+              {sq.points && (
+                <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">
+                  ({sq.points} marks)
+                </span>
+              )}
+            </div>
+            {sq.sub_sub_questions &&
+              sq.sub_sub_questions.length > 0 &&
+              renderSubQuestions(sq.sub_sub_questions, level + 1)}
           </div>
-          {sq.sub_sub_questions &&
-            sq.sub_sub_questions.length > 0 &&
-            renderSubQuestions(sq.sub_sub_questions, level + 1)}
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 };
@@ -354,6 +354,7 @@ const smartParseBulkQuestions = (
             const subSubQuestions: TheorySubQuestion[] = subSubMatches.map(
               (ss, idx) => ({
                 id: `temp_${Date.now()}_${Math.random()}_${idx}`,
+                question_text: ss.text,
                 text: ss.text,
                 points: 3,
                 keywords: [],
@@ -362,6 +363,7 @@ const smartParseBulkQuestions = (
             );
             subQuestionsList.push({
               id: `temp_${Date.now()}_${Math.random()}_${i}`,
+              question_text: mainText || subContent.substring(0, 100),
               text: mainText || subContent.substring(0, 100),
               points: 5 + subSubMatches.length * 2,
               keywords: [],
@@ -380,6 +382,7 @@ const smartParseBulkQuestions = (
               if (romanMatch) {
                 subSubQuestions.push({
                   id: `temp_${Date.now()}_${Math.random()}_${j}`,
+                  question_text: romanMatch[2].trim(),
                   text: romanMatch[2].trim(),
                   points: 3,
                   keywords: [],
@@ -392,6 +395,7 @@ const smartParseBulkQuestions = (
             if (subSubQuestions.length > 0) {
               subQuestionsList.push({
                 id: `temp_${Date.now()}_${Math.random()}_${i}`,
+                question_text: mainText || subContent.substring(0, 100),
                 text: mainText || subContent.substring(0, 100),
                 points: 5 + subSubQuestions.length * 2,
                 keywords: [],
@@ -401,6 +405,7 @@ const smartParseBulkQuestions = (
             } else {
               subQuestionsList.push({
                 id: `temp_${Date.now()}_${Math.random()}_${i}`,
+                question_text: subContent,
                 text: subContent,
                 points: 5,
                 keywords: [],
@@ -419,6 +424,7 @@ const smartParseBulkQuestions = (
         if (simpleMatch) {
           subQuestionsList.push({
             id: `temp_${Date.now()}_${Math.random()}`,
+            question_text: simpleMatch[1].trim(),
             text: simpleMatch[1].trim(),
             points: 5,
             keywords: [],
@@ -472,10 +478,10 @@ const smartParseBulkQuestionsFallback = (
   const subPattern = /^\(?([a-z])\)?[\.\)]\s+(.*)/i;
   const marksPattern = /^(?:Marks?\s*:\s*)?(\d+)\s*(?:marks?)?$/i;
 
-  const cleanText = (text: string): string => text.replace(/\s+/g, " ").trim();
+  const cleanText = (t: string): string => t.replace(/\s+/g, " ").trim();
 
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim();
+    const line = lines[i].trim();
     if (
       !line ||
       line === "---" ||
@@ -489,6 +495,7 @@ const smartParseBulkQuestionsFallback = (
       if (inSubQuestion && currentSubText) {
         currentSubQuestions.push({
           id: `temp_${Date.now()}_${i}`,
+          question_text: cleanText(currentSubText),
           text: cleanText(currentSubText),
           points: defaultPoints,
           keywords: [],
@@ -516,6 +523,7 @@ const smartParseBulkQuestionsFallback = (
         if (inSubQuestion && currentSubText) {
           currentSubQuestions.push({
             id: `temp_${Date.now()}_${i}`,
+            question_text: cleanText(currentSubText),
             text: cleanText(currentSubText),
             points: defaultPoints,
             keywords: [],
@@ -547,6 +555,7 @@ const smartParseBulkQuestionsFallback = (
       if (inSubQuestion && currentSubText) {
         currentSubQuestions.push({
           id: `temp_${Date.now()}_${i}`,
+          question_text: cleanText(currentSubText),
           text: cleanText(currentSubText),
           points: defaultPoints,
           keywords: [],
@@ -566,6 +575,7 @@ const smartParseBulkQuestionsFallback = (
     if (inSubQuestion && currentSubText) {
       currentSubQuestions.push({
         id: `temp_${Date.now()}_end`,
+        question_text: cleanText(currentSubText),
         text: cleanText(currentSubText),
         points: defaultPoints,
         keywords: [],
@@ -599,6 +609,10 @@ const splitIntoBatches = <T,>(items: T[], batchSize: number): T[][] => {
   return batches;
 };
 
+function cn(...classNames: (string | boolean | undefined | null)[]): string {
+  return classNames.filter(Boolean).join(" ");
+}
+
 export function TheoryQuestionsTab({
   questions,
   hasTheory,
@@ -607,7 +621,6 @@ export function TheoryQuestionsTab({
   onDeleteQuestion,
   onBulkAdd,
   isSaving = false,
-  defaultMark = 0.5,
   totalTheoryMarks = 0,
   theoryQuestionCount = 0,
   examTotal = 60,
@@ -656,7 +669,9 @@ export function TheoryQuestionsTab({
     return questions.filter(
       (q) =>
         q.question_text?.toLowerCase().includes(query) ||
-        q.sub_questions?.some((sq) => sq.text.toLowerCase().includes(query)),
+        q.sub_questions?.some((sq) =>
+          (sq.question_text || sq.text || "").toLowerCase().includes(query),
+        ),
     );
   }, [questions, searchQuery]);
 
@@ -811,10 +826,6 @@ export function TheoryQuestionsTab({
     };
     return questions.reduce((sum, q) => sum + countSubQs(q.sub_questions), 0);
   }, [questions]);
-
-  function cn(...classNames: string[]): string {
-    return classNames.filter(Boolean).join(" ");
-  }
 
   return (
     <TooltipProvider>
@@ -1166,8 +1177,8 @@ export function TheoryQuestionsTab({
               split them into optimal batches for fast import.
               <br />
               <span className="text-xs text-slate-500 dark:text-slate-400 mt-1 block">
-                Supports format: "1. Question... Sub-questions: a. ... b. ... i.
-                ... ii. ... 10 marks"
+                Supports format: &quot;1. Question... Sub-questions: a. ... b. ... i.
+                ... ii. ... 10 marks&quot;
               </span>
               {marksPerTheoryQuestion > 0 && (
                 <>
