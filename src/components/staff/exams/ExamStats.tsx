@@ -1,209 +1,321 @@
-// src/components/staff/exams/ExamStats.tsx - UPDATED
-
 'use client'
 
+import React from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { motion } from 'framer-motion'
-import { FileText, Clock, CheckCircle2, BookOpen, Calculator } from 'lucide-react'
+import {
+  FileText,
+  Clock,
+  CheckCircle2,
+  BookOpen,
+  Calculator,
+  ShieldCheck,
+  Archive,
+  TrendingUp,
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-interface ExamStatsProps {
+export interface ExamStatsProps {
   totalExams: number
   draftCount: number
   pendingCount: number
+  approvedCount: number        // ✅ Always counted and displayed
   publishedCount: number
-  // ✅ Optional: mark stats from database
+  archivedCount?: number
   totalMarks?: number
   averageMarks?: number
   balancedExams?: number
+  activeFilter?: string
+  onFilterChange?: (filter: string) => void
 }
 
 interface StatItem {
+  id: string
   label: string
   value: number
   color: string
+  bgLight: string
+  borderLight: string
   icon: React.ElementType
   gradientFrom: string
   gradientTo: string
+  barBg: string
   description?: string
 }
 
-export function ExamStats({ 
-  totalExams, 
-  draftCount, 
-  pendingCount, 
+export function ExamStats({
+  totalExams,
+  draftCount,
+  pendingCount,
+  approvedCount = 0,
   publishedCount,
+  archivedCount = 0,
   totalMarks = 0,
   averageMarks = 0,
   balancedExams = 0,
+  activeFilter,
+  onFilterChange,
 }: ExamStatsProps) {
-  const stats: StatItem[] = [
-    { 
-      label: 'Total Exams', 
-      value: totalExams, 
+  // ✅ 5 Core Lifecycle Stat Cards (Always Visible)
+  const lifecycleStats: StatItem[] = [
+    {
+      id: 'all',
+      label: 'Total Exams',
+      value: totalExams,
       color: 'text-blue-600 dark:text-blue-400',
+      bgLight: 'bg-blue-50/50 dark:bg-blue-950/20',
+      borderLight: 'border-blue-200 dark:border-blue-800/50',
       icon: BookOpen,
       gradientFrom: 'from-blue-500',
-      gradientTo: 'to-blue-600'
+      gradientTo: 'to-indigo-600',
+      barBg: 'bg-blue-500',
     },
-    { 
-      label: 'Drafts', 
-      value: draftCount, 
-      color: 'text-slate-600 dark:text-slate-400',
+    {
+      id: 'draft',
+      label: 'Drafts',
+      value: draftCount,
+      color: 'text-slate-600 dark:text-slate-300',
+      bgLight: 'bg-slate-50/50 dark:bg-slate-900/40',
+      borderLight: 'border-slate-200 dark:border-slate-800',
       icon: FileText,
       gradientFrom: 'from-slate-500',
-      gradientTo: 'to-slate-600'
+      gradientTo: 'to-slate-600',
+      barBg: 'bg-slate-500',
     },
-    { 
-      label: 'Pending', 
-      value: pendingCount, 
+    {
+      id: 'pending',
+      label: 'Pending',
+      value: pendingCount,
       color: 'text-amber-600 dark:text-amber-400',
+      bgLight: 'bg-amber-50/50 dark:bg-amber-950/20',
+      borderLight: 'border-amber-200 dark:border-amber-800/50',
       icon: Clock,
-      gradientFrom: 'from-yellow-500',
-      gradientTo: 'to-amber-600'
+      gradientFrom: 'from-amber-500',
+      gradientTo: 'to-orange-600',
+      barBg: 'bg-amber-500',
     },
-    { 
-      label: 'Published', 
-      value: publishedCount, 
+    {
+      id: 'approved',
+      label: 'Approved',
+      value: approvedCount,
+      color: 'text-teal-600 dark:text-teal-400',
+      bgLight: 'bg-teal-50/50 dark:bg-teal-950/20',
+      borderLight: 'border-teal-200 dark:border-teal-800/50',
+      icon: ShieldCheck,
+      gradientFrom: 'from-teal-500',
+      gradientTo: 'to-emerald-600',
+      barBg: 'bg-teal-500',
+      description: 'Ready to publish',
+    },
+    {
+      id: 'published',
+      label: 'Published',
+      value: publishedCount,
       color: 'text-emerald-600 dark:text-emerald-400',
+      bgLight: 'bg-emerald-50/50 dark:bg-emerald-950/20',
+      borderLight: 'border-emerald-200 dark:border-emerald-800/50',
       icon: CheckCircle2,
-      gradientFrom: 'from-green-500',
-      gradientTo: 'to-emerald-600'
-    }
+      gradientFrom: 'from-emerald-500',
+      gradientTo: 'to-green-600',
+      barBg: 'bg-emerald-500',
+      description: 'Active for students',
+    },
   ]
 
-  // ✅ Add mark stats if available
-  const markStats: StatItem[] = []
-  
-  if (totalMarks > 0) {
-    markStats.push({
-      label: 'Total Marks',
-      value: totalMarks,
+  // Optional Archived & Marks Metrics
+  const extraStats: StatItem[] = []
+
+  if (archivedCount > 0) {
+    extraStats.push({
+      id: 'archived',
+      label: 'Archived',
+      value: archivedCount,
       color: 'text-purple-600 dark:text-purple-400',
-      icon: Calculator,
+      bgLight: 'bg-purple-50/50 dark:bg-purple-950/20',
+      borderLight: 'border-purple-200 dark:border-purple-800/50',
+      icon: Archive,
       gradientFrom: 'from-purple-500',
-      gradientTo: 'to-purple-600',
-      description: 'All exams combined'
+      gradientTo: 'to-purple-700',
+      barBg: 'bg-purple-500',
     })
   }
-  
+
+  if (totalMarks > 0) {
+    extraStats.push({
+      id: 'total_marks',
+      label: 'Total Marks',
+      value: totalMarks,
+      color: 'text-violet-600 dark:text-violet-400',
+      bgLight: 'bg-violet-50/50 dark:bg-violet-950/20',
+      borderLight: 'border-violet-200 dark:border-violet-800/50',
+      icon: Calculator,
+      gradientFrom: 'from-violet-500',
+      gradientTo: 'to-purple-600',
+      barBg: 'bg-violet-500',
+      description: 'Sum of all exams',
+    })
+  }
+
   if (averageMarks > 0) {
-    markStats.push({
+    extraStats.push({
+      id: 'avg_marks',
       label: 'Avg Marks',
       value: averageMarks,
       color: 'text-indigo-600 dark:text-indigo-400',
-      icon: Calculator,
+      bgLight: 'bg-indigo-50/50 dark:bg-indigo-950/20',
+      borderLight: 'border-indigo-200 dark:border-indigo-800/50',
+      icon: TrendingUp,
       gradientFrom: 'from-indigo-500',
-      gradientTo: 'to-indigo-600',
-      description: 'Per exam average'
-    })
-  }
-  
-  if (balancedExams > 0 && totalExams > 0) {
-    markStats.push({
-      label: 'Balanced',
-      value: balancedExams,
-      color: 'text-emerald-600 dark:text-emerald-400',
-      icon: CheckCircle2,
-      gradientFrom: 'from-emerald-500',
-      gradientTo: 'to-teal-600',
-      description: `${Math.round((balancedExams / totalExams) * 100)}% of exams`
+      gradientTo: 'to-blue-600',
+      barBg: 'bg-indigo-500',
+      description: 'Per exam benchmark',
     })
   }
 
-  // Combine stats
-  const allStats = [...stats, ...markStats]
+  if (balancedExams > 0 && totalExams > 0) {
+    const percentage = Math.round((balancedExams / totalExams) * 100)
+    extraStats.push({
+      id: 'balanced',
+      label: 'Balanced',
+      value: balancedExams,
+      color: 'text-cyan-600 dark:text-cyan-400',
+      bgLight: 'bg-cyan-50/50 dark:bg-cyan-950/20',
+      borderLight: 'border-cyan-200 dark:border-cyan-800/50',
+      icon: ShieldCheck,
+      gradientFrom: 'from-cyan-500',
+      gradientTo: 'to-teal-600',
+      barBg: 'bg-cyan-500',
+      description: `${percentage}% compliance`,
+    })
+  }
+
+  const allStats = [...lifecycleStats, ...extraStats]
 
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1
-      }
-    }
+        staggerChildren: 0.04,
+      },
+    },
   }
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { 
-      opacity: 1, 
+    hidden: { opacity: 0, y: 10 },
+    visible: {
+      opacity: 1,
       y: 0,
-      transition: { 
-        type: "spring" as const,
+      transition: {
+        type: 'spring' as const,
         stiffness: 300,
-        damping: 24
-      }
-    }
+        damping: 24,
+      },
+    },
   }
 
   return (
-    <motion.div 
-      className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4 w-full"
+    <motion.div
+      className={cn(
+        'grid gap-2.5 sm:gap-3 md:gap-4 w-full',
+        allStats.length === 5
+          ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-5'
+          : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-6'
+      )}
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
-      {allStats.map((stat, index) => {
+      {allStats.map((stat) => {
         const Icon = stat.icon
+        const isInteractive = Boolean(
+          onFilterChange && stat.id !== 'total_marks' && stat.id !== 'avg_marks'
+        )
+        const isSelected = activeFilter === stat.id
+
         return (
           <motion.div
-            key={stat.label}
+            key={stat.id}
             variants={itemVariants}
-            className="w-full"
+            whileHover={isInteractive ? { scale: 1.02, y: -2 } : undefined}
+            whileTap={isInteractive ? { scale: 0.98 } : undefined}
+            onClick={() => isInteractive && onFilterChange?.(stat.id)}
+            className={cn('w-full', isInteractive && 'cursor-pointer')}
           >
-            <Card className="border-0 shadow-sm overflow-hidden hover:shadow-md transition-all duration-300">
-              <div className={cn(
-                "bg-gradient-to-br p-0.5",
-                stat.gradientFrom,
-                stat.gradientTo
-              )}>
-                <CardContent className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-[calc(0.5rem-1px)]">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1 uppercase tracking-wide">
-                        {stat.label}
-                      </p>
-                      <p className={cn(
-                        "text-xl sm:text-2xl md:text-3xl font-bold",
+            <Card
+              className={cn(
+                'relative overflow-hidden transition-all duration-200 border rounded-xl shadow-xs',
+                isSelected
+                  ? 'ring-2 ring-primary border-transparent shadow-md'
+                  : 'hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-xs',
+                stat.bgLight,
+                stat.borderLight
+              )}
+            >
+              {/* Top Accent Gradient Line */}
+              <div
+                className={cn(
+                  'h-1 w-full bg-gradient-to-r',
+                  stat.gradientFrom,
+                  stat.gradientTo
+                )}
+              />
+
+              <CardContent className="p-3 sm:p-4 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xs">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider truncate mb-1">
+                      {stat.label}
+                    </p>
+                    <p
+                      className={cn(
+                        'text-xl sm:text-2xl md:text-3xl font-extrabold tracking-tight',
                         stat.color
-                      )}>
-                        {stat.value}
-                      </p>
-                      {stat.description && (
-                        <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5">
-                          {stat.description}
-                        </p>
                       )}
-                    </div>
-                    <div className={cn(
-                      "h-8 w-8 sm:h-10 sm:w-10 rounded-full bg-gradient-to-br flex items-center justify-center shrink-0 ml-2",
+                    >
+                      {stat.value.toLocaleString()}
+                    </p>
+                    {stat.description && (
+                      <p className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 truncate font-medium">
+                        {stat.description}
+                      </p>
+                    )}
+                  </div>
+
+                  <div
+                    className={cn(
+                      'h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br flex items-center justify-center shrink-0 shadow-xs',
                       stat.gradientFrom,
                       stat.gradientTo
-                    )}>
-                      <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
-                    </div>
+                    )}
+                  >
+                    <Icon className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-white" />
                   </div>
-                  
-                  {/* Optional progress bar for visual effect */}
-                  {stat.value > 0 && totalExams > 0 && stat.label !== 'Total Marks' && stat.label !== 'Avg Marks' && (
-                    <div className="mt-2 sm:mt-3">
-                      <div className="w-full bg-gray-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
-                        <div 
+                </div>
+
+                {/* Progress bar relative to total */}
+                {totalExams > 0 &&
+                  stat.id !== 'all' &&
+                  stat.id !== 'total_marks' &&
+                  stat.id !== 'avg_marks' && (
+                    <div className="mt-2.5 sm:mt-3">
+                      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-1 overflow-hidden">
+                        <div
                           className={cn(
-                            "h-full rounded-full transition-all duration-500",
-                            stat.gradientFrom.replace('from-', 'bg-'),
-                            stat.gradientTo.replace('to-', 'bg-')
+                            'h-full rounded-full transition-all duration-500',
+                            stat.barBg
                           )}
-                          style={{ 
-                            width: `${(stat.value / totalExams) * 100}%` 
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.round((stat.value / totalExams) * 100)
+                            )}%`,
                           }}
                         />
                       </div>
                     </div>
                   )}
-                </CardContent>
-              </div>
+              </CardContent>
             </Card>
           </motion.div>
         )
