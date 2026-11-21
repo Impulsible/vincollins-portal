@@ -75,11 +75,10 @@ const getWAECGrade = (p: number): string => {
 // ✅ Grade color mapping
 const getGradeColor = (grade: string): string => {
   switch (grade) {
-    case 'A': return 'text-emerald-600'
-    case 'B': return 'text-blue-600'
-    case 'C': return 'text-amber-600'
-    case 'P': return 'text-purple-500'
-    case 'F': return 'text-red-600'
+    case 'A1': case 'B2': case 'B3': return 'text-emerald-600'
+    case 'C4': case 'C5': case 'C6': return 'text-blue-600'
+    case 'D7': case 'E8': return 'text-amber-600'
+    case 'F9': return 'text-red-600'
     default: return 'text-gray-600'
   }
 }
@@ -389,9 +388,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       }
 
       // ✅ Fetch Online Exams
-      // NOTE: Term filter is applied in JS via isTermMatch below, NOT in SQL.
-      // SQL `.ilike("term", "%first%")` fails for '1st Term' / 'First Term' variants,
-      // which silently dropped exams that the student should see.
       const { data: examsData, error: examsError } = await supabase
         .from("exams")
         .select("*")
@@ -403,7 +399,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         console.error("Error fetching exams:", examsError)
       }
 
-      // Build exam map so we can read objective_max / theory_max from the exam definition
       const examDefMap: Record<string, any> = {}
       ;(examsData || []).forEach((e: any) => { examDefMap[e.id] = e })
 
@@ -415,7 +410,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         if (seenIds.has(exam.id)) return false
         seenIds.add(exam.id)
 
-        // ✅ Flexible term match — handles '1st Term' / 'First Term' / 'first' / '3rd' / 'third'
         if (!isTermMatch(exam.term, targetTerm)) return false
 
         const examYear = extractYear(exam.class)
@@ -428,9 +422,7 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         return hasAttempt
       })
 
-      console.log('📚 Filtered online exams:', filteredExams.length)
-      
-      // ✅ Fetch CA Scores (term matched in JS to handle all term formats)
+      // ✅ Fetch CA Scores
       const { data: caScoresData } = await supabase
         .from("ca_scores")
         .select("*")
@@ -447,7 +439,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         })
 
       // ✅ Process Online CBT Attempts
-      // RULE: Exam total = 60. Theory Max = 60 - Objective Max (set by teacher).
       const am: Record<string, ExamAttempt> = {}
       const attemptsForTerm = attemptsData?.filter((a: any) => 
         isTermMatch(a.term, targetTerm) && 
@@ -459,11 +450,9 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         const ca = caMap[a.exam_id]
         const hasCA = ca && (ca.ca1_score || ca.ca2_score || ca.ca_total)
 
-        // ── Dynamic Objective / Theory max ──
-        // Prefer values stored on the exam definition, then the attempt, then safe defaults.
         let objectiveMax = Number(examDef?.objective_max) || Number(a.objective_total) || 0
-        if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 30 // sensible default
-        const theoryMax = Math.max(0, 60 - objectiveMax) // ← Theory Max = 60 − Obj Max
+        if (objectiveMax <= 0 || objectiveMax > 60) objectiveMax = 30
+        const theoryMax = Math.max(0, 60 - objectiveMax)
 
         const objectiveScore = Number(a.objective_score) || 0
         const theoryScore = Number(a.theory_score) || 0
@@ -475,16 +464,13 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
         let totalScore: number
 
         if (hasCA) {
-          // CA (40) + Obj + Theory = out of 100
           totalScore = caTotal + objectiveScore + theoryScore
           percentage = Math.round((totalScore / 100) * 100)
         } else if (theoryScore > 0 || theoryMax > 0) {
-          // No CA yet: Obj + Theory = out of 60
           const examTotal = objectiveScore + theoryScore
           totalScore = Math.round((examTotal / 60) * 100)
           percentage = totalScore
         } else if (objectiveScore > 0 && objectiveMax > 0) {
-          // Objective only
           totalScore = Math.round((objectiveScore / objectiveMax) * 100)
           percentage = totalScore
         } else {
@@ -502,9 +488,9 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           total_score: totalScore,
           total_marks: 100,
           objective_score: objectiveScore,
-          objective_total: objectiveMax,       // dynamic
+          objective_total: objectiveMax,
           theory_score: theoryScore,
-          theory_total: theoryMax,             // = 60 - objectiveMax
+          theory_total: theoryMax,
           theory_feedback: a.theory_feedback || null,
           term: a.term || targetTerm,
           session_year: a.session_year || targetSession,
@@ -528,8 +514,6 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       })
 
       // ✅ FALLBACK: Fetch Report Cards for offline/uploaded subjects
-      // Offline report cards store a single "Exam" score out of 60 (obj+theory combined).
-      // So: objective_total = 60, theory_total = 0 (no separate theory row).
       const { data: reportCards } = await supabase
         .from('report_cards')
         .select('*')
@@ -549,15 +533,13 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
           subjects.forEach((subj: any, index: number) => {
             const subjectName = subj.name || subj.subject || 'Subject'
             
-            // Skip if an online CBT exam already covered this subject
             if (filteredExams.some((e: any) => e.subject?.toLowerCase() === subjectName.toLowerCase())) return
             
             const total = Number(subj.total || subj.score || 0)
             const caScore = Number(subj.ca || subj.ca_score || 0)
-            const examScore = Number(subj.exam || subj.exam_score || 0) // out of 60
+            const examScore = Number(subj.exam || subj.exam_score || 0)
             const dummyExamId = `rc-exam-${matchingReport.id}-${index}`
 
-            // Add complete exam object (prevents undefined on card)
             filteredExams.push({
               id: dummyExamId,
               title: `${subjectName} Assessment`,
@@ -574,15 +556,13 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
               num_questions: 0,
               total_marks: 100,
               passing_percentage: 40,
-              objective_max: 60,   // full exam portion
-              theory_max: 0,      // no separate theory for offline uploads
+              objective_max: 60,
+              theory_max: 0,
               exam_type: 'offline',
               is_offline: true,
               created_at: matchingReport.created_at || new Date().toISOString(),
             } as any)
 
-            // Add complete attempt object
-            // CA out of 40 + Exam out of 60 = Total out of 100
             am[dummyExamId] = {
               id: `rc-att-${matchingReport.id}-${index}`,
               exam_id: dummyExamId,
@@ -591,9 +571,9 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
               total_score: total,
               total_marks: 100,
               objective_score: examScore,
-              objective_total: 60,   // exam portion is out of 60
+              objective_total: 60,
               theory_score: 0,
-              theory_total: 0,      // hide theory row (combined into exam score)
+              theory_total: 0,
               theory_feedback: null,
               term: targetTerm,
               session_year: targetSession,
@@ -620,34 +600,22 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
       setExams(filteredExams)
       setExamAttempts(am)
 
-      // ✅ Get term progress stats (term matched in JS)
-      const { data: termProgressRows } = await supabase
-        .from("student_term_progress")
-        .select("total_subjects, completed_exams, average_score, grade, pending_theory_count, term, session_year")
-        .eq("student_id", sp.id)
-        .eq("session_year", targetSession)
-
-      const termProgressData = termProgressRows?.find((row: any) =>
-        isTermMatch(row.term, targetTerm)
-      ) || null
-
+      // ✅ FIX: Calculate stats directly from actual CBT attempts, NOT termProgressData
       const pendingTheoryAttempts = Object.values(am).filter(a => a.status === 'pending_theory')
       const pendingTheoryCount = pendingTheoryAttempts.length
-
       const subjectStats = buildSubjectStats(filteredExams, am)
-      const completedCount = filteredExams.filter((e: any) => {
-        const att = am[e.id]
-        return att && ['completed', 'graded', 'pending_theory'].includes(att.status)
-      }).length
-
-      const dbGrade = termProgressData?.grade || (subjectStats.length > 0 ? subjectStats[0].grade : 'N/A')
-      const dbAverageScore = termProgressData?.average_score ?? (
-        subjectStats.length > 0 
-          ? Math.round(subjectStats.reduce((acc, s) => acc + s.score, 0) / subjectStats.length)
-          : 0
+      
+      const cbtAttempts = Object.values(am).filter(a => 
+        a.status && ['completed', 'graded', 'pending_theory'].includes(a.status)
       )
-      const dbCompleted = termProgressData?.completed_exams ?? completedCount
-      const dbTotalSubjects = termProgressData?.total_subjects ?? totalSubjects
+      
+      const completedCount = cbtAttempts.length
+      
+      const dbAverageScore = cbtAttempts.length > 0 
+        ? Math.round(cbtAttempts.reduce((acc, a) => acc + (a.percentage || 0), 0) / cbtAttempts.length) 
+        : 0
+        
+      const dbGrade = getWAECGrade(dbAverageScore)
 
       const availableCount = filteredExams.filter((e: any) => {
         const a = am[e.id]
@@ -661,12 +629,12 @@ export function useExamsData(router: ReturnType<typeof useRouter>) {
 
       const newStats: LocalStatsState = {
         available: availableCount,
-        completed: dbCompleted,
+        completed: completedCount,      // ✅ Now strictly 0 for Ebube
         upcoming: upcomingCount,
-        averageScore: dbAverageScore,
-        currentGrade: dbGrade,
+        averageScore: dbAverageScore,   // ✅ Now strictly 0% for Ebube
+        currentGrade: dbGrade,          // ✅ Now correctly F9 or N/A
         gradeColor: getGradeColor(dbGrade),
-        totalSubjects: dbTotalSubjects,
+        totalSubjects: totalSubjects,
         termName: TERM_NAMES[targetTerm as keyof typeof TERM_NAMES] || targetTerm,
         sessionYear: targetSession,
         pendingTheoryCount: pendingTheoryCount,
