@@ -1,20 +1,20 @@
 // src/components/staff/exams/edit/TheoryQuestionFormDialog.tsx - WITH TABLE PASTE, DIAGRAM UPLOADER & DARK MODE
-'use client'
+"use client";
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Textarea } from '@/components/ui/textarea'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   X,
   Plus,
@@ -31,23 +31,23 @@ import {
   Brain,
   FileCheck,
   Save,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
-import { QuestionContent } from '@/components/shared/QuestionContent'
-import { createClient } from '@/lib/supabase/client'
-import type { TheoryQuestion, TheorySubQuestion } from './types'
+} from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
+import { QuestionContent } from "@/components/shared/QuestionContent";
+import { createClient } from "@/lib/supabase/client";
+import type { TheoryQuestion, TheorySubQuestion } from "./types";
 
 interface TheoryQuestionFormDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  initialData?: Partial<TheoryQuestion>
-  onSave: (data: Partial<TheoryQuestion>) => void
-  onCancel?: () => void
-  defaultMark?: number
-  totalTheoryMarks?: number
-  theoryQuestionCount?: number
-  examTotal?: number
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  initialData?: Partial<TheoryQuestion>;
+  onSave: (data: Partial<TheoryQuestion>) => void;
+  onCancel?: () => void;
+  defaultMark?: number;
+  totalTheoryMarks?: number;
+  theoryQuestionCount?: number;
+  examTotal?: number;
 }
 
 /**
@@ -55,59 +55,66 @@ interface TheoryQuestionFormDialogProps {
  * Prefers question_text, falls back to legacy text.
  */
 function getSubText(sq: TheorySubQuestion): string {
-  return sq.question_text || sq.text || ''
+  return sq.question_text || sq.text || "";
 }
 
 function handleTablePaste(
   event: React.ClipboardEvent<HTMLTextAreaElement>,
-  setValue: (value: string) => void
+  setValue: (value: string) => void,
 ) {
-  const clipboard = event.clipboardData
-  const html = clipboard.getData('text/html')
-  let rows: string[][] = []
+  const clipboard = event.clipboardData;
+  const html = clipboard.getData("text/html");
+  let rows: string[][] = [];
 
   if (html) {
     const table = new DOMParser()
-      .parseFromString(html, 'text/html')
-      .querySelector('table')
+      .parseFromString(html, "text/html")
+      .querySelector("table");
 
     if (table) {
-      rows = Array.from(table.querySelectorAll('tr')).map((row) =>
-        Array.from(row.querySelectorAll('th, td')).map((cell) =>
-          (cell.textContent || '').trim().replace(/\s+/g, ' ').replace(/\|/g, '\\|')
-        )
-      )
+      rows = Array.from(table.querySelectorAll("tr")).map((row) =>
+        Array.from(row.querySelectorAll("th, td")).map((cell) =>
+          (cell.textContent || "")
+            .trim()
+            .replace(/\s+/g, " ")
+            .replace(/\|/g, "\\|"),
+        ),
+      );
     }
   }
 
   if (rows.length === 0) {
     const textRows = clipboard
-      .getData('text/plain')
+      .getData("text/plain")
       .split(/\r?\n/)
-      .filter((row) => row.trim())
+      .filter((row) => row.trim());
 
-    if (textRows.length > 0 && textRows.some((row) => row.includes('\t'))) {
+    if (textRows.length > 0 && textRows.some((row) => row.includes("\t"))) {
       rows = textRows.map((row) =>
-        row.split('\t').map((cell) => cell.trim().replace(/\|/g, '\\|'))
-      )
+        row.split("\t").map((cell) => cell.trim().replace(/\|/g, "\\|")),
+      );
     }
   }
 
-  if (rows.length === 0) return
+  if (rows.length === 0) return;
 
-  event.preventDefault()
-  const columnCount = Math.max(...rows.map((row) => row.length))
+  event.preventDefault();
+  const columnCount = Math.max(...rows.map((row) => row.length));
   const normalizedRows = rows.map((row) =>
-    Array.from({ length: columnCount }, (_, index) => row[index] || '')
-  )
-  const markdownRows = normalizedRows.map((row) => `| ${row.join(' | ')} |`)
-  const separator = `| ${Array(columnCount).fill('---').join(' | ')} |`
-  const markdown = [markdownRows[0], separator, ...markdownRows.slice(1)].join('\n')
-  const target = event.currentTarget
-  const start = target.selectionStart
-  const end = target.selectionEnd
+    Array.from({ length: columnCount }, (_, index) => row[index] || ""),
+  );
+  const markdownRows = normalizedRows.map((row) => `| ${row.join(" | ")} |`);
+  const separator = `| ${Array(columnCount).fill("---").join(" | ")} |`;
+  const markdown = [markdownRows[0], separator, ...markdownRows.slice(1)].join(
+    "\n",
+  );
+  const target = event.currentTarget;
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
 
-  setValue(`${target.value.slice(0, start)}${markdown}${target.value.slice(end)}`)
+  setValue(
+    `${target.value.slice(0, start)}${markdown}${target.value.slice(end)}`,
+  );
 }
 
 /**
@@ -115,7 +122,7 @@ function handleTablePaste(
  * full TheorySubQuestion shape (fills missing question_text/text).
  */
 function normalizeSubQuestion(s: any): TheorySubQuestion {
-  const text = s?.question_text || s?.text || ''
+  const text = s?.question_text || s?.text || "";
   return {
     id: s?.id || Date.now().toString() + Math.random().toString(36).slice(2, 7),
     label: s?.label,
@@ -123,9 +130,9 @@ function normalizeSubQuestion(s: any): TheorySubQuestion {
     text,
     points: s?.points ?? 0,
     keywords: s?.keywords || [],
-    model_answer: s?.model_answer || '',
+    model_answer: s?.model_answer || "",
     sub_sub_questions: s?.sub_sub_questions || [],
-  }
+  };
 }
 
 export function TheoryQuestionFormDialog({
@@ -139,201 +146,208 @@ export function TheoryQuestionFormDialog({
   theoryQuestionCount = 0,
   examTotal = 60,
 }: TheoryQuestionFormDialogProps) {
-  const [questionText, setQuestionText] = useState('')
-  const [points, setPoints] = useState(10)
-  const [imageUrl, setImageUrl] = useState<string>('')
-  const [imageCaption, setImageCaption] = useState<string>('')
-  const [keywords, setKeywords] = useState<string[]>([])
-  const [modelAnswer, setModelAnswer] = useState('')
-  const [subQuestions, setSubQuestions] = useState<TheorySubQuestion[]>([])
-  const [keywordInput, setKeywordInput] = useState('')
-  const [useSubQuestions, setUseSubQuestions] = useState(false)
-  const [isDraft, setIsDraft] = useState(true)
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isUploadingImage, setIsUploadingImage] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
+  const [questionText, setQuestionText] = useState("");
+  const [points, setPoints] = useState(10);
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [imageCaption, setImageCaption] = useState<string>("");
+  const [keywords, setKeywords] = useState<string[]>([]);
+  const [modelAnswer, setModelAnswer] = useState("");
+  const [subQuestions, setSubQuestions] = useState<TheorySubQuestion[]>([]);
+  const [keywordInput, setKeywordInput] = useState("");
+  const [useSubQuestions, setUseSubQuestions] = useState(false);
+  const [isDraft, setIsDraft] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const marksPerTheoryQuestion =
     theoryQuestionCount > 0 && totalTheoryMarks > 0
       ? totalTheoryMarks / theoryQuestionCount
-      : 0
+      : 0;
 
   useEffect(() => {
     if (open) {
-      setQuestionText(initialData?.question_text || '')
+      setQuestionText(initialData?.question_text || "");
       setPoints(
         initialData?.points !== undefined
           ? initialData.points
           : marksPerTheoryQuestion > 0
-          ? marksPerTheoryQuestion
-          : 10
-      )
-      setImageUrl(initialData?.image_url || '')
-      setImageCaption(initialData?.image_caption || '')
-      setKeywords(initialData?.keywords || [])
-      setModelAnswer(initialData?.model_answer || '')
+            ? marksPerTheoryQuestion
+            : 10,
+      );
+      setImageUrl(initialData?.image_url || "");
+      setImageCaption(initialData?.image_caption || "");
+      setKeywords(initialData?.keywords || []);
+      setModelAnswer(initialData?.model_answer || "");
 
       // Normalize loaded sub-questions
-      const normalizedSubs = (initialData?.sub_questions || []).map(normalizeSubQuestion)
-      setSubQuestions(normalizedSubs)
-      setUseSubQuestions(normalizedSubs.length > 0)
+      const normalizedSubs = (initialData?.sub_questions || []).map(
+        normalizeSubQuestion,
+      );
+      setSubQuestions(normalizedSubs);
+      setUseSubQuestions(normalizedSubs.length > 0);
 
-      setIsDraft(initialData?.is_draft !== undefined ? initialData.is_draft : true)
-      setKeywordInput('')
-      setShowPreview(false)
+      setIsDraft(
+        initialData?.is_draft !== undefined ? initialData.is_draft : true,
+      );
+      setKeywordInput("");
+      setShowPreview(false);
     }
-  }, [open, initialData, marksPerTheoryQuestion])
+  }, [open, initialData, marksPerTheoryQuestion]);
 
   const isQuestionComplete = (): boolean => {
-    if (!questionText.trim()) return false
+    if (!questionText.trim()) return false;
     if (useSubQuestions) {
       return (
         subQuestions.length > 0 &&
-        subQuestions.every((sq) => getSubText(sq).trim() !== '' && sq.points > 0)
-      )
+        subQuestions.every(
+          (sq) => getSubText(sq).trim() !== "" && sq.points > 0,
+        )
+      );
     }
-    return points > 0
-  }
+    return points > 0;
+  };
 
   const handleAddKeyword = () => {
-    const keyword = keywordInput.trim().toLowerCase()
-    if (!keyword) return
-    if (keywords.includes(keyword)) return toast.error('Keyword already added')
-    if (keywords.length >= 10) return toast.error('Maximum 10 keywords per question')
-    setKeywords([...keywords, keyword])
-    setKeywordInput('')
-  }
+    const keyword = keywordInput.trim().toLowerCase();
+    if (!keyword) return;
+    if (keywords.includes(keyword)) return toast.error("Keyword already added");
+    if (keywords.length >= 10)
+      return toast.error("Maximum 10 keywords per question");
+    setKeywords([...keywords, keyword]);
+    setKeywordInput("");
+  };
 
   const handleRemoveKeyword = (keyword: string) => {
-    setKeywords(keywords.filter((k) => k !== keyword))
-  }
+    setKeywords(keywords.filter((k) => k !== keyword));
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      handleAddKeyword()
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleAddKeyword();
     }
-  }
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file (PNG, JPG, WEBP, SVG)')
-      return
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (PNG, JPG, WEBP, SVG)");
+      return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image size must be less than 5MB')
-      return
+      toast.error("Image size must be less than 5MB");
+      return;
     }
 
-    setIsUploadingImage(true)
+    setIsUploadingImage(true);
     try {
-      const supabase = createClient()
-      const ext = file.name.split('.').pop()
-      const fileName = `theory/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`
+      const supabase = createClient();
+      const ext = file.name.split(".").pop();
+      const fileName = `theory/${Date.now()}_${Math.random().toString(36).substring(2, 9)}.${ext}`;
 
       const { data, error } = await supabase.storage
-        .from('exam-assets')
-        .upload(fileName, file, { cacheControl: '3600', upsert: true })
+        .from("exam-assets")
+        .upload(fileName, file, { cacheControl: "3600", upsert: true });
 
       if (error) {
         // Fallback to local Base64 URL
-        const reader = new FileReader()
+        const reader = new FileReader();
         reader.onloadend = () => {
-          setImageUrl(reader.result as string)
-          toast.success('Diagram attached (local format)')
-          setIsUploadingImage(false)
-        }
-        reader.readAsDataURL(file)
-        return
+          setImageUrl(reader.result as string);
+          toast.success("Diagram attached (local format)");
+          setIsUploadingImage(false);
+        };
+        reader.readAsDataURL(file);
+        return;
       }
 
       const { data: publicUrlData } = supabase.storage
-        .from('exam-assets')
-        .getPublicUrl(data.path)
+        .from("exam-assets")
+        .getPublicUrl(data.path);
 
-      setImageUrl(publicUrlData.publicUrl)
-      toast.success('Diagram uploaded successfully')
+      setImageUrl(publicUrlData.publicUrl);
+      toast.success("Diagram uploaded successfully");
     } catch (err) {
-      console.error('Image upload failed, fallback to base64:', err)
-      const reader = new FileReader()
+      console.error("Image upload failed, fallback to base64:", err);
+      const reader = new FileReader();
       reader.onloadend = () => {
-        setImageUrl(reader.result as string)
-        toast.success('Diagram attached')
-      }
-      reader.readAsDataURL(file)
+        setImageUrl(reader.result as string);
+        toast.success("Diagram attached");
+      };
+      reader.readAsDataURL(file);
     } finally {
-      setIsUploadingImage(false)
+      setIsUploadingImage(false);
     }
-  }
+  };
 
   const handleRemoveImage = () => {
-    setImageUrl('')
-    setImageCaption('')
+    setImageUrl("");
+    setImageCaption("");
     if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+      fileInputRef.current.value = "";
     }
-  }
+  };
 
   const handleAddSubQuestion = () => {
     const subQuestionPoints =
       marksPerTheoryQuestion > 0
         ? Math.round((marksPerTheoryQuestion / 2) * 100) / 100
-        : 5
+        : 5;
     setSubQuestions([
       ...subQuestions,
       {
         id: Date.now().toString(),
-        question_text: '',
-        text: '',
+        question_text: "",
+        text: "",
         points: subQuestionPoints,
       },
-    ])
-  }
+    ]);
+  };
 
   const handleUpdateSubQuestion = (
     index: number,
-    data: Partial<TheorySubQuestion>
+    data: Partial<TheorySubQuestion>,
   ) => {
-    const updated = [...subQuestions]
-    const merged = { ...updated[index], ...data }
+    const updated = [...subQuestions];
+    const merged = { ...updated[index], ...data };
 
     // Keep question_text and text synchronized
     if (data.question_text !== undefined) {
-      merged.text = data.question_text
+      merged.text = data.question_text;
     } else if (data.text !== undefined) {
-      merged.question_text = data.text
+      merged.question_text = data.text;
     }
 
-    updated[index] = merged
-    setSubQuestions(updated)
-  }
+    updated[index] = merged;
+    setSubQuestions(updated);
+  };
 
   const handleDeleteSubQuestion = (index: number) => {
-    setSubQuestions(subQuestions.filter((_, i) => i !== index))
-  }
+    setSubQuestions(subQuestions.filter((_, i) => i !== index));
+  };
 
   const handleClose = () => {
     if (!isSubmitting) {
-      onOpenChange(false)
-      if (onCancel) onCancel()
+      onOpenChange(false);
+      if (onCancel) onCancel();
     }
-  }
+  };
 
   const handleSubmit = (saveAsDraft: boolean = false) => {
-    if (!questionText.trim()) return toast.error('Please enter question text')
+    if (!questionText.trim()) return toast.error("Please enter question text");
 
     const calculatedPoints = useSubQuestions
       ? subQuestions.reduce((sum, sq) => sum + (sq.points || 0), 0)
-      : points
+      : points;
 
     if (saveAsDraft) {
-      setIsSubmitting(true)
+      setIsSubmitting(true);
       onSave({
         question_text: questionText.trim(),
         points: calculatedPoints || defaultMark,
@@ -343,30 +357,32 @@ export function TheoryQuestionFormDialog({
         image_url: imageUrl || null,
         image_caption: imageCaption || null,
         is_draft: true,
-      })
-      setTimeout(() => setIsSubmitting(false), 400)
-      return
+      });
+      setTimeout(() => setIsSubmitting(false), 400);
+      return;
     }
 
     if (useSubQuestions) {
       if (subQuestions.length === 0)
-        return toast.error('Please add at least one sub-question')
+        return toast.error("Please add at least one sub-question");
 
       for (let i = 0; i < subQuestions.length; i++) {
-        const sq = subQuestions[i]
+        const sq = subQuestions[i];
         if (!getSubText(sq).trim())
-          return toast.error(`Sub-question (${String.fromCharCode(97 + i)}) is empty`)
+          return toast.error(
+            `Sub-question (${String.fromCharCode(97 + i)}) is empty`,
+          );
         if (sq.points <= 0)
           return toast.error(
-            `Sub-question (${String.fromCharCode(97 + i)}) points must be greater than 0`
-          )
+            `Sub-question (${String.fromCharCode(97 + i)}) points must be greater than 0`,
+          );
       }
     } else {
-      if (points <= 0) return toast.error('Points must be greater than 0')
-      if (points > 100) return toast.error('Points cannot exceed 100')
+      if (points <= 0) return toast.error("Points must be greater than 0");
+      if (points > 100) return toast.error("Points cannot exceed 100");
     }
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
     onSave({
       question_text: questionText.trim(),
       points: calculatedPoints,
@@ -376,16 +392,16 @@ export function TheoryQuestionFormDialog({
       image_url: imageUrl || null,
       image_caption: imageCaption || null,
       is_draft: false,
-    })
-    setTimeout(() => setIsSubmitting(false), 400)
-  }
+    });
+    setTimeout(() => setIsSubmitting(false), 400);
+  };
 
-  const complete = isQuestionComplete()
+  const complete = isQuestionComplete();
   const totalSubQuestionPoints = subQuestions.reduce(
     (sum, sq) => sum + (sq.points || 0),
-    0
-  )
-  const currentTotalMarks = useSubQuestions ? totalSubQuestionPoints : points
+    0,
+  );
+  const currentTotalMarks = useSubQuestions ? totalSubQuestionPoints : points;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -393,7 +409,7 @@ export function TheoryQuestionFormDialog({
         <DialogHeader>
           <div className="flex items-center justify-between pr-4 flex-wrap gap-2">
             <DialogTitle className="flex items-center gap-2 flex-wrap text-slate-900 dark:text-slate-100 text-lg">
-              {initialData?.id ? 'Edit Theory Question' : 'Add Theory Question'}
+              {initialData?.id ? "Edit Theory Question" : "Add Theory Question"}
               {initialData?.is_draft && (
                 <Badge
                   variant="outline"
@@ -469,8 +485,8 @@ export function TheoryQuestionFormDialog({
               <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
               <AlertDescription className="text-amber-700 dark:text-amber-400 text-xs sm:text-sm">
                 {useSubQuestions
-                  ? 'Add question text, sub-questions, and marks to complete.'
-                  : 'Add question text and marks to mark as complete.'}
+                  ? "Add question text, sub-questions, and marks to complete."
+                  : "Add question text and marks to mark as complete."}
               </AlertDescription>
             </Alert>
           )}
@@ -479,7 +495,8 @@ export function TheoryQuestionFormDialog({
             <Alert className="bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50">
               <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-500" />
               <AlertDescription className="text-emerald-700 dark:text-emerald-400 text-xs sm:text-sm flex items-center gap-1.5">
-                <FileCheck className="h-4 w-4" /> Theory question is complete and ready.
+                <FileCheck className="h-4 w-4" /> Theory question is complete
+                and ready.
               </AlertDescription>
             </Alert>
           )}
@@ -497,7 +514,7 @@ export function TheoryQuestionFormDialog({
               </div>
 
               <QuestionContent
-                text={questionText || '_No question text provided yet_'}
+                text={questionText || "_No question text provided yet_"}
                 imageUrl={imageUrl}
                 imageCaption={imageCaption}
               />
@@ -520,7 +537,9 @@ export function TheoryQuestionFormDialog({
                             </span>
                             <div className="flex-1">
                               <QuestionContent
-                                text={getSubText(sq) || '_No sub-question text_'}
+                                text={
+                                  getSubText(sq) || "_No sub-question text_"
+                                }
                               />
                             </div>
                           </div>
@@ -537,7 +556,8 @@ export function TheoryQuestionFormDialog({
               {modelAnswer && (
                 <div className="p-3 bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl border border-emerald-200 dark:border-emerald-800/50 space-y-1">
                   <span className="text-xs font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                    <CheckCircle2 className="h-3.5 w-3.5" /> Model Answer / Marking Scheme
+                    <CheckCircle2 className="h-3.5 w-3.5" /> Model Answer /
+                    Marking Scheme
                   </span>
                   <QuestionContent text={modelAnswer} />
                 </div>
@@ -569,13 +589,13 @@ export function TheoryQuestionFormDialog({
                 <Button
                   type="button"
                   size="sm"
-                  variant={!useSubQuestions ? 'default' : 'ghost'}
+                  variant={!useSubQuestions ? "default" : "ghost"}
                   onClick={() => setUseSubQuestions(false)}
                   className={cn(
-                    'h-8 text-xs font-semibold',
+                    "h-8 text-xs font-semibold",
                     !useSubQuestions
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
+                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-400",
                   )}
                 >
                   Single Question
@@ -583,13 +603,13 @@ export function TheoryQuestionFormDialog({
                 <Button
                   type="button"
                   size="sm"
-                  variant={useSubQuestions ? 'default' : 'ghost'}
+                  variant={useSubQuestions ? "default" : "ghost"}
                   onClick={() => setUseSubQuestions(true)}
                   className={cn(
-                    'h-8 text-xs font-semibold',
+                    "h-8 text-xs font-semibold",
                     useSubQuestions
-                      ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                      : 'text-slate-600 dark:text-slate-400'
+                      ? "bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm"
+                      : "text-slate-600 dark:text-slate-400",
                   )}
                 >
                   <Layers className="h-3.5 w-3.5 mr-1" />
@@ -676,7 +696,7 @@ export function TheoryQuestionFormDialog({
                       ) : (
                         <Upload className="h-3.5 w-3.5 mr-1.5 text-slate-500" />
                       )}
-                      {isUploadingImage ? 'Uploading...' : 'Upload Diagram'}
+                      {isUploadingImage ? "Uploading..." : "Upload Diagram"}
                     </Button>
                     <span className="text-[11px] text-slate-400 dark:text-slate-500">
                       Supports JPG, PNG, WebP & SVG
@@ -690,7 +710,8 @@ export function TheoryQuestionFormDialog({
                 <>
                   <div>
                     <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">
-                      Question Points / Marks <span className="text-red-500">*</span>
+                      Question Points / Marks{" "}
+                      <span className="text-red-500">*</span>
                     </Label>
                     <Input
                       type="number"
@@ -710,7 +731,8 @@ export function TheoryQuestionFormDialog({
                       Grading Keywords (Optional)
                     </Label>
                     <p className="text-xs text-slate-400 dark:text-slate-500 mb-2">
-                      Add keywords used for rubric evaluation and student feedback.
+                      Add keywords used for rubric evaluation and student
+                      feedback.
                     </p>
                     <div className="flex gap-2">
                       <Input
@@ -800,7 +822,8 @@ export function TheoryQuestionFormDialog({
                         No sub-questions added yet
                       </p>
                       <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-                        Add structured sub-questions like (a), (b), (c) with individual marks
+                        Add structured sub-questions like (a), (b), (c) with
+                        individual marks
                       </p>
                       <Button
                         type="button"
@@ -848,11 +871,11 @@ export function TheoryQuestionFormDialog({
                                 handleUpdateSubQuestion(idx, {
                                   question_text: val,
                                   text: val,
-                                })
+                                }),
                               )
                             }
                             placeholder={`Enter sub-question (${String.fromCharCode(
-                              97 + idx
+                              97 + idx,
                             )}) text... (Paste tables directly)`}
                             className="min-h-[65px] bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white text-xs sm:text-sm font-sans"
                             disabled={isSubmitting}
@@ -917,7 +940,7 @@ export function TheoryQuestionFormDialog({
             className="gap-2 bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100 hover:bg-slate-200 dark:hover:bg-slate-700"
           >
             <Save className="h-4 w-4" />
-            {initialData?.id ? 'Save Changes as Draft' : 'Save as Draft'}
+            {initialData?.id ? "Save Changes as Draft" : "Save as Draft"}
           </Button>
           <Button
             onClick={() => handleSubmit(false)}
@@ -925,10 +948,10 @@ export function TheoryQuestionFormDialog({
             disabled={!complete || isSubmitting}
           >
             <FileCheck className="h-4 w-4" />
-            {initialData?.id ? 'Update Complete' : 'Add Complete Question'}
+            {initialData?.id ? "Update Complete" : "Add Complete Question"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
