@@ -28,12 +28,15 @@ export interface Exam {
   is_locked?: boolean
   version?: number
   shuffle_questions?: boolean
+  /** ✅ ADDED — read by useExamLoader.processExamQuestions() */
+  shuffle_options?: boolean
   randomize_questions?: boolean
   required_theory_count?: number
 }
 
 // ============================================
 // ✅ STUDENT PROFILE
+// ✅ useExamLoader imports this as `Profile`
 // ============================================
 export interface StudentProfile {
   id: string
@@ -51,6 +54,32 @@ export interface StudentProfile {
   admission_number?: string
   role?: string
   gender?: string
+}
+
+/** ✅ ADDED — alias so `import type { Profile } from "../types"` resolves */
+export type Profile = StudentProfile
+
+// ============================================
+// ✅ QUESTION
+// ✅ useExamLoader imports this as `Question`
+//    and the normalizer/scoring utils operate on it
+// ============================================
+export interface Question {
+  id: string
+  type: string
+  question: string
+  /** may arrive as array, JSON string, or object[]; the parser tolerates all */
+  options?: string[] | string
+  correct_answer: string
+  marks: number
+  /** injected by processExamQuestions() for display ordering */
+  display_number?: number
+  /** optional diagram / figure attached to the question */
+  image_url?: string
+  /** optional caption rendered beneath the image */
+  image_caption?: string
+  /** optional explanation shown after grading */
+  explanation?: string
 }
 
 // ============================================
@@ -89,6 +118,10 @@ export interface ExamAttempt {
   remark?: string
   graded_by?: string
   graded_at?: string | null
+  // ✅ ADDED — runtime attempt state used by useExamLoader
+  answers?: Record<string, string>
+  current_index?: number
+  flagged_questions?: string[]
 }
 
 // ============================================
@@ -268,6 +301,46 @@ export interface ResumeData {
   fullscreenExits: number
   unloadCount: number
   attemptNumber?: number
+  /** ✅ ADDED — written by useExamLoader resume flow */
+  started_at?: string
+  duration?: number
+  currentIndex?: number
+  flaggedQuestions?: string[]
+}
+
+// ============================================
+// ✅ START ATTEMPT RESULT
+// ✅ returned by useExamLoader.startNewAttempt()
+// ============================================
+export interface StartAttemptResult {
+  attemptId: string
+  isResuming: boolean
+  attemptNumber?: number
+  started_at?: string
+}
+
+// ============================================
+// ✅ USE EXAM LOADER RETURN
+// ✅ public API shape of the useExamLoader hook
+// ============================================
+export interface UseExamLoaderReturn {
+  loading: boolean
+  loadError: string | null
+  exam: Exam | null
+  profile: Profile | null
+  allQuestions: Question[]
+  hasCompletedAttempt: boolean
+  examResult: ExamResult | null
+  setExamResult: (r: ExamResult | null) => void
+  attemptId: string | null
+  setAttemptId: (id: string | null) => void
+  attemptsUsed: number
+  resumeData: ResumeData | null
+  showResumeDialog: boolean
+  setShowResumeDialog: (v: boolean) => void
+  examTerminated: boolean
+  handleResumeExam: () => Promise<ResumeData | null>
+  startNewAttempt: () => Promise<StartAttemptResult | null>
 }
 
 // ============================================

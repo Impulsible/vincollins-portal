@@ -41,17 +41,14 @@ import type {
 } from "./types";
 
 /* ═══════════════════════════════════════════════════════════
-   SCORING ENGINE — reconciled model
+   SCORING ENGINE — Reconciled 60-Mark Model
    ─────────────────────────────────────────────────────────
    Objective total  = Σ objective question marks
    Theory total     = effectiveN × resolvedMarksPerQ
                       • resolvedMarksPerQ is derived from the
-                        actual questions when they are equal,
-                        else falls back to the parent-held value
-                      • Mixed-mark theory is draftable but blocked
-                        at submit to guarantee fairness
-   Exam total       = objective + theory  →  must equal 60
-   CA1 = 20, CA2 = 20, CA total = 40, Grand = 100
+                        actual questions when they are equal
+   Exam total       = objective + theory → must equal 60
+   CA1 = 20, CA2 = 20, CA total = 40, Grand Total = 100
    ═══════════════════════════════════════════════════════════ */
 
 const calculateMarkDistribution = (
@@ -62,13 +59,13 @@ const calculateMarkDistribution = (
   theoryMarksPerQuestion: number,
   hasTheory: boolean,
 ): MarkDistribution => {
-  /* ── objective ─────────────────────────────────────── */
+  /* ── Objective ─────────────────────────────────────── */
   const objectiveTotal = questions.reduce(
-    (sum, q) => sum + (q.marks || defaultMark),
+    (sum, q) => sum + (Number(q.marks) || defaultMark),
     0,
   );
 
-  /* ── theory ────────────────────────────────────────── */
+  /* ── Theory ────────────────────────────────────────── */
   const theoryQuestionCount = theoryQuestions.length;
 
   const effectiveN = hasTheory
@@ -84,18 +81,14 @@ const calculateMarkDistribution = (
     theoryQuestionCount === 0 ||
     theoryQuestions.every((q) => q.marks === theoryQuestions[0]?.marks);
 
-  /* resolvedMarksPerQ = the number we actually trust for display
-     & for computing the theory total. */
   let resolvedMarksPerQ = theoryMarksPerQuestion;
   let theoryTotal = 0;
 
   if (hasTheory && theoryQuestionCount > 0) {
     if (theoryMarksEqual) {
-      // All questions carry the same mark — use it as truth
       resolvedMarksPerQ = theoryQuestions[0].marks;
       theoryTotal = effectiveN * resolvedMarksPerQ;
     } else {
-      // Mixed marks → sum top-N (draft-only path, blocked at submit)
       const sorted = [...theoryQuestions].sort((a, b) => b.marks - a.marks);
       theoryTotal = sorted
         .slice(0, effectiveN)
@@ -106,16 +99,18 @@ const calculateMarkDistribution = (
           : theoryMarksPerQuestion;
     }
   } else if (hasTheory) {
-    // No theory Qs yet — project what they'd be worth at current settings
     theoryTotal = effectiveN * theoryMarksPerQuestion;
   }
 
-  /* ── totals ────────────────────────────────────────── */
-  const examTotal = objectiveTotal + theoryTotal;
+  /* ── Totals ────────────────────────────────────────── */
+  const examTotal = Math.round((objectiveTotal + theoryTotal) * 100) / 100;
+  const isBalanced =
+    Math.abs(examTotal - MARK_CONSTANTS.EXAM_TOTAL) < 0.01 &&
+    (!hasTheory || theoryQuestionCount === 0 || theoryMarksEqual);
 
   return {
-    objectiveTotal,
-    theoryTotal,
+    objectiveTotal: Math.round(objectiveTotal * 100) / 100,
+    theoryTotal: Math.round(theoryTotal * 100) / 100,
     examTotal,
     ca1Max: MARK_CONSTANTS.CA1_MAX, // 20
     ca2Max: MARK_CONSTANTS.CA2_MAX, // 20
@@ -124,16 +119,14 @@ const calculateMarkDistribution = (
     questionCount: questions.length,
     theoryQuestionCount,
     theoryMarksPerQuestion: resolvedMarksPerQ,
-    marksPerTheoryQuestion: resolvedMarksPerQ, // back-compat alias
-    isBalanced:
-      examTotal === MARK_CONSTANTS.EXAM_TOTAL &&
-      (!hasTheory || theoryQuestionCount === 0 || theoryMarksEqual),
+    marksPerTheoryQuestion: resolvedMarksPerQ,
+    isBalanced,
     theoryMarksEqual,
   };
 };
 
 /* ═══════════════════════════════════════════════════════════
-   VALIDATION GATE — runs before submit
+   VALIDATION GATE
    ═══════════════════════════════════════════════════════════ */
 
 const validateExam = (
@@ -150,18 +143,18 @@ const validateExam = (
   if (dist.questionCount === 0)
     errors.push("Add at least one objective question.");
 
-  if (dist.examTotal !== MARK_CONSTANTS.EXAM_TOTAL)
+  if (Math.abs(dist.examTotal - MARK_CONSTANTS.EXAM_TOTAL) >= 0.01)
     errors.push(
-      `Exam total is ${dist.examTotal}, must be ${MARK_CONSTANTS.EXAM_TOTAL}.`,
+      `Exam total is ${dist.examTotal.toFixed(1)}, must be ${MARK_CONSTANTS.EXAM_TOTAL}.`,
     );
 
   if (hasTheory && !dist.theoryMarksEqual)
     errors.push(
-      "All theory questions must carry the same marks so any N a student picks is fair.",
+      "All theory questions must carry the same marks so any N questions a student selects is balanced.",
     );
 
   if (hasTheory && dist.theoryQuestionCount === 0)
-    errors.push("Add at least one theory question or disable theory.");
+    errors.push("Add at least one theory question or disable the theory section.");
 
   return errors;
 };
@@ -185,8 +178,6 @@ export function CreateExamDialog({
   const [theoryQuestions, setTheoryQuestions] = useState<TheoryQuestion[]>([]);
   const [hasTheory, setHasTheory] = useState(false);
 
-  /* legacy state — still consumed by ExamDetailsStep & PreviewStep.
-     Derived below from markDistribution so it can never drift. */
   const [objectiveMax, setObjectiveMax] = useState(20);
   const [theoryMax, setTheoryMax] = useState(40);
 
@@ -199,27 +190,22 @@ export function CreateExamDialog({
     number | null
   >(null);
 
-  /* Master marks per theory question — kept in sync with questions
-     whenever all theory questions share one value. */
   const [theoryMarksPerQuestion, setTheoryMarksPerQuestion] =
     useState<number>(10);
 
   const [scoringRule, setScoringRule] = useState<ScoringRule>("standard");
-
   const [bulkQuestionsText, setBulkQuestionsText] = useState("");
-
   const [passageText, setPassageText] = useState("");
   const [hasPassage, setHasPassage] = useState(false);
-
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
 
   const { debouncedSave, loadFromStorage, clearStorage } = useExamDraft();
-  const { parseObjective, parseTheory } = useQuestionParser(defaultMark);
+  const { parseObjective } = useQuestionParser(defaultMark);
 
   const handleClose = useCallback(() => onOpenChange(false), [onOpenChange]);
   const { loading, submit } = useExamSubmit(onSuccess, handleClose);
 
-  /* ── derived scoring ── */
+  /* ── Derived Scoring ── */
 
   const markDistribution = useMemo<MarkDistribution>(
     () =>
@@ -241,15 +227,13 @@ export function CreateExamDialog({
     ],
   );
 
-  /* keep legacy objectiveMax / theoryMax mirrors in sync */
+  /* Keep legacy objectiveMax / theoryMax mirrors in sync */
   useEffect(() => {
     setObjectiveMax(markDistribution.objectiveTotal);
     setTheoryMax(markDistribution.theoryTotal);
   }, [markDistribution.objectiveTotal, markDistribution.theoryTotal]);
 
-  /* keep parent theoryMarksPerQuestion in sync with equal-mark questions.
-     This closes the drift loophole: any time all Qs share a value,
-     the parent adopts it immediately. */
+  /* Sync parent theory marks with equal-mark questions */
   useEffect(() => {
     if (
       theoryQuestions.length > 0 &&
@@ -280,7 +264,6 @@ export function CreateExamDialog({
     [examDetails, markDistribution, hasTheory],
   );
 
-  /* effective N for footer display */
   const effectiveTheoryN = useMemo(() => {
     if (!hasTheory || theoryQuestions.length === 0) return 0;
     if (!theoryQuestionsToAnswer || theoryQuestionsToAnswer <= 0)
@@ -288,7 +271,7 @@ export function CreateExamDialog({
     return Math.min(theoryQuestionsToAnswer, theoryQuestions.length);
   }, [hasTheory, theoryQuestions.length, theoryQuestionsToAnswer]);
 
-  /* ── auto-save draft ── */
+  /* ── Auto-Save Draft ── */
 
   useEffect(() => {
     const hasData =
@@ -335,7 +318,7 @@ export function CreateExamDialog({
     debouncedSave,
   ]);
 
-  /* ── restore draft on open ── */
+  /* ── Restore Draft on Open ── */
 
   useEffect(() => {
     if (!open) return;
@@ -362,7 +345,7 @@ export function CreateExamDialog({
     });
   }, [open, loadFromStorage]);
 
-  /* ── navigation ── */
+  /* ── Navigation ── */
 
   const goToStep = useCallback((id: StepId) => setActiveStep(id), []);
 
@@ -377,7 +360,7 @@ export function CreateExamDialog({
     if (prev) setActiveStep(prev.id);
   }, [currentStepIndex]);
 
-  /* ── clear draft ── */
+  /* ── Clear Draft ── */
 
   const handleClearDraft = useCallback(() => {
     clearStorage();
@@ -398,7 +381,7 @@ export function CreateExamDialog({
     toast.success("Started fresh!");
   }, [clearStorage]);
 
-  /* ── close ── */
+  /* ── Close ── */
 
   const handleOpenChange = useCallback(
     (isOpen: boolean) => {
@@ -410,7 +393,7 @@ export function CreateExamDialog({
     [onOpenChange],
   );
 
-  /* ── submit ── */
+  /* ── Submit ── */
 
   const handleSubmit = useCallback(
     async (submitForApproval: boolean) => {
@@ -496,12 +479,12 @@ export function CreateExamDialog({
               </div>
               <div className="min-w-0">
                 <h2 className="text-white font-bold text-xs sm:text-sm leading-tight truncate">
-                  {examDetails.title || "Create New Exam"}
+                  {examDetails.title || "Assessment Management Suite"}
                 </h2>
-                <p className="text-gray-500 text-[10px] truncate hidden sm:block">
+                <p className="text-gray-400 text-[10px] truncate hidden sm:block">
                   {examDetails.subject && examDetails.class
                     ? `${examDetails.subject} • ${examDetails.class}`
-                    : "Follow the steps below"}
+                    : "Create & configure assessment parameters"}
                 </p>
               </div>
             </div>
@@ -515,21 +498,20 @@ export function CreateExamDialog({
                   <span
                     className={cn(
                       "text-[10px]",
-                      totalMarks === MARK_CONSTANTS.EXAM_TOTAL
-                        ? "text-gray-400"
+                      markDistribution.isBalanced
+                        ? "text-emerald-400 font-bold"
                         : isOver
-                          ? "text-red-400"
-                          : "text-amber-400",
+                        ? "text-red-400 font-bold"
+                        : "text-amber-400 font-bold",
                     )}
                   >
-                    • {totalMarks}mk
+                    • {totalMarks.toFixed(1)}mk
                     {isOver && " ⛔"}
-                    {totalMarks !== MARK_CONSTANTS.EXAM_TOTAL &&
-                      !isOver &&
-                      " ⚠️"}
+                    {!markDistribution.isBalanced && !isOver && " ⚠️"}
                   </span>
                 </div>
               )}
+
               <div className="hidden sm:flex items-center gap-1 bg-white/10 rounded-full px-2 py-0.5">
                 <div className="w-10 h-1 bg-gray-700 rounded-full overflow-hidden">
                   <div
@@ -541,11 +523,13 @@ export function CreateExamDialog({
                   {examProgress}%
                 </span>
               </div>
+
               {(examDetails.title || questions.length > 0) && (
                 <button
+                  type="button"
                   onClick={handleClearDraft}
                   title="Start fresh"
-                  className="text-gray-500 hover:text-white p-1 rounded transition-colors"
+                  className="text-gray-400 hover:text-white p-1 rounded transition-colors"
                 >
                   <RotateCcw className="h-3 w-3" />
                 </button>
@@ -562,7 +546,7 @@ export function CreateExamDialog({
           </div>
         </div>
 
-        {/* ── Draft banner ── */}
+        {/* ── Draft Banner ── */}
         {hasSavedDraft && (
           <div className="bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50 px-3 py-1.5 flex items-center justify-between flex-shrink-0">
             <p className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-400 font-medium truncate">
@@ -572,6 +556,7 @@ export function CreateExamDialog({
                 : ""}
             </p>
             <button
+              type="button"
               onClick={() => setHasSavedDraft(false)}
               className="text-amber-500 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 p-0.5 flex-shrink-0"
             >
@@ -580,7 +565,7 @@ export function CreateExamDialog({
           </div>
         )}
 
-        {/* ── Step content ── */}
+        {/* ── Step Content ── */}
         <div className="flex-1 overflow-hidden flex flex-col min-h-0 bg-white dark:bg-slate-950">
           {activeStep === "details" && (
             <ExamDetailsStep
@@ -655,6 +640,7 @@ export function CreateExamDialog({
           <div className="flex items-center justify-between max-w-4xl mx-auto">
             <div className="flex items-center gap-1.5">
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 onClick={() => handleOpenChange(false)}
@@ -665,6 +651,7 @@ export function CreateExamDialog({
               </Button>
               {!isFirst && (
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   onClick={goPrev}
@@ -691,15 +678,14 @@ export function CreateExamDialog({
               <span
                 className={cn(
                   "font-semibold",
-                  totalMarks === MARK_CONSTANTS.EXAM_TOTAL &&
-                    (!hasTheory || markDistribution.theoryMarksEqual)
+                  markDistribution.isBalanced
                     ? "text-emerald-600 dark:text-emerald-400"
                     : isOver
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-amber-600 dark:text-amber-400",
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-400",
                 )}
               >
-                Total: {totalMarks}mk
+                Total: {totalMarks.toFixed(1)}mk
                 {isOver && " ⛔ OVER"}
               </span>
             </div>
@@ -707,10 +693,11 @@ export function CreateExamDialog({
             <div className="flex items-center gap-1.5">
               {!isLast ? (
                 <Button
+                  type="button"
                   onClick={goNext}
                   disabled={isOver}
                   className={cn(
-                    "h-7 sm:h-8 px-3 sm:px-4 text-xs",
+                    "h-7 sm:h-8 px-3 sm:px-4 text-xs font-semibold text-white",
                     isOver
                       ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed"
                       : "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500",
@@ -722,6 +709,7 @@ export function CreateExamDialog({
               ) : (
                 <>
                   <Button
+                    type="button"
                     variant="outline"
                     onClick={() => handleSubmit(false)}
                     disabled={loading || isOver}
@@ -735,17 +723,18 @@ export function CreateExamDialog({
                     Draft
                   </Button>
                   <Button
+                    type="button"
                     onClick={() => handleSubmit(true)}
                     disabled={
                       loading ||
                       isOver ||
-                      totalMarks !== MARK_CONSTANTS.EXAM_TOTAL ||
+                      !markDistribution.isBalanced ||
                       validationErrors.length > 0
                     }
                     className={cn(
-                      "h-7 sm:h-8 px-2 sm:px-3 text-xs",
+                      "h-7 sm:h-8 px-2 sm:px-3 text-xs font-semibold text-white",
                       !isOver &&
-                        totalMarks === MARK_CONSTANTS.EXAM_TOTAL &&
+                        markDistribution.isBalanced &&
                         validationErrors.length === 0
                         ? "bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                         : "bg-gray-400 dark:bg-gray-700 cursor-not-allowed",

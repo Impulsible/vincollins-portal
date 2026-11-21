@@ -268,3 +268,71 @@ export function getSubjectCountByClassLevel(className: string): number {
   
   return 0
 }
+
+/* ============================================================
+   ✅ ADDED: RELATIVE-OPTION DETECTION
+   ------------------------------------------------------------
+   Used by ObjectiveQuestionsStep to lock option shuffling for
+   items whose choices depend on each other (e.g. "All of the
+   above", "Both A and B"). Shuffling those would break the
+   question's logic.
+
+   Exported from this shared constants file so both the student
+   runner and the staff exam builder can rely on the same list.
+   ============================================================ */
+
+/** Canonical relative phrases (already normalized to lowercase). */
+export const RELATIVE_OPTION_PHRASES: readonly string[] = [
+  'all of the above',
+  'none of the above',
+  'all the above',
+  'none the above',
+  'all of these',
+  'none of these',
+  'all the these',
+  'none the these',
+  'both a and b',
+  'both a & b',
+  'both b and c',
+  'both b & c',
+  'a and b only',
+  'b and c only',
+  'a and b',
+  'b and c',
+  'options a and b',
+  'options b and c',
+  'options a & b',
+  'options b & c',
+  'a only',
+  'b only',
+  'c only',
+  'd only',
+] as const
+
+/** Strip punctuation/whitespace and lowercase an option for matching. */
+function normalizeOptionText(opt: string): string {
+  return opt
+    .toLowerCase()
+    .replace(/[^a-z0-9 &]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/**
+ * Returns true if any of the provided options references another option
+ * ("All of the above", "Both A and B", etc.). When true, option order
+ * must be preserved (no shuffling) for the question to remain valid.
+ */
+export function hasRelativeOptions(options: readonly string[] | undefined | null): boolean {
+  if (!options || options.length === 0) return false
+
+  return options.some((opt) => {
+    if (!opt) return false
+    const norm = normalizeOptionText(opt)
+    if (!norm) return false
+
+    return RELATIVE_OPTION_PHRASES.some(
+      (phrase) => norm === phrase || norm.includes(phrase),
+    )
+  })
+}

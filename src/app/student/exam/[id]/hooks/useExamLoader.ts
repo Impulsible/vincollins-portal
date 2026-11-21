@@ -1,11 +1,15 @@
-// src/app/student/exam/[id]/hooks/useExamLoader.ts
-"use client"
+"use client";
 
-import { useState, useCallback, useRef, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
-import { calculateScore } from "../utils/scoring"
-import { normalizeExamQuestions } from "../utils/questionNormalizer"
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { calculateScore } from "../utils/scoring";
+import { normalizeExamQuestions } from "../utils/questionNormalizer";
+import {
+  isSubjectExcludedFromShuffle,
+  hasRelativeOptions,
+  resolveExamDuration,
+} from "../constants";
 import {
   requireSession,
   fetchProfile,
@@ -18,7 +22,7 @@ import {
   incrementUnloadCount,
   findInProgressAttempt,
   createAttempt,
-} from "../services/examLoaderService"
+} from "../services/examLoaderService";
 import type {
   Exam,
   Profile,
@@ -27,9 +31,9 @@ import type {
   ResumeData,
   StartAttemptResult,
   UseExamLoaderReturn,
-} from "../types"
+} from "../types";
 
-const MAX_UNLOADS = 3
+const MAX_UNLOADS = 3;
 
 /**
  * A genuine "security terminated" attempt is one whose status is
@@ -38,93 +42,195 @@ const MAX_UNLOADS = 3
  * granting extra time (which sets status back to `in_progress`).
  */
 function isSecurityTerminated(attempt: {
-  status?: string | null
-  is_auto_submitted?: boolean | null
+  status?: string | null;
+  is_auto_submitted?: boolean | null;
 }): boolean {
-  return attempt.status === "terminated"
+  return attempt.status === "terminated";
+}
+
+/**
+ * Standard Fisher-Yates shuffle algorithm
+ */
+function shuffleArray<T>(array: T[]): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/**
+ * Prepares and normalizes questions and options per subject and content rules:
+ * - Languages & Reasoning: STRICT LOCK (Questions and Options never shuffle).
+ * - Maths / Sciences / Others: Full question and option shuffle.
+ * - Relative Options ("All/None of the above"): Locks option order for that question.
+ */
+function processExamQuestions(
+  rawQuestions: Question[],
+  subjectName?: string | null,
+  examSettings: { shuffle_questions?: boolean; shuffle_options?: boolean } = {},
+): Question[] {
+  const isExcludedSubject = isSubjectExcludedFromShuffle(subjectName);
+
+  // Tier 1: Question Shuffling Rule
+  const allowQuestionShuffle = isExcludedSubject
+    ? false
+    : (examSettings.shuffle_questions ?? true);
+
+  // Tier 1: Base Option Shuffling Rule
+  const allowOptionShuffleGlobally = isExcludedSubject
+    ? false
+    : (examSettings.shuffle_options ?? true);
+
+  // 1. Order Questions
+  let orderedQuestions = [...rawQuestions];
+  if (allowQuestionShuffle) {
+    orderedQuestions = shuffleArray(orderedQuestions);
+  }
+
+  // 2. Order Options for each Question
+  return orderedQuestions.map((q, index) => {
+    let options: string[] = [];
+
+    if (Array.isArray(q.options)) {
+      options = q.options.map((opt) => {
+        if (typeof opt === "string") return opt;
+
+        if (typeof opt === "object" && opt !== null && "text" in opt) {
+          const text = (opt as { text?: unknown }).text;
+          return typeof text === "string" ? text : String(text ?? "");
+        }
+
+        return String(opt ?? "");
+      });
+    } else if (typeof q.options === "string") {
+      try {
+        const parsed = JSON.parse(q.options);
+        options = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        options = [];
+      }
+    }
+
+    // Tier 2: Check for relative phrases ("All of the above", "None of the above", etc.)
+    const containsRelativePhrases = hasRelativeOptions(options);
+
+    // Options shuffle only if globally permitted AND no relative phrases exist
+    const shouldShuffleOptions =
+      allowOptionShuffleGlobally && !containsRelativePhrases;
+
+    const finalizedOptions = shouldShuffleOptions
+      ? shuffleArray([...options])
+      : [...options];
+
+    return {
+      ...q,
+      display_number: index + 1,
+      options: finalizedOptions,
+    };
+  });
 }
 
 export function useExamLoader(
   examId: string,
   router: ReturnType<typeof useRouter>,
 ): UseExamLoaderReturn {
-  const [loading, setLoading] = useState(true)
-  const [loadError, setLoadError] = useState<string | null>(null)
-  const [exam, setExam] = useState<Exam | null>(null)
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [allQuestions, setAllQuestions] = useState<Question[]>([])
-  const [examResult, setExamResult] = useState<ExamResult | null>(null)
-  const [attemptId, setAttemptId] = useState<string | null>(null)
-  const [attemptsUsed, setAttemptsUsed] = useState(0)
-  const [hasCompletedAttempt, setHasCompletedAttempt] = useState(false)
-  const [showResumeDialog, setShowResumeDialog] = useState(false)
-  const [resumeData, setResumeData] = useState<ResumeData | null>(null)
-  const [examTerminated, setExamTerminated] = useState(false)
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [exam, setExam] = useState<Exam | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [allQuestions, setAllQuestions] = useState<Question[]>([]);
+  const [examResult, setExamResult] = useState<ExamResult | null>(null);
+  const [attemptId, setAttemptId] = useState<string | null>(null);
+  const [attemptsUsed, setAttemptsUsed] = useState(0);
+  const [hasCompletedAttempt, setHasCompletedAttempt] = useState(false);
+  const [showResumeDialog, setShowResumeDialog] = useState(false);
+  const [resumeData, setResumeData] = useState<ResumeData | null>(null);
+  const [examTerminated, setExamTerminated] = useState(false);
 
-  const loadedRef = useRef(false)
+  const loadedRef = useRef(false);
 
   // ── Main Load ──────────────────────────────────────────────────────────
 
   const loadExam = useCallback(async () => {
-    if (loadedRef.current) return
-    loadedRef.current = true
-    setLoading(true)
-    setLoadError(null)
+    if (loadedRef.current) return;
+    loadedRef.current = true;
+    setLoading(true);
+    setLoadError(null);
 
     try {
       // 1. Auth
-      let session: { userId: string; email: string }
+      let session: { userId: string; email: string };
       try {
-        session = await requireSession()
+        session = await requireSession();
       } catch {
-        router.push("/portal")
-        return
+        router.push("/portal");
+        return;
       }
 
       // 2. Profile
-      const userProfile = await fetchProfile(session.userId)
-      if (userProfile) setProfile(userProfile)
+      const userProfile = await fetchProfile(session.userId);
+      if (userProfile) setProfile(userProfile);
 
       // 3. Exam
-      let examData: Exam
+      let examData: Exam;
       try {
-        examData = await fetchExam(examId)
+        examData = await fetchExam(examId);
       } catch {
-        setLoadError("Exam not found")
-        return
+        setLoadError("Exam not found");
+        return;
       }
-      setExam(examData)
+      setExam(examData);
 
-      // 4. Normalize questions
-      const { questions, objectiveCount, theoryCount } =
-        normalizeExamQuestions(examData)
-      setAllQuestions(questions)
+      // 4. Normalize & Apply Subject/Option Shuffle Rules
+      const {
+        questions: normalizedQuestions,
+        objectiveCount,
+        theoryCount,
+      } = normalizeExamQuestions(examData);
 
-      const objectiveMax = objectiveCount || examData.objective_max || 20
-      const theoryMax = theoryCount > 0 ? (examData.theory_max || 40) : 0
-      const actualTotalMarks = objectiveMax + theoryMax
+      const subjectName =
+        examData.subject || (examData as any).subject_name || "";
+      const processedQuestions = processExamQuestions(
+        normalizedQuestions,
+        subjectName,
+        {
+          shuffle_questions: examData.shuffle_questions,
+          shuffle_options:
+            typeof examData.shuffle_options === "boolean"
+              ? examData.shuffle_options
+              : undefined,
+        },
+      );
+      setAllQuestions(processedQuestions);
 
-      // 5. Attempts
+      const objectiveMax = objectiveCount || examData.objective_max || 20;
+      const theoryMax = theoryCount > 0 ? examData.theory_max || 40 : 0;
+      const actualTotalMarks = objectiveMax + theoryMax;
+
+      // 5. Dynamic Duration Resolution (Respects custom duration like 10, 45, 50 mins)
+      const dynamicDuration = resolveExamDuration(examData);
+
+      // 6. Attempts
       const allAttempts = await fetchAttempts(
         examId,
         userProfile?.id ?? session.userId,
-      )
-      const completed = getCompletedAttempts(allAttempts)
-      const active = getActiveAttempt(allAttempts)
-      const completedCount = completed.length
+      );
+      const completed = getCompletedAttempts(allAttempts);
+      const active = getActiveAttempt(allAttempts);
+      const completedCount = completed.length;
 
       // ✅ PRIORITY 1: If ANY attempt is currently `in_progress`, prefer
-      // resuming over showing a completed/terminated view. This is the
-      // critical fix — an admin grant flips status back to `in_progress`,
-      // and we MUST resume it even if a previous attempt was auto-submitted.
+      // resuming over showing a completed/terminated view.
       if (active) {
-        const latest = active
-        setAttemptsUsed(completedCount)
+        const latest = active;
+        setAttemptsUsed(completedCount);
 
-        // ✅ Genuine security termination always wins
+        // Genuine security termination always wins
         if (isSecurityTerminated(latest)) {
-          setHasCompletedAttempt(true)
-          setExamTerminated(true)
+          setHasCompletedAttempt(true);
+          setExamTerminated(true);
           setExamResult(
             buildExamResult({
               attempt: latest,
@@ -134,62 +240,62 @@ export function useExamLoader(
               actualTotalMarks,
               completedCount,
             }),
-          )
-          return
+          );
+          return;
         }
 
         // Live attempt → resume flow
-        const newUnloadCount = (latest.unload_count || 0) + 1
+        const newUnloadCount = (latest.unload_count || 0) + 1;
 
         if (newUnloadCount >= MAX_UNLOADS) {
           const result = await autoSubmitOnUnloadExceeded({
             attemptId: latest.id,
             answers: latest.answers || {},
-            allQuestions: questions,
+            allQuestions: processedQuestions,
             exam: examData,
             objectiveMax,
             theoryMax,
             actualTotalMarks,
             unloadCount: newUnloadCount,
             calcScore: calculateScore,
-          })
-          setHasCompletedAttempt(true)
-          setAttemptsUsed(completedCount + 1)
-          setExamResult(result)
-          return
+          });
+          setHasCompletedAttempt(true);
+          setAttemptsUsed(completedCount + 1);
+          setExamResult(result);
+          return;
         }
 
-        const originalStartedAt = latest.started_at
+        const originalStartedAt = latest.started_at;
         if (!originalStartedAt) {
           toast.error(
             "Exam data corrupted — missing start time. Contact support.",
-          )
-          return
+          );
+          return;
         }
 
-        await incrementUnloadCount(latest.id, newUnloadCount)
+        await incrementUnloadCount(latest.id, newUnloadCount);
 
         setResumeData({
           attemptId: latest.id,
           answers: latest.answers || {},
           started_at: originalStartedAt,
-          duration: Number(examData.duration) || 30,
+          duration: dynamicDuration, // ✅ Dynamic duration without hardcoded fallback
           tabSwitches: latest.tab_switches || 0,
           fullscreenExits: latest.fullscreen_exits || 0,
           unloadCount: newUnloadCount,
           currentIndex: latest.current_index || 0,
           flaggedQuestions: latest.flagged_questions || [],
-        })
-        setShowResumeDialog(true)
-        return
+        });
+        setShowResumeDialog(true);
+        return;
       }
 
       // Case A: Max attempts reached (no active attempt)
       if (completedCount >= (examData.max_attempts || 1)) {
-        setHasCompletedAttempt(true)
-        setAttemptsUsed(completedCount)
-        const latest = completed[0]
-        if (isSecurityTerminated(latest)) setExamTerminated(true)
+        setHasCompletedAttempt(true);
+        setAttemptsUsed(completedCount);
+        const latest = completed[0];
+        if (isSecurityTerminated(latest)) setExamTerminated(true);
         setExamResult(
           buildExamResult({
             attempt: latest,
@@ -199,20 +305,18 @@ export function useExamLoader(
             actualTotalMarks,
             completedCount,
           }),
-        )
-        return
+        );
+        return;
       }
 
       // Case B: Existing attempts, none in-progress
       if (allAttempts.length > 0) {
-        const latest = allAttempts[0]
-        setAttemptsUsed(completedCount)
+        const latest = allAttempts[0];
+        setAttemptsUsed(completedCount);
 
-        // ✅ Only genuine `status === "terminated"` sets the flag.
-        // Auto-submitted attempts are NOT terminations.
         if (isSecurityTerminated(latest)) {
-          setHasCompletedAttempt(true)
-          setExamTerminated(true)
+          setHasCompletedAttempt(true);
+          setExamTerminated(true);
           setExamResult(
             buildExamResult({
               attempt: latest,
@@ -222,8 +326,8 @@ export function useExamLoader(
               actualTotalMarks,
               completedCount,
             }),
-          )
-          return
+          );
+          return;
         }
 
         if (
@@ -231,7 +335,7 @@ export function useExamLoader(
             String(latest.status),
           )
         ) {
-          setHasCompletedAttempt(true)
+          setHasCompletedAttempt(true);
           setExamResult(
             buildExamResult({
               attempt: latest,
@@ -241,94 +345,95 @@ export function useExamLoader(
               actualTotalMarks,
               completedCount,
             }),
-          )
-          return
+          );
+          return;
         }
       }
 
       // Case C: No attempts
-      setAttemptsUsed(0)
-      setHasCompletedAttempt(false)
-      setAttemptId(null)
+      setAttemptsUsed(0);
+      setHasCompletedAttempt(false);
+      setAttemptId(null);
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Failed to load exam"
-      setLoadError(message)
+        err instanceof Error ? err.message : "Failed to load exam";
+      setLoadError(message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [examId, router])
+  }, [examId, router]);
 
   useEffect(() => {
-    loadExam()
-  }, [loadExam])
+    loadExam();
+  }, [loadExam]);
 
   // ── Start New Attempt ──────────────────────────────────────────────────
 
-  const startNewAttempt = useCallback(async (): Promise<StartAttemptResult | null> => {
-    try {
-      const session = await requireSession()
+  const startNewAttempt =
+    useCallback(async (): Promise<StartAttemptResult | null> => {
+      try {
+        const session = await requireSession();
 
-      const existing = await findInProgressAttempt(examId, session.userId)
-      if (existing?.started_at) {
-        // Clear any stale terminated flag when actually resuming
-        setExamTerminated(false)
-        return {
-          attemptId: existing.id,
-          isResuming: true,
-          attemptNumber: existing.attempt_number,
-          started_at: existing.started_at,
+        const existing = await findInProgressAttempt(examId, session.userId);
+        if (existing?.started_at) {
+          setExamTerminated(false);
+          return {
+            attemptId: existing.id,
+            isResuming: true,
+            attemptNumber: existing.attempt_number,
+            started_at: existing.started_at,
+          };
         }
+
+        if (!exam || !profile) {
+          toast.error("Exam data not loaded");
+          return null;
+        }
+
+        const allAttempts = await fetchAttempts(examId, session.userId);
+        const completedCount = getCompletedAttempts(allAttempts).length;
+        const attemptNumber = completedCount + 1;
+
+        const objCount = allQuestions.filter((q) => q.type !== "theory").length;
+        const theoCount = allQuestions.filter(
+          (q) => q.type === "theory",
+        ).length;
+        const objectiveMax = objCount || exam.objective_max || 20;
+        const theoryMax = theoCount > 0 ? exam.theory_max || 40 : 0;
+        const actualTotalMarks = objectiveMax + theoryMax;
+
+        setExamTerminated(false);
+        return await createAttempt({
+          examId,
+          studentId: session.userId,
+          studentName:
+            profile.full_name || session.email.split("@")[0] || "Student",
+          studentEmail: session.email,
+          studentClass: (profile.class as string) || "",
+          attemptNumber,
+          exam,
+          objectiveMax,
+          theoryMax,
+          actualTotalMarks,
+        });
+      } catch {
+        toast.error("Failed to start exam");
+        return null;
       }
-
-      if (!exam || !profile) {
-        toast.error("Exam data not loaded")
-        return null
-      }
-
-      const allAttempts = await fetchAttempts(examId, session.userId)
-      const completedCount = getCompletedAttempts(allAttempts).length
-      const attemptNumber = completedCount + 1
-
-      const objCount = allQuestions.filter((q) => q.type !== "theory").length
-      const theoCount = allQuestions.filter((q) => q.type === "theory").length
-      const objectiveMax = objCount || exam.objective_max || 20
-      const theoryMax = theoCount > 0 ? (exam.theory_max || 40) : 0
-      const actualTotalMarks = objectiveMax + theoryMax
-
-      setExamTerminated(false)
-      return await createAttempt({
-        examId,
-        studentId: session.userId,
-        studentName:
-          profile.full_name || session.email.split("@")[0] || "Student",
-        studentEmail: session.email,
-        studentClass: (profile.class as string) || "",
-        attemptNumber,
-        exam,
-        objectiveMax,
-        theoryMax,
-        actualTotalMarks,
-      })
-    } catch {
-      toast.error("Failed to start exam")
-      return null
-    }
-  }, [examId, exam, profile, allQuestions])
+    }, [examId, exam, profile, allQuestions]);
 
   // ── Resume ─────────────────────────────────────────────────────────────
 
   const handleResumeExam = useCallback(async (): Promise<ResumeData | null> => {
-    if (!resumeData) return null
+    if (!resumeData) return null;
     if (examTerminated) {
-      toast.error("This exam was terminated due to security violations")
-      router.push("/student")
-      return null
+      toast.error("This exam was terminated due to security violations");
+      router.push("/student");
+      return null;
     }
-    // ✅ Clear any stale flags while resuming
-    setExamTerminated(false)
-    return resumeData
-  }, [resumeData, examTerminated, router])
+    setExamTerminated(false);
+    return resumeData;
+  }, [resumeData, examTerminated, router]);
 
   return {
     loading,
@@ -348,5 +453,5 @@ export function useExamLoader(
     examTerminated,
     handleResumeExam,
     startNewAttempt,
-  }
+  };
 }

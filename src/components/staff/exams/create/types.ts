@@ -30,6 +30,8 @@ export interface Question {
   marks: number;
   /** optional per-question image (objective) */
   image_url?: string;
+  /** optional caption rendered beneath the per-question image */
+  image_caption?: string;
   /** optional per-question explanation shown after grading */
   explanation?: string;
 }

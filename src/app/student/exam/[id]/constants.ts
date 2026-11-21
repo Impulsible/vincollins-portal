@@ -202,6 +202,64 @@ export const TERMINAL_STATUSES = [
 export type TerminalStatus = (typeof TERMINAL_STATUSES)[number]
 
 // ============================================
+// SHUFFLE EXCLUSION RULES
+// ============================================
+
+/**
+ * TIER 1: STRICT SUBJECT EXCLUSION LIST
+ * Subjects containing reading passages, comprehension blocks, oral tests,
+ * or narrative sequences where question and option order must remain
+ * 100% IDENTICAL across all students.
+ */
+export const SHUFFLE_EXCLUDED_SUBJECTS: string[] = [
+  // Languages
+  'english',
+  'english language',
+  'english studies',
+  'use of english',
+  'literature',
+  'literature in english',
+  'literature-in-english',
+  'oral english',
+  'french',
+  'yoruba',
+  'igbo',
+  'hausa',
+  'arabic',
+  'german',
+
+  // Aptitude & Reasoning
+  'verbal reasoning',
+  'verbal aptitude',
+
+  // Context & Comprehension
+  'reading comprehension',
+  'comprehension',
+]
+
+/**
+ * TIER 2: RELATIVE OPTION PHRASES
+ * If an individual question (in any subject, e.g. Maths, Biology) contains
+ * relative positional phrases, its options (A, B, C, D) are locked in order.
+ */
+export const RELATIVE_OPTION_PHRASES: string[] = [
+  'all of the above',
+  'none of the above',
+  'both a and b',
+  'both b and c',
+  'both a and c',
+  'a and b only',
+  'b and c only',
+  'neither a nor b',
+  'all the options',
+  'none of these',
+  'a and c only',
+  'all of these',
+  'all the above',
+  'none of the options',
+]
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -221,4 +279,88 @@ export function isPassingGrade(grade: string): boolean {
 export function isPassingWAECGrade(grade: string): boolean {
   const passingGrades = ['A1', 'B2', 'B3', 'C4', 'C5', 'C6']
   return passingGrades.includes(grade)
+}
+
+/**
+ * Checks if a subject is in the excluded list (Languages, Verbal Reasoning, Comprehension).
+ */
+export function isSubjectExcludedFromShuffle(subjectName?: string | null): boolean {
+  if (!subjectName) return false
+  const normalized = subjectName
+    .trim()
+    .toLowerCase()
+    .replace(/[._]/g, ' ')
+    .replace(/\s+/g, ' ')
+
+  return SHUFFLE_EXCLUDED_SUBJECTS.some((excluded) => {
+    const cleanExcluded = excluded.toLowerCase()
+    return (
+      normalized === cleanExcluded ||
+      normalized.startsWith(`${cleanExcluded} `) ||
+      normalized.endsWith(` ${cleanExcluded}`) ||
+      normalized.includes(` ${cleanExcluded} `) ||
+      normalized.includes(cleanExcluded)
+    )
+  })
+}
+
+/**
+ * Checks if options contain directional/relative phrases (e.g. "All of the above").
+ */
+export function hasRelativeOptions(options: string[]): boolean {
+  if (!Array.isArray(options) || options.length === 0) return false
+  return options.some((opt) => {
+    const text = String(opt || "").trim().toLowerCase()
+    return RELATIVE_OPTION_PHRASES.some((phrase) => text.includes(phrase))
+  })
+}
+
+/**
+ * Evaluates whether questions can be shuffled for a given subject.
+ */
+export function shouldShuffleQuestions(
+  subjectName?: string | null,
+  examSettingShuffleQuestions: boolean = true
+): boolean {
+  if (isSubjectExcludedFromShuffle(subjectName)) {
+    return false // Languages & Reasoning subjects are strictly locked
+  }
+  return examSettingShuffleQuestions
+}
+
+/**
+ * Evaluates whether options can be shuffled for a specific question.
+ */
+export function shouldShuffleOptions(
+  subjectName?: string | null,
+  options: string[] = [],
+  examSettingShuffleOptions: boolean = true
+): boolean {
+  // 1. Subject-level lock (Languages / Reasoning)
+  if (isSubjectExcludedFromShuffle(subjectName)) {
+    return false
+  }
+
+  // 2. Relative phrase lock ("All of the above", "None of the above")
+  if (hasRelativeOptions(options)) {
+    return false
+  }
+
+  // 3. Exam setting toggle
+  return examSettingShuffleOptions
+}
+
+/**
+ * Dynamically resolves exam duration from all possible database alias columns
+ * without defaulting to rigid numbers.
+ */
+export function resolveExamDuration(exam: any): number {
+  if (!exam) return DEFAULT_EXAM_DURATION
+  const candidate =
+    exam.duration_minutes ??
+    exam.duration ??
+    exam.time_limit_minutes ??
+    DEFAULT_EXAM_DURATION
+  const parsed = Number(candidate)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_EXAM_DURATION
 }
